@@ -185,13 +185,21 @@ Cursor movements follow bounded cubic paths; scrolling uses eased wheel steps.
 Typing uses a fixed 50 ms interval, configured by the internal
 `_TYPING_INTERVAL_SECONDS` constant in `browserrig/input/keyboard.py`.
 
-`KeyboardTools` supplies `press_key` and `type_text` in both modes:
+`KeyboardTools` supplies `send_keys` in both modes. It addresses the current page
+focus and takes exactly one of `text` or `key`:
 
-- `type_text(ref=..., text=...)` replaces the referenced field by default.
-- `type_text(ref=..., text=..., clear=False)` types at its current selection.
-- `type_text(text=...)` types into the focused editor, preserving existing content.
-- `type_text(text=..., clear=True)` replaces the focused editor's content.
-- `sensitive=True` masks typing events. Password fields are masked automatically.
+- `send_keys(text="Hello world")` types literal text at the current selection.
+- `send_keys(text="Enter")` types the word Enter.
+- `send_keys(key="Enter")` presses Enter.
+- `send_keys(key="Escape")` presses Escape.
+- `send_keys(key="a", hold_control=True)` selects all text in the focused editor.
+- `send_keys(key="Tab", hold_shift=True)` moves focus backwards.
+
+`hold_control`, `hold_shift`, `hold_alt`, and `hold_meta` apply to `key`. All held
+modifiers are released after the key. Literal text uses `text` without modifier flags.
+
+In DOM mode, `FormTools` also supplies `type_text(ref=..., text=...)` to focus and
+replace a referenced field. Use `clear=False` to type at its current selection.
 
 Keys and modifiers are released on failure or cancellation. Unicode text is
 dispatched once per character, without simulated typos. Empty replacement text
@@ -208,7 +216,7 @@ registers these frozen event types alongside its durable browser events:
 | `CursorMovedEvent` | Start, destination, two control points, duration, easing |
 | `CursorStateEvent` | Actual cursor position and held mouse buttons |
 | `PointerPressedEvent`, `PointerReleasedEvent` | Position and native click count |
-| `KeyPressedEvent` | Key, modifiers, duration, sensitive flag |
+| `KeyPressedEvent` | Key, modifiers, duration |
 | `KeyboardVisibilityEvent` | Keyboard presentation opened or closed |
 | `ScrolledEvent` | Wheel origin, dispatched deltas, duration |
 | `ElementHighlightedEvent` | DOM reference and viewport bounds |
@@ -219,7 +227,7 @@ Coordinates use viewport CSS pixels; durations use seconds. Events carry
 carry its `action_id`. `CursorMovedEvent` describes the path before execution;
 `CursorStateEvent` reports the actual endpoint, including after cancellation.
 Key and pointer receipts follow successful dispatch. Action failure events close
-interrupted sequences. Sensitive keys contain an empty `key` and no modifiers.
+interrupted sequences. Key events contain the dispatched key and modifiers.
 
 Navigation, tab changes, downloads, and model/tool/readiness/pause intervals keep
 their existing typed events. Consumers can use those together with input events
@@ -258,8 +266,8 @@ async for event in session.subscribe(transient=True):
             print(kind)
         case CursorMovedEvent(to_position=point, duration=duration):
             print("cursor", point, duration)
-        case KeyPressedEvent(key=key, sensitive=sensitive):
-            print("key", "***" if sensitive else key)
+        case KeyPressedEvent(key=key):
+            print("key", key)
 ```
 
 Subscriptions observe future events and finish when the session closes.

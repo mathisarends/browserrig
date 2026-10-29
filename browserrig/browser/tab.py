@@ -182,9 +182,23 @@ class Tab:
         if result.error_text:
             raise BrowserError(f"Navigation failed: {result.error_text}")
 
-    async def press_key(self, key: str) -> None:
+    async def press_key(
+        self,
+        key: str,
+        *,
+        hold_control: bool = False,
+        hold_shift: bool = False,
+        hold_alt: bool = False,
+        hold_meta: bool = False,
+    ) -> None:
         """Dispatch input to this tab's page session, never to browser chrome or the OS."""
-        await self.input.press_key(key)
+        await self.input.press_key(
+            key,
+            hold_control=hold_control,
+            hold_shift=hold_shift,
+            hold_alt=hold_alt,
+            hold_meta=hold_meta,
+        )
 
 
 def validated_url(url: str) -> str:

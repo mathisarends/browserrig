@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from harnessed import ToolError
 from harnessed.events import EventRegistry
 
 from browserrig.browser.models import Point
@@ -15,6 +16,7 @@ from browserrig.events import (
     KeyPressedEvent,
 )
 from browserrig.input.pointer import movement
+from browserrig.tools.keyboard import KeyboardTools
 
 
 def _tab(*, dispatch=None):
@@ -55,38 +57,29 @@ async def test_exact_typing_emits_ordered_correlated_keys_without_persistable_te
     assert isinstance(events[-1], KeyboardVisibilityEvent) and not events[-1].visible
 
 
-async def test_sensitive_typing_does_not_reveal_characters_or_shift(monkeypatch):
-    monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", AsyncMock())
-    tab, events, _ = _tab()
-    await tab.input.type_text("Secret!", sensitive=True)
-    keys = [event for event in events if isinstance(event, KeyPressedEvent)]
-    assert len(keys) == 7
-    assert all(event.key == "" and event.modifiers == () and event.sensitive for event in keys)
-
-
 async def test_key_cancellation_releases_main_and_modifiers_and_hides_keyboard():
     entered = asyncio.Event()
 
     async def dispatch(command):
-        if command.get("key") == "a" and command["type"] == "rawKeyDown":
+        if command.get("key") == "A" and command["type"] == "rawKeyDown":
             entered.set()
             await asyncio.Event().wait()
 
     tab, events, commands = _tab(dispatch=dispatch)
-    task = asyncio.create_task(tab.input.press_key("Control+Shift+a"))
+    task = asyncio.create_task(tab.input.press_key("a", hold_control=True, hold_shift=True))
     await entered.wait()
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
     released = [command["key"] for command in commands if command["type"] == "keyUp"]
-    assert released == ["a", "Shift", "Control"]
+    assert released == ["A", "Shift", "Control"]
     assert not any(isinstance(event, KeyPressedEvent) for event in events)
     assert isinstance(events[-1], KeyboardVisibilityEvent) and not events[-1].visible
 
 
 async def test_shortcut_dispatches_modifiers_without_inserting_text():
     tab, events, commands = _tab()
-    await tab.press_key("Control+a")
+    await tab.press_key("a", hold_control=True)
     assert [(command["type"], command["key"]) for command in commands] == [
         ("rawKeyDown", "Control"),
         ("rawKeyDown", "a"),
@@ -96,6 +89,54 @@ async def test_shortcut_dispatches_modifiers_without_inserting_text():
     assert next(event for event in events if isinstance(event, KeyPressedEvent)).modifiers == (
         "Control",
     )
+
+
+@pytest.mark.parametrize(
+    "modifier,name,flag,key",
+    [
+        ("hold_control", "Control", 2, "a"),
+        ("hold_shift", "Shift", 8, "A"),
+        ("hold_alt", "Alt", 1, "a"),
+        ("hold_meta", "Meta", 4, "a"),
+    ],
+)
+async def test_modifier_flags_reach_cdp_and_key_events(modifier, name, flag, key):
+    tab, events, commands = _tab()
+    await tab.press_key("a", **{modifier: True})
+    down = [command for command in commands if command["type"] == "rawKeyDown"]
+    assert [command["key"] for command in down] == [name, key]
+    assert down[-1]["modifiers"] == flag
+    event = next(event for event in events if isinstance(event, KeyPressedEvent))
+    assert event.key == key and event.modifiers == (name,)
+    assert commands[-1]["type"] == "keyUp" and commands[-1]["key"] == name
+
+
+@pytest.mark.parametrize(
+    "arguments", [{}, {"text": "hello", "key": "Enter"}, {"text": "hello", "hold_control": True}]
+)
+async def test_send_keys_rejects_ambiguous_arguments_before_dispatch(arguments):
+    actions = SimpleNamespace(run=AsyncMock())
+    with pytest.raises(ToolError):
+        await KeyboardTools().send_keys(**arguments, actions=actions)
+    actions.run.assert_not_awaited()
+
+
+async def test_send_keys_distinguishes_literal_text_from_named_keys(monkeypatch):
+    monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", AsyncMock())
+    tab, events, commands = _tab()
+
+    async def run(*, kind, operation):
+        assert kind in {"type", "press"}
+        return (await operation(tab)).text
+
+    actions = SimpleNamespace(run=run)
+    await KeyboardTools().send_keys(text="Escape", actions=actions)
+    assert [command["text"] for command in commands if command["type"] == "char"] == list("Escape")
+    commands.clear()
+    events.clear()
+    await KeyboardTools().send_keys(key="Escape", actions=actions)
+    assert [command["type"] for command in commands] == ["rawKeyDown", "keyUp"]
+    assert [event.key for event in events if isinstance(event, KeyPressedEvent)] == ["Escape"]
 
 
 async def test_cancelled_cursor_reports_actual_position():

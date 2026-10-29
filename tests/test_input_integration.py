@@ -25,60 +25,17 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.parametrize("canvas", [False, True])
-async def test_typing_shortcuts_password_masking_stream_and_storage(site, tmp_path, canvas):
+async def test_typing_shortcuts_stream_and_storage(site, tmp_path, canvas):
     holder = {}
     output = io.StringIO()
-    step = 0
-    text = "Grüße + 🙂"
 
     class Access(Plugin):
         async def setup(self, browser: Inject[Browser]):
             holder["browser"] = browser
 
-    async def respond(request):
-        nonlocal step
-        if step == 0:
-            if canvas:
-                yield ModelChunk(tool_call=ToolCall("click_at", {"x": 80, "y": 18}))
-            else:
-                yield ModelChunk(
-                    tool_call=ToolCall(
-                        "type_text", {"ref": _ref(request, "Email"), "text": "old value"}
-                    )
-                )
-        elif step == 1:
-            arguments = {"text": text, "clear": True}
-            if not canvas:
-                arguments["ref"] = _ref(request, "Email")
-            yield ModelChunk(tool_call=ToolCall("type_text", arguments))
-        elif step == 2:
-            assert (
-                await holder["browser"].active_tab.evaluate(
-                    "document.querySelector('#email').value"
-                )
-                == text
-            )
-            yield ModelChunk(tool_call=ToolCall("press_key", {"key": "Control+a"}))
-        elif step == 3:
-            yield ModelChunk(tool_call=ToolCall("press_key", {"key": "+"}))
-        elif step == 4:
-            if canvas:
-                yield ModelChunk(tool_call=ToolCall("click_at", {"x": 320, "y": 18}))
-            else:
-                yield ModelChunk(
-                    tool_call=ToolCall(
-                        "type_text", {"ref": _ref(request, "Password"), "text": "Secret!"}
-                    )
-                )
-        elif step == 5 and canvas:
-            yield ModelChunk(tool_call=ToolCall("type_text", {"text": "Secret!", "clear": True}))
-        else:
-            yield ModelChunk(text="Done")
-        step += 1
-
     directory = tmp_path / "sessions"
     agent = BrowserAgent(
-        model=CallbackModel(respond),
+        model=_typing_model(holder, canvas),
         browser=LaunchBrowser(url=site),
         mode=CanvasMode(selector="html") if canvas else DomMode(),
         session_directory=directory,
@@ -104,6 +61,63 @@ async def test_typing_shortcuts_password_masking_stream_and_storage(site, tmp_pa
     _assert_events(streamed, output.getvalue(), directory, canvas)
 
 
+def _typing_model(holder, canvas):
+    text = "Grüße + 🙂"
+    shortcut = ToolCall("send_keys", {"key": "a", "hold_control": True})
+    if canvas:
+        calls = [
+            ToolCall("click_at", {"x": 80, "y": 18}),
+            ToolCall("send_keys", {"text": text}),
+            shortcut,
+            ToolCall("send_keys", {"key": "+"}),
+            ToolCall("click_at", {"x": 320, "y": 18}),
+            ToolCall("send_keys", {"key": "a", "hold_control": True}),
+            ToolCall("send_keys", {"text": "Secret!"}),
+        ]
+    else:
+        calls = [
+            lambda request: ToolCall(
+                "type_text", {"ref": _ref(request, "Email"), "text": "old value"}
+            ),
+            lambda request: ToolCall("type_text", {"ref": _ref(request, "Email"), "text": text}),
+            shortcut,
+            ToolCall("send_keys", {"key": "+"}),
+            lambda request: ToolCall(
+                "type_text", {"ref": _ref(request, "Password"), "text": "Secret!"}
+            ),
+        ]
+    step = 0
+
+    async def respond(request):
+        nonlocal step
+        tools = {tool.name: tool for tool in request.tools}
+        assert "press_key" not in tools
+        assert ("type_text" in tools) != canvas
+        assert set(tools["send_keys"].parameters["properties"]) == {
+            "text",
+            "key",
+            "hold_control",
+            "hold_shift",
+            "hold_alt",
+            "hold_meta",
+        }
+        if step == 2:
+            assert (
+                await holder["browser"].active_tab.evaluate(
+                    "document.querySelector('#email').value"
+                )
+                == text
+            )
+        if step < len(calls):
+            call = calls[step]
+            yield ModelChunk(tool_call=call(request) if callable(call) else call)
+        else:
+            yield ModelChunk(text="Done")
+        step += 1
+
+    return CallbackModel(respond)
+
+
 async def _consume(session, streamed, ready):
     ready.set()
     async for event in session.subscribe(transient=True):
@@ -114,13 +128,14 @@ def _assert_events(streamed, output, directory, canvas):
     live = [event for event in streamed if isinstance(event, InputEvent)]
     assert live and all(event.action_id and event.browser_id and event.target_id for event in live)
     keys = [event for event in live if event.type == "browser.key.pressed"]
-    assert [event.key for event in keys if not event.sensitive][-1] == "+"
-    private = [event for event in keys if event.sensitive]
-    assert private and all(event.key == "" and not event.modifiers for event in private)
+    assert [event.key for event in keys][-7:] == list("Secret!")
+    assert keys[-7].modifiers == ("Shift",)
     records = [json.loads(line) for line in output.splitlines()]
     assert any(record["type"] == "browser.cursor.moved" for record in records)
     assert any(record["type"] == "browser.pointer.pressed" for record in records) == canvas
-    assert "Secret!" not in output
+    assert [record["key"] for record in records if record["type"] == "browser.key.pressed"] == [
+        event.key for event in keys
+    ]
     files = list(directory.rglob("*.jsonl"))
     assert files
     for path in files:

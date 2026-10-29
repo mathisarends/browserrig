@@ -7,6 +7,29 @@ from .execution import Actions, Effect
 
 
 class FormTools(Plugin):
+    @tool(description="Type exact text into a DOM ref; clear replaces its value by default.")
+    async def type_text(
+        self,
+        ref: str,
+        text: str,
+        clear: bool = True,
+        *,
+        actions: Inject[Actions],
+    ) -> str:
+        async def type_text(tab: Tab) -> Effect:
+            point = await actions.element_point(tab=tab, ref=ref)
+            await tab.input.move_to(point)
+            await actions.element_point(tab=tab, ref=ref, scroll=False)
+            await actions.element_call(
+                tab=tab, ref=ref, operation=ElementOperation.FOCUS, value=clear
+            )
+            if clear:
+                await tab.input.press_key("Backspace")
+            await tab.input.type_text(text)
+            return Effect("Text entered.")
+
+        return await actions.run(kind=ActionKind.TYPE, operation=type_text)
+
     @tool(description="Select an exact option label or value in a native select element.")
     async def select_option(
         self,

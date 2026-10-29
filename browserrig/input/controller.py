@@ -19,7 +19,7 @@ from browserrig.events import (
     ScrolledEvent,
 )
 
-from .keyboard import _TYPING_INTERVAL_SECONDS, _character, _parse_key, _Stroke
+from .keyboard import _TYPING_INTERVAL_SECONDS, _character, _key_stroke, _Stroke
 from .pointer import ease, movement
 
 if TYPE_CHECKING:
@@ -106,36 +106,43 @@ class Input:
             ScrolledEvent(x=point.x, y=point.y, delta_x=0, delta_y=delta_y, duration=duration)
         )
 
-    async def press_key(self, key: str, *, sensitive: bool = False) -> None:
-        stroke = _parse_key(key)
+    async def press_key(
+        self,
+        key: str,
+        *,
+        hold_control: bool = False,
+        hold_shift: bool = False,
+        hold_alt: bool = False,
+        hold_meta: bool = False,
+    ) -> None:
+        modifiers = tuple(
+            name
+            for enabled, name in (
+                (hold_control, "Control"),
+                (hold_shift, "Shift"),
+                (hold_alt, "Alt"),
+                (hold_meta, "Meta"),
+            )
+            if enabled
+        )
+        stroke = _key_stroke(key, modifiers)
         try:
             await self.emit(KeyboardVisibilityEvent(visible=True))
-            await self._stroke(stroke, sensitive=sensitive)
+            await self._stroke(stroke)
         finally:
             await self.emit(KeyboardVisibilityEvent(visible=False))
 
-    async def type_text(self, text: str, *, sensitive: bool = False) -> None:
+    async def type_text(self, text: str) -> None:
         try:
             await self.emit(KeyboardVisibilityEvent(visible=True))
             # CRLF is one line break. Other Unicode characters are inserted unchanged.
             for value in text.replace("\r\n", "\n"):
-                await self._stroke(
-                    _character(value), sensitive=sensitive, duration=_TYPING_INTERVAL_SECONDS
-                )
+                await self._stroke(_character(value), duration=_TYPING_INTERVAL_SECONDS)
                 await asyncio.sleep(_TYPING_INTERVAL_SECONDS)
         finally:
             await self.emit(KeyboardVisibilityEvent(visible=False))
 
-    async def select_all(self, *, sensitive: bool = False) -> None:
-        try:
-            await self.tab.cdp.input.dispatch_key_event(
-                type="rawKeyDown", key="a", commands=["SelectAll"]
-            )
-        finally:
-            await self.tab.cdp.input.dispatch_key_event(type="keyUp", key="a")
-        await self.emit(KeyPressedEvent(key="" if sensitive else "SelectAll", sensitive=sensitive))
-
-    async def _stroke(self, stroke: _Stroke, *, sensitive: bool, duration: float = 0) -> None:
+    async def _stroke(self, stroke: _Stroke, *, duration: float = 0) -> None:
         async with AsyncExitStack() as held:
             flags = 0
             for modifier in stroke.modifiers:
@@ -177,9 +184,8 @@ class Input:
                 )
         await self.emit(
             KeyPressedEvent(
-                key="" if sensitive else stroke.key,
-                modifiers=() if sensitive else stroke.modifiers,
-                sensitive=sensitive,
+                key=stroke.key,
+                modifiers=stroke.modifiers,
                 duration=duration,
             )
         )

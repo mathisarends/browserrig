@@ -41,6 +41,7 @@ _PUNCTUATION = {
     "`": (192, "Backquote"),
 }
 _SHIFTED = dict(zip('!@#$%^&*()_+{}|:"<>?~', "1234567890-=[]\\;',./`", strict=True))
+_SHIFTED_BY_BASE = {base: shifted for shifted, base in _SHIFTED.items()}
 
 
 class _KeyArguments(TypedDict):
@@ -67,19 +68,17 @@ class _Stroke:
         return {"key": self.key, "code": code, "windows_virtual_key_code": virtual}
 
 
-def _parse_key(value: str) -> _Stroke:
-    if value == "+":
-        return _character(value)
-    parts = value.split("+")
-    key = parts[-1]
-    if not key and len(parts) > 2 and parts[-2] == "":
-        key, parts = "+", parts[:-1]
-    modifiers = tuple(dict.fromkeys(parts[:-1]))
-    if any(name not in _MODIFIERS for name in modifiers):
-        raise BrowserError("Unknown key modifier; use Alt, Control, Meta or Shift")
-    if len(key) != 1 and key not in _SPECIAL_KEYS:
-        raise BrowserError("Unsupported key")
-    return _Stroke(key, modifiers) if modifiers or key in _SPECIAL_KEYS else _character(key)
+def _key_stroke(value: str, modifiers: tuple[str, ...]) -> _Stroke:
+    if len(value) != 1 and value not in _SPECIAL_KEYS:
+        raise BrowserError("Provide one character or a named key such as Escape, Enter or Tab")
+    stroke = _character(value) if len(value) == 1 else _Stroke(value)
+    modifiers = tuple(dict.fromkeys((*modifiers, *stroke.modifiers)))
+    key = stroke.key
+    if "Shift" in modifiers and len(key) == 1:
+        shifted = _SHIFTED_BY_BASE.get(key, key.upper())
+        if len(shifted) == 1:
+            key = shifted
+    return _Stroke(key, modifiers)
 
 
 def _character(value: str) -> _Stroke:

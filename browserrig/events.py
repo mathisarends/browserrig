@@ -119,7 +119,6 @@ class PointerReleasedEvent(InputEvent):
 class KeyPressedEvent(InputEvent):
     key: str
     modifiers: tuple[str, ...] = ()
-    sensitive: bool = False
     duration: float = 0
     type: Literal[EventKind.KEY_PRESSED] = field(default=EventKind.KEY_PRESSED, kw_only=True)
 
