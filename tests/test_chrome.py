@@ -10,7 +10,7 @@ import pytest
 
 from browserrig import ChromeBrowser, ConnectBrowser
 from browserrig.browser.tab import Tab
-from browserrig.events import DisconnectedEvent, TabClosedEvent, TabOpenedEvent
+from browserrig.events import CursorStateEvent, DisconnectedEvent, TabClosedEvent, TabOpenedEvent
 
 
 class _Subscription:
@@ -122,3 +122,37 @@ async def test_failed_startup_does_not_emit_disconnected():
     browser, events = _browser()
     await browser.aclose()
     assert not any(isinstance(event, DisconnectedEvent) for event in events)
+
+
+async def test_frame_cache_is_action_scoped_and_invalidated_by_geometry_and_document(monkeypatch):
+    browser, _ = _browser()
+    tab = await browser._attach("tab")
+    browser.client.target.get_targets.return_value = SimpleNamespace(target_infos=[])
+    discover = AsyncMock(return_value=())
+    monkeypatch.setattr("browserrig.browser.chrome.discover_frames", discover)
+    with tab.input.action("action"):
+        await browser.frames(tab)
+        await browser.frames(tab)
+        assert discover.await_count == 1
+        await tab.emit(CursorStateEvent(x=1, y=2))
+        await browser.frames(tab)
+        assert discover.await_count == 2
+        tab.document_id = "another-document"
+        await browser.frames(tab)
+        assert discover.await_count == 3
+    await browser.frames(tab)
+    await browser.frames(tab)
+    assert discover.await_count == 5
+
+
+async def test_main_frame_query_does_not_update_document_metadata():
+    browser, _ = _browser()
+    tab = await browser._attach("tab")
+    frame = SimpleNamespace(id="frame", loader_id="new-document", url="https://example.org")
+    tab.cdp.page.get_frame_tree.return_value = SimpleNamespace(
+        frame_tree=SimpleNamespace(frame=frame)
+    )
+    await tab.main_frame()
+    assert tab.document_id == "doc" and tab.url == "about:blank"
+    await tab.sync_document()
+    assert tab.document_id == "new-document" and tab.url == "https://example.org"

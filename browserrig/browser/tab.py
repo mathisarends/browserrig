@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import suppress
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -15,10 +15,12 @@ from pydantic import BaseModel
 
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Bounds, Projection
-from browserrig.events import BrowserEvent, InputEvent
+from browserrig.events import BrowserEvent, CursorStateEvent, InputEvent, ScrolledEvent
 from browserrig.input import Input, Keyboard, Mouse
 from browserrig.scripts import OWNER_HITS, Script, failure
 from browserrig.scripts.models import OwnerHitsArgs
+
+from .worlds import Worlds
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +36,8 @@ class Frame:
     projection: Projection = Projection()
     parent: Frame | None = None
     owner_id: int | None = None
+    document_id: str = ""
+    worlds: Worlds = field(default_factory=Worlds, repr=False, compare=False)
 
     @property
     def x(self) -> float:
@@ -64,9 +68,21 @@ class Frame:
     async def run_on_owner[A: BaseModel, R](self, script: Script[A, R], args: A | None = None) -> R:
         """Run with this frame's embedding element as `this`, using the same error policy."""
         assert self.parent is not None and self.owner_id is not None
+        parent = self.parent
+        return await parent.worlds.run(
+            parent.cdp,
+            parent.id,
+            parent.document_id,
+            lambda context: self._owner_call(script, args, context),
+        )
+
+    async def _owner_call[A: BaseModel, R](
+        self, script: Script[A, R], args: A | None, context: int
+    ) -> R:
+        assert self.parent is not None and self.owner_id is not None
         cdp = self.parent.cdp
         resolved = await cdp.dom.resolve_node(
-            backend_node_id=self.owner_id, execution_context_id=await self.parent.context()
+            backend_node_id=self.owner_id, execution_context_id=context
         )
         object_id = resolved.object.object_id
         if object_id is None:
@@ -101,10 +117,7 @@ class Frame:
         return tuple(visible)
 
     async def context(self) -> int:
-        result = await self.cdp.page.create_isolated_world(
-            frame_id=self.id, world_name="browserrig"
-        )
-        return result.execution_context_id
+        return await self.worlds.context(self.cdp, self.id, self.document_id)
 
     async def run[A: BaseModel, R](
         self,
@@ -115,14 +128,20 @@ class Frame:
         by_value: bool = True,
         user_gesture: bool = False,
     ) -> R:
-        return await _call(
+        return await self.worlds.run(
             self.cdp,
-            script,
-            args,
-            objects=objects,
-            by_value=by_value,
-            user_gesture=user_gesture,
-            context_id=await self.context(),
+            self.id,
+            self.document_id,
+            lambda context: _call(
+                self.cdp,
+                script,
+                args,
+                objects=objects,
+                by_value=by_value,
+                user_gesture=user_gesture,
+                context_id=context,
+            ),
+            retry=not objects,
         )
 
 
@@ -133,6 +152,7 @@ class Tab:
         cdp: CdpSession,
         *,
         emit: Callable[[BrowserEvent | InputEvent], Awaitable[None]] | None = None,
+        worlds: Worlds | None = None,
     ) -> None:
         self.id = target_id
         self.cdp = cdp
@@ -143,6 +163,8 @@ class Tab:
         self.closed = False
         self.changed = asyncio.Event()
         self.frame_limitations: tuple[str, ...] = ()
+        self.frame_revision = 0
+        self.worlds = worlds if worlds is not None else Worlds()
         self._emit = emit
         self.input = Input(self.cdp, self.emit)
 
@@ -155,18 +177,23 @@ class Tab:
         return self.input.keyboard
 
     async def emit(self, event: BrowserEvent | InputEvent) -> None:
+        if isinstance(event, (CursorStateEvent, ScrolledEvent)):
+            self.frame_revision += 1
         if self._emit is not None:
             await self._emit(replace(event, target_id=self.id, document_id=self.document_id))
 
     async def main_frame(self) -> Frame:
         tree = await self.frame_tree()
-        return Frame(tree.frame.id, self.cdp)
+        return Frame(tree.frame.id, self.cdp, document_id=tree.frame.loader_id, worlds=self.worlds)
 
     async def frame_tree(self) -> FrameTree:
         return await _frame_tree(self.cdp)
 
     async def sync_document(self) -> None:
         tree = await self.frame_tree()
+        if self.document_id != tree.frame.loader_id:
+            self.worlds.invalidate(frame_id=tree.frame.id)
+            self.frame_revision += 1
         self.document_id, self.url = tree.frame.loader_id, tree.frame.url
 
     async def go_back(self) -> bool:

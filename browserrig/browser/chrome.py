@@ -15,7 +15,8 @@ from cdpify.domains.page import (
     JavascriptDialogOpeningEvent,
     NavigatedWithinDocumentEvent,
 )
-from cdpify.domains.target import TargetDestroyedEvent, TargetInfoChangedEvent
+from cdpify.domains.runtime import ExecutionContextDestroyedEvent, ExecutionContextsClearedEvent
+from cdpify.domains.target import TargetDestroyedEvent, TargetInfo, TargetInfoChangedEvent
 
 from browserrig.browser.models import TabInfo
 from browserrig.core.errors import BrowserClosed, BrowserError
@@ -42,6 +43,7 @@ from .config import BrowserOptions, ConnectBrowser, LaunchBrowser
 from .frames import discover_frames
 from .process import ChromeProcess
 from .tab import Frame, Tab, validated_url
+from .worlds import Worlds
 
 
 async def _discard(_event: BrowserEvent | InputEvent) -> None:
@@ -77,6 +79,9 @@ class ChromeBrowser:
         self._failure: Exception | None = None
         self._connected = False
         self._closed_targets: set[str] = set()
+        self._worlds = Worlds()
+        self._frames_key: tuple[str, str, str, int] | None = None
+        self._frames: tuple[Frame, ...] = ()
         self._attach_lock = asyncio.Lock()
         self.action_lock = asyncio.Lock()
         self._close_task: asyncio.Task[None] | None = None
@@ -202,7 +207,7 @@ class ChromeBrowser:
                         device_scale_factor=size.scale,
                         mobile=False,
                     )
-                tab = Tab(target_id, cdp, emit=self.emit)
+                tab = Tab(target_id, cdp, emit=self.emit, worlds=self._worlds)
                 await tab.sync_document()
                 if target_id in self._closed_targets:
                     raise BrowserError("Target closed while attaching")
@@ -222,6 +227,7 @@ class ChromeBrowser:
 
     async def _detach(self, session_id: str) -> None:
         self._sessions.pop(session_id, None)
+        self._worlds.invalidate(session_id=session_id)
         if self.client.is_connected:
             # The target may already have been destroyed by its owner.
             with suppress(Exception):
@@ -229,10 +235,10 @@ class ChromeBrowser:
 
     async def tabs(self) -> tuple[TabInfo, ...]:
         self._check()
-        result = await self.client.target.get_targets()
-        self._closed_targets.intersection_update(info.target_id for info in result.target_infos)
+        targets = await self._targets()
+        self._closed_targets.intersection_update(info.target_id for info in targets)
         found = []
-        for info in result.target_infos:
+        for info in targets:
             if info.target_id in self._closed_targets:
                 continue
             if info.type != "page":
@@ -297,6 +303,8 @@ class ChromeBrowser:
         for sid, tid in tuple(self._sessions.items()):
             if tid == target_id:
                 self._sessions.pop(sid, None)
+                self._worlds.invalidate(session_id=sid)
+        self._frames_key, self._frames = None, ()
         if self._active == target_id:
             self._active = ""
         if tab is not None:
@@ -306,12 +314,23 @@ class ChromeBrowser:
     async def frames(self, tab: Tab) -> tuple[Frame, ...]:
         """Resolve each frame to its own session, including cross-process targets."""
         self._check()
-        targets = tuple((await self.client.target.get_targets()).target_infos)
+        key = (tab.id, tab.document_id, tab.input.action_id, tab.frame_revision)
+        if key[2] and self._frames_key == key:
+            return self._frames
+        targets = await self._targets()
         live = {info.target_id for info in targets if info.type == "iframe"}
         for sid, target_id in tuple(self._sessions.items()):
             if target_id not in self._tabs and target_id not in live:
                 await self._detach(sid)
-        return await discover_frames(tab, targets, self._frame_session)
+        frames = await discover_frames(tab, targets, self._frame_session)
+        current = (tab.id, tab.document_id, tab.input.action_id, tab.frame_revision)
+        if key[2] and key == current:
+            self._frames_key, self._frames = key, frames
+        return frames
+
+    async def _targets(self) -> tuple[TargetInfo, ...]:
+        result = await self.client.target.get_targets()
+        return tuple(result.target_infos)
 
     async def _frame_session(self, frame_id: str) -> CdpSession:
         """Reuse owned OOPIF sessions; discard stale sessions when targets disappear."""
@@ -325,6 +344,9 @@ class ChromeBrowser:
                 self._sessions[sid] = frame_id
                 assert self._stack is not None
                 self._stack.push_async_callback(self._detach, sid)
+                cdp = self.client.session(sid)
+                await cdp.page.enable()
+                await cdp.runtime.enable()
             return self.client.session(sid)
 
     async def downloads(self) -> tuple[Download, ...]:
@@ -339,6 +361,8 @@ class ChromeBrowser:
             NavigatedWithinDocumentEvent,
             JavascriptDialogOpeningEvent,
             JavascriptDialogClosedEvent,
+            ExecutionContextDestroyedEvent,
+            ExecutionContextsClearedEvent,
         ):
             subscription = self.client.listen_all(event_type)
             self._tasks.append(
@@ -367,6 +391,8 @@ class ChromeBrowser:
                     target_id = self._sessions.get(received.session_id, "") if scoped else ""
                     tab = self._tabs.get(target_id)
                     try:
+                        if scoped:
+                            self._invalidate_contexts(event, received.session_id)
                         await self._dispatch(event, tab)
                     except Exception:  # pylint: disable=broad-exception-caught
                         # A target can disappear while its event is being handled.
@@ -374,6 +400,17 @@ class ChromeBrowser:
         except Exception as error:  # pylint: disable=broad-exception-caught
             # Surface listener failures on the next browser operation.
             self._failure = error
+
+    def _invalidate_contexts(self, event: Any, session_id: str) -> None:
+        match event:
+            case ExecutionContextsClearedEvent():
+                self._worlds.invalidate(session_id=session_id)
+            case ExecutionContextDestroyedEvent(execution_context_id=context):
+                self._worlds.invalidate(session_id=session_id, context_id=context)
+            case FrameNavigatedEvent(frame=frame):
+                self._worlds.invalidate(frame_id=frame.id)
+                for tab in self._tabs.values():
+                    tab.frame_revision += 1
 
     async def _dispatch(self, event: Any, tab: Tab | None) -> None:
         handlers: dict[type, Callable[[Any, Tab | None], Awaitable[None]]] = {

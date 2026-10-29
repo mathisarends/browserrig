@@ -55,6 +55,7 @@ async def test_script_errors_are_identical_for_frame_and_owner(owner):
     )
     release = AsyncMock()
     cdp = SimpleNamespace(
+        session_id="session",
         page=SimpleNamespace(
             create_isolated_world=AsyncMock(return_value=SimpleNamespace(execution_context_id=1))
         ),

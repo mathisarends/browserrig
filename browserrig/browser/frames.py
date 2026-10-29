@@ -27,7 +27,15 @@ async def discover_frames(
     root = await tab.frame_tree()
     width, height = await (await tab.main_frame()).run(VIEWPORT)
     viewport = Bounds(x=0, y=0, width=width, height=height)
-    result = [Frame(root.frame.id, tab.cdp, Projection(clip=viewport))]
+    result = [
+        Frame(
+            root.frame.id,
+            tab.cdp,
+            Projection(clip=viewport),
+            document_id=root.frame.loader_id,
+            worlds=tab.worlds,
+        )
+    ]
     limitations: list[str] = []
     target_map = {info.target_id: info for info in targets if info.type == "iframe"}
     seen = {root.frame.id}
@@ -56,6 +64,8 @@ async def discover_frames(
                         continue
                     if frame_id in target_map:
                         child_tree = await child.frame_tree()
+                    if child_tree is not None:
+                        child = replace(child, document_id=child_tree.frame.loader_id)
                 result.append(child)
                 if child_tree is not None:
                     child_space = child.projection if frame_id in target_map else session_projection
@@ -65,7 +75,9 @@ async def discover_frames(
 
     async def inspect(frame_id: str, parent: Frame, space: Projection) -> Frame | None:
         owner = await parent.cdp.dom.get_frame_owner(frame_id=frame_id)
-        child = Frame(frame_id, parent.cdp, parent=parent, owner_id=owner.backend_node_id)
+        child = Frame(
+            frame_id, parent.cdp, parent=parent, owner_id=owner.backend_node_id, worlds=tab.worlds
+        )
         size = await child.run_on_owner(OWNER_SIZE)
         if not size or min(size) <= 0:
             return None

@@ -237,7 +237,9 @@ async def test_offscreen_frame_is_scrolled_into_view_before_interaction(
                 "document.body.style.height='5000px';"
                 "document.querySelector('iframe').style.cssText="
                 "'position:absolute;top:1800px;left:100px;width:600px;height:240px';"
-                f"document.querySelector('iframe').src={json.dumps(origin + '/frame-leaf')};",
+                "new Promise(resolve => {const frame=document.querySelector('iframe');"
+                "frame.addEventListener('load', () => resolve(), {once:true});"
+                f"frame.src={json.dumps(origin + '/frame-leaf')};" + "})",
             )
             if oversized:
                 await evaluate(

@@ -21,6 +21,10 @@ class Input:
         self.mouse = Mouse(cdp, emit=self.emit)
         self.keyboard = Keyboard(cdp, emit=self.emit)
 
+    @property
+    def action_id(self) -> str:
+        return self._action_id
+
     @contextmanager
     def action(self, action_id: str):
         previous, self._action_id = self._action_id, action_id

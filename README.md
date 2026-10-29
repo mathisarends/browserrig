@@ -46,11 +46,14 @@ Use the browser without an LLM inside an async function:
 
 ```python
 from browserrig import ChromeBrowser, LaunchBrowser, wait_for_page
+from browserrig.scripts import PAGE_FACTS
 
 async with ChromeBrowser(LaunchBrowser(url="https://example.com")) as browser:
     tab = browser.active_tab
     await wait_for_page(browser, tab)
-    print(await tab.evaluate("document.title"))
+    frame = await tab.main_frame()
+    facts = await frame.run(PAGE_FACTS)
+    print(facts.title)
 ```
 
 Runnable examples:
