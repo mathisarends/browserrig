@@ -1,4 +1,5 @@
 import asyncio
+import errno
 import os
 import shutil
 import subprocess
@@ -108,9 +109,11 @@ class ChromeProcess:
                     await asyncio.to_thread(profile.cleanup)
                     self.profile = None
                     break
-                except PermissionError:
-                    # Windows can release child-process cache handles shortly
-                    # after the browser parent exits. Keep ownership until done.
+                except OSError as error:
+                    # Chrome helpers can retain handles or repopulate profile
+                    # directories briefly after the browser parent exits.
+                    if not isinstance(error, PermissionError) and error.errno != errno.ENOTEMPTY:
+                        raise
                     if asyncio.get_running_loop().time() >= deadline:
                         raise
                     await asyncio.sleep(0.05)
