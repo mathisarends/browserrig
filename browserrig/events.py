@@ -44,6 +44,7 @@ class EventKind(StrEnum):
     NUDGE_EXPIRED = "browser.nudge.expired"
     RECORDING_STARTED = "browser.recording.started"
     RECORDING_SEGMENT_CLOSED = "browser.recording.segment.closed"
+    RECORDING_SEGMENT_LOST = "browser.recording.segment.lost"
     RECORDING_FINISHED = "browser.recording.finished"
     RECORDING_FAILED = "browser.recording.failed"
     ACTIVITY_STARTED = "browser.activity.started"
@@ -385,6 +386,15 @@ class RecordingSegmentClosedEvent(BrowserEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class RecordingSegmentLostEvent(BrowserEvent):
+    recording_id: str
+    reason: str
+    type: Literal[EventKind.RECORDING_SEGMENT_LOST] = field(
+        default=EventKind.RECORDING_SEGMENT_LOST, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class RecordingFinishedEvent(BrowserEvent):
     manifest: str
     type: Literal[EventKind.RECORDING_FINISHED] = field(
@@ -458,6 +468,7 @@ NUDGE_EVENTS = (NudgeQueuedEvent, NudgeIncludedEvent, NudgeExpiredEvent)
 RECORDING_EVENTS = (
     RecordingStartedEvent,
     RecordingSegmentClosedEvent,
+    RecordingSegmentLostEvent,
     RecordingFinishedEvent,
     RecordingFailedEvent,
 )

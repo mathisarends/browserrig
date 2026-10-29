@@ -354,6 +354,10 @@ cdpify. Recordings under `.browserrig/recordings/` include segments and a valida
 manifest with checksums, timing references, and periods spent waiting only for the
 model. The media container is checked; ffmpeg is not a runtime dependency.
 The manifest distinguishes canvas crops from native viewport recordings.
+Lost segments are reported by `RecordingSegmentLostEvent` and the manifest's
+`lost_segments` field. Recording can continue on later tabs after a tab closes or
+a segment exceeds `max_bytes`; partial files are removed. `required=True` treats
+backend start failures as fatal.
 
 Launched browsers automatically get a workspace under `.browserrig/files/<unique-id>/`
 and save downloads in its `downloads/` directory. Files remain available after the

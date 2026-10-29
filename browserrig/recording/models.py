@@ -5,7 +5,7 @@ from pydantic import Field, model_validator
 from browserrig.activity.models import TimeRange
 from browserrig.core.geometry import Geometry
 from browserrig.core.options import Options
-from browserrig.events import ActivityFinishedEvent
+from browserrig.events import ActivityFinishedEvent, RecordingSegmentLostEvent
 
 
 class RecordingSegment(Options):
@@ -31,5 +31,6 @@ class RecordingManifest(Options):
     browser_id: str
     segments: tuple[RecordingSegment, ...]
     failed: bool
+    lost_segments: tuple[RecordingSegmentLostEvent, ...] = ()
     activity: tuple[ActivityFinishedEvent, ...] = ()
     inference_only: tuple[TimeRange, ...] = ()

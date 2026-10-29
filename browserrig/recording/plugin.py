@@ -2,6 +2,7 @@ import asyncio
 import base64
 import hashlib
 import os
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,7 +15,7 @@ from harnessed.events import AgentControlChangedEvent, ControlState
 from browserrig.activity.models import inference_only, project_intervals
 from browserrig.browser.base import Browser
 from browserrig.browser.tab import Tab
-from browserrig.core.errors import RecordingError
+from browserrig.core.errors import BrowserError, RecordingError
 from browserrig.core.geometry import Geometry
 from browserrig.events import (
     RECORDING_EVENTS,
@@ -22,7 +23,9 @@ from browserrig.events import (
     RecordingFailedEvent,
     RecordingFinishedEvent,
     RecordingSegmentClosedEvent,
+    RecordingSegmentLostEvent,
     RecordingStartedEvent,
+    TabClosedEvent,
 )
 from browserrig.readiness.plugin import Readiness
 
@@ -44,6 +47,7 @@ class _State:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     start_task: asyncio.Task[None] | None = None
     segments: list[RecordingSegment] = field(default_factory=list)
+    lost_segments: list[RecordingSegmentLostEvent] = field(default_factory=list)
 
 
 class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
@@ -67,17 +71,23 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
     @hook(ReadyEvent)
     async def _on_ready(self, event: ReadyEvent) -> None:
         browser = self._browser
-        if event.target_id != browser.active_tab.id or self._state.paused:
+        try:
+            active = browser.active_tab
+        except BrowserError:
+            return
+        if event.target_id != active.id or self._state.paused:
             return
         if self._state.start_task is not None and not self._state.start_task.done():
             return
         self._state.start_task = asyncio.create_task(
-            self.ensure_started(browser.active_tab), name="browserrig:recording-start"
+            self.ensure_started(active), name="browserrig:recording-start"
         )
         self._state.start_task.add_done_callback(_retrieve_failure)
 
     async def ensure_started(self, tab: Tab, *, geometry: Geometry | None = None) -> None:
         async with self._state.lock:
+            if tab.closed:
+                return
             if self._state.paused or self._state.failed:
                 if self._state.failed and self.options.required:
                     raise RecordingError("Required native recording is unavailable")
@@ -109,7 +119,9 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
                 )
             except Exception as error:  # pylint: disable=broad-exception-caught
                 # Record optional backend failures and enforce required recording in _failed.
-                await self._failed(f"Native recording start failed ({type(error).__name__})")
+                await self._failed(
+                    f"Native recording start failed ({type(error).__name__}: {error})"
+                )
 
     async def _failed(self, reason: str) -> None:
         self._state.failed = True
@@ -117,11 +129,33 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
         if self.options.required:
             raise RecordingError(reason)
 
+    async def _lost(self, tab: Tab, reason: str) -> None:
+        event = RecordingSegmentLostEvent(
+            recording_id=self._state.recording_id,
+            browser_id=self._browser.id,
+            reason=reason,
+            target_id=tab.id,
+            document_id=tab.document_id,
+        )
+        self._state.lost_segments.append(event)
+        await self._browser.emit(event)
+
+    @hook(TabClosedEvent)
+    async def _on_tab_closed(self, event: TabClosedEvent) -> None:
+        async with self._state.lock:
+            tab = self._state.tab
+            if tab is not None and tab.id == event.target_id:
+                self._state.tab, self._state.stream = None, None
+                await self._lost(tab, "Recorded tab closed before its segment could be saved")
+
     async def _stop(self) -> None:
         tab, stream = self._state.tab, self._state.stream
         if tab is None:
             return
         self._state.tab, self._state.stream = None, None
+        if tab.closed:
+            await self._lost(tab, "Recorded tab closed before its segment could be saved")
+            return
         assert self._state.directory is not None
         partial = self._state.directory / f"{self._state.recording_id}.partial"
         handles = {stream} if stream else set()
@@ -129,29 +163,8 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
             async with asyncio.timeout(self.options.timeout):
                 stopped = await tab.cdp.page.stop_screen_recording()
                 handles.add(stopped.stream)
-                digest, size = hashlib.sha256(), 0
-                output = await asyncio.to_thread(partial.open, "xb")
-                try:
-                    while True:
-                        chunk = await tab.cdp.io.read(handle=stopped.stream, size=64 * 1024)
-                        data = (
-                            base64.b64decode(chunk.data, validate=True)
-                            if chunk.base64_encoded
-                            else chunk.data.encode("utf-8")
-                        )
-                        size += len(data)
-                        if size > self.options.max_bytes:
-                            raise RecordingError("Native recording exceeds max_bytes")
-                        digest.update(data)
-                        await _disk(output.write, data)
-                        if chunk.eof:
-                            break
-                    await _disk(output.flush)
-                    await _disk(os.fsync, output.fileno())
-                finally:
-                    await _disk(output.close)
-                header = await asyncio.to_thread(_header, partial)
-                extension, mime = _container(header)
+                checksum, size = await self._read_stream(tab, stopped.stream, partial)
+                extension, mime = _container(await asyncio.to_thread(_header, partial))
                 target = partial.with_suffix(extension)
                 await asyncio.to_thread(partial.replace, target)
                 segment = RecordingSegment(
@@ -161,29 +174,60 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
                     target_id=tab.id,
                     started_at=self._state.started_at,
                     ended_at=monotonic(),
-                    sha256=digest.hexdigest(),
+                    sha256=checksum,
                     size=size,
                     geometry=self._state.geometry,
                 )
                 self._state.segments.append(segment)
                 await self._browser.emit(
                     RecordingSegmentClosedEvent(
-                        recording_id=self._state.recording_id,
+                        recording_id=segment.id,
                         path=str(target),
-                        sha256=digest.hexdigest(),
-                        started_at=self._state.started_at,
+                        sha256=checksum,
+                        started_at=segment.started_at,
                         size=size,
                         target_id=tab.id,
                     )
                 )
+        except asyncio.CancelledError:
+            await self._lost(tab, "Recording segment finalization was cancelled")
+            raise
         except Exception as error:  # pylint: disable=broad-exception-caught
-            # Finalization failures must produce a recording receipt.
-            await self._failed(f"Native recording finalization failed ({type(error).__name__})")
+            # Segment loss is recoverable; only a backend start failure disables recording.
+            await self._lost(
+                tab, f"Native recording segment lost ({type(error).__name__}: {error})"
+            )
         finally:
+            await _disk(partial.unlink, missing_ok=True)
             for handle in handles:
                 with suppress(Exception):
                     async with asyncio.timeout(5):
                         await tab.cdp.io.close(handle=handle)
+
+    async def _read_stream(self, tab: Tab, stream: str, partial: Path) -> tuple[str, int]:
+        digest, size = hashlib.sha256(), 0
+        # Open synchronously so cancellation cannot orphan an asynchronously opened file.
+        output = partial.open("xb")
+        try:
+            while True:
+                chunk = await tab.cdp.io.read(handle=stream, size=64 * 1024)
+                data = (
+                    base64.b64decode(chunk.data, validate=True)
+                    if chunk.base64_encoded
+                    else chunk.data.encode("utf-8")
+                )
+                size += len(data)
+                if size > self.options.max_bytes:
+                    raise RecordingError("Native recording exceeds max_bytes")
+                digest.update(data)
+                await _disk(output.write, data)
+                if chunk.eof:
+                    break
+            await _disk(output.flush)
+            await _disk(os.fsync, output.fileno())
+        finally:
+            await _disk(output.close)
+        return digest.hexdigest(), size
 
     @hook(AgentControlChangedEvent)
     async def _on_control(self, event: AgentControlChangedEvent) -> None:
@@ -207,6 +251,7 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
                 browser_id=self._browser.id,
                 segments=tuple(self._state.segments),
                 failed=self._state.failed,
+                lost_segments=tuple(self._state.lost_segments),
                 activity=intervals,
                 inference_only=inference_only(intervals),
             )
@@ -215,8 +260,8 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
             await self._browser.emit(RecordingFinishedEvent(manifest=str(manifest)))
 
 
-async def _disk(function, *arguments):
-    task = asyncio.create_task(asyncio.to_thread(function, *arguments))
+async def _disk[**P, R](function: Callable[P, R], *arguments: P.args, **kwargs: P.kwargs) -> R:
+    task = asyncio.create_task(asyncio.to_thread(function, *arguments, **kwargs))
     try:
         return await asyncio.shield(task)
     except asyncio.CancelledError:
