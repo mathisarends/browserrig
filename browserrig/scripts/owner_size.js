@@ -1,14 +1,7 @@
+/* global isRendered */
 function browserrigOwnerSize(_args) {
-  for (let el = this; el; el = el.parentElement || el.getRootNode().host) {
-    const style = getComputedStyle(el);
-    if (
-      style.display === 'none' ||
-      style.visibility !== 'visible' ||
-      Number(style.opacity) === 0 ||
-      el.inert
-    ) {
-      return null;
-    }
+  if (!isRendered(this)) {
+    return null;
   }
   const style = getComputedStyle(this);
   return [

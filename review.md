@@ -2,13 +2,6 @@
 
 Die erledigten Abschnitte werden mit den jeweiligen ?nderungen entfernt.
 
-## JavaScript: gemeinsame Helfer und Verhaltenskorrekturen
-
-- Gemeinsame Helfer f?r Geometrie, komponierten DOM, Sichtbarkeit, Hit-Tests und Element-Aufl?sung.
-- Sichtbarkeit mit `checkVisibility` und `inert`, inklusive sichtbarer Kinder versteckter Vorfahren.
-- Snapshot-Styles pro Lauf cachen; `element.js` soll keine Snapshot-Closure ben?tigen.
-- Markdown bei K?rzung mit geschlossenen Code-Fences zur?ckgeben.
-
 ## Caches (urspr?nglich 3.3, 6.8, 6.9)
 
 - Isolated Worlds pro Session/Frame/Dokument cachen und bei Context-Verlust invalidieren.

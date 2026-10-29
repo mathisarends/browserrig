@@ -68,18 +68,27 @@ class Script[A: BaseModel, R]:
         return cls(name, main, arguments, adapter.validate_python)
 
 
-SNAPSHOT: Script[SnapshotArgs, DOMExtraction] = Script.load("snapshot", SnapshotArgs, DOMExtraction)
-ELEMENT: Script[ElementArgs, Any] = Script.load("element", ElementArgs, Any)
+SNAPSHOT: Script[SnapshotArgs, DOMExtraction] = Script.load(
+    "snapshot", SnapshotArgs, DOMExtraction, uses=("geometry", "composed", "visibility", "hit")
+)
+ELEMENT: Script[ElementArgs, Any] = Script.load(
+    "element", ElementArgs, Any, uses=("geometry", "composed", "visibility", "hit", "elements")
+)
 SCROLL: Script[ScrollArgs, ScrollPlan | None] = Script.load(
-    "scroll", ScrollArgs, ScrollPlan | None, uses=("scroll",)
+    "scroll", ScrollArgs, ScrollPlan | None, uses=("geometry", "composed", "elements", "scroll")
 )
 SCROLL_OWNER: Script[OwnerScrollArgs, ScrollPlan | None] = Script.load(
-    "owner_scroll", OwnerScrollArgs, ScrollPlan | None, uses=("scroll",)
+    "owner_scroll",
+    OwnerScrollArgs,
+    ScrollPlan | None,
+    uses=("geometry", "composed", "elements", "scroll"),
 )
 CONTENT: Script[ContentArgs, ContentExtraction] = Script.load(
-    "content", ContentArgs, ContentExtraction
+    "content", ContentArgs, ContentExtraction, uses=("composed", "visibility", "markdown")
 )
-CANVAS: Script[CanvasArgs, CanvasProbe] = Script.load("canvas", CanvasArgs, CanvasProbe)
+CANVAS: Script[CanvasArgs, CanvasProbe] = Script.load(
+    "canvas", CanvasArgs, CanvasProbe, uses=("composed", "visibility")
+)
 STABILITY: Script[ScriptArgs, DOMProbe] = Script.load("stability", ScriptArgs, DOMProbe)
 SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))
 RESET: Script[ScriptArgs, None] = Script.load("reset", ScriptArgs, type(None))
@@ -88,10 +97,13 @@ VIEWPORT: Script[ScriptArgs, tuple[float, float]] = Script.load(
     "viewport", ScriptArgs, tuple[float, float]
 )
 OWNER_SIZE: Script[ScriptArgs, tuple[float, float] | None] = Script.load(
-    "owner_size", ScriptArgs, tuple[float, float] | None
+    "owner_size", ScriptArgs, tuple[float, float] | None, uses=("composed", "visibility")
 )
 OWNER_HITS: Script[OwnerHitsArgs, tuple[bool, ...]] = Script.load(
-    "owner_hits", OwnerHitsArgs, tuple[bool, ...]
+    "owner_hits",
+    OwnerHitsArgs,
+    tuple[bool, ...],
+    uses=("geometry", "composed", "visibility", "hit"),
 )
 
 

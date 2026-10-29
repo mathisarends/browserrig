@@ -1,26 +1,10 @@
+/* global intersect, parentFor, closedRootsForDocument */
 function planScroll(el, {clip = null, targetBounds = null}) {
   const root = document.scrollingElement;
-  const parentFor = (node) => node.assignedSlot || node.parentElement || node.getRootNode().host;
-  const closedRoots = new Map(
-    (globalThis.__browserrig?.dom?.roots || []).map((shadow) => [shadow.host, shadow]),
-  );
+  const closedRoots = closedRootsForDocument();
   const viewport = intersect({x: 0, y: 0, width: innerWidth, height: innerHeight}, clip);
   const containers = [];
   let pinned = false;
-
-  function intersect(box, other) {
-    if (!other) {
-      return box;
-    }
-    const x = Math.max(box.x, other.x);
-    const y = Math.max(box.y, other.y);
-    return {
-      x,
-      y,
-      width: Math.max(0, Math.min(box.x + box.width, other.x + other.width) - x),
-      height: Math.max(0, Math.min(box.y + box.height, other.y + other.height) - y),
-    };
-  }
 
   function scrollable(node) {
     if (node === root) {

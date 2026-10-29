@@ -1,7 +1,6 @@
+/* global parentFor, closedRootsForDocument, childrenFor, isRendered, canTraverse, truncateMarkdown */
 function browserrigContent({maxChars}) {
-  const closedRoots = new Map(
-    (globalThis.__browserrig?.dom?.roots || []).map((root) => [root.host, root]),
-  );
+  const closedRoots = closedRootsForDocument();
   const skipped = new Set([
     'script',
     'style',
@@ -51,21 +50,9 @@ function browserrigContent({maxChars}) {
     return pre ? part : escape(part.replace(/\s+/g, ' '));
   }
 
-  function children(node) {
-    const shadow = node.shadowRoot || closedRoots.get(node);
-    if (shadow) {
-      return shadow.childNodes;
-    }
-    if (node.localName === 'slot') {
-      const assigned = node.assignedNodes({flatten: true});
-      return assigned.length ? assigned : node.childNodes;
-    }
-    return node.childNodes;
-  }
-
   function content(node, depth, pre = false) {
     const parts = [];
-    for (const child of children(node)) {
+    for (const child of childrenFor(node, closedRoots)) {
       if (visited >= 50000 || textLength >= maxChars) {
         truncated = true;
         break;
@@ -76,15 +63,7 @@ function browserrigContent({maxChars}) {
   }
 
   function hidden(node) {
-    const style = getComputedStyle(node);
-    return (
-      node.hidden ||
-      node.getAttribute('aria-hidden') === 'true' ||
-      style.display === 'none' ||
-      style.visibility === 'hidden' ||
-      style.visibility === 'collapse' ||
-      Number(style.opacity) === 0
-    );
+    return node.hidden || node.getAttribute('aria-hidden') === 'true' || !canTraverse(node);
   }
 
   function destination(value) {
@@ -112,7 +91,7 @@ function browserrigContent({maxChars}) {
   function list(node, depth) {
     let number = Number(node.getAttribute('start')) || 1;
     const items = [];
-    for (const child of children(node)) {
+    for (const child of childrenFor(node, closedRoots)) {
       if (visited >= 50000 || textLength >= maxChars) {
         truncated = true;
         break;
@@ -188,7 +167,7 @@ function browserrigContent({maxChars}) {
       return '';
     }
     if (node.nodeType === Node.TEXT_NODE) {
-      return text(node.textContent, pre);
+      return isRendered(parentFor(node), true) ? text(node.textContent, pre) : '';
     }
     if (node.nodeType !== Node.ELEMENT_NODE) {
       return '';
@@ -196,7 +175,7 @@ function browserrigContent({maxChars}) {
     if (skipped.has(node.localName) || hidden(node)) {
       return '';
     }
-    return element(node, depth, pre);
+    return isRendered(node, true) ? element(node, depth, pre) : content(node, depth, pre);
   }
 
   function element(node, depth, pre) {
@@ -247,7 +226,7 @@ function browserrigContent({maxChars}) {
   return {
     url: location.href,
     title: document.title,
-    markdown: markdown.slice(0, maxChars),
+    markdown: truncateMarkdown(markdown, maxChars),
     truncated: truncated || markdown.length > maxChars,
     frames,
   };

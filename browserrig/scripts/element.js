@@ -1,12 +1,6 @@
+/* global resolveElement, pointFor */
 function browserrigElement({token, index, operation, value, clip = null}) {
-  const state = globalThis.__browserrig?.elements;
-  const el = state?.token === token ? state.nodes[index] : null;
-  if (!el || !el.isConnected) {
-    throw new Error('STALE_ELEMENT');
-  }
-  if (el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true') {
-    throw new Error('ELEMENT_DISABLED');
-  }
+  const el = resolveElement({token, index});
   function selectOption() {
     if (el.localName !== 'select') {
       throw new Error('NOT_A_SELECT');
@@ -70,7 +64,7 @@ function browserrigElement({token, index, operation, value, clip = null}) {
   if (operation === 'focus') {
     return focus();
   }
-  const point = state.pointFor(el, clip);
+  const point = pointFor(el, clip);
   if (!point) {
     throw new Error('ELEMENT_BLOCKED');
   }

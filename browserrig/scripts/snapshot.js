@@ -1,3 +1,4 @@
+/* global intersect, parentFor, closedRootsForDocument, childrenFor, isRendered, createStyleReader, visibleBounds, pointFor */
 function browserrigSnapshot({token, maxElements, maxText, clip}) {
   const nodes = [];
   const elements = [];
@@ -5,13 +6,13 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
   let textLength = 0;
   let truncated = false;
   const hints = globalThis.__browserrig?.dom;
-  const closedRoots = new Map((hints?.roots || []).map((root) => [root.host, root]));
+  const closedRoots = closedRootsForDocument();
+  const styleFor = createStyleReader();
   const clean = (s, n = 300) =>
     String(s || '')
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, n);
-  const parentFor = (el) => el.assignedSlot || el.parentElement || el.getRootNode().host;
   const roles = new Set([
     'button',
     'link',
@@ -32,100 +33,14 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
     'treeitem',
   ]);
 
-  function intersect(a, b) {
-    const x = Math.max(a.x, b.x);
-    const y = Math.max(a.y, b.y);
-    return {
-      x,
-      y,
-      width: Math.max(0, Math.min(a.x + a.width, b.x + b.width) - x),
-      height: Math.max(0, Math.min(a.y + a.height, b.y + b.height) - y),
-    };
-  }
-
-  function visibleBounds(el, rect, viewport) {
-    let bounds = intersect(rect, viewport);
-    for (let current = el; current; current = parentFor(current)) {
-      const style = getComputedStyle(current);
-      if (
-        style.display === 'none' ||
-        style.visibility !== 'visible' ||
-        Number(style.opacity) === 0 ||
-        current.inert
-      ) {
-        return null;
-      }
-      if (current === el) {
-        continue;
-      }
-      const box = current.getBoundingClientRect();
-      const x = /hidden|clip|scroll|auto/.test(style.overflowX);
-      const y = /hidden|clip|scroll|auto/.test(style.overflowY);
-      const area = {
-        x: x ? box.x : bounds.x,
-        y: y ? box.y : bounds.y,
-        width: x ? box.width : bounds.width,
-        height: y ? box.height : bounds.height,
-      };
-      bounds = intersect(bounds, area);
-    }
-    return bounds.width > 0 && bounds.height > 0 ? bounds : null;
-  }
-
-  function hits(el, x, y) {
-    let root = el.getRootNode();
-    let target = el;
-    while (root) {
-      const hit = root.elementFromPoint?.(x, y);
-      if (!hit || !containsComposed(target, hit)) {
-        return false;
-      }
-      target = root.host;
-      root = target?.getRootNode();
-    }
-    return true;
-  }
-
-  function containsComposed(target, hit) {
-    for (let current = hit; current; current = parentFor(current)) {
-      if (current === target) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  function pointFor(el, area = null) {
-    const viewport = intersect(
-      {x: 0, y: 0, width: innerWidth, height: innerHeight},
-      area || {x: 0, y: 0, width: innerWidth, height: innerHeight},
-    );
-    for (const rect of el.getClientRects()) {
-      const bounds = visibleBounds(el, rect, viewport);
-      if (!bounds) {
-        continue;
-      }
-      const point = hitPoint(el, bounds);
-      if (point) {
-        return {...point, bounds};
-      }
-    }
-    return null;
-  }
-
   function renderedBounds(el) {
+    if (!isRendered(el)) {
+      return null;
+    }
     const original = el.getBoundingClientRect();
     let bounds = original;
     for (let current = el; current; current = parentFor(current)) {
-      const style = getComputedStyle(current);
-      if (
-        style.display === 'none' ||
-        style.visibility !== 'visible' ||
-        Number(style.opacity) === 0 ||
-        current.inert
-      ) {
-        return null;
-      }
+      const style = styleFor(current);
       if (current === el) {
         continue;
       }
@@ -157,24 +72,9 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
 
   function geometricallyVisible(el) {
     const viewport = clip || {x: 0, y: 0, width: innerWidth, height: innerHeight};
-    return Array.from(el.getClientRects()).some((rect) => visibleBounds(el, rect, viewport));
-  }
-
-  function hitPoint(el, bounds) {
-    for (const [fx, fy] of [
-      [0.5, 0.5],
-      [0.15, 0.15],
-      [0.85, 0.15],
-      [0.15, 0.85],
-      [0.85, 0.85],
-    ]) {
-      const x = bounds.x + bounds.width * fx;
-      const y = bounds.y + bounds.height * fy;
-      if (hits(el, x, y)) {
-        return {x, y};
-      }
-    }
-    return null;
+    return Array.from(el.getClientRects()).some((rect) =>
+      visibleBounds(el, rect, viewport, styleFor),
+    );
   }
 
   function roleFor(el, type) {
@@ -223,10 +123,7 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
       return true;
     }
     const parent = parentFor(el);
-    return (
-      getComputedStyle(el).cursor === 'pointer' &&
-      (!parent || getComputedStyle(parent).cursor !== 'pointer')
-    );
+    return styleFor(el).cursor === 'pointer' && (!parent || styleFor(parent).cursor !== 'pointer');
   }
 
   function nameFor(el, type) {
@@ -262,7 +159,7 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
     if (!bounds) {
       return;
     }
-    const point = pointFor(el, clip);
+    const point = pointFor(el, clip, styleFor);
     if (!point && geometricallyVisible(el)) {
       return;
     }
@@ -306,7 +203,7 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
     const parent = node.parentElement || node.getRootNode().host;
     const viewport = clip || {x: 0, y: 0, width: innerWidth, height: innerHeight};
     const visible = Array.from(range.getClientRects()).some((r) =>
-      visibleBounds(parent, r, viewport),
+      visibleBounds(parent, r, viewport, styleFor),
     );
     if (!visible) {
       return;
@@ -323,18 +220,6 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
     textLength += part.length + (text.length > 1 ? 1 : 0);
   }
 
-  function childrenFor(node) {
-    const shadow = node.shadowRoot || closedRoots.get(node);
-    if (shadow) {
-      return shadow.childNodes;
-    }
-    if (node.localName === 'slot') {
-      const assigned = node.assignedNodes({flatten: true});
-      return assigned.length ? assigned : node.childNodes;
-    }
-    return node.childNodes;
-  }
-
   function composedText(el) {
     const pending = [el];
     const parts = [];
@@ -344,7 +229,7 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
       if (node.nodeType === Node.TEXT_NODE) {
         parts.push(node.textContent);
       }
-      const children = childrenFor(node);
+      const children = childrenFor(node, closedRoots);
       for (let i = children.length - 1; i >= 0; i--) {
         pending.push(children[i]);
       }
@@ -396,13 +281,13 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
     if (node.nodeType === Node.TEXT_NODE) {
       collectText(node);
     }
-    const children = childrenFor(node);
+    const children = childrenFor(node, closedRoots);
     for (let i = children.length - 1; i >= 0; i--) {
       pending.push(children[i]);
     }
   }
   const unique = deduplicate();
-  (globalThis.__browserrig ||= {}).elements = {token, nodes, pointFor};
+  (globalThis.__browserrig ||= {}).elements = {token, nodes};
   return {
     url: location.href,
     title: document.title,

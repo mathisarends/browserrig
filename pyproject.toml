@@ -68,7 +68,7 @@ disable = [
     "missing-module-docstring",
     "missing-class-docstring",
     "missing-function-docstring",
-    "line-too-long",  # Ruff checks code while allowing long embedded HTML/JS strings.
+    "line-too-long",  # Ruff handles line length, including long HTML test fixtures.
     # Models, plugin hooks and transactions do not fit these size heuristics.
     "too-few-public-methods",
     "too-many-instance-attributes",

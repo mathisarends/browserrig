@@ -1,0 +1,45 @@
+import json
+import re
+
+import pytest
+
+from browserrig import ChromeBrowser, DomMode, LaunchBrowser, wait_for_page
+from browserrig.observation import capture
+from browserrig.observation.content import extract_content
+from tests.javascript import evaluate
+
+pytestmark = pytest.mark.integration
+
+
+async def test_visible_descendant_of_hidden_parent_is_extracted_and_inert_content_is_not(site):
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        markup = (
+            '<div style="visibility:hidden">Hidden parent text'
+            '<button style="visibility:visible">Visible child</button></div>'
+            "<div inert><button>Inert child</button></div>"
+            '<div style="display:contents"><p>Contents text</p></div>'
+        )
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
+        report = await wait_for_page(browser, tab)
+        snapshot = await capture(browser, tab, DomMode(), report)
+        assert [element.name for element in snapshot.elements] == ["Visible child"]
+        content = await extract_content(browser, tab)
+        assert "Visible child" in content.markdown and "Contents text" in content.markdown
+        assert (
+            "Hidden parent text" not in content.markdown and "Inert child" not in content.markdown
+        )
+
+
+@pytest.mark.parametrize("limit", [2, 4, 7, 20, 40, 80])
+async def test_truncated_markdown_keeps_code_fences_closed(site, limit):
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        await evaluate(
+            tab, "document.body.innerHTML = '<pre><code>'+ 'x'.repeat(500) +'</code></pre>'"
+        )
+        content = await extract_content(browser, tab, max_chars=limit)
+        assert len(content.markdown) <= limit
+        fences = re.findall(r"^`{3,}", content.markdown, flags=re.M)
+        assert len(fences) % 2 == 0
+        assert content.limitations

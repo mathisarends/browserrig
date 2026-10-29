@@ -22,3 +22,9 @@ The isolated world's `globalThis.__browserrig` namespace holds:
 Scripts throw only the fixed codes in `ScriptError`. Unexpected exception text
 is never returned to the model. ESLint and Prettier cover main files and helpers;
 Python contract tests guard script names, inline JavaScript and error codes.
+
+Shared helpers own composed ancestry, shadow/slot traversal, visibility, geometry,
+hit testing and element resolution. Snapshot style lookups are cached for one run;
+elements store no closures. Visibility follows `checkVisibility` plus inert
+ancestors, allowing descendants to override inherited `visibility:hidden`.
+Content traversal preserves such descendants and balances truncated code fences.

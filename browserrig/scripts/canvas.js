@@ -1,6 +1,7 @@
+/* global isRendered */
 function browserrigCanvas({selector, loadingSelector}) {
   const visible = (el) => {
-    if (!el.checkVisibility({checkOpacity: true, checkVisibilityCSS: true})) {
+    if (!isRendered(el)) {
       return false;
     }
     const r = el.getBoundingClientRect();
