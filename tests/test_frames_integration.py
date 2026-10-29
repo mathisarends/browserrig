@@ -131,7 +131,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
             assert frame.cdp.session_id != browser.active_tab.cdp.session_id
 
 
-async def test_hidden_offscreen_and_covered_frames_are_excluded_and_blockers_checked(site):
+async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_discovered(site):
     async with ChromeBrowser(LaunchBrowser(url=site + "/frame-host")) as browser:
         tab = browser.active_tab
         report = await wait_for_page(browser, tab)
@@ -156,7 +156,9 @@ async def test_hidden_offscreen_and_covered_frames_are_excluded_and_blockers_che
         await tab.evaluate(
             "document.querySelector('iframe').style.cssText='display:block;top:2000px'"
         )
-        assert len(await browser.frames(tab)) == 1
+        assert len(await browser.frames(tab)) == 2
+        offscreen = await capture(browser, tab, DomMode(), report)
+        assert offscreen.elements and all(not element.in_viewport for element in offscreen.elements)
 
 
 async def test_unrendered_sibling_does_not_discard_usable_frame(site):

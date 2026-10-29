@@ -26,6 +26,7 @@ class ViewportView(Options):
 
 class ElementView(Options):
     ref: str
+    in_viewport: bool
     mark: int | None = None
     role: str
     name: str
@@ -41,6 +42,7 @@ class ElementView(Options):
     def from_element(cls, element: Element) -> Self:
         return cls(
             ref=element.ref,
+            in_viewport=element.in_viewport,
             mark=element.mark,
             role=element.role,
             name=element.name,

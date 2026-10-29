@@ -2,15 +2,16 @@ import pytest
 import yaml
 from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
 from harnessed.events import ModelRequestedEvent, ObservationForm, ObservationsIncludedEvent
-from harnessed.models import ModelChunk
+from harnessed.models import ImagePart, ModelChunk, ToolReply
 from harnessed.plugins import Approvals
-from harnessed.testing import CallbackModel, ScriptedModel
+from harnessed.testing import CallbackModel, ScriptedModel, call
 
 from browserrig import (
     Browser,
     CanvasMode,
     Chrome,
     DomMode,
+    LaunchBrowser,
     Observe,
     Readiness,
     ReadinessOptions,
@@ -25,6 +26,80 @@ from browserrig.events import (
 )
 
 pytestmark = pytest.mark.integration
+
+
+async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(site, monkeypatch):
+    captures = 0
+
+    class CountScreenshots(Plugin, needs=(Browser,)):
+        async def setup(self, _ctx: Context, browser: Inject[Browser]):
+            page_type = type(browser.active_tab.cdp.page)
+            original = page_type.capture_screenshot
+
+            async def counted(page, *args, **kwargs):
+                nonlocal captures
+                captures += 1
+                return await original(page, *args, **kwargs)
+
+            monkeypatch.setattr(page_type, "capture_screenshot", counted)
+
+    model = ScriptedModel(
+        [call("screenshot"), call("observe"), call("extract_content"), call("screenshot"), "Done"]
+    )
+    agent = Agent(
+        model=model,
+        plugins=[
+            *browser_plugins(LaunchBrowser(url=site)),
+            CountScreenshots(),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
+    )
+    result = await agent.run("Inspect the page on demand", max_steps=5)
+    assert result.text == "Done"
+    assert captures == 2
+    assert {"screenshot", "extract_content", "observe"} <= {
+        item.name for item in model.requests[0].tools
+    }
+    assert not any(
+        isinstance(part, ImagePart)
+        for message in model.requests[0].messages
+        if not isinstance(message.content, str)
+        for part in message.content
+    )
+    for index, request in enumerate(model.requests):
+        states = [
+            yaml.safe_load(message.text)
+            for message in request.messages
+            if message.text.startswith("page:\n")
+        ]
+        assert states and all("text" not in state for state in states)
+        images = [
+            message for message in request.messages if message.id.startswith("browser-image:")
+        ]
+        assert len(images) == (1 if index in (1, 4) else 0)
+        if not images:
+            continue
+        assert any(isinstance(part, ImagePart) for part in images[0].content)
+        state = next(
+            yaml.safe_load(message.text)
+            for message in reversed(request.messages)
+            if message.text.startswith("page:\n")
+        )
+        assert [element["mark"] for element in state["elements"]] == list(
+            range(len(state["elements"]))
+        )
+        assert (
+            images[0]
+            .id.removeprefix("browser-image:")
+            .startswith(state["elements"][0]["ref"].split(":")[0])
+        )
+    replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolReply)]
+    assert len(replies) == 4
+    assert all(not reply.is_error for reply in replies)
+    assert all(isinstance(reply.content, str) for reply in replies)
+    assert isinstance(replies[1].content, str) and "page:" in replies[1].text
+    assert "text" not in yaml.safe_load(replies[1].text)
+    assert isinstance(replies[2].content, str) and "# Test form" in replies[2].text
 
 
 async def test_model_tools_yaml_and_activity(site):
@@ -87,7 +162,8 @@ async def test_model_tools_yaml_and_activity(site):
         assert all(len(item.refs) == 1 and item.refs[0] in snapshots for item in observations)
 
 
-async def test_canvas_mode_native_image(site):
+@pytest.mark.parametrize("mode", [DomMode(screenshots=True), CanvasMode()])
+async def test_visual_modes_native_image(site, mode):
     model = ScriptedModel(["Canvas ready"])
 
     # Start on a canvas before the first observation: blank about:blank is intentionally not ready.
@@ -100,7 +176,7 @@ async def test_canvas_mode_native_image(site):
         plugins=[
             Chrome(),
             Start(),
-            Readiness(CanvasMode()),
+            Readiness(mode),
             Observe(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
@@ -109,7 +185,7 @@ async def test_canvas_mode_native_image(site):
     assert result.text == "Canvas ready"
     assert any(msg.id.startswith("browser-image:") for msg in model.requests[0].messages)
     observations = [e for e in result.events if isinstance(e, ObservationCapturedEvent)]
-    assert observations[0].mode == "canvas"
+    assert observations[0].mode == mode.kind
 
 
 async def test_no_progress_hint_is_derived_from_events(site):

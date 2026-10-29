@@ -40,7 +40,7 @@ async def main() -> None:
     agent = BrowserAgent(
         model=OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")),
         browser=LaunchBrowser(url=args.url, headless=not args.headed),
-        mode=DomMode(screenshots=True),
+        mode=DomMode(),
         recording=RecordingOptions() if args.record else None,
         session_directory=Path(".browserrig/sessions-v2"),
         approvals=Approvals(default=PolicyDecision.ALLOW),

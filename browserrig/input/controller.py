@@ -88,22 +88,26 @@ class Input:
         event_type = PointerPressedEvent if kind == "mousePressed" else PointerReleasedEvent
         await self.emit(event_type(x=point.x, y=point.y, click_count=click_count))
 
-    async def scroll(self, *, point: Point, delta_y: float) -> None:
-        if delta_y == 0:
+    async def scroll(self, *, point: Point, delta_y: float, delta_x: float = 0) -> None:
+        if delta_y == 0 and delta_x == 0:
             return
         await self.move_to(point)
-        duration = min(0.4, max(0.08, abs(delta_y) * 0.0003))
+        duration = min(0.4, max(0.08, max(abs(delta_x), abs(delta_y)) * 0.0003))
         steps = max(3, round(duration * 60))
         previous = 0.0
         for index in range(1, steps + 1):
-            current = delta_y * ease(index / steps)
+            current = ease(index / steps)
             await self.tab.cdp.input.dispatch_mouse_event(
-                type="mouseWheel", x=point.x, y=point.y, delta_x=0, delta_y=current - previous
+                type="mouseWheel",
+                x=point.x,
+                y=point.y,
+                delta_x=delta_x * (current - previous),
+                delta_y=delta_y * (current - previous),
             )
             previous = current
             await asyncio.sleep(duration / steps)
         await self.emit(
-            ScrolledEvent(x=point.x, y=point.y, delta_x=0, delta_y=delta_y, duration=duration)
+            ScrolledEvent(x=point.x, y=point.y, delta_x=delta_x, delta_y=delta_y, duration=duration)
         )
 
     async def press_key(

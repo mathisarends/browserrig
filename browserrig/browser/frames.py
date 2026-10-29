@@ -83,8 +83,6 @@ async def discover_frames(
         projection = space.embed(box.model.content, *size)
         clip = projection.box(Bounds(x=0, y=0, width=size[0], height=size[1]))
         clip = clip.intersect(parent.projection.clip or viewport)
-        if clip.width <= 0 or clip.height <= 0:
-            return None
         # BoxModel quads are relative to the CDP session's root, not the parent frame.
         cdp = await session_for(frame_id) if frame_id in target_map else parent.cdp
         return replace(child, cdp=cdp, projection=replace(projection, clip=clip))

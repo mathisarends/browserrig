@@ -42,6 +42,7 @@ class ActionKind(StrEnum):
 
 class ElementOperation(StrEnum):
     POINT = "point"
+    BOUNDS = "bounds"
     FOCUS = "focus"
     NODE = "node"
     SELECT = "select"

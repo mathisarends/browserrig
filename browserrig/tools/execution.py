@@ -24,6 +24,8 @@ from browserrig.observation.plugin import Observe
 from browserrig.readiness.models import ReadinessPhase, ReadinessStatus
 from browserrig.readiness.plugin import Readiness
 
+from .scrolling import prepare_element
+
 # Pointer actions aim at coordinates from the last observation, so it must still be current.
 _POINTER_KINDS = frozenset({ActionKind.CLICK, ActionKind.DOUBLE_CLICK, ActionKind.DRAG})
 
@@ -148,16 +150,25 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
         value: object = None,
         by_value: bool = True,
     ) -> Any:
+        if operation in {
+            ElementOperation.SELECT,
+            ElementOperation.SET_VALUE,
+            ElementOperation.NODE,
+        }:
+            await self.element_point(tab=tab, ref=ref)
         frame, element = await self.observe.element(tab, ref)
         return await self._call(frame, element, operation, value, by_value=by_value)
 
     async def element_point(self, *, tab: Tab, ref: str, scroll: bool = True) -> ElementPoint:
         frame, element = await self.observe.element(tab, ref)
-        point = current = await self._locate(frame, element, scroll=scroll)
+        scrolled = False
         if scroll:
-            # scrollIntoView may have moved ancestor documents; refresh their transforms.
+            snapshot = self.observe.snapshot
+            assert snapshot is not None
+            scrolled = await prepare_element(self.browser, tab, snapshot, element)
+            # Wheel input may have moved ancestor documents; refresh their transforms.
             frame, _ = await self.observe.element(tab, ref)
-            current = await self._locate(frame, element, scroll=False)
+        current = await self._locate(frame, element)
         x, y = frame.projection.point(current.x, current.y)
         await frame.check_point(x, y)
         bounds = frame.projection.box(current.bounds) if current.bounds is not None else None
@@ -167,11 +178,11 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
                     ref=ref, x=bounds.x, y=bounds.y, width=bounds.width, height=bounds.height
                 )
             )
-        return ElementPoint(x=x, y=y, scrolled=point.scrolled, bounds=bounds)
+        return ElementPoint(x=x, y=y, scrolled=scrolled, bounds=bounds)
 
-    async def _locate(self, frame: Frame, element: Element, *, scroll: bool) -> ElementPoint:
+    async def _locate(self, frame: Frame, element: Element) -> ElementPoint:
         clip = frame.local_clip.model_dump() if frame.local_clip else None
-        raw = await self._call(frame, element, ElementOperation.POINT, scroll, clip)
+        raw = await self._call(frame, element, ElementOperation.POINT, False, clip)
         return ElementPoint.model_validate(raw)
 
     async def _call(

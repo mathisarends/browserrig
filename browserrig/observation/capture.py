@@ -67,7 +67,7 @@ class DomCapture(CaptureStrategy):
         self,
         frame: Frame,
         snapshot_id: str,
-        max_elements: int,
+        max_elements: int | None,
         max_text: int,
         limitations: list[str],
     ) -> DOMExtraction:
@@ -108,7 +108,9 @@ class DomCapture(CaptureStrategy):
                 state = await self._extract(
                     frame,
                     snapshot_id,
-                    max(0, self.mode.max_elements - len(elements)),
+                    None
+                    if self.mode.max_elements is None
+                    else max(0, self.mode.max_elements - len(elements)),
                     max(0, self.mode.max_text_chars - sum(len(part) for part in text) - len(text)),
                     limitations,
                 )
@@ -121,18 +123,23 @@ class DomCapture(CaptureStrategy):
                 if state.text:
                     text.append(state.text)
                 included_elements = (
-                    item for item, included in zip(state.elements, visible, strict=True) if included
+                    item
+                    for item, included in zip(state.elements, visible, strict=True)
+                    if included or not item.in_viewport
                 )
                 for item in included_elements:
                     bounds = frame.projection.box(item.bounds)
                     bounds = (
-                        bounds.intersect(frame.projection.clip) if frame.projection.clip else bounds
+                        bounds.intersect(frame.projection.clip)
+                        if item.in_viewport and frame.projection.clip is not None
+                        else bounds
                     )
                     elements.append(
                         Element(
                             ref=f"{snapshot_id[:8]}:{len(elements)}",
+                            in_viewport=item.in_viewport,
                             mark=len(elements)
-                            if self.mode.screenshots and self.mode.marks
+                            if self.mode.screenshots and self.mode.marks and item.in_viewport
                             else None,
                             frame_id=frame.id,
                             index=item.index,
@@ -226,7 +233,12 @@ async def capture(
         scroll_y=facts.scroll_y,
         elements=tuple(
             ElementFingerprint(
-                role=e.role, name=e.name, value=e.value, disabled=e.disabled, checked=e.checked
+                role=e.role,
+                name=e.name,
+                in_viewport=e.in_viewport,
+                value=e.value,
+                disabled=e.disabled,
+                checked=e.checked,
             )
             for e in content.elements
         ),

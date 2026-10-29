@@ -38,7 +38,7 @@ function browserrigElement(token, index, operation, value, clip = null) {
     if (!(el.matches('input:not([readonly]),textarea:not([readonly])') || el.isContentEditable)) {
       throw new Error('NOT_EDITABLE');
     }
-    el.focus();
+    el.focus({preventScroll: true});
     if (!value) {
       return true;
     }
@@ -57,6 +57,10 @@ function browserrigElement(token, index, operation, value, clip = null) {
   if (operation === 'node') {
     return el;
   }
+  if (operation === 'bounds') {
+    const box = el.getBoundingClientRect();
+    return {x: box.x, y: box.y, width: box.width, height: box.height};
+  }
   if (operation === 'select') {
     return selectOption();
   }
@@ -66,10 +70,6 @@ function browserrigElement(token, index, operation, value, clip = null) {
   if (operation === 'focus') {
     return focus();
   }
-  const before = scrollY;
-  if (value !== false) {
-    el.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'});
-  }
   const point = state.pointFor(el, clip);
   if (!point) {
     throw new Error('ELEMENT_BLOCKED');
@@ -78,7 +78,7 @@ function browserrigElement(token, index, operation, value, clip = null) {
   return {
     x: point.x,
     y: point.y,
-    scrolled: scrollY !== before,
+    scrolled: false,
     bounds: {x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height},
   };
 }

@@ -127,7 +127,8 @@ class InteractionTools(PointerTools):
 
     @tool(
         description=(
-            "Drag between visible DOM refs; native draggable sources use HTML5 DataTransfer."
+            "Drag between DOM refs, scrolling them into view first. Both endpoints must fit "
+            "in the viewport together; native draggable sources use HTML5 DataTransfer."
         )
     )
     async def drag(
@@ -140,11 +141,16 @@ class InteractionTools(PointerTools):
     ) -> str:
         async def drag(tab: Tab) -> Effect:
             _, source = await actions.observe.element(tab, source_ref)
+            prepared = await actions.element_point(tab=tab, ref=source_ref)
+            target = await actions.element_point(tab=tab, ref=target_ref)
             start = await actions.element_point(tab=tab, ref=source_ref, scroll=False)
             end = await actions.element_point(tab=tab, ref=target_ref, scroll=False)
             mode = DragMode.HTML5 if source.draggable else DragMode.POINTER
             await drag_gesture(tab, start=start, end=end, duration=duration, mode=mode)
-            return Effect("Drag dispatched; inspect the destination.")
+            return Effect(
+                "Drag dispatched; inspect the destination.",
+                prepared_scroll=prepared.scrolled or target.scrolled,
+            )
 
         return await actions.run(kind=ActionKind.DRAG, operation=drag, expects_change=True)
 

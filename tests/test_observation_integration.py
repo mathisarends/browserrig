@@ -42,17 +42,20 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
                 '<button><slot name=label></slot></button>';
         """)
         report = await wait_for_page(browser, tab)
-        state = await capture(browser, tab, DomMode(screenshots=False), report)
+        state = await capture(browser, tab, DomMode(max_text_chars=12000), report)
         names = [element.name for element in state.elements]
         for expected in ("Wrapped", "Check", "Listener only", "Switch", "Editor", "Closed shadow"):
             assert names.count(expected) == 1
         assert not {
             "Transparent ancestor",
             "Inert ancestor",
-            "Offscreen",
             "Clipped",
             "Covered",
         } & set(names)
+        assert not next(
+            element for element in state.elements if element.name == "Offscreen"
+        ).in_viewport
+        assert next(element for element in state.elements if element.name == "Wrapped").in_viewport
         assert "Slotted label" in state.text and "Closed shadow" in state.text
         assert "Offscreen text" not in state.text
         assert not state.limitations
@@ -67,7 +70,7 @@ async def test_marks_match_yaml_and_hidpi_screenshot_without_page_mutation(site,
         tab = browser.active_tab
         report = await wait_for_page(browser, tab)
         before = await tab.evaluate("document.documentElement.outerHTML")
-        state = await capture(browser, tab, DomMode(marks=marks), report)
+        state = await capture(browser, tab, DomMode(screenshots=True, marks=marks), report)
         assert await tab.evaluate("document.documentElement.outerHTML") == before
         assert state.image is not None
         with Image.open(BytesIO(base64.b64decode(state.image))) as image:
@@ -79,7 +82,7 @@ async def test_marks_match_yaml_and_hidpi_screenshot_without_page_mutation(site,
         else:
             assert all("mark" not in e for e in entries)
         assert "never-echo-this" not in render(state)
-        fresh = await capture(browser, tab, DomMode(marks=marks), report)
+        fresh = await capture(browser, tab, DomMode(screenshots=True, marks=marks), report)
         assert fresh.fingerprint == state.fingerprint
         assert fresh.elements[0].ref != state.elements[0].ref
         with pytest.raises(BrowserError, match="STALE_ELEMENT"):

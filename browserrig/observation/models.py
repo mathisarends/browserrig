@@ -13,6 +13,7 @@ from .config import ObservationKind
 
 class Element(Options):
     ref: str
+    in_viewport: bool = True
     mark: int | None = None
     frame_id: str
     index: int
@@ -63,6 +64,7 @@ class PageFacts(Options):
 
 class ExtractedElement(Options):
     index: int
+    in_viewport: bool
     role: str
     name: str
     tag: str
@@ -86,6 +88,7 @@ class DOMExtraction(PageFacts):
 class ElementFingerprint(Options):
     role: str
     name: str
+    in_viewport: bool = True
     value: str | None
     disabled: bool
     checked: bool | None = None

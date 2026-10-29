@@ -77,7 +77,7 @@ from browserrig import BrowserAgent, LaunchBrowser, RecordingOptions, DomMode, T
 agent = BrowserAgent(
     model=OpenAIResponsesModel("gpt-6.1-terra"),
     browser=LaunchBrowser(url="https://en.wikipedia.org/wiki/Voyager_program"),
-    mode=DomMode(screenshots=True),
+    mode=DomMode(),
     recording=RecordingOptions(),
     session_directory=".browserrig/sessions-v2",
     approvals=Approvals(default=PolicyDecision.ALLOW),
@@ -171,7 +171,41 @@ references tied to the current observation.
 
 ## Element references and screenshot marks
 
-DOM mode includes an annotated screenshot by default. Numbered labels and colored
+DOM mode returns structured YAML with page metadata and interactive elements by
+default. Normal observations omit page-text excerpts and do not capture or attach
+screenshots. Use `extract_content()` to read the page. The agent can call
+`screenshot()` to request the current view as an image in its next iteration. The
+image and element refs are captured together at that step boundary and stay in sync. This does not
+enable automatic screenshots for subsequent observations. `observe()` refreshes
+the normal page state. Use `DomMode(screenshots=True)` to explicitly enable images
+on every step; canvas mode continues to include images automatically.
+`DomMode(max_text_chars=N)` explicitly enables a page-text excerpt; its default is `0`.
+
+All rendered interactive elements on the loaded page are listed, including controls
+below the fold and inside offscreen frames or scrollable containers. Every YAML
+element explicitly includes `in_viewport: true` or `in_viewport: false`:
+
+```yaml
+elements:
+- ref: a1b2c3d4:0
+  in_viewport: true
+  role: button
+  name: Search
+  tag: button
+- ref: a1b2c3d4:1
+  in_viewport: false
+  role: textbox
+  name: Email
+  tag: input
+```
+
+There is no default element-count limit. Use `DomMode(max_elements=N)` to set one;
+the DOM walk remains bounded to 50000 nodes and reports any truncation. Hidden,
+inert, and fully clipped controls are omitted. Controls behind another element
+are excluded when an overlap can be measured in the viewport.
+
+Requested DOM screenshots annotate elements with `in_viewport: true` by default.
+Numbered labels and colored
 dashed borders identify interactive elements. Each label matches an element's
 `mark` in the YAML; pass that element's full `ref`, such as `a1b2c3d4:7`, to
 `click`, `type_text`, and other element tools. A mark is a visual lookup number;
@@ -182,23 +216,50 @@ Links use blue borders, buttons green, text inputs purple, and selection control
 pink or orange. Marks follow document order within each frame. Screenshots use
 viewport CSS pixels even on HiDPI displays. Annotations are drawn on the image
 without changing the page. Use `DomMode(marks=False)` for plain screenshots or
-`DomMode(screenshots=False)` for YAML only.
+`DomMode(screenshots=False)` (the default) for YAML only between screenshot requests.
 
 Extraction follows the composed DOM, including slots, open and closed shadow
 roots, and CDP click-listener metadata. It checks viewport visibility, clipping,
-and overlapping controls. Nested same-origin and cross-origin frames use their
-own isolated worlds and CDP sessions where needed. Frame transforms account for
+and overlapping controls without scrolling during observation. Nested same-origin
+and cross-origin frames use their own isolated worlds and CDP sessions where needed. Frame transforms account for
 borders, scrolling, scaling, and rotation; ancestor hit tests reject covered
 frames before clicking. Unreachable frames and content limits are reported in
 `limitations`, while usable frames remain available. Frame discovery is bounded
 to 64 frames and eight levels; perspective transforms are reported as unsupported.
 
+## Page content as Markdown
+
+The agent can call `extract_content(max_chars=50000)` to read the active page as
+structured Markdown. The result includes the page title and source URL, headings,
+paragraphs, emphasis, lists, links with absolute URLs, tables, quotes, and code.
+It reads already loaded content below the viewport without scrolling, navigating,
+or invalidating the current element references. Open and closed shadow roots and
+available same-origin and cross-origin frame documents are included.
+
+`max_chars` limits the Markdown body (1–200000 characters); the title, source URL,
+and extraction limitations are reported separately. Truncation, unavailable DOM
+metadata, and unavailable frames are explicit. Offscreen rendered frame documents
+are included. Scripts, styles, hidden content, and form field values are excluded.
+Lazy content must already be
+loaded; images contribute their alt text, and canvas pixels are not converted to
+text. Use `screenshot()` when visual inspection is needed.
+
 ## Double-clicks and dragging
 
+DOM interactions prepare the target's viewport automatically with native, eased
+wheel input, including horizontal scrolling, nested scroll containers, and parent
+frames. Comfortable targets stay in place. Near-edge and offscreen targets are
+positioned with a 12% comfort margin and a preferred vertical anchor around one
+third of the viewport; fitting form groups and labels are kept together. Fixed
+and pinned sticky controls do not trigger document scrolling. Coordinates and
+ancestor hit tests are refreshed after scrolling and before dispatching input.
+Typing, selecting options, setting date inputs, and uploads use this preparation
+as well as clicks. Focus uses `preventScroll` to avoid an extra browser jump.
+
 `InteractionTools` provides `click(ref=..., count=2)` and
-`drag(source_ref=..., target_ref=...)`. Both drag endpoints must be visible at
-the same time; gestures do not scroll automatically. Native `draggable` elements
-use HTML5 drag and drop with a real `DataTransfer`.
+`drag(source_ref=..., target_ref=...)`. Both drag endpoints are prepared first and
+must fit in the viewport together before the gesture starts. Native `draggable`
+elements use HTML5 drag and drop with a real `DataTransfer`.
 
 `PointerTools`, used in canvas mode, provides
 `click_at(x=..., y=..., count=2)` and

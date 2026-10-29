@@ -113,6 +113,53 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
     return null;
   }
 
+  function renderedBounds(el) {
+    const original = el.getBoundingClientRect();
+    let bounds = original;
+    for (let current = el; current; current = parentFor(current)) {
+      const style = getComputedStyle(current);
+      if (
+        style.display === 'none' ||
+        style.visibility !== 'visible' ||
+        Number(style.opacity) === 0 ||
+        current.inert
+      ) {
+        return null;
+      }
+      if (current === el) {
+        continue;
+      }
+      const box = current.getBoundingClientRect();
+      const scrollX =
+        /auto|scroll/.test(style.overflowX) && current.scrollWidth > current.clientWidth;
+      const scrollY =
+        /auto|scroll/.test(style.overflowY) && current.scrollHeight > current.clientHeight;
+      // A scrollable ancestor can reveal its descendants inside an outer clipping region.
+      bounds = {
+        x: scrollX ? box.x : bounds.x,
+        y: scrollY ? box.y : bounds.y,
+        width: scrollX ? box.width : bounds.width,
+        height: scrollY ? box.height : bounds.height,
+      };
+      const x = /hidden|clip/.test(style.overflowX);
+      const y = /hidden|clip/.test(style.overflowY);
+      bounds = intersect(bounds, {
+        x: x ? box.x : bounds.x,
+        y: y ? box.y : bounds.y,
+        width: x ? box.width : bounds.width,
+        height: y ? box.height : bounds.height,
+      });
+    }
+    return bounds.width > 0 && bounds.height > 0 && original.width > 0 && original.height > 0
+      ? {x: original.x, y: original.y, width: original.width, height: original.height}
+      : null;
+  }
+
+  function geometricallyVisible(el) {
+    const viewport = clip || {x: 0, y: 0, width: innerWidth, height: innerHeight};
+    return Array.from(el.getClientRects()).some((rect) => visibleBounds(el, rect, viewport));
+  }
+
   function hitPoint(el, bounds) {
     for (const [fx, fy] of [
       [0.5, 0.5],
@@ -211,17 +258,18 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
     if (!interactive(el, role)) {
       return;
     }
-    const point = pointFor(el, clip);
-    if (!point) {
+    const bounds = renderedBounds(el);
+    if (!bounds) {
       return;
     }
-    if (elements.length >= 4000) {
-      truncated = true;
+    const point = pointFor(el, clip);
+    if (!point && geometricallyVisible(el)) {
       return;
     }
     const index = nodes.push(el) - 1;
     elements.push({
       index,
+      in_viewport: point !== null,
       role,
       name: nameFor(el, type),
       tag: el.localName,
@@ -231,9 +279,9 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
       checked: checkedFor(el),
       draggable: Boolean(el.draggable),
       options: el.localName === 'select' ? Array.from(el.options).map((o) => clean(o.text)) : [],
-      bounds: point.bounds,
-      x: point.x,
-      y: point.y,
+      bounds: point ? point.bounds : bounds,
+      x: point ? point.x : bounds.x + bounds.width / 2,
+      y: point ? point.y : bounds.y + bounds.height / 2,
     });
   }
 
@@ -246,6 +294,9 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
   }
 
   function collectText(node) {
+    if (maxText === 0) {
+      return;
+    }
     const value = clean(node.textContent, maxText + 1);
     if (!value || node.parentElement?.closest('script,style,noscript,template')) {
       return;
@@ -359,7 +410,8 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
     height: innerHeight,
     scroll_y: scrollY,
     text: text.join(' '),
-    elements: unique.slice(0, maxElements),
-    truncated: truncated || pending.length > 0 || unique.length > maxElements,
+    elements: maxElements === null ? unique : unique.slice(0, maxElements),
+    truncated:
+      truncated || pending.length > 0 || (maxElements !== null && unique.length > maxElements),
   };
 }
