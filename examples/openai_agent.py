@@ -9,7 +9,7 @@ from harnessed import PolicyDecision
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import BrowserAgent, LaunchBrowser, RecordingOptions, WebMode
+from browserrig import BrowserAgent, DomMode, LaunchBrowser, RecordingOptions
 
 DEFAULT_TASK = (
     "Erkunde das Voyager-Programm. Vergleiche Voyager 1 und Voyager 2 nach Startdatum, "
@@ -37,7 +37,7 @@ async def main() -> None:
         agent = BrowserAgent(
             model=openai,
             browser=LaunchBrowser(url=args.url, headless=not args.headed),
-            mode=WebMode(screenshots=True),
+            mode=DomMode(screenshots=True),
             recording=RecordingOptions() if args.record else None,
             session_directory=Path(".browserrig/sessions"),
             approvals=Approvals(default=PolicyDecision.ALLOW),

@@ -17,7 +17,7 @@ def test_yaml_projection_is_typed_and_omits_internal_routing():
         document_id="document",
         url="https://example.org",
         title="A: title",
-        mode="web",
+        mode="dom",
         readiness="ready",
         width=1280,
         height=800,

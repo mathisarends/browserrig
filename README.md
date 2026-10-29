@@ -68,13 +68,13 @@ from harnessed import PolicyDecision
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import BrowserAgent, LaunchBrowser, RecordingOptions, WebMode
+from browserrig import BrowserAgent, LaunchBrowser, RecordingOptions, DomMode
 
 async with OpenAIResponsesModel("gpt-6.1-terra") as openai:
     agent = BrowserAgent(
         model=openai,
         browser=LaunchBrowser(url="https://en.wikipedia.org/wiki/Voyager_program"),
-        mode=WebMode(screenshots=True),
+        mode=DomMode(screenshots=True),
         recording=RecordingOptions(),
         session_directory=".browserrig/sessions",
         approvals=Approvals(default=PolicyDecision.ALLOW),
@@ -129,7 +129,7 @@ references tied to the current observation.
 the same time; gestures do not scroll automatically. Native `draggable` elements
 use HTML5 drag and drop with a real `DataTransfer`.
 
-`PointerTools`, also used by the Figma profile, provides
+`PointerTools`, used in canvas mode, provides
 `click_at(x=..., y=..., count=2)` and
 `drag_at(start=Point(...), end=Point(...), mode=DragMode.POINTER)`.
 Use `DragMode.HTML5` for coordinate-based dragging of native HTML5 sources.
@@ -201,6 +201,3 @@ uses ffprobe when available.
 The core is implemented and tested against real Chrome. Broader platform coverage,
 complex Figma device-frame detection, transformed frames and out-of-process iframes
 (OOPIFs), and recovery from process crashes remain areas for further validation.
-
-See [SPEC.md](SPEC.md) for contracts and [STRUTURE.md](STRUTURE.md) for module
-responsibilities.

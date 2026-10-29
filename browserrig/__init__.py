@@ -9,7 +9,7 @@ from .browser.models import Point
 from .composition import browser_plugins
 from .kinds import DragMode
 from .nudges import Nudges
-from .observation import FigmaMode, WebMode
+from .observation import CanvasMode, DomMode
 from .observation.plugin import Observe
 from .readiness import wait_for_page
 from .readiness.config import ReadinessOptions
@@ -24,11 +24,11 @@ __all__ = [
     "DragMode",
     "Browser",
     "BrowserAgent",
-    "FigmaMode",
+    "CanvasMode",
     "Chrome",
     "ChromeBrowser",
     "ConnectBrowser",
-    "WebMode",
+    "DomMode",
     "LaunchBrowser",
     "Nudges",
     "Observe",

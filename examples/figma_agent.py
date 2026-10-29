@@ -8,11 +8,13 @@ from harnessed import PolicyDecision
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import BrowserAgent, FigmaMode, LaunchBrowser, RecordingOptions
+from browserrig import BrowserAgent, CanvasMode, LaunchBrowser, RecordingOptions
 
 
 async def main() -> None:
-    parser = argparse.ArgumentParser(description="Visual browser automation in explicit Figma mode")
+    parser = argparse.ArgumentParser(
+        description="Visual automation of a Figma prototype in canvas mode"
+    )
     parser.add_argument("--url", required=True)
     parser.add_argument("--selector", default="canvas")
     parser.add_argument("--task", default="Inspect the visible screen and describe its controls.")
@@ -24,7 +26,7 @@ async def main() -> None:
         agent = BrowserAgent(
             model=openai,
             browser=LaunchBrowser(url=args.url),
-            mode=FigmaMode(selector=args.selector),
+            mode=CanvasMode(selector=args.selector),
             recording=RecordingOptions() if args.record else None,
             approvals=Approvals(default=PolicyDecision.ALLOW),
         )

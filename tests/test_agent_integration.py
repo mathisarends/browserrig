@@ -7,12 +7,12 @@ from harnessed.testing import CallbackModel, ScriptedModel
 
 from browserrig import (
     Browser,
+    CanvasMode,
     Chrome,
-    FigmaMode,
+    DomMode,
     Observe,
     Readiness,
     ReadinessOptions,
-    WebMode,
     browser_plugins,
 )
 from browserrig.events import (
@@ -84,7 +84,7 @@ async def test_canvas_mode_native_image(site):
         plugins=[
             Chrome(),
             Start(),
-            Readiness(FigmaMode()),
+            Readiness(CanvasMode()),
             Observe(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
@@ -93,7 +93,7 @@ async def test_canvas_mode_native_image(site):
     assert result.text == "Canvas ready"
     assert any(msg.id.startswith("browser-image:") for msg in model.requests[0].messages)
     observations = [e for e in result.events if isinstance(e, ObservationCapturedEvent)]
-    assert observations[0].mode == "figma"
+    assert observations[0].mode == "canvas"
 
 
 async def test_no_progress_hint_is_derived_from_events(site):
@@ -127,7 +127,7 @@ async def test_no_progress_hint_is_derived_from_events(site):
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(
-                mode=WebMode(), readiness=ReadinessOptions(quiet_ms=50, navigation_min_ms=100)
+                mode=DomMode(), readiness=ReadinessOptions(quiet_ms=50, navigation_min_ms=100)
             ),
             Approvals(default=PolicyDecision.ALLOW),
         ],

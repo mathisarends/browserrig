@@ -56,7 +56,7 @@ async def test_scroll_nudge_requires_exact_same_url_document_and_unrequested_scr
                 url=after_url,
                 fingerprint="after",
                 scroll_y=640,
-                mode="web",
+                mode="dom",
                 readiness="ready",
             )
         )

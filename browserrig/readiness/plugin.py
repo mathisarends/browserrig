@@ -10,7 +10,7 @@ from browserrig.browser.tab import Tab
 from browserrig.events import (
     READINESS_EVENTS,
 )
-from browserrig.observation.config import ObservationMode, WebMode
+from browserrig.observation.config import DomMode, ObservationMode
 
 from .config import ReadinessOptions
 from .models import ReadinessPhase, ReadinessReport
@@ -34,7 +34,7 @@ class Readiness(Plugin, needs=(Browser,)):
         self, mode: ObservationMode | None = None, options: ReadinessOptions | None = None
     ) -> None:
         super().__init__()
-        self.mode = mode or WebMode()
+        self.mode = mode or DomMode()
         self.options = options or ReadinessOptions()
 
     async def setup(self, ctx: Context, browser: Inject[Browser]) -> None:

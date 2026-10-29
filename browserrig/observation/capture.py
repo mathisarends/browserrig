@@ -10,7 +10,7 @@ from browserrig.browser.images import screenshot
 from browserrig.browser.tab import Tab
 from browserrig.readiness.models import ReadinessReport
 
-from .config import FigmaMode, ObservationMode
+from .config import CanvasMode, ObservationMode
 from .models import (
     DOMExtraction,
     Element,
@@ -58,9 +58,9 @@ async def capture(
     elements: list[Element] = []
     text: list[str] = []
     limitations: list[str] = []
-    frames = () if isinstance(mode, FigmaMode) else await browser.frames(tab)
+    frames = () if isinstance(mode, CanvasMode) else await browser.frames(tab)
     for frame in frames:
-        assert not isinstance(mode, FigmaMode)
+        assert not isinstance(mode, CanvasMode)
         try:
             raw_state = await frame.call(
                 SNAPSHOT_SCRIPT,
@@ -104,7 +104,7 @@ async def capture(
             for e in elements
         ),
         image_digest=hashlib.sha256(image.encode()).hexdigest()
-        if isinstance(mode, FigmaMode) and image
+        if isinstance(mode, CanvasMode) and image
         else None,
     ).digest()
     return Snapshot(

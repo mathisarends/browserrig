@@ -6,10 +6,10 @@ import pytest
 from harnessed import Agent, Context, Inject, Plugin
 from harnessed.testing import ScriptedModel
 
-from browserrig import FigmaMode, Readiness, ReadinessOptions, wait_for_page
+from browserrig import CanvasMode, Readiness, ReadinessOptions, wait_for_page
 from browserrig.browser.models import Geometry
 from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent
-from browserrig.readiness.figma import FigmaProbe
+from browserrig.readiness.canvas import CanvasProbe
 from tests.fakes import FakeBrowser, FakeChrome
 
 
@@ -80,14 +80,14 @@ async def test_canvas_reuses_cached_geometry_and_rechecks_pixels_only_after_geom
     original = Geometry(width=500, height=400)
     current = original.model_copy(update={"width": 600}) if changed else original
     cache = {(tab.id, tab.document_id): original}
-    locate = AsyncMock(return_value=FigmaProbe(ready=True, geometry=current))
+    locate = AsyncMock(return_value=CanvasProbe(ready=True, geometry=current))
     pixels = AsyncMock(return_value=(current, ""))
-    monkeypatch.setattr("browserrig.readiness.wait.locate_prototype", locate)
-    monkeypatch.setattr("browserrig.readiness.wait.probe_figma", pixels)
+    monkeypatch.setattr("browserrig.readiness.canvas.locate_canvas", locate)
+    monkeypatch.setattr("browserrig.readiness.canvas.probe_canvas", pixels)
     report = await wait_for_page(
         browser,
         tab,
-        mode=FigmaMode(),
+        mode=CanvasMode(),
         options=ReadinessOptions(timeout=2, quiet_ms=0),
         geometry_cache=cache,
     )

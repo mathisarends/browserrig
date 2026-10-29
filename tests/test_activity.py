@@ -49,7 +49,7 @@ def _request():
 def _readiness_started(readiness_id):
     return ReadinessStartedEvent(
         readiness_id=readiness_id,
-        mode=ObservationKind.WEB,
+        mode=ObservationKind.DOM,
         phase=ReadinessPhase.ACTION,
     )
 
@@ -57,7 +57,7 @@ def _readiness_started(readiness_id):
 def _readiness_ended(kind, readiness_id, reason=""):
     return kind(
         readiness_id=readiness_id,
-        mode=ObservationKind.WEB,
+        mode=ObservationKind.DOM,
         phase=ReadinessPhase.ACTION,
         duration=0.1,
         reason=reason,

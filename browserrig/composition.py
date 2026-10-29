@@ -5,7 +5,7 @@ from .activity import Activity
 from .browser import Chrome
 from .browser.config import BrowserOptions
 from .nudges import Nudges
-from .observation.config import ObservationMode, WebMode
+from .observation.config import DomMode, ObservationMode
 from .observation.plugin import Observe
 from .readiness.config import ReadinessOptions
 from .readiness.plugin import Readiness
@@ -30,7 +30,7 @@ def browser_plugins(
     recording: RecordingOptions | None = None,
 ) -> list[Plugin]:
     """An ordinary, inspectable plugin list. Policies and provider remain caller choices."""
-    selected = mode or WebMode()
+    selected = mode or DomMode()
     plugins: list[Plugin] = [
         Activity(),
         Chrome(options),
@@ -39,12 +39,12 @@ def browser_plugins(
         Observe(),
         Actions(),
         NavigationTools(),
-        InteractionTools() if isinstance(selected, WebMode) else PointerTools(),
+        InteractionTools() if isinstance(selected, DomMode) else PointerTools(),
         TabTools(),
         DialogTools(),
         LatestObservationOnly(),
     ]
-    if isinstance(selected, WebMode):
+    if isinstance(selected, DomMode):
         plugins.extend((FormTools(), FileTools()))
     if recording is not None:
         plugins.append(Recording(recording))

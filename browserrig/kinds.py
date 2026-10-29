@@ -55,8 +55,8 @@ class DragMode(StrEnum):
 
 
 class ObservationKind(StrEnum):
-    WEB = "web"
-    FIGMA = "figma"
+    DOM = "dom"
+    CANVAS = "canvas"
 
 
 class ReadinessStatus(StrEnum):

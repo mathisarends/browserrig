@@ -1,6 +1,6 @@
 import asyncio
-from dataclasses import dataclass
 from time import monotonic
+from typing import assert_never
 from uuid import uuid4
 
 from cdpify.exceptions import CDPCommandError
@@ -16,70 +16,29 @@ from browserrig.events import (
     ReadinessStartedEvent,
     ReadyEvent,
 )
-from browserrig.observation.config import FigmaMode, ObservationMode, WebMode
+from browserrig.observation.config import CanvasMode, DomMode, ObservationMode
 
+from .canvas import CanvasReadiness
 from .config import ReadinessOptions
-from .dom import DOMProbe, probe_dom
-from .figma import locate_prototype, probe_figma
+from .dom import DomReadiness
 from .models import ReadinessPhase, ReadinessReport, ReadinessStatus
+from .strategy import ReadinessStrategy
 
 
-@dataclass
-class _Probe:
-    tab: Tab
-    mode: ObservationMode
-    options: ReadinessOptions
-    phase: ReadinessPhase
-    started: float
-    geometry_cache: dict[tuple[str, str], Geometry]
-    geometry: Geometry | None
-    last_geometry: Geometry | None = None
-    usable: bool = False
-    reason: str = ""
-    delay: float = 0
-
-    async def check(self) -> bool:
-        canvas = isinstance(self.mode, FigmaMode)
-        self.delay = max(self.options.poll_interval, 0.5 if canvas else 0)
-        try:
-            state = await probe_dom(self.tab)
-            self.usable = state.loaded and state.body
-            if isinstance(self.mode, FigmaMode):
-                return await self._canvas(state, self.mode)
-            minimum = (
-                self.options.navigation_min_ms
-                if self.phase in {ReadinessPhase.INITIAL, ReadinessPhase.NAVIGATION}
-                else 0
-            )
-            self.reason = "DOM is loading or continues changing"
-            return (
-                self.usable
-                and state.quiet_ms >= self.options.quiet_ms
-                and (monotonic() - self.started) * 1000 >= minimum
-            )
-        except CDPCommandError as error:
-            if not any(text in error.message.lower() for text in ("context", "frame", "navigat")):
-                raise
-            self.reason = "document changed during readiness"
-            return False
-
-    async def _canvas(self, state: DOMProbe, mode: FigmaMode) -> bool:
-        if self.geometry is not None:
-            location = await locate_prototype(self.tab, mode)
-            if location.geometry == self.geometry:
-                # Recheck pixels only when capture geometry changes.
-                self.delay = self.options.poll_interval
-                return state.quiet_ms >= self.options.quiet_ms
-            self.geometry = None
-            self.geometry_cache.pop((self.tab.id, self.tab.document_id), None)
-        candidate, self.reason = await probe_figma(self.tab, mode)
-        if candidate is not None and candidate == self.last_geometry:
-            self.geometry = candidate
-            self.geometry_cache[(self.tab.id, self.tab.document_id)] = candidate
-            return True
-        self.last_geometry = candidate
-        self.reason = self.reason or "canvas geometry is not stable yet"
-        return False
+def readiness_strategy(
+    mode: ObservationMode,
+    tab: Tab,
+    options: ReadinessOptions,
+    phase: ReadinessPhase,
+    geometry_cache: dict[tuple[str, str], Geometry],
+) -> ReadinessStrategy:
+    match mode:
+        case DomMode():
+            return DomReadiness(tab, options, phase)
+        case CanvasMode():
+            return CanvasReadiness(tab, options, mode, geometry_cache)
+        case _:
+            assert_never(mode)
 
 
 async def wait_for_page(
@@ -92,16 +51,14 @@ async def wait_for_page(
     geometry_cache: dict[tuple[str, str], Geometry] | None = None,
 ) -> ReadinessReport:
     """The same readiness algorithm for a direct browser and the Harnessed plugin."""
-    selected = mode or WebMode()
+    selected = mode or DomMode()
     options = options or ReadinessOptions()
     if geometry_cache is None:
         geometry_cache = {}
     await tab.main_frame()
     started = monotonic()
     rid = uuid4().hex
-    key = (tab.id, tab.document_id)
-    canvas = isinstance(selected, FigmaMode)
-    budget = options.figma_timeout if canvas and key not in geometry_cache else options.timeout
+    strategy = readiness_strategy(selected, tab, options, phase, geometry_cache)
     await browser.emit(
         ReadinessStartedEvent(
             readiness_id=rid,
@@ -112,23 +69,18 @@ async def wait_for_page(
         )
     )
     status = ReadinessStatus.READY
-    probe = _Probe(tab, selected, options, phase, started, geometry_cache, geometry_cache.get(key))
     try:
-        async with asyncio.timeout(budget):
+        async with asyncio.timeout(strategy.budget):
             while True:
                 if tab.dialog:
                     status = ReadinessStatus.BLOCKED
-                    probe.reason = "A JavaScript dialog must be handled first"
+                    strategy.reason = "A JavaScript dialog must be handled first"
                     break
-                if await probe.check():
+                if await _check(strategy):
                     break
-                await asyncio.sleep(probe.delay)
+                await asyncio.sleep(strategy.delay)
     except TimeoutError:
-        status = (
-            ReadinessStatus.DEGRADED
-            if not canvas and probe.usable and options.allow_degraded_dom
-            else ReadinessStatus.FAILED
-        )
+        status = strategy.timeout_status()
     except asyncio.CancelledError:
         await browser.emit(
             ReadinessCancelledEvent(
@@ -163,8 +115,8 @@ async def wait_for_page(
         phase=phase,
         status=status,
         duration=monotonic() - started,
-        reason=probe.reason if status != ReadinessStatus.READY else "",
-        geometry=probe.geometry,
+        reason=strategy.reason if status != ReadinessStatus.READY else "",
+        geometry=strategy.geometry,
     )
     match status:
         case ReadinessStatus.READY:
@@ -185,5 +137,15 @@ async def wait_for_page(
         )
     )
     if status == ReadinessStatus.FAILED:
-        raise ReadinessError(f"{selected.kind} readiness timed out: {probe.reason}")
+        raise ReadinessError(f"{selected.kind} readiness timed out: {strategy.reason}")
     return report
+
+
+async def _check(strategy: ReadinessStrategy) -> bool:
+    try:
+        return await strategy.check()
+    except CDPCommandError as error:
+        if not any(text in error.message.lower() for text in ("context", "frame", "navigat")):
+            raise
+        strategy.reason = "document changed during readiness"
+        return False

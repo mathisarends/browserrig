@@ -38,7 +38,7 @@ allow-direct-references = true
 packages = ["browserrig"]
 
 [tool.hatch.build.targets.sdist]
-include = ["browserrig", "examples", "tests", "README.md", "SPEC.md", "STRUTURE.md",
+include = ["browserrig", "examples", "tests", "README.md",
            "pyproject.toml", "uv.lock", ".env.example", ".github", ".gitattributes",
            ".pre-commit-config.yaml", "package.json", "package-lock.json", "eslint.config.mjs",
            ".prettierrc.json", ".prettierignore"]

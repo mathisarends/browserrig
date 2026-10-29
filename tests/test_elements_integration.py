@@ -1,6 +1,6 @@
 import pytest
 
-from browserrig import ChromeBrowser, LaunchBrowser, WebMode, wait_for_page
+from browserrig import ChromeBrowser, DomMode, LaunchBrowser, wait_for_page
 from browserrig.browser.errors import BrowserError
 from browserrig.kinds import ElementOperation
 from browserrig.observation.capture import ELEMENT_SCRIPT, capture
@@ -26,7 +26,7 @@ async def test_select_notifies_bubbling_listeners_and_rejects_disabled_options(s
             "  });"
             "}"
         )
-        snapshot = await capture(browser, tab, WebMode(), report)
+        snapshot = await capture(browser, tab, DomMode(), report)
         select = next(element for element in snapshot.elements if element.tag == "select")
         result = await frame.call(
             ELEMENT_SCRIPT, snapshot.id, select.index, ElementOperation.SELECT, "Second"
@@ -50,7 +50,7 @@ async def test_focus_selects_text_in_native_and_contenteditable_controls(site, m
         frame = await tab.main_frame()
         # Both tags are fixed test cases, with no page-controlled JavaScript.
         await frame.evaluate(f"document.body.innerHTML = '{markup}'")
-        snapshot = await capture(browser, tab, WebMode(), report)
+        snapshot = await capture(browser, tab, DomMode(), report)
         element = snapshot.elements[0]
         assert await frame.call(
             ELEMENT_SCRIPT, snapshot.id, element.index, ElementOperation.FOCUS, True
@@ -69,7 +69,7 @@ async def test_native_value_setter_preserves_password_redaction_and_value_valida
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(browser, tab)
-        snapshot = await capture(browser, tab, WebMode(), report)
+        snapshot = await capture(browser, tab, DomMode(), report)
         frame = await tab.main_frame()
         secret = next(element for element in snapshot.elements if element.input_type == "password")
         assert secret.value is None

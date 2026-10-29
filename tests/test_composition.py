@@ -8,14 +8,14 @@ from harnessed.testing import ScriptedModel
 
 from browserrig import (
     BrowserAgent,
+    CanvasMode,
     Chrome,
-    FigmaMode,
+    DomMode,
     LaunchBrowser,
     Readiness,
     ReadinessOptions,
     Recording,
     RecordingOptions,
-    WebMode,
 )
 from browserrig.tools import FileTools, FormTools, InteractionTools, PointerTools
 
@@ -32,7 +32,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     agent = BrowserAgent(
         model=ScriptedModel(["ok"]),
         browser=options,
-        mode=WebMode(screenshots=True),
+        mode=DomMode(screenshots=True),
         readiness=readiness,
         recording=recording,
         session_directory=tmp_path / "sessions",
@@ -53,14 +53,14 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
 
 
 @pytest.mark.parametrize(
-    "mode,interaction", [(WebMode(), InteractionTools), (FigmaMode(), PointerTools)]
+    "mode,interaction", [(DomMode(), InteractionTools), (CanvasMode(), PointerTools)]
 )
 def test_facade_keeps_dom_and_canvas_tool_sets_distinct(mode, interaction):
     agent = BrowserAgent(model=ScriptedModel(["ok"]), mode=mode)
     assert sum(isinstance(item, interaction) for item in agent.plugins) == 1
     has_forms = any(isinstance(item, FormTools) for item in agent.plugins)
     has_files = any(isinstance(item, FileTools) for item in agent.plugins)
-    assert has_forms == has_files == isinstance(mode, WebMode)
+    assert has_forms == has_files == isinstance(mode, DomMode)
     assert next(item for item in agent.plugins if isinstance(item, Readiness)).mode == mode
 
 
