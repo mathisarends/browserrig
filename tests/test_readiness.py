@@ -1,12 +1,16 @@
 import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Agent, Context, Inject, Plugin
 from harnessed.testing import ScriptedModel
 
-from browserrig import Readiness, ReadinessOptions
+from browserrig import FigmaMode, Readiness, ReadinessOptions, wait_for_page
+from browserrig.browser.models import Geometry
 from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent
-from tests.fakes import FakeChrome
+from browserrig.readiness.figma import FigmaProbe
+from tests.fakes import FakeBrowser, FakeChrome
 
 
 class Access(Plugin, needs=(Readiness,)):
@@ -14,7 +18,7 @@ class Access(Plugin, needs=(Readiness,)):
         super().__init__()
         self.holder = holder
 
-    async def setup(self, ctx: Context, readiness: Inject[Readiness]):
+    async def setup(self, _ctx: Context, readiness: Inject[Readiness]):
         self.holder["readiness"] = readiness
 
 
@@ -65,3 +69,30 @@ async def test_plugin_state_is_per_session():
         second = holder["readiness"]
         assert second is not first
         assert not second.state.geometry
+
+
+@pytest.mark.parametrize("changed", [False, True])
+async def test_canvas_reuses_cached_geometry_and_rechecks_pixels_only_after_geometry_changes(
+    monkeypatch, changed
+):
+    browser = FakeBrowser(SimpleNamespace(emit=AsyncMock()))
+    tab = browser.active_tab
+    original = Geometry(width=500, height=400)
+    current = original.model_copy(update={"width": 600}) if changed else original
+    cache = {(tab.id, tab.document_id): original}
+    locate = AsyncMock(return_value=FigmaProbe(ready=True, geometry=current))
+    pixels = AsyncMock(return_value=(current, ""))
+    monkeypatch.setattr("browserrig.readiness.wait.locate_prototype", locate)
+    monkeypatch.setattr("browserrig.readiness.wait.probe_figma", pixels)
+    report = await wait_for_page(
+        browser,
+        tab,
+        mode=FigmaMode(),
+        options=ReadinessOptions(timeout=2, quiet_ms=0),
+        geometry_cache=cache,
+    )
+    assert report.status == "ready"
+    assert report.geometry == current
+    assert cache[(tab.id, tab.document_id)] == current
+    assert locate.await_count == 1
+    assert pixels.await_count == (2 if changed else 0)

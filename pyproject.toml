@@ -22,7 +22,14 @@ openai = ["harnessed[openai]"]
 anthropic = ["harnessed[anthropic]"]
 
 [dependency-groups]
-dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.14,<1", "ty>=0.0.93,<0.1"]
+dev = [
+    "pre-commit>=4,<5",
+    "pylint>=4,<5",
+    "pytest>=8,<10",
+    "pytest-asyncio>=1,<2",
+    "ruff>=0.14,<1",
+    "ty>=0.0.93,<0.1",
+]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -32,7 +39,9 @@ packages = ["browserrig"]
 
 [tool.hatch.build.targets.sdist]
 include = ["browserrig", "examples", "tests", "README.md", "SPEC.md", "STRUTURE.md",
-           "pyproject.toml", "uv.lock", ".env.example", ".github"]
+           "pyproject.toml", "uv.lock", ".env.example", ".github", ".gitattributes",
+           ".pre-commit-config.yaml", "package.json", "package-lock.json", "eslint.config.mjs",
+           ".prettierrc.json", ".prettierignore"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -46,7 +55,36 @@ target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pylint.main]
+py-version = "3.12"
+persistent = false
+# Harnessed exposes its public API through module __getattr__.
+ignored-modules = ["harnessed"]
+
+[tool.pylint.messages_control]
+disable = [
+    # Documentation policy and formatting are separate from correctness checks.
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "line-too-long",  # Ruff checks code while allowing long embedded HTML/JS strings.
+    # Models, plugin hooks and transactions do not fit these size heuristics.
+    "too-few-public-methods",
+    "too-many-instance-attributes",
+    "too-many-arguments",
+    "too-many-positional-arguments",
+    "too-many-locals",
+    "duplicate-code",
+]
+
+[tool.pylint.design]
+max-nested-blocks = 3
+
+[tool.pylint.reports]
+reports = false
+score = false
 
 [tool.ty.environment]
 python-version = "3.12"

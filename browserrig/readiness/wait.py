@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import dataclass
 from time import monotonic
 from uuid import uuid4
 
@@ -18,9 +19,67 @@ from browserrig.events import (
 from browserrig.observation.config import FigmaMode, ObservationMode, WebMode
 
 from .config import ReadinessOptions
-from .dom import probe_dom
+from .dom import DOMProbe, probe_dom
 from .figma import locate_prototype, probe_figma
 from .models import ReadinessPhase, ReadinessReport, ReadinessStatus
+
+
+@dataclass
+class _Probe:
+    tab: Tab
+    mode: ObservationMode
+    options: ReadinessOptions
+    phase: ReadinessPhase
+    started: float
+    geometry_cache: dict[tuple[str, str], Geometry]
+    geometry: Geometry | None
+    last_geometry: Geometry | None = None
+    usable: bool = False
+    reason: str = ""
+    delay: float = 0
+
+    async def check(self) -> bool:
+        canvas = isinstance(self.mode, FigmaMode)
+        self.delay = max(self.options.poll_interval, 0.5 if canvas else 0)
+        try:
+            state = await probe_dom(self.tab)
+            self.usable = state.loaded and state.body
+            if isinstance(self.mode, FigmaMode):
+                return await self._canvas(state, self.mode)
+            minimum = (
+                self.options.navigation_min_ms
+                if self.phase in {ReadinessPhase.INITIAL, ReadinessPhase.NAVIGATION}
+                else 0
+            )
+            self.reason = "DOM is loading or continues changing"
+            return (
+                self.usable
+                and state.quiet_ms >= self.options.quiet_ms
+                and (monotonic() - self.started) * 1000 >= minimum
+            )
+        except CDPCommandError as error:
+            if not any(text in error.message.lower() for text in ("context", "frame", "navigat")):
+                raise
+            self.reason = "document changed during readiness"
+            return False
+
+    async def _canvas(self, state: DOMProbe, mode: FigmaMode) -> bool:
+        if self.geometry is not None:
+            location = await locate_prototype(self.tab, mode)
+            if location.geometry == self.geometry:
+                # Recheck pixels only when capture geometry changes.
+                self.delay = self.options.poll_interval
+                return state.quiet_ms >= self.options.quiet_ms
+            self.geometry = None
+            self.geometry_cache.pop((self.tab.id, self.tab.document_id), None)
+        candidate, self.reason = await probe_figma(self.tab, mode)
+        if candidate is not None and candidate == self.last_geometry:
+            self.geometry = candidate
+            self.geometry_cache[(self.tab.id, self.tab.document_id)] = candidate
+            return True
+        self.last_geometry = candidate
+        self.reason = self.reason or "canvas geometry is not stable yet"
+        return False
 
 
 async def wait_for_page(
@@ -53,65 +112,21 @@ async def wait_for_page(
         )
     )
     status = ReadinessStatus.READY
-    reason = ""
-    geometry = geometry_cache.get(key)
-    last_geometry: Geometry | None = None
-    usable = False
+    probe = _Probe(tab, selected, options, phase, started, geometry_cache, geometry_cache.get(key))
     try:
         async with asyncio.timeout(budget):
             while True:
                 if tab.dialog:
-                    status, reason = (
-                        ReadinessStatus.BLOCKED,
-                        "A JavaScript dialog must be handled first",
-                    )
+                    status = ReadinessStatus.BLOCKED
+                    probe.reason = "A JavaScript dialog must be handled first"
                     break
-                try:
-                    state = await probe_dom(tab)
-                    usable = state.loaded and state.body
-                    if canvas:
-                        if geometry is not None:
-                            location = await locate_prototype(tab, selected)
-                            if location.geometry == geometry:
-                                # Later loading content is observable; initial pixel readiness
-                                # is repeated only when capture geometry changes.
-                                if state.quiet_ms >= options.quiet_ms:
-                                    break
-                                await asyncio.sleep(options.poll_interval)
-                                continue
-                            geometry = None
-                            geometry_cache.pop((tab.id, tab.document_id), None)
-                        candidate, reason = await probe_figma(tab, selected)
-                        if candidate is not None and candidate == last_geometry:
-                            geometry = candidate
-                            geometry_cache[(tab.id, tab.document_id)] = geometry
-                            break
-                        last_geometry = candidate
-                        reason = reason or "canvas geometry is not stable yet"
-                    else:
-                        minimum = (
-                            options.navigation_min_ms
-                            if phase in {ReadinessPhase.INITIAL, ReadinessPhase.NAVIGATION}
-                            else 0
-                        )
-                        if (
-                            usable
-                            and state.quiet_ms >= options.quiet_ms
-                            and (monotonic() - started) * 1000 >= minimum
-                        ):
-                            break
-                        reason = "DOM is loading or continues changing"
-                except CDPCommandError as error:
-                    if not any(
-                        text in error.message.lower() for text in ("context", "frame", "navigat")
-                    ):
-                        raise
-                    reason = "document changed during readiness"
-                await asyncio.sleep(max(options.poll_interval, 0.5 if canvas else 0))
+                if await probe.check():
+                    break
+                await asyncio.sleep(probe.delay)
     except TimeoutError:
         status = (
             ReadinessStatus.DEGRADED
-            if not canvas and usable and options.allow_degraded_dom
+            if not canvas and probe.usable and options.allow_degraded_dom
             else ReadinessStatus.FAILED
         )
     except asyncio.CancelledError:
@@ -148,8 +163,8 @@ async def wait_for_page(
         phase=phase,
         status=status,
         duration=monotonic() - started,
-        reason=reason if status != ReadinessStatus.READY else "",
-        geometry=geometry,
+        reason=probe.reason if status != ReadinessStatus.READY else "",
+        geometry=probe.geometry,
     )
     match status:
         case ReadinessStatus.READY:
@@ -170,5 +185,5 @@ async def wait_for_page(
         )
     )
     if status == ReadinessStatus.FAILED:
-        raise ReadinessError(f"{selected.kind} readiness timed out: {reason}")
+        raise ReadinessError(f"{selected.kind} readiness timed out: {probe.reason}")
     return report

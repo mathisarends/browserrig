@@ -117,13 +117,32 @@ async for event in session.subscribe():
 
 ## Entwicklung und Arbeitsstand
 
+Python >=3.12, uv und Node.js >=24 werden für die Entwicklungswerkzeuge benötigt.
+
 ```powershell
+uv sync --locked --extra openai
+npm.cmd ci
+uv run pre-commit install
+uv run pre-commit run --all-files
+
 uv run ruff check browserrig examples tests
+uv run ruff format --check browserrig examples tests
+uv run pylint browserrig examples tests
 uv run ty check
+npm.cmd run lint
+npm.cmd run format:check
 uv run pytest -m "not integration"
 uv run pytest -m integration
 uv build
 ```
+
+Die Pre-commit-Hooks verwenden die in den Lockfiles festgelegten uv-/npm-Abhängigkeiten.
+Unter Linux/macOS heißt der npm-Aufruf `npm`. JavaScript wird mit ESLint und Prettier
+geprüft: geschweifte Klammern für alle Kontrollblöcke, maximal zwei verschachtelte
+Blöcke und keine verschachtelten ternären Ausdrücke. Pylint begrenzt verschachtelte
+Python-Blöcke auf drei; Ruff prüft zusätzlich Vereinfachungen. CI führt dieselben
+Lint-, Format- und Typprüfungen aus. Zum Formatieren: `uv run ruff format browserrig examples tests`
+und `npm.cmd run format`.
 
 Integrationstests benötigen Chrome/Chromium. `BROWSERRIG_CHROME` oder
 `LaunchBrowser(executable=...)` kann das Binary vorgeben. Medienprüfung verwendet

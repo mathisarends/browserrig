@@ -1,5 +1,5 @@
 import asyncio
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, suppress
 from dataclasses import replace
 from typing import Any, Self
 from uuid import uuid4
@@ -38,7 +38,7 @@ from .process import ChromeProcess
 from .tab import Frame, Tab, validated_url
 
 
-async def _discard(event: BrowserEvent) -> None:
+async def _discard(_event: BrowserEvent) -> None:
     pass
 
 
@@ -178,11 +178,9 @@ class ChromeBrowser:
 
     async def _detach(self, session_id: str) -> None:
         if self.client.is_connected:
-            try:
+            # The target may already have been destroyed by its owner.
+            with suppress(Exception):
                 await self.client.target.detach_from_target(session_id=session_id)
-            except Exception:
-                # The target may already have been destroyed by its owner.
-                pass
 
     async def tabs(self) -> tuple[TabInfo, ...]:
         self._check()
@@ -352,35 +350,38 @@ class ChromeBrowser:
                                 DownloadStartedEvent(download_id=guid, filename=name, url=url)
                             )
                         case DownloadProgressEvent(guid=guid) if guid in self._downloads:
-                            previous = self._downloads[guid]
-                            download = Download(
-                                id=guid,
-                                url=previous.url,
-                                filename=previous.filename,
-                                state=DownloadState(event.state),
-                                received_bytes=int(event.received_bytes),
-                                path=event.file_path,
-                            )
-                            self._downloads[guid] = download
-                            match download.state:
-                                case DownloadState.COMPLETED:
-                                    await self.emit(
-                                        DownloadCompletedEvent(
-                                            download_id=guid,
-                                            filename=download.filename,
-                                            size=download.received_bytes,
-                                        )
-                                    )
-                                case DownloadState.CANCELED:
-                                    await self.emit(
-                                        DownloadFailedEvent(
-                                            download_id=guid, reason="Download canceled by browser"
-                                        )
-                                    )
+                            await self._download_progress(event)
         except asyncio.CancelledError:
             raise
-        except BaseException as error:
+        except BaseException as error:  # pylint: disable=broad-exception-caught
+            # Surface listener failures on the next browser operation.
             self._failure = error
+
+    async def _download_progress(self, event: DownloadProgressEvent) -> None:
+        guid = event.guid
+        previous = self._downloads[guid]
+        download = Download(
+            id=guid,
+            url=previous.url,
+            filename=previous.filename,
+            state=DownloadState(event.state),
+            received_bytes=int(event.received_bytes),
+            path=event.file_path,
+        )
+        self._downloads[guid] = download
+        match download.state:
+            case DownloadState.COMPLETED:
+                await self.emit(
+                    DownloadCompletedEvent(
+                        download_id=guid,
+                        filename=download.filename,
+                        size=download.received_bytes,
+                    )
+                )
+            case DownloadState.CANCELED:
+                await self.emit(
+                    DownloadFailedEvent(download_id=guid, reason="Download canceled by browser")
+                )
 
     async def _stop_listeners(self) -> None:
         for task in self._tasks:

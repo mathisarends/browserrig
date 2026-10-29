@@ -8,3 +8,4 @@ build/
 *.egg-info/
 .env
 .browserrig/
+node_modules/

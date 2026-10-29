@@ -58,36 +58,37 @@ async def capture(
     elements: list[Element] = []
     text: list[str] = []
     limitations: list[str] = []
-    if not isinstance(mode, FigmaMode):
-        for frame in await browser.frames(tab):
-            try:
-                raw_state = await frame.call(
-                    SNAPSHOT_SCRIPT,
-                    {
-                        "token": snapshot_id,
-                        "maxElements": max(0, mode.max_elements - len(elements)),
-                        "maxText": max(0, mode.max_text_chars - sum(len(part) for part in text)),
-                    },
-                )
-                state = DOMExtraction.model_validate(raw_state)
-                text.append(state.text)
-                for item in state.elements:
-                    elements.append(
-                        Element(
-                            ref=f"{snapshot_id[:8]}:{len(elements)}",
-                            frame_id=frame.id,
-                            index=item.index,
-                            role=item.role,
-                            name=item.name,
-                            tag=item.tag,
-                            input_type=item.input_type,
-                            value=item.value,
-                            disabled=item.disabled,
-                            options=item.options,
-                        )
+    frames = () if isinstance(mode, FigmaMode) else await browser.frames(tab)
+    for frame in frames:
+        assert not isinstance(mode, FigmaMode)
+        try:
+            raw_state = await frame.call(
+                SNAPSHOT_SCRIPT,
+                {
+                    "token": snapshot_id,
+                    "maxElements": max(0, mode.max_elements - len(elements)),
+                    "maxText": max(0, mode.max_text_chars - sum(len(part) for part in text)),
+                },
+            )
+            state = DOMExtraction.model_validate(raw_state)
+            text.append(state.text)
+            for item in state.elements:
+                elements.append(
+                    Element(
+                        ref=f"{snapshot_id[:8]}:{len(elements)}",
+                        frame_id=frame.id,
+                        index=item.index,
+                        role=item.role,
+                        name=item.name,
+                        tag=item.tag,
+                        input_type=item.input_type,
+                        value=item.value,
+                        disabled=item.disabled,
+                        options=item.options,
                     )
-            except CDPCommandError:
-                limitations.append(f"Frame {frame.id} changed or could not be inspected")
+                )
+        except CDPCommandError:
+            limitations.append(f"Frame {frame.id} changed or could not be inspected")
     image = await screenshot(tab, report.geometry) if mode.screenshots else None
     await tab.main_frame()
     if tab.document_id != document_id:

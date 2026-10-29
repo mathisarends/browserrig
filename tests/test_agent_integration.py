@@ -1,11 +1,12 @@
 import pytest
 import yaml
-from harnessed import Agent, PolicyDecision, ToolCall
+from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel
 
 from browserrig import (
+    Browser,
     Chrome,
     FigmaMode,
     Observe,
@@ -33,16 +34,22 @@ async def test_model_tools_yaml_and_activity(site):
             result = ToolCall("navigate", {"url": site})
         else:
             state = next(
-                yaml.safe_load(msg.text)
-                for msg in reversed(request.messages)
-                if msg.text.startswith("page:\n")
+                (
+                    yaml.safe_load(msg.text)
+                    for msg in reversed(request.messages)
+                    if msg.text.startswith("page:\n")
+                ),
+                None,
             )
+            assert state is not None
             if count == 1:
-                email = next(el for el in state["elements"] if el.get("name") == "Email")
+                email = next((el for el in state["elements"] if el.get("name") == "Email"), None)
+                assert email is not None
                 result = ToolCall("type_text", {"ref": email["ref"], "text": "person@example.org"})
                 assert "never-echo-this" not in str(state)
             elif count == 2:
-                button = next(el for el in state["elements"] if el.get("name") == "Submit")
+                button = next((el for el in state["elements"] if el.get("name") == "Submit"), None)
+                assert button is not None
                 result = ToolCall("click", {"ref": button["ref"]})
             else:
                 assert any(el.get("name") == "Done" for el in state["elements"])
@@ -66,13 +73,10 @@ async def test_model_tools_yaml_and_activity(site):
 
 async def test_canvas_mode_native_image(site):
     model = ScriptedModel(["Canvas ready"])
+
     # Start on a canvas before the first observation: blank about:blank is intentionally not ready.
-    from harnessed import Context, Inject, Plugin
-
-    from browserrig import Browser
-
     class Start(Plugin, needs=(Browser,)):
-        async def setup(self, ctx: Context, browser: Inject[Browser]):
+        async def setup(self, _ctx: Context, browser: Inject[Browser]):
             await browser.active_tab.navigate(site + "/canvas")
 
     agent = Agent(
@@ -101,11 +105,16 @@ async def test_no_progress_hint_is_derived_from_events(site):
             result = ToolCall("navigate", {"url": site})
         elif count == 1:
             state = next(
-                yaml.safe_load(msg.text)
-                for msg in reversed(request.messages)
-                if msg.text.startswith("page:\n")
+                (
+                    yaml.safe_load(msg.text)
+                    for msg in reversed(request.messages)
+                    if msg.text.startswith("page:\n")
+                ),
+                None,
             )
-            element = next(el for el in state["elements"] if el.get("name") == "Nothing")
+            assert state is not None
+            element = next((el for el in state["elements"] if el.get("name") == "Nothing"), None)
+            assert element is not None
             result = ToolCall("click", {"ref": element["ref"]})
         else:
             assert any("no observable page change" in msg.text for msg in request.messages)

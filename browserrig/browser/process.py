@@ -2,6 +2,7 @@ import asyncio
 import os
 import shutil
 import subprocess
+from asyncio.subprocess import Process
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Self
@@ -41,7 +42,7 @@ class ChromeProcess:
 
     def __init__(self, options: LaunchBrowser) -> None:
         self.options = options
-        self.process: asyncio.subprocess.Process | None = None
+        self.process: Process | None = None
         self.profile: TemporaryDirectory[str] | None = None
         self.endpoint = ""
 

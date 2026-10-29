@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import replace
 
 from harnessed import Context, Inject, Plugin
 from harnessed.core.session.session import SessionLog
@@ -18,7 +19,7 @@ class FakeTab:
     async def main_frame(self):
         return self
 
-    async def evaluate(self, expression):
+    async def evaluate(self, _expression):
         self.probes += 1
         await asyncio.sleep(0)
         return {
@@ -38,8 +39,6 @@ class FakeBrowser:
         self.log = log
 
     async def emit(self, event):
-        from dataclasses import replace
-
         await self.log.emit(replace(event, browser_id=self.id))
 
 

@@ -23,7 +23,7 @@ class TabTools(Plugin, needs=(Actions,)):
     ) -> str:
         """Open and activate a new tab."""
 
-        async def open_tab(tab: Tab) -> Effect:
+        async def open_tab(_tab: Tab) -> Effect:
             opened = await actions.browser.open_tab(url)
             await actions.readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
             return Effect(f"Opened tab {opened.id}.")
@@ -39,7 +39,7 @@ class TabTools(Plugin, needs=(Actions,)):
     ) -> str:
         """Activate one listed tab by its stable target ID."""
 
-        async def switch(tab: Tab) -> Effect:
+        async def switch(_tab: Tab) -> Effect:
             selected = await actions.browser.activate_tab(target_id)
             await actions.readiness.wait(selected)
             return Effect(f"Activated tab {selected.id}.")

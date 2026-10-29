@@ -8,8 +8,6 @@ from browserrig.events import (
     NavigationStartedEvent,
 )
 from browserrig.kinds import ActionKind
-from browserrig.observation.plugin import Observe
-from browserrig.readiness.plugin import Readiness
 
 from .execution import Actions, Effect
 
@@ -49,9 +47,7 @@ class NavigationTools(Plugin, needs=(Actions,)):
         )
 
     @tool
-    async def go_back(
-        self, *, actions: Inject[Actions], readiness: Inject[Readiness], observe: Inject[Observe]
-    ) -> str:
+    async def go_back(self, *, actions: Inject[Actions]) -> str:
         """Go to the previous browser history entry."""
 
         async def back(tab: Tab) -> Effect:
@@ -69,9 +65,7 @@ class NavigationTools(Plugin, needs=(Actions,)):
         )
 
     @tool
-    async def reload(
-        self, *, actions: Inject[Actions], readiness: Inject[Readiness], observe: Inject[Observe]
-    ) -> str:
+    async def reload(self, *, actions: Inject[Actions]) -> str:
         """Reload the active tab."""
 
         async def reload(tab: Tab) -> Effect:

@@ -2,6 +2,7 @@ import asyncio
 import base64
 import hashlib
 import os
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import monotonic
@@ -76,12 +77,14 @@ class Recording(Plugin, needs=(Browser, Readiness)):
     async def on_ready(self, event: ReadyEvent) -> None:
         browser = self.state.browser
         assert browser is not None
-        if event.target_id == browser.active_tab.id and not self.state.paused:
-            if self.state.start_task is None or self.state.start_task.done():
-                self.state.start_task = asyncio.create_task(
-                    self.ensure_started(browser.active_tab), name="browserrig:recording-start"
-                )
-                self.state.start_task.add_done_callback(_retrieve_failure)
+        if event.target_id != browser.active_tab.id or self.state.paused:
+            return
+        if self.state.start_task is not None and not self.state.start_task.done():
+            return
+        self.state.start_task = asyncio.create_task(
+            self.ensure_started(browser.active_tab), name="browserrig:recording-start"
+        )
+        self.state.start_task.add_done_callback(_retrieve_failure)
 
     async def ensure_started(self, tab: Tab, *, geometry: Geometry | None = None) -> None:
         async with self.state.lock:
@@ -115,9 +118,8 @@ class Recording(Plugin, needs=(Browser, Readiness)):
                         document_id=tab.document_id,
                     )
                 )
-            except asyncio.CancelledError:
-                raise
-            except Exception as error:
+            except Exception as error:  # pylint: disable=broad-exception-caught
+                # Record optional backend failures and enforce required recording in _failed.
                 await self._failed(f"Native recording start failed ({type(error).__name__})")
 
     async def _failed(self, reason: str) -> None:
@@ -161,12 +163,7 @@ class Recording(Plugin, needs=(Browser, Readiness)):
                 finally:
                     await _disk(output.close)
                 header = await asyncio.to_thread(_header, partial)
-                if header.startswith(b"\x1aE\xdf\xa3"):
-                    extension, mime = ".webm", "video/webm"
-                elif header[4:8] == b"ftyp":
-                    extension, mime = ".mp4", "video/mp4"
-                else:
-                    raise RecordingError("Native recording returned an unknown video container")
+                extension, mime = _container(header)
                 target = partial.with_suffix(extension)
                 await asyncio.to_thread(partial.replace, target)
                 segment = RecordingSegment(
@@ -192,17 +189,14 @@ class Recording(Plugin, needs=(Browser, Readiness)):
                         target_id=tab.id,
                     )
                 )
-        except asyncio.CancelledError:
-            raise
-        except Exception as error:
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            # Finalization failures must produce a recording receipt.
             await self._failed(f"Native recording finalization failed ({type(error).__name__})")
         finally:
             for handle in handles:
-                try:
+                with suppress(Exception):
                     async with asyncio.timeout(5):
                         await tab.cdp.io.close(handle=handle)
-                except Exception:
-                    pass
 
     @hook(session.ControlChanged)
     async def on_control(self, event: session.ControlChanged) -> None:
@@ -258,3 +252,11 @@ def _write_manifest(path: Path, payload: RecordingManifest) -> None:
 def _retrieve_failure(task: asyncio.Task[None]) -> None:
     if not task.cancelled():
         task.exception()
+
+
+def _container(header: bytes) -> tuple[str, str]:
+    if header.startswith(b"\x1aE\xdf\xa3"):
+        return ".webm", "video/webm"
+    if header[4:8] == b"ftyp":
+        return ".mp4", "video/mp4"
+    raise RecordingError("Native recording returned an unknown video container")

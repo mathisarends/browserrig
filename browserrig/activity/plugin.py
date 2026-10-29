@@ -64,7 +64,7 @@ class Activity(Plugin):
             await self._finish(key, "closed")
 
     @hook(model.Requested)
-    async def on_model(self, event: model.Requested) -> None:
+    async def on_model(self, _event: model.Requested) -> None:
         self.state.request_count += 1
         await self._start("llm", ActivityKind.LLM, f"{self.state.epoch}:{self.state.request_count}")
 

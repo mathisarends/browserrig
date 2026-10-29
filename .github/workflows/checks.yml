@@ -15,11 +15,26 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: uv sync --locked --extra openai
+      - run: uv run --no-sync pre-commit validate-config
       - run: uv run --no-sync ruff check browserrig examples tests
+      - run: uv run --no-sync ruff format --check browserrig examples tests
+      - run: uv run --no-sync pylint browserrig examples tests
       - run: uv run --no-sync ty check
       - run: uv run --no-sync pytest -m "not integration"
       - run: uv build
       - run: uv run --no-sync python -m examples.openai_agent --help
+
+  javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
 
   chrome:
     runs-on: ubuntu-latest

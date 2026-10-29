@@ -17,7 +17,7 @@ async def test_pause_steer_resume_observes_external_page_change(site):
     holder = {}
 
     class Gate(Plugin, needs=(Browser,)):
-        async def setup(self, ctx: Context, browser: Inject[Browser]):
+        async def setup(self, _ctx: Context, browser: Inject[Browser]):
             holder["browser"] = browser
 
         @tool

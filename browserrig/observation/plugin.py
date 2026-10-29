@@ -122,7 +122,9 @@ class Observe(Plugin, needs=(Browser, Readiness)):
         return await next_()
 
     @hook(PrepareRequest)
-    async def prepare_image(self, event: PrepareRequest, next_: Next[ModelRequest]) -> ModelRequest:
+    async def prepare_image(
+        self, _event: PrepareRequest, next_: Next[ModelRequest]
+    ) -> ModelRequest:
         request = await next_()
         snapshot = self.state.snapshot
         if snapshot is not None and snapshot.image:
