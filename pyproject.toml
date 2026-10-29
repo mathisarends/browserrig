@@ -1,0 +1,55 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "browserrig"
+version = "0.1.0"
+description = "Event-driven Chrome automation for Harnessed."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "harnessed @ git+https://github.com/mathisarends/harnessed.git@967380be850e349e52b67b4a094a995adff9602e",
+    "cdpify[websocket]>=0.4.0,<0.5",
+    "httpx>=0.28,<1",
+    "pillow>=13,<14",
+    "pydantic>=2.12,<3",
+    "pyyaml>=6,<7",
+]
+
+[project.optional-dependencies]
+openai = ["harnessed[openai]"]
+anthropic = ["harnessed[anthropic]"]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.14,<1", "ty>=0.0.93,<0.1"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["browserrig"]
+
+[tool.hatch.build.targets.sdist]
+include = ["browserrig", "examples", "tests", "README.md", "SPEC.md", "STRUTURE.md",
+           "pyproject.toml", "uv.lock", ".env.example", ".github"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--import-mode=importlib"
+markers = ["integration: runs a real local Chrome browser"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+include = ["browserrig"]
