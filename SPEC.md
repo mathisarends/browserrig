@@ -83,7 +83,7 @@ durch `PluginState` oder in `setup`. `needs` und `Inject` beschreiben Abhängigk
 ## 3. Typen und Quellcodestil
 
 - Geschlossene Werte werden mit `StrEnum` modelliert: Browser- und Beobachtungsmodus,
-  Readiness-Zustand/-Phase, Aktionsart, Aktivitätsart und Event-Tags.
+  Readiness-Zustand/-Phase, Aktionsart, Aktivitätsart/-ausgang und Event-Tags.
 - Konfigurations-Unionen verwenden `Literal[Enum.MEMBER]` als Diskriminator.
 - Öffentliche Daten, Extraktionsergebnisse, YAML-Ansicht, Fingerprint-Eingaben,
   Recording-Segmente und Manifest sind Pydantic-Modelle.
@@ -312,6 +312,23 @@ Die Baseline verwendet cdpifys `page.start_screen_recording(...)` und
 `Activity` beobachtet Modellrequest/Assistant-Receipt, Toolreceipts, Readiness und
 bestätigte Controls. Das LLM wird dafür nicht dekoriert. `ActivityKind` ist derselbe
 Enum-Typ im Event und in der Projektion.
+
+Offene Intervalle sind durch `ActivityKey(kind, correlation_id)` adressiert. Modellwartezeit
+und Pause besitzen je einen Slot ohne Korrelations-ID; Tool- und Readiness-Intervalle
+erfordern ihre eigene ID. Identische ID-Texte verschiedener Aktivitätsarten kollidieren nicht.
+Ein erneuter Start desselben Slots beendet nur dessen Vorgänger mit `SUPERSEDED`.
+
+`ActivityFinishedEvent.outcome` ist ein validierter `ActivityOutcome`-Enum.
+Readiness-Endereignisse und Harnesseds Step-/Turn-Enums bestimmen den Ausgang explizit;
+freie Diagnosetexte stehen ausschließlich in `reason`. Fehlerhafte Toolreceipts ergeben
+`FAILED`. Turn-Ende beendet offene Arbeit, aber keine bestätigte Pause; Session-Cleanup
+schließt verbleibende Intervalle mit `CLOSED`. Liveansicht und Replay verwenden dieselbe
+Intervallprojektion.
+
+Bekannte bisherige Outcome-Werte wie `completed` bleiben beim Laden gültig; ein fehlendes
+`reason` wird als leer behandelt. Alte Records, die freien Readiness-Text in `outcome`
+gespeichert haben, benötigen eine Migration anhand der zugehörigen Readiness-Endereignisse.
+Unbekannte Outcome-Werte werden nicht als gültige Zustände akzeptiert.
 
 Gemessen wird clientseitige Modellwartezeit einschließlich Netzwerk/Streaming.
 Die Projektion `inference_only` zieht überlappende Tool-, Readiness- und Pausezeit

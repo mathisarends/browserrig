@@ -10,6 +10,7 @@ from harnessed.events import DurableEvent
 from browserrig.kinds import (
     ActionKind,
     ActivityKind,
+    ActivityOutcome,
     ObservationKind,
     ReadinessPhase,
     ReadinessStatus,
@@ -305,6 +306,9 @@ class ActivityStartedEvent(BrowserEvent):
         default=EventKind.ACTIVITY_STARTED, kw_only=True
     )
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "kind", ActivityKind(self.kind))
+
 
 @dataclass(frozen=True, slots=True)
 class ActivityFinishedEvent(BrowserEvent):
@@ -312,11 +316,16 @@ class ActivityFinishedEvent(BrowserEvent):
     kind: ActivityKind
     cause_id: str
     started_at: float
-    outcome: str
+    outcome: ActivityOutcome
     epoch_id: str = ""
+    reason: str = ""
     type: Literal[EventKind.ACTIVITY_FINISHED] = field(
         default=EventKind.ACTIVITY_FINISHED, kw_only=True
     )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "kind", ActivityKind(self.kind))
+        object.__setattr__(self, "outcome", ActivityOutcome(self.outcome))
 
 
 BROWSER_EVENTS = (

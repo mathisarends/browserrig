@@ -177,7 +177,9 @@ und Cleanup. Es gibt keinen obligatorischen Encoderprozess und keine JPEG-Pipeli
 
 `activity/plugin.py` liest vorhandene Modell-/Tool-/Control-Ereignisse.
 `activity/models.py` enthält Zeitbereiche und die reine Überlappungsprojektion.
-`ActivityKind` wird im Event und in der Berechnung gemeinsam verwendet.
+Außerdem definiert es typisierte Intervallschlüssel und die explizite Zuordnung der
+Harnessed-Step-/Turn-Outcomes. `ActivityKind` und `ActivityOutcome` werden im Event
+und in der Berechnung gemeinsam verwendet; freier Diagnosetext liegt separat in `reason`.
 
 Das LLM bleibt das native Modell plus Harnesseds vorhandener Provideradapter.
 

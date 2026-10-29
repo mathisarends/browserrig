@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from time import monotonic
 from uuid import uuid4
 
 from harnessed import Context, Inject, Plugin, PluginState, hook
@@ -10,15 +9,24 @@ from browserrig.events import (
     ACTIVITY_EVENTS,
     ActivityFinishedEvent,
     ActivityStartedEvent,
+    ReadinessCancelledEvent,
+    ReadinessDegradedEvent,
     ReadinessEndedEvent,
+    ReadinessFailedEvent,
     ReadinessStartedEvent,
+    ReadyEvent,
 )
-from browserrig.kinds import ActivityKind
+from browserrig.kinds import ActivityKind, ActivityOutcome
+
+from .models import ActivityKey, project_intervals, step_outcome, turn_outcome
+
+_MODEL_WAIT = ActivityKey(ActivityKind.LLM)
+_PAUSE = ActivityKey(ActivityKind.PAUSED)
 
 
 @dataclass
 class _State:
-    open: dict[str, ActivityStartedEvent] = field(default_factory=dict)
+    open: dict[ActivityKey, ActivityStartedEvent] = field(default_factory=dict)
     log: SessionLog | None = None
     epoch: str = field(default_factory=lambda: uuid4().hex)
     request_count: int = 0
@@ -35,95 +43,119 @@ class Activity(Plugin):
         ctx.effect(self._close_all)
         ctx.provide(Activity, self)
 
-    async def _start(self, key: str, kind: ActivityKind, cause: str) -> None:
-        await self._finish(key, "superseded")
+    async def _start(self, key: ActivityKey, *, cause_id: str) -> None:
+        """A new interval in the same slot supersedes only that slot's previous interval."""
+        await self._finish(key, ActivityOutcome.SUPERSEDED)
         event = ActivityStartedEvent(
-            interval_id=uuid4().hex, kind=kind, cause_id=cause, epoch_id=self.state.epoch
+            interval_id=uuid4().hex, kind=key.kind, cause_id=cause_id, epoch_id=self.state.epoch
         )
         self.state.open[key] = event
         assert self.state.log is not None
         await self.state.log.emit(event)
 
-    async def _finish(self, key: str, outcome: str = "completed") -> None:
+    async def _finish(
+        self,
+        key: ActivityKey,
+        outcome: ActivityOutcome = ActivityOutcome.COMPLETED,
+        *,
+        reason: str = "",
+    ) -> None:
         event = self.state.open.pop(key, None)
-        if event is not None:
-            assert self.state.log is not None
-            await self.state.log.emit(
-                ActivityFinishedEvent(
-                    interval_id=event.interval_id,
-                    kind=event.kind,
-                    cause_id=event.cause_id,
-                    started_at=event.at,
-                    outcome=outcome,
-                    epoch_id=event.epoch_id,
-                )
-            )
-
-    async def _close_all(self) -> None:
-        for key in tuple(self.state.open):
-            await self._finish(key, "closed")
-
-    @hook(model.Requested)
-    async def on_model(self, _event: model.Requested) -> None:
-        self.state.request_count += 1
-        await self._start("llm", ActivityKind.LLM, f"{self.state.epoch}:{self.state.request_count}")
-
-    @hook(message.Assistant)
-    async def on_assistant(self, event: message.Assistant) -> None:
-        await self._finish("llm", "interrupted" if event.interrupted else "completed")
-
-    @hook(tool.ExecutionStarted)
-    async def on_tool(self, event: tool.ExecutionStarted) -> None:
-        await self._finish("llm")
-        await self._start(f"tool:{event.call_id}", ActivityKind.TOOL, event.call_id)
-
-    @hook(tool.ExecutionFinished)
-    async def on_tool_finished(self, event: tool.ExecutionFinished) -> None:
-        await self._finish(f"tool:{event.call_id}")
-
-    @hook(ReadinessStartedEvent)
-    async def on_readiness(self, event: ReadinessStartedEvent) -> None:
-        await self._start(event.readiness_id, ActivityKind.READINESS, event.readiness_id)
-
-    @hook(ReadinessEndedEvent)
-    async def on_ready(self, event: ReadinessEndedEvent) -> None:
-        await self._finish(event.readiness_id, event.reason or "completed")
-
-    @hook(session.ControlChanged)
-    async def on_control(self, event: session.ControlChanged) -> None:
-        if event.state == session.ControlState.PAUSED:
-            await self._start("paused", ActivityKind.PAUSED, self.state.epoch)
-        elif event.state == session.ControlState.ACTIVE:
-            await self._finish("paused")
-
-    @hook(step.Finished)
-    async def on_step(self, event: step.Finished) -> None:
-        await self._finish("llm", str(event.reason))
-
-    @hook(turn.Ended)
-    async def on_turn(self, event: turn.Ended) -> None:
-        for key in tuple(self.state.open):
-            if key != "paused":
-                await self._finish(key, str(event.reason))
-
-    def intervals(self, *, now: float | None = None) -> tuple[ActivityFinishedEvent, ...]:
+        if event is None:
+            return
         assert self.state.log is not None
-        closed = tuple(
-            event
-            for event in self.state.log.events
-            if isinstance(event, ActivityFinishedEvent) and event.epoch_id == self.state.epoch
-        )
-        current_time = monotonic() if now is None else now
-        running = tuple(
+        await self.state.log.emit(
             ActivityFinishedEvent(
                 interval_id=event.interval_id,
                 kind=event.kind,
                 cause_id=event.cause_id,
                 started_at=event.at,
-                outcome="running",
-                at=current_time,
+                outcome=outcome,
+                reason=reason,
                 epoch_id=event.epoch_id,
             )
-            for event in self.state.open.values()
         )
-        return closed + running
+
+    async def _close_all(self) -> None:
+        for key in tuple(self.state.open):
+            await self._finish(key, ActivityOutcome.CLOSED)
+
+    @hook(model.Requested)
+    async def on_model(self, _event: model.Requested) -> None:
+        self.state.request_count += 1
+        await self._start(_MODEL_WAIT, cause_id=f"{self.state.epoch}:{self.state.request_count}")
+
+    @hook(message.Assistant)
+    async def on_assistant(self, event: message.Assistant) -> None:
+        await self._finish(
+            _MODEL_WAIT,
+            ActivityOutcome.INTERRUPTED if event.interrupted else ActivityOutcome.COMPLETED,
+        )
+
+    @hook(tool.ExecutionStarted)
+    async def on_tool(self, event: tool.ExecutionStarted) -> None:
+        await self._finish(_MODEL_WAIT)
+        await self._start(ActivityKey(ActivityKind.TOOL, event.call_id), cause_id=event.call_id)
+
+    @hook(tool.ExecutionFinished)
+    async def on_tool_finished(self, event: tool.ExecutionFinished) -> None:
+        reason = event.result.status.value if event.result.is_error else ""
+        if event.result.exit_code not in (None, 0):
+            reason = f"{event.result.status.value}; exit_code={event.result.exit_code}"
+        await self._finish(
+            ActivityKey(ActivityKind.TOOL, event.call_id),
+            ActivityOutcome.FAILED if event.result.is_error else ActivityOutcome.COMPLETED,
+            reason=reason,
+        )
+
+    @hook(ReadinessStartedEvent)
+    async def on_readiness(self, event: ReadinessStartedEvent) -> None:
+        await self._start(
+            ActivityKey(ActivityKind.READINESS, event.readiness_id), cause_id=event.readiness_id
+        )
+
+    @hook(ReadinessEndedEvent)
+    async def on_ready(self, event: ReadinessEndedEvent) -> None:
+        match event:
+            case ReadyEvent():
+                outcome = ActivityOutcome.COMPLETED
+            case ReadinessDegradedEvent():
+                outcome = ActivityOutcome.DEGRADED
+            case ReadinessFailedEvent():
+                outcome = ActivityOutcome.FAILED
+            case ReadinessCancelledEvent():
+                outcome = ActivityOutcome.CANCELLED
+            case _:
+                raise TypeError(f"Unsupported readiness event: {type(event).__name__}")
+        await self._finish(
+            ActivityKey(ActivityKind.READINESS, event.readiness_id), outcome, reason=event.reason
+        )
+
+    @hook(session.ControlChanged)
+    async def on_control(self, event: session.ControlChanged) -> None:
+        if event.state == session.ControlState.PAUSED:
+            await self._start(_PAUSE, cause_id=self.state.epoch)
+        elif event.state == session.ControlState.ACTIVE:
+            await self._finish(_PAUSE)
+
+    @hook(step.Finished)
+    async def on_step(self, event: step.Finished) -> None:
+        await self._finish(_MODEL_WAIT, step_outcome(event.reason))
+
+    @hook(turn.Ended)
+    async def on_turn(self, event: turn.Ended) -> None:
+        for key in tuple(self.state.open):
+            if key.kind != ActivityKind.PAUSED:
+                await self._finish(key, turn_outcome(event.reason))
+
+    def intervals(self, *, now: float | None = None) -> tuple[ActivityFinishedEvent, ...]:
+        assert self.state.log is not None
+        return project_intervals(
+            (
+                event
+                for event in self.state.log.events
+                if isinstance(event, ActivityStartedEvent | ActivityFinishedEvent)
+                and event.epoch_id == self.state.epoch
+            ),
+            now=now,
+        )

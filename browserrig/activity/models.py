@@ -1,13 +1,67 @@
 from collections.abc import Iterable
+from dataclasses import dataclass
 from time import monotonic
-from typing import Self
+from typing import Self, assert_never
 
-from harnessed.events import SessionEvent
+from harnessed.events import SessionEvent, step, turn
 from pydantic import model_validator
 
 from browserrig.browser.config import Options
 from browserrig.events import ActivityFinishedEvent, ActivityStartedEvent
-from browserrig.kinds import ActivityKind
+from browserrig.kinds import ActivityKind, ActivityOutcome
+
+
+@dataclass(frozen=True, slots=True)
+class ActivityKey:
+    """Singleton model/pause slots and separately correlated tool/readiness slots."""
+
+    kind: ActivityKind
+    correlation_id: str = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "kind", ActivityKind(self.kind))
+        if not isinstance(self.correlation_id, str):
+            raise TypeError("Activity correlation IDs must be strings")
+        correlated = self.kind in {ActivityKind.TOOL, ActivityKind.READINESS}
+        if bool(self.correlation_id) != correlated:
+            raise ValueError("Only tool and readiness activities require a correlation ID")
+
+
+def step_outcome(reason: step.Outcome) -> ActivityOutcome:
+    match reason:
+        case step.Outcome.COMPLETED:
+            return ActivityOutcome.COMPLETED
+        case step.Outcome.INTERRUPTED:
+            return ActivityOutcome.INTERRUPTED
+        case step.Outcome.ABORTED:
+            return ActivityOutcome.ABORTED
+        case step.Outcome.CONTEXT_LIMIT:
+            return ActivityOutcome.CONTEXT_LIMIT
+        case _:
+            assert_never(reason)
+
+
+def turn_outcome(reason: turn.Outcome) -> ActivityOutcome:
+    match reason:
+        case turn.Outcome.COMPLETED:
+            outcome = ActivityOutcome.COMPLETED
+        case turn.Outcome.INTERRUPTED:
+            outcome = ActivityOutcome.INTERRUPTED
+        case turn.Outcome.STOPPED:
+            outcome = ActivityOutcome.STOPPED
+        case turn.Outcome.MAX_STEPS:
+            outcome = ActivityOutcome.MAX_STEPS
+        case turn.Outcome.TOKEN_BUDGET:
+            outcome = ActivityOutcome.TOKEN_BUDGET
+        case turn.Outcome.REJECTED:
+            outcome = ActivityOutcome.REJECTED
+        case turn.Outcome.ABORTED:
+            outcome = ActivityOutcome.ABORTED
+        case turn.Outcome.DISCARDED:
+            outcome = ActivityOutcome.DISCARDED
+        case _:
+            assert_never(reason)
+    return outcome
 
 
 class TimeRange(Options):
@@ -42,7 +96,7 @@ def project_intervals(
             cause_id=event.cause_id,
             started_at=event.at,
             at=timestamp,
-            outcome="running",
+            outcome=ActivityOutcome.RUNNING,
             epoch_id=event.epoch_id,
         )
         for event in opened.values()

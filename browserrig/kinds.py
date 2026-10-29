@@ -10,6 +10,24 @@ class ActivityKind(StrEnum):
     PAUSED = "paused"
 
 
+class ActivityOutcome(StrEnum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    SUPERSEDED = "superseded"
+    CLOSED = "closed"
+    INTERRUPTED = "interrupted"
+    ABORTED = "aborted"
+    CONTEXT_LIMIT = "context_limit"
+    STOPPED = "stopped"
+    MAX_STEPS = "max_steps"
+    TOKEN_BUDGET = "token_budget"
+    REJECTED = "rejected"
+    DISCARDED = "discarded"
+    DEGRADED = "degraded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class ActionKind(StrEnum):
     NAVIGATE = "navigate"
     CLICK = "click"

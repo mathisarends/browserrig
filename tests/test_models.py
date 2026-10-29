@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from browserrig.activity.models import TimeRange, inference_only
 from browserrig.browser.config import BrowserKind, ConnectBrowser, LaunchBrowser
 from browserrig.events import ActivityFinishedEvent
-from browserrig.kinds import ActivityKind
+from browserrig.kinds import ActivityKind, ActivityOutcome
 from browserrig.observation.models import Element, ElementFingerprint, PageFingerprint, Snapshot
 from browserrig.observation.render import SnapshotView, render
 
@@ -66,7 +66,7 @@ def test_inference_projection_subtracts_overlaps_and_respects_epoch():
             cause_id="test",
             started_at=start,
             at=end,
-            outcome="completed",
+            outcome=ActivityOutcome.COMPLETED,
             epoch_id=epoch,
         )
 
