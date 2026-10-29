@@ -23,6 +23,35 @@ async def site() -> AsyncIterator[str]:
               root.innerHTML='<button>Shadow button</button>';
             </script><div style="height:2200px"></div>""",
         "/other": "<!doctype html><title>Other</title><h1>Other page</h1>",
+        "/gestures": """<!doctype html><title>Gestures</title><style>
+            body{margin:0} .box{position:absolute;width:120px;height:60px;background:#acf}
+            #double{position:absolute;left:20px;top:20px;width:120px;height:40px}
+            #native{left:20px;top:110px} #nativeTarget{left:300px;top:110px}
+            #pointer{left:20px;top:260px} #pointerTarget{left:300px;top:260px}
+            </style><button id=double>Double</button>
+            <div id=native class=box draggable=true tabindex=0>Native source</div>
+            <div id=nativeTarget class=box role=button>Native target</div>
+            <div id=pointer class=box tabindex=0>Pointer source</div>
+            <div id=pointerTarget class=box role=button>Pointer target</div>
+            <script>
+            window.details=[];window.doubles=0;window.nativeDrop='';window.pointerDrop=false;
+            const double=document.querySelector('#double');
+            double.addEventListener('click',e=>window.details.push(e.detail));
+            double.addEventListener('dblclick',()=>window.doubles++);
+            const native=document.querySelector('#native');
+            native.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain','payload'));
+            const target=document.querySelector('#nativeTarget');
+            target.addEventListener('dragover',e=>e.preventDefault());
+            target.addEventListener('drop',e=>{e.preventDefault();
+                window.nativeDrop=e.dataTransfer.getData('text/plain')});
+            let dragging=false;
+            document.querySelector('#pointer').addEventListener('pointerdown',e=>{
+                e.preventDefault();dragging=true});
+            document.addEventListener('pointerup',e=>{if(dragging){
+                const r=document.querySelector('#pointerTarget').getBoundingClientRect();
+                window.pointerDrop=e.clientX>=r.left&&e.clientX<=r.right&&
+                    e.clientY>=r.top&&e.clientY<=r.bottom;dragging=false}});
+            </script>""",
         "/canvas": """<!doctype html><title>Canvas</title><style>body{margin:0}</style>
             <canvas width=500 height=400></canvas><script>
             const ctx=document.querySelector('canvas').getContext('2d');

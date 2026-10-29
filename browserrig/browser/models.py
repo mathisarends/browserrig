@@ -5,6 +5,15 @@ from pydantic import Field
 from .config import Options
 
 
+class Point(Options):
+    x: float = Field(ge=0)
+    y: float = Field(ge=0)
+
+
+class ElementPoint(Point):
+    scrolled: bool = False
+
+
 class Geometry(Options):
     x: float = Field(default=0, ge=0)
     y: float = Field(default=0, ge=0)

@@ -32,6 +32,7 @@ class ElementView(Options):
     input_type: str = ""
     value: str | None = None
     disabled: bool = False
+    draggable: bool = False
     options: tuple[str, ...] = ()
 
     @classmethod
@@ -44,6 +45,7 @@ class ElementView(Options):
             input_type=element.input_type,
             value=element.value,
             disabled=element.disabled,
+            draggable=element.draggable,
             options=element.options,
         )
 

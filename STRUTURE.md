@@ -51,6 +51,7 @@ browserrig/
 │   │   ├── execution.py
 │   │   ├── navigation.py
 │   │   ├── interaction.py
+│   │   ├── gestures.py
 │   │   ├── forms.py
 │   │   ├── tabs.py
 │   │   ├── files.py
@@ -151,6 +152,10 @@ Serialisierung, Readiness und Ergebnisereignisse werden dort zusammengehalten.
 Die fachlichen Module besitzen die tatsächlichen `@tool`-Methoden. Sie registrieren
 keinen eigenen Middleware-Stack. Dialogbehandlung hängt direkt am Browser,
 damit sie ein blockiertes Readiness-Gate auflösen kann.
+
+`gestures.py` enthält native Klick-/Doppelklick- und Drag-Sequenzen einschließlich
+HTML5-DataTransfer und Cancellation-Cleanup. Die Tools besitzen die Schemas;
+die Gestenfunktionen besitzen keine zusätzliche Agenten- oder Plugin-Laufzeit.
 
 `PointerTools` bietet Koordinaten/Keys/Scrollen. `InteractionTools` ergänzt den
 DOM-Referenzklick. Die Moduskomposition entscheidet explizit über das Angebot.

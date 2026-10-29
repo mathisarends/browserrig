@@ -59,7 +59,7 @@ function browserrigSnapshot({token, maxElements, maxText}) {
     seen.add(el);
     const tag = el.localName;
     const interactive = el.matches(
-      'a[href],button,input,textarea,select,summary,[role="button"],[role="link"],[role="textbox"],[role="combobox"],[role="checkbox"],[contenteditable="true"],[tabindex]',
+      'a[href],button,input,textarea,select,summary,[draggable="true"],[role="button"],[role="link"],[role="textbox"],[role="combobox"],[role="checkbox"],[contenteditable="true"],[tabindex]',
     );
     if (!interactive || !visible(el) || elements.length >= maxElements) {
       return;
@@ -91,6 +91,7 @@ function browserrigSnapshot({token, maxElements, maxText}) {
       input_type: type,
       value: valueFor(el, type),
       disabled: Boolean(el.disabled || el.getAttribute('aria-disabled') === 'true'),
+      draggable: el.draggable,
       options: tag === 'select' ? Array.from(el.options).map((o) => clean(o.text)) : [],
     });
   }

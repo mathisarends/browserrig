@@ -13,6 +13,8 @@ class ActivityKind(StrEnum):
 class ActionKind(StrEnum):
     NAVIGATE = "navigate"
     CLICK = "click"
+    DOUBLE_CLICK = "double_click"
+    DRAG = "drag"
     TYPE = "type"
     PRESS = "press"
     SCROLL = "scroll"
@@ -27,6 +29,11 @@ class ElementOperation(StrEnum):
     NODE = "node"
     SELECT = "select"
     SET_VALUE = "set_value"
+
+
+class DragMode(StrEnum):
+    POINTER = "pointer"
+    HTML5 = "html5"
 
 
 class ObservationKind(StrEnum):

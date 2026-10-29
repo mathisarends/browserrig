@@ -84,6 +84,7 @@ async def capture(
                         input_type=item.input_type,
                         value=item.value,
                         disabled=item.disabled,
+                        draggable=item.draggable,
                         options=item.options,
                     )
                 )

@@ -51,8 +51,8 @@ Controls und das append-only Session-Log. Browserrig ersetzt diese Mechanismen n
 | `Observe` | Readiness, Aufnahme des Zustands und Projektion vor dem Modellschritt |
 | `Actions` | Aktionsgrenze: Serialisierung, Readiness, einmaliger Dispatch und Receipts |
 | `NavigationTools` | Navigation, Suche, Verlauf und Reload |
-| `InteractionTools` | DOM-Klick plus Koordinaten, Tastatur und Scrollen |
-| `PointerTools` | Koordinaten, Tastatur und Scrollen ohne DOM-Referenzen |
+| `InteractionTools` | DOM-Klick, Doppelklick und Drag plus Koordinaten, Tastatur und Scrollen |
+| `PointerTools` | Koordinatenklick/-doppelklick, Drag, Tastatur und Scrollen ohne DOM-Referenzen |
 | `FormTools` | Text, native Auswahl und Datumsfelder |
 | `TabTools` | kontrollierte Tabs auflisten, öffnen, wechseln und schließen |
 | `FileTools` | Uploads und Downloadinformationen |
@@ -260,6 +260,16 @@ protokollierte Modellrequest begründet `NudgeIncludedEvent`. Veraltete oder sch
 verwendete Hinweise werden beim Reopen nicht erneut ungeprüft zugestellt.
 
 ## 8. Start, Attach und Besitz
+
+### Doppelklick und Drag
+
+Doppelklick verwendet native Click-Counts. Drag hat den geschlossenen Modus
+`DragMode.POINTER` oder `DragMode.HTML5`; letzterer transportiert die vom Browser
+abgefangenen nativen DragData über CDP-DragEnter/DragOver/Drop.
+DOM-Quellen mit `draggable=true` wählen HTML5 automatisch. Beide DOM-Endpunkte
+müssen gleichzeitig sichtbar sein. Maustasten und temporäre Drag-Interception
+werden auch bei Cancellation zurückgesetzt. Koordinatengesten binden sich an die
+aktuelle Beobachtung; ein Dokument-/Tabwechsel macht alte Ziele ungültig.
 
 `LaunchBrowser` und `ConnectBrowser` sind Pydantic-Konfigurationen mit
 `BrowserKind`. Start verwendet ein eigenes temporäres Profil und einen vom Browser

@@ -8,6 +8,7 @@ from harnessed import Context, Inject, Plugin, ToolError
 
 from browserrig.browser.base import Browser
 from browserrig.browser.errors import BrowserError
+from browserrig.browser.models import ElementPoint
 from browserrig.browser.tab import Tab
 from browserrig.events import (
     ACTION_EVENTS,
@@ -61,7 +62,21 @@ class Actions(Plugin, needs=(Browser, Readiness, Observe)):
             action_id = uuid4().hex
             dispatched = False
             try:
+                await tab.main_frame()
                 before = observe.snapshot
+                if (
+                    before is not None
+                    and kind
+                    in {
+                        ActionKind.CLICK,
+                        ActionKind.DOUBLE_CLICK,
+                        ActionKind.DRAG,
+                    }
+                    and (before.tab_id != tab.id or before.document_id != tab.document_id)
+                ):
+                    raise BrowserError(
+                        "The observed tab or document changed; observe before pointing"
+                    )
                 if before is None or before.tab_id != tab.id:
                     before = await observe.capture(tab)
                 report = await readiness.wait(tab, phase=ReadinessPhase.ACTION)
@@ -161,3 +176,12 @@ class Actions(Plugin, needs=(Browser, Readiness, Observe)):
             value,
             by_value=by_value,
         )
+
+    async def element_point(self, *, tab: Tab, ref: str, scroll: bool = True) -> ElementPoint:
+        frame, element = await self.observe.element(tab, ref)
+        assert self.observe.snapshot is not None
+        raw = await frame.call(
+            ELEMENT_SCRIPT, self.observe.snapshot.id, element.index, ElementOperation.POINT, scroll
+        )
+        point = ElementPoint.model_validate(raw)
+        return ElementPoint(x=point.x + frame.x, y=point.y + frame.y, scrolled=point.scrolled)

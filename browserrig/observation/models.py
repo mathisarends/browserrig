@@ -20,6 +20,7 @@ class Element(Options):
     input_type: str = ""
     value: str | None = None
     disabled: bool = False
+    draggable: bool = False
     options: tuple[str, ...] = ()
 
 
@@ -64,6 +65,7 @@ class ExtractedElement(Options):
     input_type: str = ""
     value: str | None = None
     disabled: bool = False
+    draggable: bool = False
     options: tuple[str, ...] = ()
 
 

@@ -93,6 +93,19 @@ Canvas verwendet Bild und Koordinaten. Die Initialprüfung prüft Geometrie und
 Pixelinhalt. DOM-Modus liefert Pydantic-validiertes YAML mit Rollen, Labels und
 beobachtungsgebundenen Referenzen.
 
+## Doppelklick und Drag
+
+`InteractionTools` bietet `click(ref=..., count=2)` und
+`drag(source_ref=..., target_ref=...)`. Die Drag-Endpunkte müssen gleichzeitig
+sichtbar sein; während der Geste wird nicht automatisch gescrollt.
+Native `draggable`-Elemente verwenden HTML5-Drag-and-drop mit echtem `DataTransfer`.
+
+`PointerTools`, auch im Figma-Profil, bietet `click_at(x=..., y=..., count=2)`
+und `drag_at(start=Point(...), end=Point(...), mode=DragMode.POINTER)`.
+Für native HTML5-Quellen kann bei Koordinaten `DragMode.HTML5` gewählt werden.
+Die aktuelle Beobachtung bestimmt die Crop-Zuordnung. Beide Varianten verwenden
+echte CDP-Eingaben und geben Maustasten auch bei Abbruch frei.
+
 ## Aufnahme, Downloads und Events
 
 Native Aufnahme verwendet `Page.startScreenRecording`/`stopScreenRecording` über

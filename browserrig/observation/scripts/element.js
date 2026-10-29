@@ -67,7 +67,9 @@ function browserrigElement(token, index, operation, value) {
     return focus();
   }
   const before = scrollY;
-  el.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'});
+  if (value !== false) {
+    el.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'});
+  }
   const r = el.getBoundingClientRect();
   const x = Math.max(0, r.left) + (Math.min(innerWidth, r.right) - Math.max(0, r.left)) / 2;
   const y = Math.max(0, r.top) + (Math.min(innerHeight, r.bottom) - Math.max(0, r.top)) / 2;
