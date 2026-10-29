@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
-from harnessed import Context, Inject, Plugin, ToolError
+from harnessed import Inject, Plugin, ToolError
 
 from browserrig.browser.base import Browser
 from browserrig.browser.errors import BrowserError
@@ -29,23 +29,13 @@ class Effect:
     prepared_scroll: bool = False
 
 
-class Actions(Plugin, needs=(Browser, Readiness, Observe)):
+class Actions(Plugin, provides=True):
     """Own the action transaction: serialization, readiness, dispatch and receipts."""
 
     events = ACTION_EVENTS
-    browser: Browser
-    readiness: Readiness
-    observe: Observe
-
-    async def setup(
-        self,
-        ctx: Context,
-        browser: Inject[Browser],
-        readiness: Inject[Readiness],
-        observe: Inject[Observe],
-    ) -> None:
-        self.browser, self.readiness, self.observe = browser, readiness, observe
-        ctx.provide(Actions, self)
+    browser: Inject[Browser]
+    readiness: Inject[Readiness]
+    observe: Inject[Observe]
 
     async def run(
         self,

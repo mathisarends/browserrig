@@ -1,8 +1,7 @@
 import asyncio
 from dataclasses import replace
 
-from harnessed import Context, Inject, Plugin
-from harnessed.core.session.session import SessionLog
+from harnessed import Context, Inject, Plugin, SessionLog
 
 from browserrig import Browser
 

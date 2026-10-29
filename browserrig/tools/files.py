@@ -10,8 +10,12 @@ from browserrig.kinds import ActionKind, ElementOperation
 from .execution import Actions, Effect
 
 
-class FileTools(Plugin, needs=(Actions,)):
-    @tool
+class FileTools(Plugin):
+    @tool(
+        description=(
+            "Set a file input using absolute paths on the browser host, not the client host."
+        )
+    )
     async def upload_files(
         self,
         ref: str,
@@ -39,7 +43,7 @@ class FileTools(Plugin, needs=(Actions,)):
             operation=upload,
         )
 
-    @tool(readonly=True)
+    @tool(readonly=True, description="List recent browser downloads and their status.")
     async def list_downloads(self, *, actions: Inject[Actions]) -> tuple[Download, ...]:
         """List download status and browser-host paths, when configured by the host."""
         return await actions.browser.downloads()

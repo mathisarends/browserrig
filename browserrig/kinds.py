@@ -26,6 +26,7 @@ class ActivityOutcome(StrEnum):
     DEGRADED = "degraded"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    TIMEOUT = "timeout"
 
 
 class ActionKind(StrEnum):

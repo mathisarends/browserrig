@@ -2,7 +2,7 @@ import asyncio
 from dataclasses import dataclass, field
 
 from harnessed import Context, Inject, Plugin, PluginState, hook
-from harnessed.events import session
+from harnessed.events import AgentControlChangedEvent, ControlState
 
 from browserrig.browser.base import Browser
 from browserrig.browser.models import Geometry
@@ -21,14 +21,14 @@ from .wait import wait_for_page
 class _State:
     pending: dict[tuple[str, str, str], asyncio.Task[ReadinessReport]] = field(default_factory=dict)
     geometry: dict[tuple[str, str], Geometry] = field(default_factory=dict)
-    browser: Browser | None = None
 
 
-class Readiness(Plugin, needs=(Browser,)):
+class Readiness(Plugin, provides=True):
     """Document-scoped readiness, shared by observation and browser actions."""
 
     events = READINESS_EVENTS
     state = PluginState(_State)
+    browser: Inject[Browser]
 
     def __init__(
         self, mode: ObservationMode | None = None, options: ReadinessOptions | None = None
@@ -37,10 +37,8 @@ class Readiness(Plugin, needs=(Browser,)):
         self.mode = mode or DomMode()
         self.options = options or ReadinessOptions()
 
-    async def setup(self, ctx: Context, browser: Inject[Browser]) -> None:
-        self.state.browser = browser
+    async def setup(self, ctx: Context) -> None:
         ctx.effect(self._cancel)
-        ctx.provide(Readiness, self)
 
     async def _cancel(self) -> None:
         tasks = tuple(self.state.pending.values())
@@ -49,9 +47,9 @@ class Readiness(Plugin, needs=(Browser,)):
         await asyncio.gather(*tasks, return_exceptions=True)
         self.state.pending.clear()
 
-    @hook(session.ControlChanged)
-    async def on_control(self, event: session.ControlChanged) -> None:
-        if event.state in (session.ControlState.ABORTING, session.ControlState.STOPPED):
+    @hook(AgentControlChangedEvent)
+    async def on_control(self, event: AgentControlChangedEvent) -> None:
+        if event.state in (ControlState.ABORTING, ControlState.STOPPED):
             await self._cancel()
 
     async def wait(
@@ -72,10 +70,8 @@ class Readiness(Plugin, needs=(Browser,)):
         return await asyncio.shield(self.state.pending[key])
 
     async def _wait(self, tab: Tab, phase: ReadinessPhase) -> ReadinessReport:
-        browser = self.state.browser
-        assert browser is not None
         return await wait_for_page(
-            browser,
+            self.browser,
             tab,
             mode=self.mode,
             options=self.options,

@@ -8,13 +8,13 @@ from browserrig.readiness.models import ReadinessPhase
 from .execution import Actions, Effect
 
 
-class TabTools(Plugin, needs=(Actions,)):
-    @tool(readonly=True)
+class TabTools(Plugin):
+    @tool(readonly=True, description="List controlled tabs and identify the active tab.")
     async def list_tabs(self, *, actions: Inject[Actions]) -> tuple[TabInfo, ...]:
         """List tabs controlled by this connection, including the active tab."""
         return await actions.browser.tabs()
 
-    @tool
+    @tool(description="Open and activate a new tab.")
     async def open_tab(
         self,
         url: str = "about:blank",
@@ -30,7 +30,7 @@ class TabTools(Plugin, needs=(Actions,)):
 
         return await actions.run(kind=ActionKind.TAB, operation=open_tab, settle=False)
 
-    @tool
+    @tool(description="Activate one listed tab by its stable target ID.")
     async def switch_tab(
         self,
         target_id: str,
@@ -46,7 +46,7 @@ class TabTools(Plugin, needs=(Actions,)):
 
         return await actions.run(kind=ActionKind.TAB, operation=switch, settle=False)
 
-    @tool
+    @tool(description="Close a controlled tab. A remaining tab is explicitly selected if needed.")
     async def close_tab(
         self,
         target_id: str,

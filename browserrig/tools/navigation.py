@@ -12,8 +12,8 @@ from browserrig.kinds import ActionKind
 from .execution import Actions, Effect
 
 
-class NavigationTools(Plugin, needs=(Actions,)):
-    @tool
+class NavigationTools(Plugin):
+    @tool(description="Navigate the active tab to an HTTP(S) URL.")
     async def navigate(
         self,
         url: str,
@@ -33,7 +33,7 @@ class NavigationTools(Plugin, needs=(Actions,)):
             operation=navigate,
         )
 
-    @tool
+    @tool(description="Search the web with DuckDuckGo in the active tab.")
     async def search(
         self,
         query: str,
@@ -46,7 +46,7 @@ class NavigationTools(Plugin, needs=(Actions,)):
             actions=actions,
         )
 
-    @tool
+    @tool(description="Go to the previous browser history entry.")
     async def go_back(self, *, actions: Inject[Actions]) -> str:
         """Go to the previous browser history entry."""
 
@@ -64,7 +64,7 @@ class NavigationTools(Plugin, needs=(Actions,)):
             operation=back,
         )
 
-    @tool
+    @tool(description="Reload the active tab.")
     async def reload(self, *, actions: Inject[Actions]) -> str:
         """Reload the active tab."""
 

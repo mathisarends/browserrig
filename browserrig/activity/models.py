@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from time import monotonic
 from typing import Self, assert_never
 
-from harnessed.events import SessionEvent, step, turn
+from harnessed.events import SessionEvent, StepOutcome, TurnOutcome
 from pydantic import model_validator
 
 from browserrig.browser.config import Options
@@ -13,7 +13,7 @@ from browserrig.kinds import ActivityKind, ActivityOutcome
 
 @dataclass(frozen=True, slots=True)
 class ActivityKey:
-    """Singleton model/pause slots and separately correlated tool/readiness slots."""
+    """Correlated request/tool/readiness slots and a singleton pause slot."""
 
     kind: ActivityKind
     correlation_id: str = ""
@@ -22,42 +22,42 @@ class ActivityKey:
         object.__setattr__(self, "kind", ActivityKind(self.kind))
         if not isinstance(self.correlation_id, str):
             raise TypeError("Activity correlation IDs must be strings")
-        correlated = self.kind in {ActivityKind.TOOL, ActivityKind.READINESS}
+        correlated = self.kind in {ActivityKind.LLM, ActivityKind.TOOL, ActivityKind.READINESS}
         if bool(self.correlation_id) != correlated:
-            raise ValueError("Only tool and readiness activities require a correlation ID")
+            raise ValueError("Model, tool and readiness activities require a correlation ID")
 
 
-def step_outcome(reason: step.Outcome) -> ActivityOutcome:
+def step_outcome(reason: StepOutcome) -> ActivityOutcome:
     match reason:
-        case step.Outcome.COMPLETED:
+        case StepOutcome.COMPLETED:
             return ActivityOutcome.COMPLETED
-        case step.Outcome.INTERRUPTED:
+        case StepOutcome.INTERRUPTED:
             return ActivityOutcome.INTERRUPTED
-        case step.Outcome.ABORTED:
+        case StepOutcome.ABORTED:
             return ActivityOutcome.ABORTED
-        case step.Outcome.CONTEXT_LIMIT:
+        case StepOutcome.CONTEXT_LIMIT:
             return ActivityOutcome.CONTEXT_LIMIT
         case _:
             assert_never(reason)
 
 
-def turn_outcome(reason: turn.Outcome) -> ActivityOutcome:
+def turn_outcome(reason: TurnOutcome) -> ActivityOutcome:
     match reason:
-        case turn.Outcome.COMPLETED:
+        case TurnOutcome.COMPLETED:
             outcome = ActivityOutcome.COMPLETED
-        case turn.Outcome.INTERRUPTED:
+        case TurnOutcome.INTERRUPTED:
             outcome = ActivityOutcome.INTERRUPTED
-        case turn.Outcome.STOPPED:
+        case TurnOutcome.STOPPED:
             outcome = ActivityOutcome.STOPPED
-        case turn.Outcome.MAX_STEPS:
+        case TurnOutcome.MAX_STEPS:
             outcome = ActivityOutcome.MAX_STEPS
-        case turn.Outcome.TOKEN_BUDGET:
+        case TurnOutcome.TOKEN_BUDGET:
             outcome = ActivityOutcome.TOKEN_BUDGET
-        case turn.Outcome.REJECTED:
+        case TurnOutcome.REJECTED:
             outcome = ActivityOutcome.REJECTED
-        case turn.Outcome.ABORTED:
+        case TurnOutcome.ABORTED:
             outcome = ActivityOutcome.ABORTED
-        case turn.Outcome.DISCARDED:
+        case TurnOutcome.DISCARDED:
             outcome = ActivityOutcome.DISCARDED
         case _:
             assert_never(reason)

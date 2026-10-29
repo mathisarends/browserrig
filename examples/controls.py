@@ -18,23 +18,20 @@ async def main() -> None:
     args = parser.parse_args()
     if not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY first")
-    async with OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")) as openai:
-        agent = BrowserAgent(
-            model=openai,
-            browser=LaunchBrowser(url=args.url),
-            approvals=Approvals(default=PolicyDecision.ALLOW),
-        )
-        async with agent.session() as session:
-            handle = await session.submit(args.task)
-            await session.pause()  # Wait for the current complete step, if already running.
-            print("Paused:", session.status)
-            await session.steer(
-                "Pay particular attention to the navigation and contact information."
-            )
-            await session.context.set("constraints", "Do not submit forms.")
-            await session.resume()
-            print((await handle.result()).text)
-            # Also available: await session.stop() and await session.abort().
+    agent = BrowserAgent(
+        model=OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")),
+        browser=LaunchBrowser(url=args.url),
+        approvals=Approvals(default=PolicyDecision.ALLOW),
+    )
+    async with agent.session() as session:
+        handle = await session.submit(args.task)
+        await session.pause()  # Wait for the current complete step, if already running.
+        print("Paused:", session.status)
+        await session.steer("Pay particular attention to the navigation and contact information.")
+        await session.context.set("constraints", "Do not submit forms.")
+        await session.resume()
+        print((await handle.result()).text)
+        # Also available: await session.stop() and await session.abort().
 
 
 if __name__ == "__main__":

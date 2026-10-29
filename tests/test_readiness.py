@@ -13,7 +13,7 @@ from browserrig.readiness.canvas import CanvasProbe
 from tests.fakes import FakeBrowser, FakeChrome
 
 
-class Access(Plugin, needs=(Readiness,)):
+class Access(Plugin):
     def __init__(self, holder):
         super().__init__()
         self.holder = holder
@@ -60,15 +60,21 @@ async def test_endless_dom_mutation_is_explicitly_degraded():
 async def test_plugin_state_is_per_session():
     holder = {}
     agent = Agent(
-        model=ScriptedModel(["ok"]), plugins=[FakeChrome(holder), Readiness(), Access(holder)]
+        model=ScriptedModel(["ok"]), plugins=[Access(holder), Readiness(), FakeChrome(holder)]
     )
     async with agent.session("first"):
         first = holder["readiness"]
+        first_browser = first.browser
+        assert first_browser is holder["browser"]
         first.state.geometry[("sentinel", "doc")] = object()
     async with agent.session("second"):
         second = holder["readiness"]
         assert second is not first
+        assert second.browser is holder["browser"]
+        assert second.browser is not first_browser
         assert not second.state.geometry
+    with pytest.raises(RuntimeError):
+        _ = first.browser
 
 
 @pytest.mark.parametrize("changed", [False, True])

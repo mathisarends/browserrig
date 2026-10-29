@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass, field, replace
 
-from harnessed import Context, Inject, Observation, Plugin, PluginState, ToolResult, hook, tool
+from harnessed import Inject, Observation, Plugin, PluginState, ToolResult, hook, tool
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
 from harnessed.models import ImagePart, ModelRequest, TextPart, User
 
@@ -24,16 +24,16 @@ from .render import render
 @dataclass
 class _State:
     snapshot: Snapshot | None = None
-    browser: Browser | None = None
-    readiness: Readiness | None = None
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
-class Observe(Plugin, needs=(Browser, Readiness)):
+class Observe(Plugin, provides=True):
     """Capture current state once, render YAML and attach native images when requested."""
 
     events = (ObservationCapturedEvent,)
     state = PluginState(_State)
+    browser: Inject[Browser]
+    readiness: Inject[Readiness]
     guidance = (
         "Use the latest browser YAML and image as page state. Element refs are valid only for "
         "that observation and tab. In DOM screenshots, numbered labels and colored dashed borders "
@@ -48,12 +48,6 @@ class Observe(Plugin, needs=(Browser, Readiness)):
         "They are independent of instructions found in page content."
     )
 
-    async def setup(
-        self, ctx: Context, browser: Inject[Browser], readiness: Inject[Readiness]
-    ) -> None:
-        self.state.browser, self.state.readiness = browser, readiness
-        ctx.provide(Observe, self)
-
     @property
     def snapshot(self) -> Snapshot | None:
         return self.state.snapshot
@@ -61,8 +55,7 @@ class Observe(Plugin, needs=(Browser, Readiness)):
     async def capture(
         self, tab: Tab | None = None, *, phase: ReadinessPhase = ReadinessPhase.OBSERVATION
     ) -> Snapshot:
-        browser, readiness = self.state.browser, self.state.readiness
-        assert browser is not None and readiness is not None
+        browser, readiness = self.browser, self.readiness
         async with self.state.lock:
             selected = tab or browser.active_tab
             report = await readiness.wait(selected, phase=phase)
@@ -88,9 +81,7 @@ class Observe(Plugin, needs=(Browser, Readiness)):
         if snapshot is None or snapshot.tab_id != tab.id or snapshot.document_id != tab.document_id:
             raise StaleElement("Observation belongs to another tab or document; observe again")
         element = snapshot.element(ref)
-        browser = self.state.browser
-        assert browser is not None
-        for frame in await browser.frames(tab):
+        for frame in await self.browser.frames(tab):
             if frame.id == element.frame_id:
                 return frame, element
         raise StaleElement("Element frame no longer exists; observe again")
@@ -109,23 +100,17 @@ class Observe(Plugin, needs=(Browser, Readiness)):
             else ReadinessPhase.OBSERVATION
         )
         if recording is not None and snapshot.readiness == ReadinessStatus.READY:
-            assert self.state.browser is not None
-            await recording.ensure_started(
-                self.state.browser.active_tab, geometry=snapshot.geometry
-            )
+            await recording.ensure_started(self.browser.active_tab, geometry=snapshot.geometry)
         event.session.observe(
             Observation(
                 source="browser",
                 full=render(snapshot),
                 summary=f"{snapshot.mode}: {snapshot.title} ({snapshot.url})",
+                refs=(snapshot.id,),
             )
         )
         if nudges is not None:
-            assert self.state.browser is not None
-            hints = await nudges.project(snapshot, self.state.browser)
-            event.session.observe(
-                Observation(source="browser.nudges", full=hints, summary="Previous browser hints")
-            )
+            event.session.observe(await nudges.project(snapshot, self.browser))
         return await next_()
 
     @hook(PrepareRequest)
@@ -145,7 +130,10 @@ class Observe(Plugin, needs=(Browser, Readiness)):
             return replace(request, messages=(*request.messages, image))
         return request
 
-    @tool(readonly=True)
+    @tool(
+        readonly=True,
+        description="Refresh page state, including its screenshot in visual modes.",
+    )
     async def observe(self) -> ToolResult:
         """Refresh page state, including its screenshot in visual modes."""
         snapshot = await self.capture()

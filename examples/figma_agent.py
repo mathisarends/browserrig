@@ -22,15 +22,14 @@ async def main() -> None:
     args = parser.parse_args()
     if not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY first")
-    async with OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")) as openai:
-        agent = BrowserAgent(
-            model=openai,
-            browser=LaunchBrowser(url=args.url),
-            mode=CanvasMode(selector=args.selector),
-            recording=RecordingOptions() if args.record else None,
-            approvals=Approvals(default=PolicyDecision.ALLOW),
-        )
-        print((await agent.run(args.task, max_steps=10)).text)
+    agent = BrowserAgent(
+        model=OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")),
+        browser=LaunchBrowser(url=args.url),
+        mode=CanvasMode(selector=args.selector),
+        recording=RecordingOptions() if args.record else None,
+        approvals=Approvals(default=PolicyDecision.ALLOW),
+    )
+    print((await agent.run(args.task, max_steps=10)).text)
 
 
 if __name__ == "__main__":

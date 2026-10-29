@@ -8,9 +8,8 @@ from pathlib import Path
 from time import monotonic
 from uuid import uuid4
 
-from harnessed import Context, Inject, Plugin, PluginState, hook
-from harnessed.core.session.session import SessionLog
-from harnessed.events import session
+from harnessed import Context, Inject, Plugin, PluginState, SessionLog, hook
+from harnessed.events import AgentControlChangedEvent, ControlState
 
 from browserrig.activity.models import inference_only, project_intervals
 from browserrig.browser.base import Browser
@@ -33,8 +32,6 @@ from .models import RecordingManifest, RecordingSegment
 
 @dataclass
 class _State:
-    browser: Browser | None = None
-    log: SessionLog | None = None
     log_offset: int = 0
     directory: Path | None = None
     tab: Tab | None = None
@@ -49,34 +46,29 @@ class _State:
     segments: list[RecordingSegment] = field(default_factory=list)
 
 
-class Recording(Plugin, needs=(Browser, Readiness)):
+class Recording(Plugin, needs=(Readiness,), provides=True):
     """Native Page recording; no LLM wrapper, JPEG queue or obligatory encoder."""
 
     events = RECORDING_EVENTS
     state = PluginState(_State)
+    browser: Inject[Browser]
+    log: Inject[SessionLog]
 
     def __init__(self, options: RecordingOptions | None = None) -> None:
         super().__init__()
         self.options = options or RecordingOptions()
 
-    async def setup(
-        self,
-        ctx: Context,
-        browser: Inject[Browser],
-        log: Inject[SessionLog],
-    ) -> None:
-        self.state.browser = browser
-        self.state.log = log
-        self.state.log_offset = len(log.events)
-        self.state.directory = self.options.directory.resolve() / f"{log.id}-{browser.id[:12]}"
+    async def setup(self, ctx: Context) -> None:
+        self.state.log_offset = len(self.log.events)
+        self.state.directory = (
+            self.options.directory.resolve() / f"{self.log.id}-{self.browser.id[:12]}"
+        )
         await asyncio.to_thread(self.state.directory.mkdir, parents=True, exist_ok=False)
         ctx.effect(self._finalize)
-        ctx.provide(Recording, self)
 
     @hook(ReadyEvent)
     async def on_ready(self, event: ReadyEvent) -> None:
-        browser = self.state.browser
-        assert browser is not None
+        browser = self.browser
         if event.target_id != browser.active_tab.id or self.state.paused:
             return
         if self.state.start_task is not None and not self.state.start_task.done():
@@ -110,8 +102,7 @@ class Recording(Plugin, needs=(Browser, Readiness)):
                 self.state.geometry = geometry
                 self.state.recording_id = uuid4().hex
                 self.state.started_at = monotonic()
-                assert self.state.browser is not None
-                await self.state.browser.emit(
+                await self.browser.emit(
                     RecordingStartedEvent(
                         recording_id=self.state.recording_id,
                         target_id=tab.id,
@@ -124,8 +115,7 @@ class Recording(Plugin, needs=(Browser, Readiness)):
 
     async def _failed(self, reason: str) -> None:
         self.state.failed = True
-        assert self.state.browser is not None
-        await self.state.browser.emit(RecordingFailedEvent(reason=reason))
+        await self.browser.emit(RecordingFailedEvent(reason=reason))
         if self.options.required:
             raise RecordingError(reason)
 
@@ -178,8 +168,7 @@ class Recording(Plugin, needs=(Browser, Readiness)):
                     geometry=self.state.geometry,
                 )
                 self.state.segments.append(segment)
-                assert self.state.browser is not None
-                await self.state.browser.emit(
+                await self.browser.emit(
                     RecordingSegmentClosedEvent(
                         recording_id=self.state.recording_id,
                         path=str(target),
@@ -198,15 +187,15 @@ class Recording(Plugin, needs=(Browser, Readiness)):
                     async with asyncio.timeout(5):
                         await tab.cdp.io.close(handle=handle)
 
-    @hook(session.ControlChanged)
-    async def on_control(self, event: session.ControlChanged) -> None:
+    @hook(AgentControlChangedEvent)
+    async def on_control(self, event: AgentControlChangedEvent) -> None:
         if self.options.record_during_pause:
             return
-        if event.state == session.ControlState.PAUSED:
+        if event.state == ControlState.PAUSED:
             self.state.paused = True
             async with self.state.lock:
                 await self._stop()
-        elif event.state == session.ControlState.ACTIVE:
+        elif event.state == ControlState.ACTIVE:
             self.state.paused = False
 
     async def _finalize(self) -> None:
@@ -214,11 +203,10 @@ class Recording(Plugin, needs=(Browser, Readiness)):
             await asyncio.gather(self.state.start_task, return_exceptions=True)
         async with self.state.lock:
             await self._stop()
-            assert self.state.directory is not None and self.state.browser is not None
-            assert self.state.log is not None
-            intervals = project_intervals(self.state.log.events[self.state.log_offset :])
+            assert self.state.directory is not None
+            intervals = project_intervals(self.log.events[self.state.log_offset :])
             payload = RecordingManifest(
-                browser_id=self.state.browser.id,
+                browser_id=self.browser.id,
                 segments=tuple(self.state.segments),
                 failed=self.state.failed,
                 activity=intervals,
@@ -226,7 +214,7 @@ class Recording(Plugin, needs=(Browser, Readiness)):
             )
             manifest = self.state.directory / "manifest.json"
             await asyncio.to_thread(_write_manifest, manifest, payload)
-            await self.state.browser.emit(RecordingFinishedEvent(manifest=str(manifest)))
+            await self.browser.emit(RecordingFinishedEvent(manifest=str(manifest)))
 
 
 async def _disk(function, *arguments):

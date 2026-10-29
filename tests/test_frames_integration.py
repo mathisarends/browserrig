@@ -4,7 +4,7 @@ import pytest
 import yaml
 from cdpify.exceptions import CDPCommandError
 from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
-from harnessed.events import tool
+from harnessed.events import ToolExecutionFinishedEvent
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
@@ -62,7 +62,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
     holder = {}
     count = 0
 
-    class Prepare(Plugin, needs=(Browser, Actions)):
+    class Prepare(Plugin):
         async def setup(self, _ctx: Context, browser: Inject[Browser], actions: Inject[Actions]):
             holder.update(browser=browser, actions=actions)
             origin = site.replace("127.0.0.1", "localhost") if cross else site
@@ -118,7 +118,9 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
     async with agent.session() as session:
         result = await session.run("Fill and click inside the frame", max_steps=3)
         assert result.text == "Done"
-        receipts = [event for event in session.events if isinstance(event, tool.ExecutionFinished)]
+        receipts = [
+            event for event in session.events if isinstance(event, ToolExecutionFinishedEvent)
+        ]
         assert len(receipts) == 2 and all(not event.result.is_error for event in receipts)
         browser, actions = holder["browser"], holder["actions"]
         entry = next(e for e in actions.observe.snapshot.elements if e.name == "Frame button")

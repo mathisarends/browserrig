@@ -1,5 +1,4 @@
-from harnessed import Context, Inject, Plugin
-from harnessed.core.session.session import SessionLog
+from harnessed import Context, Inject, Plugin, SessionLog
 
 from browserrig.events import BROWSER_EVENTS
 

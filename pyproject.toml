@@ -9,7 +9,7 @@ description = "Event-driven Chrome automation for Harnessed."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "harnessed @ git+https://github.com/mathisarends/harnessed.git@967380be850e349e52b67b4a094a995adff9602e",
+    "harnessed==0.2.0",
     "cdpify[websocket]>=0.4.0,<0.5",
     "httpx>=0.28,<1",
     "pillow>=13,<14",
@@ -18,8 +18,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-openai = ["harnessed[openai]"]
-anthropic = ["harnessed[anthropic]"]
+openai = ["harnessed[openai]==0.2.0"]
+anthropic = ["harnessed[anthropic]==0.2.0"]
 
 [dependency-groups]
 dev = [
@@ -31,9 +31,6 @@ dev = [
     "ruff>=0.14,<1",
     "ty>=0.0.93,<0.1",
 ]
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["browserrig"]

@@ -16,7 +16,7 @@ async def test_pause_steer_resume_observes_external_page_change(site):
     started, release = asyncio.Event(), asyncio.Event()
     holder = {}
 
-    class Gate(Plugin, needs=(Browser,)):
+    class Gate(Plugin):
         async def setup(self, _ctx: Context, browser: Inject[Browser]):
             holder["browser"] = browser
 

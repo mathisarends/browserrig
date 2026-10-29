@@ -2,9 +2,8 @@ from dataclasses import dataclass, field
 from uuid import uuid4
 
 import yaml
-from harnessed import Context, Inject, Plugin, PluginState, hook
-from harnessed.core.session.session import SessionLog
-from harnessed.events import model
+from harnessed import Inject, Observation, Plugin, PluginState, SessionLog, hook
+from harnessed.events import ObservationForm, ObservationsIncludedEvent
 
 from browserrig.browser.base import Browser
 from browserrig.events import (
@@ -33,7 +32,7 @@ class _State:
     effect_at: float = 0
 
 
-class Nudges(Plugin, needs=(Browser,)):
+class Nudges(Plugin, provides=True):
     """Bounded, document-aware hints driven by durable browser facts."""
 
     events = NUDGE_EVENTS
@@ -45,7 +44,7 @@ class Nudges(Plugin, needs=(Browser,)):
             raise ValueError("Invalid nudge limits")
         self.max_hints, self.max_chars = max_hints, max_chars
 
-    async def setup(self, ctx: Context, log: Inject[SessionLog]) -> None:
+    async def setup(self, log: Inject[SessionLog]) -> None:
         # Reconstruct audit state without redispatching live browser side effects.
         for event in log.events:
             match event:
@@ -55,7 +54,6 @@ class Nudges(Plugin, needs=(Browser,)):
                     self._remove(ids)
                 case NudgeExpiredEvent(nudge_id=nudge_id):
                     self._remove((nudge_id,))
-        ctx.provide(Nudges, self)
 
     def _remove(self, ids: tuple[str, ...]) -> None:
         self.state.queued = {
@@ -197,7 +195,7 @@ class Nudges(Plugin, needs=(Browser,)):
             document_id=event.document_id,
         )
 
-    async def project(self, snapshot: Snapshot, browser: Browser) -> str:
+    async def project(self, snapshot: Snapshot, browser: Browser) -> Observation:
         selected, size = [], 0
         for key, event in tuple(self.state.queued.items()):
             expired = (
@@ -212,20 +210,24 @@ class Nudges(Plugin, needs=(Browser,)):
             if size + len(event.text) <= self.max_chars and len(selected) < self.max_hints:
                 selected.append({"id": event.nudge_id, "text": event.text})
                 size += len(event.text)
-        return yaml.safe_dump({"nudges": selected}, sort_keys=False, allow_unicode=True)
+        return Observation(
+            source="browser.nudges",
+            full=yaml.safe_dump({"nudges": selected}, sort_keys=False, allow_unicode=True),
+            summary="Previous browser hints",
+            refs=tuple(item["id"] for item in selected),
+        )
 
-    @hook(model.Requested)
-    async def on_request(
-        self, event: model.Requested, browser: Inject[Browser], log: Inject[SessionLog]
-    ) -> None:
-        text = "\n".join(message.text for message in event.request.messages)
+    @hook(ObservationsIncludedEvent)
+    async def on_request(self, event: ObservationsIncludedEvent, browser: Inject[Browser]) -> None:
+        refs = {
+            ref
+            for observation in event.observations
+            if observation.source == "browser.nudges" and observation.form is ObservationForm.FULL
+            for ref in observation.refs
+        }
         included = tuple(
-            item.nudge_id for item in self.state.queued.values() if item.nudge_id in text
+            item.nudge_id for item in self.state.queued.values() if item.nudge_id in refs
         )
         if included:
-            await browser.emit(
-                NudgeIncludedEvent(
-                    nudge_ids=included, request_id=f"{log.id}:{len(log.requests) - 1}"
-                )
-            )
+            await browser.emit(NudgeIncludedEvent(nudge_ids=included, request_id=event.request_id))
             self._remove(included)

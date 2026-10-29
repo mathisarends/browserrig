@@ -1,7 +1,7 @@
 import pytest
 import yaml
 from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
-from harnessed.events import tool
+from harnessed.events import ToolExecutionFinishedEvent
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
@@ -16,7 +16,7 @@ async def _perform(site, name, arguments):
     holder = {}
     count = 0
 
-    class Access(Plugin, needs=(Browser,)):
+    class Access(Plugin):
         async def setup(self, _ctx: Context, browser: Inject[Browser]):
             holder["browser"] = browser
 
@@ -48,7 +48,9 @@ async def _perform(site, name, arguments):
     async with agent.session() as session:
         result = await session.run("Perform one gesture")
         assert result.text == "Gesture completed"
-        receipts = [event for event in session.events if isinstance(event, tool.ExecutionFinished)]
+        receipts = [
+            event for event in session.events if isinstance(event, ToolExecutionFinishedEvent)
+        ]
         assert receipts and all(not event.result.is_error for event in receipts)
         # The test fixture stores counters in its main world. Production extraction
         # deliberately runs in an isolated world, where page-owned globals are absent.

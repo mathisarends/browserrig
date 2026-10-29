@@ -1,6 +1,8 @@
+from unittest.mock import AsyncMock
+
 import pytest
 from harnessed import Context, Inject, Plugin, PolicyDecision
-from harnessed.events import tool
+from harnessed.events import ToolCallFinishedEvent
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
@@ -14,7 +16,7 @@ pytestmark = pytest.mark.integration
 async def test_facade_reopens_native_sessions_and_owns_a_fresh_browser_per_session(site, tmp_path):
     browsers = []
 
-    class Access(Plugin, needs=(Browser,)):
+    class Access(Plugin):
         async def setup(self, _ctx: Context, browser: Inject[Browser]):
             browsers.append(browser)
 
@@ -54,16 +56,23 @@ async def test_facade_honors_explicit_tool_policy(site):
     )
     result = await agent.run("Try navigation")
     assert result.text == "Denied"
-    replies = [item for item in result.events if isinstance(item, tool.Returned)]
+    replies = [item for item in result.events if isinstance(item, ToolCallFinishedEvent)]
     assert len(replies) == 1
     assert replies[0].result.is_error
     assert not any(isinstance(item, ActionStartedEvent) for item in result.events)
 
 
-async def test_facade_accepts_native_pydantic_ai_models_without_manual_adapters(site):
+async def test_facade_manages_supplied_native_model_context_on_reuse(site, monkeypatch):
     native = pytest.importorskip("pydantic_ai.models.test")
     model = native.TestModel(call_tools=[], custom_output_text="Native model adapted")
+    enter, leave = AsyncMock(return_value=model), AsyncMock()
+    monkeypatch.setattr(native.TestModel, "__aenter__", enter)
+    monkeypatch.setattr(native.TestModel, "__aexit__", leave)
     agent = BrowserAgent(model=model, browser=LaunchBrowser(url=site))
     result = await agent.run("Inspect the page")
     assert result.text == "Native model adapted"
     assert model.last_model_request_parameters is not None
+    assert enter.await_count == leave.await_count > 0
+    first_contexts = enter.await_count
+    assert (await agent.run("Inspect again")).text == "Native model adapted"
+    assert enter.await_count == leave.await_count > first_contexts

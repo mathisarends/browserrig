@@ -1,6 +1,7 @@
 import pytest
 import yaml
 from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
+from harnessed.events import ModelRequestedEvent, ObservationForm, ObservationsIncludedEvent
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel
@@ -18,6 +19,7 @@ from browserrig import (
 from browserrig.events import (
     ActionFinishedEvent,
     ActivityFinishedEvent,
+    NudgeIncludedEvent,
     NudgeQueuedEvent,
     ObservationCapturedEvent,
 )
@@ -69,13 +71,27 @@ async def test_model_tools_yaml_and_activity(site):
     intervals = [event for event in result.events if isinstance(event, ActivityFinishedEvent)]
     assert len([event for event in intervals if event.kind == "llm"]) == 4
     assert all(event.at >= event.started_at for event in intervals)
+    requests = [event for event in result.events if isinstance(event, ModelRequestedEvent)]
+    provenance = [event for event in result.events if isinstance(event, ObservationsIncludedEvent)]
+    assert len(requests) == len(provenance) == 4
+    assert [item.request_id for item in requests] == [item.request_id for item in provenance]
+    assert {event.cause_id for event in intervals if event.kind == "llm"} == {
+        item.request_id for item in requests
+    }
+    snapshots = {
+        item.observation_id for item in result.events if isinstance(item, ObservationCapturedEvent)
+    }
+    for included in provenance:
+        observations = [item for item in included.observations if item.source == "browser"]
+        assert sum(item.form is ObservationForm.FULL for item in observations) == 1
+        assert all(len(item.refs) == 1 and item.refs[0] in snapshots for item in observations)
 
 
 async def test_canvas_mode_native_image(site):
     model = ScriptedModel(["Canvas ready"])
 
     # Start on a canvas before the first observation: blank about:blank is intentionally not ready.
-    class Start(Plugin, needs=(Browser,)):
+    class Start(Plugin):
         async def setup(self, _ctx: Context, browser: Inject[Browser]):
             await browser.active_tab.navigate(site + "/canvas")
 
@@ -134,3 +150,20 @@ async def test_no_progress_hint_is_derived_from_events(site):
     )
     result = await agent.run("Click Nothing")
     assert any(isinstance(e, NudgeQueuedEvent) and e.key == "no_progress" for e in result.events)
+    hint = next(
+        e for e in result.events if isinstance(e, NudgeQueuedEvent) and e.key == "no_progress"
+    )
+    receipt = next(
+        e
+        for e in result.events
+        if isinstance(e, NudgeIncludedEvent) and hint.nudge_id in e.nudge_ids
+    )
+    included = next(
+        e
+        for e in result.events
+        if isinstance(e, ObservationsIncludedEvent) and e.request_id == receipt.request_id
+    )
+    assert any(
+        hint.nudge_id in item.refs and item.form is ObservationForm.FULL
+        for item in included.observations
+    )

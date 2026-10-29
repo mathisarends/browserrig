@@ -6,8 +6,12 @@ from browserrig.kinds import ActionKind, ElementOperation
 from .execution import Actions, Effect
 
 
-class FormTools(Plugin, needs=(Actions,)):
-    @tool
+class FormTools(Plugin):
+    @tool(
+        description=(
+            "Fill the latest observation's ref; clear replaces its value. Input text is not echoed."
+        )
+    )
     async def type_text(
         self,
         ref: str,
@@ -33,7 +37,7 @@ class FormTools(Plugin, needs=(Actions,)):
             operation=fill,
         )
 
-    @tool
+    @tool(description="Select an exact option label or value in a native select element.")
     async def select_option(
         self,
         ref: str,
@@ -57,7 +61,7 @@ class FormTools(Plugin, needs=(Actions,)):
             operation=select,
         )
 
-    @tool
+    @tool(description="Set a native date/time input in its HTML format, such as YYYY-MM-DD.")
     async def set_date(
         self,
         ref: str,

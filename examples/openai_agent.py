@@ -36,19 +36,17 @@ async def main() -> None:
     if not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY in the environment or in .env")
 
-    # The caller owns the provider model; BrowserAgent configures the browser plugins.
-    async with OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")) as openai:
-        agent = BrowserAgent(
-            model=openai,
-            browser=LaunchBrowser(url=args.url, headless=not args.headed),
-            mode=DomMode(screenshots=True),
-            recording=RecordingOptions() if args.record else None,
-            session_directory=Path(".browserrig/sessions"),
-            approvals=Approvals(default=PolicyDecision.ALLOW),
-        )
-        async with agent.session() as session:
-            result = await session.run(args.task, max_steps=20, token_budget=80000)
-            print(result.text)
+    agent = BrowserAgent(
+        model=OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")),
+        browser=LaunchBrowser(url=args.url, headless=not args.headed),
+        mode=DomMode(screenshots=True),
+        recording=RecordingOptions() if args.record else None,
+        session_directory=Path(".browserrig/sessions-v2"),
+        approvals=Approvals(default=PolicyDecision.ALLOW),
+    )
+    async with agent.session() as session:
+        result = await session.run(args.task, max_steps=20, token_budget=80000)
+        print(result.text)
 
 
 if __name__ == "__main__":

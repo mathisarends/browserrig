@@ -18,8 +18,8 @@ type ClickCount = Annotated[
 ]
 
 
-class PointerTools(Plugin, needs=(Actions,)):
-    @tool
+class PointerTools(Plugin):
+    @tool(description="Click screenshot coordinates; count=2 performs a native double click.")
     async def click_at(
         self,
         x: Annotated[float, Field(ge=0)],
@@ -41,7 +41,7 @@ class PointerTools(Plugin, needs=(Actions,)):
 
         return await actions.run(kind=_click_kind(count), operation=click, expects_change=True)
 
-    @tool
+    @tool(description="Press a page key, optionally with modifiers, e.g. Enter, Tab or Control+a.")
     async def press_key(
         self,
         key: str,
@@ -59,7 +59,7 @@ class PointerTools(Plugin, needs=(Actions,)):
             operation=press,
         )
 
-    @tool
+    @tool(description="Scroll the visible page vertically by CSS pixels.")
     async def scroll(
         self,
         delta_y: Annotated[float, Field(ge=-10000, le=10000)],
@@ -86,13 +86,20 @@ class PointerTools(Plugin, needs=(Actions,)):
             operation=scroll,
         )
 
-    @tool(readonly=True)
+    @tool(
+        readonly=True,
+        description="Wait briefly for an expected asynchronous page update, then observe again.",
+    )
     async def wait(self, seconds: Annotated[float, Field(ge=0, le=10)] = 1) -> str:
         """Wait briefly for an expected asynchronous page update, then observe again."""
         await asyncio.sleep(seconds)
         return "Wait completed; observe the current state."
 
-    @tool
+    @tool(
+        description=(
+            "Drag between screenshot points. Use html5 for a native draggable/DataTransfer source."
+        )
+    )
     async def drag_at(
         self,
         start: Point,
@@ -120,7 +127,7 @@ class PointerTools(Plugin, needs=(Actions,)):
 
 
 class InteractionTools(PointerTools):
-    @tool
+    @tool(description="Click a current DOM ref; count=2 performs a native double click.")
     async def click(
         self,
         ref: str,
@@ -140,7 +147,11 @@ class InteractionTools(PointerTools):
 
         return await actions.run(kind=_click_kind(count), operation=click, expects_change=True)
 
-    @tool
+    @tool(
+        description=(
+            "Drag between visible DOM refs; native draggable sources use HTML5 DataTransfer."
+        )
+    )
     async def drag(
         self,
         source_ref: str,

@@ -1,7 +1,8 @@
 # Browserrig
 
 Event-driven Chrome automation for AI agents and Python applications, built with
-[Harnessed](https://github.com/mathisarends/harnessed), cdpify, and Pydantic.
+[Harnessed 0.2.0](https://github.com/mathisarends/harnessed/releases/tag/v0.2.0),
+cdpify, and Pydantic. Harnessed is pinned exactly in `pyproject.toml` and `uv.lock`.
 Browserrig combines direct browser access with composable agent plugins, explicit
 DOM and canvas modes, and a shared event log.
 
@@ -16,7 +17,7 @@ DOM and canvas modes, and a shared event log.
 From a checkout of this repository:
 
 ```powershell
-uv sync --extra openai
+uv sync --locked --extra openai
 Copy-Item .env.example .env
 # Set OPENAI_API_KEY in .env.
 uv run --env-file .env --extra openai python -m examples.openai_agent --headed --record
@@ -70,21 +71,21 @@ from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import BrowserAgent, LaunchBrowser, RecordingOptions, DomMode
 
-async with OpenAIResponsesModel("gpt-6.1-terra") as openai:
-    agent = BrowserAgent(
-        model=openai,
-        browser=LaunchBrowser(url="https://en.wikipedia.org/wiki/Voyager_program"),
-        mode=DomMode(screenshots=True),
-        recording=RecordingOptions(),
-        session_directory=".browserrig/sessions",
-        approvals=Approvals(default=PolicyDecision.ALLOW),
-    )
-    result = await agent.run("Compare Voyager 1 and 2 and cite the source URLs.", max_steps=20)
-    print(result.text)
+agent = BrowserAgent(
+    model=OpenAIResponsesModel("gpt-6.1-terra"),
+    browser=LaunchBrowser(url="https://en.wikipedia.org/wiki/Voyager_program"),
+    mode=DomMode(screenshots=True),
+    recording=RecordingOptions(),
+    session_directory=".browserrig/sessions-v2",
+    approvals=Approvals(default=PolicyDecision.ALLOW),
+)
+result = await agent.run("Compare Voyager 1 and 2 and cite the source URLs.", max_steps=20)
+print(result.text)
 ```
 
 `run()`, `session()`, `sessions`, and session controls remain native Harnessed APIs.
-Native Pydantic AI models are accepted directly; the caller owns their lifecycle.
+Native Pydantic AI models are accepted directly; Harnessed enters and exits their
+resource contexts. Explicitly supplied HTTP and provider SDK clients remain caller-owned.
 Use `instructions=...` to replace the default instruction and `plugins=[...]` to
 add capabilities. Conversations stay in memory unless `session_directory` is set.
 Without explicit `approvals`, Harnessed's default `ASK` policy applies; the example
@@ -94,6 +95,18 @@ For custom composition, `browser_plugins()` returns an inspectable plugin list:
 `Agent(model=model, plugins=[*browser_plugins(), MyPlugin()])`.
 Individual capabilities such as `Chrome`, `Readiness`, `Observe`, `Actions`, tool
 plugins, `Nudges`, `Activity`, and `Recording` are also available directly.
+Shared plugin services use class-level `Inject[T]` and `provides=True`; required
+injections infer dependencies. Optional services resolve on each hook invocation.
+Tool decorators declare model-facing descriptions independently of developer docstrings.
+
+## Upgrading existing sessions
+
+Harnessed 0.2.0 requires session record format 2 and rejects format 1 without
+automatic migration. Back up existing session stores and choose a fresh directory
+when upgrading. The OpenAI example now writes to `.browserrig/sessions-v2`;
+existing `.browserrig/sessions` files stay available in their original directory.
+Custom `session_directory` values should also point to a fresh store. See the
+[migration guide](https://github.com/mathisarends/harnessed/blob/v0.2.0/Changelog.md).
 
 ## Session controls and canvas mode
 
@@ -183,6 +196,19 @@ async for event in session.subscribe():
         case ActionStartedEvent(kind=kind):
             print(kind)
 ```
+
+Import SDK events directly from `harnessed.events`, for example
+`ToolCallRequestedEvent` and `ToolCallFinishedEvent`. The latter carries the final
+reviewed result, including denied calls. Activity intervals use execution receipts
+for tool timing and the SDK's `request_id` for model timing, including failures,
+cancellations, and context-limit retries. Tool cancellation and timeout have
+separate activity outcomes.
+
+Browser observations carry their snapshot ID in `Observation.refs`. Hints carry
+their nudge IDs and are acknowledged only by `ObservationsIncludedEvent` for the
+`browser.nudges` source in full form. Summaries and IDs appearing in ordinary text
+leave hints queued. `NudgeIncludedEvent.request_id` matches the submitted request;
+`SessionLog.included_observations(request)` exposes the durable provenance on replay.
 
 ## Development
 
