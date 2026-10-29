@@ -11,6 +11,7 @@ DOM and canvas modes, and a shared event log.
 - Interact through DOM references or screenshot coordinates, including double-clicks and drags.
 - Pause, steer, resume, stop, or abort agent sessions through Harnessed's native controls.
 - Record browser activity and subscribe to typed events for actions and downloads.
+- Give agents a persistent workspace, read downloaded PDFs, and preview files in new tabs.
 
 ## Quick start
 
@@ -351,10 +352,61 @@ manifest with checksums, timing references, and periods spent waiting only for t
 model. The media container is checked; ffmpeg is not a runtime dependency.
 The manifest distinguishes canvas crops from native viewport recordings.
 
-`LaunchBrowser(download_directory="ABSOLUTE_PATH_ON_BROWSER_HOST")` enables
-downloads in the browser's own context. `DownloadState` includes `IN_PROGRESS`,
+Launched browsers automatically get a workspace under `.browserrig/files/<unique-id>/`
+and save downloads in its `downloads/` directory. Files remain available after the
+browser closes. Choose a reusable workspace explicitly:
+
+```python
+from pathlib import Path
+from browserrig import BrowserAgent, FileSystemOptions, LaunchBrowser
+
+agent = BrowserAgent(
+    model=model,
+    browser=LaunchBrowser(url="https://example.com"),
+    file_system=FileSystemOptions(directory=Path(".browserrig/research")),
+)
+```
+
+`file_system` is also accepted by `browser_plugins()`, `Chrome`, and `ChromeBrowser`.
+The constructor creates no files or directories; browser startup creates the directories.
+File access is confined to the workspace and any explicitly configured download
+directory, including checks for path traversal and symlinks leaving those roots.
+
+The agent sees the workspace and its latest 20 downloads before every step.
+File tools are available in both DOM and canvas modes:
+
+| Tool | Behavior |
+| --- | --- |
+| `list_files(path=".", offset=0, limit=100)` | List a directory; follow `next_offset` for more. |
+| `read_file(path, page_number=None, offset=0, max_chars=20000)` | Read UTF-8 text or one PDF page, defaulting to page 1. Returns `page_count` for PDFs and `next_offset` for longer text. |
+| `write_file(path, content, overwrite=False)` | Save UTF-8 text and create parent directories; overwriting requires an explicit flag. |
+| `list_downloads()` | List download IDs, status, saved paths, and file errors. |
+| `open_downloaded_file(download_id)` | Open a completed download in a new active tab. |
+| `open_file(path)` | Open a workspace/download file in a new active tab. |
+
+Pass paths returned by `list_files` or `list_downloads`, or paths relative to the
+workspace. To inspect a PDF, use `read_file` for its text and `open_downloaded_file`
+followed by `screenshot` for its appearance. PDFs without extractable text report
+that limitation; OCR is not performed. `max_file_bytes` defaults to 50 MB for reads
+and writes. `switch_tab` returns to the original page. DOM uploads remain available
+through `UploadTools.upload_files`, using absolute paths on the browser host.
+
+Direct Python callers can use `browser.files.read_file(path, page_number=2)` and
+`await browser.open_file(path)`. Filesystem methods are synchronous; use
+`asyncio.to_thread` when processing files inside an async application.
+
+`LaunchBrowser(download_directory="ABSOLUTE_PATH_ON_BROWSER_HOST")` overrides the
+download location. Downloads first use `.pending/` and then move into a folder
+named by their stable download ID, preserving their filename and extension.
+Duplicate filenames get separate folders. `DownloadState` includes `IN_PROGRESS`,
 `COMPLETED`, and `CANCELED`; download events use the `browser.download.*` namespace.
-Upload and download paths refer to the browser host.
+
+Connected browsers keep their existing host semantics: `ConnectBrowser` enables
+workspace tools only when `file_system=FileSystemOptions(...)` explicitly identifies
+a directory shared with the browser host at the same absolute path. Without it,
+download tracking still works but local file reads and previews are unavailable.
+Attaching to an existing `target_id` retains its browser-wide download policy.
+The OpenAI example accepts `--workspace .browserrig/research` to reuse a directory.
 
 Subscribe to durable facts and live choreography from a session while a run is
 active (for example, from a consumer task started before `session.run`):

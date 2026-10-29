@@ -11,13 +11,14 @@ from browserrig import (
     CanvasMode,
     Chrome,
     DomMode,
+    FileSystemOptions,
     LaunchBrowser,
     Readiness,
     ReadinessOptions,
     Recording,
     RecordingOptions,
 )
-from browserrig.tools import FileTools, FormTools, InteractionTools, PointerTools
+from browserrig.tools import FileTools, FormTools, InteractionTools, PointerTools, UploadTools
 
 
 def test_facade_configures_resources_without_opening_them_and_accepts_extra_plugins(tmp_path):
@@ -27,6 +28,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     options = LaunchBrowser(url="https://example.com", headless=False)
     readiness = ReadinessOptions(quiet_ms=123)
     recording = RecordingOptions(directory=tmp_path / "recordings")
+    file_system = FileSystemOptions(directory=tmp_path / "files")
     approvals = Approvals(default=PolicyDecision.DENY)
     extension = Extension()
     agent = BrowserAgent(
@@ -35,6 +37,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
         mode=DomMode(screenshots=True),
         readiness=readiness,
         recording=recording,
+        file_system=file_system,
         session_directory=tmp_path / "sessions",
         approvals=approvals,
         instructions="Custom instructions.",
@@ -44,12 +47,16 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     assert next(item for item in agent.plugins if isinstance(item, Chrome)).options == options
     assert next(item for item in agent.plugins if isinstance(item, Readiness)).options == readiness
     assert next(item for item in agent.plugins if isinstance(item, Recording)).options == recording
+    assert (
+        next(item for item in agent.plugins if isinstance(item, Chrome)).file_system == file_system
+    )
     assert extension in agent.plugins
     assert [item for item in agent.plugins if isinstance(item, Approvals)] == [approvals]
     assert sum(isinstance(item, JsonlSessions) for item in agent.plugins) == 1
     assert not any(isinstance(item, MemorySessions) for item in agent.plugins)
     assert not (tmp_path / "sessions").exists()
     assert not recording.directory.exists()
+    assert not file_system.directory.exists()
 
 
 @pytest.mark.parametrize(
@@ -59,8 +66,9 @@ def test_facade_keeps_dom_and_canvas_tool_sets_distinct(mode, interaction):
     agent = BrowserAgent(model=ScriptedModel(["ok"]), mode=mode)
     assert sum(isinstance(item, interaction) for item in agent.plugins) == 1
     has_forms = any(isinstance(item, FormTools) for item in agent.plugins)
-    has_files = any(isinstance(item, FileTools) for item in agent.plugins)
-    assert has_forms == has_files == isinstance(mode, DomMode)
+    has_uploads = any(isinstance(item, UploadTools) for item in agent.plugins)
+    assert has_forms == has_uploads == isinstance(mode, DomMode)
+    assert sum(isinstance(item, FileTools) for item in agent.plugins) == 1
     assert next(item for item in agent.plugins if isinstance(item, Readiness)).mode == mode
 
 

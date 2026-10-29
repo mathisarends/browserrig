@@ -36,6 +36,10 @@ class FakeBrowser:
         self.active_tab = FakeTab()
         self.action_lock = asyncio.Lock()
         self.log = log
+        self.files = None
+
+    async def downloads(self):
+        return ()
 
     async def emit(self, event):
         await self.log.emit(replace(event, browser_id=self.id))

@@ -49,3 +49,4 @@ class Download(Options):
     state: DownloadState = DownloadState.IN_PROGRESS
     received_bytes: int = 0
     path: str | None = None
+    error: str | None = None

@@ -78,7 +78,8 @@ def _fake_chrome(monkeypatch):
     resources = []
 
     @asynccontextmanager
-    async def open_browser(_options, *, emit):
+    async def open_browser(_options, *, emit, file_system):
+        assert file_system is None
         resource = SimpleNamespace(browser=FakeBrowser(SimpleNamespace(emit=emit)), closed=False)
         resources.append(resource)
         try:

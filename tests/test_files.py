@@ -1,0 +1,204 @@
+# CDP handlers are exercised directly for missing and repeated completion events.
+# pylint: disable=protected-access
+
+from io import BytesIO
+from pathlib import Path
+
+import pytest
+from cdpify.domains.browser import DownloadProgressEvent
+from harnessed import ToolError
+from pypdf import PdfReader, PdfWriter
+
+from browserrig import ChromeBrowser, ConnectBrowser, FileSystem, FileSystemOptions, LaunchBrowser
+from browserrig.browser.models import Download, DownloadState
+from browserrig.tools.files import _file_call
+
+
+@pytest.fixture(name="files")
+def _files(tmp_path):
+    workspace = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
+    assert not workspace.directory.exists()
+    workspace.initialize()
+    return workspace
+
+
+def test_workspace_text_round_trip_pagination_and_explicit_overwrite(files):
+    content = "Grüße aus dem Weltall 🌍\n" * 10
+    saved = files.write_file("notes/research.md", content)
+    assert saved.size == len(content.encode())
+    assert files.list_files().entries[1].name == "notes"
+    assert files.list_files("notes").entries[0].path == saved.path
+    with pytest.raises(FileExistsError):
+        files.write_file("notes/research.md", "oops")
+    first = files.read_file(saved.path, max_chars=17)
+    second = files.read_file(saved.path, offset=first.next_offset, max_chars=20000)
+    assert first.text + second.text == content
+    assert second.next_offset is None
+    files.write_file(saved.path, "updated", overwrite=True)
+    assert files.read_file(saved.path).text == "updated"
+
+
+def test_directory_listing_is_bounded(files):
+    for index in range(5):
+        files.write_file(f"note-{index}.txt", "test")
+    first = files.list_files(limit=2)
+    second = files.list_files(offset=first.next_offset, limit=2)
+    assert len(first.entries) == len(second.entries) == 2
+    assert {entry.name for entry in first.entries}.isdisjoint(
+        entry.name for entry in second.entries
+    )
+
+
+@pytest.mark.parametrize("path", ["../private.txt", "notes/../../private.txt"])
+def test_workspace_rejects_traversal_for_read_write_and_list(files, path):
+    for operation in (files.read_file, files.list_files, lambda p: files.write_file(p, "secret")):
+        with pytest.raises(ValueError, match="outside"):
+            operation(path)
+    with pytest.raises(ValueError, match="outside"):
+        files.resolve(files.directory.parent / "secret.txt")
+
+
+def test_workspace_rejects_symlink_escapes(files, tmp_path):
+    outside = tmp_path / "private"
+    outside.mkdir()
+    (outside / "secret.txt").write_text("secret")
+    link = files.directory / "shortcut"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("Creating symlinks is unavailable on this host")
+    with pytest.raises(ValueError, match="outside"):
+        files.read_file("shortcut/secret.txt")
+    with pytest.raises(ValueError, match="outside"):
+        files.write_file("shortcut/secret.txt", "changed", overwrite=True)
+    assert "shortcut" not in {entry.name for entry in files.list_files().entries}
+    assert (outside / "secret.txt").read_text() == "secret"
+
+
+def test_pdf_pages_and_character_continuation(files, pdf_document):
+    path = files.directory / "report.pdf"
+    path.write_bytes(pdf_document)
+    first = files.read_file(str(path), max_chars=8)
+    rest = files.read_file(str(path), page_number=1, offset=first.next_offset)
+    assert "First page: Voyager 1" in first.text + rest.text
+    assert first.page_count == 2
+    assert first.page_number == 1
+    second = files.read_file(str(path), page_number=2)
+    assert "Second page: Voyager 2" in second.text
+    assert "First page" not in second.text
+    with pytest.raises(ValueError, match="2 pages"):
+        files.read_file(str(path), page_number=3)
+    with pytest.raises(ValueError, match="2 pages"):
+        files.read_file(str(path), page_number=0)
+
+
+def test_empty_encrypted_and_invalid_pdf_report_usable_errors(files):
+    path = files.directory / "report.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=100, height=100)
+    writer.write(path)
+    empty = files.read_file(str(path))
+    assert not empty.text
+    assert "No extractable text" in empty.limitations[0]
+    writer.encrypt("secret")
+    writer.write(path)
+    with pytest.raises(ValueError, match="encrypted"):
+        files.read_file(str(path))
+    path.write_bytes(b"not a PDF")
+    with pytest.raises(ValueError, match="Could not read PDF"):
+        files.read_file(str(path))
+
+
+def test_binary_missing_and_oversized_files_are_not_read_as_text(files):
+    path = files.directory / "image.png"
+    path.write_bytes(b"\x89PNG\x00\x01")
+    with pytest.raises(ValueError, match="visual inspection"):
+        files.read_file(str(path))
+    with pytest.raises(FileNotFoundError):
+        files.read_file("missing.txt")
+    small = FileSystem(FileSystemOptions(directory=files.directory, max_file_bytes=2))
+    with pytest.raises(ValueError, match="max_file_bytes"):
+        small.read_file(str(path))
+    with pytest.raises(ValueError, match="max_file_bytes"):
+        small.write_file("large.txt", "abc")
+    files.write_file("notes.txt", "test")
+    with pytest.raises(ValueError, match="only supported for PDF"):
+        files.read_file("notes.txt", page_number=1)
+
+
+def test_downloads_keep_extensions_and_duplicate_names_without_overwriting(files, pdf_document):
+    paths = []
+    for download_id in ("first", "second"):
+        (files.pending_directory / download_id).write_bytes(pdf_document)
+        paths.append(files.complete_download(download_id, "report.pdf", None))
+    assert paths[0] != paths[1]
+    assert all(Path(path).name == "report.pdf" for path in paths)
+    assert all(Path(path).read_bytes() == pdf_document for path in paths)
+    assert len(PdfReader(BytesIO(Path(paths[0]).read_bytes())).pages) == 2
+
+
+@pytest.mark.parametrize(
+    "filename", ["../../report.pdf", "CON.pdf", "bad:name?.pdf", "a" * 300 + ".pdf"]
+)
+def test_download_names_are_safe_on_windows_and_preserve_suffix(files, filename):
+    (files.pending_directory / "download-id").write_bytes(b"content")
+    saved = Path(files.complete_download("download-id", filename, None))
+    assert saved.is_relative_to(files.download_directory)
+    assert saved.suffix == ".pdf"
+    assert saved.read_bytes() == b"content"
+
+
+def test_explicit_download_directory_is_accessible_without_opening_other_paths(tmp_path):
+    files = FileSystem(
+        FileSystemOptions(directory=tmp_path / "workspace"),
+        download_directory=str(tmp_path / "downloads"),
+    )
+    files.initialize()
+    (files.pending_directory / "id").write_text("download")
+    path = files.complete_download("id", "note.txt", None)
+    assert files.read_file(path).text == "download"
+    with pytest.raises(ValueError, match="outside"):
+        files.resolve(tmp_path / "other")
+
+
+async def test_download_completion_falls_back_to_guid_and_tolerates_repeated_events(tmp_path):
+    browser = ChromeBrowser(file_system=FileSystemOptions(directory=tmp_path))
+    browser.files.initialize()
+    (browser.files.pending_directory / "id").write_text("download")
+    browser._downloads["id"] = Download(id="id", filename="note.txt", url="https://example.org")
+    event = DownloadProgressEvent(guid="id", total_bytes=8, received_bytes=8, state="completed")
+    await browser._download_progress(event)
+    await browser._download_progress(event)
+    download = (await browser.downloads())[0]
+    assert download.state is DownloadState.COMPLETED
+    assert browser.files.read_file(download.path).text == "download"
+    assert download.error is None
+
+
+async def test_missing_download_does_not_break_browser_listener(tmp_path):
+    browser = ChromeBrowser(file_system=FileSystemOptions(directory=tmp_path))
+    browser.files.initialize()
+    browser._downloads["id"] = Download(id="id", filename="note.txt", url="https://example.org")
+    await browser._download_progress(
+        DownloadProgressEvent(guid="id", total_bytes=8, received_bytes=8, state="completed")
+    )
+    download = (await browser.downloads())[0]
+    assert download.path is None
+    assert "could not be saved" in download.error
+    assert browser._failure is None
+
+
+def test_remote_browser_requires_explicit_shared_filesystem(tmp_path):
+    remote = ConnectBrowser(endpoint="http://127.0.0.1:9222")
+    assert ChromeBrowser(remote).files is None
+    shared = ChromeBrowser(remote, file_system=FileSystemOptions(directory=tmp_path))
+    assert shared.files.directory == tmp_path
+    assert ChromeBrowser(LaunchBrowser()).files is not None
+
+
+async def test_io_errors_become_model_visible_tool_errors():
+    def fail():
+        raise FileNotFoundError("Download the file first")
+
+    with pytest.raises(ToolError, match="Download the file first"):
+        await _file_call(fail)

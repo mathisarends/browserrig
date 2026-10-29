@@ -12,6 +12,7 @@ from harnessed.plugins import Approvals, JsonlSessions
 
 from .browser.config import BrowserOptions
 from .composition import browser_plugins
+from .files import FileSystemOptions
 from .observation.config import ObservationMode
 from .readiness.config import ReadinessOptions
 from .recording import RecordingOptions
@@ -35,6 +36,7 @@ class BrowserAgent(Agent):
         mode: ObservationMode | None = None,
         readiness: ReadinessOptions | None = None,
         recording: RecordingOptions | None = None,
+        file_system: FileSystemOptions | None = None,
         session_directory: str | Path | None = None,
         approvals: Approvals | None = None,
         instructions: InstructionValues | None = (
@@ -44,7 +46,13 @@ class BrowserAgent(Agent):
         plugin_validation: PluginValidation = PluginValidation.ERROR,
     ) -> None:
         composed: list[PluginLike] = list(
-            browser_plugins(browser, mode=mode, readiness=readiness, recording=recording)
+            browser_plugins(
+                browser,
+                mode=mode,
+                readiness=readiness,
+                recording=recording,
+                file_system=file_system,
+            )
         )
         if session_directory is not None:
             composed.append(JsonlSessions(session_directory))

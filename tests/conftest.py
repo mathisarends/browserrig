@@ -1,11 +1,37 @@
 import asyncio
 from collections.abc import AsyncIterator
+from io import BytesIO
 
 import pytest
+from pypdf import PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+
+@pytest.fixture(name="pdf_document")
+def _pdf_document() -> bytes:
+    writer = PdfWriter()
+    for text in ("First page: Voyager 1", "Second page: Voyager 2"):
+        page = writer.add_blank_page(width=612, height=792)
+        font = DictionaryObject(
+            {
+                NameObject("/Type"): NameObject("/Font"),
+                NameObject("/Subtype"): NameObject("/Type1"),
+                NameObject("/BaseFont"): NameObject("/Helvetica"),
+            }
+        )
+        page[NameObject("/Resources")] = DictionaryObject(
+            {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})}
+        )
+        stream = DecodedStreamObject()
+        stream.set_data(f"BT /F1 18 Tf 72 720 Td ({text}) Tj ET".encode())
+        page.replace_contents(stream)
+    output = BytesIO()
+    writer.write(output)
+    return output.getvalue()
 
 
 @pytest.fixture
-async def site() -> AsyncIterator[str]:
+async def site(pdf_document) -> AsyncIterator[str]:
     pages = {
         "/": """<!doctype html><title>Test form</title>
             <label>Email<input id=email></label>
@@ -17,6 +43,7 @@ async def site() -> AsyncIterator[str]:
             <button id=jump onclick="window.scrollTo(0,1000)">Jump</button>
             <button id=hash onclick="location.hash='changed';window.scrollTo(0,1000)">Hash</button>
             <button id=popup onclick="window.open('/other')">New tab</button>
+            <a id=download href='/download-pdf' download>Download PDF</a>
             <button id=dialog onclick="alert('Confirm me')">Dialog</button>
             <div id=shadow></div><script>
               const root=document.querySelector('#shadow').attachShadow({mode:'open'});
@@ -88,19 +115,21 @@ async def site() -> AsyncIterator[str]:
         try:
             raw = await reader.readuntil(b"\r\n\r\n")
             path = raw.split(b" ")[1].decode().split("?")[0]
-            body = (
-                b"download payload"
-                if path == "/download"
-                else pages.get(path, "<title>Missing</title>").encode()
-            )
-            content_type = (
-                (
+            if path == "/download":
+                body = b"download payload"
+                content_type = (
                     b"Content-Type: application/octet-stream\r\n"
                     b"Content-Disposition: attachment; filename=example.txt\r\n"
                 )
-                if path == "/download"
-                else b"Content-Type: text/html; charset=utf-8\r\n"
-            )
+            elif path == "/download-pdf":
+                body = pdf_document
+                content_type = (
+                    b"Content-Type: application/pdf\r\n"
+                    b"Content-Disposition: attachment; filename=report.pdf\r\n"
+                )
+            else:
+                body = pages.get(path, "<title>Missing</title>").encode()
+                content_type = b"Content-Type: text/html; charset=utf-8\r\n"
             writer.write(
                 b"HTTP/1.1 200 OK\r\n"
                 + content_type

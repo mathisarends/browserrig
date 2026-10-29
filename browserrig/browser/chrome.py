@@ -30,6 +30,7 @@ from browserrig.events import (
     TabClosedEvent,
     TabOpenedEvent,
 )
+from browserrig.files import FileSystem, FileSystemOptions
 
 from .base import EventSink
 from .config import BrowserOptions, ConnectBrowser, LaunchBrowser
@@ -46,9 +47,18 @@ async def _discard(_event: BrowserEvent | InputEvent) -> None:
 
 class ChromeBrowser:
     def __init__(
-        self, options: BrowserOptions | None = None, *, emit: EventSink = _discard
+        self,
+        options: BrowserOptions | None = None,
+        *,
+        file_system: FileSystemOptions | None = None,
+        emit: EventSink = _discard,
     ) -> None:
         self.options = options or LaunchBrowser()
+        self.files = (
+            FileSystem(file_system, download_directory=self.options.download_directory)
+            if isinstance(self.options, LaunchBrowser) or file_system is not None
+            else None
+        )
         self.id = uuid4().hex
         self._emit = emit
         self._stack: AsyncExitStack | None = None
@@ -70,6 +80,8 @@ class ChromeBrowser:
         self._stack = AsyncExitStack()
         try:
             options = self.options
+            if self.files is not None:
+                await asyncio.to_thread(self.files.initialize)
             if isinstance(options, LaunchBrowser):
                 process = await self._stack.enter_async_context(ChromeProcess(options))
                 endpoint, headers = process.endpoint, {}
@@ -103,10 +115,15 @@ class ChromeBrowser:
                     self._stack.push_async_callback(
                         self.client.target.dispose_browser_context, browser_context_id=self._context
                     )
-                    if options.download_directory is not None:
+                    download_directory = (
+                        str(self.files.pending_directory)
+                        if self.files is not None
+                        else options.download_directory
+                    )
+                    if download_directory is not None:
                         await self.client.browser.set_download_behavior(
                             behavior="allowAndName",
-                            download_path=options.download_directory,
+                            download_path=download_directory,
                             browser_context_id=self._context,
                             events_enabled=True,
                         )
@@ -206,10 +223,19 @@ class ChromeBrowser:
         return tuple(found)
 
     async def open_tab(self, url: str = "about:blank") -> Tab:
+        return await self._open_tab(validated_url(url))
+
+    async def open_file(self, path: str) -> Tab:
+        if self.files is None:
+            raise BrowserError("A shared local file system must be configured for this browser")
+        resolved = self.files.resolve(path)
+        if not await asyncio.to_thread(resolved.is_file):
+            raise BrowserError(f"File not found: {path}")
+        return await self._open_tab(resolved.as_uri())
+
+    async def _open_tab(self, url: str) -> Tab:
         self._check()
-        result = await self.client.target.create_target(
-            url=validated_url(url), browser_context_id=self._context
-        )
+        result = await self.client.target.create_target(url=url, browser_context_id=self._context)
         tab = await self._attach(result.target_id)
         self._active = tab.id
         await self.emit(TabOpenedEvent(target_id=tab.id, url=url))
@@ -358,17 +384,33 @@ class ChromeBrowser:
     async def _download_progress(self, event: DownloadProgressEvent) -> None:
         guid = event.guid
         previous = self._downloads[guid]
+        # Terminal CDP events can be repeated; never move an already completed file twice.
+        if previous.state != DownloadState.IN_PROGRESS:
+            return
+        path, error = event.file_path, None
+        if event.state == DownloadState.COMPLETED and self.files is not None:
+            try:
+                path = await asyncio.to_thread(
+                    self.files.complete_download, guid, previous.filename, path
+                )
+            except (OSError, ValueError) as failure:
+                # A single missing file must not stop browser event processing.
+                path, error = None, f"Downloaded file could not be saved: {failure}"
         download = Download(
             id=guid,
             url=previous.url,
             filename=previous.filename,
             state=DownloadState(event.state),
             received_bytes=int(event.received_bytes),
-            path=event.file_path,
+            path=path,
+            error=error,
         )
         self._downloads[guid] = download
         match download.state:
             case DownloadState.COMPLETED:
+                if error is not None:
+                    await self.emit(DownloadFailedEvent(download_id=guid, reason=error))
+                    return
                 await self.emit(
                     DownloadCompletedEvent(
                         download_id=guid,

@@ -32,6 +32,9 @@ def readiness_strategy(
     phase: ReadinessPhase,
     geometry_cache: dict[tuple[str, str], Geometry],
 ) -> ReadinessStrategy:
+    # File previews use the full viewport, even when the task tab is a canvas application.
+    if tab.url.startswith("file:"):
+        return DomReadiness(tab, options, phase)
     match mode:
         case DomMode():
             return DomReadiness(tab, options, phase)

@@ -4,6 +4,7 @@ from harnessed.plugins import LatestObservationOnly
 from .activity import Activity
 from .browser import Chrome
 from .browser.config import BrowserOptions
+from .files import FileSystemOptions
 from .nudges import Nudges
 from .observation.config import DomMode, ObservationMode
 from .observation.plugin import Observe
@@ -19,6 +20,7 @@ from .tools import (
     NavigationTools,
     PointerTools,
     TabTools,
+    UploadTools,
 )
 from .tools.execution import Actions
 
@@ -29,11 +31,12 @@ def browser_plugins(
     mode: ObservationMode | None = None,
     readiness: ReadinessOptions | None = None,
     recording: RecordingOptions | None = None,
+    file_system: FileSystemOptions | None = None,
 ) -> list[Plugin]:
     selected = mode or DomMode()
     plugins: list[Plugin] = [
         Activity(),
-        Chrome(options),
+        Chrome(options, file_system=file_system),
         Readiness(selected, readiness),
         Nudges(),
         Observe(),
@@ -43,10 +46,11 @@ def browser_plugins(
         InteractionTools() if isinstance(selected, DomMode) else PointerTools(),
         TabTools(),
         DialogTools(),
+        FileTools(),
         LatestObservationOnly(),
     ]
     if isinstance(selected, DomMode):
-        plugins.extend((FormTools(), FileTools()))
+        plugins.extend((FormTools(), UploadTools()))
     if recording is not None:
         plugins.append(Recording(recording))
     return plugins

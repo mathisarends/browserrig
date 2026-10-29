@@ -1,5 +1,5 @@
 from .dialogs import DialogTools
-from .files import FileTools
+from .files import FileTools, UploadTools
 from .forms import FormTools
 from .keyboard import KeyboardTools
 from .mouse import InteractionTools, PointerTools
@@ -15,4 +15,5 @@ __all__ = [
     "PointerTools",
     "NavigationTools",
     "TabTools",
+    "UploadTools",
 ]
