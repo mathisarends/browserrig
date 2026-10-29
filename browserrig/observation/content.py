@@ -63,19 +63,26 @@ async def extract_content(browser: Browser, tab: Tab, *, max_chars: int = 50000)
             embedded += state.frames
             if main is None:
                 main = state
-            part = state.markdown
+            prefix = "\n\n" if parts else ""
             if frame.parent is not None:
-                part = (
+                prefix += (
                     f"## Frame: {_heading(state.title) or 'Embedded document'}\n\n"
-                    f"Source: <{_source(state.url)}>\n\n{part}"
+                    f"Source: <{_source(state.url)}>\n\n"
                 )
-            separator = "\n\n" if parts else ""
-            part = separator + part
-            if state.truncated or len(part) > remaining:
+            available = max(0, remaining - len(prefix))
+            body = state.markdown
+            if state.truncated or len(body) > available:
                 limitations.append(
                     "Page content was truncated by max_chars or DOM traversal limits"
                 )
-            parts.append(part[:remaining])
+            if len(body) > available:
+                # Let the script close code fences using the actual body budget.
+                body = (
+                    (await frame.run(CONTENT, ContentArgs(max_chars=available))).markdown
+                    if available
+                    else ""
+                )
+            parts.append(prefix[:remaining] + body)
             remaining -= len(parts[-1])
         except (CDPCommandError, BrowserError, TimeoutError):
             if frame.parent is None:

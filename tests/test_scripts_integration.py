@@ -43,3 +43,14 @@ async def test_truncated_markdown_keeps_code_fences_closed(site, limit):
         fences = re.findall(r"^`{3,}", content.markdown, flags=re.M)
         assert len(fences) % 2 == 0
         assert content.limitations
+
+
+async def test_frame_heading_budget_does_not_reopen_a_truncated_code_fence(site):
+    async with ChromeBrowser(LaunchBrowser(url=site + "/frames")) as browser:
+        tab = browser.active_tab
+        await wait_for_page(browser, tab)
+        child = next(frame for frame in await browser.frames(tab) if frame.parent is not None)
+        await evaluate(child, "document.body.innerHTML = '<pre>'+ 'x'.repeat(500) +'</pre>'")
+        content = await extract_content(browser, tab, max_chars=200)
+        assert len(content.markdown) <= 200
+        assert len(re.findall(r"^`{3,}", content.markdown, flags=re.M)) % 2 == 0
