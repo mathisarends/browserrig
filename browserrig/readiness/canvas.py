@@ -18,7 +18,7 @@ from .config import ReadinessOptions
 from .dom import probe_dom
 from .strategy import ReadinessStrategy
 
-SCRIPT = files("browserrig.readiness").joinpath("scripts/canvas.js").read_text(encoding="utf-8")
+_SCRIPT = files("browserrig.readiness").joinpath("scripts/canvas.js").read_text(encoding="utf-8")
 
 
 class CanvasProbe(Options):
@@ -27,11 +27,11 @@ class CanvasProbe(Options):
     reason: str = ""
 
 
-async def locate_canvas(tab: Tab, mode: CanvasMode) -> CanvasProbe:
+async def _locate_canvas(tab: Tab, mode: CanvasMode) -> CanvasProbe:
     return CanvasProbe.model_validate(
         await tab.evaluate(
             script_call(
-                SCRIPT,
+                _SCRIPT,
                 {
                     "selector": mode.selector,
                     "loadingSelector": mode.loading_selector,
@@ -41,8 +41,8 @@ async def locate_canvas(tab: Tab, mode: CanvasMode) -> CanvasProbe:
     )
 
 
-async def probe_canvas(tab: Tab, mode: CanvasMode) -> tuple[Geometry | None, str]:
-    state = await locate_canvas(tab, mode)
+async def _probe_canvas(tab: Tab, mode: CanvasMode) -> tuple[Geometry | None, str]:
+    state = await _locate_canvas(tab, mode)
     if not state.ready or state.geometry is None:
         return None, state.reason
     geometry = state.geometry
@@ -70,33 +70,33 @@ class CanvasReadiness(ReadinessStrategy):
         geometry_cache: dict[tuple[str, str], Geometry],
     ) -> None:
         super().__init__(tab, options)
-        self.mode = mode
-        self.cache = geometry_cache
-        self.geometry = geometry_cache.get(self.key)
+        self._mode = mode
+        self._cache = geometry_cache
+        self.geometry = geometry_cache.get(self._key)
         self.budget = options.timeout if self.geometry is not None else options.canvas_timeout
-        self.last_geometry: Geometry | None = None
+        self._last_geometry: Geometry | None = None
 
     @property
-    def key(self) -> tuple[str, str]:
-        return self.tab.id, self.tab.document_id
+    def _key(self) -> tuple[str, str]:
+        return self._tab.id, self._tab.document_id
 
     async def check(self) -> bool:
-        self.delay = max(self.options.poll_interval, 0.5)
-        state = await probe_dom(self.tab)
+        self.delay = max(self._options.poll_interval, 0.5)
+        state = await probe_dom(self._tab)
         if self.geometry is not None:
-            location = await locate_canvas(self.tab, self.mode)
+            location = await _locate_canvas(self._tab, self._mode)
             if location.geometry == self.geometry:
                 # Recheck pixels only when capture geometry changes.
-                self.delay = self.options.poll_interval
-                return state.quiet_ms >= self.options.quiet_ms
+                self.delay = self._options.poll_interval
+                return state.quiet_ms >= self._options.quiet_ms
             self.geometry = None
-            self.cache.pop(self.key, None)
-        candidate, self.reason = await probe_canvas(self.tab, self.mode)
-        if candidate is not None and candidate == self.last_geometry:
+            self._cache.pop(self._key, None)
+        candidate, self.reason = await _probe_canvas(self._tab, self._mode)
+        if candidate is not None and candidate == self._last_geometry:
             self.geometry = candidate
-            self.cache[self.key] = candidate
+            self._cache[self._key] = candidate
             return True
-        self.last_geometry = candidate
+        self._last_geometry = candidate
         self.reason = self.reason or "canvas geometry is not stable yet"
         return False
 

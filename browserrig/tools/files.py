@@ -24,7 +24,7 @@ from .execution import Actions, Effect
 
 
 class FileTools(Plugin, needs=(Actions,)):
-    actions: Inject[Actions]
+    _actions: Inject[Actions]
     guidance = (
         "The file system observation identifies your workspace and recent downloads. "
         "Use list_files and read_file to inspect UTF-8 text and PDF pages; write_file saves "
@@ -38,15 +38,15 @@ class FileTools(Plugin, needs=(Actions,)):
     )
 
     def _files(self) -> FileSystem:
-        files = self.actions.browser.files
+        files = self._actions.browser.files
         if files is None:
             raise ToolError("A shared local file system must be configured for this browser")
         return files
 
     @hook(PreStep)
-    async def before_step(self, event: PreStep, next_: Next[StepDecision]) -> StepDecision:
-        files = self.actions.browser.files
-        downloads = await self.actions.browser.downloads()
+    async def _before_step(self, event: PreStep, next_: Next[StepDecision]) -> StepDecision:
+        files = self._actions.browser.files
+        downloads = await self._actions.browser.downloads()
         state = FileSystemState(
             directory=files.directory if files is not None else None,
             download_directory=files.download_directory if files is not None else None,
@@ -69,7 +69,7 @@ class FileTools(Plugin, needs=(Actions,)):
         readonly=True, description="List recent browser downloads, their stable IDs and file paths."
     )
     async def list_downloads(self) -> tuple[Download, ...]:
-        return await self.actions.browser.downloads()
+        return await self._actions.browser.downloads()
 
     @tool(
         readonly=True,
@@ -118,7 +118,7 @@ class FileTools(Plugin, needs=(Actions,)):
 
     @tool(description="Open a completed download in a new active tab using its list_downloads ID.")
     async def open_downloaded_file(self, download_id: str) -> str:
-        downloads = await self.actions.browser.downloads()
+        downloads = await self._actions.browser.downloads()
         download = next((item for item in downloads if item.id == download_id), None)
         if download is None:
             raise ToolError("Unknown download ID; use list_downloads to find available downloads")
@@ -130,11 +130,11 @@ class FileTools(Plugin, needs=(Actions,)):
 
     async def _open(self, path: str) -> str:
         async def open_file(_tab: Tab) -> Effect:
-            opened = await self.actions.browser.open_file(path)
-            await self.actions.readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
+            opened = await self._actions.browser.open_file(path)
+            await self._actions.readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
             return Effect(f"Opened file in tab {opened.id}: {path}")
 
-        return await self.actions.run(kind=ActionKind.TAB, operation=open_file, settle=False)
+        return await self._actions.run(kind=ActionKind.TAB, operation=open_file, settle=False)
 
 
 class UploadTools(Plugin, needs=(Actions,)):

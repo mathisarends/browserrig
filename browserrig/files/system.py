@@ -23,9 +23,9 @@ class FileSystem:
         *,
         download_directory: str | None = None,
     ) -> None:
-        self.options = options or FileSystemOptions()
+        self._options = options or FileSystemOptions()
         self.directory = (
-            self.options.directory or Path(".browserrig/files") / uuid4().hex
+            self._options.directory or Path(".browserrig/files") / uuid4().hex
         ).resolve()
         self.download_directory = (
             Path(download_directory).resolve()
@@ -89,7 +89,7 @@ class FileSystem:
         resolved = self.resolve(path)
         if not resolved.is_file():
             raise FileNotFoundError(f"File not found: {path}")
-        if resolved.stat().st_size > self.options.max_file_bytes:
+        if resolved.stat().st_size > self._options.max_file_bytes:
             raise ValueError("File exceeds max_file_bytes; use open_file to view it in the browser")
         if resolved.suffix.lower() == ".pdf":
             return self._read_pdf(
@@ -149,7 +149,7 @@ class FileSystem:
     def write_file(self, path: str, content: str, *, overwrite: bool = False) -> FileEntry:
         resolved = self.resolve(path)
         data = content.encode("utf-8")
-        if len(data) > self.options.max_file_bytes:
+        if len(data) > self._options.max_file_bytes:
             raise ValueError("Content exceeds max_file_bytes")
         resolved.parent.mkdir(parents=True, exist_ok=True)
         with resolved.open("wb" if overwrite else "xb") as stream:

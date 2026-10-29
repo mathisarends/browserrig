@@ -28,7 +28,7 @@ from .models import (
     Snapshot,
 )
 
-SNAPSHOT_SCRIPT = (
+_SNAPSHOT_SCRIPT = (
     files("browserrig.observation").joinpath("scripts/snapshot.js").read_text(encoding="utf-8")
 )
 ELEMENT_SCRIPT = (
@@ -37,7 +37,7 @@ ELEMENT_SCRIPT = (
 
 
 @dataclass(frozen=True, slots=True)
-class Content:
+class _Content:
     text: tuple[str, ...] = ()
     elements: tuple[Element, ...] = ()
     limitations: tuple[str, ...] = ()
@@ -45,7 +45,7 @@ class Content:
     image_digest: str | None = None
 
 
-class CaptureStrategy(ABC):
+class _CaptureStrategy(ABC):
     """How one observation mode extracts page content.
 
     `capture` owns the shared flow: dialogs, page facts, document changes,
@@ -55,12 +55,12 @@ class CaptureStrategy(ABC):
     @abstractmethod
     async def collect(
         self, browser: Browser, tab: Tab, snapshot_id: str, report: ReadinessReport
-    ) -> Content: ...
+    ) -> _Content: ...
 
 
-class DomCapture(CaptureStrategy):
+class _DomCapture(_CaptureStrategy):
     def __init__(self, mode: DomMode) -> None:
-        self.mode = mode
+        self._mode = mode
         self._metadata: dict[str, CaptureSnapshotResult | None] = {}
 
     async def _extract(
@@ -86,7 +86,7 @@ class DomCapture(CaptureStrategy):
         except (CDPCommandError, TimeoutError):
             limitations.append(f"Supplementary DOM metadata unavailable for frame {frame.id}")
         raw = await frame.call(
-            SNAPSHOT_SCRIPT,
+            _SNAPSHOT_SCRIPT,
             {
                 "token": snapshot_id,
                 "maxElements": max_elements,
@@ -98,7 +98,7 @@ class DomCapture(CaptureStrategy):
 
     async def collect(
         self, browser: Browser, tab: Tab, snapshot_id: str, report: ReadinessReport
-    ) -> Content:
+    ) -> _Content:
         elements: list[Element] = []
         text: list[str] = []
         frames = await browser.frames(tab)
@@ -109,9 +109,9 @@ class DomCapture(CaptureStrategy):
                     frame,
                     snapshot_id,
                     None
-                    if self.mode.max_elements is None
-                    else max(0, self.mode.max_elements - len(elements)),
-                    max(0, self.mode.max_text_chars - sum(len(part) for part in text) - len(text)),
+                    if self._mode.max_elements is None
+                    else max(0, self._mode.max_elements - len(elements)),
+                    max(0, self._mode.max_text_chars - sum(len(part) for part in text) - len(text)),
                     limitations,
                 )
                 if state.truncated:
@@ -139,7 +139,7 @@ class DomCapture(CaptureStrategy):
                             ref=f"{snapshot_id[:8]}:{len(elements)}",
                             in_viewport=item.in_viewport,
                             mark=len(elements)
-                            if self.mode.screenshots and self.mode.marks and item.in_viewport
+                            if self._mode.screenshots and self._mode.marks and item.in_viewport
                             else None,
                             frame_id=frame.id,
                             index=item.index,
@@ -160,13 +160,13 @@ class DomCapture(CaptureStrategy):
                     raise
                 limitations.append(f"Frame {frame.id} changed or could not be inspected")
         image = None
-        if self.mode.screenshots:
+        if self._mode.screenshots:
             viewport = frames[0].projection.clip
             assert viewport is not None
             image = await asyncio.to_thread(
                 annotate, await screenshot(tab), tuple(elements), viewport
             )
-        return Content(
+        return _Content(
             text=tuple(text),
             elements=tuple(elements),
             limitations=tuple(dict.fromkeys(limitations)),
@@ -174,23 +174,23 @@ class DomCapture(CaptureStrategy):
         )
 
 
-class CanvasCapture(CaptureStrategy):
+class _CanvasCapture(_CaptureStrategy):
     def __init__(self, mode: CanvasMode) -> None:
-        self.mode = mode
+        self._mode = mode
 
     async def collect(
         self, browser: Browser, tab: Tab, snapshot_id: str, report: ReadinessReport
-    ) -> Content:
+    ) -> _Content:
         image = await screenshot(tab, report.geometry)
-        return Content(image=image, image_digest=hashlib.sha256(image.encode()).hexdigest())
+        return _Content(image=image, image_digest=hashlib.sha256(image.encode()).hexdigest())
 
 
-def capture_strategy(mode: ObservationMode) -> CaptureStrategy:
+def _capture_strategy(mode: ObservationMode) -> _CaptureStrategy:
     match mode:
         case DomMode():
-            return DomCapture(mode)
+            return _DomCapture(mode)
         case CanvasMode():
-            return CanvasCapture(mode)
+            return _CanvasCapture(mode)
         case _:
             assert_never(mode)
 
@@ -222,7 +222,7 @@ async def capture(
             "height: innerHeight, scroll_y: scrollY})"
         )
     )
-    content = await capture_strategy(mode).collect(browser, tab, snapshot_id, report)
+    content = await _capture_strategy(mode).collect(browser, tab, snapshot_id, report)
     await tab.main_frame()
     if tab.document_id != document_id:
         raise BrowserError("Document changed during capture; observe again before acting")

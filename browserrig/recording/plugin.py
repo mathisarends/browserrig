@@ -48,45 +48,45 @@ class _State:
 
 class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
     events = RECORDING_EVENTS
-    state = PluginState(_State)
-    browser: Inject[Browser]
-    log: Inject[SessionLog]
+    _state = PluginState(_State)
+    _browser: Inject[Browser]
+    _log: Inject[SessionLog]
 
     def __init__(self, options: RecordingOptions | None = None) -> None:
         super().__init__()
         self.options = options or RecordingOptions()
 
     async def setup(self, ctx: Context) -> None:
-        self.state.log_offset = len(self.log.events)
-        self.state.directory = (
-            self.options.directory.resolve() / f"{self.log.id}-{self.browser.id[:12]}"
+        self._state.log_offset = len(self._log.events)
+        self._state.directory = (
+            self.options.directory.resolve() / f"{self._log.id}-{self._browser.id[:12]}"
         )
-        await asyncio.to_thread(self.state.directory.mkdir, parents=True, exist_ok=False)
+        await asyncio.to_thread(self._state.directory.mkdir, parents=True, exist_ok=False)
         ctx.effect(self._finalize)
 
     @hook(ReadyEvent)
-    async def on_ready(self, event: ReadyEvent) -> None:
-        browser = self.browser
-        if event.target_id != browser.active_tab.id or self.state.paused:
+    async def _on_ready(self, event: ReadyEvent) -> None:
+        browser = self._browser
+        if event.target_id != browser.active_tab.id or self._state.paused:
             return
-        if self.state.start_task is not None and not self.state.start_task.done():
+        if self._state.start_task is not None and not self._state.start_task.done():
             return
-        self.state.start_task = asyncio.create_task(
+        self._state.start_task = asyncio.create_task(
             self.ensure_started(browser.active_tab), name="browserrig:recording-start"
         )
-        self.state.start_task.add_done_callback(_retrieve_failure)
+        self._state.start_task.add_done_callback(_retrieve_failure)
 
     async def ensure_started(self, tab: Tab, *, geometry: Geometry | None = None) -> None:
-        async with self.state.lock:
-            if self.state.paused or self.state.failed:
-                if self.state.failed and self.options.required:
+        async with self._state.lock:
+            if self._state.paused or self._state.failed:
+                if self._state.failed and self.options.required:
                     raise RecordingError("Required native recording is unavailable")
                 return
-            if self.state.tab is tab:
+            if self._state.tab is tab:
                 if geometry is not None:
-                    self.state.geometry = geometry
+                    self._state.geometry = geometry
                 return
-            if self.state.tab is not None:
+            if self._state.tab is not None:
                 await self._stop()
             try:
                 async with asyncio.timeout(self.options.timeout):
@@ -96,13 +96,13 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
                         max_height=self.options.max_height,
                         frame_rate=self.options.frame_rate,
                     )
-                self.state.tab, self.state.stream = tab, result.stream
-                self.state.geometry = geometry
-                self.state.recording_id = uuid4().hex
-                self.state.started_at = monotonic()
-                await self.browser.emit(
+                self._state.tab, self._state.stream = tab, result.stream
+                self._state.geometry = geometry
+                self._state.recording_id = uuid4().hex
+                self._state.started_at = monotonic()
+                await self._browser.emit(
                     RecordingStartedEvent(
-                        recording_id=self.state.recording_id,
+                        recording_id=self._state.recording_id,
                         target_id=tab.id,
                         document_id=tab.document_id,
                     )
@@ -112,18 +112,18 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
                 await self._failed(f"Native recording start failed ({type(error).__name__})")
 
     async def _failed(self, reason: str) -> None:
-        self.state.failed = True
-        await self.browser.emit(RecordingFailedEvent(reason=reason))
+        self._state.failed = True
+        await self._browser.emit(RecordingFailedEvent(reason=reason))
         if self.options.required:
             raise RecordingError(reason)
 
     async def _stop(self) -> None:
-        tab, stream = self.state.tab, self.state.stream
+        tab, stream = self._state.tab, self._state.stream
         if tab is None:
             return
-        self.state.tab, self.state.stream = None, None
-        assert self.state.directory is not None
-        partial = self.state.directory / f"{self.state.recording_id}.partial"
+        self._state.tab, self._state.stream = None, None
+        assert self._state.directory is not None
+        partial = self._state.directory / f"{self._state.recording_id}.partial"
         handles = {stream} if stream else set()
         try:
             async with asyncio.timeout(self.options.timeout):
@@ -155,23 +155,23 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
                 target = partial.with_suffix(extension)
                 await asyncio.to_thread(partial.replace, target)
                 segment = RecordingSegment(
-                    id=self.state.recording_id,
+                    id=self._state.recording_id,
                     path=target.name,
                     mime=mime,
                     target_id=tab.id,
-                    started_at=self.state.started_at,
+                    started_at=self._state.started_at,
                     ended_at=monotonic(),
                     sha256=digest.hexdigest(),
                     size=size,
-                    geometry=self.state.geometry,
+                    geometry=self._state.geometry,
                 )
-                self.state.segments.append(segment)
-                await self.browser.emit(
+                self._state.segments.append(segment)
+                await self._browser.emit(
                     RecordingSegmentClosedEvent(
-                        recording_id=self.state.recording_id,
+                        recording_id=self._state.recording_id,
                         path=str(target),
                         sha256=digest.hexdigest(),
-                        started_at=self.state.started_at,
+                        started_at=self._state.started_at,
                         size=size,
                         target_id=tab.id,
                     )
@@ -186,33 +186,33 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
                         await tab.cdp.io.close(handle=handle)
 
     @hook(AgentControlChangedEvent)
-    async def on_control(self, event: AgentControlChangedEvent) -> None:
+    async def _on_control(self, event: AgentControlChangedEvent) -> None:
         if self.options.record_during_pause:
             return
         if event.state == ControlState.PAUSED:
-            self.state.paused = True
-            async with self.state.lock:
+            self._state.paused = True
+            async with self._state.lock:
                 await self._stop()
         elif event.state == ControlState.ACTIVE:
-            self.state.paused = False
+            self._state.paused = False
 
     async def _finalize(self) -> None:
-        if self.state.start_task is not None:
-            await asyncio.gather(self.state.start_task, return_exceptions=True)
-        async with self.state.lock:
+        if self._state.start_task is not None:
+            await asyncio.gather(self._state.start_task, return_exceptions=True)
+        async with self._state.lock:
             await self._stop()
-            assert self.state.directory is not None
-            intervals = project_intervals(self.log.events[self.state.log_offset :])
+            assert self._state.directory is not None
+            intervals = project_intervals(self._log.events[self._state.log_offset :])
             payload = RecordingManifest(
-                browser_id=self.browser.id,
-                segments=tuple(self.state.segments),
-                failed=self.state.failed,
+                browser_id=self._browser.id,
+                segments=tuple(self._state.segments),
+                failed=self._state.failed,
                 activity=intervals,
                 inference_only=inference_only(intervals),
             )
-            manifest = self.state.directory / "manifest.json"
+            manifest = self._state.directory / "manifest.json"
             await asyncio.to_thread(_write_manifest, manifest, payload)
-            await self.browser.emit(RecordingFinishedEvent(manifest=str(manifest)))
+            await self._browser.emit(RecordingFinishedEvent(manifest=str(manifest)))
 
 
 async def _disk(function, *arguments):

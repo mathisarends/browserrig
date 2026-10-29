@@ -53,10 +53,10 @@ class ChromeBrowser:
         file_system: FileSystemOptions | None = None,
         emit: EventSink = _discard,
     ) -> None:
-        self.options = options or LaunchBrowser()
+        self._options = options or LaunchBrowser()
         self.files = (
-            FileSystem(file_system, download_directory=self.options.download_directory)
-            if isinstance(self.options, LaunchBrowser) or file_system is not None
+            FileSystem(file_system, download_directory=self._options.download_directory)
+            if isinstance(self._options, LaunchBrowser) or file_system is not None
             else None
         )
         self.id = uuid4().hex
@@ -79,7 +79,7 @@ class ChromeBrowser:
             raise BrowserError("A ChromeBrowser instance can be opened only once")
         self._stack = AsyncExitStack()
         try:
-            options = self.options
+            options = self._options
             if self.files is not None:
                 await asyncio.to_thread(self.files.initialize)
             if isinstance(options, LaunchBrowser):
@@ -173,7 +173,7 @@ class ChromeBrowser:
             try:
                 await cdp.page.enable()
                 await cdp.runtime.enable()
-                options = self.options
+                options = self._options
                 if options.viewport:
                     size = options.viewport
                     await cdp.emulation.set_device_metrics_override(

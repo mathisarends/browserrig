@@ -17,8 +17,8 @@ class ReadinessStrategy(ABC):
     budget: float
 
     def __init__(self, tab: Tab, options: ReadinessOptions) -> None:
-        self.tab = tab
-        self.options = options
+        self._tab = tab
+        self._options = options
         self.delay = options.poll_interval
         self.reason = ""
         self.geometry: Geometry | None = None

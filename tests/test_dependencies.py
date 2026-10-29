@@ -1,3 +1,6 @@
+# Internal state is inspected to verify lifecycle and cleanup.
+# pylint: disable=protected-access
+
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
@@ -43,25 +46,25 @@ async def test_browser_dependency_loss_and_replacement_restart_observation_state
         await ctx.settle()
         assert not ctx.plugin_diagnostics()
         first_readiness, first_observe = ctx[Readiness], ctx[Observe]
-        assert first_readiness.browser is first_browser
-        first_readiness.state.geometry[("sentinel", "doc")] = object()
-        first_observe.state.snapshot = object()
+        assert first_readiness._browser is first_browser
+        first_readiness._state.geometry[("sentinel", "doc")] = object()
+        first_observe._state.snapshot = object()
 
         second_browser = FakeBrowser(None)
         remove_second = ctx.provide(Browser, second_browser)
         await ctx.settle()
         assert ctx[Readiness] is not first_readiness
         assert ctx[Observe] is not first_observe
-        assert ctx[Observe].browser is ctx[Readiness].browser is second_browser
-        assert ctx[Observe].readiness is ctx[Readiness]
-        assert not ctx[Readiness].state.geometry
+        assert ctx[Observe]._browser is ctx[Readiness]._browser is second_browser
+        assert ctx[Observe]._readiness is ctx[Readiness]
+        assert not ctx[Readiness]._state.geometry
         assert ctx[Observe].snapshot is None
         with pytest.raises(RuntimeError):
-            _ = first_observe.browser
+            _ = first_observe._browser
 
         await remove_second()
         await ctx.settle()
-        assert ctx[Readiness].browser is first_browser
+        assert ctx[Readiness]._browser is first_browser
         await remove_first()
         await ctx.settle()
         assert Readiness not in ctx and Observe not in ctx

@@ -25,7 +25,7 @@ from .models import ReadinessPhase, ReadinessReport, ReadinessStatus
 from .strategy import ReadinessStrategy
 
 
-def readiness_strategy(
+def _readiness_strategy(
     mode: ObservationMode,
     tab: Tab,
     options: ReadinessOptions,
@@ -60,7 +60,7 @@ async def wait_for_page(
     await tab.main_frame()
     started = monotonic()
     rid = uuid4().hex
-    strategy = readiness_strategy(selected, tab, options, phase, geometry_cache)
+    strategy = _readiness_strategy(selected, tab, options, phase, geometry_cache)
     await browser.emit(
         ReadinessStartedEvent(
             readiness_id=rid,

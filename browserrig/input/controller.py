@@ -17,18 +17,18 @@ class Input:
     """Share action correlation across a tab's independent mouse and keyboard controllers."""
 
     def __init__(self, tab: Tab) -> None:
-        self.tab = tab
-        self.action_id = ""
+        self._tab = tab
+        self._action_id = ""
         self.mouse = Mouse(tab, emit=self.emit)
         self.keyboard = Keyboard(tab, emit=self.emit)
 
     @contextmanager
     def action(self, action_id: str):
-        previous, self.action_id = self.action_id, action_id
+        previous, self._action_id = self._action_id, action_id
         try:
             yield
         finally:
-            self.action_id = previous
+            self._action_id = previous
 
     async def emit(self, event: InputEvent) -> None:
-        await self.tab.emit(replace(event, action_id=self.action_id))
+        await self._tab.emit(replace(event, action_id=self._action_id))

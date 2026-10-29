@@ -99,8 +99,8 @@ def _character(value: str) -> _Stroke:
 
 class Keyboard:
     def __init__(self, tab: Tab, *, emit: Callable[[InputEvent], Awaitable[None]]) -> None:
-        self.tab = tab
-        self.emit = emit
+        self._tab = tab
+        self._emit = emit
 
     async def press_key(
         self,
@@ -123,20 +123,20 @@ class Keyboard:
         )
         stroke = _key_stroke(key, modifiers)
         try:
-            await self.emit(KeyboardVisibilityEvent(visible=True))
+            await self._emit(KeyboardVisibilityEvent(visible=True))
             await self._stroke(stroke)
         finally:
-            await self.emit(KeyboardVisibilityEvent(visible=False))
+            await self._emit(KeyboardVisibilityEvent(visible=False))
 
     async def type_text(self, text: str) -> None:
         try:
-            await self.emit(KeyboardVisibilityEvent(visible=True))
+            await self._emit(KeyboardVisibilityEvent(visible=True))
             # CRLF is one line break. Other Unicode characters are inserted unchanged.
             for value in text.replace("\r\n", "\n"):
                 await self._stroke(_character(value), duration=_TYPING_INTERVAL_SECONDS)
                 await asyncio.sleep(_TYPING_INTERVAL_SECONDS)
         finally:
-            await self.emit(KeyboardVisibilityEvent(visible=False))
+            await self._emit(KeyboardVisibilityEvent(visible=False))
 
     async def _stroke(self, stroke: _Stroke, *, duration: float = 0) -> None:
         async with AsyncExitStack() as held:
@@ -144,18 +144,18 @@ class Keyboard:
             for modifier in stroke.modifiers:
                 arguments = _Stroke(modifier).arguments()
                 held.push_async_callback(
-                    self.tab.cdp.input.dispatch_key_event,
+                    self._tab.cdp.input.dispatch_key_event,
                     type="keyUp",
                     modifiers=flags,
                     **arguments,
                 )
                 flags |= _Stroke("", (modifier,)).flags
-                await self.tab.cdp.input.dispatch_key_event(
+                await self._tab.cdp.input.dispatch_key_event(
                     type="rawKeyDown", modifiers=flags, **arguments
                 )
             arguments = stroke.arguments()
             held.push_async_callback(
-                self.tab.cdp.input.dispatch_key_event,
+                self._tab.cdp.input.dispatch_key_event,
                 type="keyUp",
                 modifiers=flags,
                 **arguments,
@@ -168,17 +168,17 @@ class Keyboard:
                 )
             # Separate rawKeyDown and char so text is inserted once, including
             # Unicode without a physical mapping. Enter keeps native semantics.
-            await self.tab.cdp.input.dispatch_key_event(
+            await self._tab.cdp.input.dispatch_key_event(
                 type="keyDown" if stroke.key == "Enter" and not shortcut else "rawKeyDown",
                 modifiers=flags,
                 text="\r" if stroke.key == "Enter" and not shortcut else "",
                 **arguments,
             )
             if text and stroke.key != "Enter":
-                await self.tab.cdp.input.dispatch_key_event(
+                await self._tab.cdp.input.dispatch_key_event(
                     type="char", modifiers=flags, text=text, **arguments
                 )
-        await self.emit(
+        await self._emit(
             KeyPressedEvent(
                 key=stroke.key,
                 modifiers=stroke.modifiers,

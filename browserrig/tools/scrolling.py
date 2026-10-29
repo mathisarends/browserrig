@@ -10,7 +10,7 @@ from browserrig.kinds import ElementOperation
 from browserrig.observation.capture import ELEMENT_SCRIPT
 from browserrig.observation.models import Element, Snapshot
 
-SCROLL_SCRIPT = (
+_SCROLL_SCRIPT = (
     files("browserrig.observation").joinpath("scripts/scroll.js").read_text(encoding="utf-8")
 )
 
@@ -42,11 +42,11 @@ async def _plan(
         clip = parent.local_clip.model_dump() if parent.local_clip is not None else None
         assert target is not None
         local = parent.projection.local_box(target).model_dump()
-        raw = await child.owner_call(SCROLL_SCRIPT, False, 0, clip, local)
+        raw = await child.owner_call(_SCROLL_SCRIPT, False, 0, clip, local)
         if raw is not None:
             return parent, _ScrollPlan.model_validate(raw)
     clip = frame.local_clip.model_dump() if frame.local_clip is not None else None
-    raw = await frame.call(SCROLL_SCRIPT, snapshot.id, element.index, clip)
+    raw = await frame.call(_SCROLL_SCRIPT, snapshot.id, element.index, clip)
     return (frame, _ScrollPlan.model_validate(raw)) if raw is not None else None
 
 

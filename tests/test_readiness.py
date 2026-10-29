@@ -1,3 +1,6 @@
+# Internal state is inspected to verify lifecycle and cleanup.
+# pylint: disable=protected-access
+
 import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -64,17 +67,17 @@ async def test_plugin_state_is_per_session():
     )
     async with agent.session("first"):
         first = holder["readiness"]
-        first_browser = first.browser
+        first_browser = first._browser
         assert first_browser is holder["browser"]
-        first.state.geometry[("sentinel", "doc")] = object()
+        first._state.geometry[("sentinel", "doc")] = object()
     async with agent.session("second"):
         second = holder["readiness"]
         assert second is not first
-        assert second.browser is holder["browser"]
-        assert second.browser is not first_browser
-        assert not second.state.geometry
+        assert second._browser is holder["browser"]
+        assert second._browser is not first_browser
+        assert not second._state.geometry
     with pytest.raises(RuntimeError):
-        _ = first.browser
+        _ = first._browser
 
 
 @pytest.mark.parametrize("changed", [False, True])
@@ -88,8 +91,8 @@ async def test_canvas_reuses_cached_geometry_and_rechecks_pixels_only_after_geom
     cache = {(tab.id, tab.document_id): original}
     locate = AsyncMock(return_value=CanvasProbe(ready=True, geometry=current))
     pixels = AsyncMock(return_value=(current, ""))
-    monkeypatch.setattr("browserrig.readiness.canvas.locate_canvas", locate)
-    monkeypatch.setattr("browserrig.readiness.canvas.probe_canvas", pixels)
+    monkeypatch.setattr("browserrig.readiness.canvas._locate_canvas", locate)
+    monkeypatch.setattr("browserrig.readiness.canvas._probe_canvas", pixels)
     report = await wait_for_page(
         browser,
         tab,

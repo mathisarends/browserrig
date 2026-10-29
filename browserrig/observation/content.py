@@ -12,7 +12,7 @@ from browserrig.browser.tab import Frame, Tab
 
 from .dom import seed_dom
 
-CONTENT_SCRIPT = (
+_CONTENT_SCRIPT = (
     files("browserrig.observation").joinpath("scripts/content.js").read_text(encoding="utf-8")
 )
 
@@ -90,7 +90,7 @@ async def extract_content(browser: Browser, tab: Tab, *, max_chars: int = 50000)
             break
         try:
             await _seed(frame, metadata, limitations)
-            state = _Extraction.model_validate(await frame.call(CONTENT_SCRIPT, remaining))
+            state = _Extraction.model_validate(await frame.call(_CONTENT_SCRIPT, remaining))
             embedded += state.frames
             if main is None:
                 main = state

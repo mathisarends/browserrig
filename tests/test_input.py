@@ -1,3 +1,6 @@
+# Internal state is inspected to verify lifecycle and cleanup.
+# pylint: disable=protected-access
+
 import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -83,7 +86,7 @@ async def test_mouse_and_keyboard_share_action_correlation_without_sharing_curso
     assert any(isinstance(event, PointerPressedEvent) for event in events)
     assert any(isinstance(event, KeyPressedEvent) for event in events)
     assert all(event.action_id == "shared-action" for event in events)
-    assert tab.input.action_id == ""
+    assert tab.input._action_id == ""
 
 
 async def test_exact_typing_emits_ordered_correlated_keys_without_persistable_text(monkeypatch):
@@ -99,7 +102,7 @@ async def test_exact_typing_emits_ordered_correlated_keys_without_persistable_te
     assert all(event.duration == 0.05 for event in keys)
     assert all(event.target_id == "tab-1" and event.document_id == "document-1" for event in events)
     assert all(event.action_id == "action-1" for event in events)
-    assert tab.input.action_id == ""
+    assert tab.input._action_id == ""
     assert sleep.await_count == len(keys)
     assert all(call.args == (0.05,) for call in sleep.await_args_list)
     assert isinstance(events[0], KeyboardVisibilityEvent) and events[0].visible

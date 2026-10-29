@@ -11,7 +11,7 @@ from browserrig.observation.models import Snapshot
 
 from .execution import Actions, Effect
 
-type ClickCount = Annotated[
+type _ClickCount = Annotated[
     Literal[1, 2], Field(description="2 = native double click (open, edit, select word)")
 ]
 
@@ -22,7 +22,7 @@ class PointerTools(Plugin, needs=(Actions,)):
         self,
         x: Annotated[float, Field(ge=0)],
         y: Annotated[float, Field(ge=0)],
-        count: ClickCount = 1,
+        count: _ClickCount = 1,
         *,
         actions: Inject[Actions],
     ) -> str:
@@ -90,7 +90,7 @@ class InteractionTools(PointerTools):
     async def click(
         self,
         ref: str,
-        count: ClickCount = 1,
+        count: _ClickCount = 1,
         *,
         actions: Inject[Actions],
     ) -> str:
@@ -137,7 +137,7 @@ class InteractionTools(PointerTools):
         return await actions.run(kind=ActionKind.DRAG, operation=drag, expects_change=True)
 
 
-def _click_kind(count: ClickCount) -> ActionKind:
+def _click_kind(count: _ClickCount) -> ActionKind:
     return ActionKind.DOUBLE_CLICK if count == 2 else ActionKind.CLICK
 
 

@@ -42,8 +42,8 @@ class _State:
 
 class Activity(Plugin, provides=True, needs=(SessionLog,)):
     events = ACTIVITY_EVENTS
-    state = PluginState(_State)
-    log: Inject[SessionLog]
+    _state = PluginState(_State)
+    _log: Inject[SessionLog]
 
     async def setup(self, ctx: Context) -> None:
         ctx.effect(self._close_all)
@@ -52,10 +52,10 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         """A new interval in the same slot supersedes only that slot's previous interval."""
         await self._finish(key, ActivityOutcome.SUPERSEDED)
         event = ActivityStartedEvent(
-            interval_id=uuid4().hex, kind=key.kind, cause_id=cause_id, epoch_id=self.state.epoch
+            interval_id=uuid4().hex, kind=key.kind, cause_id=cause_id, epoch_id=self._state.epoch
         )
-        self.state.open[key] = event
-        await self.log.emit(event)
+        self._state.open[key] = event
+        await self._log.emit(event)
 
     async def _finish(
         self,
@@ -64,10 +64,10 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         *,
         reason: str = "",
     ) -> None:
-        event = self.state.open.pop(key, None)
+        event = self._state.open.pop(key, None)
         if event is None:
             return
-        await self.log.emit(
+        await self._log.emit(
             ActivityFinishedEvent(
                 interval_id=event.interval_id,
                 kind=event.kind,
@@ -80,24 +80,24 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         )
 
     async def _close_all(self) -> None:
-        for key in tuple(self.state.open):
+        for key in tuple(self._state.open):
             await self._finish(key, ActivityOutcome.CLOSED)
 
     @hook(ModelRequestedEvent)
-    async def on_model(self, event: ModelRequestedEvent) -> None:
+    async def _on_model(self, event: ModelRequestedEvent) -> None:
         await self._start(
             ActivityKey(ActivityKind.LLM, event.request_id), cause_id=event.request_id
         )
 
     @hook(AssistantMessageEvent)
-    async def on_assistant(self, event: AssistantMessageEvent) -> None:
+    async def _on_assistant(self, event: AssistantMessageEvent) -> None:
         await self._finish(
             ActivityKey(ActivityKind.LLM, event.request_id),
             ActivityOutcome.INTERRUPTED if event.interrupted else ActivityOutcome.COMPLETED,
         )
 
     @hook(ModelRequestFailedEvent)
-    async def on_model_failed(self, event: ModelRequestFailedEvent) -> None:
+    async def _on_model_failed(self, event: ModelRequestFailedEvent) -> None:
         match event.outcome:
             case ModelRequestOutcome.FAILED:
                 outcome = ActivityOutcome.FAILED
@@ -112,11 +112,11 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         )
 
     @hook(ToolExecutionStartedEvent)
-    async def on_tool(self, event: ToolExecutionStartedEvent) -> None:
+    async def _on_tool(self, event: ToolExecutionStartedEvent) -> None:
         await self._start(ActivityKey(ActivityKind.TOOL, event.call_id), cause_id=event.call_id)
 
     @hook(ToolExecutionFinishedEvent)
-    async def on_tool_finished(self, event: ToolExecutionFinishedEvent) -> None:
+    async def _on_tool_finished(self, event: ToolExecutionFinishedEvent) -> None:
         reason = event.result.status.value if event.result.is_error else ""
         if event.result.exit_code not in (None, 0):
             reason = f"{event.result.status.value}; exit_code={event.result.exit_code}"
@@ -133,13 +133,13 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         )
 
     @hook(ReadinessStartedEvent)
-    async def on_readiness(self, event: ReadinessStartedEvent) -> None:
+    async def _on_readiness(self, event: ReadinessStartedEvent) -> None:
         await self._start(
             ActivityKey(ActivityKind.READINESS, event.readiness_id), cause_id=event.readiness_id
         )
 
     @hook(ReadinessEndedEvent)
-    async def on_ready(self, event: ReadinessEndedEvent) -> None:
+    async def _on_ready(self, event: ReadinessEndedEvent) -> None:
         match event:
             case ReadyEvent():
                 outcome = ActivityOutcome.COMPLETED
@@ -156,21 +156,21 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         )
 
     @hook(AgentControlChangedEvent)
-    async def on_control(self, event: AgentControlChangedEvent) -> None:
+    async def _on_control(self, event: AgentControlChangedEvent) -> None:
         if event.state == ControlState.PAUSED:
-            await self._start(_PAUSE, cause_id=self.state.epoch)
+            await self._start(_PAUSE, cause_id=self._state.epoch)
         elif event.state == ControlState.ACTIVE:
             await self._finish(_PAUSE)
 
     @hook(StepEndedEvent)
-    async def on_step(self, event: StepEndedEvent) -> None:
-        for key in tuple(self.state.open):
+    async def _on_step(self, event: StepEndedEvent) -> None:
+        for key in tuple(self._state.open):
             if key.kind is ActivityKind.LLM:
                 await self._finish(key, step_outcome(event.reason))
 
     @hook(TurnEndedEvent)
-    async def on_turn(self, event: TurnEndedEvent) -> None:
-        for key in tuple(self.state.open):
+    async def _on_turn(self, event: TurnEndedEvent) -> None:
+        for key in tuple(self._state.open):
             if key.kind != ActivityKind.PAUSED:
                 await self._finish(key, turn_outcome(event.reason))
 
@@ -178,9 +178,9 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         return project_intervals(
             (
                 event
-                for event in self.log.events
+                for event in self._log.events
                 if isinstance(event, ActivityStartedEvent | ActivityFinishedEvent)
-                and event.epoch_id == self.state.epoch
+                and event.epoch_id == self._state.epoch
             ),
             now=now,
         )

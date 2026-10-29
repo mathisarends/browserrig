@@ -20,7 +20,7 @@ class RecordingSegment(Options):
     geometry: Geometry | None = None
 
     @model_validator(mode="after")
-    def ordered_interval(self) -> Self:
+    def _ordered_interval(self) -> Self:
         if self.ended_at < self.started_at:
             raise ValueError("Recording segment end precedes start")
         return self

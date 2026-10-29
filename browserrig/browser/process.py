@@ -39,41 +39,41 @@ def _chrome_executable(explicit: Path | None = None) -> str:
 
 class ChromeProcess:
     def __init__(self, options: LaunchBrowser) -> None:
-        self.options = options
-        self.process: Process | None = None
-        self.profile: TemporaryDirectory[str] | None = None
+        self._options = options
+        self._process: Process | None = None
+        self._profile: TemporaryDirectory[str] | None = None
         self.endpoint = ""
 
     async def __aenter__(self) -> Self:
-        binary = _chrome_executable(self.options.executable)
-        self.profile = TemporaryDirectory(prefix="browserrig-chrome-")
+        binary = _chrome_executable(self._options.executable)
+        self._profile = TemporaryDirectory(prefix="browserrig-chrome-")
         flags = [
             binary,
             "--remote-debugging-address=127.0.0.1",
             "--remote-debugging-port=0",
-            f"--user-data-dir={self.profile.name}",
+            f"--user-data-dir={self._profile.name}",
             "--no-first-run",
             "--no-default-browser-check",
-            f"--window-size={self.options.viewport.width},{self.options.viewport.height}",
+            f"--window-size={self._options.viewport.width},{self._options.viewport.height}",
         ]
-        if self.options.headless:
+        if self._options.headless:
             flags.append("--headless=new")
-        flags.extend(self.options.arguments)
+        flags.extend(self._options.arguments)
         flags.append("about:blank")
         try:
-            self.process = await asyncio.create_subprocess_exec(
+            self._process = await asyncio.create_subprocess_exec(
                 *flags,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
-            active_port = Path(self.profile.name) / "DevToolsActivePort"
-            async with asyncio.timeout(self.options.timeout):
+            active_port = Path(self._profile.name) / "DevToolsActivePort"
+            async with asyncio.timeout(self._options.timeout):
                 while True:
-                    if self.process.returncode is not None:
+                    if self._process.returncode is not None:
                         raise BrowserError(
-                            f"Chrome exited during startup ({self.process.returncode})"
+                            f"Chrome exited during startup ({self._process.returncode})"
                         )
                     if active_port.is_file():
                         lines = (await asyncio.to_thread(active_port.read_text)).splitlines()
@@ -89,22 +89,22 @@ class ChromeProcess:
         await self.aclose()
 
     async def aclose(self) -> None:
-        if self.process is not None and self.process.returncode is None:
-            self.process.terminate()
+        if self._process is not None and self._process.returncode is None:
+            self._process.terminate()
             try:
                 async with asyncio.timeout(5):
-                    await self.process.wait()
+                    await self._process.wait()
             except TimeoutError:
-                self.process.kill()
-                await self.process.wait()
-        self.process = None
-        if self.profile is not None:
-            profile = self.profile
+                self._process.kill()
+                await self._process.wait()
+        self._process = None
+        if self._profile is not None:
+            profile = self._profile
             deadline = asyncio.get_running_loop().time() + 3
             while True:
                 try:
                     await asyncio.to_thread(profile.cleanup)
-                    self.profile = None
+                    self._profile = None
                     break
                 except PermissionError:
                     # Windows can release child-process cache handles shortly

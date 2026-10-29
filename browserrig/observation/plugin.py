@@ -34,9 +34,9 @@ class _State:
 
 class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
     events = (ObservationCapturedEvent,)
-    state = PluginState(_State)
-    browser: Inject[Browser]
-    readiness: Inject[Readiness]
+    _state = PluginState(_State)
+    _browser: Inject[Browser]
+    _readiness: Inject[Readiness]
     guidance = (
         "Use the latest browser YAML and any accompanying image as page state. "
         "Normal DOM observations contain page metadata and interactive elements, without a "
@@ -62,7 +62,7 @@ class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
 
     @property
     def snapshot(self) -> Snapshot | None:
-        return self.state.snapshot
+        return self._state.snapshot
 
     async def capture(
         self,
@@ -71,15 +71,15 @@ class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
         phase: ReadinessPhase = ReadinessPhase.OBSERVATION,
         screenshots: bool | None = None,
     ) -> Snapshot:
-        browser, readiness = self.browser, self.readiness
-        async with self.state.lock:
+        browser, readiness = self._browser, self._readiness
+        async with self._state.lock:
             selected = tab or browser.active_tab
             report = await readiness.wait(selected, phase=phase)
             mode = readiness.mode
             if isinstance(mode, DomMode) and screenshots is not None:
                 mode = mode.model_copy(update={"screenshots": screenshots})
             snapshot = await capture(browser, selected, mode, report)
-            self.state.snapshot = snapshot
+            self._state.snapshot = snapshot
             await browser.emit(
                 ObservationCapturedEvent(
                     observation_id=snapshot.id,
@@ -95,18 +95,18 @@ class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
             return snapshot
 
     async def element(self, tab: Tab, ref: str) -> tuple[Frame, Element]:
-        snapshot = self.state.snapshot
+        snapshot = self._state.snapshot
         await tab.main_frame()
         if snapshot is None or snapshot.tab_id != tab.id or snapshot.document_id != tab.document_id:
             raise StaleElement("Observation belongs to another tab or document; observe again")
         element = snapshot.element(ref)
-        for frame in await self.browser.frames(tab):
+        for frame in await self._browser.frames(tab):
             if frame.id == element.frame_id:
                 return frame, element
         raise StaleElement("Element frame no longer exists; observe again")
 
     @hook(PreStep)
-    async def before_step(
+    async def _before_step(
         self,
         event: PreStep,
         next_: Next[StepDecision],
@@ -115,13 +115,13 @@ class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
     ) -> StepDecision:
         snapshot = await self.capture(
             phase=ReadinessPhase.INITIAL
-            if self.state.snapshot is None
+            if self._state.snapshot is None
             else ReadinessPhase.OBSERVATION,
-            screenshots=True if self.state.screenshot_requested else None,
+            screenshots=True if self._state.screenshot_requested else None,
         )
-        self.state.screenshot_requested = False
+        self._state.screenshot_requested = False
         if recording is not None and snapshot.readiness == ReadinessStatus.READY:
-            await recording.ensure_started(self.browser.active_tab, geometry=snapshot.geometry)
+            await recording.ensure_started(self._browser.active_tab, geometry=snapshot.geometry)
         event.session.observe(
             Observation(
                 source="browser",
@@ -131,15 +131,15 @@ class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
             )
         )
         if nudges is not None:
-            event.session.observe(await nudges.project(snapshot, self.browser))
+            event.session.observe(await nudges.project(snapshot, self._browser))
         return await next_()
 
     @hook(PrepareRequest)
-    async def prepare_image(
+    async def _prepare_image(
         self, _event: PrepareRequest, next_: Next[ModelRequest]
     ) -> ModelRequest:
         request = await next_()
-        snapshot = self.state.snapshot
+        snapshot = self._state.snapshot
         if snapshot is not None and snapshot.image:
             image = User(
                 (
@@ -176,12 +176,12 @@ class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
         ),
     )
     async def screenshot(self) -> ToolResult:
-        if self.browser.active_tab.dialog:
+        if self._browser.active_tab.dialog:
             raise ToolError(
                 "Screenshot unavailable; handle the open dialog before requesting an image"
             )
         # Capture at the next step boundary so image marks and actionable refs stay in sync.
-        self.state.screenshot_requested = True
+        self._state.screenshot_requested = True
         return ToolResult(
             "Screenshot requested. Your next observation will include the current image."
         )
@@ -197,10 +197,10 @@ class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
     async def extract_content(
         self, max_chars: Annotated[int, Field(ge=1, le=200000)] = 50000
     ) -> ToolResult:
-        async with self.browser.action_lock:
-            tab = self.browser.active_tab
-            report = await self.readiness.wait(tab)
+        async with self._browser.action_lock:
+            tab = self._browser.active_tab
+            report = await self._readiness.wait(tab)
             if report.status == ReadinessStatus.BLOCKED:
                 raise ToolError(report.reason)
-            content = await extract_content(self.browser, tab, max_chars=max_chars)
+            content = await extract_content(self._browser, tab, max_chars=max_chars)
             return ToolResult(content.render())

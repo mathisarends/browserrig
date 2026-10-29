@@ -35,7 +35,7 @@ class LaunchBrowser(Options):
 
     @field_validator("arguments")
     @classmethod
-    def owned_arguments(cls, arguments: tuple[str, ...]) -> tuple[str, ...]:
+    def _owned_arguments(cls, arguments: tuple[str, ...]) -> tuple[str, ...]:
         reserved = ("--remote-debugging", "--user-data-dir", "--headless")
         if any(arg.startswith(reserved) or not arg.startswith("--") for arg in arguments):
             raise ValueError("Arguments must be flags and cannot override process ownership")
@@ -53,14 +53,14 @@ class ConnectBrowser(Options):
     download_directory: str | None = None
 
     @model_validator(mode="after")
-    def target_ownership(self) -> Self:
+    def _target_ownership(self) -> Self:
         if self.target_id and (self.url != "about:blank" or self.download_directory):
             raise ValueError("An attached target keeps its URL and browser-wide download policy")
         return self
 
     @field_validator("endpoint")
     @classmethod
-    def browser_endpoint(cls, endpoint: SecretStr) -> SecretStr:
+    def _browser_endpoint(cls, endpoint: SecretStr) -> SecretStr:
         parsed = urlsplit(endpoint.get_secret_value())
         if parsed.scheme not in {"http", "https", "ws", "wss"} or not parsed.hostname:
             raise ValueError("Expected an HTTP(S) discovery endpoint or browser WebSocket")

@@ -25,8 +25,8 @@ class _State:
 
 class Readiness(Plugin, provides=True, needs=(Browser,)):
     events = READINESS_EVENTS
-    state = PluginState(_State)
-    browser: Inject[Browser]
+    _state = PluginState(_State)
+    _browser: Inject[Browser]
 
     def __init__(
         self, mode: ObservationMode | None = None, options: ReadinessOptions | None = None
@@ -39,14 +39,14 @@ class Readiness(Plugin, provides=True, needs=(Browser,)):
         ctx.effect(self._cancel)
 
     async def _cancel(self) -> None:
-        tasks = tuple(self.state.pending.values())
+        tasks = tuple(self._state.pending.values())
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
-        self.state.pending.clear()
+        self._state.pending.clear()
 
     @hook(AgentControlChangedEvent)
-    async def on_control(self, event: AgentControlChangedEvent) -> None:
+    async def _on_control(self, event: AgentControlChangedEvent) -> None:
         if event.state in (ControlState.ABORTING, ControlState.STOPPED):
             await self._cancel()
 
@@ -55,24 +55,24 @@ class Readiness(Plugin, provides=True, needs=(Browser,)):
     ) -> ReadinessReport:
         await tab.main_frame()
         key = (tab.id, tab.document_id, phase)
-        if key not in self.state.pending:
+        if key not in self._state.pending:
             task = asyncio.create_task(self._wait(tab, phase), name="browserrig:readiness")
-            self.state.pending[key] = task
+            self._state.pending[key] = task
 
             def finished(completed: asyncio.Task[ReadinessReport]) -> None:
-                self.state.pending.pop(key, None)
+                self._state.pending.pop(key, None)
                 if not completed.cancelled():
                     completed.exception()
 
             task.add_done_callback(finished)
-        return await asyncio.shield(self.state.pending[key])
+        return await asyncio.shield(self._state.pending[key])
 
     async def _wait(self, tab: Tab, phase: ReadinessPhase) -> ReadinessReport:
         return await wait_for_page(
-            self.browser,
+            self._browser,
             tab,
             mode=self.mode,
             options=self.options,
             phase=phase,
-            geometry_cache=self.state.geometry,
+            geometry_cache=self._state.geometry,
         )

@@ -69,7 +69,7 @@ class TimeRange(Options):
     end: float
 
     @model_validator(mode="after")
-    def ordered(self) -> Self:
+    def _ordered(self) -> Self:
         if self.end < self.start:
             raise ValueError("Interval end precedes start")
         return self

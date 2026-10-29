@@ -52,19 +52,19 @@ def _event_record(event: SessionEvent | InputEvent) -> dict[str, object]:
 class TerminalEvents(Plugin):
     def __init__(self, output: TextIO | None = None) -> None:
         super().__init__()
-        self.output = output
+        self._output = output
 
     def _write(self, event: SessionEvent | InputEvent) -> None:
         print(
             json.dumps(_event_record(event), ensure_ascii=True, allow_nan=False),
-            file=self.output if self.output is not None else sys.stderr,
+            file=self._output if self._output is not None else sys.stderr,
             flush=True,
         )
 
     @hook(SessionAppended)
-    def appended(self, receipt: SessionAppended) -> None:
+    def _appended(self, receipt: SessionAppended) -> None:
         self._write(receipt.event)
 
     @hook(InputEvent)
-    def input_event(self, event: InputEvent) -> None:
+    def _input_event(self, event: InputEvent) -> None:
         self._write(event)
