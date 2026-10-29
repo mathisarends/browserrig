@@ -1,26 +1,43 @@
 # Browserrig
 
-Browserautomation mit Harnessed, cdpify und Pydantic. Ein Browser-Seam,
-fest adressierte Tabs, explizite DOM-/Canvas-Modi und ein gemeinsames Event-Log.
-Die Quellen liegen direkt in `browserrig/`.
+Event-driven Chrome automation for AI agents and Python applications, built with
+[Harnessed](https://github.com/mathisarends/harnessed), cdpify, and Pydantic.
+Browserrig combines direct browser access with composable agent plugins, explicit
+DOM and canvas modes, and a shared event log.
+
+- Launch Chrome or connect to a running browser through CDP.
+- Work with explicitly addressed tabs and structured, validated page observations.
+- Interact through DOM references or screenshot coordinates, including double-clicks and drags.
+- Pause, steer, resume, stop, or abort agent sessions through Harnessed's native controls.
+- Record browser activity and subscribe to typed events for actions and downloads.
+
+## Quick start
+
+From a checkout of this repository:
 
 ```powershell
 uv sync --extra openai
 Copy-Item .env.example .env
-# OPENAI_API_KEY in .env eintragen.
+# Set OPENAI_API_KEY in .env.
 uv run --env-file .env --extra openai python -m examples.openai_agent --headed --record
 ```
 
-Die Beispielmission erkundet das Voyager-Programm: Missionen vergleichen,
-Detailartikel in neuen Tabs öffnen und ungewöhnliche Inhalte der Golden Record
-finden. `--task` und `--url` überschreiben Aufgabe und Startseite.
+The example mission explores the Voyager program: compare the missions, open
+detail articles in new tabs, and find unusual contents of the Golden Record.
+The default task and starting page are in German; use `--task` and `--url` to
+override them, for example:
 
-Die Beispiele verwenden `OpenAIResponsesModel` und standardmäßig `gpt-6.1-terra`.
-`OPENAI_MODEL` überschreibt die Modell-ID. Für Tool Calling wird die
-[Responses API benötigt](https://developers.openai.com/api/docs/models/gpt-6.1-terra).
-Die Tests verwenden geskriptete Modelle und benötigen keinen API-Key.
+```powershell
+uv run --env-file .env --extra openai python -m examples.openai_agent --headed --url https://en.wikipedia.org/wiki/Voyager_program --task "Compare Voyager 1 and 2 and cite the source URLs."
+```
 
-## Direkt ohne LLM
+The examples use `OpenAIResponsesModel` with `gpt-6.1-terra` by default.
+Set `OPENAI_MODEL` to override the model ID. These examples use the Responses API
+for tool calling. Tests use scripted models and do not require an API key.
+
+## Direct browser access
+
+Use the browser without an LLM inside an async function:
 
 ```python
 from browserrig import ChromeBrowser, LaunchBrowser, wait_for_page
@@ -31,93 +48,108 @@ async with ChromeBrowser(LaunchBrowser(url="https://example.com")) as browser:
     print(await tab.evaluate("document.title"))
 ```
 
+Runnable examples:
+
 ```powershell
 uv run python -m examples.direct_browser --url https://example.com
 uv run python -m examples.connect_browser --endpoint http://127.0.0.1:9222
 ```
 
-Connect öffnet einen eigenen isolierten Kontext im laufenden Browser.
-`--target-id TARGET` wählt ausdrücklich einen vorhandenen Tab. Der externe
-Browser bleibt beim Disconnect erhalten und muss CDP bereits anbieten.
+Connecting creates an isolated context in the running browser. Use
+`--target-id TARGET` to explicitly select an existing tab. The external browser
+must already expose a CDP endpoint and stays running after disconnecting.
 
-## Mit Harnessed komponieren
+## BrowserAgent
+
+`BrowserAgent` configures Harnessed's `Agent` with browser capabilities:
 
 ```python
-from harnessed import Agent, PolicyDecision
-from harnessed.models import PydanticAIModel
+from harnessed import PolicyDecision
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
-from browserrig import WebMode, LaunchBrowser, RecordingOptions, browser_plugins
+
+from browserrig import BrowserAgent, LaunchBrowser, RecordingOptions, WebMode
 
 async with OpenAIResponsesModel("gpt-6.1-terra") as openai:
-    agent = Agent(
-        model=PydanticAIModel(openai),
-        plugins=[
-            *browser_plugins(
-                LaunchBrowser(url="https://de.wikipedia.org/wiki/Voyager-Programm"),
-                mode=WebMode(screenshots=True),
-                recording=RecordingOptions(),
-            ),
-            Approvals(default=PolicyDecision.ALLOW),
-        ],
+    agent = BrowserAgent(
+        model=openai,
+        browser=LaunchBrowser(url="https://en.wikipedia.org/wiki/Voyager_program"),
+        mode=WebMode(screenshots=True),
+        recording=RecordingOptions(),
+        session_directory=".browserrig/sessions",
+        approvals=Approvals(default=PolicyDecision.ALLOW),
     )
-    result = await agent.run("Vergleiche Voyager 1 und 2 mit Quellen-URLs.", max_steps=20)
+    result = await agent.run("Compare Voyager 1 and 2 and cite the source URLs.", max_steps=20)
     print(result.text)
 ```
 
-`browser_plugins()` gibt eine normale, inspizierbare Plugin-Liste zurück.
-Eigene Komposition: `Chrome`, `Readiness`, `Observe`, `Actions`, gewünschte
-Tool-Plugins, `Nudges`, `Activity` und optional `Recording`.
+`run()`, `session()`, `sessions`, and session controls remain native Harnessed APIs.
+Native Pydantic AI models are accepted directly; the caller owns their lifecycle.
+Use `instructions=...` to replace the default instruction and `plugins=[...]` to
+add capabilities. Conversations stay in memory unless `session_directory` is set.
+Without explicit `approvals`, Harnessed's default `ASK` policy applies; the example
+above allows actions automatically. The constructor does not open Chrome or files.
 
-## Controls und Canvas
+For custom composition, `browser_plugins()` returns an inspectable plugin list:
+`Agent(model=model, plugins=[*browser_plugins(), MyPlugin()])`.
+Individual capabilities such as `Chrome`, `Readiness`, `Observe`, `Actions`, tool
+plugins, `Nudges`, `Activity`, and `Recording` are also available directly.
+
+## Session controls and canvas mode
+
+Inside an `async with agent.session() as session:` block:
 
 ```python
-handle = await session.submit("Untersuche diese Seite.")
+handle = await session.submit("Inspect this page.")
 await session.pause()
-await session.steer("Konzentriere dich auf die Navigation.")
-await session.context.set("constraints", "Keine Formulare absenden.")
+await session.steer("Focus on the navigation.")
+await session.context.set("constraints", "Do not submit forms.")
 await session.resume()
 result = await handle.result()
 ```
 
-Pause wartet auf die vollständige Schrittgrenze und friert Chromium nicht ein.
-`session.stop()` beendet geordnet, `session.abort()` unterbricht unmittelbar.
-Resume beobachtet die aktuelle Seite neu. Activity verwendet Events, keinen LLM-Decorator.
+Pausing waits for a complete step boundary and leaves Chromium running.
+`session.stop()` ends the session gracefully; `session.abort()` interrupts it
+immediately. Resuming observes the current page again. Activity tracking uses
+events rather than an LLM decorator.
 
 ```powershell
 uv run --env-file .env --extra openai python -m examples.controls
 uv run --env-file .env --extra openai python -m examples.figma_agent --url YOUR_URL --record
 ```
 
-Canvas verwendet Bild und Koordinaten. Die Initialprüfung prüft Geometrie und
-Pixelinhalt. DOM-Modus liefert Pydantic-validiertes YAML mit Rollen, Labels und
-beobachtungsgebundenen Referenzen.
+Canvas mode uses images and coordinates, with an initial check of geometry and
+pixel content. DOM mode returns Pydantic-validated YAML with roles, labels, and
+references tied to the current observation.
 
-## Doppelklick und Drag
+## Double-clicks and dragging
 
-`InteractionTools` bietet `click(ref=..., count=2)` und
-`drag(source_ref=..., target_ref=...)`. Die Drag-Endpunkte müssen gleichzeitig
-sichtbar sein; während der Geste wird nicht automatisch gescrollt.
-Native `draggable`-Elemente verwenden HTML5-Drag-and-drop mit echtem `DataTransfer`.
+`InteractionTools` provides `click(ref=..., count=2)` and
+`drag(source_ref=..., target_ref=...)`. Both drag endpoints must be visible at
+the same time; gestures do not scroll automatically. Native `draggable` elements
+use HTML5 drag and drop with a real `DataTransfer`.
 
-`PointerTools`, auch im Figma-Profil, bietet `click_at(x=..., y=..., count=2)`
-und `drag_at(start=Point(...), end=Point(...), mode=DragMode.POINTER)`.
-Für native HTML5-Quellen kann bei Koordinaten `DragMode.HTML5` gewählt werden.
-Die aktuelle Beobachtung bestimmt die Crop-Zuordnung. Beide Varianten verwenden
-echte CDP-Eingaben und geben Maustasten auch bei Abbruch frei.
+`PointerTools`, also used by the Figma profile, provides
+`click_at(x=..., y=..., count=2)` and
+`drag_at(start=Point(...), end=Point(...), mode=DragMode.POINTER)`.
+Use `DragMode.HTML5` for coordinate-based dragging of native HTML5 sources.
+The current observation determines how crop coordinates map to the viewport.
+Both variants use real CDP input and release mouse buttons even when interrupted.
 
-## Aufnahme, Downloads und Events
+## Recording, downloads, and events
 
-Native Aufnahme verwendet `Page.startScreenRecording`/`stopScreenRecording` über
-cdpify. Unter `.browserrig/recordings/` liegen Segmente und ein validiertes Manifest
-mit Prüfsummen, Zeitbezügen und Abschnitten ausschließlicher Modellwartezeit.
-Der Container wird geprüft; ffmpeg ist keine Laufzeitabhängigkeit.
-Canvas-Crop und native Viewportaufnahme sind im Manifest unterscheidbar.
+Native recording uses `Page.startScreenRecording` / `stopScreenRecording` through
+cdpify. Recordings under `.browserrig/recordings/` include segments and a validated
+manifest with checksums, timing references, and periods spent waiting only for the
+model. The media container is checked; ffmpeg is not a runtime dependency.
+The manifest distinguishes canvas crops from native viewport recordings.
 
-`LaunchBrowser(download_directory="ABSOLUTE_PATH_ON_BROWSER_HOST")` aktiviert
-Downloads im eigenen Kontext. `DownloadState` enthält `IN_PROGRESS`, `COMPLETED`
-und `CANCELED`; die Events liegen unter `browser.download.*`.
-Upload- und Downloadpfade beziehen sich auf den Browserhost.
+`LaunchBrowser(download_directory="ABSOLUTE_PATH_ON_BROWSER_HOST")` enables
+downloads in the browser's own context. `DownloadState` includes `IN_PROGRESS`,
+`COMPLETED`, and `CANCELED`; download events use the `browser.download.*` namespace.
+Upload and download paths refer to the browser host.
+
+Subscribe to typed events from a session:
 
 ```python
 from browserrig.events import ActionStartedEvent
@@ -128,9 +160,10 @@ async for event in session.subscribe():
             print(kind)
 ```
 
-## Entwicklung und Arbeitsstand
+## Development
 
-Python >=3.12, uv und Node.js >=24 werden für die Entwicklungswerkzeuge benötigt.
+Development tools require Python >=3.12, uv, and Node.js >=24.
+Python sources live in `browserrig/`.
 
 ```powershell
 uv sync --locked --extra openai
@@ -149,19 +182,25 @@ uv run pytest -m integration
 uv build
 ```
 
-Die Pre-commit-Hooks verwenden die in den Lockfiles festgelegten uv-/npm-Abhängigkeiten.
-Unter Linux/macOS heißt der npm-Aufruf `npm`. JavaScript wird mit ESLint und Prettier
-geprüft: geschweifte Klammern für alle Kontrollblöcke, maximal zwei verschachtelte
-Blöcke und keine verschachtelten ternären Ausdrücke. Pylint begrenzt verschachtelte
-Python-Blöcke auf drei; Ruff prüft zusätzlich Vereinfachungen. CI führt dieselben
-Lint-, Format- und Typprüfungen aus. Zum Formatieren: `uv run ruff format browserrig examples tests`
-und `npm.cmd run format`.
+Pre-commit hooks use the uv and npm dependencies pinned in the lockfiles.
+On Linux and macOS, use `npm` instead of `npm.cmd` and `cp .env.example .env`
+instead of `Copy-Item`.
 
-Integrationstests benötigen Chrome/Chromium. `BROWSERRIG_CHROME` oder
-`LaunchBrowser(executable=...)` kann das Binary vorgeben. Medienprüfung verwendet
-zusätzlich ffprobe, wenn vorhanden.
+JavaScript is checked with ESLint and Prettier: braces for every control block,
+at most two nested blocks, and no nested ternary expressions. Pylint limits Python
+blocks to three nesting levels; Ruff also checks for simplifications. CI runs the
+same lint, formatting, and type checks. To format code, run
+`uv run ruff format browserrig examples tests` and `npm.cmd run format`.
 
-Der Kern ist implementiert und gegen echtes Chrome geprüft. Breite Plattformmatrix,
-komplexe Figma-Geräterahmenerkennung, transformierte/OOPIF-Frames und Prozesscrash-
-Recovery bleiben gezielte Abnahmebereiche. Verträge stehen in [SPEC.md](SPEC.md),
-Zuständigkeiten in [STRUTURE.md](STRUTURE.md).
+Integration tests require Chrome or Chromium. Set `BROWSERRIG_CHROME` or
+`LaunchBrowser(executable=...)` to select the executable. Media validation also
+uses ffprobe when available.
+
+## Project status
+
+The core is implemented and tested against real Chrome. Broader platform coverage,
+complex Figma device-frame detection, transformed frames and out-of-process iframes
+(OOPIFs), and recovery from process crashes remain areas for further validation.
+
+See [SPEC.md](SPEC.md) for contracts and [STRUTURE.md](STRUTURE.md) for module
+responsibilities.
