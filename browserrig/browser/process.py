@@ -101,5 +101,16 @@ class ChromeProcess:
                 await self.process.wait()
         self.process = None
         if self.profile is not None:
-            profile, self.profile = self.profile, None
-            await asyncio.to_thread(profile.cleanup)
+            profile = self.profile
+            deadline = asyncio.get_running_loop().time() + 3
+            while True:
+                try:
+                    await asyncio.to_thread(profile.cleanup)
+                    self.profile = None
+                    break
+                except PermissionError:
+                    # Windows can release child-process cache handles shortly
+                    # after the browser parent exits. Keep ownership until done.
+                    if asyncio.get_running_loop().time() >= deadline:
+                        raise
+                    await asyncio.sleep(0.05)
