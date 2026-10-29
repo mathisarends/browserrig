@@ -10,11 +10,10 @@ from urllib.parse import urlsplit
 from cdpify import CdpSession
 from cdpify.domains.runtime import CallArgument
 
+from browserrig.core.errors import BrowserError
+from browserrig.core.geometry import Bounds, Projection
 from browserrig.events import BrowserEvent, InputEvent
 from browserrig.input import Input, Keyboard, Mouse
-
-from .errors import BrowserError
-from .geometry import Bounds, Projection
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,7 +161,7 @@ class Tab:
         self.changed = asyncio.Event()
         self.frame_limitations: tuple[str, ...] = ()
         self._emit = emit
-        self.input = Input(self)
+        self.input = Input(self.cdp, self.emit)
 
     @property
     def mouse(self) -> Mouse:
@@ -211,7 +210,7 @@ class Tab:
 
 def validated_url(url: str) -> str:
     parsed = urlsplit(url)
-    if url == "about:blank" or parsed.scheme in {"http", "https"} and parsed.hostname:
+    if url == "about:blank" or (parsed.scheme in {"http", "https"} and parsed.hostname):
         return url
     raise BrowserError("Navigation requires an HTTP(S) URL or about:blank")
 

@@ -1,7 +1,6 @@
-from browserrig.browser.config import Options
-from browserrig.browser.models import Geometry
-from browserrig.kinds import ReadinessPhase, ReadinessStatus
-from browserrig.observation.config import ObservationKind
+from browserrig.core.geometry import Geometry
+from browserrig.core.kinds import ObservationKind, ReadinessPhase, ReadinessStatus
+from browserrig.core.options import Options
 
 
 class ReadinessReport(Options):

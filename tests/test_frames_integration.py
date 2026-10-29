@@ -18,7 +18,7 @@ from browserrig import (
     browser_plugins,
     wait_for_page,
 )
-from browserrig.browser.errors import BrowserError
+from browserrig.core.errors import BrowserError
 from browserrig.kinds import ElementOperation
 from browserrig.observation.capture import ELEMENT_SCRIPT, capture
 

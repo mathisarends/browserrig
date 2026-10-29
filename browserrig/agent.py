@@ -10,10 +10,11 @@ from harnessed.kernel import PluginLike
 from harnessed.models import Model
 from harnessed.plugins import Approvals, JsonlSessions
 
+from browserrig.core.modes import ObservationMode
+
 from .browser.config import BrowserOptions
 from .composition import browser_plugins
 from .files import FileSystemOptions
-from .observation.config import ObservationMode
 from .readiness.config import ReadinessOptions
 from .recording import RecordingOptions
 

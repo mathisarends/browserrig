@@ -3,7 +3,7 @@ from urllib.parse import urlsplit
 import pytest
 
 from browserrig import ChromeBrowser, ConnectBrowser
-from browserrig.browser.models import Point
+from browserrig.core.geometry import Point
 from browserrig.events import CursorStateEvent
 
 pytestmark = pytest.mark.integration

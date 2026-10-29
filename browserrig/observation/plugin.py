@@ -8,8 +8,9 @@ from harnessed.models import ImagePart, ModelRequest, TextPart, User
 from pydantic import Field
 
 from browserrig.browser.base import Browser
-from browserrig.browser.errors import StaleElement
 from browserrig.browser.tab import Frame, Tab
+from browserrig.core.errors import StaleElement
+from browserrig.core.modes import DomMode
 from browserrig.events import (
     ObservationCapturedEvent,
 )
@@ -19,7 +20,6 @@ from browserrig.readiness.plugin import Readiness
 from browserrig.recording import Recording
 
 from .capture import capture
-from .config import DomMode
 from .content import extract_content
 from .models import Element, Snapshot
 from .render import render

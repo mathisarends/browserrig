@@ -1,8 +1,8 @@
 from harnessed import Inject, Plugin, tool
 
-from browserrig.browser.errors import BrowserError
 from browserrig.browser.tab import Tab
-from browserrig.kinds import ActionKind, ElementOperation
+from browserrig.core.errors import BrowserError
+from browserrig.core.kinds import ActionKind, ElementOperation
 
 from .execution import Actions, Effect
 

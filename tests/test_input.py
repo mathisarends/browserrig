@@ -9,8 +9,8 @@ import pytest
 from harnessed import ToolError
 from harnessed.events import EventRegistry
 
-from browserrig.browser.models import Point
 from browserrig.browser.tab import Tab
+from browserrig.core.geometry import Point
 from browserrig.events import (
     INPUT_EVENTS,
     CursorMovedEvent,

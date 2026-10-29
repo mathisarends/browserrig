@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from pydantic import Field
 
-from .config import Options
+from .options import Options
 
 
 class Bounds(Options):
@@ -88,3 +88,26 @@ class Projection:
             x=origin[0],
             y=origin[1],
         )
+
+
+class Point(Options):
+    x: float = Field(ge=0)
+    y: float = Field(ge=0)
+
+
+class ElementPoint(Point):
+    scrolled: bool = False
+    bounds: Bounds | None = None
+
+
+class Geometry(Options):
+    x: float = Field(default=0, ge=0)
+    y: float = Field(default=0, ge=0)
+    width: float = Field(gt=0)
+    height: float = Field(gt=0)
+    scale: float = Field(default=1, gt=0)
+
+    def point(self, x: float, y: float) -> tuple[float, float]:
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            raise ValueError("Point is outside the observed image")
+        return self.x + x / self.scale, self.y + y / self.scale

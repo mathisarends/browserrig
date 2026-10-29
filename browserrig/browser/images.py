@@ -1,6 +1,7 @@
 from cdpify.domains.page import Viewport
 
-from .models import Geometry
+from browserrig.core.geometry import Geometry
+
 from .tab import Tab
 
 

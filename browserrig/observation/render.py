@@ -2,10 +2,10 @@ from typing import Self
 
 import yaml
 
-from browserrig.browser.config import Options
+from browserrig.core.kinds import ObservationKind
+from browserrig.core.options import Options
 from browserrig.readiness.models import ReadinessStatus
 
-from .config import ObservationKind
 from .models import Element, Snapshot
 
 

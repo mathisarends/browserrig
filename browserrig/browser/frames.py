@@ -7,8 +7,9 @@ from cdpify.domains.page import FrameTree
 from cdpify.domains.target import TargetInfo
 from cdpify.exceptions import CDPCommandError
 
-from .errors import BrowserError
-from .geometry import Bounds, Projection
+from browserrig.core.errors import BrowserError
+from browserrig.core.geometry import Bounds, Projection
+
 from .tab import Frame, Tab
 
 _MAX_FRAMES = 64

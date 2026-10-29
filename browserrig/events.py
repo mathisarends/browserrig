@@ -5,7 +5,7 @@ from typing import Literal
 
 from harnessed.events import DurableEvent, TransientEvent
 
-from browserrig.kinds import (
+from browserrig.core.kinds import (
     ActionKind,
     ActivityKind,
     ActivityOutcome,

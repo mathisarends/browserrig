@@ -4,10 +4,11 @@ from typing import Protocol
 
 from cdpify import CdpClient
 
+from browserrig.browser.models import TabInfo
 from browserrig.events import BrowserEvent, InputEvent
 from browserrig.files import FileSystem
+from browserrig.files.models import Download
 
-from .models import Download, TabInfo
 from .tab import Frame, Tab
 
 type EventSink = Callable[[BrowserEvent | InputEvent], Awaitable[None]]

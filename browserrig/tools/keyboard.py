@@ -1,7 +1,7 @@
 from harnessed import Inject, Plugin, ToolError, tool
 
 from browserrig.browser.tab import Tab
-from browserrig.kinds import ActionKind
+from browserrig.core.kinds import ActionKind
 
 from .execution import Actions, Effect
 

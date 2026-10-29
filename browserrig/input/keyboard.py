@@ -4,13 +4,12 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypedDict
+from typing import TypedDict
 
-from browserrig.browser.errors import BrowserError
+from cdpify import CdpSession
+
+from browserrig.core.errors import BrowserError
 from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
-
-if TYPE_CHECKING:
-    from browserrig.browser.tab import Tab
 
 _TYPING_INTERVAL_SECONDS = 0.05
 
@@ -98,8 +97,8 @@ def _character(value: str) -> _Stroke:
 
 
 class Keyboard:
-    def __init__(self, tab: Tab, *, emit: Callable[[InputEvent], Awaitable[None]]) -> None:
-        self._tab = tab
+    def __init__(self, cdp: CdpSession, *, emit: Callable[[InputEvent], Awaitable[None]]) -> None:
+        self._cdp = cdp
         self._emit = emit
 
     async def press_key(
@@ -144,18 +143,18 @@ class Keyboard:
             for modifier in stroke.modifiers:
                 arguments = _Stroke(modifier).arguments()
                 held.push_async_callback(
-                    self._tab.cdp.input.dispatch_key_event,
+                    self._cdp.input.dispatch_key_event,
                     type="keyUp",
                     modifiers=flags,
                     **arguments,
                 )
-                flags |= _Stroke("", (modifier,)).flags
-                await self._tab.cdp.input.dispatch_key_event(
+                flags |= _MODIFIERS[modifier]
+                await self._cdp.input.dispatch_key_event(
                     type="rawKeyDown", modifiers=flags, **arguments
                 )
             arguments = stroke.arguments()
             held.push_async_callback(
-                self._tab.cdp.input.dispatch_key_event,
+                self._cdp.input.dispatch_key_event,
                 type="keyUp",
                 modifiers=flags,
                 **arguments,
@@ -168,14 +167,14 @@ class Keyboard:
                 )
             # Separate rawKeyDown and char so text is inserted once, including
             # Unicode without a physical mapping. Enter keeps native semantics.
-            await self._tab.cdp.input.dispatch_key_event(
+            await self._cdp.input.dispatch_key_event(
                 type="keyDown" if stroke.key == "Enter" and not shortcut else "rawKeyDown",
                 modifiers=flags,
                 text="\r" if stroke.key == "Enter" and not shortcut else "",
                 **arguments,
             )
             if text and stroke.key != "Enter":
-                await self._tab.cdp.input.dispatch_key_event(
+                await self._cdp.input.dispatch_key_event(
                     type="char", modifiers=flags, text=text, **arguments
                 )
         await self._emit(

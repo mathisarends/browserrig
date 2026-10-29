@@ -7,9 +7,9 @@ from harnessed import Inject, Observation, Plugin, ToolError, hook, tool
 from harnessed.hooks import Next, PreStep, StepDecision
 from pydantic import Field
 
-from browserrig.browser.errors import BrowserError
-from browserrig.browser.models import Download, DownloadState
 from browserrig.browser.tab import Tab
+from browserrig.core.errors import BrowserError
+from browserrig.core.kinds import ActionKind, ElementOperation
 from browserrig.files import (
     FileContent,
     FileEntry,
@@ -18,7 +18,7 @@ from browserrig.files import (
     FileSystemState,
     FileSystemView,
 )
-from browserrig.kinds import ActionKind, ElementOperation
+from browserrig.files.models import Download, DownloadState
 from browserrig.readiness.models import ReadinessPhase
 
 from .execution import Actions, Effect

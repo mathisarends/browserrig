@@ -13,9 +13,9 @@ from harnessed.events import AgentControlChangedEvent, ControlState
 
 from browserrig.activity.models import inference_only, project_intervals
 from browserrig.browser.base import Browser
-from browserrig.browser.errors import RecordingError
-from browserrig.browser.models import Geometry
 from browserrig.browser.tab import Tab
+from browserrig.core.errors import RecordingError
+from browserrig.core.geometry import Geometry
 from browserrig.events import (
     RECORDING_EVENTS,
     ReadyEvent,

@@ -6,6 +6,7 @@ from harnessed import Inject, Observation, Plugin, PluginState, SessionLog, hook
 from harnessed.events import ObservationForm, ObservationsIncludedEvent
 
 from browserrig.browser.base import Browser
+from browserrig.core.kinds import ActionKind, ReadinessStatus
 from browserrig.events import (
     NUDGE_EVENTS,
     ActionFailedEvent,
@@ -20,7 +21,6 @@ from browserrig.events import (
     ReadinessDegradedEvent,
     TabOpenedEvent,
 )
-from browserrig.kinds import ActionKind, ReadinessStatus
 from browserrig.observation.models import Snapshot
 
 

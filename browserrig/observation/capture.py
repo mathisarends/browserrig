@@ -10,13 +10,13 @@ from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser.base import Browser
-from browserrig.browser.errors import BrowserError
 from browserrig.browser.images import screenshot
 from browserrig.browser.tab import Frame, Tab
-from browserrig.kinds import ReadinessStatus
+from browserrig.core.errors import BrowserError
+from browserrig.core.kinds import ReadinessStatus
+from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
 from browserrig.readiness.models import ReadinessReport
 
-from .config import CanvasMode, DomMode, ObservationMode
 from .dom import seed_dom
 from .marks import annotate
 from .models import (

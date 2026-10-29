@@ -3,10 +3,10 @@ from typing import Annotated, Literal
 from harnessed import Inject, Plugin, tool
 from pydantic import Field
 
-from browserrig.browser.errors import BrowserError
-from browserrig.browser.models import Point
 from browserrig.browser.tab import Tab
-from browserrig.kinds import ActionKind, DragMode
+from browserrig.core.errors import BrowserError
+from browserrig.core.geometry import Point
+from browserrig.core.kinds import ActionKind, DragMode
 from browserrig.observation.models import Snapshot
 
 from .execution import Actions, Effect

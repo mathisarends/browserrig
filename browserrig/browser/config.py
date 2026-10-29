@@ -3,13 +3,9 @@ from pathlib import Path
 from typing import Annotated, Literal, Self
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 
-
-class Options(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid", frozen=True, allow_inf_nan=False, hide_input_in_errors=True
-    )
+from browserrig.core.options import Options
 
 
 class Viewport(Options):

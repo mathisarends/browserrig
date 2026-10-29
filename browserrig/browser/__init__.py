@@ -1,7 +1,8 @@
+from browserrig.files.models import Download, DownloadState
+
 from .base import Browser
 from .chrome import ChromeBrowser
 from .config import ConnectBrowser, LaunchBrowser, Viewport
-from .models import Download, DownloadState
 from .plugin import Chrome
 from .tab import Frame, Tab
 

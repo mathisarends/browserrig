@@ -1,4 +1,4 @@
-from browserrig.kinds import MouseEventKind
+from browserrig.core.kinds import MouseEventKind
 
 from .controller import Input
 from .keyboard import Keyboard

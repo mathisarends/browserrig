@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock
 import pytest
 from harnessed import ToolError
 
-from browserrig.browser.errors import BrowserError
 from browserrig.browser.tab import Tab
+from browserrig.core.errors import BrowserError
 from browserrig.events import ActionFailedEvent
 from browserrig.kinds import ActionKind
 from browserrig.tools.execution import Actions

@@ -10,7 +10,7 @@ from harnessed import ToolError
 from pypdf import PdfReader, PdfWriter
 
 from browserrig import ChromeBrowser, ConnectBrowser, FileSystem, FileSystemOptions, LaunchBrowser
-from browserrig.browser.models import Download, DownloadState
+from browserrig.files.models import Download, DownloadState
 from browserrig.tools.files import _file_call
 
 

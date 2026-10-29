@@ -4,12 +4,14 @@ import asyncio
 import math
 import random
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
+from cdpify import CdpSession
 from cdpify.domains.input import DragData, DragInterceptedEvent, MouseButton
 
-from browserrig.browser.errors import BrowserError
-from browserrig.browser.models import Point
+from browserrig.core.errors import BrowserError
+from browserrig.core.geometry import Point
+from browserrig.core.kinds import DragMode, MouseEventKind
 from browserrig.events import (
     CursorMovedEvent,
     CursorStateEvent,
@@ -18,17 +20,13 @@ from browserrig.events import (
     PointerReleasedEvent,
     ScrolledEvent,
 )
-from browserrig.kinds import DragMode, MouseEventKind
 
 from .pointer import ease, movement
 
-if TYPE_CHECKING:
-    from browserrig.browser.tab import Tab
-
 
 class Mouse:
-    def __init__(self, tab: Tab, *, emit: Callable[[InputEvent], Awaitable[None]]) -> None:
-        self._tab = tab
+    def __init__(self, cdp: CdpSession, *, emit: Callable[[InputEvent], Awaitable[None]]) -> None:
+        self._cdp = cdp
         self._emit = emit
         self.position = Point(x=0, y=0)
         self._cursor_initialized = False
@@ -36,7 +34,8 @@ class Mouse:
     async def initialize_cursor(self) -> None:
         """Seed a tab's native pointer near the center, without animating from the origin."""
         if not self._cursor_initialized:
-            viewport = (await self._tab.cdp.page.get_layout_metrics()).css_layout_viewport
+            metrics = await self._cdp.page.get_layout_metrics()
+            viewport = metrics.css_layout_viewport
             await self.dispatch(
                 MouseEventKind.MOVED,
                 Point(
@@ -82,7 +81,7 @@ class Mouse:
         event_kind = MouseEventKind(kind)
         if event_kind is MouseEventKind.WHEEL:
             raise ValueError("Use scroll() for wheel input")
-        await self._tab.cdp.input.dispatch_mouse_event(
+        await self._cdp.input.dispatch_mouse_event(
             type=event_kind.value,
             x=point.x,
             y=point.y,
@@ -126,11 +125,12 @@ class Mouse:
         distance = math.hypot(end.x - start.x, end.y - start.y)
         if distance < 1:
             raise BrowserError("Drag source and destination must be different")
-        cdp = self._tab.cdp
+        cdp = self._cdp
         await self.move_to(start)
         current = start
         data: DragData | None = None
         dropped = False
+        start_fraction = 0.0
         try:
             if mode is DragMode.HTML5:
                 await cdp.input.set_intercept_drags(enabled=True)
@@ -138,9 +138,10 @@ class Mouse:
             if mode is DragMode.HTML5:
                 # Subscribe before crossing the native drag threshold.
                 async with cdp.listen(DragInterceptedEvent, timeout=2) as subscription:
+                    start_fraction = min(12 / distance, 1)
                     current = Point(
-                        x=start.x + (end.x - start.x) * min(12 / distance, 1),
-                        y=start.y + (end.y - start.y) * min(12 / distance, 1),
+                        x=start.x + (end.x - start.x) * start_fraction,
+                        y=start.y + (end.y - start.y) * start_fraction,
                     )
                     await self.dispatch(MouseEventKind.MOVED, current, buttons=1)
                     data = (await anext(subscription)).data
@@ -149,7 +150,7 @@ class Mouse:
                 )
             steps = max(3, math.ceil(duration * 30))
             for index in range(1, steps + 1):
-                fraction = index / steps
+                fraction = start_fraction + (1 - start_fraction) * index / steps
                 current = Point(
                     x=start.x + (end.x - start.x) * fraction,
                     y=start.y + (end.y - start.y) * fraction,
@@ -174,7 +175,7 @@ class Mouse:
     ) -> None:
         try:
             if data is not None and not dropped:
-                await self._tab.cdp.input.dispatch_drag_event(
+                await self._cdp.input.dispatch_drag_event(
                     type="dragCancel", x=point.x, y=point.y, data=data
                 )
         finally:
@@ -182,7 +183,7 @@ class Mouse:
                 await self.dispatch(MouseEventKind.RELEASED, point, buttons=0, click_count=1)
             finally:
                 if mode is DragMode.HTML5:
-                    await self._tab.cdp.input.set_intercept_drags(enabled=False)
+                    await self._cdp.input.set_intercept_drags(enabled=False)
 
     async def scroll(self, *, point: Point, delta_y: float, delta_x: float = 0) -> None:
         if delta_y == 0 and delta_x == 0:
@@ -193,7 +194,7 @@ class Mouse:
         previous = 0.0
         for index in range(1, steps + 1):
             current = ease(index / steps)
-            await self._tab.cdp.input.dispatch_mouse_event(
+            await self._cdp.input.dispatch_mouse_event(
                 type=MouseEventKind.WHEEL.value,
                 x=point.x,
                 y=point.y,

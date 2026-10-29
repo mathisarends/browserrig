@@ -5,10 +5,10 @@ from urllib.parse import quote_plus
 from harnessed import Inject, Plugin, tool
 from pydantic import Field
 
-from browserrig.browser.errors import BrowserError
 from browserrig.browser.tab import Tab, validated_url
+from browserrig.core.errors import BrowserError
+from browserrig.core.kinds import ActionKind
 from browserrig.events import NavigationStartedEvent, WaitingEvent
-from browserrig.kinds import ActionKind
 
 from .execution import Actions, Effect
 

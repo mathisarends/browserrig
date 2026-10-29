@@ -2,13 +2,11 @@ import hashlib
 
 from pydantic import Field
 
-from browserrig.browser.config import Options
-from browserrig.browser.errors import StaleElement
-from browserrig.browser.geometry import Bounds
-from browserrig.browser.models import Geometry
+from browserrig.core.errors import StaleElement
+from browserrig.core.geometry import Bounds, Geometry
+from browserrig.core.kinds import ObservationKind
+from browserrig.core.options import Options
 from browserrig.readiness.models import ReadinessStatus
-
-from .config import ObservationKind
 
 
 class Element(Options):

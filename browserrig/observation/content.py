@@ -6,9 +6,9 @@ from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser.base import Browser
-from browserrig.browser.config import Options
-from browserrig.browser.errors import BrowserError
 from browserrig.browser.tab import Frame, Tab
+from browserrig.core.errors import BrowserError
+from browserrig.core.options import Options
 
 from .dom import seed_dom
 

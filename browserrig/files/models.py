@@ -1,9 +1,25 @@
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import Field
 
-from browserrig.browser.config import Options
-from browserrig.browser.models import Download
+from browserrig.core.options import Options
+
+
+class DownloadState(StrEnum):
+    IN_PROGRESS = "inProgress"
+    COMPLETED = "completed"
+    CANCELED = "canceled"
+
+
+class Download(Options):
+    id: str
+    filename: str
+    url: str
+    state: DownloadState = DownloadState.IN_PROGRESS
+    received_bytes: int = 0
+    path: str | None = None
+    error: str | None = None
 
 
 class FileSystemState(Options):

@@ -16,6 +16,7 @@ from harnessed.events import (
     TurnEndedEvent,
 )
 
+from browserrig.core.kinds import ActivityKind, ActivityOutcome
 from browserrig.events import (
     ACTIVITY_EVENTS,
     ActivityFinishedEvent,
@@ -27,7 +28,6 @@ from browserrig.events import (
     ReadinessStartedEvent,
     ReadyEvent,
 )
-from browserrig.kinds import ActivityKind, ActivityOutcome
 
 from .models import ActivityKey, project_intervals, step_outcome, turn_outcome
 

@@ -3,8 +3,8 @@ from typing import Literal, Self
 from pydantic import Field, model_validator
 
 from browserrig.activity.models import TimeRange
-from browserrig.browser.config import Options
-from browserrig.browser.models import Geometry
+from browserrig.core.geometry import Geometry
+from browserrig.core.options import Options
 from browserrig.events import ActivityFinishedEvent
 
 

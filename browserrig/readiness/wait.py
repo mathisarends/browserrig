@@ -6,9 +6,10 @@ from uuid import uuid4
 from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser.base import Browser
-from browserrig.browser.errors import ReadinessError
-from browserrig.browser.models import Geometry
 from browserrig.browser.tab import Tab
+from browserrig.core.errors import ReadinessError
+from browserrig.core.geometry import Geometry
+from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
 from browserrig.events import (
     ReadinessCancelledEvent,
     ReadinessDegradedEvent,
@@ -16,7 +17,6 @@ from browserrig.events import (
     ReadinessStartedEvent,
     ReadyEvent,
 )
-from browserrig.observation.config import CanvasMode, DomMode, ObservationMode
 
 from .canvas import CanvasReadiness
 from .config import ReadinessOptions

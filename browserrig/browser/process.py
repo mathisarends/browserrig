@@ -7,8 +7,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Self
 
+from browserrig.core.errors import BrowserError
+
 from .config import LaunchBrowser
-from .errors import BrowserError
 
 
 def _chrome_executable(explicit: Path | None = None) -> str:

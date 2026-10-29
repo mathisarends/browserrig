@@ -6,9 +6,9 @@ from typing import Self, assert_never
 from harnessed.events import SessionEvent, StepOutcome, TurnOutcome
 from pydantic import model_validator
 
-from browserrig.browser.config import Options
+from browserrig.core.kinds import ActivityKind, ActivityOutcome
+from browserrig.core.options import Options
 from browserrig.events import ActivityFinishedEvent, ActivityStartedEvent
-from browserrig.kinds import ActivityKind, ActivityOutcome
 
 
 @dataclass(frozen=True, slots=True)

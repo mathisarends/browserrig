@@ -13,7 +13,7 @@ from harnessed.testing import ScriptedModel
 from PIL import Image
 
 from browserrig import CanvasMode, Readiness, ReadinessOptions, wait_for_page
-from browserrig.browser.models import Geometry
+from browserrig.core.geometry import Geometry
 from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent
 from browserrig.readiness.canvas import CanvasProbe, _has_canvas_content
 from tests.fakes import FakeBrowser, FakeChrome

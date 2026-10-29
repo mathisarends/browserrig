@@ -1,4 +1,4 @@
-from browserrig.kinds import ActivityKind, ActivityOutcome
+from browserrig.core.kinds import ActivityKind, ActivityOutcome
 
 from .plugin import Activity
 

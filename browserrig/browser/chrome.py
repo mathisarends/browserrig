@@ -17,6 +17,8 @@ from cdpify.domains.page import (
 )
 from cdpify.domains.target import TargetDestroyedEvent, TargetInfoChangedEvent
 
+from browserrig.browser.models import TabInfo
+from browserrig.core.errors import BrowserClosed, BrowserError
 from browserrig.events import (
     BrowserEvent,
     ConnectedEvent,
@@ -33,12 +35,11 @@ from browserrig.events import (
     TabOpenedEvent,
 )
 from browserrig.files import FileSystem, FileSystemOptions
+from browserrig.files.models import Download, DownloadState
 
 from .base import EventSink
 from .config import BrowserOptions, ConnectBrowser, LaunchBrowser
-from .errors import BrowserClosed, BrowserError
 from .frames import discover_frames
-from .models import Download, DownloadState, TabInfo
 from .process import ChromeProcess
 from .tab import Frame, Tab, validated_url
 

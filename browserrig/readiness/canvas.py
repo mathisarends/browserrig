@@ -7,12 +7,12 @@ from typing import cast
 
 from PIL import Image, ImageStat
 
-from browserrig.browser.config import Options
 from browserrig.browser.images import screenshot
-from browserrig.browser.models import Geometry
 from browserrig.browser.tab import Tab, script_call
-from browserrig.kinds import ReadinessStatus
-from browserrig.observation.config import CanvasMode
+from browserrig.core.geometry import Geometry
+from browserrig.core.kinds import ReadinessStatus
+from browserrig.core.modes import CanvasMode
+from browserrig.core.options import Options
 
 from .config import ReadinessOptions
 from .strategy import ReadinessStrategy

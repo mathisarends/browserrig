@@ -1,12 +1,13 @@
 from harnessed import Plugin
 from harnessed.plugins import LatestObservationOnly
 
+from browserrig.core.modes import DomMode, ObservationMode
+
 from .activity import Activity
 from .browser import Chrome
 from .browser.config import BrowserOptions
 from .files import FileSystemOptions
 from .nudges import Nudges
-from .observation.config import DomMode, ObservationMode
 from .observation.plugin import Observe
 from .readiness.config import ReadinessOptions
 from .readiness.plugin import Readiness

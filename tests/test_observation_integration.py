@@ -7,7 +7,7 @@ import yaml
 from PIL import Image
 
 from browserrig import ChromeBrowser, DomMode, LaunchBrowser, Viewport, wait_for_page
-from browserrig.browser.errors import BrowserError
+from browserrig.core.errors import BrowserError
 from browserrig.kinds import ElementOperation
 from browserrig.observation.capture import ELEMENT_SCRIPT, capture
 from browserrig.observation.render import render

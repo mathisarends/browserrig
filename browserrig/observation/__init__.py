@@ -1,4 +1,5 @@
-from .config import CanvasMode, DomMode
+from browserrig.core.modes import CanvasMode, DomMode
+
 from .models import Element, Snapshot
 from .render import render
 

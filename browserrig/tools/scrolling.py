@@ -2,11 +2,10 @@ import asyncio
 from importlib.resources import files
 
 from browserrig.browser.base import Browser
-from browserrig.browser.errors import BrowserError, StaleElement
-from browserrig.browser.geometry import Bounds
-from browserrig.browser.models import Point
 from browserrig.browser.tab import Frame, Tab
-from browserrig.kinds import ElementOperation
+from browserrig.core.errors import BrowserError, StaleElement
+from browserrig.core.geometry import Bounds, Point
+from browserrig.core.kinds import ElementOperation
 from browserrig.observation.capture import ELEMENT_SCRIPT
 from browserrig.observation.models import Element, Snapshot
 

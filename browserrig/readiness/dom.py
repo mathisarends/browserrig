@@ -1,9 +1,9 @@
 from importlib.resources import files
 from time import monotonic
 
-from browserrig.browser.config import Options
 from browserrig.browser.tab import Tab
-from browserrig.kinds import ReadinessPhase, ReadinessStatus
+from browserrig.core.kinds import ReadinessPhase, ReadinessStatus
+from browserrig.core.options import Options
 
 from .config import ReadinessOptions
 from .strategy import ReadinessStrategy

@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 
-from browserrig.browser.models import Geometry
 from browserrig.browser.tab import Tab
-from browserrig.kinds import ReadinessStatus
+from browserrig.core.geometry import Geometry
+from browserrig.core.kinds import ReadinessStatus
 
 from .config import ReadinessOptions
 

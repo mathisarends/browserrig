@@ -2,8 +2,9 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from browserrig.browser.config import Options
-from browserrig.kinds import ObservationKind
+from browserrig.core.kinds import ObservationKind
+
+from .options import Options
 
 
 class DomMode(Options):

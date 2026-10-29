@@ -5,12 +5,12 @@ from harnessed import Context, Inject, Plugin, PluginState, hook
 from harnessed.events import AgentControlChangedEvent, ControlState
 
 from browserrig.browser.base import Browser
-from browserrig.browser.models import Geometry
 from browserrig.browser.tab import Tab
+from browserrig.core.geometry import Geometry
+from browserrig.core.modes import DomMode, ObservationMode
 from browserrig.events import (
     READINESS_EVENTS,
 )
-from browserrig.observation.config import DomMode, ObservationMode
 
 from .config import ReadinessOptions
 from .models import ReadinessPhase, ReadinessReport

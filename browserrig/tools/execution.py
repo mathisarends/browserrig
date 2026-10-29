@@ -7,9 +7,10 @@ from uuid import uuid4
 from harnessed import Inject, Plugin, ToolError
 
 from browserrig.browser.base import Browser
-from browserrig.browser.errors import BrowserError
-from browserrig.browser.models import ElementPoint
 from browserrig.browser.tab import Frame, Tab
+from browserrig.core.errors import BrowserError
+from browserrig.core.geometry import ElementPoint
+from browserrig.core.kinds import ActionKind, ElementOperation
 from browserrig.events import (
     ACTION_EVENTS,
     ActionFailedEvent,
@@ -17,7 +18,6 @@ from browserrig.events import (
     ActionStartedEvent,
     ElementHighlightedEvent,
 )
-from browserrig.kinds import ActionKind, ElementOperation
 from browserrig.observation.capture import ELEMENT_SCRIPT
 from browserrig.observation.models import Element, Snapshot
 from browserrig.observation.plugin import Observe
