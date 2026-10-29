@@ -38,6 +38,17 @@ def _chrome_executable(explicit: Path | None = None) -> str:
     )
 
 
+def _active_endpoint(path: Path) -> str | None:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (FileNotFoundError, PermissionError):
+        # Chrome can still hold the port file while publishing its endpoint on Windows.
+        return None
+    if len(lines) >= 2 and lines[0].isdigit() and lines[1].startswith("/devtools/browser/"):
+        return f"ws://127.0.0.1:{lines[0]}{lines[1]}"
+    return None
+
+
 class ChromeProcess:
     def __init__(self, options: LaunchBrowser) -> None:
         self._options = options
@@ -76,13 +87,12 @@ class ChromeProcess:
                         raise BrowserError(
                             f"Chrome exited during startup ({self._process.returncode})"
                         )
-                    if active_port.is_file():
-                        lines = (await asyncio.to_thread(active_port.read_text)).splitlines()
-                        if len(lines) >= 2 and lines[0].isdigit():
-                            self.endpoint = f"ws://127.0.0.1:{lines[0]}{lines[1]}"
-                            return self
+                    endpoint = await asyncio.to_thread(_active_endpoint, active_port)
+                    if endpoint is not None:
+                        self.endpoint = endpoint
+                        return self
                     await asyncio.sleep(0.05)
-        except BaseException:
+        except (Exception, asyncio.CancelledError):
             await self.aclose()
             raise
 
