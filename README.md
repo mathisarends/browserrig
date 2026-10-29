@@ -346,6 +346,8 @@ without a background consumer task. It includes session lifecycle, model/tool
 metadata, browser actions, and live input events. Prompts, tool arguments, model
 output, and screenshots are omitted. Pass `TerminalEvents(output=file)` to select
 another text stream.
+Page text, dialog messages and form value fields are omitted; URLs, filenames and
+dispatched key names remain diagnostic metadata.
 
 ## Recording, downloads, and events
 

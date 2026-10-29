@@ -10,7 +10,7 @@ from browserrig.browser.base import Browser
 from browserrig.browser.tab import Frame, Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Bounds, ElementPoint
-from browserrig.core.kinds import ActionKind, ElementOperation
+from browserrig.core.kinds import ActionKind, ElementOperation, ReadinessPhase, ReadinessStatus
 from browserrig.events import (
     ACTION_EVENTS,
     ActionFailedEvent,
@@ -21,7 +21,6 @@ from browserrig.events import (
 )
 from browserrig.observation.models import Element, Snapshot
 from browserrig.observation.plugin import Observe
-from browserrig.readiness.models import ReadinessPhase, ReadinessStatus
 from browserrig.readiness.plugin import Readiness
 from browserrig.scripts import ELEMENT
 from browserrig.scripts.models import ElementArgs

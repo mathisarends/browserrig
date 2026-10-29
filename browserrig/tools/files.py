@@ -10,7 +10,7 @@ from pydantic import Field
 from browserrig.browser.base import Browser
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
-from browserrig.core.kinds import ActionKind, ElementOperation
+from browserrig.core.kinds import ActionKind, ElementOperation, ReadinessPhase
 from browserrig.files import (
     FileContent,
     FileEntry,
@@ -21,7 +21,6 @@ from browserrig.files import (
 )
 from browserrig.files.models import Download, DownloadState
 from browserrig.observation.plugin import Observe
-from browserrig.readiness.models import ReadinessPhase
 from browserrig.readiness.plugin import Readiness
 
 from .execution import Actions, Effect

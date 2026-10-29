@@ -10,12 +10,12 @@ from pydantic import Field
 from browserrig.browser.base import Browser
 from browserrig.browser.tab import Frame, Tab
 from browserrig.core.errors import StaleElement
+from browserrig.core.kinds import ReadinessPhase, ReadinessStatus
 from browserrig.core.modes import DomMode
 from browserrig.events import (
     ObservationCapturedEvent,
 )
 from browserrig.nudges import Nudges
-from browserrig.readiness.models import ReadinessPhase, ReadinessStatus
 from browserrig.readiness.plugin import Readiness
 from browserrig.recording import Recording
 

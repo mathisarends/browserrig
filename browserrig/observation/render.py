@@ -2,9 +2,8 @@ from typing import Self
 
 import yaml
 
-from browserrig.core.kinds import ObservationKind
+from browserrig.core.kinds import ObservationKind, ReadinessStatus
 from browserrig.core.options import Options
-from browserrig.readiness.models import ReadinessStatus
 
 from .models import Element, Snapshot
 

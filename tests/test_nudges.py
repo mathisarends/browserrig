@@ -19,6 +19,7 @@ from browserrig.events import (
     NudgeQueuedEvent,
     ObservationCapturedEvent,
     PageState,
+    TabClosedEvent,
 )
 from browserrig.observation.models import Snapshot
 from tests.fakes import FakeChrome
@@ -75,6 +76,45 @@ async def test_scroll_nudge_requires_exact_same_url_document_and_unrequested_scr
             isinstance(e, NudgeQueuedEvent) and e.key == "unexpected_scroll" for e in session.events
         )
         assert actual is expected
+
+
+async def test_pending_actions_are_separate_per_tab_and_closed_tabs_are_forgotten():
+    class Producer(FakeChrome):
+        events = (ActionStartedEvent, ActionFinishedEvent, ObservationCapturedEvent, TabClosedEvent)
+
+    agent = Agent(model=ScriptedModel(["unused"]), plugins=[Producer({}), Nudges()])
+    async with agent.session() as session:
+        for target in ("first", "second"):
+            await session.emit(ActionStartedEvent(action_id=target, kind="click", target_id=target))
+            await session.emit(
+                ActionFinishedEvent(
+                    action_id=target,
+                    kind="click",
+                    target_id=target,
+                    before=PageState(url="https://example.org/", document_id="doc"),
+                    after_url="https://example.org/",
+                )
+            )
+        await session.emit(TabClosedEvent(target_id="first"))
+        for target in ("first", "second"):
+            await session.emit(
+                ObservationCapturedEvent(
+                    observation_id=target,
+                    target_id=target,
+                    document_id="doc",
+                    url="https://example.org/",
+                    fingerprint="changed",
+                    scroll_y=500,
+                    mode="dom",
+                    readiness="ready",
+                )
+            )
+        scrolls = [
+            event
+            for event in session.events
+            if isinstance(event, NudgeQueuedEvent) and event.key == "unexpected_scroll"
+        ]
+        assert len(scrolls) == 1 and scrolls[0].target_id == "second"
 
 
 class _Access(Plugin, needs=(Nudges,)):

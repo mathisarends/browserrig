@@ -31,8 +31,8 @@ _METADATA = {
 def _event_record(event: SessionEvent | InputEvent) -> dict[str, object]:
     if isinstance(event, BrowserEvent | InputEvent):
         record = asdict(event)
-        # Nudges and page dialogs can contain arbitrary page text.
-        for name in ("text", "message"):
+        # Omit page/form contents. URLs and key names remain diagnostic metadata.
+        for name in ("text", "message", "value"):
             record.pop(name, None)
         return record
     record: dict[str, object] = {"type": str(event.type)}

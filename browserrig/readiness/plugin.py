@@ -7,13 +7,14 @@ from harnessed.events import AgentControlChangedEvent, ControlState
 from browserrig.browser.base import Browser
 from browserrig.browser.tab import Tab
 from browserrig.core.geometry import Geometry
+from browserrig.core.kinds import ReadinessPhase
 from browserrig.core.modes import DomMode, ObservationMode
 from browserrig.events import (
     READINESS_EVENTS,
 )
 
 from .config import ReadinessOptions
-from .models import ReadinessPhase, ReadinessReport
+from .models import ReadinessReport
 from .wait import wait_for_page
 
 

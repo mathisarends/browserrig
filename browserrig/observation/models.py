@@ -4,9 +4,8 @@ from pydantic import Field
 
 from browserrig.core.errors import StaleElement
 from browserrig.core.geometry import Bounds, Geometry
-from browserrig.core.kinds import ObservationKind
+from browserrig.core.kinds import ObservationKind, ReadinessStatus
 from browserrig.core.options import Options
-from browserrig.readiness.models import ReadinessStatus
 
 
 class Element(Options):

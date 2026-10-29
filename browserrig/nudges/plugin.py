@@ -22,6 +22,7 @@ from browserrig.events import (
     NudgeQueuedEvent,
     ObservationCapturedEvent,
     ReadinessDegradedEvent,
+    TabClosedEvent,
     TabOpenedEvent,
 )
 
@@ -30,10 +31,15 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class _TabState:
+    pending: ActionFinishedEvent | None = None
+    starts: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass
 class _State:
     queued: dict[str, NudgeQueuedEvent] = field(default_factory=dict)
-    pending: dict[str, ActionFinishedEvent] = field(default_factory=dict)
-    starts: dict[str, float] = field(default_factory=dict)
+    tabs: dict[str, _TabState] = field(default_factory=dict)
     effect_at: float = 0
 
 
@@ -95,30 +101,41 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
 
     @hook(ActionStartedEvent)
     async def _on_start(self, event: ActionStartedEvent) -> None:
-        self._state.starts[event.action_id] = event.at
+        state = self._state.tabs.setdefault(event.target_id, _TabState())
+        state.starts[event.action_id] = event.at
 
     @hook(ActionFinishedEvent)
     async def _on_action(self, event: ActionFinishedEvent) -> None:
-        if previous := self._state.pending.pop(event.target_id, None):
-            self._state.starts.pop(previous.action_id, None)
+        state = self._state.tabs.setdefault(event.target_id, _TabState())
+        if state.pending is not None:
+            state.starts.pop(state.pending.action_id, None)
+        state.pending = None
         if not event.expects_change and event.kind != ActionKind.CLICK:
-            self._state.starts.pop(event.action_id, None)
+            state.starts.pop(event.action_id, None)
+            if not state.starts:
+                self._state.tabs.pop(event.target_id, None)
             return
-        self._state.pending[event.target_id] = event
+        state.pending = event
 
     @hook(ActionFailedEvent)
     async def _on_failure(self, event: ActionFailedEvent) -> None:
-        self._state.starts.pop(event.action_id, None)
-        self._state.pending.pop(event.target_id, None)
+        self._state.tabs.pop(event.target_id, None)
+
+    @hook(TabClosedEvent)
+    async def _on_tab_closed(self, event: TabClosedEvent) -> None:
+        self._state.tabs.pop(event.target_id, None)
 
     @hook(ObservationCapturedEvent)
     async def _on_observation(
         self, event: ObservationCapturedEvent, browser: Inject[Browser]
     ) -> None:
-        action = self._state.pending.pop(event.target_id, None)
-        if action is None:
+        state = self._state.tabs.get(event.target_id)
+        if state is None or state.pending is None:
             return
-        started_at = self._state.starts.pop(action.action_id, action.at)
+        action, state.pending = state.pending, None
+        started_at = state.starts.pop(action.action_id, action.at)
+        if not state.starts:
+            self._state.tabs.pop(event.target_id, None)
         same_page = (
             action.before.url == event.url == action.after_url
             and action.before.document_id == event.document_id

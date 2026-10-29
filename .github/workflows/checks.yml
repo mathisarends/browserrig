@@ -70,3 +70,8 @@ jobs:
       - run: uv run --no-sync pytest -m integration
         env:
           BROWSERRIG_CHROME: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Direct browser example smoke test
+        run: uv run --no-sync python -m examples.direct_browser --url about:blank
+        env:
+          BROWSERRIG_CHROME: ${{ steps.chrome.outputs.chrome-path }}

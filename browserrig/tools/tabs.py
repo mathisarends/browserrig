@@ -3,8 +3,7 @@ from harnessed import Inject, Plugin, tool
 from browserrig.browser.base import Browser
 from browserrig.browser.models import TabInfo
 from browserrig.browser.tab import Tab
-from browserrig.core.kinds import ActionKind
-from browserrig.readiness.models import ReadinessPhase
+from browserrig.core.kinds import ActionKind, ReadinessPhase
 from browserrig.readiness.plugin import Readiness
 
 from .execution import Actions, Effect

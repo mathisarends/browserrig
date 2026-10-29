@@ -9,6 +9,7 @@ from browserrig.browser.base import Browser
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import ReadinessError
 from browserrig.core.geometry import Geometry
+from browserrig.core.kinds import ReadinessPhase, ReadinessStatus
 from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
 from browserrig.events import (
     ReadinessCancelledEvent,
@@ -21,7 +22,7 @@ from browserrig.events import (
 from .canvas import CanvasReadiness
 from .config import ReadinessOptions
 from .dom import DomReadiness
-from .models import ReadinessPhase, ReadinessReport, ReadinessStatus
+from .models import ReadinessReport
 from .strategy import ReadinessStrategy
 
 

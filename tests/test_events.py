@@ -24,6 +24,19 @@ def test_enum_tags_and_registry_roundtrip():
     assert restored.type == "browser.connected"
 
 
+def test_action_page_state_roundtrips_as_a_typed_nested_value():
+    registry = EventRegistry(events.ACTION_EVENTS)
+    event = events.ActionFinishedEvent(
+        action_id="action",
+        kind="click",
+        after_url="https://example.org/",
+        before=events.PageState(url="https://example.org/", document_id="document", scroll_y=100),
+    )
+    restored = registry.decode(registry.encode(event))
+    assert restored == event
+    assert isinstance(restored.before, events.PageState)
+
+
 @pytest.mark.parametrize(
     "kind",
     events.BROWSER_EVENTS

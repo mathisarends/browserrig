@@ -1,12 +1,14 @@
 import io
 import json
+from dataclasses import dataclass
 
 from harnessed import Agent, Inject, Plugin, SessionLog, hook
 from harnessed.events import ModelRequestedEvent
 from harnessed.testing import ScriptedModel
 
 from browserrig import TerminalEvents
-from browserrig.events import INPUT_EVENTS, KeyPressedEvent
+from browserrig.events import INPUT_EVENTS, BrowserEvent, KeyPressedEvent
+from browserrig.terminal import _event_record
 
 
 async def test_terminal_observes_native_and_live_events_without_model_or_log_pollution():
@@ -33,3 +35,15 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
     )
     assert "PRIVATE PROMPT" not in output.getvalue()
     assert "Final answer" not in output.getvalue()
+
+
+def test_terminal_omits_arbitrary_page_and_form_value_fields():
+    @dataclass(frozen=True)
+    class FormEvent(BrowserEvent):
+        value: str
+        message: str
+        text: str
+        type: str = "test.form"
+
+    record = _event_record(FormEvent(value="private form", message="page dialog", text="page text"))
+    assert not {"text", "message", "value"} & record.keys()
