@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import json
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
+from contextlib import suppress
 from dataclasses import dataclass, replace
 from typing import Any
 from urllib.parse import urlsplit
@@ -10,11 +10,15 @@ from urllib.parse import urlsplit
 from cdpify import CdpSession
 from cdpify.domains.page import FrameTree
 from cdpify.domains.runtime import CallArgument
+from cdpify.exceptions import CDPCommandError
+from pydantic import BaseModel
 
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Bounds, Projection
 from browserrig.events import BrowserEvent, InputEvent
 from browserrig.input import Input, Keyboard, Mouse
+from browserrig.scripts import OWNER_HITS, Script, failure
+from browserrig.scripts.models import OwnerHitsArgs
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,8 +61,8 @@ class Frame:
         finally:
             await self.cdp.runtime.release_object(object_id=object_id)
 
-    async def owner_call(self, function: str, *arguments: object) -> Any:
-        """Inspect the embedding element in its parent's isolated world."""
+    async def run_on_owner[A: BaseModel, R](self, script: Script[A, R], args: A | None = None) -> R:
+        """Run with this frame's embedding element as `this`, using the same error policy."""
         assert self.parent is not None and self.owner_id is not None
         cdp = self.parent.cdp
         resolved = await cdp.dom.resolve_node(
@@ -68,17 +72,10 @@ class Frame:
         if object_id is None:
             raise BrowserError("Element frame no longer exists; observe again")
         try:
-            result = await cdp.runtime.call_function_on(
-                object_id=object_id,
-                function_declaration=function,
-                arguments=[CallArgument(value=value) for value in arguments],
-                return_by_value=True,
-            )
-            if result.exception_details:
-                raise BrowserError("Frame owner could not be inspected")
-            return result.result.value
+            return await _call(cdp, script, args, object_id=object_id)
         finally:
-            await cdp.runtime.release_object(object_id=object_id)
+            with suppress(CDPCommandError):
+                await cdp.runtime.release_object(object_id=object_id)
 
     async def check_point(self, x: float, y: float) -> None:
         """A child hit test cannot see blockers in ancestor documents."""
@@ -90,20 +87,11 @@ class Frame:
         current = self
         while current.parent is not None:
             clip = current.projection.clip
-            hits = await current.owner_call(
-                """function(points) {
-                    return points.map(([x, y]) => {
-                        let root = this.getRootNode(), target = this;
-                        while (root) {
-                            const hit = root.elementFromPoint(x, y);
-                            if (hit !== target) { return false; }
-                            target = root.host;
-                            root = target?.getRootNode();
-                        }
-                        return true;
-                    });
-                }""",
-                [current.parent.projection.inverse(x, y) for x, y in points],
+            hits = await current.run_on_owner(
+                OWNER_HITS,
+                OwnerHitsArgs(
+                    points=tuple(current.parent.projection.inverse(x, y) for x, y in points)
+                ),
             )
             visible = [
                 before and hit and (clip is None or clip.contains(*point))
@@ -118,43 +106,24 @@ class Frame:
         )
         return result.execution_context_id
 
-    async def evaluate(self, expression: str) -> Any:
-        result = await self.cdp.runtime.evaluate(
-            expression=expression,
+    async def run[A: BaseModel, R](
+        self,
+        script: Script[A, R],
+        args: A | None = None,
+        *,
+        objects: Sequence[str] = (),
+        by_value: bool = True,
+        user_gesture: bool = False,
+    ) -> R:
+        return await _call(
+            self.cdp,
+            script,
+            args,
+            objects=objects,
+            by_value=by_value,
+            user_gesture=user_gesture,
             context_id=await self.context(),
-            return_by_value=True,
-            await_promise=True,
         )
-        if result.exception_details:
-            raise BrowserError("Page script failed in the isolated browserrig world")
-        return result.result.value
-
-    async def call(self, function: str, *arguments: object, by_value: bool = True) -> Any:
-        result = await self.cdp.runtime.call_function_on(
-            function_declaration=function,
-            execution_context_id=await self.context(),
-            arguments=[CallArgument(value=value) for value in arguments],
-            return_by_value=by_value,
-            await_promise=True,
-            user_gesture=True,
-        )
-        if result.exception_details:
-            detail = result.exception_details.exception
-            message = detail.description if detail else result.exception_details.text
-            # Scripts use fixed error codes; never expose arbitrary page exceptions.
-            for code in (
-                "STALE_ELEMENT",
-                "ELEMENT_BLOCKED",
-                "ELEMENT_DISABLED",
-                "NOT_EDITABLE",
-                "OPTION_NOT_FOUND",
-                "NOT_A_SELECT",
-                "INVALID_VALUE",
-            ):
-                if code in (message or ""):
-                    raise BrowserError(code)
-            raise BrowserError("Element operation failed in the page")
-        return result.result.value if by_value else result.result
 
 
 class Tab:
@@ -223,9 +192,6 @@ class Tab:
     async def bring_to_front(self) -> None:
         await self.cdp.page.bring_to_front()
 
-    async def evaluate(self, expression: str) -> Any:
-        return await (await self.main_frame()).evaluate(expression)
-
     async def navigate(self, url: str) -> None:
         result = await self.cdp.page.navigate(url=validated_url(url))
         if result.error_text:
@@ -244,5 +210,30 @@ def validated_url(url: str) -> str:
     raise BrowserError("Navigation requires an HTTP(S) URL or about:blank")
 
 
-def script_call(script: str, arguments: dict[str, object]) -> str:
-    return f"({script})({json.dumps(arguments, ensure_ascii=True)})"
+async def _call[A: BaseModel, R](
+    cdp: CdpSession,
+    script: Script[A, R],
+    args: A | None,
+    *,
+    objects: Sequence[str] = (),
+    by_value: bool = True,
+    user_gesture: bool = False,
+    context_id: int | None = None,
+    object_id: str | None = None,
+) -> Any:
+    payload = script.arguments.model_validate({} if args is None else args)
+    result = await cdp.runtime.call_function_on(
+        function_declaration=script.declaration,
+        execution_context_id=context_id,
+        object_id=object_id,
+        arguments=[
+            CallArgument(value=payload.model_dump(mode="json", by_alias=True)),
+            *(CallArgument(object_id=node) for node in objects),
+        ],
+        return_by_value=by_value,
+        await_promise=True,
+        user_gesture=user_gesture,
+    )
+    if result.exception_details:
+        raise BrowserError(failure(script, result.exception_details))
+    return script.parse(result.result.value) if by_value else result.result

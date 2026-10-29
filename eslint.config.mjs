@@ -31,10 +31,10 @@ export default defineConfig([
     },
   },
   {
-    files: ['browserrig/**/scripts/*.js'],
+    files: ['browserrig/scripts/**/*.js'],
     languageOptions: {sourceType: 'script', globals: globals.browser},
     // CDP receives each file as a standalone function declaration.
-    rules: {'no-unused-vars': ['error', {varsIgnorePattern: '^browserrig'}]},
+    rules: {'no-unused-vars': ['error', {vars: 'local', argsIgnorePattern: '^_'}]},
   },
   {
     files: ['**/*.mjs'],

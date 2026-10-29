@@ -20,6 +20,7 @@ from browserrig import (
     TerminalEvents,
 )
 from browserrig.events import CursorMovedEvent, CursorStateEvent, InputEvent
+from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
 
@@ -54,8 +55,8 @@ async def test_typing_shortcuts_stream_and_storage(site, tmp_path, canvas):
         receipts = [e for e in session.events if isinstance(e, ToolExecutionFinishedEvent)]
         assert all(not receipt.result.is_error for receipt in receipts)
         tab = holder["browser"].active_tab
-        assert await tab.evaluate("document.querySelector('#email').value") == "+"
-        assert await tab.evaluate("document.querySelector('#secret').value") == "Secret!"
+        assert await evaluate(tab, "document.querySelector('#email').value") == "+"
+        assert await evaluate(tab, "document.querySelector('#secret').value") == "Secret!"
         assert not any(isinstance(event, InputEvent) for event in session.events)
     await consumer
     _assert_events(streamed, output.getvalue(), directory, canvas)
@@ -103,8 +104,8 @@ def _typing_model(holder, canvas):
         }
         if step == 2:
             assert (
-                await holder["browser"].active_tab.evaluate(
-                    "document.querySelector('#email').value"
+                await evaluate(
+                    holder["browser"].active_tab, "document.querySelector('#email').value"
                 )
                 == text
             )
@@ -165,7 +166,7 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
         await ready.wait()
         tab = holder["browser"].active_tab
         position = tab.mouse.position
-        width, height = await tab.evaluate("[innerWidth, innerHeight]")
+        width, height = await evaluate(tab, "[innerWidth, innerHeight]")
         assert 0.35 * width <= position.x <= 0.65 * width
         assert 0.35 * height <= position.y <= 0.65 * height
         await session.run("Inspect without moving")
@@ -221,14 +222,16 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
         ref = next(
             element.ref for element in actions.observe.snapshot.elements if element.name == "Email"
         )
-        await tab.evaluate(
+        await evaluate(
+            tab,
             "Object.assign(document.querySelector('#email').style, "
-            "{position:'absolute',top:'1800px',left:'30px'})"
+            "{position:'absolute',top:'1800px',left:'30px'})",
         )
         point = await actions.element_point(tab=tab, ref=ref)
-        actual = await tab.evaluate(
+        actual = await evaluate(
+            tab,
             "(() => { const r = document.querySelector('#email').getBoundingClientRect();"
-            "return {x:r.x,y:r.y,width:r.width,height:r.height}; })()"
+            "return {x:r.x,y:r.y,width:r.width,height:r.height}; })()",
         )
         assert point.scrolled
         assert point.bounds.model_dump() == actual

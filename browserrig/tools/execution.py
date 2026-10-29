@@ -9,7 +9,7 @@ from harnessed import Inject, Plugin, ToolError
 from browserrig.browser.base import Browser
 from browserrig.browser.tab import Frame, Tab
 from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import ElementPoint
+from browserrig.core.geometry import Bounds, ElementPoint
 from browserrig.core.kinds import ActionKind, ElementOperation
 from browserrig.events import (
     ACTION_EVENTS,
@@ -19,11 +19,12 @@ from browserrig.events import (
     ElementHighlightedEvent,
     PageState,
 )
-from browserrig.observation.capture import ELEMENT_SCRIPT
 from browserrig.observation.models import Element, Snapshot
 from browserrig.observation.plugin import Observe
 from browserrig.readiness.models import ReadinessPhase, ReadinessStatus
 from browserrig.readiness.plugin import Readiness
+from browserrig.scripts import ELEMENT
+from browserrig.scripts.models import ElementArgs
 
 from .scrolling import prepare_element
 
@@ -194,7 +195,7 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
         return ElementPoint(x=x, y=y, scrolled=scrolled, bounds=bounds)
 
     async def _locate(self, frame: Frame, element: Element) -> ElementPoint:
-        clip = frame.local_clip.model_dump() if frame.local_clip else None
+        clip = frame.local_clip
         raw = await self._call(frame, element, ElementOperation.POINT, False, clip)
         return ElementPoint.model_validate(raw)
 
@@ -203,13 +204,20 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
         frame: Frame,
         element: Element,
         operation: ElementOperation,
-        *arguments: object,
+        value: object = None,
+        clip: Bounds | None = None,
+        *,
         by_value: bool = True,
     ) -> Any:
         snapshot = self.observe.snapshot
         assert snapshot is not None
-        return await frame.call(
-            ELEMENT_SCRIPT, snapshot.id, element.index, operation, *arguments, by_value=by_value
+        return await frame.run(
+            ELEMENT,
+            ElementArgs(
+                token=snapshot.id, index=element.index, operation=operation, value=value, clip=clip
+            ),
+            by_value=by_value,
+            user_gesture=True,
         )
 
 

@@ -1,6 +1,6 @@
-function browserrigContent(maxChars) {
+function browserrigContent({maxChars}) {
   const closedRoots = new Map(
-    (globalThis.__browserrigDOM?.roots || []).map((root) => [root.host, root]),
+    (globalThis.__browserrig?.dom?.roots || []).map((root) => [root.host, root]),
   );
   const skipped = new Set([
     'script',

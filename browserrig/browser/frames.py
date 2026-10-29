@@ -9,24 +9,13 @@ from cdpify.exceptions import CDPCommandError
 
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Bounds, Projection
+from browserrig.scripts import OWNER_SIZE, VIEWPORT
 
 from .tab import Frame, Tab
 
 _MAX_FRAMES = 64
 _MAX_DEPTH = 8
 _FRAME_TIMEOUT = 2.0
-
-_OWNER_SIZE = """function() {
-    for (let el = this; el; el = el.parentElement || el.getRootNode().host) {
-        const style = getComputedStyle(el);
-        if (style.display === 'none' || style.visibility !== 'visible' ||
-            Number(style.opacity) === 0 || el.inert) { return null; }
-    }
-    const style = getComputedStyle(this);
-    return [this.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
-            this.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)];
-}"""
-
 
 type _FrameSession = Callable[[str], Awaitable[CdpSession]]
 
@@ -36,7 +25,7 @@ async def discover_frames(
 ) -> tuple[Frame, ...]:
     """Keep usable siblings when a frame detaches; bound work on frame-heavy pages."""
     root = await tab.frame_tree()
-    width, height = await (await tab.main_frame()).evaluate("[innerWidth, innerHeight]")
+    width, height = await (await tab.main_frame()).run(VIEWPORT)
     viewport = Bounds(x=0, y=0, width=width, height=height)
     result = [Frame(root.frame.id, tab.cdp, Projection(clip=viewport))]
     limitations: list[str] = []
@@ -77,7 +66,7 @@ async def discover_frames(
     async def inspect(frame_id: str, parent: Frame, space: Projection) -> Frame | None:
         owner = await parent.cdp.dom.get_frame_owner(frame_id=frame_id)
         child = Frame(frame_id, parent.cdp, parent=parent, owner_id=owner.backend_node_id)
-        size = await child.owner_call(_OWNER_SIZE)
+        size = await child.run_on_owner(OWNER_SIZE)
         if not size or min(size) <= 0:
             return None
         box = await parent.cdp.dom.get_box_model(backend_node_id=owner.backend_node_id)

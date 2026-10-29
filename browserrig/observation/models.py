@@ -52,37 +52,6 @@ class Snapshot(Options):
         raise StaleElement("Unknown or expired element reference; observe again")
 
 
-class PageFacts(Options):
-    url: str
-    title: str
-    width: float
-    height: float
-    scroll_y: float
-
-
-class ExtractedElement(Options):
-    index: int
-    in_viewport: bool
-    role: str
-    name: str
-    tag: str
-    input_type: str = ""
-    value: str | None = None
-    disabled: bool = False
-    checked: bool | None = None
-    draggable: bool = False
-    options: tuple[str, ...] = ()
-    bounds: Bounds
-    x: float
-    y: float
-
-
-class DOMExtraction(PageFacts):
-    text: str
-    elements: tuple[ExtractedElement, ...]
-    truncated: bool = False
-
-
 class ElementFingerprint(Options):
     role: str
     name: str

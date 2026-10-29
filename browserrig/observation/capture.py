@@ -2,7 +2,6 @@ import asyncio
 import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from importlib.resources import files
 from typing import assert_never
 from uuid import uuid4
 
@@ -16,23 +15,16 @@ from browserrig.core.errors import BrowserError
 from browserrig.core.kinds import ReadinessStatus
 from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
 from browserrig.readiness.models import ReadinessReport
+from browserrig.scripts import PAGE_FACTS, SNAPSHOT
+from browserrig.scripts.models import DOMExtraction, SnapshotArgs
 
-from .dom import seed_dom
+from .dom import seed_frame
 from .marks import annotate
 from .models import (
-    DOMExtraction,
     Element,
     ElementFingerprint,
-    PageFacts,
     PageFingerprint,
     Snapshot,
-)
-
-_SNAPSHOT_SCRIPT = (
-    files("browserrig.observation").joinpath("scripts/snapshot.js").read_text(encoding="utf-8")
-)
-ELEMENT_SCRIPT = (
-    files("browserrig.observation").joinpath("scripts/element.js").read_text(encoding="utf-8")
 )
 
 
@@ -71,30 +63,16 @@ class _DomCapture(_CaptureStrategy):
         max_text: int,
         limitations: list[str],
     ) -> DOMExtraction:
-        await frame.evaluate("globalThis.__browserrigDOM = null")
-        try:
-            session_id = frame.cdp.session_id
-            if session_id not in self._metadata:
-                self._metadata[session_id] = None
-                async with asyncio.timeout(2):
-                    self._metadata[session_id] = await frame.cdp.dom_snapshot.capture_snapshot(
-                        computed_styles=[]
-                    )
-            metadata = self._metadata[session_id]
-            if metadata is None or not await seed_dom(frame, metadata):
-                limitations.append(f"Supplementary DOM metadata incomplete for frame {frame.id}")
-        except (CDPCommandError, TimeoutError):
-            limitations.append(f"Supplementary DOM metadata unavailable for frame {frame.id}")
-        raw = await frame.call(
-            _SNAPSHOT_SCRIPT,
-            {
-                "token": snapshot_id,
-                "maxElements": max_elements,
-                "maxText": max_text,
-                "clip": frame.local_clip.model_dump() if frame.local_clip else None,
-            },
+        await seed_frame(frame, self._metadata, limitations)
+        return await frame.run(
+            SNAPSHOT,
+            SnapshotArgs(
+                token=snapshot_id,
+                max_elements=max_elements,
+                max_text=max_text,
+                clip=frame.local_clip,
+            ),
         )
-        return DOMExtraction.model_validate(raw)
 
     async def collect(
         self, browser: Browser, tab: Tab, snapshot_id: str, report: ReadinessReport
@@ -217,12 +195,7 @@ async def capture(
     await tab.sync_document()
     main = await tab.main_frame()
     document_id = tab.document_id
-    facts = PageFacts.model_validate(
-        await main.evaluate(
-            "({url: location.href, title: document.title, width: innerWidth, "
-            "height: innerHeight, scroll_y: scrollY})"
-        )
-    )
+    facts = await main.run(PAGE_FACTS)
     content = await _capture_strategy(mode).collect(browser, tab, snapshot_id, report)
     await tab.sync_document()
     if tab.document_id != document_id:

@@ -2,18 +2,30 @@ import asyncio
 from contextlib import suppress
 
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
-from cdpify.domains.runtime import CallArgument
 from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser.tab import Frame
+from browserrig.scripts import RESET, SEED
+from browserrig.scripts.models import SeedArgs
 
-_SEED_SCRIPT = """function(clickable, ...nodes) {
-    globalThis.__browserrigDOM = {
-        roots: Array.from(new Set(nodes.map(node => node.getRootNode())
-            .filter(root => root.mode === 'closed'))),
-        clickable: new WeakSet(nodes.filter((node, index) => clickable[index])),
-    };
-}"""
+
+async def seed_frame(
+    frame: Frame, metadata: dict[str, CaptureSnapshotResult | None], limitations: list[str]
+) -> None:
+    await frame.run(RESET)
+    try:
+        session_id = frame.cdp.session_id
+        if session_id not in metadata:
+            metadata[session_id] = None
+            async with asyncio.timeout(2):
+                metadata[session_id] = await frame.cdp.dom_snapshot.capture_snapshot(
+                    computed_styles=[]
+                )
+        snapshot = metadata[session_id]
+        if snapshot is None or not await seed_dom(frame, snapshot):
+            limitations.append(f"Supplementary DOM metadata incomplete for frame {frame.id}")
+    except (CDPCommandError, TimeoutError):
+        limitations.append(f"Supplementary DOM metadata unavailable for frame {frame.id}")
 
 
 async def seed_dom(frame: Frame, snapshot: CaptureSnapshotResult) -> bool:
@@ -59,13 +71,10 @@ async def seed_dom(frame: Frame, snapshot: CaptureSnapshotResult) -> bool:
                 for index, object_id in zip(indexes[:256], objects, strict=True)
                 if object_id is not None
             ]
-            await frame.cdp.runtime.call_function_on(
-                function_declaration=_SEED_SCRIPT,
-                execution_context_id=context,
-                arguments=[
-                    CallArgument(value=[index in clickable for index, _ in resolved]),
-                    *(CallArgument(object_id=object_id) for _, object_id in resolved),
-                ],
+            await frame.run(
+                SEED,
+                SeedArgs(clickable=tuple(index in clickable for index, _ in resolved)),
+                objects=tuple(object_id for _, object_id in resolved),
             )
         return len(indexes) <= 256 and all(objects)
     finally:

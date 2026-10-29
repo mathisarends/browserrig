@@ -1,5 +1,6 @@
-(() => {
-  if (!globalThis.__browserrigStability) {
+function browserrigStability(_args) {
+  globalThis.__browserrig ||= {};
+  if (!globalThis.__browserrig.stability) {
     const state = {last: performance.now()};
     state.observer = new MutationObserver(() => {
       state.last = performance.now();
@@ -10,13 +11,13 @@
       attributes: true,
       characterData: true,
     });
-    globalThis.__browserrigStability = state;
+    globalThis.__browserrig.stability = state;
   }
   return {
     loaded: document.readyState !== 'loading',
     body: Boolean(document.body),
-    quiet_ms: performance.now() - globalThis.__browserrigStability.last,
+    quiet_ms: performance.now() - globalThis.__browserrig.stability.last,
     width: innerWidth,
     height: innerHeight,
   };
-})();
+}

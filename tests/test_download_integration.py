@@ -21,6 +21,7 @@ from browserrig import (
 from browserrig.browser import DownloadState
 from browserrig.browser.images import screenshot
 from browserrig.events import DownloadCompletedEvent, DownloadStartedEvent
+from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
 
@@ -36,9 +37,10 @@ async def test_scoped_download_has_enum_state_and_namespaced_events(site, tmp_pa
     ) as browser:
         tab = browser.active_tab
         await wait_for_page(browser, tab)
-        await tab.evaluate(
+        await evaluate(
+            tab,
             "(() => {const a=document.createElement('a');a.href='/download';"
-            "a.download='example.txt';a.click();return true})()"
+            "a.download='example.txt';a.click();return true})()",
         )
         async with asyncio.timeout(5):
             while True:
@@ -59,7 +61,7 @@ async def test_default_downloads_can_be_read_and_viewed_as_pdf_in_a_new_tab(site
     ) as browser:
         original = browser.active_tab
         await wait_for_page(browser, original)
-        await original.evaluate("document.querySelector('#download').click()")
+        await evaluate(original, "document.querySelector('#download').click()")
         async with asyncio.timeout(10):
             while (
                 not (downloads := await browser.downloads())
@@ -74,7 +76,7 @@ async def test_default_downloads_can_be_read_and_viewed_as_pdf_in_a_new_tab(site
         await wait_for_page(browser, opened)
         assert opened.id != original.id
         assert opened.url == Path(downloaded.path).as_uri()
-        assert await opened.evaluate("document.contentType") == "application/pdf"
+        assert await evaluate(opened, "document.contentType") == "application/pdf"
         assert original.url == site + "/"
         assert len(await browser.tabs()) == 2
         image = await screenshot(opened)

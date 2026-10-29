@@ -1,5 +1,5 @@
-function browserrigElement(token, index, operation, value, clip = null) {
-  const state = globalThis.__browserrigElements;
+function browserrigElement({token, index, operation, value, clip = null}) {
+  const state = globalThis.__browserrig?.elements;
   const el = state?.token === token ? state.nodes[index] : null;
   if (!el || !el.isConnected) {
     throw new Error('STALE_ELEMENT');

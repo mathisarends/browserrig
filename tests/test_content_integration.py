@@ -4,8 +4,11 @@ import pytest
 
 from browserrig import ChromeBrowser, DomMode, LaunchBrowser, wait_for_page
 from browserrig.kinds import ElementOperation
-from browserrig.observation.capture import ELEMENT_SCRIPT, capture
+from browserrig.observation import capture
 from browserrig.observation.content import extract_content
+from browserrig.scripts import ELEMENT
+from browserrig.scripts.models import ElementArgs
+from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
 
@@ -30,21 +33,24 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
             <h2>Below viewport</h2><p>Last paragraph</p></div>"""
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
-        await tab.evaluate(f"document.body.innerHTML = {json.dumps(markup)}")
-        await tab.evaluate("""
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
+        await evaluate(
+            tab,
+            """
             document.querySelector('#open').attachShadow({mode:'open'}).innerHTML =
                 '<p>Open shadow <slot name=label></slot></p>';
             document.querySelector('#closed').attachShadow({mode:'closed'}).innerHTML =
                 '<h2>Closed shadow</h2><p>Closed root text</p>';
-        """)
+        """,
+        )
         report = await wait_for_page(browser, tab)
         snapshot = await capture(browser, tab, DomMode(), report)
         assert snapshot.image is None
         assert snapshot.text == ""
         assert not snapshot.limitations
-        before = await tab.evaluate("[document.documentElement.outerHTML, scrollY]")
+        before = await evaluate(tab, "[document.documentElement.outerHTML, scrollY]")
         content = await extract_content(browser, tab)
-        assert await tab.evaluate("[document.documentElement.outerHTML, scrollY]") == before
+        assert await evaluate(tab, "[document.documentElement.outerHTML, scrollY]") == before
         assert content.url == site + "/" and content.title == "Test form"
         assert not content.limitations
         text = content.markdown
@@ -82,15 +88,21 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
         ):
             assert excluded not in text
         button = next(element for element in snapshot.elements if element.name == "Continue")
-        await (await tab.main_frame()).call(
-            ELEMENT_SCRIPT, snapshot.id, button.index, ElementOperation.POINT, False
+        await (await tab.main_frame()).run(
+            ELEMENT,
+            ElementArgs(
+                token=snapshot.id, index=button.index, operation=ElementOperation.POINT, value=False
+            ),
+            user_gesture=True,
         )
 
 
 async def test_markdown_limits_are_explicit_and_output_is_bounded(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
-        await tab.evaluate("document.body.innerHTML = '<h1>Heading</h1><p>'+'x'.repeat(500)+'</p>'")
+        await evaluate(
+            tab, "document.body.innerHTML = '<h1>Heading</h1><p>'+'x'.repeat(500)+'</p>'"
+        )
         content = await extract_content(browser, tab, max_chars=40)
         assert len(content.markdown) <= 40
         assert "# Heading" in content.markdown
@@ -106,8 +118,8 @@ async def test_markdown_includes_available_frame_documents(site, cross_origin):
     ) as browser:
         tab = browser.active_tab
         origin = site.replace("127.0.0.1", "localhost") if cross_origin else site
-        await tab.evaluate(
-            f"document.querySelector('iframe').src = {json.dumps(origin + '/other')}"
+        await evaluate(
+            tab, f"document.querySelector('iframe').src = {json.dumps(origin + '/other')}"
         )
         await wait_for_page(browser, tab)
         content = await extract_content(browser, tab)

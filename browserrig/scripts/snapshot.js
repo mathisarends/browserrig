@@ -4,7 +4,7 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
   const text = [];
   let textLength = 0;
   let truncated = false;
-  const hints = globalThis.__browserrigDOM;
+  const hints = globalThis.__browserrig?.dom;
   const closedRoots = new Map((hints?.roots || []).map((root) => [root.host, root]));
   const clean = (s, n = 300) =>
     String(s || '')
@@ -402,7 +402,7 @@ function browserrigSnapshot({token, maxElements, maxText, clip}) {
     }
   }
   const unique = deduplicate();
-  globalThis.__browserrigElements = {token, nodes, pointFor};
+  (globalThis.__browserrig ||= {}).elements = {token, nodes, pointFor};
   return {
     url: location.href,
     title: document.title,

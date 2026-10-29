@@ -8,6 +8,7 @@ from harnessed.testing import ScriptedModel, call
 
 from browserrig import Browser, BrowserAgent, LaunchBrowser
 from browserrig.events import ActivityFinishedEvent
+from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
 
@@ -43,7 +44,7 @@ async def test_pause_steer_resume_observes_external_page_change(site):
             await pause
             assert len(model.requests) == 1
             await session.steer("Look for the changed title")
-            await holder["browser"].active_tab.evaluate("document.title='Changed during pause'")
+            await evaluate(holder["browser"].active_tab, "document.title='Changed during pause'")
             await session.resume()
             result = await handle.result()
         assert result.text == "Resumed"

@@ -1,20 +1,16 @@
-import asyncio
 import re
-from importlib.resources import files
 
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser.base import Browser
-from browserrig.browser.tab import Frame, Tab
+from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.options import Options
+from browserrig.scripts import CONTENT
+from browserrig.scripts.models import ContentArgs, ContentExtraction
 
-from .dom import seed_dom
-
-_CONTENT_SCRIPT = (
-    files("browserrig.observation").joinpath("scripts/content.js").read_text(encoding="utf-8")
-)
+from .dom import seed_frame
 
 
 def _heading(text: str) -> str:
@@ -23,14 +19,6 @@ def _heading(text: str) -> str:
 
 def _source(url: str) -> str:
     return url.replace("<", "%3C").replace(">", "%3E").replace("\n", "%0A").replace("\r", "%0D")
-
-
-class _Extraction(Options):
-    url: str
-    title: str
-    markdown: str
-    truncated: bool = False
-    frames: int = 0
 
 
 class PageContent(Options):
@@ -50,25 +38,6 @@ class PageContent(Options):
         return text
 
 
-async def _seed(
-    frame: Frame, metadata: dict[str, CaptureSnapshotResult | None], limitations: list[str]
-) -> None:
-    await frame.evaluate("globalThis.__browserrigDOM = null")
-    try:
-        session_id = frame.cdp.session_id
-        if session_id not in metadata:
-            metadata[session_id] = None
-            async with asyncio.timeout(2):
-                metadata[session_id] = await frame.cdp.dom_snapshot.capture_snapshot(
-                    computed_styles=[]
-                )
-        snapshot = metadata[session_id]
-        if snapshot is None or not await seed_dom(frame, snapshot):
-            limitations.append(f"Supplementary DOM metadata incomplete for frame {frame.id}")
-    except (CDPCommandError, TimeoutError):
-        limitations.append(f"Supplementary DOM metadata unavailable for frame {frame.id}")
-
-
 async def extract_content(browser: Browser, tab: Tab, *, max_chars: int = 50000) -> PageContent:
     """Read loaded document content without scrolling or replacing interactive element refs."""
     if not 1 <= max_chars <= 200000:
@@ -80,7 +49,7 @@ async def extract_content(browser: Browser, tab: Tab, *, max_chars: int = 50000)
     frames = await browser.frames(tab)
     limitations = list(tab.frame_limitations)
     metadata: dict[str, CaptureSnapshotResult | None] = {}
-    main: _Extraction | None = None
+    main: ContentExtraction | None = None
     parts: list[str] = []
     remaining = max_chars
     embedded = 0
@@ -89,8 +58,8 @@ async def extract_content(browser: Browser, tab: Tab, *, max_chars: int = 50000)
             limitations.append("Page content was truncated by max_chars")
             break
         try:
-            await _seed(frame, metadata, limitations)
-            state = _Extraction.model_validate(await frame.call(_CONTENT_SCRIPT, remaining))
+            await seed_frame(frame, metadata, limitations)
+            state = await frame.run(CONTENT, ContentArgs(max_chars=remaining))
             embedded += state.frames
             if main is None:
                 main = state

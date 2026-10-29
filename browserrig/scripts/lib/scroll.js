@@ -1,16 +1,8 @@
-function browserrigScroll(token, index, clip = null, targetBounds = null) {
-  const state = globalThis.__browserrigElements;
-  const el = token === false ? this : state?.nodes[index];
-  if (!el?.isConnected || (token !== false && state?.token !== token)) {
-    throw new Error('STALE_ELEMENT');
-  }
-  if (el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true') {
-    throw new Error('ELEMENT_DISABLED');
-  }
+function planScroll(el, {clip = null, targetBounds = null}) {
   const root = document.scrollingElement;
   const parentFor = (node) => node.assignedSlot || node.parentElement || node.getRootNode().host;
   const closedRoots = new Map(
-    (globalThis.__browserrigDOM?.roots || []).map((shadow) => [shadow.host, shadow]),
+    (globalThis.__browserrig?.dom?.roots || []).map((shadow) => [shadow.host, shadow]),
   );
   const viewport = intersect({x: 0, y: 0, width: innerWidth, height: innerHeight}, clip);
   const containers = [];

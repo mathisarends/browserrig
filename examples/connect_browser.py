@@ -4,6 +4,7 @@ import argparse
 import asyncio
 
 from browserrig import ChromeBrowser, ConnectBrowser, wait_for_page
+from browserrig.scripts import PAGE_FACTS
 
 
 async def main() -> None:
@@ -19,7 +20,7 @@ async def main() -> None:
     async with ChromeBrowser(options) as browser:
         tab = browser.active_tab
         await wait_for_page(browser, tab)
-        print(await tab.evaluate("document.title"))
+        print((await (await tab.main_frame()).run(PAGE_FACTS)).title)
         print(await browser.tabs())
     # This disconnects our client. The external Chrome process remains alive.
 

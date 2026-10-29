@@ -1,29 +1,18 @@
 import asyncio
-from importlib.resources import files
 
 from browserrig.browser.base import Browser
 from browserrig.browser.tab import Frame, Tab
 from browserrig.core.errors import BrowserError, StaleElement
 from browserrig.core.geometry import Bounds, Point
 from browserrig.core.kinds import ElementOperation
-from browserrig.observation.capture import ELEMENT_SCRIPT
 from browserrig.observation.models import Element, Snapshot
-
-_SCROLL_SCRIPT = (
-    files("browserrig.observation").joinpath("scripts/scroll.js").read_text(encoding="utf-8")
-)
-
-
-class _ScrollPlan(Point):
-    delta_x: float
-    delta_y: float
-    scroll_x: float
-    scroll_y: float
+from browserrig.scripts import ELEMENT, SCROLL, SCROLL_OWNER
+from browserrig.scripts.models import ElementArgs, OwnerScrollArgs, ScrollArgs, ScrollPlan
 
 
 async def _plan(
     frame: Frame, snapshot: Snapshot, element: Element
-) -> tuple[Frame, _ScrollPlan] | None:
+) -> tuple[Frame, ScrollPlan] | None:
     ancestors: list[Frame] = []
     current = frame
     while current.parent is not None:
@@ -32,21 +21,28 @@ async def _plan(
     target = None
     if ancestors:
         box = Bounds.model_validate(
-            await frame.call(ELEMENT_SCRIPT, snapshot.id, element.index, ElementOperation.BOUNDS)
+            await frame.run(
+                ELEMENT,
+                ElementArgs(
+                    token=snapshot.id, index=element.index, operation=ElementOperation.BOUNDS
+                ),
+            )
         )
         target = frame.projection.box(box)
     for child in reversed(ancestors):
         parent = child.parent
         assert parent is not None
-        clip = parent.local_clip.model_dump() if parent.local_clip is not None else None
+        clip = parent.local_clip
         assert target is not None
-        local = parent.projection.local_box(target).model_dump()
-        raw = await child.owner_call(_SCROLL_SCRIPT, False, 0, clip, local)
+        local = parent.projection.local_box(target)
+        raw = await child.run_on_owner(
+            SCROLL_OWNER, OwnerScrollArgs(clip=clip, target_bounds=local)
+        )
         if raw is not None:
-            return parent, _ScrollPlan.model_validate(raw)
-    clip = frame.local_clip.model_dump() if frame.local_clip is not None else None
-    raw = await frame.call(_SCROLL_SCRIPT, snapshot.id, element.index, clip)
-    return (frame, _ScrollPlan.model_validate(raw)) if raw is not None else None
+            return parent, raw
+    clip = frame.local_clip
+    raw = await frame.run(SCROLL, ScrollArgs(token=snapshot.id, index=element.index, clip=clip))
+    return (frame, raw) if raw is not None else None
 
 
 async def prepare_element(browser: Browser, tab: Tab, snapshot: Snapshot, element: Element) -> bool:

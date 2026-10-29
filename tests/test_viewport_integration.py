@@ -12,6 +12,7 @@ from browserrig import Actions, BrowserAgent, ChromeBrowser, DomMode, LaunchBrow
 from browserrig.events import ActionFinishedEvent
 from browserrig.observation.capture import capture
 from browserrig.observation.render import render
+from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
 
@@ -41,11 +42,14 @@ def _assert_tools_succeeded(result):
 async def test_all_rendered_controls_are_listed_with_explicit_viewport_flags(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
-        await tab.evaluate("""
+        await evaluate(
+            tab,
+            """
             document.body.innerHTML = Array.from({length:300}, (_, i) =>
                 `<button style='display:block;height:30px'>Button ${i}</button>`).join('') +
                 '<button hidden>Hidden</button><div inert><button>Inert</button></div>';
-        """)
+        """,
+        )
         report = await wait_for_page(browser, tab)
         state = await capture(browser, tab, DomMode(), report)
         assert len(state.elements) == 300
@@ -55,7 +59,7 @@ async def test_all_rendered_controls_are_listed_with_explicit_viewport_flags(sit
         entries = yaml.safe_load(render(state))["elements"]
         assert all(isinstance(entry["in_viewport"], bool) for entry in entries)
         assert "text" not in yaml.safe_load(render(state))
-        assert await tab.evaluate("scrollY") == 0
+        assert await evaluate(tab, "scrollY") == 0
         visual = await capture(browser, tab, DomMode(screenshots=True), report)
         assert all((element.mark is not None) == element.in_viewport for element in visual.elements)
         limited = await capture(browser, tab, DomMode(max_elements=10), report)
@@ -80,17 +84,23 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
         async def setup(self, actions: Inject[Actions]):
             holder["actions"] = actions
             tab = actions.browser.active_tab
-            await tab.evaluate(f"document.body.innerHTML = {json.dumps(markup)}")
-            await tab.evaluate("""
+            await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
+            await evaluate(
+                tab,
+                """
                 window.wheels=[];window.clicks=[];
                 addEventListener('wheel', e => wheels.push({trusted:e.isTrusted,dy:e.deltaY}),
                     {passive:true});
                 document.addEventListener('click', e => clicks.push(
                     {id:e.target.id,trusted:e.isTrusted,scroll:scrollY}));
-            """)
-            await (await tab.main_frame()).evaluate("""
+            """,
+            )
+            await evaluate(
+                await tab.main_frame(),
+                """
                 Element.prototype.scrollIntoView = () => {throw Error('No instant scrolling')};
-            """)
+            """,
+            )
 
     calls = [
         ("type_text", "Far field", {"text": "Prepared"}),
@@ -102,7 +112,7 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
 
     async def respond(request):
         tab = holder["actions"].browser.active_tab
-        positions.append(await tab.evaluate("scrollY"))
+        positions.append(await evaluate(tab, "scrollY"))
         index = len(positions) - 1
         if index == len(calls):
             yield ModelChunk(text="Done")
@@ -124,11 +134,11 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
         assert result.text == "Done"
         _assert_tools_succeeded(result)
         tab = holder["actions"].browser.active_tab
-        assert await tab.evaluate("document.querySelector('#field').value") == "Prepared"
-        assert await tab.evaluate("document.querySelector('#choice').value") == "Two"
-        assert await tab.evaluate("document.querySelector('#date').value") == "2026-10-29"
-        wheels = await tab.evaluate("wheels")
-        clicks = await tab.evaluate("clicks")
+        assert await evaluate(tab, "document.querySelector('#field').value") == "Prepared"
+        assert await evaluate(tab, "document.querySelector('#choice').value") == "Two"
+        assert await evaluate(tab, "document.querySelector('#date').value") == "2026-10-29"
+        wheels = await evaluate(tab, "wheels")
+        clicks = await evaluate(tab, "clicks")
         assert len(wheels) > 6 and all(event["trusted"] for event in wheels)
         assert [event["id"] for event in clicks] == ["pinned", "far"]
         assert all(event["trusted"] for event in clicks)
@@ -156,21 +166,27 @@ async def test_offscreen_control_inside_vertical_and_horizontal_scroll_container
     class Prepare(Plugin, needs=(Actions,)):
         async def setup(self, actions: Inject[Actions]):
             holder["actions"] = actions
-            await actions.browser.active_tab.evaluate(
-                f"document.body.innerHTML = {json.dumps(markup)}"
+            await evaluate(
+                actions.browser.active_tab, f"document.body.innerHTML = {json.dumps(markup)}"
             )
             if modal:
-                await actions.browser.active_tab.evaluate("""
+                await evaluate(
+                    actions.browser.active_tab,
+                    """
                     document.documentElement.style.overflow = 'hidden';
                     document.body.style.cssText = 'margin:0;height:100vh;overflow:hidden';
                     document.querySelector('#outer').style.cssText =
                         'position:fixed;top:100px;left:50px;width:500px;height:300px;overflow:auto';
-                """)
+                """,
+                )
             if horizontal_only:
-                await actions.browser.active_tab.evaluate("""
+                await evaluate(
+                    actions.browser.active_tab,
+                    """
                     document.querySelector('#outer').style.overflowY = 'hidden';
                     document.querySelector('button').style.top = '270px';
-                """)
+                """,
+                )
 
     count = 0
 
@@ -196,11 +212,11 @@ async def test_offscreen_control_inside_vertical_and_horizontal_scroll_container
         assert result.text == "Done"
         _assert_tools_succeeded(result)
         tab = holder["actions"].browser.active_tab
-        assert await tab.evaluate("document.body.dataset.clicked") == "true"
-        inner_y = await tab.evaluate("document.querySelector('#outer').scrollTop")
+        assert await evaluate(tab, "document.body.dataset.clicked") == "true"
+        inner_y = await evaluate(tab, "document.querySelector('#outer').scrollTop")
         assert inner_y == 0 if horizontal_only else inner_y > 800
-        assert await tab.evaluate("document.querySelector('#outer').scrollLeft") > 500
-        scroll_y = await tab.evaluate("scrollY")
+        assert await evaluate(tab, "document.querySelector('#outer').scrollLeft") > 500
+        scroll_y = await evaluate(tab, "scrollY")
         assert scroll_y == 0 if modal else scroll_y > 1000
 
 
@@ -216,22 +232,29 @@ async def test_offscreen_frame_is_scrolled_into_view_before_interaction(
         async def setup(self, actions: Inject[Actions]):
             holder["actions"] = actions
             origin = site.replace("127.0.0.1", "localhost") if cross_origin else site
-            await actions.browser.active_tab.evaluate(
+            await evaluate(
+                actions.browser.active_tab,
                 "document.body.style.height='5000px';"
                 "document.querySelector('iframe').style.cssText="
                 "'position:absolute;top:1800px;left:100px;width:600px;height:240px';"
-                f"document.querySelector('iframe').src={json.dumps(origin + '/frame-leaf')};"
+                f"document.querySelector('iframe').src={json.dumps(origin + '/frame-leaf')};",
             )
             if oversized:
-                await actions.browser.active_tab.evaluate("""
+                await evaluate(
+                    actions.browser.active_tab,
+                    """
                     document.querySelector('iframe').style.cssText =
                         'position:absolute;top:100px;left:0;width:100vw;height:2400px;border:0';
-                """)
+                """,
+                )
                 frames = await actions.browser.frames(actions.browser.active_tab)
                 child = next(frame for frame in frames if frame.parent is not None)
-                await child.evaluate("""
+                await evaluate(
+                    child,
+                    """
                     document.querySelector('button').style.top='1800px';
-                """)
+                """,
+                )
 
     count = 0
 
@@ -260,8 +283,8 @@ async def test_offscreen_frame_is_scrolled_into_view_before_interaction(
         tab = actions.browser.active_tab
         element = next(el for el in actions.observe.snapshot.elements if el.name == "Frame button")
         frame, _ = await actions.observe.element(tab, element.ref)
-        assert await frame.evaluate("document.body.dataset.clicked") == "true"
-        assert await tab.evaluate("scrollY") > 1000
+        assert await evaluate(frame, "document.body.dataset.clicked") == "true"
+        assert await evaluate(tab, "scrollY") > 1000
 
 
 async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target(site):
@@ -270,12 +293,15 @@ async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target
     class Prepare(Plugin, needs=(Actions,)):
         async def setup(self, actions: Inject[Actions]):
             holder["actions"] = actions
-            await actions.browser.active_tab.evaluate("""
+            await evaluate(
+                actions.browser.active_tab,
+                """
                 document.body.innerHTML = '<button style="position:absolute;top:3000px" ' +
                     'onclick="document.body.dataset.clicked=true">Unreached</button>';
                 document.body.style.height='5000px';
                 addEventListener('wheel', event => event.preventDefault(), {passive:false});
-            """)
+            """,
+            )
 
     count = 0
 
@@ -300,5 +326,5 @@ async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target
         assert len(receipts) == 1 and receipts[0].result.is_error
         assert "wheel input" in receipts[0].result.text
         tab = holder["actions"].browser.active_tab
-        assert await tab.evaluate("scrollY") == 0
-        assert await tab.evaluate("document.body.dataset.clicked") is None
+        assert await evaluate(tab, "scrollY") == 0
+        assert await evaluate(tab, "document.body.dataset.clicked") is None

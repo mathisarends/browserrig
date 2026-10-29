@@ -2,19 +2,12 @@
 
 Die erledigten Abschnitte werden mit den jeweiligen ?nderungen entfernt.
 
-## JavaScript (urspr?nglich 2.2, 2.3, 6.7, 7 und 8.3)
+## JavaScript: gemeinsame Helfer und Verhaltenskorrekturen
 
-- Alle Skripte einschlie?lich bisheriger Inline-Snippets nach `browserrig/scripts/` verschieben.
-- Ein Loader `Script.load`, ein Ausf?hrungsweg `Frame.run`/`run_on_owner`, ein Options-Objekt je Aufruf.
-- Gemeinsame Fehlercodes pr?fen; Owner-Aufrufe und Seeding pr?fen Ergebnisse auf dieselbe Weise.
-- Scrollen im Owner-Modus vom Element-Modus trennen; keine magischen Positionsargumente.
 - Gemeinsame Helfer f?r Geometrie, komponierten DOM, Sichtbarkeit, Hit-Tests und Element-Aufl?sung.
-- Sichtbarkeit mit `checkVisibility` und `inert` behandeln, inklusive sichtbarer Kinder versteckter Vorfahren.
+- Sichtbarkeit mit `checkVisibility` und `inert`, inklusive sichtbarer Kinder versteckter Vorfahren.
 - Snapshot-Styles pro Lauf cachen; `element.js` soll keine Snapshot-Closure ben?tigen.
-- Globalen Zustand unter `globalThis.__browserrig` und den MutationObserver-Lebenszyklus dokumentieren.
 - Markdown bei K?rzung mit geschlossenen Code-Fences zur?ckgeben.
-- Seeding-Ablauf und Clip-Payloads zusammenf?hren; Argumente und Ergebnisse typisieren.
-- Contract-Tests f?r Dateiform, Inline-JS und Fehlercodes; unbekannte Skripte im Fake ablehnen.
 
 ## Caches (urspr?nglich 3.3, 6.8, 6.9)
 

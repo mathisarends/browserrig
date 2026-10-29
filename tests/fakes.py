@@ -4,6 +4,7 @@ from dataclasses import replace
 from harnessed import Context, Inject, Plugin, SessionLog
 
 from browserrig import Browser
+from browserrig.scripts.models import DOMProbe
 
 
 class FakeTab:
@@ -21,16 +22,12 @@ class FakeTab:
     async def main_frame(self):
         return self
 
-    async def evaluate(self, _expression):
+    async def run(self, script, args=None):
+        if script.name != "stability" or args is not None:
+            raise AssertionError(f"Unexpected fake script: {script.name}")
         self.probes += 1
         await asyncio.sleep(0)
-        return {
-            "loaded": True,
-            "body": True,
-            "quiet_ms": self.quiet_ms,
-            "width": 1280,
-            "height": 800,
-        }
+        return DOMProbe(loaded=True, body=True, quiet_ms=self.quiet_ms, width=1280, height=800)
 
 
 class FakeBrowser:

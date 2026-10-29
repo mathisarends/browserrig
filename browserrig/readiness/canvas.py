@@ -1,42 +1,26 @@
 import asyncio
 import base64
 from collections.abc import Iterable
-from importlib.resources import files
 from io import BytesIO
 from typing import cast
 
 from PIL import Image, ImageStat
 
 from browserrig.browser.images import screenshot
-from browserrig.browser.tab import Tab, script_call
+from browserrig.browser.tab import Tab
 from browserrig.core.geometry import Geometry
 from browserrig.core.kinds import ReadinessStatus
 from browserrig.core.modes import CanvasMode
-from browserrig.core.options import Options
+from browserrig.scripts import CANVAS
+from browserrig.scripts.models import CanvasArgs, CanvasProbe
 
 from .config import ReadinessOptions
 from .strategy import ReadinessStrategy
 
-_SCRIPT = files("browserrig.readiness").joinpath("scripts/canvas.js").read_text(encoding="utf-8")
-
-
-class CanvasProbe(Options):
-    ready: bool
-    geometry: Geometry | None = None
-    reason: str = ""
-
 
 async def _locate_canvas(tab: Tab, mode: CanvasMode) -> CanvasProbe:
-    return CanvasProbe.model_validate(
-        await tab.evaluate(
-            script_call(
-                _SCRIPT,
-                {
-                    "selector": mode.selector,
-                    "loadingSelector": mode.loading_selector,
-                },
-            )
-        )
+    return await (await tab.main_frame()).run(
+        CANVAS, CanvasArgs(selector=mode.selector, loading_selector=mode.loading_selector)
     )
 
 

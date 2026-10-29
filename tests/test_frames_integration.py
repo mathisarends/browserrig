@@ -20,7 +20,10 @@ from browserrig import (
 )
 from browserrig.core.errors import BrowserError
 from browserrig.kinds import ElementOperation
-from browserrig.observation.capture import ELEMENT_SCRIPT, capture
+from browserrig.observation import capture
+from browserrig.scripts import ELEMENT
+from browserrig.scripts.models import ElementArgs
+from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
 
@@ -33,13 +36,26 @@ async def test_frame_extraction_and_old_reference_is_rejected(site):
         inside = next(element for element in snapshot.elements if element.name == "Inside")
         assert inside.frame_id != (await tab.main_frame()).id
         frame = next(frame for frame in await browser.frames(tab) if frame.id == inside.frame_id)
-        await frame.call(ELEMENT_SCRIPT, snapshot.id, inside.index, ElementOperation.FOCUS, True)
+        await frame.run(
+            ELEMENT,
+            ElementArgs(
+                token=snapshot.id, index=inside.index, operation=ElementOperation.FOCUS, value=True
+            ),
+            user_gesture=True,
+        )
         await tab.cdp.input.insert_text(text="in an iframe")
-        assert await frame.evaluate("document.querySelector('input').value") == "in an iframe"
-        await frame.evaluate("document.querySelector('input').remove()")
+        assert await evaluate(frame, "document.querySelector('input').value") == "in an iframe"
+        await evaluate(frame, "document.querySelector('input').remove()")
         with pytest.raises(BrowserError, match="STALE_ELEMENT"):
-            await frame.call(
-                ELEMENT_SCRIPT, snapshot.id, inside.index, ElementOperation.POINT, None
+            await frame.run(
+                ELEMENT,
+                ElementArgs(
+                    token=snapshot.id,
+                    index=inside.index,
+                    operation=ElementOperation.POINT,
+                    value=None,
+                ),
+                user_gesture=True,
             )
 
 
@@ -77,7 +93,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
                 script += "document.querySelector('iframe').style.transformOrigin = 'top left';"
             if scrolled:
                 script += "document.querySelector('iframe').style.top = '1000px';scrollTo(0,900);"
-            await browser.active_tab.evaluate(script)
+            await evaluate(browser.active_tab, script)
 
     async def respond(request):
         nonlocal count
@@ -125,8 +141,8 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
         browser, actions = holder["browser"], holder["actions"]
         entry = next(e for e in actions.observe.snapshot.elements if e.name == "Frame button")
         frame, _ = await actions.observe.element(browser.active_tab, entry.ref)
-        assert await frame.evaluate("document.querySelector('input').value") == "Across frames"
-        assert await frame.evaluate("document.body.dataset.clicked") == "true"
+        assert await evaluate(frame, "document.querySelector('input').value") == "Across frames"
+        assert await evaluate(frame, "document.body.dataset.clicked") == "true"
         if cross and not nested:
             assert frame.cdp.session_id != browser.active_tab.cdp.session_id
 
@@ -141,20 +157,22 @@ async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_d
         frame = next(frame for frame in await browser.frames(tab) if frame.id == entry.frame_id)
         x, y = frame.projection.point(140, 80)
         await frame.check_point(x, y)
-        await tab.evaluate(
+        await evaluate(
+            tab,
             "document.body.insertAdjacentHTML('beforeend', "
-            "'<div style=\"position:fixed;inset:0;background:red\"></div>')"
+            "'<div style=\"position:fixed;inset:0;background:red\"></div>')",
         )
         with pytest.raises(BrowserError, match="ELEMENT_BLOCKED"):
             await frame.check_point(x, y)
         covered = await capture(browser, tab, DomMode(screenshots=False), report)
         assert not covered.elements
-        await tab.evaluate(
-            "document.body.lastElementChild.remove();document.querySelector('iframe').style.display='none'"
+        await evaluate(
+            tab,
+            "document.body.lastElementChild.remove();document.querySelector('iframe').style.display='none'",
         )
         assert len(await browser.frames(tab)) == 1
-        await tab.evaluate(
-            "document.querySelector('iframe').style.cssText='display:block;top:2000px'"
+        await evaluate(
+            tab, "document.querySelector('iframe').style.cssText='display:block;top:2000px'"
         )
         assert len(await browser.frames(tab)) == 2
         offscreen = await capture(browser, tab, DomMode(), report)
@@ -164,9 +182,10 @@ async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_d
 async def test_unrendered_sibling_does_not_discard_usable_frame(site):
     async with ChromeBrowser(LaunchBrowser(url=site + "/frame-host")) as browser:
         tab = browser.active_tab
-        await tab.evaluate(
+        await evaluate(
+            tab,
             "document.body.insertAdjacentHTML('beforeend', "
-            '\'<iframe style="display:none" src="/frame-leaf"></iframe>\')'
+            '\'<iframe style="display:none" src="/frame-leaf"></iframe>\')',
         )
         report = await wait_for_page(browser, tab)
         state = await capture(browser, tab, DomMode(screenshots=False), report)
@@ -177,10 +196,11 @@ async def test_unrendered_sibling_does_not_discard_usable_frame(site):
 async def test_detaching_sibling_retains_root_and_other_frame(site, monkeypatch):
     async with ChromeBrowser(LaunchBrowser(url=site + "/frame-host")) as browser:
         tab = browser.active_tab
-        await tab.evaluate(
+        await evaluate(
+            tab,
             "document.body.insertAdjacentHTML('beforeend', "
             "'<button>Root button</button><iframe id=gone src=/frame-leaf "
-            'style="left:750px"></iframe>\')'
+            'style="left:750px"></iframe>\')',
         )
         report = await wait_for_page(browser, tab)
         tree = (await tab.cdp.page.get_frame_tree()).frame_tree
@@ -189,7 +209,7 @@ async def test_detaching_sibling_retains_root_and_other_frame(site, monkeypatch)
 
         async def detach_during_inspection(domain, *, frame_id):
             if frame_id == removed_id:
-                await tab.evaluate("document.querySelector('#gone').remove()")
+                await evaluate(tab, "document.querySelector('#gone').remove()")
             return await original(domain, frame_id=frame_id)
 
         monkeypatch.setattr(type(tab.cdp.dom), "get_frame_owner", detach_during_inspection)

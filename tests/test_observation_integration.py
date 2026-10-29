@@ -9,8 +9,11 @@ from PIL import Image
 from browserrig import ChromeBrowser, DomMode, LaunchBrowser, Viewport, wait_for_page
 from browserrig.core.errors import BrowserError
 from browserrig.kinds import ElementOperation
-from browserrig.observation.capture import ELEMENT_SCRIPT, capture
+from browserrig.observation import capture
 from browserrig.observation.render import render
+from browserrig.scripts import ELEMENT
+from browserrig.scripts.models import ElementArgs
+from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
 
@@ -18,7 +21,9 @@ pytestmark = pytest.mark.integration
 async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
-        await tab.evaluate("""document.body.innerHTML = `
+        await evaluate(
+            tab,
+            """document.body.innerHTML = `
             <div onclick=''><button>Wrapped</button></div>
             <label>Check<input type=checkbox checked></label>
             <fieldset disabled><input aria-label='Disabled by fieldset'></fieldset>
@@ -40,7 +45,8 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
                 '<button>Closed shadow</button>';
             document.querySelector('#open').attachShadow({mode:'open'}).innerHTML =
                 '<button><slot name=label></slot></button>';
-        """)
+        """,
+        )
         report = await wait_for_page(browser, tab)
         state = await capture(browser, tab, DomMode(max_text_chars=12000), report)
         names = [element.name for element in state.elements]
@@ -69,9 +75,9 @@ async def test_marks_match_yaml_and_hidpi_screenshot_without_page_mutation(site,
     async with ChromeBrowser(LaunchBrowser(url=site, viewport=Viewport(scale=2))) as browser:
         tab = browser.active_tab
         report = await wait_for_page(browser, tab)
-        before = await tab.evaluate("document.documentElement.outerHTML")
+        before = await evaluate(tab, "document.documentElement.outerHTML")
         state = await capture(browser, tab, DomMode(screenshots=True, marks=marks), report)
-        assert await tab.evaluate("document.documentElement.outerHTML") == before
+        assert await evaluate(tab, "document.documentElement.outerHTML") == before
         assert state.image is not None
         with Image.open(BytesIO(base64.b64decode(state.image))) as image:
             assert image.size == (state.width, state.height)
@@ -86,8 +92,15 @@ async def test_marks_match_yaml_and_hidpi_screenshot_without_page_mutation(site,
         assert fresh.fingerprint == state.fingerprint
         assert fresh.elements[0].ref != state.elements[0].ref
         with pytest.raises(BrowserError, match="STALE_ELEMENT"):
-            await (await tab.main_frame()).call(
-                ELEMENT_SCRIPT, state.id, state.elements[0].index, ElementOperation.POINT, False
+            await (await tab.main_frame()).run(
+                ELEMENT,
+                ElementArgs(
+                    token=state.id,
+                    index=state.elements[0].index,
+                    operation=ElementOperation.POINT,
+                    value=False,
+                ),
+                user_gesture=True,
             )
 
 
@@ -95,13 +108,15 @@ async def test_limits_are_reported_and_checkbox_state_changes_fingerprint(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(browser, tab)
-        await tab.evaluate("document.body.innerHTML = '<label>Toggle<input type=checkbox></label>'")
+        await evaluate(
+            tab, "document.body.innerHTML = '<label>Toggle<input type=checkbox></label>'"
+        )
         before = await capture(browser, tab, DomMode(screenshots=False), report)
-        await tab.evaluate("document.querySelector('input').checked = true")
+        await evaluate(tab, "document.querySelector('input').checked = true")
         after = await capture(browser, tab, DomMode(screenshots=False), report)
         assert before.fingerprint != after.fingerprint
-        await tab.evaluate(
-            "document.body.innerHTML = '<button>First</button><button>Second</button>'"
+        await evaluate(
+            tab, "document.body.innerHTML = '<button>First</button><button>Second</button>'"
         )
         limited = await capture(browser, tab, DomMode(max_elements=1, max_text_chars=2), report)
         assert len(limited.elements) == 1 and len(limited.text) <= 2
@@ -115,11 +130,15 @@ async def test_partially_covered_element_uses_exposed_hit_point(site):
             Partial</button><div style='position:absolute;left:80px;top:20px;width:140px;
             height:80px;
             background:white'></div>"""
-        await tab.evaluate(f"document.body.innerHTML = {json.dumps(markup)}")
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(browser, tab)
         state = await capture(browser, tab, DomMode(screenshots=False), report)
         element = next(e for e in state.elements if e.name == "Partial")
-        point = await (await tab.main_frame()).call(
-            ELEMENT_SCRIPT, state.id, element.index, ElementOperation.POINT, False
+        point = await (await tab.main_frame()).run(
+            ELEMENT,
+            ElementArgs(
+                token=state.id, index=element.index, operation=ElementOperation.POINT, value=False
+            ),
+            user_gesture=True,
         )
         assert 20 <= point["x"] < 80
