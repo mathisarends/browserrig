@@ -1,18 +1,15 @@
-import asyncio
 from typing import Annotated, Literal
 
 from harnessed import Inject, Plugin, tool
 from pydantic import Field
 
+from browserrig.browser.errors import BrowserError
 from browserrig.browser.models import Point
 from browserrig.browser.tab import Tab
-from browserrig.events import WaitingEvent
 from browserrig.kinds import ActionKind, DragMode
+from browserrig.observation.models import Snapshot
 
 from .execution import Actions, Effect
-from .gestures import click as click_gesture
-from .gestures import drag as drag_gesture
-from .gestures import image_point
 
 type ClickCount = Annotated[
     Literal[1, 2], Field(description="2 = native double click (open, edit, select word)")
@@ -32,8 +29,8 @@ class PointerTools(Plugin, needs=(Actions,)):
         async def click(tab: Tab) -> Effect:
             snapshot = actions.observe.snapshot
             assert snapshot is not None
-            point = image_point(snapshot, Point(x=x, y=y))
-            await click_gesture(tab, point=point, count=count)
+            point = _image_point(snapshot, Point(x=x, y=y))
+            await tab.mouse.click(point, count=count)
             return Effect(
                 "Double click dispatched." if count == 2 else "Coordinate click dispatched."
             )
@@ -50,7 +47,7 @@ class PointerTools(Plugin, needs=(Actions,)):
         async def scroll(tab: Tab) -> Effect:
             snapshot = actions.observe.snapshot
             assert snapshot is not None
-            await tab.input.scroll(
+            await tab.mouse.scroll(
                 point=Point(x=snapshot.width / 2, y=snapshot.height / 2), delta_y=delta_y
             )
             return Effect("Scroll dispatched.")
@@ -59,20 +56,6 @@ class PointerTools(Plugin, needs=(Actions,)):
             kind=ActionKind.SCROLL,
             operation=scroll,
         )
-
-    @tool(
-        readonly=True,
-        description="Wait briefly for an expected asynchronous page update, then observe again.",
-    )
-    async def wait(
-        self,
-        seconds: Annotated[float, Field(ge=0, le=10)] = 1,
-        *,
-        actions: Inject[Actions],
-    ) -> str:
-        await actions.browser.active_tab.input.emit(WaitingEvent(duration=seconds))
-        await asyncio.sleep(seconds)
-        return "Wait completed; observe the current state."
 
     @tool(
         description=(
@@ -91,10 +74,9 @@ class PointerTools(Plugin, needs=(Actions,)):
         async def drag(tab: Tab) -> Effect:
             snapshot = actions.observe.snapshot
             assert snapshot is not None
-            await drag_gesture(
-                tab,
-                start=image_point(snapshot, start),
-                end=image_point(snapshot, end),
+            await tab.mouse.drag(
+                start=_image_point(snapshot, start),
+                end=_image_point(snapshot, end),
                 duration=duration,
                 mode=mode,
             )
@@ -114,10 +96,10 @@ class InteractionTools(PointerTools):
     ) -> str:
         async def click(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
-            await tab.input.move_to(point)
+            await tab.mouse.move_to(point)
             # Hover may reveal an overlay or move the target; hit-test again.
             current = await actions.element_point(tab=tab, ref=ref, scroll=False)
-            await click_gesture(tab, point=current, count=count)
+            await tab.mouse.click(current, count=count)
             return Effect(
                 "Double click dispatched." if count == 2 else "Click dispatched.",
                 prepared_scroll=point.scrolled,
@@ -146,7 +128,7 @@ class InteractionTools(PointerTools):
             start = await actions.element_point(tab=tab, ref=source_ref, scroll=False)
             end = await actions.element_point(tab=tab, ref=target_ref, scroll=False)
             mode = DragMode.HTML5 if source.draggable else DragMode.POINTER
-            await drag_gesture(tab, start=start, end=end, duration=duration, mode=mode)
+            await tab.mouse.drag(start=start, end=end, duration=duration, mode=mode)
             return Effect(
                 "Drag dispatched; inspect the destination.",
                 prepared_scroll=prepared.scrolled or target.scrolled,
@@ -157,3 +139,12 @@ class InteractionTools(PointerTools):
 
 def _click_kind(count: ClickCount) -> ActionKind:
     return ActionKind.DOUBLE_CLICK if count == 2 else ActionKind.CLICK
+
+
+def _image_point(snapshot: Snapshot, point: Point) -> Point:
+    if snapshot.geometry is not None:
+        x, y = snapshot.geometry.point(point.x, point.y)
+        return Point(x=x, y=y)
+    if point.x >= snapshot.width or point.y >= snapshot.height:
+        raise BrowserError("Point is outside the observed viewport")
+    return point

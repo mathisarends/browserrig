@@ -1,4 +1,5 @@
 from harnessed import Context, Inject, Plugin, SessionLog
+from harnessed.events import TurnStartedEvent
 
 from browserrig.events import BROWSER_EVENTS, INPUT_EVENTS
 
@@ -17,3 +18,9 @@ class Chrome(Plugin, needs=(SessionLog,)):
     async def setup(self, ctx: Context, log: Inject[SessionLog]) -> None:
         browser = await ctx.enter(ChromeBrowser(self.options, emit=log.emit))
         ctx.provide(Browser, browser)
+
+        async def publish_cursor(_event: TurnStartedEvent) -> None:
+            # Live subscribers often attach after setup, so seed their animation at turn start.
+            await browser.active_tab.mouse.publish_cursor()
+
+        ctx.on(TurnStartedEvent, publish_cursor)

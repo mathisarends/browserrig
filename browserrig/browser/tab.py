@@ -11,7 +11,7 @@ from cdpify import CdpSession
 from cdpify.domains.runtime import CallArgument
 
 from browserrig.events import BrowserEvent, InputEvent
-from browserrig.input import Input
+from browserrig.input import Input, Keyboard, Mouse
 
 from .errors import BrowserError
 from .geometry import Bounds, Projection
@@ -164,6 +164,14 @@ class Tab:
         self._emit = emit
         self.input = Input(self)
 
+    @property
+    def mouse(self) -> Mouse:
+        return self.input.mouse
+
+    @property
+    def keyboard(self) -> Keyboard:
+        return self.input.keyboard
+
     async def emit(self, event: BrowserEvent | InputEvent) -> None:
         if self._emit is not None:
             await self._emit(replace(event, target_id=self.id, document_id=self.document_id))
@@ -192,7 +200,7 @@ class Tab:
         hold_meta: bool = False,
     ) -> None:
         """Dispatch input to this tab's page session, never to browser chrome or the OS."""
-        await self.input.press_key(
+        await self.keyboard.press_key(
             key,
             hold_control=hold_control,
             hold_shift=hold_shift,

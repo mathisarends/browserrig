@@ -76,7 +76,7 @@ async def prepare_element(browser: Browser, tab: Tab, snapshot: Snapshot, elemen
             previous = signature
             x, y = owner.projection.point(plan.x, plan.y)
             await owner.check_point(x, y)
-            await tab.input.scroll(
+            await tab.mouse.scroll(
                 point=Point(x=x, y=y), delta_x=plan.delta_x, delta_y=plan.delta_y
             )
             scrolled = True

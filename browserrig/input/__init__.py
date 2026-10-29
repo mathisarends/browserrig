@@ -1,3 +1,7 @@
-from .controller import Input
+from browserrig.kinds import MouseEventKind
 
-__all__ = ["Input"]
+from .controller import Input
+from .keyboard import Keyboard
+from .mouse import Mouse
+
+__all__ = ["Input", "Keyboard", "Mouse", "MouseEventKind"]

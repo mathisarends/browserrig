@@ -270,8 +270,19 @@ Both variants use real CDP input and release mouse buttons even when interrupted
 
 ## Input choreography
 
-Each tab owns its input state at `tab.input`. DOM and canvas tools share this
-controller, with action serialization and readiness still owned by `Actions`.
+Each tab exposes separate `tab.mouse` and `tab.keyboard` controllers, also
+available as `tab.input.mouse` and `tab.input.keyboard`. `tab.input` shares the
+action context and event correlation across both devices. DOM and canvas tools
+use these same controllers; `Actions` owns action serialization and readiness.
+New tabs initialize the native cursor at a random position within the central
+40–60% of the actual viewport on each axis and immediately emit
+`browser.cursor.state`. There is no initial animation from the top-left corner.
+Activating an existing tab republishes its current position. Agent turn starts
+also publish the current cursor state so live subscribers attached after browser
+setup can display it before the first model request or input action.
+Low-level pointer dispatch uses `MouseEventKind`, available from `browserrig` or
+`browserrig.input`: `await tab.mouse.dispatch(MouseEventKind.MOVED, Point(x=100, y=120))`.
+The enum also provides `PRESSED`, `RELEASED`, and `WHEEL`; use `scroll()` for wheel input.
 Cursor movements follow bounded cubic paths; scrolling uses eased wheel steps.
 Typing uses a fixed 50 ms interval, configured by the internal
 `_TYPING_INTERVAL_SECONDS` constant in `browserrig/input/keyboard.py`.
@@ -294,9 +305,9 @@ replace a referenced field. Use `clear=False` to type at its current selection.
 
 Keys and modifiers are released on failure or cancellation. Unicode text is
 dispatched once per character, without simulated typos. Empty replacement text
-clears the field. Direct Python callers can use `tab.input.type_text(...)`,
-`tab.input.press_key(...)`, `tab.input.move_to(Point(...))`, and
-`tab.input.scroll(point=Point(...), delta_y=...)`. Acquire `browser.action_lock`
+clears the field. Direct Python callers can use `tab.keyboard.type_text(...)`,
+`tab.keyboard.press_key(...)`, `tab.mouse.move_to(Point(...))`, and
+`tab.mouse.scroll(point=Point(...), delta_y=...)`. Acquire `browser.action_lock`
 when combining direct inputs with other browser actions.
 
 The choreography uses Harnessed's native transient event extension. `Chrome`

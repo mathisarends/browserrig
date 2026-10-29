@@ -4,7 +4,7 @@ from dataclasses import replace
 from typing import Any, Self
 from uuid import uuid4
 
-import httpx
+import httpx2
 from cdpify import CdpClient, CdpSession
 from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
 from cdpify.domains.page import (
@@ -78,7 +78,7 @@ class ChromeBrowser:
                 headers = {key: value.get_secret_value() for key, value in options.headers.items()}
             async with asyncio.timeout(options.timeout):
                 if endpoint.startswith(("http://", "https://")):
-                    async with httpx.AsyncClient(
+                    async with httpx2.AsyncClient(
                         timeout=options.timeout, headers=headers, trust_env=False
                     ) as http:
                         response = await http.get(endpoint.rstrip("/") + "/json/version")
@@ -116,6 +116,7 @@ class ChromeBrowser:
                 if isinstance(options, ConnectBrowser) and options.target_id:
                     tab = await self._attach(options.target_id)
                     self._active = tab.id
+                    await tab.mouse.initialize_cursor()
                 else:
                     await self.open_tab(options.url)
                 await self.emit(ConnectedEvent(owned_process=isinstance(options, LaunchBrowser)))
@@ -213,6 +214,7 @@ class ChromeBrowser:
         self._active = tab.id
         await self.emit(TabOpenedEvent(target_id=tab.id, url=url))
         await self.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
+        await tab.mouse.initialize_cursor()
         return tab
 
     async def activate_tab(self, target_id: str) -> Tab:
@@ -222,6 +224,7 @@ class ChromeBrowser:
         await tab.cdp.page.bring_to_front()
         self._active = tab.id
         await self.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
+        await tab.mouse.initialize_cursor()
         return tab
 
     async def close_tab(self, target_id: str) -> None:

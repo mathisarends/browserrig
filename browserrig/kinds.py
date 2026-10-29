@@ -54,6 +54,13 @@ class DragMode(StrEnum):
     HTML5 = "html5"
 
 
+class MouseEventKind(StrEnum):
+    MOVED = "mouseMoved"
+    PRESSED = "mousePressed"
+    RELEASED = "mouseReleased"
+    WHEEL = "mouseWheel"
+
+
 class ObservationKind(StrEnum):
     DOM = "dom"
     CANVAS = "canvas"

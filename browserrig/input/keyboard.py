@@ -1,7 +1,16 @@
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Awaitable, Callable
+from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from browserrig.browser.errors import BrowserError
+from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
+
+if TYPE_CHECKING:
+    from browserrig.browser.tab import Tab
 
 _TYPING_INTERVAL_SECONDS = 0.05
 
@@ -86,3 +95,93 @@ def _character(value: str) -> _Stroke:
         return _Stroke("Enter")
     shifted = value in _SHIFTED or value.isascii() and value.isupper()
     return _Stroke(value, ("Shift",) if shifted else ())
+
+
+class Keyboard:
+    def __init__(self, tab: Tab, *, emit: Callable[[InputEvent], Awaitable[None]]) -> None:
+        self.tab = tab
+        self.emit = emit
+
+    async def press_key(
+        self,
+        key: str,
+        *,
+        hold_control: bool = False,
+        hold_shift: bool = False,
+        hold_alt: bool = False,
+        hold_meta: bool = False,
+    ) -> None:
+        modifiers = tuple(
+            name
+            for enabled, name in (
+                (hold_control, "Control"),
+                (hold_shift, "Shift"),
+                (hold_alt, "Alt"),
+                (hold_meta, "Meta"),
+            )
+            if enabled
+        )
+        stroke = _key_stroke(key, modifiers)
+        try:
+            await self.emit(KeyboardVisibilityEvent(visible=True))
+            await self._stroke(stroke)
+        finally:
+            await self.emit(KeyboardVisibilityEvent(visible=False))
+
+    async def type_text(self, text: str) -> None:
+        try:
+            await self.emit(KeyboardVisibilityEvent(visible=True))
+            # CRLF is one line break. Other Unicode characters are inserted unchanged.
+            for value in text.replace("\r\n", "\n"):
+                await self._stroke(_character(value), duration=_TYPING_INTERVAL_SECONDS)
+                await asyncio.sleep(_TYPING_INTERVAL_SECONDS)
+        finally:
+            await self.emit(KeyboardVisibilityEvent(visible=False))
+
+    async def _stroke(self, stroke: _Stroke, *, duration: float = 0) -> None:
+        async with AsyncExitStack() as held:
+            flags = 0
+            for modifier in stroke.modifiers:
+                arguments = _Stroke(modifier).arguments()
+                held.push_async_callback(
+                    self.tab.cdp.input.dispatch_key_event,
+                    type="keyUp",
+                    modifiers=flags,
+                    **arguments,
+                )
+                flags |= _Stroke("", (modifier,)).flags
+                await self.tab.cdp.input.dispatch_key_event(
+                    type="rawKeyDown", modifiers=flags, **arguments
+                )
+            arguments = stroke.arguments()
+            held.push_async_callback(
+                self.tab.cdp.input.dispatch_key_event,
+                type="keyUp",
+                modifiers=flags,
+                **arguments,
+            )
+            shortcut = any(modifier != "Shift" for modifier in stroke.modifiers)
+            text = ""
+            if not shortcut:
+                text = {"Enter": "\r", "Tab": ""}.get(
+                    stroke.key, stroke.key if len(stroke.key) == 1 else ""
+                )
+            # Separate rawKeyDown and char so text is inserted once, including
+            # Unicode without a physical mapping. Enter keeps native semantics.
+            await self.tab.cdp.input.dispatch_key_event(
+                type="keyDown" if stroke.key == "Enter" and not shortcut else "rawKeyDown",
+                modifiers=flags,
+                text="\r" if stroke.key == "Enter" and not shortcut else "",
+                **arguments,
+            )
+            if text and stroke.key != "Enter":
+                await self.tab.cdp.input.dispatch_key_event(
+                    type="char", modifiers=flags, text=text, **arguments
+                )
+        await self.emit(
+            KeyPressedEvent(
+                key=stroke.key,
+                modifiers=stroke.modifiers,
+                duration=duration,
+            )
+        )

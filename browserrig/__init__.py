@@ -5,7 +5,7 @@ from .agent import BrowserAgent
 from .browser import Browser, Chrome, ChromeBrowser, ConnectBrowser, LaunchBrowser, Viewport
 from .browser.models import Point
 from .composition import browser_plugins
-from .kinds import DragMode
+from .kinds import DragMode, MouseEventKind
 from .nudges import Nudges
 from .observation import CanvasMode, DomMode
 from .observation.plugin import Observe
@@ -21,6 +21,7 @@ __all__ = [
     "Actions",
     "Point",
     "DragMode",
+    "MouseEventKind",
     "Browser",
     "BrowserAgent",
     "CanvasMode",

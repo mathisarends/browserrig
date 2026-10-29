@@ -18,14 +18,14 @@ class FormTools(Plugin, needs=(Actions,)):
     ) -> str:
         async def type_text(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
-            await tab.input.move_to(point)
+            await tab.mouse.move_to(point)
             await actions.element_point(tab=tab, ref=ref, scroll=False)
             await actions.element_call(
                 tab=tab, ref=ref, operation=ElementOperation.FOCUS, value=clear
             )
             if clear:
-                await tab.input.press_key("Backspace")
-            await tab.input.type_text(text)
+                await tab.keyboard.press_key("Backspace")
+            await tab.keyboard.type_text(text)
             return Effect("Text entered.")
 
         return await actions.run(kind=ActionKind.TYPE, operation=type_text)

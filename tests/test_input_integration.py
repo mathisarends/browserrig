@@ -5,7 +5,7 @@ import json
 import pytest
 import yaml
 from harnessed import Inject, Plugin, PolicyDecision, ToolCall
-from harnessed.events import ToolExecutionFinishedEvent
+from harnessed.events import ModelRequestedEvent, ToolExecutionFinishedEvent
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel
@@ -19,7 +19,7 @@ from browserrig import (
     LaunchBrowser,
     TerminalEvents,
 )
-from browserrig.events import InputEvent
+from browserrig.events import CursorMovedEvent, CursorStateEvent, InputEvent
 
 pytestmark = pytest.mark.integration
 
@@ -126,7 +126,8 @@ async def _consume(session, streamed, ready):
 
 def _assert_events(streamed, output, directory, canvas):
     live = [event for event in streamed if isinstance(event, InputEvent)]
-    assert live and all(event.action_id and event.browser_id and event.target_id for event in live)
+    assert live and all(event.browser_id and event.target_id for event in live)
+    assert all(event.action_id or isinstance(event, CursorStateEvent) for event in live)
     keys = [event for event in live if event.type == "browser.key.pressed"]
     assert [event.key for event in keys][-7:] == list("Secret!")
     assert keys[-7].modifiers == ("Shift",)
@@ -142,6 +143,53 @@ def _assert_events(streamed, output, directory, canvas):
         stored = path.read_text(encoding="utf-8")
         assert '"browser.key.pressed"' not in stored
         assert '"browser.cursor.moved"' not in stored
+
+
+async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_action(site):
+    holder = {}
+    output = io.StringIO()
+
+    class Access(Plugin, needs=(Browser,)):
+        async def setup(self, browser: Inject[Browser]):
+            holder["browser"] = browser
+
+    agent = BrowserAgent(
+        model=ScriptedModel(["First", "Second"]),
+        browser=LaunchBrowser(url=site),
+        plugins=[TerminalEvents(output), Access()],
+    )
+    async with agent.session() as session:
+        streamed = []
+        ready = asyncio.Event()
+        consumer = asyncio.create_task(_consume(session, streamed, ready))
+        await ready.wait()
+        tab = holder["browser"].active_tab
+        position = tab.mouse.position
+        width, height = await tab.evaluate("[innerWidth, innerHeight]")
+        assert 0.35 * width <= position.x <= 0.65 * width
+        assert 0.35 * height <= position.y <= 0.65 * height
+        await session.run("Inspect without moving")
+        await session.run("Continue without moving")
+        assert tab.mouse.position == position
+        assert not any(isinstance(event, InputEvent) for event in session.events)
+    await consumer
+    states = [event for event in streamed if isinstance(event, CursorStateEvent)]
+    assert len(states) == 2
+    assert all((event.x, event.y) == (position.x, position.y) for event in states)
+    assert all(
+        event.browser_id and event.target_id == tab.id and not event.action_id for event in states
+    )
+    assert not any(isinstance(event, CursorMovedEvent) for event in streamed)
+    first_cursor = next(
+        index for index, event in enumerate(streamed) if isinstance(event, CursorStateEvent)
+    )
+    first_model = next(
+        index for index, event in enumerate(streamed) if isinstance(event, ModelRequestedEvent)
+    )
+    assert first_cursor < first_model
+    records = [json.loads(line) for line in output.getvalue().splitlines()]
+    cursor = next(record for record in records if record["type"] == "browser.cursor.state")
+    assert (cursor["x"], cursor["y"]) == (position.x, position.y)
 
 
 def _ref(request, name):

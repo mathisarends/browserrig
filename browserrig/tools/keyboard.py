@@ -33,7 +33,7 @@ class KeyboardTools(Plugin, needs=(Actions,)):
 
         async def send(tab: Tab) -> Effect:
             if key is not None:
-                await tab.input.press_key(
+                await tab.keyboard.press_key(
                     key,
                     hold_control=hold_control,
                     hold_shift=hold_shift,
@@ -42,7 +42,7 @@ class KeyboardTools(Plugin, needs=(Actions,)):
                 )
                 return Effect("Key dispatched.")
             assert text is not None
-            await tab.input.type_text(text)
+            await tab.keyboard.type_text(text)
             return Effect("Text entered.")
 
         return await actions.run(
