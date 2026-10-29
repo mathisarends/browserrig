@@ -7,36 +7,6 @@ from .execution import Actions, Effect
 
 
 class FormTools(Plugin):
-    @tool(
-        description=(
-            "Fill the latest observation's ref; clear replaces its value. Input text is not echoed."
-        )
-    )
-    async def type_text(
-        self,
-        ref: str,
-        text: str,
-        clear: bool = True,
-        *,
-        actions: Inject[Actions],
-    ) -> str:
-        """Fill the latest observation's ref; clear replaces its value. Input text is not echoed."""
-
-        async def fill(tab: Tab) -> Effect:
-            await actions.element_call(
-                tab=tab,
-                ref=ref,
-                operation=ElementOperation.FOCUS,
-                value=clear,
-            )
-            await tab.cdp.input.insert_text(text=text)
-            return Effect("Text entered.")
-
-        return await actions.run(
-            kind=ActionKind.TYPE,
-            operation=fill,
-        )
-
     @tool(description="Select an exact option label or value in a native select element.")
     async def select_option(
         self,
@@ -45,8 +15,6 @@ class FormTools(Plugin):
         *,
         actions: Inject[Actions],
     ) -> str:
-        """Select an exact option label or value in a native select element."""
-
         async def select(tab: Tab) -> Effect:
             await actions.element_call(
                 tab=tab,
@@ -69,8 +37,6 @@ class FormTools(Plugin):
         *,
         actions: Inject[Actions],
     ) -> str:
-        """Set a native date/time input in its HTML format, such as YYYY-MM-DD."""
-
         async def set_date(tab: Tab) -> Effect:
             _, element = await actions.observe.element(tab, ref)
             if element.input_type not in {"date", "time", "datetime-local", "month", "week"}:

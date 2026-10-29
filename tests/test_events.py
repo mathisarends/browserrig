@@ -32,6 +32,7 @@ def test_enum_tags_and_registry_roundtrip():
     + events.NUDGE_EVENTS
     + events.RECORDING_EVENTS
     + events.ACTIVITY_EVENTS
+    + events.INPUT_EVENTS
     + (events.ObservationCapturedEvent,),
 )
 def test_each_tag_has_one_literal_enum_and_matching_default(kind):

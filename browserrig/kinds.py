@@ -1,5 +1,3 @@
-"""Closed values shared by event contracts and their producers."""
-
 from enum import StrEnum
 
 

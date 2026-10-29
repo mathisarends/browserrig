@@ -38,8 +38,6 @@ def _chrome_executable(explicit: Path | None = None) -> str:
 
 
 class ChromeProcess:
-    """Own exactly one child browser and its temporary profile."""
-
     def __init__(self, options: LaunchBrowser) -> None:
         self.options = options
         self.process: Process | None = None

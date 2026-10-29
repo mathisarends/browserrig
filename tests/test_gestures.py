@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from browserrig.browser.models import Point
+from browserrig.browser.tab import Tab
 from browserrig.tools.gestures import drag
 
 
@@ -17,7 +18,7 @@ async def test_cancelled_drag_releases_mouse_button():
             entered.set()
             await asyncio.Event().wait()
 
-    tab = SimpleNamespace(cdp=SimpleNamespace(input=SimpleNamespace(dispatch_mouse_event=dispatch)))
+    tab = Tab("tab-1", SimpleNamespace(input=SimpleNamespace(dispatch_mouse_event=dispatch)))
     task = asyncio.create_task(
         drag(tab, start=Point(x=10, y=10), end=Point(x=200, y=200), duration=1)
     )

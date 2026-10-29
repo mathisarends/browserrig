@@ -55,8 +55,6 @@ class ElementView(Options):
 
 
 class SnapshotView(Options):
-    """Agent-facing schema, independent of extraction and CDP routing details."""
-
     page: PageView
     viewport: ViewportView
     text: str | None = None
@@ -85,7 +83,6 @@ class SnapshotView(Options):
 
 
 def render(snapshot: Snapshot) -> str:
-    """Render a validated presentation model as YAML, using data rather than templates."""
     return yaml.safe_dump(
         SnapshotView.from_snapshot(snapshot).model_dump(
             mode="json", exclude_none=True, exclude_defaults=True

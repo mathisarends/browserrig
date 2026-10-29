@@ -20,7 +20,6 @@ class NavigationTools(Plugin):
         *,
         actions: Inject[Actions],
     ) -> str:
-        """Navigate the active tab to an HTTP(S) URL."""
         validated_url(url)
 
         async def navigate(tab: Tab) -> Effect:
@@ -40,7 +39,6 @@ class NavigationTools(Plugin):
         *,
         actions: Inject[Actions],
     ) -> str:
-        """Search the web with DuckDuckGo in the active tab."""
         return await self.navigate(
             f"https://duckduckgo.com/?q={quote_plus(query)}",
             actions=actions,
@@ -48,8 +46,6 @@ class NavigationTools(Plugin):
 
     @tool(description="Go to the previous browser history entry.")
     async def go_back(self, *, actions: Inject[Actions]) -> str:
-        """Go to the previous browser history entry."""
-
         async def back(tab: Tab) -> Effect:
             history = await tab.cdp.page.get_navigation_history()
             if history.current_index < 1:
@@ -66,8 +62,6 @@ class NavigationTools(Plugin):
 
     @tool(description="Reload the active tab.")
     async def reload(self, *, actions: Inject[Actions]) -> str:
-        """Reload the active tab."""
-
         async def reload(tab: Tab) -> Effect:
             await tab.cdp.page.reload()
             return Effect("Reload executed.")

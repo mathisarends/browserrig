@@ -50,7 +50,6 @@ async def wait_for_page(
     phase: ReadinessPhase = ReadinessPhase.INITIAL,
     geometry_cache: dict[tuple[str, str], Geometry] | None = None,
 ) -> ReadinessReport:
-    """The same readiness algorithm for a direct browser and the Harnessed plugin."""
     selected = mode or DomMode()
     options = options or ReadinessOptions()
     if geometry_cache is None:

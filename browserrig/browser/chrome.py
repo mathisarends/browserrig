@@ -24,6 +24,7 @@ from browserrig.events import (
     DownloadCompletedEvent,
     DownloadFailedEvent,
     DownloadStartedEvent,
+    InputEvent,
     NavigationCommittedEvent,
     TabActivatedEvent,
     TabClosedEvent,
@@ -39,13 +40,11 @@ from .process import ChromeProcess
 from .tab import Frame, Tab, validated_url
 
 
-async def _discard(_event: BrowserEvent) -> None:
+async def _discard(_event: BrowserEvent | InputEvent) -> None:
     pass
 
 
 class ChromeBrowser:
-    """Own a Chrome connection, its targets and optionally its child process."""
-
     def __init__(
         self, options: BrowserOptions | None = None, *, emit: EventSink = _discard
     ) -> None:
@@ -144,7 +143,7 @@ class ChromeBrowser:
                 "Browser event listener failed; reconnect before continuing"
             ) from self._failure
 
-    async def emit(self, event: BrowserEvent) -> None:
+    async def emit(self, event: BrowserEvent | InputEvent) -> None:
         await self._emit(replace(event, browser_id=self.id))
 
     async def _attach(self, target_id: str) -> Tab:
@@ -165,7 +164,7 @@ class ChromeBrowser:
                         device_scale_factor=size.scale,
                         mobile=False,
                     )
-                tab = Tab(target_id, cdp)
+                tab = Tab(target_id, cdp, emit=self.emit)
                 await tab.main_frame()
                 self._tabs[target_id] = tab
                 self._sessions[attached.session_id] = target_id

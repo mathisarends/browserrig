@@ -38,8 +38,6 @@ ELEMENT_SCRIPT = (
 
 @dataclass(frozen=True, slots=True)
 class Content:
-    """What one observation mode extracted from the page."""
-
     text: tuple[str, ...] = ()
     elements: tuple[Element, ...] = ()
     limitations: tuple[str, ...] = ()
@@ -61,8 +59,6 @@ class CaptureStrategy(ABC):
 
 
 class DomCapture(CaptureStrategy):
-    """Visible text and interactive elements from every inspectable frame."""
-
     def __init__(self, mode: DomMode) -> None:
         self.mode = mode
         self._metadata: dict[str, CaptureSnapshotResult | None] = {}
@@ -172,8 +168,6 @@ class DomCapture(CaptureStrategy):
 
 
 class CanvasCapture(CaptureStrategy):
-    """An image of the confirmed canvas area; its pixels drive the fingerprint."""
-
     def __init__(self, mode: CanvasMode) -> None:
         self.mode = mode
 

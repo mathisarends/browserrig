@@ -1,6 +1,6 @@
 from harnessed import Context, Inject, Plugin, SessionLog
 
-from browserrig.events import BROWSER_EVENTS
+from browserrig.events import BROWSER_EVENTS, INPUT_EVENTS
 
 from .base import Browser
 from .chrome import ChromeBrowser
@@ -8,9 +8,7 @@ from .config import BrowserOptions, LaunchBrowser
 
 
 class Chrome(Plugin):
-    """Mount one independently owned Chrome connection per Harnessed session."""
-
-    events = BROWSER_EVENTS
+    events = BROWSER_EVENTS + INPUT_EVENTS
 
     def __init__(self, options: BrowserOptions | None = None) -> None:
         super().__init__()

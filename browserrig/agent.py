@@ -1,5 +1,3 @@
-"""Browser composition with Harnessed's native Agent and Session APIs."""
-
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -23,12 +21,10 @@ if TYPE_CHECKING:
 
 
 class BrowserAgent(Agent):
-    """Configure browser capabilities; Harnessed owns execution and session lifetimes.
+    """Explicit provider clients remain caller-owned.
 
-    Harnessed manages native model contexts; explicitly supplied provider clients remain
-    caller-owned. Session storage is in memory unless session_directory is supplied;
-    approvals retain Harnessed's defaults unless configured.
-    Additional plugins use the same extension points and slot checks as a plain Agent.
+    Sessions stay in memory unless session_directory is supplied.
+    Approvals use Harnessed's defaults unless configured.
     """
 
     def __init__(

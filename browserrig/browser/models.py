@@ -3,6 +3,7 @@ from enum import StrEnum
 from pydantic import Field
 
 from .config import Options
+from .geometry import Bounds
 
 
 class Point(Options):
@@ -12,6 +13,7 @@ class Point(Options):
 
 class ElementPoint(Point):
     scrolled: bool = False
+    bounds: Bounds | None = None
 
 
 class Geometry(Options):

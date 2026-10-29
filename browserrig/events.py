@@ -1,11 +1,9 @@
-"""Durable facts. No raw text input, image frames or mutable payloads."""
-
 from dataclasses import dataclass, field
 from enum import StrEnum
 from time import monotonic
 from typing import Literal
 
-from harnessed.events import DurableEvent
+from harnessed.events import DurableEvent, TransientEvent
 
 from browserrig.kinds import (
     ActionKind,
@@ -50,6 +48,15 @@ class EventKind(StrEnum):
     RECORDING_FAILED = "browser.recording.failed"
     ACTIVITY_STARTED = "browser.activity.started"
     ACTIVITY_FINISHED = "browser.activity.finished"
+    CURSOR_MOVED = "browser.cursor.moved"
+    CURSOR_STATE = "browser.cursor.state"
+    POINTER_PRESSED = "browser.pointer.pressed"
+    POINTER_RELEASED = "browser.pointer.released"
+    KEY_PRESSED = "browser.key.pressed"
+    KEYBOARD_VISIBILITY = "browser.keyboard.visibility"
+    SCROLLED = "browser.scrolled"
+    ELEMENT_HIGHLIGHTED = "browser.element.highlighted"
+    WAITING = "browser.waiting"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -58,6 +65,99 @@ class BrowserEvent(DurableEvent):
     target_id: str = ""
     document_id: str = ""
     at: float = field(default_factory=monotonic)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class InputEvent(TransientEvent):
+    browser_id: str = ""
+    target_id: str = ""
+    document_id: str = ""
+    action_id: str = ""
+    at: float = field(default_factory=monotonic)
+
+
+@dataclass(frozen=True, slots=True)
+class CursorMovedEvent(InputEvent):
+    from_position: tuple[float, float]
+    to_position: tuple[float, float]
+    control_point_1: tuple[float, float]
+    control_point_2: tuple[float, float]
+    duration: float
+    easing: Literal["easeInOutCubic"] = "easeInOutCubic"
+    type: Literal[EventKind.CURSOR_MOVED] = field(default=EventKind.CURSOR_MOVED, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
+class CursorStateEvent(InputEvent):
+    x: float
+    y: float
+    buttons: int = 0
+    type: Literal[EventKind.CURSOR_STATE] = field(default=EventKind.CURSOR_STATE, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
+class PointerPressedEvent(InputEvent):
+    x: float
+    y: float
+    click_count: int
+    type: Literal[EventKind.POINTER_PRESSED] = field(
+        default=EventKind.POINTER_PRESSED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class PointerReleasedEvent(InputEvent):
+    x: float
+    y: float
+    click_count: int
+    type: Literal[EventKind.POINTER_RELEASED] = field(
+        default=EventKind.POINTER_RELEASED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class KeyPressedEvent(InputEvent):
+    key: str
+    modifiers: tuple[str, ...] = ()
+    sensitive: bool = False
+    duration: float = 0
+    type: Literal[EventKind.KEY_PRESSED] = field(default=EventKind.KEY_PRESSED, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
+class KeyboardVisibilityEvent(InputEvent):
+    visible: bool
+    type: Literal[EventKind.KEYBOARD_VISIBILITY] = field(
+        default=EventKind.KEYBOARD_VISIBILITY, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ScrolledEvent(InputEvent):
+    x: float
+    y: float
+    delta_x: float
+    delta_y: float
+    duration: float
+    type: Literal[EventKind.SCROLLED] = field(default=EventKind.SCROLLED, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
+class ElementHighlightedEvent(InputEvent):
+    ref: str
+    x: float
+    y: float
+    width: float
+    height: float
+    type: Literal[EventKind.ELEMENT_HIGHLIGHTED] = field(
+        default=EventKind.ELEMENT_HIGHLIGHTED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class WaitingEvent(InputEvent):
+    duration: float
+    type: Literal[EventKind.WAITING] = field(default=EventKind.WAITING, kw_only=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -358,3 +458,14 @@ RECORDING_EVENTS = (
     RecordingFailedEvent,
 )
 ACTIVITY_EVENTS = (ActivityStartedEvent, ActivityFinishedEvent)
+INPUT_EVENTS = (
+    CursorMovedEvent,
+    CursorStateEvent,
+    PointerPressedEvent,
+    PointerReleasedEvent,
+    KeyPressedEvent,
+    KeyboardVisibilityEvent,
+    ScrolledEvent,
+    ElementHighlightedEvent,
+    WaitingEvent,
+)

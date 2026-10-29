@@ -15,6 +15,7 @@ from .tools import (
     FileTools,
     FormTools,
     InteractionTools,
+    KeyboardTools,
     NavigationTools,
     PointerTools,
     TabTools,
@@ -29,7 +30,6 @@ def browser_plugins(
     readiness: ReadinessOptions | None = None,
     recording: RecordingOptions | None = None,
 ) -> list[Plugin]:
-    """An ordinary, inspectable plugin list. Policies and provider remain caller choices."""
     selected = mode or DomMode()
     plugins: list[Plugin] = [
         Activity(),
@@ -39,6 +39,7 @@ def browser_plugins(
         Observe(),
         Actions(),
         NavigationTools(),
+        KeyboardTools(),
         InteractionTools() if isinstance(selected, DomMode) else PointerTools(),
         TabTools(),
         DialogTools(),

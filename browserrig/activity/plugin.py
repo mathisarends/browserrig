@@ -41,8 +41,6 @@ class _State:
 
 
 class Activity(Plugin, provides=True):
-    """Derive client-side inference and browser intervals from receipts, not wrappers."""
-
     events = ACTIVITY_EVENTS
     state = PluginState(_State)
     log: Inject[SessionLog]

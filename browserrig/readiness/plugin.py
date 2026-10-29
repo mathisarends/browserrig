@@ -24,8 +24,6 @@ class _State:
 
 
 class Readiness(Plugin, provides=True):
-    """Document-scoped readiness, shared by observation and browser actions."""
-
     events = READINESS_EVENTS
     state = PluginState(_State)
     browser: Inject[Browser]

@@ -2,6 +2,7 @@ from .dialogs import DialogTools
 from .files import FileTools
 from .forms import FormTools
 from .interaction import InteractionTools, PointerTools
+from .keyboard import KeyboardTools
 from .navigation import NavigationTools
 from .tabs import TabTools
 
@@ -10,6 +11,7 @@ __all__ = [
     "FileTools",
     "FormTools",
     "InteractionTools",
+    "KeyboardTools",
     "PointerTools",
     "NavigationTools",
     "TabTools",

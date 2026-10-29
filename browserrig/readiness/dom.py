@@ -24,8 +24,6 @@ async def probe_dom(tab: Tab) -> DOMProbe:
 
 
 class DomReadiness(ReadinessStrategy):
-    """Ready once the document is loaded and its DOM has stopped changing."""
-
     def __init__(self, tab: Tab, options: ReadinessOptions, phase: ReadinessPhase) -> None:
         super().__init__(tab, options)
         self.budget = options.timeout

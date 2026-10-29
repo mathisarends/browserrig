@@ -32,6 +32,9 @@ override them, for example:
 uv run --env-file .env --extra openai python -m examples.openai_agent --headed --url https://en.wikipedia.org/wiki/Voyager_program --task "Compare Voyager 1 and 2 and cite the source URLs."
 ```
 
+The OpenAI example streams structured JSON events to stderr while the agent runs.
+Use `--quiet` to disable this output. The final answer is written to stdout.
+
 The examples use `OpenAIResponsesModel` with `gpt-6.1-terra` by default.
 Set `OPENAI_MODEL` to override the model ID. These examples use the Responses API
 for tool calling. Tests use scripted models and do not require an API key.
@@ -69,7 +72,7 @@ from harnessed import PolicyDecision
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import BrowserAgent, LaunchBrowser, RecordingOptions, DomMode
+from browserrig import BrowserAgent, LaunchBrowser, RecordingOptions, DomMode, TerminalEvents
 
 agent = BrowserAgent(
     model=OpenAIResponsesModel("gpt-6.1-terra"),
@@ -78,6 +81,7 @@ agent = BrowserAgent(
     recording=RecordingOptions(),
     session_directory=".browserrig/sessions-v2",
     approvals=Approvals(default=PolicyDecision.ALLOW),
+    plugins=[TerminalEvents()],
 )
 result = await agent.run("Compare Voyager 1 and 2 and cite the source URLs.", max_steps=20)
 print(result.text)
@@ -94,7 +98,7 @@ above allows actions automatically. The constructor does not open Chrome or file
 For custom composition, `browser_plugins()` returns an inspectable plugin list:
 `Agent(model=model, plugins=[*browser_plugins(), MyPlugin()])`.
 Individual capabilities such as `Chrome`, `Readiness`, `Observe`, `Actions`, tool
-plugins, `Nudges`, `Activity`, and `Recording` are also available directly.
+plugins, `Nudges`, `Activity`, `Recording`, and `TerminalEvents` are also available directly.
 Shared plugin services use class-level `Inject[T]` and `provides=True`; required
 injections infer dependencies. Optional services resolve on each hook invocation.
 Tool decorators declare model-facing descriptions independently of developer docstrings.
@@ -173,6 +177,62 @@ Use `DragMode.HTML5` for coordinate-based dragging of native HTML5 sources.
 The current observation determines how crop coordinates map to the viewport.
 Both variants use real CDP input and release mouse buttons even when interrupted.
 
+## Input choreography
+
+Each tab owns its input state at `tab.input`. DOM and canvas tools share this
+controller, with action serialization and readiness still owned by `Actions`.
+Cursor movements follow bounded cubic paths; scrolling uses eased wheel steps.
+Typing uses a fixed 50 ms interval, configured by the internal
+`_TYPING_INTERVAL_SECONDS` constant in `browserrig/input/keyboard.py`.
+
+`KeyboardTools` supplies `press_key` and `type_text` in both modes:
+
+- `type_text(ref=..., text=...)` replaces the referenced field by default.
+- `type_text(ref=..., text=..., clear=False)` types at its current selection.
+- `type_text(text=...)` types into the focused editor, preserving existing content.
+- `type_text(text=..., clear=True)` replaces the focused editor's content.
+- `sensitive=True` masks typing events. Password fields are masked automatically.
+
+Keys and modifiers are released on failure or cancellation. Unicode text is
+dispatched once per character, without simulated typos. Empty replacement text
+clears the field. Direct Python callers can use `tab.input.type_text(...)`,
+`tab.input.press_key(...)`, `tab.input.move_to(Point(...))`, and
+`tab.input.scroll(point=Point(...), delta_y=...)`. Acquire `browser.action_lock`
+when combining direct inputs with other browser actions.
+
+The choreography uses Harnessed's native transient event extension. `Chrome`
+registers these frozen event types alongside its durable browser events:
+
+| Event | Payload |
+| --- | --- |
+| `CursorMovedEvent` | Start, destination, two control points, duration, easing |
+| `CursorStateEvent` | Actual cursor position and held mouse buttons |
+| `PointerPressedEvent`, `PointerReleasedEvent` | Position and native click count |
+| `KeyPressedEvent` | Key, modifiers, duration, sensitive flag |
+| `KeyboardVisibilityEvent` | Keyboard presentation opened or closed |
+| `ScrolledEvent` | Wheel origin, dispatched deltas, duration |
+| `ElementHighlightedEvent` | DOM reference and viewport bounds |
+| `WaitingEvent` | Requested wait duration |
+
+Coordinates use viewport CSS pixels; durations use seconds. Events carry
+`browser_id`, `target_id`, `document_id`, and `at`. Inputs inside an action also
+carry its `action_id`. `CursorMovedEvent` describes the path before execution;
+`CursorStateEvent` reports the actual endpoint, including after cancellation.
+Key and pointer receipts follow successful dispatch. Action failure events close
+interrupted sequences. Sensitive keys contain an empty `key` and no modifiers.
+
+Navigation, tab changes, downloads, and model/tool/readiness/pause intervals keep
+their existing typed events. Consumers can use those together with input events
+to present the session's choreography. Transient input events are excluded from
+`session.events`, JSONL storage, and model context; durable action receipts remain
+available for replay.
+
+`TerminalEvents()` prints one JSON object per event to stderr using native hooks,
+without a background consumer task. It includes session lifecycle, model/tool
+metadata, browser actions, and live input events. Prompts, tool arguments, model
+output, and screenshots are omitted. Pass `TerminalEvents(output=file)` to select
+another text stream.
+
 ## Recording, downloads, and events
 
 Native recording uses `Page.startScreenRecording` / `stopScreenRecording` through
@@ -186,16 +246,24 @@ downloads in the browser's own context. `DownloadState` includes `IN_PROGRESS`,
 `COMPLETED`, and `CANCELED`; download events use the `browser.download.*` namespace.
 Upload and download paths refer to the browser host.
 
-Subscribe to typed events from a session:
+Subscribe to durable facts and live choreography from a session while a run is
+active (for example, from a consumer task started before `session.run`):
 
 ```python
-from browserrig.events import ActionStartedEvent
+from browserrig.events import ActionStartedEvent, CursorMovedEvent, KeyPressedEvent
 
-async for event in session.subscribe():
+async for event in session.subscribe(transient=True):
     match event:
         case ActionStartedEvent(kind=kind):
             print(kind)
+        case CursorMovedEvent(to_position=point, duration=duration):
+            print("cursor", point, duration)
+        case KeyPressedEvent(key=key, sensitive=sensitive):
+            print("key", "***" if sensitive else key)
 ```
+
+Subscriptions observe future events and finish when the session closes.
+`session.subscribe()` without `transient=True` continues to return durable facts only.
 
 Import SDK events directly from `harnessed.events`, for example
 `ToolCallRequestedEvent` and `ToolCallFinishedEvent`. The latter carries the final

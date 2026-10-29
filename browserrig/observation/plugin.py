@@ -28,8 +28,6 @@ class _State:
 
 
 class Observe(Plugin, provides=True):
-    """Capture current state once, render YAML and attach native images when requested."""
-
     events = (ObservationCapturedEvent,)
     state = PluginState(_State)
     browser: Inject[Browser]
@@ -135,7 +133,6 @@ class Observe(Plugin, provides=True):
         description="Refresh page state, including its screenshot in visual modes.",
     )
     async def observe(self) -> ToolResult:
-        """Refresh page state, including its screenshot in visual modes."""
         snapshot = await self.capture()
         if snapshot.image:
             return ToolResult(

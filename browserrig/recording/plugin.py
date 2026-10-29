@@ -47,8 +47,6 @@ class _State:
 
 
 class Recording(Plugin, needs=(Readiness,), provides=True):
-    """Native Page recording; no LLM wrapper, JPEG queue or obligatory encoder."""
-
     events = RECORDING_EVENTS
     state = PluginState(_State)
     browser: Inject[Browser]

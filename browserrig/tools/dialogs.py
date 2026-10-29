@@ -12,7 +12,6 @@ class DialogTools(Plugin):
     async def handle_dialog(
         self, accept: bool, prompt_text: str = "", *, browser: Inject[Browser]
     ) -> str:
-        """Accept or dismiss the active tab's JavaScript dialog, optionally answering a prompt."""
         tab = browser.active_tab
         if tab.dialog is None:
             raise ToolError("No JavaScript dialog is open")

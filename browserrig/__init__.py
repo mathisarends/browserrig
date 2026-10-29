@@ -1,5 +1,3 @@
-"""Composable Chrome automation. Importing this package opens no resources."""
-
 __version__ = "0.1.0"
 
 from .activity import Activity
@@ -15,6 +13,7 @@ from .readiness import wait_for_page
 from .readiness.config import ReadinessOptions
 from .readiness.plugin import Readiness
 from .recording import Recording, RecordingOptions
+from .terminal import TerminalEvents
 from .tools.execution import Actions
 
 __all__ = [
@@ -37,6 +36,7 @@ __all__ = [
     "Recording",
     "RecordingOptions",
     "Viewport",
+    "TerminalEvents",
     "browser_plugins",
     "wait_for_page",
 ]

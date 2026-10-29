@@ -15,6 +15,7 @@ from browserrig.events import (
     ActionFailedEvent,
     ActionFinishedEvent,
     ActionStartedEvent,
+    ElementHighlightedEvent,
 )
 from browserrig.kinds import ActionKind, ElementOperation
 from browserrig.observation.capture import ELEMENT_SCRIPT
@@ -30,8 +31,6 @@ class Effect:
 
 
 class Actions(Plugin, provides=True):
-    """Own the action transaction: serialization, readiness, dispatch and receipts."""
-
     events = ACTION_EVENTS
     browser: Inject[Browser]
     readiness: Inject[Readiness]
@@ -81,7 +80,8 @@ class Actions(Plugin, provides=True):
                     )
                 )
                 dispatched = True
-                effect = await operation(tab)
+                with tab.input.action(action_id):
+                    effect = await operation(tab)
                 note = ""
                 if settle and not tab.closed:
                     note = await self._settle(tab, kind)
@@ -193,4 +193,11 @@ class Actions(Plugin, provides=True):
             current = point
         x, y = frame.projection.point(current.x, current.y)
         await frame.check_point(x, y)
-        return ElementPoint(x=x, y=y, scrolled=point.scrolled)
+        bounds = frame.projection.box(current.bounds) if current.bounds is not None else None
+        if bounds is not None:
+            await tab.input.emit(
+                ElementHighlightedEvent(
+                    ref=ref, x=bounds.x, y=bounds.y, width=bounds.width, height=bounds.height
+                )
+            )
+        return ElementPoint(x=x, y=y, scrolled=point.scrolled, bounds=bounds)

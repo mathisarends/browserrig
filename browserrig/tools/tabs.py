@@ -11,7 +11,6 @@ from .execution import Actions, Effect
 class TabTools(Plugin):
     @tool(readonly=True, description="List controlled tabs and identify the active tab.")
     async def list_tabs(self, *, actions: Inject[Actions]) -> tuple[TabInfo, ...]:
-        """List tabs controlled by this connection, including the active tab."""
         return await actions.browser.tabs()
 
     @tool(description="Open and activate a new tab.")
@@ -21,8 +20,6 @@ class TabTools(Plugin):
         *,
         actions: Inject[Actions],
     ) -> str:
-        """Open and activate a new tab."""
-
         async def open_tab(_tab: Tab) -> Effect:
             opened = await actions.browser.open_tab(url)
             await actions.readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
@@ -37,8 +34,6 @@ class TabTools(Plugin):
         *,
         actions: Inject[Actions],
     ) -> str:
-        """Activate one listed tab by its stable target ID."""
-
         async def switch(_tab: Tab) -> Effect:
             selected = await actions.browser.activate_tab(target_id)
             await actions.readiness.wait(selected)
@@ -53,8 +48,6 @@ class TabTools(Plugin):
         *,
         actions: Inject[Actions],
     ) -> str:
-        """Close a controlled tab. A remaining tab is explicitly selected if needed."""
-
         async def close(tab: Tab) -> Effect:
             await actions.browser.close_tab(target_id)
             remaining = await actions.browser.tabs()

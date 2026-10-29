@@ -33,8 +33,6 @@ class _State:
 
 
 class Nudges(Plugin, provides=True):
-    """Bounded, document-aware hints driven by durable browser facts."""
-
     events = NUDGE_EVENTS
     state = PluginState(_State)
 

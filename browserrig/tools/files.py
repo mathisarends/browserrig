@@ -23,8 +23,6 @@ class FileTools(Plugin):
         *,
         actions: Inject[Actions],
     ) -> str:
-        """Set a file input using absolute paths on the browser host, not the client host."""
-
         async def upload(tab: Tab) -> Effect:
             frame, element = await actions.observe.element(tab, ref)
             if element.input_type != "file":
@@ -45,5 +43,4 @@ class FileTools(Plugin):
 
     @tool(readonly=True, description="List recent browser downloads and their status.")
     async def list_downloads(self, *, actions: Inject[Actions]) -> tuple[Download, ...]:
-        """List download status and browser-host paths, when configured by the host."""
         return await actions.browser.downloads()

@@ -10,7 +10,7 @@ from harnessed import PolicyDecision
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import BrowserAgent, DomMode, LaunchBrowser, RecordingOptions
+from browserrig import BrowserAgent, DomMode, LaunchBrowser, RecordingOptions, TerminalEvents
 
 DEFAULT_TASK = (
     "Erkunde das Voyager-Programm. Vergleiche Voyager 1 und Voyager 2 nach Startdatum, "
@@ -32,6 +32,7 @@ async def main() -> None:
     )
     parser.add_argument("--headed", action="store_true")
     parser.add_argument("--record", action="store_true")
+    parser.add_argument("--quiet", action="store_true", help="Disable JSON event output on stderr")
     args = parser.parse_args()
     if not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY in the environment or in .env")
@@ -43,6 +44,7 @@ async def main() -> None:
         recording=RecordingOptions() if args.record else None,
         session_directory=Path(".browserrig/sessions-v2"),
         approvals=Approvals(default=PolicyDecision.ALLOW),
+        plugins=[] if args.quiet else [TerminalEvents()],
     )
     async with agent.session() as session:
         result = await session.run(args.task, max_steps=20, token_budget=80000)

@@ -1,14 +1,13 @@
-"""Bounded native CDP gestures with unconditional button/interception cleanup."""
-
 import asyncio
 import math
 from typing import Literal
 
-from cdpify.domains.input import DragData, DragInterceptedEvent, MouseButton
+from cdpify.domains.input import DragData, DragInterceptedEvent
 
 from browserrig.browser.errors import BrowserError
 from browserrig.browser.models import Point
 from browserrig.browser.tab import Tab
+from browserrig.events import CursorStateEvent
 from browserrig.kinds import DragMode
 from browserrig.observation.models import Snapshot
 
@@ -23,23 +22,19 @@ def image_point(snapshot: Snapshot, point: Point) -> Point:
 
 
 async def click(tab: Tab, *, point: Point, count: Literal[1, 2] = 1) -> None:
-    await tab.cdp.input.dispatch_mouse_event(type="mouseMoved", x=point.x, y=point.y)
+    await tab.input.move_to(point)
     for click_count in range(1, count + 1):
         try:
-            await tab.cdp.input.dispatch_mouse_event(
-                type="mousePressed",
-                x=point.x,
-                y=point.y,
-                button=MouseButton.LEFT,
+            await tab.input.mouse(
+                "mousePressed",
+                point,
                 buttons=1,
                 click_count=click_count,
             )
         finally:
-            await tab.cdp.input.dispatch_mouse_event(
-                type="mouseReleased",
-                x=point.x,
-                y=point.y,
-                button=MouseButton.LEFT,
+            await tab.input.mouse(
+                "mouseReleased",
+                point,
                 buttons=0,
                 click_count=click_count,
             )
@@ -51,18 +46,16 @@ async def drag(
     distance = math.hypot(end.x - start.x, end.y - start.y)
     if distance < 1:
         raise BrowserError("Drag source and destination must be different")
-    await tab.cdp.input.dispatch_mouse_event(type="mouseMoved", x=start.x, y=start.y)
+    await tab.input.move_to(start)
     current = start
     data: DragData | None = None
     dropped = False
     try:
         if mode is DragMode.HTML5:
             await tab.cdp.input.set_intercept_drags(enabled=True)
-        await tab.cdp.input.dispatch_mouse_event(
-            type="mousePressed",
-            x=start.x,
-            y=start.y,
-            button=MouseButton.LEFT,
+        await tab.input.mouse(
+            "mousePressed",
+            start,
             buttons=1,
             click_count=1,
         )
@@ -73,9 +66,7 @@ async def drag(
                     x=start.x + (end.x - start.x) * min(12 / distance, 1),
                     y=start.y + (end.y - start.y) * min(12 / distance, 1),
                 )
-                await tab.cdp.input.dispatch_mouse_event(
-                    type="mouseMoved", x=current.x, y=current.y, button=MouseButton.LEFT, buttons=1
-                )
+                await tab.input.mouse("mouseMoved", current, buttons=1)
                 data = (await anext(subscription)).data
             await tab.cdp.input.dispatch_drag_event(
                 type="dragEnter", x=current.x, y=current.y, data=data
@@ -90,10 +81,10 @@ async def drag(
                 await tab.cdp.input.dispatch_drag_event(
                     type="dragOver", x=current.x, y=current.y, data=data
                 )
+                tab.input.position = current
+                await tab.input.emit(CursorStateEvent(x=current.x, y=current.y, buttons=1))
             else:
-                await tab.cdp.input.dispatch_mouse_event(
-                    type="mouseMoved", x=current.x, y=current.y, button=MouseButton.LEFT, buttons=1
-                )
+                await tab.input.mouse("mouseMoved", current, buttons=1)
             await asyncio.sleep(duration / steps)
         if data is not None:
             await tab.cdp.input.dispatch_drag_event(type="drop", x=end.x, y=end.y, data=data)
@@ -106,11 +97,9 @@ async def drag(
                 )
         finally:
             try:
-                await tab.cdp.input.dispatch_mouse_event(
-                    type="mouseReleased",
-                    x=current.x,
-                    y=current.y,
-                    button=MouseButton.LEFT,
+                await tab.input.mouse(
+                    "mouseReleased",
+                    current,
                     buttons=0,
                     click_count=1,
                 )

@@ -74,5 +74,11 @@ function browserrigElement(token, index, operation, value, clip = null) {
   if (!point) {
     throw new Error('ELEMENT_BLOCKED');
   }
-  return {x: point.x, y: point.y, scrolled: scrollY !== before};
+  const bounds = el.getBoundingClientRect();
+  return {
+    x: point.x,
+    y: point.y,
+    scrolled: scrollY !== before,
+    bounds: {x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height},
+  };
 }
