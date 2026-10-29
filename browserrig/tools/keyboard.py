@@ -6,7 +6,7 @@ from browserrig.kinds import ActionKind
 from .execution import Actions, Effect
 
 
-class KeyboardTools(Plugin):
+class KeyboardTools(Plugin, needs=(Actions,)):
     @tool(
         description=(
             "Send keyboard input to the current page focus. Provide exactly one of "

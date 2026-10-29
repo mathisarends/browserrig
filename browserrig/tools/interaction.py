@@ -19,7 +19,7 @@ type ClickCount = Annotated[
 ]
 
 
-class PointerTools(Plugin):
+class PointerTools(Plugin, needs=(Actions,)):
     @tool(description="Click screenshot coordinates; count=2 performs a native double click.")
     async def click_at(
         self,

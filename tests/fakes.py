@@ -41,7 +41,7 @@ class FakeBrowser:
         await self.log.emit(replace(event, browser_id=self.id))
 
 
-class FakeChrome(Plugin):
+class FakeChrome(Plugin, needs=(SessionLog,)):
     def __init__(self, holder):
         super().__init__()
         self.holder = holder

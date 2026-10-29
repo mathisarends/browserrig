@@ -91,7 +91,7 @@ async def test_canvas_mode_native_image(site):
     model = ScriptedModel(["Canvas ready"])
 
     # Start on a canvas before the first observation: blank about:blank is intentionally not ready.
-    class Start(Plugin):
+    class Start(Plugin, needs=(Browser,)):
         async def setup(self, _ctx: Context, browser: Inject[Browser]):
             await browser.active_tab.navigate(site + "/canvas")
 

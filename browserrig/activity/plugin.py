@@ -40,7 +40,7 @@ class _State:
     epoch: str = field(default_factory=lambda: uuid4().hex)
 
 
-class Activity(Plugin, provides=True):
+class Activity(Plugin, provides=True, needs=(SessionLog,)):
     events = ACTIVITY_EVENTS
     state = PluginState(_State)
     log: Inject[SessionLog]

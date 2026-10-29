@@ -34,7 +34,7 @@ class Effect:
     prepared_scroll: bool = False
 
 
-class Actions(Plugin, provides=True):
+class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
     """Own the action transaction: serialization, readiness, dispatch and receipts."""
 
     events = ACTION_EVENTS

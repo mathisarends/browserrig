@@ -8,7 +8,7 @@ from browserrig.readiness.models import ReadinessPhase
 from .execution import Actions, Effect
 
 
-class TabTools(Plugin):
+class TabTools(Plugin, needs=(Actions,)):
     @tool(readonly=True, description="List controlled tabs and identify the active tab.")
     async def list_tabs(self, *, actions: Inject[Actions]) -> tuple[TabInfo, ...]:
         return await actions.browser.tabs()

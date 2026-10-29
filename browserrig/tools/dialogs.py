@@ -3,7 +3,7 @@ from harnessed import Inject, Plugin, ToolError, tool
 from browserrig.browser.base import Browser
 
 
-class DialogTools(Plugin):
+class DialogTools(Plugin, needs=(Browser,)):
     @tool(
         description=(
             "Accept or dismiss the active tab's JavaScript dialog, optionally answering a prompt."

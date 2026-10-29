@@ -10,7 +10,7 @@ from browserrig.events import INPUT_EVENTS, KeyPressedEvent
 
 
 async def test_terminal_observes_native_and_live_events_without_model_or_log_pollution():
-    class Choreography(Plugin):
+    class Choreography(Plugin, needs=(SessionLog,)):
         events = INPUT_EVENTS
 
         @hook(ModelRequestedEvent)

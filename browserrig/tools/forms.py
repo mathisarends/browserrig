@@ -6,7 +6,7 @@ from browserrig.kinds import ActionKind, ElementOperation
 from .execution import Actions, Effect
 
 
-class FormTools(Plugin):
+class FormTools(Plugin, needs=(Actions,)):
     @tool(description="Type exact text into a DOM ref; clear replaces its value by default.")
     async def type_text(
         self,

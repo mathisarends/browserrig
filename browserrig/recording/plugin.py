@@ -46,7 +46,7 @@ class _State:
     segments: list[RecordingSegment] = field(default_factory=list)
 
 
-class Recording(Plugin, needs=(Readiness,), provides=True):
+class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
     events = RECORDING_EVENTS
     state = PluginState(_State)
     browser: Inject[Browser]

@@ -27,7 +27,7 @@ class _State:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
-class Observe(Plugin, provides=True):
+class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
     events = (ObservationCapturedEvent,)
     state = PluginState(_State)
     browser: Inject[Browser]

@@ -13,7 +13,7 @@ from browserrig.readiness.canvas import CanvasProbe
 from tests.fakes import FakeBrowser, FakeChrome
 
 
-class Access(Plugin):
+class Access(Plugin, needs=(Readiness,)):
     def __init__(self, holder):
         super().__init__()
         self.holder = holder

@@ -12,7 +12,7 @@ from browserrig.kinds import ActionKind
 from .execution import Actions, Effect
 
 
-class NavigationTools(Plugin):
+class NavigationTools(Plugin, needs=(Actions,)):
     @tool(description="Navigate the active tab to an HTTP(S) URL.")
     async def navigate(
         self,

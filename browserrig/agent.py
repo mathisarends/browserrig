@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from harnessed import Agent
+from harnessed import Agent, PluginValidation
 from harnessed.core.prompt.values import InstructionValues
 from harnessed.kernel import PluginLike
 from harnessed.models import Model
@@ -41,6 +41,7 @@ class BrowserAgent(Agent):
             "Complete the requested browser task using the observed page state."
         ),
         plugins: Iterable[PluginLike] = (),
+        plugin_validation: PluginValidation = PluginValidation.ERROR,
     ) -> None:
         composed: list[PluginLike] = list(
             browser_plugins(browser, mode=mode, readiness=readiness, recording=recording)
@@ -50,4 +51,9 @@ class BrowserAgent(Agent):
         if approvals is not None:
             composed.append(approvals)
         composed.extend(plugins)
-        super().__init__(model=model, instructions=instructions, plugins=composed)
+        super().__init__(
+            model=model,
+            instructions=instructions,
+            plugins=composed,
+            plugin_validation=plugin_validation,
+        )

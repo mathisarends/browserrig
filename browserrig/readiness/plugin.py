@@ -23,7 +23,7 @@ class _State:
     geometry: dict[tuple[str, str], Geometry] = field(default_factory=dict)
 
 
-class Readiness(Plugin, provides=True):
+class Readiness(Plugin, provides=True, needs=(Browser,)):
     events = READINESS_EVENTS
     state = PluginState(_State)
     browser: Inject[Browser]

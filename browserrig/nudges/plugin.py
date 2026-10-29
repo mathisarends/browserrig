@@ -32,7 +32,7 @@ class _State:
     effect_at: float = 0
 
 
-class Nudges(Plugin, provides=True):
+class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
     events = NUDGE_EVENTS
     state = PluginState(_State)
 

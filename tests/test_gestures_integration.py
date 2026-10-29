@@ -16,7 +16,7 @@ async def _perform(site, name, arguments):
     holder = {}
     count = 0
 
-    class Access(Plugin):
+    class Access(Plugin, needs=(Browser,)):
         async def setup(self, _ctx: Context, browser: Inject[Browser]):
             holder["browser"] = browser
 

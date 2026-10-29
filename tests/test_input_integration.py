@@ -29,7 +29,7 @@ async def test_typing_shortcuts_stream_and_storage(site, tmp_path, canvas):
     holder = {}
     output = io.StringIO()
 
-    class Access(Plugin):
+    class Access(Plugin, needs=(Browser,)):
         async def setup(self, browser: Inject[Browser]):
             holder["browser"] = browser
 
@@ -157,7 +157,7 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
     holder = {}
     output = io.StringIO()
 
-    class Access(Plugin):
+    class Access(Plugin, needs=(Actions,)):
         async def setup(self, actions: Inject[Actions]):
             holder["actions"] = actions
 

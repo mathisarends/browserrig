@@ -62,7 +62,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
     holder = {}
     count = 0
 
-    class Prepare(Plugin):
+    class Prepare(Plugin, needs=(Browser, Actions)):
         async def setup(self, _ctx: Context, browser: Inject[Browser], actions: Inject[Actions]):
             holder.update(browser=browser, actions=actions)
             origin = site.replace("127.0.0.1", "localhost") if cross else site

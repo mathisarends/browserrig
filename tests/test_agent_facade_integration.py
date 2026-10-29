@@ -16,7 +16,7 @@ pytestmark = pytest.mark.integration
 async def test_facade_reopens_native_sessions_and_owns_a_fresh_browser_per_session(site, tmp_path):
     browsers = []
 
-    class Access(Plugin):
+    class Access(Plugin, needs=(Browser,)):
         async def setup(self, _ctx: Context, browser: Inject[Browser]):
             browsers.append(browser)
 

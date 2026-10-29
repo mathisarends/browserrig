@@ -77,7 +77,7 @@ async def test_scroll_nudge_requires_exact_same_url_document_and_unrequested_scr
         assert actual is expected
 
 
-class _Access(Plugin):
+class _Access(Plugin, needs=(Nudges,)):
     nudges: Inject[Nudges]
 
     def __init__(self, holder):
@@ -153,7 +153,7 @@ async def test_hint_acknowledgement_requires_matching_full_provenance(
 async def test_hint_provenance_and_unselected_hints_survive_session_replay(tmp_path):
     holder = {}
 
-    class Hints(Plugin):
+    class Hints(Plugin, needs=(Nudges, Browser)):
         @hook(PreStep)
         async def observe_hints(
             self,

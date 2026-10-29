@@ -7,7 +7,7 @@ from .chrome import ChromeBrowser
 from .config import BrowserOptions, LaunchBrowser
 
 
-class Chrome(Plugin):
+class Chrome(Plugin, needs=(SessionLog,)):
     events = BROWSER_EVENTS + INPUT_EVENTS
 
     def __init__(self, options: BrowserOptions | None = None) -> None:

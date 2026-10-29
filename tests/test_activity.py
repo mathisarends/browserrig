@@ -38,7 +38,7 @@ from browserrig.events import (
 from browserrig.kinds import ObservationKind, ReadinessPhase
 
 
-class _Access(Plugin):
+class _Access(Plugin, needs=(Activity,)):
     events = READINESS_EVENTS
 
     def __init__(self, holder):

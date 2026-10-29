@@ -10,7 +10,7 @@ from browserrig.kinds import ActionKind, ElementOperation
 from .execution import Actions, Effect
 
 
-class FileTools(Plugin):
+class FileTools(Plugin, needs=(Actions,)):
     @tool(
         description=(
             "Set a file input using absolute paths on the browser host, not the client host."

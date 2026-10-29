@@ -1,7 +1,7 @@
 # Browserrig
 
 Event-driven Chrome automation for AI agents and Python applications, built with
-[Harnessed 0.2.0](https://github.com/mathisarends/harnessed/releases/tag/v0.2.0),
+[Harnessed 0.3.0](https://github.com/mathisarends/harnessed/releases/tag/v0.3.0),
 cdpify, and Pydantic. Harnessed is pinned exactly in `pyproject.toml` and `uv.lock`.
 Browserrig combines direct browser access with composable agent plugins, explicit
 DOM and canvas modes, and a shared event log.
@@ -99,18 +99,48 @@ For custom composition, `browser_plugins()` returns an inspectable plugin list:
 `Agent(model=model, plugins=[*browser_plugins(), MyPlugin()])`.
 Individual capabilities such as `Chrome`, `Readiness`, `Observe`, `Actions`, tool
 plugins, `Nudges`, `Activity`, `Recording`, and `TerminalEvents` are also available directly.
-Shared plugin services use class-level `Inject[T]` and `provides=True`; required
-injections infer dependencies. Optional services resolve on each hook invocation.
+Shared plugin services use class-level `Inject[T]` and `provides=True`; explicit
+`needs=(...)` declarations control waiting, teardown, and restart when a provider changes.
+Injection binds values without inferring dependencies. Optional services resolve
+on each hook invocation and remain optional unless explicitly listed in `needs`.
 Tool decorators declare model-facing descriptions independently of developer docstrings.
+
+## Plugin validation and diagnostics
+
+Browser plugins declare their required services explicitly, including dependencies
+used only by tool or hook parameters. Custom plugins must do the same:
+
+```python
+from harnessed import Inject, Plugin
+from browserrig import Browser
+
+class Extension(Plugin, needs=(Browser,)):
+    browser: Inject[Browser]
+```
+
+`BrowserAgent` keeps Harnessed's strict startup validation by default. Missing
+services raise `PluginDependencyError` from `harnessed.errors` before the runtime
+starts, including through `run()`. Its `.issues` tuple identifies each waiting
+plugin through `.plugin` and its missing service keys through `.missing`.
+
+For plugins deliberately waiting for services added later, pass
+`plugin_validation=PluginValidation.WARN` to `BrowserAgent`, importing
+`PluginValidation` from `harnessed`. This emits `PluginDependencyWarning` with the
+same structured issues and retains waiting plugins for later activation; setup
+failures still propagate. Add services through native `session.use()` as usual.
+For standalone kernel compositions, call `await ctx.settle()` followed by
+`ctx.plugin_diagnostics()` to inspect waiting plugins, including blocked dependents.
 
 ## Upgrading existing sessions
 
-Harnessed 0.2.0 requires session record format 2 and rejects format 1 without
-automatic migration. Back up existing session stores and choose a fresh directory
-when upgrading. The OpenAI example now writes to `.browserrig/sessions-v2`;
+Harnessed 0.3.0 keeps session record format 2: existing 0.2.0 stores can be reused
+without migration. When upgrading from 0.1.0, format 1 is rejected without automatic
+migration. Back up those stores and choose a fresh directory. The OpenAI example
+writes to `.browserrig/sessions-v2`;
 existing `.browserrig/sessions` files stay available in their original directory.
-Custom `session_directory` values should also point to a fresh store. See the
-[migration guide](https://github.com/mathisarends/harnessed/blob/v0.2.0/Changelog.md).
+Custom `session_directory` values containing format 1 should also point to a fresh
+store. See the
+[migration guide](https://github.com/mathisarends/harnessed/blob/v0.3.0/Changelog.md).
 
 ## Session controls and canvas mode
 

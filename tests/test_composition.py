@@ -81,6 +81,7 @@ def test_facade_import_and_scripted_model_do_not_require_provider_sdks():
         "BrowserAgent(model=ScriptedModel(['ok'])); "
         "assert 'pydantic_ai' not in sys.modules; "
         "assert 'openai' not in sys.modules; "
-        "assert 'anthropic' not in sys.modules"
+        "assert 'anthropic' not in sys.modules; "
+        "assert not any(name.startswith('opentelemetry') for name in sys.modules)"
     )
     subprocess.run([sys.executable, "-c", script], check=True, capture_output=True, text=True)
