@@ -94,22 +94,7 @@ class Actions(Plugin, needs=(Browser, Readiness, Observe)):
                 effect = await operation(tab)
                 note = ""
                 if settle and not tab.closed:
-                    phase = (
-                        ReadinessPhase.NAVIGATION
-                        if kind == ActionKind.NAVIGATE
-                        else ReadinessPhase.ACTION
-                    )
-                    try:
-                        report = await readiness.wait(tab, phase=phase)
-                        if report.status != ReadinessStatus.READY:
-                            note = (
-                                f" Action executed; readiness is {report.status}: {report.reason}."
-                            )
-                    except BrowserError as error:
-                        note = (
-                            f" Action executed; follow-up observation is unavailable: {error}. "
-                            "Do not repeat blindly."
-                        )
+                    note = await self._settle(tab, kind)
                 await browser.emit(
                     ActionFinishedEvent(
                         action_id=action_id,
@@ -157,6 +142,19 @@ class Actions(Plugin, needs=(Browser, Readiness, Observe)):
                     + ("; the action may have run. Observe before retrying." if dispatched else "")
                 ) from error
 
+    async def _settle(self, tab: Tab, kind: ActionKind) -> str:
+        phase = ReadinessPhase.NAVIGATION if kind == ActionKind.NAVIGATE else ReadinessPhase.ACTION
+        try:
+            report = await self.readiness.wait(tab, phase=phase)
+            if report.status != ReadinessStatus.READY:
+                return f" Action executed; readiness is {report.status}: {report.reason}."
+        except BrowserError as error:
+            return (
+                f" Action executed; follow-up observation is unavailable: {error}. "
+                "Do not repeat blindly."
+            )
+        return ""
+
     async def element_call(
         self,
         *,
@@ -181,7 +179,28 @@ class Actions(Plugin, needs=(Browser, Readiness, Observe)):
         frame, element = await self.observe.element(tab, ref)
         assert self.observe.snapshot is not None
         raw = await frame.call(
-            ELEMENT_SCRIPT, self.observe.snapshot.id, element.index, ElementOperation.POINT, scroll
+            ELEMENT_SCRIPT,
+            self.observe.snapshot.id,
+            element.index,
+            ElementOperation.POINT,
+            scroll,
+            frame.local_clip.model_dump() if frame.local_clip else None,
         )
         point = ElementPoint.model_validate(raw)
-        return ElementPoint(x=point.x + frame.x, y=point.y + frame.y, scrolled=point.scrolled)
+        # scrollIntoView may have moved ancestor documents; refresh their transforms.
+        if scroll:
+            frame, _ = await self.observe.element(tab, ref)
+            raw = await frame.call(
+                ELEMENT_SCRIPT,
+                self.observe.snapshot.id,
+                element.index,
+                ElementOperation.POINT,
+                False,
+                frame.local_clip.model_dump() if frame.local_clip else None,
+            )
+            current = ElementPoint.model_validate(raw)
+        else:
+            current = point
+        x, y = frame.projection.point(current.x, current.y)
+        await frame.check_point(x, y)
+        return ElementPoint(x=x, y=y, scrolled=point.scrolled)

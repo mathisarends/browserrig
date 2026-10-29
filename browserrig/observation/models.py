@@ -4,6 +4,7 @@ from pydantic import Field
 
 from browserrig.browser.config import Options
 from browserrig.browser.errors import StaleElement
+from browserrig.browser.geometry import Bounds
 from browserrig.browser.models import Geometry
 from browserrig.readiness.models import ReadinessStatus
 
@@ -12,6 +13,7 @@ from .config import ObservationKind
 
 class Element(Options):
     ref: str
+    mark: int | None = None
     frame_id: str
     index: int
     role: str
@@ -20,8 +22,10 @@ class Element(Options):
     input_type: str = ""
     value: str | None = None
     disabled: bool = False
+    checked: bool | None = None
     draggable: bool = False
     options: tuple[str, ...] = ()
+    bounds: Bounds | None = None
 
 
 class Snapshot(Options):
@@ -65,13 +69,18 @@ class ExtractedElement(Options):
     input_type: str = ""
     value: str | None = None
     disabled: bool = False
+    checked: bool | None = None
     draggable: bool = False
     options: tuple[str, ...] = ()
+    bounds: Bounds
+    x: float
+    y: float
 
 
 class DOMExtraction(PageFacts):
     text: str
     elements: tuple[ExtractedElement, ...]
+    truncated: bool = False
 
 
 class ElementFingerprint(Options):
@@ -79,6 +88,7 @@ class ElementFingerprint(Options):
     name: str
     value: str | None
     disabled: bool
+    checked: bool | None = None
 
 
 class PageFingerprint(Options):

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import json
 from dataclasses import dataclass
@@ -8,6 +10,7 @@ from cdpify import CdpSession
 from cdpify.domains.runtime import CallArgument
 
 from .errors import BrowserError
+from .geometry import Bounds, Projection
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,13 +18,82 @@ class Frame:
     """A CDP page frame: the top-level document or one embedded iframe.
 
     Its isolated JavaScript world belongs to that frame, not to browser focus.
-    Coordinates are offsets relative to the containing tab's viewport.
+    Its projection maps frame-local CSS pixels to the containing tab's viewport.
     """
 
     id: str
     cdp: CdpSession
-    x: float = 0
-    y: float = 0
+    projection: Projection = Projection()
+    parent: Frame | None = None
+    owner_id: int | None = None
+
+    @property
+    def x(self) -> float:
+        return self.projection.x
+
+    @property
+    def y(self) -> float:
+        return self.projection.y
+
+    @property
+    def local_clip(self) -> Bounds | None:
+        clip = self.projection.clip
+        return self.projection.local_box(clip) if clip is not None else None
+
+    async def owner_call(self, function: str, *arguments: object) -> Any:
+        """Inspect the embedding element in its parent's isolated world."""
+        assert self.parent is not None and self.owner_id is not None
+        cdp = self.parent.cdp
+        resolved = await cdp.dom.resolve_node(
+            backend_node_id=self.owner_id, execution_context_id=await self.parent.context()
+        )
+        object_id = resolved.object.object_id
+        if object_id is None:
+            raise BrowserError("Element frame no longer exists; observe again")
+        try:
+            result = await cdp.runtime.call_function_on(
+                object_id=object_id,
+                function_declaration=function,
+                arguments=[CallArgument(value=value) for value in arguments],
+                return_by_value=True,
+            )
+            if result.exception_details:
+                raise BrowserError("Frame owner could not be inspected")
+            return result.result.value
+        finally:
+            await cdp.runtime.release_object(object_id=object_id)
+
+    async def check_point(self, x: float, y: float) -> None:
+        """A child hit test cannot see blockers in ancestor documents."""
+        if not (await self.visible_points(((x, y),)))[0]:
+            raise BrowserError("ELEMENT_BLOCKED")
+
+    async def visible_points(self, points: tuple[tuple[float, float], ...]) -> tuple[bool, ...]:
+        visible = [True] * len(points)
+        current = self
+        while current.parent is not None:
+            clip = current.projection.clip
+            hits = await current.owner_call(
+                """function(points) {
+                    return points.map(([x, y]) => {
+                        let root = this.getRootNode(), target = this;
+                        while (root) {
+                            const hit = root.elementFromPoint(x, y);
+                            if (hit !== target) { return false; }
+                            target = root.host;
+                            root = target?.getRootNode();
+                        }
+                        return true;
+                    });
+                }""",
+                [current.parent.projection.inverse(x, y) for x, y in points],
+            )
+            visible = [
+                before and hit and (clip is None or clip.contains(*point))
+                for before, hit, point in zip(visible, hits, points, strict=True)
+            ]
+            current = current.parent
+        return tuple(visible)
 
     async def context(self) -> int:
         result = await self.cdp.page.create_isolated_world(
@@ -80,6 +152,7 @@ class Tab:
         self.dialog: tuple[str, str] | None = None
         self.closed = False
         self.changed = asyncio.Event()
+        self.frame_limitations: tuple[str, ...] = ()
 
     async def main_frame(self) -> Frame:
         tree = await self.cdp.page.get_frame_tree()

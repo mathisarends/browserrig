@@ -1,10 +1,10 @@
-function browserrigElement(token, index, operation, value) {
+function browserrigElement(token, index, operation, value, clip = null) {
   const state = globalThis.__browserrigElements;
   const el = state?.token === token ? state.nodes[index] : null;
   if (!el || !el.isConnected) {
     throw new Error('STALE_ELEMENT');
   }
-  if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
+  if (el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true') {
     throw new Error('ELEMENT_DISABLED');
   }
   function selectOption() {
@@ -35,7 +35,7 @@ function browserrigElement(token, index, operation, value) {
     return {value: el.type === 'password' ? null : el.value};
   }
   function focus() {
-    if (!el.matches('input:not([readonly]),textarea:not([readonly]),[contenteditable="true"]')) {
+    if (!(el.matches('input:not([readonly]),textarea:not([readonly])') || el.isContentEditable)) {
       throw new Error('NOT_EDITABLE');
     }
     el.focus();
@@ -70,13 +70,9 @@ function browserrigElement(token, index, operation, value) {
   if (value !== false) {
     el.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'});
   }
-  const r = el.getBoundingClientRect();
-  const x = Math.max(0, r.left) + (Math.min(innerWidth, r.right) - Math.max(0, r.left)) / 2;
-  const y = Math.max(0, r.top) + (Math.min(innerHeight, r.bottom) - Math.max(0, r.top)) / 2;
-  const root = el.getRootNode();
-  const hit = root.elementFromPoint?.(x, y) || document.elementFromPoint(x, y);
-  if (!hit || !(hit === el || el.contains(hit))) {
+  const point = state.pointFor(el, clip);
+  if (!point) {
     throw new Error('ELEMENT_BLOCKED');
   }
-  return {x, y, scrolled: scrollY !== before};
+  return {x: point.x, y: point.y, scrolled: scrollY !== before};
 }

@@ -1,10 +1,11 @@
-"""uv run --env-file .env --extra openai python -m examples.openai_agent --headed"""
+"""uv run --extra openai python -m examples.openai_agent --headed"""
 
 import argparse
 import asyncio
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
 from harnessed import PolicyDecision
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
@@ -20,6 +21,9 @@ DEFAULT_TASK = (
 )
 
 
+load_dotenv()
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Browser automation using OpenAI's Responses API")
     parser.add_argument("--url", default="https://de.wikipedia.org/wiki/Voyager-Programm")
@@ -30,7 +34,7 @@ async def main() -> None:
     parser.add_argument("--record", action="store_true")
     args = parser.parse_args()
     if not os.environ.get("OPENAI_API_KEY"):
-        parser.error("Set OPENAI_API_KEY in the environment or use uv run --env-file .env")
+        parser.error("Set OPENAI_API_KEY in the environment or in .env")
 
     # The caller owns the provider model; BrowserAgent configures the browser plugins.
     async with OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")) as openai:

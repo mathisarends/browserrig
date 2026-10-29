@@ -16,7 +16,7 @@ class FormTools(Plugin, needs=(Actions,)):
         *,
         actions: Inject[Actions],
     ) -> str:
-        """Fill an editable element; clear replaces its current value. Input text is not echoed."""
+        """Fill the latest observation's ref; clear replaces its value. Input text is not echoed."""
 
         async def fill(tab: Tab) -> Effect:
             await actions.element_call(

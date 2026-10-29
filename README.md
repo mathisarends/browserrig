@@ -122,6 +122,30 @@ Canvas mode uses images and coordinates, with an initial check of geometry and
 pixel content. DOM mode returns Pydantic-validated YAML with roles, labels, and
 references tied to the current observation.
 
+## Element references and screenshot marks
+
+DOM mode includes an annotated screenshot by default. Numbered labels and colored
+dashed borders identify interactive elements. Each label matches an element's
+`mark` in the YAML; pass that element's full `ref`, such as `a1b2c3d4:7`, to
+`click`, `type_text`, and other element tools. A mark is a visual lookup number;
+the ref addresses the observed DOM node in its own frame. Both belong to the
+latest observation and can change after observing again.
+
+Links use blue borders, buttons green, text inputs purple, and selection controls
+pink or orange. Marks follow document order within each frame. Screenshots use
+viewport CSS pixels even on HiDPI displays. Annotations are drawn on the image
+without changing the page. Use `DomMode(marks=False)` for plain screenshots or
+`DomMode(screenshots=False)` for YAML only.
+
+Extraction follows the composed DOM, including slots, open and closed shadow
+roots, and CDP click-listener metadata. It checks viewport visibility, clipping,
+and overlapping controls. Nested same-origin and cross-origin frames use their
+own isolated worlds and CDP sessions where needed. Frame transforms account for
+borders, scrolling, scaling, and rotation; ancestor hit tests reject covered
+frames before clicking. Unreachable frames and content limits are reported in
+`limitations`, while usable frames remain available. Frame discovery is bounded
+to 64 frames and eight levels; perspective transforms are reported as unsupported.
+
 ## Double-clicks and dragging
 
 `InteractionTools` provides `click(ref=..., count=2)` and
@@ -198,6 +222,7 @@ uses ffprobe when available.
 
 ## Project status
 
-The core is implemented and tested against real Chrome. Broader platform coverage,
-complex Figma device-frame detection, transformed frames and out-of-process iframes
-(OOPIFs), and recovery from process crashes remain areas for further validation.
+The core is implemented and tested against real Chrome, including transformed,
+nested, and out-of-process iframes (OOPIFs). Broader platform coverage, complex Figma
+device-frame detection, perspective-transformed frames, and recovery from process
+crashes remain areas for further validation.

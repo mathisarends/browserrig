@@ -26,12 +26,14 @@ class ViewportView(Options):
 
 class ElementView(Options):
     ref: str
+    mark: int | None = None
     role: str
     name: str
     tag: str
     input_type: str = ""
     value: str | None = None
     disabled: bool = False
+    checked: bool | None = None
     draggable: bool = False
     options: tuple[str, ...] = ()
 
@@ -39,12 +41,14 @@ class ElementView(Options):
     def from_element(cls, element: Element) -> Self:
         return cls(
             ref=element.ref,
+            mark=element.mark,
             role=element.role,
             name=element.name,
             tag=element.tag,
             input_type=element.input_type,
             value=element.value,
             disabled=element.disabled,
+            checked=element.checked,
             draggable=element.draggable,
             options=element.options,
         )

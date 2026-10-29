@@ -5,7 +5,7 @@ from typing import Any, Self
 from uuid import uuid4
 
 import httpx
-from cdpify import CdpClient
+from cdpify import CdpClient, CdpSession
 from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
 from cdpify.domains.page import (
     FrameNavigatedEvent,
@@ -33,6 +33,7 @@ from browserrig.events import (
 from .base import EventSink
 from .config import BrowserOptions, ConnectBrowser, LaunchBrowser
 from .errors import BrowserClosed, BrowserError
+from .frames import discover_frames
 from .models import Download, DownloadState, TabInfo
 from .process import ChromeProcess
 from .tab import Frame, Tab, validated_url
@@ -177,6 +178,7 @@ class ChromeBrowser:
                 raise
 
     async def _detach(self, session_id: str) -> None:
+        self._sessions.pop(session_id, None)
         if self.client.is_connected:
             # The target may already have been destroyed by its owner.
             with suppress(Exception):
@@ -234,33 +236,27 @@ class ChromeBrowser:
 
     async def frames(self, tab: Tab) -> tuple[Frame, ...]:
         """Resolve each frame to its own session, including cross-process targets."""
-        root = (await tab.cdp.page.get_frame_tree()).frame_tree
-        targets = {
-            info.target_id: info for info in (await self.client.target.get_targets()).target_infos
-        }
-        result: list[Frame] = []
+        self._check()
+        targets = tuple((await self.client.target.get_targets()).target_infos)
+        live = {info.target_id for info in targets if info.type == "iframe"}
+        for sid, target_id in tuple(self._sessions.items()):
+            if target_id not in self._tabs and target_id not in live:
+                await self._detach(sid)
+        return await discover_frames(tab, targets, self._frame_session)
 
-        async def visit(tree: Any, cdp: Any, x: float, y: float) -> None:
-            frame_id = tree.frame.id
-            if frame_id in targets and targets[frame_id].type == "iframe":
-                if frame_id not in self._sessions.values():
-                    attached = await self.client.target.attach_to_target(
-                        target_id=frame_id, flatten=True
-                    )
-                    self._sessions[attached.session_id] = frame_id
-                    assert self._stack is not None
-                    self._stack.push_async_callback(self._detach, attached.session_id)
-                sid = next(sid for sid, tid in self._sessions.items() if tid == frame_id)
-                cdp = self.client.session(sid)
-                tree = (await cdp.page.get_frame_tree()).frame_tree
-            result.append(Frame(frame_id, cdp, x, y))
-            for child in tree.child_frames or ():
-                owner = await cdp.dom.get_frame_owner(frame_id=child.frame.id)
-                box = await cdp.dom.get_box_model(backend_node_id=owner.backend_node_id)
-                await visit(child, cdp, x + box.model.content[0], y + box.model.content[1])
-
-        await visit(root, tab.cdp, 0, 0)
-        return tuple(result)
+    async def _frame_session(self, frame_id: str) -> CdpSession:
+        """Reuse owned OOPIF sessions; discard stale sessions when targets disappear."""
+        async with self._attach_lock:
+            sid = next((sid for sid, tid in self._sessions.items() if tid == frame_id), None)
+            if sid is None:
+                attached = await self.client.target.attach_to_target(
+                    target_id=frame_id, flatten=True
+                )
+                sid = attached.session_id
+                self._sessions[sid] = frame_id
+                assert self._stack is not None
+                self._stack.push_async_callback(self._detach, sid)
+            return self.client.session(sid)
 
     async def downloads(self) -> tuple[Download, ...]:
         return tuple(self._downloads.values())

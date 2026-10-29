@@ -63,6 +63,23 @@ async def site() -> AsyncIterator[str]:
         ),
         "/frames": """<!doctype html><title>Frames</title><iframe src='/inner'></iframe>""",
         "/inner": "<!doctype html><label>Inside<input id=inside></label>",
+        "/frame-host": """<!doctype html><style>body{margin:0;height:3000px}
+            iframe{position:absolute;left:100px;top:100px;width:600px;height:300px;
+            border:10px solid blue}</style><iframe src='/frame-leaf'></iframe>""",
+        "/frame-middle": """<!doctype html><style>body{margin:0}</style>
+            <iframe style='position:absolute;left:40px;top:50px;width:480px;height:220px;
+            border:5px solid red' src='/frame-leaf'></iframe>""",
+        "/frame-cross-middle": """<!doctype html><style>body{margin:0}</style>
+            <iframe style='position:absolute;left:40px;top:50px;width:480px;height:220px;
+            border:5px solid red'></iframe><script>
+            const url=new URL('/frame-leaf',location.href);
+            url.hostname=location.hostname==='localhost'?'127.0.0.1':'localhost';
+            document.querySelector('iframe').src=url.href;</script>""",
+        "/frame-leaf": """<!doctype html><style>body{margin:0}
+            button{position:absolute;left:80px;top:60px;width:120px;height:40px}
+            input{position:absolute;left:80px;top:120px}</style>
+            <button onclick="document.body.dataset.clicked=event.isTrusted">Frame button</button>
+            <input aria-label='Frame input'>""",
         "/ticker": """<!doctype html><title>Ticker</title><div id=t></div>
             <script>setInterval(()=>{document.querySelector('#t').textContent=Date.now()},20)</script>""",
     }

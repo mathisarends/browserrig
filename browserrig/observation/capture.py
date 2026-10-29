@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -5,16 +6,19 @@ from importlib.resources import files
 from typing import assert_never
 from uuid import uuid4
 
+from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser.base import Browser
 from browserrig.browser.errors import BrowserError
 from browserrig.browser.images import screenshot
-from browserrig.browser.tab import Tab
+from browserrig.browser.tab import Frame, Tab
 from browserrig.kinds import ReadinessStatus
 from browserrig.readiness.models import ReadinessReport
 
 from .config import CanvasMode, DomMode, ObservationMode
+from .dom import seed_dom
+from .marks import annotate
 from .models import (
     DOMExtraction,
     Element,
@@ -61,31 +65,79 @@ class DomCapture(CaptureStrategy):
 
     def __init__(self, mode: DomMode) -> None:
         self.mode = mode
+        self._metadata: dict[str, CaptureSnapshotResult | None] = {}
+
+    async def _extract(
+        self,
+        frame: Frame,
+        snapshot_id: str,
+        max_elements: int,
+        max_text: int,
+        limitations: list[str],
+    ) -> DOMExtraction:
+        await frame.evaluate("globalThis.__browserrigDOM = null")
+        try:
+            session_id = frame.cdp.session_id
+            if session_id not in self._metadata:
+                self._metadata[session_id] = None
+                async with asyncio.timeout(2):
+                    self._metadata[session_id] = await frame.cdp.dom_snapshot.capture_snapshot(
+                        computed_styles=[]
+                    )
+            metadata = self._metadata[session_id]
+            if metadata is None or not await seed_dom(frame, metadata):
+                limitations.append(f"Supplementary DOM metadata incomplete for frame {frame.id}")
+        except (CDPCommandError, TimeoutError):
+            limitations.append(f"Supplementary DOM metadata unavailable for frame {frame.id}")
+        raw = await frame.call(
+            SNAPSHOT_SCRIPT,
+            {
+                "token": snapshot_id,
+                "maxElements": max_elements,
+                "maxText": max_text,
+                "clip": frame.local_clip.model_dump() if frame.local_clip else None,
+            },
+        )
+        return DOMExtraction.model_validate(raw)
 
     async def collect(
         self, browser: Browser, tab: Tab, snapshot_id: str, report: ReadinessReport
     ) -> Content:
         elements: list[Element] = []
         text: list[str] = []
-        limitations: list[str] = []
-        for frame in await browser.frames(tab):
+        frames = await browser.frames(tab)
+        limitations = list(tab.frame_limitations)
+        for frame in frames:
             try:
-                raw_state = await frame.call(
-                    SNAPSHOT_SCRIPT,
-                    {
-                        "token": snapshot_id,
-                        "maxElements": max(0, self.mode.max_elements - len(elements)),
-                        "maxText": max(
-                            0, self.mode.max_text_chars - sum(len(part) for part in text)
-                        ),
-                    },
+                state = await self._extract(
+                    frame,
+                    snapshot_id,
+                    max(0, self.mode.max_elements - len(elements)),
+                    max(0, self.mode.max_text_chars - sum(len(part) for part in text) - len(text)),
+                    limitations,
                 )
-                state = DOMExtraction.model_validate(raw_state)
-                text.append(state.text)
-                for item in state.elements:
+                if state.truncated:
+                    limitations.append(
+                        "DOM extraction was truncated by the configured content limits"
+                    )
+                points = tuple(frame.projection.point(item.x, item.y) for item in state.elements)
+                visible = await frame.visible_points(points) if points else ()
+                if state.text:
+                    text.append(state.text)
+                included_elements = (
+                    item for item, included in zip(state.elements, visible, strict=True) if included
+                )
+                for item in included_elements:
+                    bounds = frame.projection.box(item.bounds)
+                    bounds = (
+                        bounds.intersect(frame.projection.clip) if frame.projection.clip else bounds
+                    )
                     elements.append(
                         Element(
                             ref=f"{snapshot_id[:8]}:{len(elements)}",
+                            mark=len(elements)
+                            if self.mode.screenshots and self.mode.marks
+                            else None,
                             frame_id=frame.id,
                             index=item.index,
                             role=item.role,
@@ -94,17 +146,27 @@ class DomCapture(CaptureStrategy):
                             input_type=item.input_type,
                             value=item.value,
                             disabled=item.disabled,
+                            checked=item.checked,
                             draggable=item.draggable,
                             options=item.options,
+                            bounds=bounds,
                         )
                     )
-            except CDPCommandError:
+            except (CDPCommandError, BrowserError, TimeoutError):
+                if frame.parent is None:
+                    raise
                 limitations.append(f"Frame {frame.id} changed or could not be inspected")
-        image = await screenshot(tab, report.geometry) if self.mode.screenshots else None
+        image = None
+        if self.mode.screenshots:
+            viewport = frames[0].projection.clip
+            assert viewport is not None
+            image = await asyncio.to_thread(
+                annotate, await screenshot(tab), tuple(elements), viewport
+            )
         return Content(
             text=tuple(text),
             elements=tuple(elements),
-            limitations=tuple(limitations),
+            limitations=tuple(dict.fromkeys(limitations)),
             image=image,
         )
 
@@ -169,7 +231,9 @@ async def capture(
         text=content.text,
         scroll_y=facts.scroll_y,
         elements=tuple(
-            ElementFingerprint(role=e.role, name=e.name, value=e.value, disabled=e.disabled)
+            ElementFingerprint(
+                role=e.role, name=e.name, value=e.value, disabled=e.disabled, checked=e.checked
+            )
             for e in content.elements
         ),
         image_digest=content.image_digest,
