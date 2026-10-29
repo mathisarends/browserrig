@@ -13,13 +13,9 @@ from .gestures import click as click_gesture
 from .gestures import drag as drag_gesture
 from .gestures import image_point
 
-ClickCount = Annotated[
+type ClickCount = Annotated[
     Literal[1, 2], Field(description="2 = native double click (open, edit, select word)")
 ]
-
-
-def _click_kind(count: ClickCount) -> ActionKind:
-    return ActionKind.DOUBLE_CLICK if count == 2 else ActionKind.CLICK
 
 
 class PointerTools(Plugin, needs=(Actions,)):
@@ -164,3 +160,7 @@ class InteractionTools(PointerTools):
             return Effect("Drag dispatched; inspect the destination.")
 
         return await actions.run(kind=ActionKind.DRAG, operation=drag, expects_change=True)
+
+
+def _click_kind(count: ClickCount) -> ActionKind:
+    return ActionKind.DOUBLE_CLICK if count == 2 else ActionKind.CLICK
