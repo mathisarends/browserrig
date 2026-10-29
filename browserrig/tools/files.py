@@ -7,6 +7,7 @@ from harnessed import Inject, Observation, Plugin, ToolError, hook, tool
 from harnessed.hooks import Next, PreStep, StepDecision
 from pydantic import Field
 
+from browserrig.browser.errors import BrowserError
 from browserrig.browser.models import Download, DownloadState
 from browserrig.browser.tab import Tab
 from browserrig.files import (
@@ -150,10 +151,13 @@ class UploadTools(Plugin, needs=(Actions,)):
         *,
         actions: Inject[Actions],
     ) -> str:
-        async def upload(tab: Tab) -> Effect:
-            frame, element = await actions.observe.element(tab, ref)
+        async def check(tab: Tab) -> None:
+            _, element = await actions.observe.element(tab, ref)
             if element.input_type != "file":
-                raise ValueError("Target is not a file input")
+                raise BrowserError("Target is not a file input")
+
+        async def upload(tab: Tab) -> Effect:
+            frame, _ = await actions.observe.element(tab, ref)
             node = await actions.element_call(
                 tab=tab, ref=ref, operation=ElementOperation.NODE, by_value=False
             )
@@ -166,6 +170,7 @@ class UploadTools(Plugin, needs=(Actions,)):
         return await actions.run(
             kind=ActionKind.UPLOAD,
             operation=upload,
+            check=check,
         )
 
 

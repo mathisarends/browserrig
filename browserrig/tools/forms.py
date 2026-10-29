@@ -1,5 +1,6 @@
 from harnessed import Inject, Plugin, tool
 
+from browserrig.browser.errors import BrowserError
 from browserrig.browser.tab import Tab
 from browserrig.kinds import ActionKind, ElementOperation
 
@@ -60,10 +61,12 @@ class FormTools(Plugin, needs=(Actions,)):
         *,
         actions: Inject[Actions],
     ) -> str:
-        async def set_date(tab: Tab) -> Effect:
+        async def check(tab: Tab) -> None:
             _, element = await actions.observe.element(tab, ref)
             if element.input_type not in {"date", "time", "datetime-local", "month", "week"}:
-                raise ValueError("Element is not a native date/time input")
+                raise BrowserError("Element is not a native date/time input")
+
+        async def set_date(tab: Tab) -> Effect:
             await actions.element_call(
                 tab=tab,
                 ref=ref,
@@ -75,4 +78,5 @@ class FormTools(Plugin, needs=(Actions,)):
         return await actions.run(
             kind=ActionKind.TYPE,
             operation=set_date,
+            check=check,
         )

@@ -49,6 +49,7 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
         *,
         kind: ActionKind,
         operation: Callable[[Tab], Awaitable[Effect]],
+        check: Callable[[Tab], Awaitable[None]] | None = None,
         expects_change: bool = False,
         settle: bool = True,
     ) -> str:
@@ -59,6 +60,8 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
             dispatched = False
             try:
                 before = await self._prepare(tab, kind)
+                if check is not None:
+                    await check(tab)
                 await self.browser.emit(
                     ActionStartedEvent(
                         action_id=action_id,
@@ -96,7 +99,11 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
                 await self._fail(tab, action_id, kind, dispatched, reason)
                 raise
             except Exception as error:
-                reason = str(error) if isinstance(error, BrowserError) else type(error).__name__
+                reason = (
+                    str(error)
+                    if isinstance(error, (BrowserError, ToolError))
+                    else f"{type(error).__name__}: {error}"
+                )
                 await self._fail(tab, action_id, kind, dispatched, reason)
                 hint = "; the action may have run. Observe before retrying." if dispatched else ""
                 raise ToolError(reason + hint) from error

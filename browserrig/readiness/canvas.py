@@ -15,7 +15,6 @@ from browserrig.kinds import ReadinessStatus
 from browserrig.observation.config import CanvasMode
 
 from .config import ReadinessOptions
-from .dom import probe_dom
 from .strategy import ReadinessStrategy
 
 _SCRIPT = files("browserrig.readiness").joinpath("scripts/canvas.js").read_text(encoding="utf-8")
@@ -82,13 +81,12 @@ class CanvasReadiness(ReadinessStrategy):
 
     async def check(self) -> bool:
         self.delay = max(self._options.poll_interval, 0.5)
-        state = await probe_dom(self._tab)
         if self.geometry is not None:
             location = await _locate_canvas(self._tab, self._mode)
-            if location.geometry == self.geometry:
+            if location.ready and location.geometry == self.geometry:
                 # Recheck pixels only when capture geometry changes.
                 self.delay = self._options.poll_interval
-                return state.quiet_ms >= self._options.quiet_ms
+                return True
             self.geometry = None
             self._cache.pop(self._key, None)
         candidate, self.reason = await _probe_canvas(self._tab, self._mode)
@@ -122,7 +120,7 @@ def _has_canvas_content(encoded: str, min_fraction: float) -> bool:
             for index, pixel in enumerate(pixels)
             if max(abs(pixel[channel] - background[channel]) for channel in range(3)) > 25
         ]
-        if len(changed) < len(pixels) * min_fraction:
+        if not changed or len(changed) < len(pixels) * min_fraction:
             return False
         spread = ImageStat.Stat(image).stddev
         if max(spread) < 2:

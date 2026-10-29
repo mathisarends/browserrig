@@ -2,17 +2,20 @@
 # pylint: disable=protected-access
 
 import asyncio
+import base64
+from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Agent, Context, Inject, Plugin
 from harnessed.testing import ScriptedModel
+from PIL import Image
 
 from browserrig import CanvasMode, Readiness, ReadinessOptions, wait_for_page
 from browserrig.browser.models import Geometry
 from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent
-from browserrig.readiness.canvas import CanvasProbe
+from browserrig.readiness.canvas import CanvasProbe, _has_canvas_content
 from tests.fakes import FakeBrowser, FakeChrome
 
 
@@ -86,6 +89,7 @@ async def test_canvas_reuses_cached_geometry_and_rechecks_pixels_only_after_geom
 ):
     browser = FakeBrowser(SimpleNamespace(emit=AsyncMock()))
     tab = browser.active_tab
+    tab.quiet_ms = 0
     original = Geometry(width=500, height=400)
     current = original.model_copy(update={"width": 600}) if changed else original
     cache = {(tab.id, tab.document_id): original}
@@ -97,7 +101,7 @@ async def test_canvas_reuses_cached_geometry_and_rechecks_pixels_only_after_geom
         browser,
         tab,
         mode=CanvasMode(),
-        options=ReadinessOptions(timeout=2, quiet_ms=0),
+        options=ReadinessOptions(timeout=2),
         geometry_cache=cache,
     )
     assert report.status == "ready"
@@ -105,3 +109,11 @@ async def test_canvas_reuses_cached_geometry_and_rechecks_pixels_only_after_geom
     assert cache[(tab.id, tab.document_id)] == current
     assert locate.await_count == 1
     assert pixels.await_count == (2 if changed else 0)
+
+
+def test_canvas_zero_color_fraction_rejects_low_contrast_without_crashing():
+    image = Image.new("RGB", (20, 20), (120, 120, 120))
+    image.paste((130, 130, 130), (0, 0, 10, 20))
+    output = BytesIO()
+    image.save(output, format="PNG")
+    assert not _has_canvas_content(base64.b64encode(output.getvalue()).decode(), 0)
