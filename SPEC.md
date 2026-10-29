@@ -44,6 +44,16 @@ async with ChromeBrowser(LaunchBrowser(url="https://example.com")) as browser:
 Harnessed besitzt Agentenloop, Toolregistry, Schemas, Policies, Approvals, Turns,
 Controls und das append-only Session-Log. Browserrig ersetzt diese Mechanismen nicht.
 
+`BrowserAgent` ist die Kompositionsfassade für die übliche Agentennutzung. Sie spezialisiert
+Harnesseds `Agent` ausschließlich im Konstruktor: `browser`, `mode`, `readiness` und
+`recording` konfigurieren `browser_plugins()`. `session_directory` aktiviert optional
+`JsonlSessions`; `approvals`, `instructions` und zusätzliche `plugins` bleiben explizit.
+Ohne diese Optionen gelten In-Memory-Speicherung und Harnesseds Approval-Default `ASK`.
+Es gibt keine zusätzliche Run-/Session-Implementierung. Modellanbieter und Ressourcen
+bleiben in ihrer bestehenden Ownership; eine Browserressource entsteht erst beim Session-Mount.
+Native Pydantic-AI-Modelle können direkt übergeben werden, weil Harnessed sie adaptiert.
+`browser_plugins()` und die einzelnen Fähigkeiten bleiben für eigene Komposition erhalten.
+
 | Fähigkeit | Verantwortung |
 | --- | --- |
 | `Chrome` | konkrete Browserressource öffnen und zuverlässig schließen |
@@ -74,7 +84,8 @@ return await actions.run(
 ```
 
 Ein neues Service-Objekt ist nur gerechtfertigt, wenn es tatsächlich Zustand oder
-einen fachlichen Ablauf besitzt. Weitere Controller-/Manager-Fassaden entfallen.
+einen fachlichen Ablauf besitzt. Die Kompositionsfassade `BrowserAgent` fügt keinen
+eigenen Laufzeitzustand hinzu; weitere delegierende Controller-/Manager-Schichten entfallen.
 
 Plugin-Rezepte enthalten Konfiguration. Veränderlicher Zustand entsteht pro Mount
 durch `PluginState` oder in `setup`. `needs` und `Inject` beschreiben Abhängigkeiten;

@@ -3,6 +3,7 @@
 __version__ = "0.1.0"
 
 from .activity import Activity
+from .agent import BrowserAgent
 from .browser import Browser, Chrome, ChromeBrowser, ConnectBrowser, LaunchBrowser, Viewport
 from .browser.models import Point
 from .composition import browser_plugins
@@ -22,6 +23,7 @@ __all__ = [
     "Point",
     "DragMode",
     "Browser",
+    "BrowserAgent",
     "FigmaMode",
     "Chrome",
     "ChromeBrowser",

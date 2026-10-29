@@ -14,6 +14,7 @@ browserrig/
 ├── .github/workflows/checks.yml
 ├── browserrig/
 │   ├── __init__.py
+│   ├── agent.py
 │   ├── py.typed
 │   ├── kinds.py
 │   ├── events.py
@@ -75,6 +76,8 @@ browserrig/
     ├── conftest.py
     ├── fakes.py
     ├── test_events.py
+    ├── test_composition.py
+    ├── test_agent_facade_integration.py
     ├── test_readiness.py
     ├── test_nudges.py
     ├── test_browser_integration.py
@@ -88,6 +91,11 @@ Der Baum wird mit tatsächlich notwendigen Modulen erweitert, nicht durch leere
 Platzhalter für eine theoretische Architektur.
 
 ## Gemeinsame Verträge
+
+`agent.py` enthält die öffentliche `BrowserAgent`-Fassade. Sie übernimmt die übliche
+Konfiguration für Harnesseds `Agent` und verwendet das Plugin-Rezept aus `composition.py`.
+Run, Session, Persistenz und Controls bleiben bei Harnessed; der Konstruktor öffnet
+keine Ressourcen und importiert keine optionalen Provider-SDKs.
 
 `kinds.py` enthält geschlossene Werte, die mehrere Fähigkeiten und Eventverträge
 teilen, etwa `ActionKind` und `ActivityKind`. Fähigkeitslokale Enums wie

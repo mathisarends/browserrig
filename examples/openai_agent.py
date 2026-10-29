@@ -5,12 +5,11 @@ import asyncio
 import os
 from pathlib import Path
 
-from harnessed import Agent, PolicyDecision
-from harnessed.models import PydanticAIModel
-from harnessed.plugins import Approvals, JsonlSessions
+from harnessed import PolicyDecision
+from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import LaunchBrowser, RecordingOptions, WebMode, browser_plugins
+from browserrig import BrowserAgent, LaunchBrowser, RecordingOptions, WebMode
 
 DEFAULT_TASK = (
     "Erkunde das Voyager-Programm. Vergleiche Voyager 1 und Voyager 2 nach Startdatum, "
@@ -33,21 +32,15 @@ async def main() -> None:
     if not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY in the environment or use uv run --env-file .env")
 
-    # OpenAIResponsesModel reads OPENAI_API_KEY. Harnessed adapts its native model;
-    # activity tracking observes events and never wraps or decorates this object.
+    # The caller owns the provider model; BrowserAgent configures the browser plugins.
     async with OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")) as openai:
-        agent = Agent(
-            model=PydanticAIModel(openai),
-            instructions="Complete the requested browser task using the observed page state.",
-            plugins=[
-                *browser_plugins(
-                    LaunchBrowser(url=args.url, headless=not args.headed),
-                    mode=WebMode(screenshots=True),
-                    recording=RecordingOptions() if args.record else None,
-                ),
-                JsonlSessions(Path(".browserrig/sessions")),
-                Approvals(default=PolicyDecision.ALLOW),
-            ],
+        agent = BrowserAgent(
+            model=openai,
+            browser=LaunchBrowser(url=args.url, headless=not args.headed),
+            mode=WebMode(screenshots=True),
+            recording=RecordingOptions() if args.record else None,
+            session_directory=Path(".browserrig/sessions"),
+            approvals=Approvals(default=PolicyDecision.ALLOW),
         )
         async with agent.session() as session:
             result = await session.run(args.task, max_steps=20, token_budget=80000)

@@ -4,12 +4,11 @@ import argparse
 import asyncio
 import os
 
-from harnessed import Agent, PolicyDecision
-from harnessed.models import PydanticAIModel
+from harnessed import PolicyDecision
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import LaunchBrowser, browser_plugins
+from browserrig import BrowserAgent, LaunchBrowser
 
 
 async def main() -> None:
@@ -20,12 +19,10 @@ async def main() -> None:
     if not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY first")
     async with OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")) as openai:
-        agent = Agent(
-            model=PydanticAIModel(openai),
-            plugins=[
-                *browser_plugins(LaunchBrowser(url=args.url)),
-                Approvals(default=PolicyDecision.ALLOW),
-            ],
+        agent = BrowserAgent(
+            model=openai,
+            browser=LaunchBrowser(url=args.url),
+            approvals=Approvals(default=PolicyDecision.ALLOW),
         )
         async with agent.session() as session:
             handle = await session.submit(args.task)

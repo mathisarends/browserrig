@@ -2,11 +2,11 @@ import asyncio
 
 import pytest
 import yaml
-from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, tool
+from harnessed import Context, Inject, Plugin, PolicyDecision, tool
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Browser, LaunchBrowser, browser_plugins
+from browserrig import Browser, BrowserAgent, LaunchBrowser
 from browserrig.events import ActivityFinishedEvent
 
 pytestmark = pytest.mark.integration
@@ -27,13 +27,11 @@ async def test_pause_steer_resume_observes_external_page_change(site):
             return "Step finished"
 
     model = ScriptedModel([call(Gate.hold), "Resumed"])
-    agent = Agent(
+    agent = BrowserAgent(
         model=model,
-        plugins=[
-            *browser_plugins(LaunchBrowser(url=site)),
-            Gate(),
-            Approvals(default=PolicyDecision.ALLOW),
-        ],
+        browser=LaunchBrowser(url=site),
+        approvals=Approvals(default=PolicyDecision.ALLOW),
+        plugins=[Gate()],
     )
     async with agent.session() as session:
         handle = await session.submit("Inspect the page")
