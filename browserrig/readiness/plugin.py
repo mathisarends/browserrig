@@ -53,7 +53,7 @@ class Readiness(Plugin, provides=True, needs=(Browser,)):
     async def wait(
         self, tab: Tab, *, phase: ReadinessPhase = ReadinessPhase.OBSERVATION
     ) -> ReadinessReport:
-        await tab.main_frame()
+        await tab.sync_document()
         key = (tab.id, tab.document_id, phase)
         if key not in self._state.pending:
             task = asyncio.create_task(self._wait(tab, phase), name="browserrig:readiness")

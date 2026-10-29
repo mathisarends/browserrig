@@ -40,20 +40,7 @@ class ElementView(Options):
 
     @classmethod
     def from_element(cls, element: Element) -> Self:
-        return cls(
-            ref=element.ref,
-            in_viewport=element.in_viewport,
-            mark=element.mark,
-            role=element.role,
-            name=element.name,
-            tag=element.tag,
-            input_type=element.input_type,
-            value=element.value,
-            disabled=element.disabled,
-            checked=element.checked,
-            draggable=element.draggable,
-            options=element.options,
-        )
+        return cls.model_validate(element, from_attributes=True)
 
 
 class SnapshotView(Options):

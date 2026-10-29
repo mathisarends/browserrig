@@ -3,11 +3,14 @@ from harnessed import Inject, Plugin, tool
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.kinds import ActionKind, ElementOperation
+from browserrig.observation.plugin import Observe
 
 from .execution import Actions, Effect
 
 
-class FormTools(Plugin, needs=(Actions,)):
+class FormTools(Plugin, needs=(Actions, Observe)):
+    _observe: Inject[Observe]
+
     @tool(description="Type exact text into a DOM ref; clear replaces its value by default.")
     async def type_text(
         self,
@@ -62,7 +65,7 @@ class FormTools(Plugin, needs=(Actions,)):
         actions: Inject[Actions],
     ) -> str:
         async def check(tab: Tab) -> None:
-            _, element = await actions.observe.element(tab, ref)
+            _, element = await self._observe.element(tab, ref)
             if element.input_type not in {"date", "time", "datetime-local", "month", "week"}:
                 raise BrowserError("Element is not a native date/time input")
 

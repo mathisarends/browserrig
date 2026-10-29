@@ -8,6 +8,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from cdpify import CdpSession
+from cdpify.domains.page import FrameTree
 from cdpify.domains.runtime import CallArgument
 
 from browserrig.core.errors import BrowserError
@@ -42,6 +43,19 @@ class Frame:
     def local_clip(self) -> Bounds | None:
         clip = self.projection.clip
         return self.projection.local_box(clip) if clip is not None else None
+
+    @property
+    def clip_payload(self) -> dict[str, float] | None:
+        return self.local_clip.model_dump() if self.local_clip is not None else None
+
+    async def frame_tree(self) -> FrameTree:
+        return await _frame_tree(self.cdp)
+
+    async def upload_files(self, object_id: str, paths: list[str]) -> None:
+        try:
+            await self.cdp.dom.set_file_input_files(files=paths, object_id=object_id)
+        finally:
+            await self.cdp.runtime.release_object(object_id=object_id)
 
     async def owner_call(self, function: str, *arguments: object) -> Any:
         """Inspect the embedding element in its parent's isolated world."""
@@ -176,10 +190,38 @@ class Tab:
             await self._emit(replace(event, target_id=self.id, document_id=self.document_id))
 
     async def main_frame(self) -> Frame:
-        tree = await self.cdp.page.get_frame_tree()
-        self.document_id = tree.frame_tree.frame.loader_id
-        self.url = tree.frame_tree.frame.url
-        return Frame(tree.frame_tree.frame.id, self.cdp)
+        tree = await self.frame_tree()
+        return Frame(tree.frame.id, self.cdp)
+
+    async def frame_tree(self) -> FrameTree:
+        return await _frame_tree(self.cdp)
+
+    async def sync_document(self) -> None:
+        tree = await self.frame_tree()
+        self.document_id, self.url = tree.frame.loader_id, tree.frame.url
+
+    async def go_back(self) -> bool:
+        return await self._history(-1)
+
+    async def go_forward(self) -> bool:
+        return await self._history(1)
+
+    async def _history(self, offset: int) -> bool:
+        history = await self.cdp.page.get_navigation_history()
+        index = history.current_index + offset
+        if not 0 <= index < len(history.entries):
+            return False
+        await self.cdp.page.navigate_to_history_entry(entry_id=history.entries[index].id)
+        return True
+
+    async def reload(self) -> None:
+        await self.cdp.page.reload()
+
+    async def handle_dialog(self, *, accept: bool, text: str = "") -> None:
+        await self.cdp.page.handle_java_script_dialog(accept=accept, prompt_text=text)
+
+    async def bring_to_front(self) -> None:
+        await self.cdp.page.bring_to_front()
 
     async def evaluate(self, expression: str) -> Any:
         return await (await self.main_frame()).evaluate(expression)
@@ -189,23 +231,10 @@ class Tab:
         if result.error_text:
             raise BrowserError(f"Navigation failed: {result.error_text}")
 
-    async def press_key(
-        self,
-        key: str,
-        *,
-        hold_control: bool = False,
-        hold_shift: bool = False,
-        hold_alt: bool = False,
-        hold_meta: bool = False,
-    ) -> None:
-        """Dispatch input to this tab's page session, never to browser chrome or the OS."""
-        await self.keyboard.press_key(
-            key,
-            hold_control=hold_control,
-            hold_shift=hold_shift,
-            hold_alt=hold_alt,
-            hold_meta=hold_meta,
-        )
+
+async def _frame_tree(cdp: CdpSession) -> FrameTree:
+    result = await cdp.page.get_frame_tree()
+    return result.frame_tree
 
 
 def validated_url(url: str) -> str:

@@ -4,8 +4,7 @@ import argparse
 import asyncio
 
 from browserrig import ChromeBrowser, LaunchBrowser, wait_for_page
-from browserrig.observation import DomMode, render
-from browserrig.observation.capture import capture
+from browserrig.observation import DomMode, capture, render
 
 
 async def main() -> None:

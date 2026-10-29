@@ -131,7 +131,7 @@ async def test_key_cancellation_releases_main_and_modifiers_and_hides_keyboard()
 
 async def test_shortcut_dispatches_modifiers_without_inserting_text():
     tab, events, commands = _tab()
-    await tab.press_key("a", hold_control=True)
+    await tab.keyboard.press_key("a", hold_control=True)
     assert [(command["type"], command["key"]) for command in commands] == [
         ("rawKeyDown", "Control"),
         ("rawKeyDown", "a"),
@@ -154,7 +154,7 @@ async def test_shortcut_dispatches_modifiers_without_inserting_text():
 )
 async def test_modifier_flags_reach_cdp_and_key_events(modifier, name, flag, key):
     tab, events, commands = _tab()
-    await tab.press_key("a", **{modifier: True})
+    await tab.keyboard.press_key("a", **{modifier: True})
     down = [command for command in commands if command["type"] == "rawKeyDown"]
     assert [command["key"] for command in down] == [name, key]
     assert down[-1]["modifiers"] == flag

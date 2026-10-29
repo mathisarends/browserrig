@@ -282,7 +282,7 @@ Activating an existing tab republishes its current position. Agent turn starts
 also publish the current cursor state so live subscribers attached after browser
 setup can display it before the first model request or input action.
 Low-level pointer dispatch uses `MouseEventKind`, available from `browserrig` or
-`browserrig.input`: `await tab.mouse.dispatch(MouseEventKind.MOVED, Point(x=100, y=120))`.
+`browserrig.kinds`: `await tab.mouse.dispatch(MouseEventKind.MOVED, Point(x=100, y=120))`.
 The enum also provides `PRESSED`, `RELEASED`, and `WHEEL`; use `scroll()` for wheel input.
 Cursor movements follow bounded cubic paths; scrolling uses eased wheel steps.
 Typing uses a fixed 50 ms interval, configured by the internal

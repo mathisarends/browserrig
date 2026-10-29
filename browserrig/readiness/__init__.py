@@ -1,11 +1,11 @@
 from .config import ReadinessOptions
-from .models import ReadinessPhase, ReadinessReport, ReadinessStatus
+from .models import ReadinessReport
+from .plugin import Readiness
 from .wait import wait_for_page
 
 __all__ = [
+    "Readiness",
     "ReadinessOptions",
-    "ReadinessPhase",
     "ReadinessReport",
-    "ReadinessStatus",
     "wait_for_page",
 ]

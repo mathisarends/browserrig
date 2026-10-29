@@ -214,6 +214,7 @@ async def capture(
             fingerprint="dialog",
             text=f"Open {tab.dialog[0]} dialog: {tab.dialog[1]}",
         )
+    await tab.sync_document()
     main = await tab.main_frame()
     document_id = tab.document_id
     facts = PageFacts.model_validate(
@@ -223,7 +224,7 @@ async def capture(
         )
     )
     content = await _capture_strategy(mode).collect(browser, tab, snapshot_id, report)
-    await tab.main_frame()
+    await tab.sync_document()
     if tab.document_id != document_id:
         raise BrowserError("Document changed during capture; observe again before acting")
     fingerprint = PageFingerprint(

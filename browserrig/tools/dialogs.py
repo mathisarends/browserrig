@@ -15,5 +15,6 @@ class DialogTools(Plugin, needs=(Browser,)):
         tab = browser.active_tab
         if tab.dialog is None:
             raise ToolError("No JavaScript dialog is open")
-        await tab.cdp.page.handle_java_script_dialog(accept=accept, prompt_text=prompt_text)
+        # Dialogs may block an in-flight action; handling one must bypass its lock.
+        await tab.handle_dialog(accept=accept, text=prompt_text)
         return "Dialog handled."

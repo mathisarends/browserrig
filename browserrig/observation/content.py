@@ -75,7 +75,7 @@ async def extract_content(browser: Browser, tab: Tab, *, max_chars: int = 50000)
         raise ValueError("max_chars must be between 1 and 200000")
     if tab.dialog:
         raise BrowserError("Handle the open dialog before extracting page content")
-    await tab.main_frame()
+    await tab.sync_document()
     document_id = tab.document_id
     frames = await browser.frames(tab)
     limitations = list(tab.frame_limitations)
@@ -114,7 +114,7 @@ async def extract_content(browser: Browser, tab: Tab, *, max_chars: int = 50000)
             limitations.append(f"Frame {frame.id} changed or could not be inspected")
     if embedded > len(frames) - 1:
         limitations.append("Some embedded frames are unavailable or could not be inspected")
-    await tab.main_frame()
+    await tab.sync_document()
     if tab.document_id != document_id:
         raise BrowserError("Document changed during extraction; extract the current page again")
     assert main is not None

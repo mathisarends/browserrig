@@ -56,7 +56,7 @@ async def prepare_element(browser: Browser, tab: Tab, snapshot: Snapshot, elemen
     stalled = 0
     async with asyncio.timeout(20):
         for _ in range(32):
-            await tab.main_frame()
+            await tab.sync_document()
             if tab.document_id != snapshot.document_id:
                 raise StaleElement("Document changed while scrolling; observe again")
             frame = next(

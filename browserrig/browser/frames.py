@@ -35,7 +35,7 @@ async def discover_frames(
     tab: Tab, targets: tuple[TargetInfo, ...], session_for: _FrameSession
 ) -> tuple[Frame, ...]:
     """Keep usable siblings when a frame detaches; bound work on frame-heavy pages."""
-    root = (await tab.cdp.page.get_frame_tree()).frame_tree
+    root = await tab.frame_tree()
     width, height = await (await tab.main_frame()).evaluate("[innerWidth, innerHeight]")
     viewport = Bounds(x=0, y=0, width=width, height=height)
     result = [Frame(root.frame.id, tab.cdp, Projection(clip=viewport))]
@@ -66,7 +66,7 @@ async def discover_frames(
                     if child is None:
                         continue
                     if frame_id in target_map:
-                        child_tree = (await child.cdp.page.get_frame_tree()).frame_tree
+                        child_tree = await child.frame_tree()
                 result.append(child)
                 if child_tree is not None:
                     child_space = child.projection if frame_id in target_map else session_projection

@@ -18,6 +18,7 @@ from browserrig.events import (
     NudgeIncludedEvent,
     NudgeQueuedEvent,
     ObservationCapturedEvent,
+    PageState,
 )
 from browserrig.observation.models import Snapshot
 from tests.fakes import FakeChrome
@@ -51,11 +52,10 @@ async def test_scroll_nudge_requires_exact_same_url_document_and_unrequested_scr
                 kind="click",
                 target_id="tab-1",
                 document_id=document,
-                before_url="https://example.org/",
+                before=PageState(
+                    url="https://example.org/", document_id="doc-1", fingerprint="before"
+                ),
                 after_url=after_url,
-                before_document="doc-1",
-                before_fingerprint="before",
-                before_scroll_y=0,
                 prepared_scroll=prepared,
             )
         )

@@ -96,7 +96,7 @@ class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
 
     async def element(self, tab: Tab, ref: str) -> tuple[Frame, Element]:
         snapshot = self._state.snapshot
-        await tab.main_frame()
+        await tab.sync_document()
         if snapshot is None or snapshot.tab_id != tab.id or snapshot.document_id != tab.document_id:
             raise StaleElement("Observation belongs to another tab or document; observe again")
         element = snapshot.element(ref)

@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import yaml
@@ -21,7 +24,9 @@ from browserrig.events import (
     ReadinessDegradedEvent,
     TabOpenedEvent,
 )
-from browserrig.observation.models import Snapshot
+
+if TYPE_CHECKING:
+    from browserrig.observation.models import Snapshot
 
 
 @dataclass
@@ -115,8 +120,8 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
             return
         started_at = self._state.starts.pop(action.action_id, action.at)
         same_page = (
-            action.before_url == event.url == action.after_url
-            and action.before_document == event.document_id
+            action.before.url == event.url == action.after_url
+            and action.before.document_id == event.document_id
             and action.target_id == event.target_id
         )
         if not same_page:
@@ -124,9 +129,9 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
         if (
             action.kind == ActionKind.CLICK
             and not action.prepared_scroll
-            and abs(event.scroll_y - action.before_scroll_y) >= 50
+            and abs(event.scroll_y - action.before.scroll_y) >= 50
         ):
-            delta = event.scroll_y - action.before_scroll_y
+            delta = event.scroll_y - action.before.scroll_y
             await self.queue(
                 browser,
                 f"The page scrolled {abs(delta):.0f}px "
@@ -138,7 +143,7 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
             )
         if (
             action.expects_change
-            and action.before_fingerprint == event.fingerprint
+            and action.before.fingerprint == event.fingerprint
             and self._state.effect_at < started_at
             and event.readiness == ReadinessStatus.READY
         ):

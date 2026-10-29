@@ -17,6 +17,7 @@ from browserrig.events import (
     ActionFinishedEvent,
     ActionStartedEvent,
     ElementHighlightedEvent,
+    PageState,
 )
 from browserrig.observation.capture import ELEMENT_SCRIPT
 from browserrig.observation.models import Element, Snapshot
@@ -80,11 +81,8 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
                         kind=kind,
                         target_id=tab.id,
                         document_id=tab.document_id,
-                        before_url=before.url,
+                        before=before,
                         after_url=tab.url,
-                        before_document=before.document_id,
-                        before_fingerprint=before.fingerprint,
-                        before_scroll_y=before.scroll_y,
                         prepared_scroll=effect.prepared_scroll,
                         expects_change=expects_change,
                     )
@@ -108,9 +106,12 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
                 hint = "; the action may have run. Observe before retrying." if dispatched else ""
                 raise ToolError(reason + hint) from error
 
-    async def _prepare(self, tab: Tab, kind: ActionKind) -> Snapshot:
+    async def _prepare(self, tab: Tab, kind: ActionKind) -> PageState:
         """Return the pre-action baseline once the page accepts input."""
-        await tab.main_frame()
+        if kind == ActionKind.TAB:
+            # Tab management must work even when the current page has a blocking dialog.
+            return PageState(url=tab.url, document_id=tab.document_id)
+        await tab.sync_document()
         before = self.observe.snapshot
         if before is not None and kind in _POINTER_KINDS and not _observes(before, tab):
             raise BrowserError("The observed tab or document changed; observe before pointing")
@@ -119,7 +120,12 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
         report = await self.readiness.wait(tab, phase=ReadinessPhase.ACTION)
         if report.status == ReadinessStatus.BLOCKED:
             raise BrowserError(report.reason)
-        return before
+        return PageState(
+            url=before.url,
+            document_id=before.document_id,
+            fingerprint=before.fingerprint,
+            scroll_y=before.scroll_y,
+        )
 
     async def _settle(self, tab: Tab, kind: ActionKind) -> str:
         phase = ReadinessPhase.NAVIGATION if kind == ActionKind.NAVIGATE else ReadinessPhase.ACTION

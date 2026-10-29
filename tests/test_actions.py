@@ -54,3 +54,9 @@ async def test_validation_rejects_before_dispatch():
     operation.assert_not_awaited()
     assert len(events) == 1
     assert isinstance(events[0], ActionFailedEvent) and not events[0].dispatched
+
+
+async def test_tab_management_does_not_wait_on_current_page_dialog():
+    tab = SimpleNamespace(url="about:blank", document_id="doc", dialog=("alert", "hello"))
+    before = await Actions._prepare(SimpleNamespace(), tab, ActionKind.TAB)
+    assert before.url == tab.url and before.document_id == tab.document_id

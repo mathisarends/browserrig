@@ -9,14 +9,11 @@ from .composition import browser_plugins
 from .files import FileSystem, FileSystemOptions
 from .kinds import DragMode, MouseEventKind
 from .nudges import Nudges
-from .observation import CanvasMode, DomMode
-from .observation.plugin import Observe
-from .readiness import wait_for_page
-from .readiness.config import ReadinessOptions
-from .readiness.plugin import Readiness
+from .observation import CanvasMode, DomMode, Observe
+from .readiness import Readiness, ReadinessOptions, wait_for_page
 from .recording import Recording, RecordingOptions
 from .terminal import TerminalEvents
-from .tools.execution import Actions
+from .tools import Actions
 
 __all__ = [
     "Activity",

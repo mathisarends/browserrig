@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from pydantic import Field
@@ -56,17 +57,15 @@ class Projection:
         )
 
     def box(self, bounds: Bounds) -> Bounds:
-        points = [
-            self.point(x, y)
-            for x in (bounds.x, bounds.x + bounds.width)
-            for y in (bounds.y, bounds.y + bounds.height)
-        ]
-        xs, ys = zip(*points, strict=True)
-        return Bounds(x=min(xs), y=min(ys), width=max(xs) - min(xs), height=max(ys) - min(ys))
+        return self._box(bounds, self.point)
 
     def local_box(self, bounds: Bounds) -> Bounds:
+        return self._box(bounds, self.inverse)
+
+    @staticmethod
+    def _box(bounds: Bounds, transform: Callable[[float, float], tuple[float, float]]) -> Bounds:
         points = [
-            self.inverse(x, y)
+            transform(x, y)
             for x in (bounds.x, bounds.x + bounds.width)
             for y in (bounds.y, bounds.y + bounds.height)
         ]

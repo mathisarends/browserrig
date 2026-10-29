@@ -15,6 +15,9 @@ class FakeTab:
         self.quiet_ms = 1000
         self.probes = 0
 
+    async def sync_document(self):
+        pass
+
     async def main_frame(self):
         return self
 

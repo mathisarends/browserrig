@@ -203,7 +203,7 @@ class ChromeBrowser:
                         mobile=False,
                     )
                 tab = Tab(target_id, cdp, emit=self.emit)
-                await tab.main_frame()
+                await tab.sync_document()
                 if target_id in self._closed_targets:
                     raise BrowserError("Target closed while attaching")
                 self._tabs[target_id] = tab
@@ -275,7 +275,7 @@ class ChromeBrowser:
         if target_id not in {tab.id for tab in await self.tabs()}:
             raise BrowserError("Target is outside this browser's controlled scope")
         tab = await self._attach(target_id)
-        await tab.cdp.page.bring_to_front()
+        await tab.bring_to_front()
         self._active = tab.id
         await self.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
         await tab.mouse.initialize_cursor()
@@ -329,6 +329,9 @@ class ChromeBrowser:
 
     async def downloads(self) -> tuple[Download, ...]:
         return tuple(self._downloads.values())
+
+    async def publish_cursor(self) -> None:
+        await self.active_tab.mouse.publish_cursor()
 
     def _start_listeners(self) -> None:
         for event_type in (

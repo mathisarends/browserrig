@@ -8,6 +8,7 @@ from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Point
 from browserrig.core.kinds import ActionKind, DragMode
 from browserrig.observation.models import Snapshot
+from browserrig.observation.plugin import Observe
 
 from .execution import Actions, Effect
 
@@ -16,7 +17,9 @@ type _ClickCount = Annotated[
 ]
 
 
-class PointerTools(Plugin, needs=(Actions,)):
+class PointerTools(Plugin, needs=(Actions, Observe)):
+    _observe: Inject[Observe]
+
     @tool(description="Click screenshot coordinates; count=2 performs a native double click.")
     async def click_at(
         self,
@@ -27,7 +30,7 @@ class PointerTools(Plugin, needs=(Actions,)):
         actions: Inject[Actions],
     ) -> str:
         async def click(tab: Tab) -> Effect:
-            snapshot = actions.observe.snapshot
+            snapshot = self._observe.snapshot
             assert snapshot is not None
             point = _image_point(snapshot, Point(x=x, y=y))
             await tab.mouse.click(point, count=count)
@@ -45,7 +48,7 @@ class PointerTools(Plugin, needs=(Actions,)):
         actions: Inject[Actions],
     ) -> str:
         async def scroll(tab: Tab) -> Effect:
-            snapshot = actions.observe.snapshot
+            snapshot = self._observe.snapshot
             assert snapshot is not None
             await tab.mouse.scroll(
                 point=Point(x=snapshot.width / 2, y=snapshot.height / 2), delta_y=delta_y
@@ -72,7 +75,7 @@ class PointerTools(Plugin, needs=(Actions,)):
         actions: Inject[Actions],
     ) -> str:
         async def drag(tab: Tab) -> Effect:
-            snapshot = actions.observe.snapshot
+            snapshot = self._observe.snapshot
             assert snapshot is not None
             await tab.mouse.drag(
                 start=_image_point(snapshot, start),
@@ -86,6 +89,7 @@ class PointerTools(Plugin, needs=(Actions,)):
 
 
 class InteractionTools(PointerTools):
+    # DOM mode deliberately also supports pointing at unreferenced screenshot regions.
     @tool(description="Click a current DOM ref; count=2 performs a native double click.")
     async def click(
         self,
@@ -122,7 +126,7 @@ class InteractionTools(PointerTools):
         actions: Inject[Actions],
     ) -> str:
         async def drag(tab: Tab) -> Effect:
-            _, source = await actions.observe.element(tab, source_ref)
+            _, source = await self._observe.element(tab, source_ref)
             prepared = await actions.element_point(tab=tab, ref=source_ref)
             target = await actions.element_point(tab=tab, ref=target_ref)
             start = await actions.element_point(tab=tab, ref=source_ref, scroll=False)

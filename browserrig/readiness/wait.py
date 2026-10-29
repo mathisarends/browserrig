@@ -57,7 +57,8 @@ async def wait_for_page(
     options = options or ReadinessOptions()
     if geometry_cache is None:
         geometry_cache = {}
-    await tab.main_frame()
+    await tab.sync_document()
+    started_document = tab.document_id
     started = monotonic()
     rid = uuid4().hex
     strategy = _readiness_strategy(selected, tab, options, phase, geometry_cache)
@@ -65,7 +66,7 @@ async def wait_for_page(
         ReadinessStartedEvent(
             readiness_id=rid,
             target_id=tab.id,
-            document_id=tab.document_id,
+            document_id=started_document,
             mode=selected.kind,
             phase=phase,
         )
@@ -88,7 +89,7 @@ async def wait_for_page(
             ReadinessCancelledEvent(
                 readiness_id=rid,
                 target_id=tab.id,
-                document_id=tab.document_id,
+                document_id=started_document,
                 mode=selected.kind,
                 phase=phase,
                 duration=monotonic() - started,
@@ -101,7 +102,7 @@ async def wait_for_page(
             ReadinessFailedEvent(
                 readiness_id=rid,
                 target_id=tab.id,
-                document_id=tab.document_id,
+                document_id=started_document,
                 mode=selected.kind,
                 phase=phase,
                 duration=monotonic() - started,
@@ -131,7 +132,7 @@ async def wait_for_page(
         event_type(
             readiness_id=rid,
             target_id=tab.id,
-            document_id=tab.document_id,
+            document_id=started_document,
             mode=selected.kind,
             phase=phase,
             duration=report.duration,

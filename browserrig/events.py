@@ -252,15 +252,20 @@ class ActionStartedEvent(BrowserEvent):
     type: Literal[EventKind.ACTION_STARTED] = field(default=EventKind.ACTION_STARTED, kw_only=True)
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PageState:
+    url: str
+    document_id: str
+    fingerprint: str = ""
+    scroll_y: float = 0
+
+
 @dataclass(frozen=True, slots=True)
 class ActionFinishedEvent(BrowserEvent):
     action_id: str
     kind: ActionKind
-    before_url: str
+    before: PageState
     after_url: str
-    before_document: str
-    before_fingerprint: str
-    before_scroll_y: float
     prepared_scroll: bool = False
     expects_change: bool = False
     type: Literal[EventKind.ACTION_FINISHED] = field(

@@ -4,7 +4,7 @@ import pytest
 
 from browserrig import ChromeBrowser, ConnectBrowser
 from browserrig.core.geometry import Point
-from browserrig.events import CursorStateEvent
+from browserrig.events import CursorStateEvent, TabOpenedEvent
 
 pytestmark = pytest.mark.integration
 
@@ -24,6 +24,16 @@ async def test_tabs_seed_centered_cursor_and_activation_republishes_existing_pos
         assert 0.4 * viewport.client_height <= initial[0].y <= 0.6 * viewport.client_height
         await first.mouse.move_to(Point(x=100, y=120))
         second = await browser.open_tab(site)
+        assert (
+            len(
+                [
+                    event
+                    for event in events
+                    if isinstance(event, TabOpenedEvent) and event.target_id == second.id
+                ]
+            )
+            == 1
+        )
         assert second.mouse.position != Point(x=0, y=0)
         await browser.activate_tab(first.id)
         last = next(event for event in reversed(events) if isinstance(event, CursorStateEvent))

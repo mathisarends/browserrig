@@ -14,7 +14,7 @@ from PIL import Image
 
 from browserrig import CanvasMode, Readiness, ReadinessOptions, wait_for_page
 from browserrig.core.geometry import Geometry
-from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent
+from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent, ReadyEvent
 from browserrig.readiness.canvas import CanvasProbe, _has_canvas_content
 from tests.fakes import FakeBrowser, FakeChrome
 
@@ -117,3 +117,21 @@ def test_canvas_zero_color_fraction_rejects_low_contrast_without_crashing():
     output = BytesIO()
     image.save(output, format="PNG")
     assert not _has_canvas_content(base64.b64encode(output.getvalue()).decode(), 0)
+
+
+async def test_readiness_events_keep_start_document_when_navigation_finishes(monkeypatch):
+    events = []
+    browser = FakeBrowser(SimpleNamespace(emit=AsyncMock(side_effect=events.append)))
+    tab = browser.active_tab
+
+    async def check(_strategy):
+        tab.document_id = "new-document"
+        return True
+
+    monkeypatch.setattr("browserrig.readiness.wait._check", check)
+    report = await wait_for_page(browser, tab)
+    start = next(event for event in events if isinstance(event, ReadinessStartedEvent))
+    end = next(event for event in events if isinstance(event, ReadyEvent))
+    assert start.readiness_id == end.readiness_id
+    assert start.document_id == end.document_id == "doc-1"
+    assert report.document_id == "new-document"

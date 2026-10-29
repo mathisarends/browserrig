@@ -12,3 +12,13 @@ def test_core_has_no_dependencies_on_browser_services():
                 assert not node.module.startswith("browserrig.") or node.module.startswith(
                     "browserrig.core."
                 ), (path.name, node.module)
+
+
+def test_tools_do_not_use_cdp():
+    root = Path(__file__).resolve().parents[1] / "browserrig" / "tools"
+    for path in root.glob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.ImportFrom):
+                assert not (node.module or "").startswith("cdpify"), path.name
+            if isinstance(node, ast.Attribute):
+                assert node.attr != "cdp", (path.name, node.lineno)
