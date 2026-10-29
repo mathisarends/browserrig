@@ -45,6 +45,26 @@ jobs:
           python-version: '3.14'
       - uses: browser-actions/setup-chrome@v2
         id: chrome
+      - name: Allow Chrome sandbox user namespaces
+        env:
+          BROWSERRIG_CHROME: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          # Ubuntu restricts user namespaces for binaries outside packaged browser paths.
+          # Allow only this Chrome for Testing binary to use its sandbox.
+          # https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md
+          cat <<EOF | sudo tee /etc/apparmor.d/browserrig-chrome > /dev/null
+          abi <abi/4.0>,
+          include <tunables/global>
+
+          profile browserrig-chrome "$BROWSERRIG_CHROME" flags=(unconfined) {
+            userns,
+          }
+          EOF
+          sudo apparmor_parser -r /etc/apparmor.d/browserrig-chrome
+      - name: Check Chrome startup
+        env:
+          BROWSERRIG_CHROME: ${{ steps.chrome.outputs.chrome-path }}
+        run: timeout 20s "$BROWSERRIG_CHROME" --headless=new --dump-dom about:blank
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: uv sync --locked
       - run: uv run --no-sync pytest -m integration
