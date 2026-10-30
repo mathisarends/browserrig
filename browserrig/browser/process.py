@@ -13,43 +13,6 @@ from browserrig.core.errors import BrowserError
 from .config import LaunchBrowser
 
 
-def _chrome_executable(explicit: Path | None = None) -> str:
-    candidates = [explicit, os.environ.get("BROWSERRIG_CHROME")]
-    candidates.extend(
-        shutil.which(name) for name in ("chromium", "chromium-browser", "google-chrome")
-    )
-    for root in (
-        os.environ.get("PROGRAMFILES"),
-        os.environ.get("PROGRAMFILES(X86)"),
-        os.environ.get("LOCALAPPDATA"),
-    ):
-        if root:
-            candidates.extend(
-                Path(root) / part
-                for part in (
-                    "Google/Chrome/Application/chrome.exe",
-                    "Microsoft/Edge/Application/msedge.exe",
-                )
-            )
-    for candidate in candidates:
-        if candidate and Path(candidate).is_file():
-            return str(Path(candidate).resolve())
-    raise BrowserError(
-        "Chrome was not found; set LaunchBrowser(executable=...) or BROWSERRIG_CHROME"
-    )
-
-
-def _active_endpoint(path: Path) -> str | None:
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except (FileNotFoundError, PermissionError):
-        # Chrome can still hold the port file while publishing its endpoint on Windows.
-        return None
-    if len(lines) >= 2 and lines[0].isdigit() and lines[1].startswith("/devtools/browser/"):
-        return f"ws://127.0.0.1:{lines[0]}{lines[1]}"
-    return None
-
-
 class ChromeProcess:
     def __init__(self, options: LaunchBrowser) -> None:
         self._options = options
@@ -59,7 +22,10 @@ class ChromeProcess:
 
     async def __aenter__(self) -> Self:
         binary = _chrome_executable(self._options.executable)
-        self._profile = TemporaryDirectory(prefix="browserrig-chrome-")
+        # The profile outlives this method; __aexit__ removes it with the process.
+        self._profile = TemporaryDirectory(  # pylint: disable=consider-using-with
+            prefix="browserrig-chrome-"
+        )
         flags = [
             binary,
             "--remote-debugging-address=127.0.0.1",
@@ -126,3 +92,40 @@ class ChromeProcess:
                     if asyncio.get_running_loop().time() >= deadline:
                         raise
                     await asyncio.sleep(0.05)
+
+
+def _chrome_executable(explicit: Path | None = None) -> str:
+    candidates = [explicit, os.environ.get("BROWSERRIG_CHROME")]
+    candidates.extend(
+        shutil.which(name) for name in ("chromium", "chromium-browser", "google-chrome")
+    )
+    for root in (
+        os.environ.get("PROGRAMFILES"),
+        os.environ.get("PROGRAMFILES(X86)"),
+        os.environ.get("LOCALAPPDATA"),
+    ):
+        if root:
+            candidates.extend(
+                Path(root) / part
+                for part in (
+                    "Google/Chrome/Application/chrome.exe",
+                    "Microsoft/Edge/Application/msedge.exe",
+                )
+            )
+    for candidate in candidates:
+        if candidate and Path(candidate).is_file():
+            return str(Path(candidate).resolve())
+    raise BrowserError(
+        "Chrome was not found; set LaunchBrowser(executable=...) or BROWSERRIG_CHROME"
+    )
+
+
+def _active_endpoint(path: Path) -> str | None:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (FileNotFoundError, PermissionError):
+        # Chrome can still hold the port file while publishing its endpoint on Windows.
+        return None
+    if len(lines) >= 2 and lines[0].isdigit() and lines[1].startswith("/devtools/browser/"):
+        return f"ws://127.0.0.1:{lines[0]}{lines[1]}"
+    return None
