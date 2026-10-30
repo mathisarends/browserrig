@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 
 from browserrig.core.kinds import ObservationKind, ReadinessStatus
 
-from .models import Element, Heading, Snapshot
+from .models import Canvas, Element, Heading, Snapshot
 
 _CHECKABLE = frozenset({"checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio"})
 _PLAIN_TYPES = frozenset({"", "text", "checkbox", "radio", "submit", "button", "search"})
@@ -19,6 +19,7 @@ _MAX_NAME = 100
 _MAX_HREF = 80
 _MAX_OPTIONS = 10
 _MAX_HEADINGS = 30
+_MAX_CANVASES = 10
 
 
 def render(snapshot: Snapshot, *, offscreen: int = 40) -> str:
@@ -26,8 +27,11 @@ def render(snapshot: Snapshot, *, offscreen: int = 40) -> str:
     lines = _header(snapshot)
     if snapshot.mode == ObservationKind.CANVAS:
         lines.append("Canvas observation: no element refs; point with image coordinates.")
-    elif snapshot.elements or snapshot.headings:
-        lines.extend(_body(snapshot, offscreen))
+    else:
+        if snapshot.elements or snapshot.headings:
+            lines.extend(_body(snapshot, offscreen))
+        if snapshot.canvases:
+            lines.extend(_canvases(snapshot.canvases))
     if snapshot.text:
         lines.extend(("", "page text:", snapshot.text))
     if snapshot.limitations:
@@ -57,6 +61,8 @@ def _header(snapshot: Snapshot) -> list[str]:
         lines.append(viewport)
     if snapshot.readiness != ReadinessStatus.READY:
         lines.append(f"readiness: {snapshot.readiness}")
+    if snapshot.mode == ObservationKind.DOM and snapshot.image and snapshot.geometry:
+        lines.append(f"image: {_region(snapshot)}")
     if snapshot.modal is not None:
         name = f' "{_cut(snapshot.modal.name, 80)}"' if snapshot.modal.name else ""
         lines.append(f"modal: {snapshot.modal.role}{name} is open; interact with it first")
@@ -102,6 +108,46 @@ def _body(snapshot: Snapshot, offscreen: int) -> list[str]:
         lines.extend(_blocks([element for element in aside if id(element) in listed], url))
     if covered:
         lines.extend(("", f"covered by an overlay: {_summary(covered)}"))
+    return lines
+
+
+def image_caption(snapshot: Snapshot) -> str:
+    """Text placed before an observation image, naming the area it shows."""
+    caption = f"Current {snapshot.mode} observation {snapshot.id}"
+    if snapshot.mode == ObservationKind.DOM and snapshot.geometry:
+        caption += f"; {_region(snapshot)}"
+    return caption
+
+
+def _region(snapshot: Snapshot) -> str:
+    geometry = snapshot.geometry
+    assert geometry is not None
+    zoom = f" at {geometry.scale:g}x zoom" if geometry.scale != 1 else ""
+    return (
+        f"viewport region x={geometry.x:.0f} y={geometry.y:.0f} "
+        f"{geometry.width:.0f}x{geometry.height:.0f}{zoom}; click_at and drag_at take "
+        "pixels of this image until the next observation"
+    )
+
+
+def _canvases(canvases: tuple[Canvas, ...]) -> list[str]:
+    lines = ["", "canvases in viewport (viewport CSS pixels; no refs inside, use coordinates):"]
+    for canvas in canvases[:_MAX_CANVASES]:
+        bounds = canvas.bounds
+        parts = ["  canvas"]
+        if canvas.name:
+            parts.append(_quote(canvas.name, 60))
+        if canvas.ref:
+            parts.append(f"(ref {canvas.ref})")
+        parts.append(
+            f"x={bounds.x:.0f} y={bounds.y:.0f} {bounds.width:.0f}x{bounds.height:.0f} "
+            f"center={bounds.x + bounds.width / 2:.0f},{bounds.y + bounds.height / 2:.0f}"
+        )
+        if canvas.clipped:
+            parts.append("(visible part)")
+        lines.append(" ".join(parts))
+    if len(canvases) > _MAX_CANVASES:
+        lines.append(f"  …+{len(canvases) - _MAX_CANVASES} more canvases")
     return lines
 
 

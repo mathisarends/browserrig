@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 
 from browserrig.core.geometry import Bounds, FrameTransform
 
-from ..models import Element, Heading, Modal
+from ..models import Canvas, Element, Heading, Modal
 from . import semantics
 from .document import Document, Rect, clean
 from .styles import Style
@@ -80,6 +80,8 @@ _GROUPS = {
 }
 _UNNAMED_GROUPS = frozenset({"form", "radiogroup", "menu", "tabs", "toolbar"})
 _ALERT_ROLES = frozenset({"alert", "status"})
+# Smaller canvases are icons, sparklines or tracking pixels, not drawing surfaces.
+_MIN_CANVAS_SIDE = 24
 
 type Context = tuple[str, str]
 """Section and group labels that apply to a node's descendants."""
@@ -92,6 +94,7 @@ class FrameExtraction:
     document: Document
     elements: list[tuple[int, Element]] = field(default_factory=list)
     headings: list[tuple[int, Heading]] = field(default_factory=list)
+    canvases: list[tuple[int, Canvas]] = field(default_factory=list)
     alerts: list[str] = field(default_factory=list)
     modal: tuple[int, Modal] | None = None
     text: str = ""
@@ -158,6 +161,7 @@ class _FrameExtractor:
             result.modal = (modal[0], self._modal_view(modal[1]))
         result.elements = self._elements()
         result.headings, result.alerts = self._headings_and_alerts()
+        result.canvases = self._canvases({index for index, _ in result.elements})
         if text_limit > 0:
             result.text = self._text(text_limit)
         return result
@@ -350,6 +354,44 @@ class _FrameExtractor:
             current=semantics.current(document, index),
             draggable=attributes.get("draggable") == "true",
         )
+
+    # Canvases
+
+    def _canvases(self, listed: set[int]) -> list[tuple[int, Canvas]]:
+        """Visible, uncovered canvases; `listed` holds indexes already built as elements."""
+        document = self._document
+        canvases: list[tuple[int, Canvas]] = []
+        for index in document.elements():
+            if not document.is_element(index) or document.tag(index) != "canvas":
+                continue
+            if not document.has_layout(index):
+                continue
+            placement = self._placement(index)
+            if placement is None:
+                continue
+            rect, area, covered = placement
+            if area is None or covered:
+                continue
+            bounds = self._bounds(rect, area)
+            if min(bounds.width, bounds.height) < _MIN_CANVAS_SIDE:
+                continue
+            attributes = document.attributes(index)
+            canvases.append(
+                (
+                    index,
+                    Canvas.model_construct(
+                        frame_id=self._frame_id,
+                        bounds=bounds,
+                        name=semantics.labelled_by(document, index)
+                        or clean(attributes.get("aria-label") or attributes.get("title", ""), 80),
+                        ref=f"{self._prefix}{document.backend_ids[index]}"
+                        if index in listed
+                        else "",
+                        clipped=area != rect,
+                    ),
+                )
+            )
+        return canvases
 
     # Headings, alerts and dialogs
 

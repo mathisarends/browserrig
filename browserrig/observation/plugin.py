@@ -20,7 +20,8 @@ from pydantic import Field
 from browserrig.browser.base import Browser, BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import StaleElement
-from browserrig.core.kinds import ActionKind, ReadinessPhase, ReadinessStatus
+from browserrig.core.geometry import Region
+from browserrig.core.kinds import ActionKind, ObservationKind, ReadinessPhase, ReadinessStatus
 from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
 from browserrig.core.tools import browser_tool as tool
 from browserrig.events import (
@@ -34,13 +35,15 @@ from .capture import capture
 from .content import extract_content
 from .handle import ElementHandle
 from .models import Snapshot
-from .render import render
+from .render import image_caption, render
 
 
 @dataclass
 class _State:
     snapshot: Snapshot | None = None
     screenshot_requested: bool = False
+    screenshot_region: Region | None = None
+    screenshot_zoom: float = 1
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
@@ -74,6 +77,10 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             "A leading * marks elements that appeared since the previous observation. "
             "Elements covered by an overlay are counted, not listed; when a modal is open, "
             "act inside it first. Hidden and inert controls are omitted. "
+            "Visible canvases are listed with their viewport-pixel bounds; their drawn content "
+            "has no refs, so screenshot that region and point with click_at or drag_at. "
+            "When the current observation has no image, coordinate tools take viewport CSS "
+            "pixels, the same space as those bounds. "
         )
         text += (
             "Observations include a bounded page-text excerpt. "
@@ -85,6 +92,10 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             if self.mode.screenshots
             else "Screenshots are included only when requested; their pixels equal viewport "
             "CSS pixels."
+        )
+        text += (
+            " A region screenshot shows only part of the viewport, optionally zoomed; its "
+            "observation states the region, and coordinate tools then take that image's pixels."
         )
         if self.mode.marks:
             text += (
@@ -137,6 +148,8 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         *,
         phase: ReadinessPhase = ReadinessPhase.OBSERVATION,
         screenshots: bool | None = None,
+        region: Region | None = None,
+        zoom: float = 1,
     ) -> Snapshot:
         browser, readiness = self._browser, self._readiness
         async with self._state.lock:
@@ -151,6 +164,8 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 report,
                 tabs=tuple(await browser.tabs()),
                 previous=self._state.snapshot,
+                region=region,
+                zoom=zoom,
             )
             self._state.snapshot = snapshot
             await self._events.emit(
@@ -186,15 +201,21 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         nudges: Inject[Nudges | None],
         recording: Inject[Recording | None],
     ) -> StepDecision:
+        state = self._state
         snapshot = await self.capture(
-            phase=ReadinessPhase.INITIAL
-            if self._state.snapshot is None
-            else ReadinessPhase.OBSERVATION,
-            screenshots=True if self._state.screenshot_requested else None,
+            phase=ReadinessPhase.INITIAL if state.snapshot is None else ReadinessPhase.OBSERVATION,
+            screenshots=True if state.screenshot_requested else None,
+            region=state.screenshot_region,
+            zoom=state.screenshot_zoom,
         )
-        self._state.screenshot_requested = False
+        state.screenshot_requested = False
+        state.screenshot_region, state.screenshot_zoom = None, 1
         if recording is not None and snapshot.readiness == ReadinessStatus.READY:
-            await recording.ensure_started(self._browser.active_tab, geometry=snapshot.geometry)
+            # Recordings follow the canvas, never a one-off screenshot region.
+            await recording.ensure_started(
+                self._browser.active_tab,
+                geometry=snapshot.geometry if snapshot.mode == ObservationKind.CANVAS else None,
+            )
         event.session.observe(
             Observation(
                 source="browser",
@@ -216,7 +237,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         if snapshot is not None and snapshot.image:
             image = User(
                 (
-                    TextPart(f"Current {snapshot.mode} observation {snapshot.id}"),
+                    TextPart(image_caption(snapshot)),
                     ImagePart(f"data:image/png;base64,{snapshot.image}"),
                 ),
                 id=f"browser-image:{snapshot.id}",
@@ -254,19 +275,48 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         description=(
             "Request a screenshot of the active tab for visual inspection in your next iteration. "
             "The next observation includes an image and matching page state. "
+            "In DOM mode, region limits the image to a viewport area in CSS pixels, such as a "
+            "listed canvas, and zoom magnifies it to read small details; click_at and drag_at "
+            "then take pixels of that image. "
             "This does not enable automatic screenshots for later iterations."
         ),
     )
-    async def screenshot(self) -> ToolResult:
+    async def screenshot(
+        self,
+        region: Annotated[
+            Region | None,
+            Field(description="Viewport area in CSS pixels; omit for the full viewport."),
+        ] = None,
+        zoom: Annotated[
+            float, Field(ge=1, le=4, description="Magnification of the region image.")
+        ] = 1,
+    ) -> ToolResult:
         if self._browser.active_tab.dialog:
             raise ToolError(
                 "Screenshot unavailable; handle the open dialog before requesting an image"
             )
+        if region is None and zoom != 1:
+            raise ToolError("zoom needs a region; pass the viewport area to magnify")
+        if region is not None:
+            if isinstance(self.mode, CanvasMode):
+                raise ToolError(
+                    "Region screenshots need DOM mode; canvas observations already show the canvas"
+                )
+            snapshot = self._state.snapshot
+            if (
+                snapshot is not None
+                and snapshot.width
+                and (region.x >= snapshot.width or region.y >= snapshot.height)
+            ):
+                raise ToolError(
+                    f"Region starts outside the {snapshot.width:.0f}x{snapshot.height:.0f} "
+                    "viewport; use viewport CSS pixels"
+                )
         # Capture at the next step boundary so image marks and actionable refs stay in sync.
         self._state.screenshot_requested = True
-        return ToolResult(
-            "Screenshot requested. Your next observation will include the current image."
-        )
+        self._state.screenshot_region, self._state.screenshot_zoom = region, zoom
+        target = "requested region" if region is not None else "current viewport"
+        return ToolResult(f"Screenshot requested. Your next observation will show the {target}.")
 
     @tool(
         kind=ActionKind.EXTRACT_CONTENT,

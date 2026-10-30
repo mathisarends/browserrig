@@ -9,6 +9,7 @@ from browserrig.browser.images import screenshot
 from browserrig.browser.models import TabInfo
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
+from browserrig.core.geometry import Bounds, Geometry, Region
 from browserrig.core.kinds import ReadinessStatus
 from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
 from browserrig.readiness.models import ReadinessReport
@@ -18,12 +19,16 @@ from .extraction import Extraction, extract
 from .marks import annotate
 from .models import Element, ElementFingerprint, PageFingerprint, Snapshot
 
+# Longest side of a zoomed region image, to bound image tokens.
+_MAX_REGION_SIDE = 2000
+
 
 @dataclass(frozen=True, slots=True)
 class _Content:
     page: Extraction
     image: str | None = None
     image_digest: str | None = None
+    geometry: Geometry | None = None
 
 
 class _CaptureStrategy(ABC):
@@ -38,8 +43,10 @@ class _CaptureStrategy(ABC):
 
 
 class _DomCapture(_CaptureStrategy):
-    def __init__(self, mode: DomMode) -> None:
+    def __init__(self, mode: DomMode, region: Region | None, zoom: float) -> None:
         self._mode = mode
+        self._region = region
+        self._zoom = zoom
 
     async def collect(self, tab: Tab, report: ReadinessReport) -> _Content:
         frames = await tab.frames()
@@ -47,13 +54,28 @@ class _DomCapture(_CaptureStrategy):
             frames, max_elements=self._mode.max_elements, max_text=self._mode.max_text_chars
         )
         page.limitations = tuple(dict.fromkeys((*tab.frame_limitations, *page.limitations)))
-        image = None
-        if self._mode.screenshots:
-            viewport = frames[0].visible
-            assert viewport is not None
-            marked = page.elements if self._mode.marks else ()
-            image = await asyncio.to_thread(annotate, await screenshot(tab), marked, viewport)
-        return _Content(page=page, image=image)
+        if not self._mode.screenshots:
+            return _Content(page=page)
+        viewport = frames[0].visible
+        assert viewport is not None
+        marked = page.elements if self._mode.marks else ()
+        geometry = None
+        if self._region is not None:
+            geometry = self._region.capture(viewport, self._zoom, _MAX_REGION_SIDE)
+            if geometry is None:
+                page.limitations = (
+                    *page.limitations,
+                    "Screenshot region is outside the viewport; showing the full viewport",
+                )
+        if geometry is None:
+            area, scale = Bounds(x=0, y=0, width=viewport.width, height=viewport.height), 1.0
+        else:
+            area = Bounds(x=geometry.x, y=geometry.y, width=geometry.width, height=geometry.height)
+            scale = geometry.scale
+        image = await asyncio.to_thread(
+            annotate, await screenshot(tab, geometry), marked, area, scale
+        )
+        return _Content(page=page, image=image, geometry=geometry)
 
 
 class _CanvasCapture(_CaptureStrategy):
@@ -72,14 +94,19 @@ class _CanvasCapture(_CaptureStrategy):
             page_height=0,
         )
         return _Content(
-            page=page, image=image, image_digest=hashlib.sha256(image.encode()).hexdigest()
+            page=page,
+            image=image,
+            image_digest=hashlib.sha256(image.encode()).hexdigest(),
+            geometry=report.geometry,
         )
 
 
-def _capture_strategy(mode: ObservationMode) -> _CaptureStrategy:
+def _capture_strategy(
+    mode: ObservationMode, region: Region | None, zoom: float
+) -> _CaptureStrategy:
     match mode:
         case DomMode():
-            return _DomCapture(mode)
+            return _DomCapture(mode, region, zoom)
         case CanvasMode():
             return _CanvasCapture(mode)
         case _:
@@ -93,8 +120,13 @@ async def capture(
     *,
     tabs: tuple[TabInfo, ...] = (),
     previous: Snapshot | None = None,
+    region: Region | None = None,
+    zoom: float = 1,
 ) -> Snapshot:
-    """Observe `tab`. With `previous` from the same document, unseen elements get `new`."""
+    """Observe `tab`. With `previous` from the same document, unseen elements get `new`.
+
+    `region` crops a DOM-mode screenshot to a viewport area, magnified by `zoom`.
+    """
     snapshot_id = uuid4().hex
     if tab.dialog:
         return Snapshot(
@@ -114,7 +146,7 @@ async def capture(
         )
     await tab.sync_document()
     document_id = tab.document_id
-    content = await _capture_strategy(mode).collect(tab, report)
+    content = await _capture_strategy(mode, region, zoom).collect(tab, report)
     await tab.sync_document()
     if tab.document_id != document_id:
         raise BrowserError("Document changed during capture; observe again before acting")
@@ -139,9 +171,10 @@ async def capture(
         headings=page.headings,
         alerts=page.alerts,
         modal=page.modal,
+        canvases=page.canvases,
         limitations=page.limitations,
         image=content.image,
-        geometry=report.geometry,
+        geometry=content.geometry,
     )
 
 

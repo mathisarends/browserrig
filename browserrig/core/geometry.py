@@ -110,6 +110,27 @@ class Geometry(Options):
     scale: float = Field(default=1, gt=0)
 
     def point(self, x: float, y: float) -> tuple[float, float]:
-        if not (0 <= x < self.width and 0 <= y < self.height):
+        if not (0 <= x < self.width * self.scale and 0 <= y < self.height * self.scale):
             raise ValueError("Point is outside the observed image")
         return self.x + x / self.scale, self.y + y / self.scale
+
+
+class Region(Options):
+    """A viewport area in CSS pixels, such as a screenshot crop."""
+
+    x: float = Field(ge=0)
+    y: float = Field(ge=0)
+    width: float = Field(gt=0)
+    height: float = Field(gt=0)
+
+    def capture(self, viewport: Bounds, zoom: float, max_side: float) -> Geometry | None:
+        """Clip to `viewport` and cap `zoom` so no image side exceeds `max_side` pixels."""
+        visible = Bounds(x=self.x, y=self.y, width=self.width, height=self.height).intersect(
+            Bounds(x=0, y=0, width=viewport.width, height=viewport.height)
+        )
+        if visible.width < 1 or visible.height < 1:
+            return None
+        scale = max(1.0, min(zoom, max_side / max(visible.width, visible.height)))
+        return Geometry(
+            x=visible.x, y=visible.y, width=visible.width, height=visible.height, scale=scale
+        )

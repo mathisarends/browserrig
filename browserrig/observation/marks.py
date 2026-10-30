@@ -34,12 +34,15 @@ _COLORS = {
 }
 
 
-def annotate(image: str, elements: tuple[Element, ...], viewport: Bounds) -> str:
-    """Label visible elements with their refs without inserting an overlay into the page."""
+def annotate(image: str, elements: tuple[Element, ...], area: Bounds, scale: float = 1) -> str:
+    """Label visible elements with their refs without inserting an overlay into the page.
+
+    `area` is the viewport region the image shows; each image pixel is 1/`scale` CSS pixels.
+    """
     with Image.open(BytesIO(base64.b64decode(image))) as source:
-        # Keep screenshot pixels and viewport CSS coordinates identical, including on HiDPI.
+        # Keep image pixels an exact multiple of viewport CSS pixels, including on HiDPI.
         canvas = source.convert("RGB").resize(
-            (round(viewport.width), round(viewport.height)), Image.Resampling.LANCZOS
+            (round(area.width * scale), round(area.height * scale)), Image.Resampling.LANCZOS
         )
     draw = ImageDraw.Draw(canvas)
     font = ImageFont.load_default(size=14)
@@ -47,9 +50,15 @@ def annotate(image: str, elements: tuple[Element, ...], viewport: Bounds) -> str
     for element in elements:
         if not element.in_viewport or element.bounds is None:
             continue
-        bounds = element.bounds.intersect(viewport)
-        if bounds.width <= 0 or bounds.height <= 0:
+        shown = element.bounds.intersect(area)
+        if shown.width <= 0 or shown.height <= 0:
             continue
+        bounds = Bounds(
+            x=(shown.x - area.x) * scale,
+            y=(shown.y - area.y) * scale,
+            width=shown.width * scale,
+            height=shown.height * scale,
+        )
         color = _COLORS.get(element.role, _Color.GRAY)
         _border(draw, bounds, color)
         label = element.ref

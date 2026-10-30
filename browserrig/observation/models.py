@@ -68,6 +68,20 @@ class Modal(Options):
     name: str
 
 
+class Canvas(Options):
+    """A visible canvas; its pixels have no element refs, so agents point with coordinates.
+
+    `bounds` is the visible part in viewport CSS pixels. `ref` is set when the canvas is
+    also listed as an interactive element.
+    """
+
+    frame_id: str
+    bounds: Bounds
+    name: str = ""
+    ref: str = ""
+    clipped: bool = False
+
+
 class Snapshot(Options):
     id: str
     tab_id: str
@@ -87,8 +101,10 @@ class Snapshot(Options):
     headings: tuple[Heading, ...] = ()
     alerts: tuple[str, ...] = ()
     modal: Modal | None = None
+    canvases: tuple[Canvas, ...] = ()
     limitations: tuple[str, ...] = ()
     image: str | None = Field(default=None, repr=False)
+    # The viewport area the image shows; coordinate tools map image pixels through it.
     geometry: Geometry | None = None
 
     def element(self, ref: str) -> Element:

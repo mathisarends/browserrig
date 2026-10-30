@@ -3,10 +3,24 @@ import json
 from io import BytesIO
 
 import pytest
+from harnessed import Inject, Plugin, PolicyDecision, ToolCall
+from harnessed.events import ToolExecutionFinishedEvent
+from harnessed.models import ModelChunk
+from harnessed.plugins import Approvals
+from harnessed.testing import CallbackModel
 from PIL import Image
 
-from browserrig import ChromeBrowser, DomMode, LaunchBrowser, Viewport, wait_for_page
+from browserrig import (
+    Browser,
+    BrowserAgent,
+    ChromeBrowser,
+    DomMode,
+    LaunchBrowser,
+    Viewport,
+    wait_for_page,
+)
 from browserrig.core.errors import BrowserError
+from browserrig.core.geometry import Bounds, Geometry, Region
 from browserrig.kinds import ElementOperation
 from browserrig.observation import capture
 from browserrig.observation.render import render
@@ -138,3 +152,100 @@ async def test_partially_covered_element_uses_exposed_hit_point(site):
             user_gesture=True,
         )
         assert 20 <= point["x"] < 80
+
+
+_CANVASES = """<style>body{margin:0}</style>
+    <canvas id=board width=400 height=200
+        style='position:absolute;left:100px;top:150px;width:400px;height:200px'></canvas>
+    <canvas aria-label=Icon width=10 height=10
+        style='position:absolute;left:0;top:0;width:10px;height:10px'></canvas>
+    <div style='position:absolute;left:600px;top:100px'>
+        <canvas width=100 height=100></canvas>
+        <div style='position:absolute;inset:0;background:white'></div>
+    </div>"""
+
+
+async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(site):
+    async with ChromeBrowser(LaunchBrowser(url=site, viewport=Viewport(scale=2))) as browser:
+        tab = browser.active_tab
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(_CANVASES)}")
+        await evaluate(tab, "document.querySelector('#board').addEventListener('click', () => {})")
+        report = await wait_for_page(tab)
+        state = await capture(
+            tab,
+            DomMode(screenshots=True),
+            report,
+            region=Region(x=100, y=150, width=400, height=200),
+            zoom=2,
+        )
+        assert [canvas.bounds for canvas in state.canvases] == [
+            Bounds(x=100, y=150, width=400, height=200)
+        ]
+        board = next(element for element in state.elements if element.tag == "canvas")
+        assert state.canvases[0].ref == board.ref
+        assert state.geometry == Geometry(x=100, y=150, width=400, height=200, scale=2)
+        assert state.image is not None
+        with Image.open(BytesIO(base64.b64decode(state.image))) as image:
+            assert image.size == (800, 400)
+        rendered = render(state)
+        assert f"canvas (ref {board.ref}) x=100 y=150 400x200 center=300,250" in rendered
+        assert "image: viewport region x=100 y=150 400x200 at 2x zoom" in rendered
+
+        outside = await capture(
+            tab, DomMode(screenshots=True), report, region=Region(x=5000, y=0, width=10, height=10)
+        )
+        assert outside.geometry is None
+        assert any("outside the viewport" in note for note in outside.limitations)
+        with Image.open(BytesIO(base64.b64decode(outside.image))) as image:
+            assert image.size == (outside.width, outside.height)
+
+
+async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
+    holder = {}
+
+    class Access(Plugin, needs=(Browser,)):
+        async def setup(self, browser: Inject[Browser]):
+            holder["browser"] = browser
+
+    step = 0
+    captions = []
+
+    async def respond(request):
+        nonlocal step
+        texts = [message.text for message in request.messages]
+        if step == 0:
+            assert any("x=100 y=150 400x200 center=300,250" in text for text in texts)
+            region = {"x": 100, "y": 150, "width": 400, "height": 200}
+            yield ModelChunk(tool_call=ToolCall("screenshot", {"region": region, "zoom": 2}))
+        elif step == 1:
+            captions.extend(text for text in texts if text.startswith("Current dom observation"))
+            # Image pixel (100, 60) at 2x zoom is viewport (150, 180), canvas offset (50, 30).
+            yield ModelChunk(tool_call=ToolCall("click_at", {"x": 100, "y": 60}))
+        else:
+            yield ModelChunk(text="Done")
+        step += 1
+
+    agent = BrowserAgent(
+        model=CallbackModel(respond),
+        browser=LaunchBrowser(url=site),
+        mode=DomMode(),
+        approvals=Approvals(default=PolicyDecision.ALLOW),
+        plugins=[Access()],
+    )
+    async with agent.session() as session:
+        tab = holder["browser"].active_tab
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(_CANVASES)}")
+        await evaluate(
+            tab,
+            """const board = document.querySelector('#board');
+            board.addEventListener('click', (e) => {
+                board.dataset.offset = `${e.offsetX},${e.offsetY}`;
+            });""",
+        )
+        result = await session.run("Click the board", max_steps=5)
+        assert result.text == "Done"
+        receipts = [e for e in session.events if isinstance(e, ToolExecutionFinishedEvent)]
+        assert receipts and not any(receipt.result.is_error for receipt in receipts)
+        offset = await evaluate(tab, "document.querySelector('#board').dataset.offset")
+        assert offset == "50,30"
+    assert captions and "viewport region x=100 y=150 400x200 at 2x zoom" in captions[-1]

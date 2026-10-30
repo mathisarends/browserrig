@@ -24,14 +24,18 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
     coordinates = SystemSection(
         title="Screenshot coordinates",
         text=(
-            "Coordinates are measured in pixels from the top-left of the latest screenshot. "
+            "Coordinates are pixels from the top-left of the current observation's image; "
+            "region and canvas images are mapped back to the viewport automatically. "
             "Observe again if the tab or document changes before pointing."
         ),
     )
 
     @tool(
         kind=ActionKind.CLICK_AT,
-        description="Click screenshot coordinates; count=2 performs a native double click.",
+        description=(
+            "Click image or viewport coordinates, such as inside a listed canvas; "
+            "count=2 performs a native double click."
+        ),
     )
     async def click_at(
         self,

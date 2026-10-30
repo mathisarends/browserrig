@@ -4,10 +4,11 @@ from pydantic import ValidationError
 from browserrig.activity.models import TimeRange, inference_only
 from browserrig.browser.config import BrowserKind, ConnectBrowser, LaunchBrowser
 from browserrig.core.errors import StaleElement
-from browserrig.core.geometry import Bounds
+from browserrig.core.geometry import Bounds, Geometry, Region
 from browserrig.events import ActivityFinishedEvent
 from browserrig.kinds import ActivityKind, ActivityOutcome
 from browserrig.observation.models import (
+    Canvas,
     Element,
     ElementFingerprint,
     Heading,
@@ -15,7 +16,7 @@ from browserrig.observation.models import (
     PageFingerprint,
     Snapshot,
 )
-from browserrig.observation.render import render
+from browserrig.observation.render import image_caption, render
 
 
 def _snapshot(*elements: Element, **fields) -> Snapshot:
@@ -94,6 +95,51 @@ def test_render_summarizes_offscreen_elements_and_reports_modal():
     assert "below viewport: 5 elements (5 button)" in text
     assert "[0] button" in text and "[1] button" in text and "[2] button" not in text
     assert "scroll 0 of 4000px (0.0 pages above, 4.0 below)" in text
+
+
+def test_render_lists_canvases_with_viewport_bounds_even_without_elements():
+    snapshot = _snapshot(
+        canvases=(
+            Canvas(frame_id="f", bounds=Bounds(x=100, y=150, width=400, height=200), name="Map"),
+            Canvas(
+                frame_id="f",
+                bounds=Bounds(x=0, y=600, width=300, height=200),
+                ref="42",
+                clipped=True,
+            ),
+        )
+    )
+    text = render(snapshot)
+    assert '  canvas "Map" x=100 y=150 400x200 center=300,250' in text
+    assert "  canvas (ref 42) x=0 y=600 300x200 center=150,700 (visible part)" in text
+    assert "image:" not in text
+
+
+def test_region_image_is_described_in_render_and_caption():
+    geometry = Geometry(x=100, y=150, width=400, height=200, scale=2)
+    snapshot = _snapshot(image="png", geometry=geometry)
+    assert "image: viewport region x=100 y=150 400x200 at 2x zoom" in render(snapshot)
+    assert image_caption(snapshot).endswith(
+        "viewport region x=100 y=150 400x200 at 2x zoom; click_at and drag_at take pixels "
+        "of this image until the next observation"
+    )
+    assert image_caption(_snapshot(image="png")) == "Current dom observation observation"
+
+
+def test_region_clips_to_viewport_and_caps_zoom():
+    viewport = Bounds(x=0, y=0, width=1280, height=800)
+    clipped = Region(x=1200, y=700, width=400, height=400).capture(viewport, 2, 2000)
+    assert clipped == Geometry(x=1200, y=700, width=80, height=100, scale=2)
+    capped = Region(x=0, y=0, width=1280, height=800).capture(viewport, 4, 2000)
+    assert capped is not None and capped.scale == pytest.approx(2000 / 1280)
+    assert Region(x=1300, y=0, width=10, height=10).capture(viewport, 1, 2000) is None
+
+
+def test_zoomed_geometry_maps_image_pixels_back_to_viewport():
+    geometry = Geometry(x=100, y=150, width=400, height=200, scale=2)
+    assert geometry.point(799, 399) == (499.5, 349.5)
+    with pytest.raises(ValueError, match="outside"):
+        geometry.point(800, 0)
 
 
 def test_unknown_ref_is_stale():

@@ -17,7 +17,7 @@ from browserrig.browser.tab import Frame
 from browserrig.core.errors import BrowserError
 from browserrig.scripts import FOCUSED
 
-from ..models import Element, Heading, Modal
+from ..models import Canvas, Element, Heading, Modal
 from .document import Document
 from .elements import FrameExtraction, extract_frame
 from .styles import STYLES
@@ -39,6 +39,7 @@ class Extraction:
     headings: tuple[Heading, ...] = ()
     alerts: tuple[str, ...] = ()
     modal: Modal | None = None
+    canvases: tuple[Canvas, ...] = ()
     text: str = ""
     limitations: tuple[str, ...] = field(default_factory=tuple)
 
@@ -117,6 +118,7 @@ class _Assembler:
                 dict.fromkeys(alert for result in self._results.values() for alert in result.alerts)
             ),
             modal=self._modal(),
+            canvases=self._canvases(),
             text=text,
             limitations=tuple(dict.fromkeys(self._limitations)),
         )
@@ -212,6 +214,17 @@ class _Assembler:
             "viewport first"
         )
         return [element for element in elements if id(element) in kept]
+
+    def _canvases(self) -> tuple[Canvas, ...]:
+        """Canvases of all uncovered frames, in page order."""
+        ordered = [
+            ((*self._keys[frame.id], index), canvas)
+            for frame in self._frames
+            if frame.id in self._results and frame.id not in self._covered
+            for index, canvas in self._results[frame.id].canvases
+        ]
+        ordered.sort(key=lambda item: item[0])
+        return tuple(canvas for _, canvas in ordered)
 
     def _modal(self) -> Modal | None:
         main = self._results.get(self._frames[0].id)
