@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 
@@ -58,7 +59,7 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
             "# Mission report",
             "**bold**",
             "*small*",
-            f"[Details](<{site}/other?q=1&x=2>)",
+            "[Details](</other?q=1&x=2>)",
             "Space probe",
             "- First item\n\n  - Nested item",
             "- Second item",
@@ -108,6 +109,51 @@ async def test_markdown_limits_are_explicit_and_output_is_bounded(site):
         assert any("truncated" in item for item in content.limitations)
         assert "Extraction limitations" in content.render()
         assert site in content.render()
+
+
+@pytest.mark.parametrize("article_chars", [400, 20])
+async def test_main_region_replaces_page_chrome_unless_it_holds_too_little(site, article_chars):
+    markup = (
+        "<header><a href='/login'>Sign in</a></header><nav><a href='/news'>News</a></nav>"
+        f"<main><h1>Article</h1><p>{'word ' * (article_chars // 5)}</p></main>"
+        "<footer>Imprint</footer>"
+    )
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
+        await wait_for_page(tab)
+        content = await extract_content(tab)
+        full = await extract_content(tab, full_page=True)
+    assert "# Article" in content.markdown and "Imprint" in full.markdown
+    assert not any("main region" in item for item in full.limitations)
+    if article_chars > 200:
+        assert "Sign in" not in content.markdown and "Imprint" not in content.markdown
+        assert any("full_page=true" in item for item in content.limitations)
+    else:
+        # A main landmark with almost no text is not trusted to hold the content.
+        assert content.markdown == full.markdown
+
+
+async def test_links_are_compact_and_controls_are_left_to_observe(site):
+    markup = """<h1>Links</h1>
+        <p><a href='#part'>Jump</a> <a href='/'>This page</a> <a href='/other#top'>Other</a>
+        <a href='https://example.org/a?b=1'>External</a></p>
+        <ul><li><a href='/item'><img alt='Item preview'></a>
+        <a href='/item'>Item title</a></li></ul>
+        <p>Before <button>Hide</button> after</p>
+        <h3><button aria-expanded=false>Question?</button></h3>
+        <label><input type=radio name=size>Small</label>"""
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
+        await wait_for_page(tab)
+        text = (await extract_content(tab)).markdown
+    assert "Jump This page [Other](</other#top>)" in text
+    assert "[External](<https://example.org/a?b=1>)" in text
+    assert "[Item preview](</item>) Item title" in text
+    assert "Before after" in text and "### Question?" in text
+    assert "Hide" not in text and "Small" not in text
+    assert not re.search(r"[ \t]+$", text, flags=re.M)
 
 
 @pytest.mark.parametrize("cross_origin", [False, True])

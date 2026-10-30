@@ -1,6 +1,6 @@
 import asyncio
 from typing import Annotated
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import quote_plus, urljoin, urlsplit
 
 from harnessed import Inject, Plugin, ToolResult
 from pydantic import Field
@@ -27,7 +27,8 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
     @tool(
         kind=ActionKind.NAVIGATE,
         description=(
-            "Navigate to an HTTP(S) URL in the active tab, or in a new tab with new_tab=true."
+            "Navigate to an HTTP(S) URL in the active tab, or in a new tab with new_tab=true. "
+            "A path starting with / opens on the active page's site."
         ),
     )
     async def navigate(
@@ -37,6 +38,7 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
+        url = site_url(url, self._browser.active_tab.url)
         return await self._navigate(
             url, actions, ActionKind.NAVIGATE, typed=typed_address(url), new_tab=new_tab
         )
@@ -138,6 +140,14 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
         if new_tab:
             return await actions.run(kind=kind, operation=navigate_new, settle=False)
         return await actions.run(kind=kind, operation=navigate)
+
+
+def site_url(url: str, current: str) -> str:
+    """Resolve a site path such as ``/wiki/Page`` against the current HTTP(S) page."""
+    site_path = url.startswith("/") and not url.startswith("//")
+    if site_path and urlsplit(current).scheme in {"http", "https"}:
+        return urljoin(current, url)
+    return url
 
 
 def typed_address(url: str) -> str:

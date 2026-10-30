@@ -11,7 +11,7 @@ from browserrig.browser.favicon import load_favicon
 from browserrig.browser.tab import Tab
 from browserrig.events import TabUpdatedEvent
 from browserrig.scripts.models import TabStrip
-from browserrig.tools.navigation import typed_address
+from browserrig.tools.navigation import site_url, typed_address
 
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
 
@@ -28,6 +28,24 @@ _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
 )
 def test_typed_address_drops_only_what_a_person_would_not_type(url, typed):
     assert typed_address(url) == typed
+
+
+@pytest.mark.parametrize(
+    "url, current, resolved",
+    [
+        (
+            "/wiki/Voyager_1",
+            "https://de.wikipedia.org/wiki/Voyager_2",
+            "https://de.wikipedia.org/wiki/Voyager_1",
+        ),
+        ("/search?q=a#top", "http://localhost:8000/x/y", "http://localhost:8000/search?q=a#top"),
+        ("https://example.org/", "https://de.wikipedia.org/", "https://example.org/"),
+        ("//example.org/", "https://de.wikipedia.org/", "//example.org/"),
+        ("/wiki/Voyager_1", "about:blank", "/wiki/Voyager_1"),
+    ],
+)
+def test_site_paths_resolve_only_against_web_pages(url, current, resolved):
+    assert site_url(url, current) == resolved
 
 
 @pytest.mark.parametrize(

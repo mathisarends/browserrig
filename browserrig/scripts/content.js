@@ -1,5 +1,5 @@
 /* global parentFor, closedRootsForDocument, childrenFor, isRendered, canTraverse, truncateMarkdown */
-function browserrigContent({maxChars}) {
+function browserrigContent({maxChars, mainOnly, origin}) {
   const closedRoots = closedRootsForDocument();
   const skipped = new Set([
     'script',
@@ -35,6 +35,8 @@ function browserrigContent({maxChars}) {
   let truncated = false;
   let frames = 0;
   const literals = [];
+  const page = location.href.split('#')[0];
+  let lastHref = '';
 
   function escape(text) {
     return text.replace(/([\\`*_[\]<>#|])/g, '\\$1');
@@ -72,7 +74,12 @@ function browserrigContent({maxChars}) {
       if (!['http:', 'https:', 'mailto:', 'tel:'].includes(url.protocol)) {
         return '';
       }
-      return url.href.replace(/[<>\s()]/g, (char) => encodeURIComponent(char));
+      // Links into the current document lead nowhere new; same-site links need only a path.
+      if (url.href.split('#')[0] === page) {
+        return '';
+      }
+      const href = url.origin === origin ? url.pathname + url.search + url.hash : url.href;
+      return href.replace(/[<>\s()]/g, (char) => encodeURIComponent(char));
     } catch {
       return '';
     }
@@ -144,7 +151,15 @@ function browserrigContent({maxChars}) {
     }
     if (tag === 'a') {
       const href = node.hasAttribute('href') ? destination(node.getAttribute('href')) : '';
-      return href && value.trim() ? `[${value.trim()}](<${href}>)` : value;
+      if (!href || !value.trim()) {
+        return value;
+      }
+      // An image link and its caption link often repeat the same destination.
+      if (href === lastHref) {
+        return value.trim();
+      }
+      lastHref = href;
+      return `[${value.trim()}](<${href}>)`;
     }
     if (tag === 'strong' || tag === 'b') {
       return value.trim() ? `**${value.trim()}**` : '';
@@ -201,6 +216,13 @@ function browserrigContent({maxChars}) {
       const fence = '`'.repeat(Math.max(1, ...runs.map((run) => run.length + 1)));
       return literal(`${fence} ${value} ${fence}`);
     }
+    // Controls are listed by observe; only disclosure buttons inside headings name content.
+    if (tag === 'button' && !node.closest('h1, h2, h3, h4, h5, h6, [role="heading"]')) {
+      return '';
+    }
+    if (tag === 'label' && node.control) {
+      return '';
+    }
     if (tag === 'br') {
       return '\n';
     }
@@ -218,8 +240,28 @@ function browserrigContent({maxChars}) {
     return pre ? value : format(node, value);
   }
 
-  const markdown = render(document.body || document.documentElement, 0)
-    .replace(/\n[ \t]+\n/g, '\n\n')
+  function mainRegion() {
+    // The page's main landmark, unless it holds too little of the visible text to trust.
+    if (!mainOnly) {
+      return null;
+    }
+    let best = null;
+    let bestLength = 0;
+    for (const node of document.querySelectorAll('main, [role="main"]')) {
+      const length = hidden(node) ? 0 : (node.innerText || '').trim().length;
+      if (length > bestLength) {
+        best = node;
+        bestLength = length;
+      }
+    }
+    const total = ((document.body || document.documentElement).innerText || '').trim().length;
+    return best && bestLength >= Math.max(200, total * 0.2) ? best : null;
+  }
+
+  const main = mainRegion();
+  const markdown = render(main || document.body || document.documentElement, 0)
+    .replace(/(\S) {2,}/g, '$1 ')
+    .replace(/[ \t]+$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/\0(\d+)\0/g, (_, index) => literals[Number(index)])
     .trim();
@@ -229,5 +271,6 @@ function browserrigContent({maxChars}) {
     markdown: truncateMarkdown(markdown, maxChars),
     truncated: truncated || markdown.length > maxChars,
     frames,
+    main: main !== null,
   };
 }

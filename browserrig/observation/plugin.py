@@ -252,18 +252,22 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         description=(
             "Extract the active page as structured Markdown with headings, lists, links, tables "
             "and code, including loaded content below the viewport. Does not scroll or navigate. "
+            "Reads the page's main region when it has one; full_page=true adds header, "
+            "navigation and footer. Same-site links are paths that navigate accepts. "
             "max_chars limits the Markdown body; truncation and unavailable content are reported."
         ),
     )
     async def extract_content(
-        self, max_chars: Annotated[int, Field(ge=1, le=200000)] = 50000
+        self,
+        max_chars: Annotated[int, Field(ge=1, le=200000)] = 50000,
+        full_page: bool = False,
     ) -> ToolResult:
         async with self._browser.action_lock:
             tab = self._browser.active_tab
             report = await self._readiness.wait(tab)
             if report.status == ReadinessStatus.BLOCKED:
                 raise ToolError(report.reason)
-            content = await extract_content(tab, max_chars=max_chars)
+            content = await extract_content(tab, max_chars=max_chars, full_page=full_page)
             return ToolResult(content.render())
 
     def project(self, snapshot: Snapshot) -> Observation:

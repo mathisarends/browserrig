@@ -18,8 +18,8 @@ async def test_visible_descendant_of_hidden_parent_is_extracted_and_inert_conten
         tab = browser.active_tab
         markup = (
             '<div style="visibility:hidden">Hidden parent text'
-            '<button style="visibility:visible">Visible child</button></div>'
-            "<div inert><button>Inert child</button></div>"
+            '<a href="/next" style="visibility:visible">Visible child</a></div>'
+            "<div inert><a href='/next'>Inert child</a></div>"
             '<div style="display:contents"><p>Contents text</p></div>'
         )
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")

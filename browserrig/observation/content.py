@@ -1,4 +1,5 @@
 import re
+from urllib.parse import urlsplit
 
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from cdpify.exceptions import CDPCommandError
@@ -29,14 +30,26 @@ class PageContent(Options):
         return text
 
 
-async def extract_content(tab: Tab, *, max_chars: int = 50000) -> PageContent:
-    """Read loaded document content without scrolling or replacing interactive element refs."""
+async def extract_content(
+    tab: Tab, *, max_chars: int = 50000, full_page: bool = False
+) -> PageContent:
+    """Read loaded document content without scrolling or replacing interactive element refs.
+
+    Unless ``full_page`` is set, a page's main landmark replaces its surrounding header,
+    navigation and footer. Links on the page's own origin are shortened to paths.
+    """
     if not 1 <= max_chars <= 200000:
         raise ValueError("max_chars must be between 1 and 200000")
     if tab.dialog:
         raise BrowserError("Handle the open dialog before extracting page content")
     await tab.sync_document()
     document_id = tab.document_id
+    url = urlsplit(tab.url)
+    origin = f"{url.scheme}://{url.netloc}" if url.scheme in {"http", "https"} else ""
+
+    def args(budget: int) -> ContentArgs:
+        return ContentArgs(max_chars=budget, main_only=not full_page, origin=origin)
+
     frames = await tab.frames()
     limitations = list(tab.frame_limitations)
     metadata: dict[str, CaptureSnapshotResult | None] = {}
@@ -50,10 +63,9 @@ async def extract_content(tab: Tab, *, max_chars: int = 50000) -> PageContent:
             break
         try:
             await seed_frame(frame, metadata, limitations)
-            state = await frame.run(CONTENT, ContentArgs(max_chars=remaining))
+            state = await frame.run(CONTENT, args(remaining))
             embedded += state.frames
-            if main is None:
-                main = state
+            main = main or state
             prefix = "\n\n" if parts else ""
             if frame.parent is not None:
                 prefix += (
@@ -68,11 +80,7 @@ async def extract_content(tab: Tab, *, max_chars: int = 50000) -> PageContent:
                 )
             if len(body) > available:
                 # Let the script close code fences using the actual body budget.
-                body = (
-                    (await frame.run(CONTENT, ContentArgs(max_chars=available))).markdown
-                    if available
-                    else ""
-                )
+                body = (await frame.run(CONTENT, args(available))).markdown if available else ""
             parts.append(prefix[:remaining] + body)
             remaining -= len(parts[-1])
         except (CDPCommandError, BrowserError, TimeoutError):
@@ -85,6 +93,12 @@ async def extract_content(tab: Tab, *, max_chars: int = 50000) -> PageContent:
     if tab.document_id != document_id:
         raise BrowserError("Document changed during extraction; extract the current page again")
     assert main is not None
+    if main.main:
+        limitations.insert(
+            0,
+            "Only the main region is included; header, navigation and footer were omitted "
+            "(full_page=true includes them)",
+        )
     return PageContent(
         url=main.url,
         title=main.title,

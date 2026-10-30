@@ -27,6 +27,9 @@ class OwnerScrollArgs(ScriptArgs):
 
 class ContentArgs(ScriptArgs):
     max_chars: int
+    main_only: bool = False
+    # Links on this origin are shortened to paths.
+    origin: str = ""
 
 
 class OwnerHitsArgs(ScriptArgs):
@@ -63,6 +66,8 @@ class ContentExtraction(Options):
     markdown: str
     truncated: bool = False
     frames: int = 0
+    # Whether only the main landmark was read.
+    main: bool = False
 
 
 class PageFacts(Options):
