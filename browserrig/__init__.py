@@ -13,7 +13,7 @@ from .observation import CanvasMode, DomMode, Observe
 from .readiness import Readiness, ReadinessOptions, wait_for_page
 from .recording import Recording, RecordingOptions
 from .terminal import TerminalEvents
-from .tools import Actions
+from .tools import Actions, MouseTools
 
 __all__ = [
     "Activity",
@@ -21,6 +21,7 @@ __all__ = [
     "Point",
     "DragMode",
     "MouseEventKind",
+    "MouseTools",
     "Browser",
     "BrowserAgent",
     "CanvasMode",

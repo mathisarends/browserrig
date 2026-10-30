@@ -1,12 +1,13 @@
 from typing import Annotated, Literal
 
-from harnessed import Inject, Plugin, tool
+from harnessed import Inject, Plugin, SystemSection, tool
 from pydantic import Field
 
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Point
 from browserrig.core.kinds import ActionKind, DragMode
+from browserrig.core.modes import DomMode
 from browserrig.observation.models import Snapshot
 from browserrig.observation.plugin import Observe
 
@@ -17,8 +18,19 @@ type _ClickCount = Annotated[
 ]
 
 
-class PointerTools(Plugin, needs=(Actions, Observe)):
+class MouseTools(Plugin, needs=(Actions, Observe)):
     _observe: Inject[Observe]
+
+    coordinates = SystemSection(
+        title="Screenshot coordinates",
+        text=(
+            "Coordinates are measured in pixels from the top-left of the latest screenshot. "
+            "Observe again if the tab or document changes before pointing."
+        ),
+    )
+
+    def _dom_enabled(self) -> bool:
+        return isinstance(self._observe.mode, DomMode)
 
     @tool(description="Click screenshot coordinates; count=2 performs a native double click.")
     async def click_at(
@@ -87,10 +99,11 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
 
         return await actions.run(kind=ActionKind.DRAG, operation=drag, expects_change=True)
 
-
-class InteractionTools(PointerTools):
     # DOM mode deliberately also supports pointing at unreferenced screenshot regions.
-    @tool(description="Click a current DOM ref; count=2 performs a native double click.")
+    @tool(
+        enabled=_dom_enabled,
+        description="Click a current DOM ref; count=2 performs a native double click.",
+    )
     async def click(
         self,
         ref: str,
@@ -112,10 +125,11 @@ class InteractionTools(PointerTools):
         return await actions.run(kind=_click_kind(count), operation=click, expects_change=True)
 
     @tool(
+        enabled=_dom_enabled,
         description=(
             "Drag between DOM refs, scrolling them into view first. Both endpoints must fit "
             "in the viewport together; native draggable sources use HTML5 DataTransfer."
-        )
+        ),
     )
     async def drag(
         self,

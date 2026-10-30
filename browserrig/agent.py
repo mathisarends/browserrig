@@ -4,8 +4,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from harnessed import Agent, PluginValidation
-from harnessed.core.prompt.values import InstructionValues
+from harnessed import Agent, PluginValidation, SystemPrompt
 from harnessed.kernel import PluginLike
 from harnessed.models import Model
 from harnessed.plugins import Approvals, JsonlSessions
@@ -40,7 +39,7 @@ class BrowserAgent(Agent):
         file_system: FileSystemOptions | None = None,
         session_directory: str | Path | None = None,
         approvals: Approvals | None = None,
-        instructions: InstructionValues | None = (
+        system_prompt: str | SystemPrompt | None = (
             "Complete the requested browser task using the observed page state."
         ),
         plugins: Iterable[PluginLike] = (),
@@ -62,7 +61,7 @@ class BrowserAgent(Agent):
         composed.extend(plugins)
         super().__init__(
             model=model,
-            instructions=instructions,
+            system_prompt=system_prompt,
             plugins=composed,
             plugin_validation=plugin_validation,
         )

@@ -1,7 +1,7 @@
 # Browserrig
 
 Event-driven Chrome automation for AI agents and Python applications, built with
-[Harnessed 0.3.0](https://github.com/mathisarends/harnessed/releases/tag/v0.3.0),
+[Harnessed 0.4.0](https://github.com/mathisarends/harnessed/releases/tag/v0.4.0),
 cdpify, and Pydantic. Harnessed is pinned exactly in `pyproject.toml` and `uv.lock`.
 Browserrig combines direct browser access with composable agent plugins, explicit
 DOM and canvas modes, and a shared event log.
@@ -94,7 +94,7 @@ print(result.text)
 `run()`, `session()`, `sessions`, and session controls remain native Harnessed APIs.
 Native Pydantic AI models are accepted directly; Harnessed enters and exits their
 resource contexts. Explicitly supplied HTTP and provider SDK clients remain caller-owned.
-Use `instructions=...` to replace the default instruction and `plugins=[...]` to
+Use `system_prompt=...` to replace the default instruction and `plugins=[...]` to
 add capabilities. Conversations stay in memory unless `session_directory` is set.
 Without explicit `approvals`, Harnessed's default `ASK` policy applies; the example
 above allows actions automatically. The constructor does not open Chrome or files.
@@ -108,6 +108,57 @@ Shared plugin services use class-level `Inject[T]` and `provides=True`; explicit
 Injection binds values without inferring dependencies. Optional services resolve
 on each hook invocation and remain optional unless explicitly listed in `needs`.
 Tool decorators declare model-facing descriptions independently of developer docstrings.
+
+## System prompts and optional MCP tools
+
+`BrowserAgent(system_prompt="...")` appends browser plugin sections automatically.
+For titled Markdown or XML, pass a native `SystemPrompt`:
+
+```python
+from harnessed import PromptFormat, SystemPrompt
+from browserrig import BrowserAgent
+
+agent = BrowserAgent(
+    system_prompt=SystemPrompt(
+        format=PromptFormat.MARKDOWN,
+        sections=("Complete the requested browser task using the observed page state.",),
+    ),
+)
+print(agent.prompt)
+```
+
+`Observe` declares configuration-dependent `page_state` and `refs` sections, plus
+the shared `trust` section. DOM guidance follows screenshot, mark and page-text
+settings; canvas guidance describes image coordinates and omits DOM-ref rules.
+`MouseTools.coordinates` and `FileTools.usage` describe shared workflows.
+Single-tool instructions live in tool descriptions.
+
+With a custom `browser_plugins()` composition, use the configured recipes' section
+attributes in `SystemPrompt(sections=..., exclude=...)` to reorder or replace
+individual sections. `PluginSections()` places the remaining declarations.
+For manual compositions, pass the same mode to `Observe(mode)` and `Readiness(mode)`.
+Use `await session.prompt.render()` to inspect the exact session system text.
+
+Plugins mounted through `session.use()` require an explicit choice when they declare
+sections: `section_delivery=SectionDelivery.CONTEXT` delivers guidance until the
+mount closes or suspends; `SectionDelivery.IGNORE` skips it. Import `SectionDelivery`
+from `harnessed`. The fixed system prompt stays unchanged.
+
+Install the optional MCP client with `uv sync --locked --extra openai --extra mcp`.
+All Harnessed extras are pinned to **0.4.0**. Add MCP servers through the native plugin:
+
+```python
+from harnessed.plugins.mcp import MCP
+
+agent = BrowserAgent(
+    plugins=[MCP.http("catalog", url="http://localhost:8000/mcp", include_tools=["search"])],
+)
+```
+
+`MCP.stdio("catalog", command=..., args=[...])` starts a local server instead.
+Connections belong to each session, tool names are prefixed (for example
+`catalog__search`), and existing approval policies apply. See the
+[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.4.0/docs/guides/mcp.md).
 
 ## Plugin validation and diagnostics
 
@@ -137,14 +188,21 @@ For standalone kernel compositions, call `await ctx.settle()` followed by
 
 ## Upgrading existing sessions
 
-Harnessed 0.3.0 keeps session record format 2: existing 0.2.0 stores can be reused
+Harnessed 0.4.0 keeps session record format 2: existing 0.2.0 and 0.3.0 stores can be reused
 without migration. When upgrading from 0.1.0, format 1 is rejected without automatic
 migration. Back up those stores and choose a fresh directory. The OpenAI example
 writes to `.browserrig/sessions-v2`;
 existing `.browserrig/sessions` files stay available in their original directory.
 Custom `session_directory` values containing format 1 should also point to a fresh
 store. See the
-[migration guide](https://github.com/mathisarends/harnessed/blob/v0.3.0/Changelog.md).
+[migration guide](https://github.com/mathisarends/harnessed/blob/v0.4.0/Changelog.md).
+
+When upgrading application code from 0.3.0, rename `BrowserAgent(instructions=...)`
+to `BrowserAgent(system_prompt=...)`; wrap instruction lists in
+`SystemPrompt(sections=(...))`. Replace custom plugin `guidance` attributes with
+`SystemSection` or synchronous `@system_section` declarations. Replace imports of
+`PointerTools` and `InteractionTools` with `MouseTools` from `browserrig.tools`.
+The shared mouse plugin enables DOM-ref calls only when `Observe` uses `DomMode`.
 
 ## Session controls and canvas mode
 
@@ -260,17 +318,20 @@ ancestor hit tests are refreshed after scrolling and before dispatching input.
 Typing, selecting options, setting date inputs, and uploads use this preparation
 as well as clicks. Focus uses `preventScroll` to avoid an extra browser jump.
 
-`InteractionTools` provides `click(ref=..., count=2)` and
+`MouseTools` provides `click(ref=..., count=2)` and
 `drag(source_ref=..., target_ref=...)`. Both drag endpoints are prepared first and
 must fit in the viewport together before the gesture starts. Native `draggable`
 elements use HTML5 drag and drop with a real `DataTransfer`.
 
-`PointerTools`, used in canvas mode, provides
+In both DOM and canvas mode, the same plugin provides `scroll(delta_y=...)`,
 `click_at(x=..., y=..., count=2)` and
 `drag_at(start=Point(...), end=Point(...), mode=DragMode.POINTER)`.
 Use `DragMode.HTML5` for coordinate-based dragging of native HTML5 sources.
 The current observation determines how crop coordinates map to the viewport.
-Both variants use real CDP input and release mouse buttons even when interrupted.
+All gestures use real CDP input and release mouse buttons even when interrupted.
+DOM-ref calls are hidden and rejected in canvas mode through Harnessed's conditional
+tool availability. Workspace tools are likewise hidden when a connected browser has
+no shared local file system; `list_downloads` remains available.
 
 ## Input choreography
 

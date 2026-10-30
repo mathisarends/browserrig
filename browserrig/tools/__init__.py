@@ -3,7 +3,7 @@ from .execution import Actions
 from .files import FileTools, UploadTools
 from .forms import FormTools
 from .keyboard import KeyboardTools
-from .mouse import InteractionTools, PointerTools
+from .mouse import MouseTools
 from .navigation import NavigationTools
 from .tabs import TabTools
 
@@ -12,9 +12,8 @@ __all__ = [
     "DialogTools",
     "FileTools",
     "FormTools",
-    "InteractionTools",
     "KeyboardTools",
-    "PointerTools",
+    "MouseTools",
     "NavigationTools",
     "TabTools",
     "UploadTools",
