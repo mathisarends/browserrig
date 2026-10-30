@@ -58,6 +58,7 @@ class EventKind(StrEnum):
     NUDGE_QUEUED = "browser.nudge.queued"
     NUDGE_INCLUDED = "browser.nudge.included"
     NUDGE_EXPIRED = "browser.nudge.expired"
+    SECRET_ENTERED = "browser.secret.entered"
     RECORDING_STARTED = "browser.recording.started"
     RECORDING_SEGMENT_CLOSED = "browser.recording.segment.closed"
     RECORDING_SEGMENT_LOST = "browser.recording.segment.lost"
@@ -565,6 +566,15 @@ class NudgeExpiredEvent(BrowserEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class SecretEnteredEvent(BrowserEvent):
+    """Names the secrets typed and where; values are never part of an event."""
+
+    names: tuple[str, ...]
+    origin: str
+    type: Literal[EventKind.SECRET_ENTERED] = field(default=EventKind.SECRET_ENTERED, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
 class RecordingStartedEvent(BrowserEvent):
     recording_id: str
     type: Literal[EventKind.RECORDING_STARTED] = field(
@@ -676,6 +686,7 @@ READINESS_EVENTS = (
     ReadinessCancelledEvent,
 )
 NUDGE_EVENTS = (NudgeQueuedEvent, NudgeIncludedEvent, NudgeExpiredEvent)
+SECRET_EVENTS = (SecretEnteredEvent,)
 RECORDING_EVENTS = (
     RecordingStartedEvent,
     RecordingSegmentClosedEvent,

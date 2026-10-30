@@ -89,3 +89,23 @@ class TabStrip(Options):
 
     title: str
     icon: str
+
+
+class SecretFieldArgs(ScriptArgs):
+    mask: bool = False
+
+
+class SecretFocusArgs(ScriptArgs):
+    start: bool = False
+
+
+class SecretField(Options):
+    origin: str
+    focused: bool
+
+
+class SecretFocus(Options):
+    origins: tuple[str, ...]
+    cross_origin: bool
+    editable: bool
+    same: bool

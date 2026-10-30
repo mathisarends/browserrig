@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,6 +19,7 @@ from .observation.images import ImageContext
 from .readiness import Readiness
 from .readiness.config import ReadinessOptions
 from .recording import RecordingOptions
+from .secrets import Secret, Secrets
 from .tools.execution import Actions
 
 if TYPE_CHECKING:
@@ -45,6 +46,7 @@ class BrowserAgent(Agent):
         image_context: ImageContext | None = None,
         actions: Actions | None = None,
         local_files: bool = True,
+        secrets: Secrets | Mapping[str, Secret] | None = None,
         session_directory: str | Path | None = None,
         approvals: Approvals | None = None,
         system_prompt: str | SystemPrompt | None = (
@@ -64,6 +66,7 @@ class BrowserAgent(Agent):
                 image_context=image_context,
                 actions=actions,
                 local_files=local_files,
+                secrets=secrets,
             )
         )
         if session_directory is not None:

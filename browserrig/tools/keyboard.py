@@ -5,6 +5,7 @@ from browserrig.browser.tab import Tab
 from browserrig.core.kinds import ActionKind
 from browserrig.core.tools import browser_tool as tool
 from browserrig.observation.plugin import Observe, has_dom_refs
+from browserrig.secrets import Secrets
 
 from .execution import Actions, Effect
 
@@ -26,6 +27,7 @@ class DomKeyboardTools(Plugin, needs=(Actions, Browser, Observe)):
         clear: bool = True,
         *,
         actions: Inject[Actions],
+        secrets: Inject[Secrets | None] = None,
     ) -> ToolResult:
         async def type_text(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
@@ -33,10 +35,19 @@ class DomKeyboardTools(Plugin, needs=(Actions, Browser, Observe)):
             # Hover may reveal an overlay over the field; hit-test before focusing it.
             await actions.element_point(tab=tab, ref=ref, scroll=False)
             field = await self._observe.element(tab, ref)
+            # Check the secrets' domains before the field is touched.
+            entry = (
+                await secrets.prepare(text, browser=self._browser, field=field)
+                if secrets is not None
+                else None
+            )
             await field.focus(select_all=clear)
             if clear:
                 await self._browser.keyboard.press_key("Backspace")
-            await self._browser.keyboard.type_text(text)
+            if entry is not None and secrets is not None:
+                await secrets.enter(entry, self._browser.keyboard)
+            else:
+                await self._browser.keyboard.type_text(text)
             return Effect("Text entered.")
 
         return await actions.run(kind=ActionKind.TYPE, operation=type_text)
@@ -67,6 +78,7 @@ class KeyboardTools(Plugin, needs=(Actions, Browser, Observe)):
         hold_meta: bool = False,
         *,
         actions: Inject[Actions],
+        secrets: Inject[Secrets | None] = None,
     ) -> ToolResult:
         if (text is None) == (key is None):
             raise ToolError("Provide exactly one of text or key")
@@ -84,6 +96,11 @@ class KeyboardTools(Plugin, needs=(Actions, Browser, Observe)):
                 )
                 return Effect("Key dispatched.")
             assert text is not None
+            if secrets is not None:
+                entry = await secrets.prepare(text, browser=self._browser)
+                if entry is not None:
+                    await secrets.enter(entry, self._browser.keyboard)
+                    return Effect("Text entered.")
             await self._browser.keyboard.type_text(text)
             return Effect("Text entered.")
 

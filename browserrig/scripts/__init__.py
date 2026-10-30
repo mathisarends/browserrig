@@ -26,6 +26,10 @@ from .models import (
     ScriptArgs,
     ScrollArgs,
     ScrollPlan,
+    SecretField,
+    SecretFieldArgs,
+    SecretFocus,
+    SecretFocusArgs,
     SeedArgs,
     TabStrip,
 )
@@ -104,6 +108,13 @@ OWNER_HITS: Script[OwnerHitsArgs, tuple[bool, ...]] = Script.load(
     OwnerHitsArgs,
     tuple[bool, ...],
     uses=("geometry", "composed", "visibility", "hit"),
+)
+
+SECRET_FIELD: Script[SecretFieldArgs, SecretField] = Script.load(
+    "secret_field", SecretFieldArgs, SecretField, uses=("secret",)
+)
+SECRET_FOCUS: Script[SecretFocusArgs, SecretFocus] = Script.load(
+    "secret_focus", SecretFocusArgs, SecretFocus, uses=("secret",)
 )
 
 

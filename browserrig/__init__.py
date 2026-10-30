@@ -41,6 +41,7 @@ from .readiness import (
     wait_for_page,
 )
 from .recording import Recording, RecordingOptions
+from .secrets import Secret, Secrets, Totp, env, totp
 from .terminal import TerminalEvents
 from .tools import (
     Actions,
@@ -104,6 +105,11 @@ __all__ = [
     "ReadinessOptions",
     "Recording",
     "RecordingOptions",
+    "Secret",
+    "Secrets",
+    "Totp",
+    "env",
+    "totp",
     "Viewport",
     "TerminalEvents",
     "browser_plugins",

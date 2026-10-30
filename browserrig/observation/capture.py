@@ -17,12 +17,18 @@ from browserrig.readiness.models import ReadinessReport
 from browserrig.scripts import PAGE_FACTS
 
 from .extraction import Extraction, extract
-from .marks import annotate
+from .marks import annotate, blackout
 from .models import Element, ElementFingerprint, PageFingerprint, Snapshot
 from .regions import CanvasRegion, CaptureRegion
 
 # Longest side of a zoomed region image, to bound image tokens.
 _MAX_REGION_SIDE = 2000
+
+
+class Redaction(Protocol):
+    """Hides known secret values, e.g. the Secrets plugin."""
+
+    def redact[T](self, value: T) -> T: ...
 
 
 async def capture(
@@ -36,11 +42,13 @@ async def capture(
     zoom: float = 1,
     screenshots: bool | None = None,
     cursor: Point | None = None,
+    redaction: Redaction | None = None,
 ) -> Snapshot:
     """Observe `tab`. With `previous` from the same document, unseen elements get `new`.
 
     `region` crops a DOM-mode screenshot to a viewport area, magnified by `zoom`.
     `cursor` is where the browser's mouse rests in `tab`; screenshots mark it.
+    `redaction` hides secrets in all text and blacks out elements showing one.
     """
     if isinstance(mode, (DomMode, CanvasMode)):
         strategy = capture_for_mode(mode)
@@ -73,7 +81,9 @@ async def capture(
     await tab.sync_document()
     if tab.document_id != document_id:
         raise BrowserError("Document changed during capture; observe again before acting")
-    page = content.page
+    page, image = content.page, content.image
+    if redaction is not None:
+        page, image = await _redact(page, image, content, redaction)
     elements = _mark_new(page.elements, previous, tab.id, document_id)
     return Snapshot(
         id=snapshot_id,
@@ -97,17 +107,21 @@ async def capture(
         modal=page.modal,
         canvases=page.canvases,
         limitations=page.limitations,
-        image=content.image,
+        image=image,
         geometry=content.geometry,
     )
 
 
 @dataclass(frozen=True, slots=True)
 class CaptureContent:
+    """`area` is the viewport region `image` shows, at `scale` image pixels per CSS pixel."""
+
     page: Extraction
     image: str | None = None
     image_digest: str | None = None
     geometry: Geometry | None = None
+    area: Bounds | None = None
+    scale: float = 1
 
 
 class CaptureStrategy(Protocol):
@@ -190,7 +204,7 @@ class DomCapture:
             scale,
             cursor=cursor,
         )
-        return CaptureContent(page=page, image=image, geometry=geometry)
+        return CaptureContent(page=page, image=image, geometry=geometry, area=area, scale=scale)
 
 
 class CanvasCapture:
@@ -251,6 +265,30 @@ def capture_for_mode(mode: ObservationMode) -> CaptureStrategy:
             max_elements=mode.max_elements, max_text_chars=mode.max_text_chars, marks=mode.marks
         )
     return CanvasCapture(region=CanvasRegion(selector=mode.selector))
+
+
+async def _redact(
+    page: Extraction, image: str | None, content: CaptureContent, redaction: Redaction
+) -> tuple[Extraction, str | None]:
+    """Redact page text before the snapshot and its fingerprint are built.
+
+    Elements whose text holds a secret are blacked out in the image. An image without a
+    known area is dropped rather than shown with a secret it might contain.
+    """
+    redacted = redaction.redact(page)
+    if image is None or redacted is page:
+        return redacted, image
+    hidden = tuple(
+        element.bounds
+        for element, clean in zip(page.elements, redacted.elements, strict=True)
+        if element.bounds is not None and clean is not element
+    )
+    if not hidden:
+        return redacted, image
+    if content.area is None:
+        redacted.limitations = (*redacted.limitations, "Screenshot withheld: it may show a secret")
+        return redacted, None
+    return redacted, await asyncio.to_thread(blackout, image, hidden, content.area, content.scale)
 
 
 def _mark_new(

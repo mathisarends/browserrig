@@ -12,6 +12,8 @@ from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEve
 from .target import Focus, InputTarget, focused
 
 _TYPING_INTERVAL_SECONDS = 0.05
+# Key events of sensitive text show this instead of the character and its modifiers.
+_HIDDEN_KEY = "•"
 
 _MODIFIERS = {"Alt": 1, "Control": 2, "Meta": 4, "Shift": 8}
 _SPECIAL_KEYS = {
@@ -88,18 +90,43 @@ class Keyboard:
         finally:
             await self._emit(target, KeyboardVisibilityEvent(visible=False))
 
-    async def type_text(self, text: str) -> None:
+    async def type_text(
+        self,
+        text: str,
+        *,
+        sensitive: bool = False,
+        guard: Callable[[], Awaitable[None]] | None = None,
+    ) -> None:
+        """Type `text` key by key.
+
+        `sensitive` keeps the characters out of key events. `guard` runs before each key
+        and aborts typing by raising, e.g. when focus left the intended field.
+        """
         target = focused(self._focus)
         try:
             await self._emit(target, KeyboardVisibilityEvent(visible=True))
             # CRLF is one line break. Other Unicode characters are inserted unchanged.
             for value in text.replace("\r\n", "\n"):
-                await self._stroke(target, _character(value), duration=_TYPING_INTERVAL_SECONDS)
+                if guard is not None:
+                    await guard()
+                await self._stroke(
+                    target,
+                    _character(value),
+                    duration=_TYPING_INTERVAL_SECONDS,
+                    sensitive=sensitive,
+                )
                 await asyncio.sleep(_TYPING_INTERVAL_SECONDS)
         finally:
             await self._emit(target, KeyboardVisibilityEvent(visible=False))
 
-    async def _stroke(self, target: InputTarget, stroke: _Stroke, *, duration: float = 0) -> None:
+    async def _stroke(
+        self,
+        target: InputTarget,
+        stroke: _Stroke,
+        *,
+        duration: float = 0,
+        sensitive: bool = False,
+    ) -> None:
         async with AsyncExitStack() as held:
             flags = 0
             for modifier in stroke.modifiers:
@@ -138,8 +165,8 @@ class Keyboard:
         await self._emit(
             target,
             KeyPressedEvent(
-                key=stroke.key,
-                modifiers=stroke.modifiers,
+                key=_HIDDEN_KEY if sensitive else stroke.key,
+                modifiers=() if sensitive else stroke.modifiers,
                 duration=duration,
             ),
         )

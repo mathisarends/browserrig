@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from harnessed import Plugin
 from harnessed.plugins import LatestObservationOnly
 
@@ -13,6 +15,7 @@ from .observation.plugin import Observe
 from .readiness.config import ReadinessOptions
 from .readiness.plugin import Readiness
 from .recording import Recording, RecordingOptions
+from .secrets import Secret, Secrets
 from .tools import (
     DialogTools,
     DomTools,
@@ -38,6 +41,7 @@ def browser_plugins(
     image_context: ImageContext | None = None,
     actions: Actions | None = None,
     local_files: bool = True,
+    secrets: Secrets | Mapping[str, Secret] | None = None,
 ) -> list[Plugin]:
     if mode is not None and observe is not None:
         raise ValueError("Choose mode or observe, not both")
@@ -48,6 +52,11 @@ def browser_plugins(
         Chrome(options, file_system=file_system),
         readiness if isinstance(readiness, Readiness) else Readiness(selected, readiness),
         Nudges(),
+    ]
+    if secrets is not None:
+        # Before Observe, which redacts every observation with it.
+        plugins.append(secrets if isinstance(secrets, Secrets) else Secrets(secrets))
+    plugins += [
         observation,
         image_context or ImageContext(),
         actions or Actions(),

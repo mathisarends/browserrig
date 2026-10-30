@@ -29,6 +29,7 @@ from browserrig.events import (
 from browserrig.nudges import Nudges
 from browserrig.readiness.plugin import Readiness
 from browserrig.recording import Recording
+from browserrig.secrets import Secrets
 
 from .capture import CaptureStrategy, DomCapture, capture_for_mode
 from .capture import capture as capture_snapshot
@@ -55,6 +56,8 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
     _browser: Inject[Browser]
     _events: Inject[BrowserEvents]
     _readiness: Inject[Readiness]
+    # Mounted before Observe when used; it redacts every snapshot and screenshot.
+    _secrets: Inject[Secrets | None]
 
     def __init__(
         self,
@@ -119,6 +122,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 tabs=tuple(await self._browser.tabs()),
                 previous=self._state.snapshot,
                 screenshots=False,
+                redaction=self._secrets,
             )
 
     async def capture(
@@ -146,6 +150,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 screenshots=(self.screenshots.trigger == ScreenshotTrigger.EACH_STEP)
                 if screenshots is None
                 else screenshots,
+                redaction=self._secrets,
             )
             self._state.snapshot = snapshot
             await self._events.emit(
@@ -279,16 +284,24 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 self._browser.active_tab,
                 geometry=snapshot.geometry if snapshot.mode == ObservationKind.CANVAS else None,
             )
-        event.session.observe(
+        observations = [
             Observation(
                 source="browser",
                 full=self._render(snapshot),
                 summary=f"{snapshot.mode}: {snapshot.title} ({snapshot.url})",
                 refs=(snapshot.id,),
             )
-        )
+        ]
         if nudges is not None:
-            event.session.observe(await nudges.project(snapshot))
+            observations.append(await nudges.project(snapshot))
+        secrets = self._secrets
+        if secrets is not None:
+            listed = secrets.project(snapshot)
+            if listed is not None:
+                observations.append(listed)
+        for observation in observations:
+            # Nudges quote page text too; nothing reaches the session unredacted.
+            event.session.observe(secrets.redact(observation) if secrets else observation)
         return await next_()
 
     def image_delivered(self, image: CapturedImage) -> None:

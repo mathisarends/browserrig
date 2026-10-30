@@ -18,6 +18,10 @@ The isolated world's `globalThis.__browserrig` namespace holds:
 - `stability`: one MutationObserver per document and its last mutation time.
   Its guard prevents duplicate observers. Document/context destruction disposes
   of the world and observer together.
+- `secretFields`: fields that received a secret; their text is masked with
+  `-webkit-text-security`.
+- `secretTarget`: the field focused when secret typing started; typing aborts
+  as soon as focus leaves it.
 
 Scripts throw only the fixed codes in `ScriptError`. Unexpected exception text
 is never returned to the model. ESLint and Prettier cover main files and helpers;

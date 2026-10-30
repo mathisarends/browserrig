@@ -16,3 +16,7 @@ class ReadinessError(BrowserError):
 
 class RecordingError(BrowserError):
     pass
+
+
+class SecretError(BrowserError):
+    """A secret could not be used; messages name secrets, never their values."""

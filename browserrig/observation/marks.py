@@ -1,4 +1,5 @@
 import base64
+import math
 from enum import StrEnum
 from io import BytesIO
 
@@ -87,6 +88,25 @@ def annotate(
         draw.text((x + 4 - left, y + 2 - top), label, font=font, fill=_Color.WHITE)
     if cursor is not None and area.contains(cursor.x, cursor.y):
         _cursor(draw, cursor, area, scale)
+    output = BytesIO()
+    canvas.save(output, format="PNG")
+    return base64.b64encode(output.getvalue()).decode("ascii")
+
+
+def blackout(image: str, regions: tuple[Bounds, ...], area: Bounds, scale: float = 1) -> str:
+    """Paint viewport `regions` solid black in an image of `area`, e.g. fields with secrets."""
+    with Image.open(BytesIO(base64.b64decode(image))) as source:
+        canvas = source.convert("RGB")
+    draw = ImageDraw.Draw(canvas)
+    for region in regions:
+        shown = region.intersect(area)
+        if shown.width <= 0 or shown.height <= 0:
+            continue
+        # Round outward so no anti-aliased edge of a glyph survives.
+        left, top = math.floor((shown.x - area.x) * scale), math.floor((shown.y - area.y) * scale)
+        right = math.ceil((shown.x + shown.width - area.x) * scale)
+        bottom = math.ceil((shown.y + shown.height - area.y) * scale)
+        draw.rectangle((left - 2, top - 2, right + 2, bottom + 2), fill="#000000")
     output = BytesIO()
     canvas.save(output, format="PNG")
     return base64.b64encode(output.getvalue()).decode("ascii")
