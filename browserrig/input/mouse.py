@@ -5,11 +5,11 @@ from collections.abc import Awaitable, Callable
 from typing import Literal
 
 from cdpify import CdpSession
-from cdpify.domains.input import DragData, DragInterceptedEvent, MouseButton
+from cdpify.domains.input import MouseButton
 
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Point
-from browserrig.core.kinds import CursorStyle, DragMode, MouseEventKind
+from browserrig.core.kinds import CursorStyle, MouseEventKind
 from browserrig.events import (
     CursorMovedEvent,
     CursorStateEvent,
@@ -119,58 +119,34 @@ class Mouse:
         start: Point,
         end: Point,
         duration: float,
-        mode: DragMode = DragMode.POINTER,
     ) -> None:
-        """Drag with the left button; the button is released even when interrupted."""
+        """Let the browser handle the drag gesture; always release the left button."""
         distance = math.hypot(end.x - start.x, end.y - start.y)
         if distance < 1:
             raise BrowserError("Drag source and destination must be different")
-        cdp = self._cdp
         await self.move_to(start)
         current = start
-        data: DragData | None = None
-        dropped = False
-        start_fraction = 0.0
         try:
-            if mode is DragMode.HTML5:
-                await cdp.input.set_intercept_drags(enabled=True)
             await self._dispatch(MouseEventKind.PRESSED, start, buttons=1, click_count=1)
-            if mode is DragMode.HTML5:
-                # Subscribe before crossing the native drag threshold.
-                async with cdp.listen(DragInterceptedEvent, timeout=2) as subscription:
-                    start_fraction = min(12 / distance, 1)
-                    current = Point(
-                        x=start.x + (end.x - start.x) * start_fraction,
-                        y=start.y + (end.y - start.y) * start_fraction,
-                    )
-                    await self._dispatch(MouseEventKind.MOVED, current, buttons=1)
-                    data = (await anext(subscription)).data
-                await cdp.input.dispatch_drag_event(
-                    type="dragEnter", x=current.x, y=current.y, data=data
-                )
+            # CDP's mouse input handles native drag-and-drop as well as pointer gestures.
             steps = max(3, math.ceil(duration * 30))
             for index in range(1, steps + 1):
-                fraction = start_fraction + (1 - start_fraction) * index / steps
+                fraction = index / steps
                 current = Point(
                     x=start.x + (end.x - start.x) * fraction,
                     y=start.y + (end.y - start.y) * fraction,
                 )
-                if data is not None:
-                    await cdp.input.dispatch_drag_event(
-                        type="dragOver", x=current.x, y=current.y, data=data
-                    )
-                    self.position = current
-                    self._layout_changed()
-                    await self._emit(CursorStateEvent(x=current.x, y=current.y, buttons=1))
-                else:
-                    await self._dispatch(MouseEventKind.MOVED, current, buttons=1)
+                await self._dispatch(MouseEventKind.MOVED, current, buttons=1)
                 await asyncio.sleep(duration / steps)
-            if data is not None:
-                await cdp.input.dispatch_drag_event(type="drop", x=end.x, y=end.y, data=data)
-                dropped = True
-                self._layout_changed()
+            # Entering the drop target may only fire dragenter. Move again there so
+            # its dragover handler can accept the drop before the button is released.
+            await self._dispatch(MouseEventKind.MOVED, end, buttons=1)
+        except BaseException:
+            # Cancel a native drag before releasing so an interrupted gesture cannot drop.
+            await self._cdp.input.cancel_dragging()
+            raise
         finally:
-            await self._release_drag(current, data, dropped=dropped, mode=mode)
+            await self._dispatch(MouseEventKind.RELEASED, current, buttons=0, click_count=1)
 
     async def scroll(self, *, point: Point, delta_y: float, delta_x: float = 0) -> None:
         if delta_y == 0 and delta_x == 0:
@@ -235,18 +211,3 @@ class Mouse:
         await self._emit(
             event_type(x=point.x, y=point.y, click_count=click_count, button=button.value)
         )
-
-    async def _release_drag(
-        self, point: Point, data: DragData | None, *, dropped: bool, mode: DragMode
-    ) -> None:
-        try:
-            if data is not None and not dropped:
-                await self._cdp.input.dispatch_drag_event(
-                    type="dragCancel", x=point.x, y=point.y, data=data
-                )
-        finally:
-            try:
-                await self._dispatch(MouseEventKind.RELEASED, point, buttons=0, click_count=1)
-            finally:
-                if mode is DragMode.HTML5:
-                    await self._cdp.input.set_intercept_drags(enabled=False)

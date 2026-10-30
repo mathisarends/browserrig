@@ -6,7 +6,7 @@ from pydantic import Field
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Point
-from browserrig.core.kinds import ActionKind, DragMode
+from browserrig.core.kinds import ActionKind
 from browserrig.core.tools import browser_tool as tool
 from browserrig.observation.models import CapturedImage, Snapshot
 from browserrig.observation.plugin import Observe, has_dom_refs
@@ -103,16 +103,13 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
 
     @tool(
         kind=ActionKind.DRAG_AT,
-        description=(
-            "Drag between screenshot points. Use html5 for a native draggable/DataTransfer source."
-        ),
+        description="Drag between screenshot points.",
     )
     async def drag_at(
         self,
         start: Point,
         end: Point,
         duration: Annotated[float, Field(ge=0.05, le=5)] = 0.5,
-        mode: DragMode = DragMode.POINTER,
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
@@ -123,7 +120,6 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
                 start=_image_point(self._observe.coordinate_source(), start),
                 end=_image_point(self._observe.coordinate_source(), end),
                 duration=duration,
-                mode=mode,
             )
             return Effect("Drag dispatched; inspect the destination.")
 
@@ -178,7 +174,7 @@ class DomPointerTools(Plugin, needs=(Actions, Observe)):
         enabled=has_dom_refs,
         description=(
             "Drag between DOM refs, scrolling them into view first. Both endpoints must fit "
-            "in the viewport together; native draggable sources use HTML5 DataTransfer."
+            "in the viewport together."
         ),
     )
     async def drag(
@@ -190,13 +186,11 @@ class DomPointerTools(Plugin, needs=(Actions, Observe)):
         actions: Inject[Actions],
     ) -> ToolResult:
         async def drag(tab: Tab) -> Effect:
-            source = (await self._observe.element(tab, source_ref)).element
             prepared = await actions.element_point(tab=tab, ref=source_ref)
             target = await actions.element_point(tab=tab, ref=target_ref)
             start = await actions.element_point(tab=tab, ref=source_ref, scroll=False)
             end = await actions.element_point(tab=tab, ref=target_ref, scroll=False)
-            mode = DragMode.HTML5 if source.draggable else DragMode.POINTER
-            await tab.mouse.drag(start=start, end=end, duration=duration, mode=mode)
+            await tab.mouse.drag(start=start, end=end, duration=duration)
             return Effect(
                 "Drag dispatched; inspect the destination.",
                 prepared_scroll=prepared.scrolled or target.scrolled,

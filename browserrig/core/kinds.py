@@ -77,11 +77,6 @@ class ElementOperation(StrEnum):
     SET_VALUE = "set_value"
 
 
-class DragMode(StrEnum):
-    POINTER = "pointer"
-    HTML5 = "html5"
-
-
 class MouseEventKind(StrEnum):
     MOVED = "mouseMoved"
     PRESSED = "mousePressed"

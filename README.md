@@ -434,14 +434,14 @@ as well as clicks. Focus uses `preventScroll` to avoid an extra browser jump.
 
 `DomTools` provides `click(ref=..., count=2)` and
 `drag(source_ref=..., target_ref=...)`. Both drag endpoints are prepared first and
-must fit in the viewport together before the gesture starts. Native `draggable`
-elements use HTML5 drag and drop with a real `DataTransfer`.
+must fit in the viewport together before the gesture starts.
 
 In both DOM and canvas mode, `PointerTools` provides `move_mouse(x=..., y=...)`,
 `scroll(delta_y=...)`,
 `click_at(x=..., y=..., count=2)` and
-`drag_at(start=Point(...), end=Point(...), mode=DragMode.POINTER)`.
-Use `DragMode.HTML5` for coordinate-based dragging of native HTML5 sources.
+`drag_at(start=Point(...), end=Point(...))`.
+Both drag tools use the same mouse gesture. The browser handles pointer dragging
+and native HTML5 drag and drop, including `DataTransfer`, automatically.
 `move_mouse` moves the cursor without clicking and can reveal hover controls.
 `scroll` sends wheel input at the current cursor position: move over a sidebar,
 panel, or other scrollable area first to scroll that area.

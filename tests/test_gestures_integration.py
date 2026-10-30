@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
 from harnessed.events import ToolExecutionFinishedEvent
@@ -5,11 +7,19 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
-from browserrig import Browser, LaunchBrowser, browser_plugins
-from browserrig.kinds import DragMode
+from browserrig import Browser, ChromeBrowser, LaunchBrowser, browser_plugins
+from browserrig.core.geometry import Point
+from browserrig.events import CursorStateEvent
 from tests.observations import latest
 
 pytestmark = pytest.mark.integration
+
+
+async def evaluate(tab, expression):
+    # Fixture counters and DataTransfer listeners live in the page's main world.
+    result = await tab.cdp.runtime.evaluate(expression=expression, return_by_value=True)
+    assert result.exception_details is None
+    return result.result.value
 
 
 @pytest.mark.parametrize("coordinates", [False, True])
@@ -38,19 +48,18 @@ async def test_right_click_dispatches_native_contextmenu_without_a_left_click(si
     assert state["details"] == [] and state["doubles"] == 0
 
 
-@pytest.mark.parametrize("mode", [DragMode.POINTER, DragMode.HTML5])
+@pytest.mark.parametrize("native", [False, True])
 @pytest.mark.parametrize("coordinates", [False, True])
-async def test_drag_pointer_and_html5_transfer(site, mode, coordinates):
+async def test_drag_pointer_and_html5_transfer(site, native, coordinates):
     def arguments(state):
         if coordinates:
-            y = 140 if mode is DragMode.HTML5 else 290
+            y = 140 if native else 290
             return {
                 "start": {"x": 70, "y": y},
                 "end": {"x": 350, "y": y},
-                "mode": mode,
                 "duration": 0.1,
             }
-        prefix = "Native" if mode is DragMode.HTML5 else "Pointer"
+        prefix = "Native" if native else "Pointer"
         refs = {e["name"]: e["ref"] for e in state["elements"]}
         return {
             "source_ref": refs[f"{prefix} source"],
@@ -59,7 +68,62 @@ async def test_drag_pointer_and_html5_transfer(site, mode, coordinates):
         }
 
     state = await _perform(site, "drag_at" if coordinates else "drag", arguments)
-    assert state["native"] == "payload" if mode is DragMode.HTML5 else state["pointer"] is True
+    assert state["native"] == "payload" if native else state["pointer"] is True
+
+
+@pytest.mark.parametrize("prevented", [False, True])
+async def test_drag_uses_browser_behavior_for_draggable_ancestor(site, prevented):
+    async with ChromeBrowser(LaunchBrowser(url=site + "/gestures")) as browser:
+        tab = browser.active_tab
+        await evaluate(
+            tab,
+            """(() => {
+                const source = document.querySelector('#native');
+                source.innerHTML =
+                    '<span style="display:block;width:100%;height:100%">Child</span>';
+                window.dragStarts = 0;
+                source.addEventListener('dragstart', e => {
+                    window.dragStarts++;
+                    if (PREVENTED) e.preventDefault();
+                });
+            })()""".replace("PREVENTED", str(prevented).lower()),
+        )
+        assert await evaluate(tab, "document.elementFromPoint(70, 140).draggable") is False
+        await tab.mouse.drag(start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1)
+        assert await evaluate(tab, "window.dragStarts") == 1
+        assert await evaluate(tab, "window.nativeDrop") == ("" if prevented else "payload")
+
+
+async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site):
+    reached_target = asyncio.Event()
+
+    async def emit(event):
+        if isinstance(event, CursorStateEvent) and event.buttons == 1 and event.x == 350:
+            reached_target.set()
+            await asyncio.Event().wait()
+
+    async with ChromeBrowser(LaunchBrowser(url=site + "/gestures"), emit=emit) as browser:
+        tab = browser.active_tab
+        await evaluate(
+            tab,
+            """window.dragEnds = [];
+            document.querySelector('#native').addEventListener('dragend', e => {
+                window.dragEnds.push(e.dataTransfer.dropEffect);
+            });""",
+        )
+        task = asyncio.create_task(
+            tab.mouse.drag(start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1)
+        )
+        try:
+            await asyncio.wait_for(reached_target.wait(), timeout=5)
+        finally:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        assert await evaluate(tab, "window.nativeDrop") == ""
+        assert await evaluate(tab, "window.dragEnds") == ["none"]
+        await tab.mouse.click(Point(x=70, y=40))
+        assert await evaluate(tab, "window.details") == [1]
 
 
 async def _perform(site, name, arguments):

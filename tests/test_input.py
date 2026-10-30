@@ -293,6 +293,20 @@ async def test_cancelled_drag_releases_mouse_button():
         await task
     assert commands[-1]["type"] == "mouseReleased"
     assert commands[-1]["buttons"] == 0
+    tab.cdp.input.cancel_dragging.assert_awaited_once_with()
+
+
+async def test_failed_native_drag_cancellation_still_releases_mouse_button():
+    async def dispatch(arguments):
+        if arguments["type"] == "mouseMoved" and arguments.get("buttons") == 1:
+            raise RuntimeError("movement failed")
+
+    tab, _, commands = _tab(dispatch=dispatch)
+    tab.cdp.input.cancel_dragging.side_effect = RuntimeError("cancel failed")
+    with pytest.raises(RuntimeError, match="cancel failed"):
+        await tab.mouse.drag(start=Point(x=10, y=10), end=Point(x=200, y=200), duration=0.1)
+    assert commands[-1]["type"] == "mouseReleased"
+    assert commands[-1]["buttons"] == 0
 
 
 def _tab(*, dispatch=None):
@@ -308,6 +322,11 @@ def _tab(*, dispatch=None):
             await dispatch(arguments)
 
     cdp = SimpleNamespace(
-        input=SimpleNamespace(dispatch_key_event=send, insert_text=send, dispatch_mouse_event=send)
+        input=SimpleNamespace(
+            dispatch_key_event=send,
+            insert_text=send,
+            dispatch_mouse_event=send,
+            cancel_dragging=AsyncMock(),
+        )
     )
     return Tab("tab-1", cdp, emit=emit), events, commands

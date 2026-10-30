@@ -7,7 +7,7 @@ from .agent import BrowserAgent
 from .browser import Browser, Chrome, ChromeBrowser, ConnectBrowser, LaunchBrowser, Viewport
 from .composition import browser_plugins
 from .files import FileSystem, FileSystemOptions
-from .kinds import DragMode, MouseEventKind
+from .kinds import MouseEventKind
 from .nudges import Nudges
 from .observation import (
     CanvasCapture,
@@ -86,7 +86,6 @@ __all__ = [
     "Activity",
     "Actions",
     "Point",
-    "DragMode",
     "MouseEventKind",
     "MouseTools",
     "Browser",
