@@ -41,7 +41,7 @@ otel = ["harnessed[otel]==0.7.0"]
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4,<5",
+    "prek>=0.5.7,<0.6",
     "pylint>=4,<5",
     "pytest>=8,<10",
     "pytest-asyncio>=1,<2",

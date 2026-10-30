@@ -816,8 +816,8 @@ Apply this order to production code, tests and examples.
 ```powershell
 uv sync --locked --extra openai
 npm.cmd ci
-uv run pre-commit install
-uv run pre-commit run --all-files
+uv run prek install --overwrite
+uv run prek run --all-files
 
 uv run ruff check browserrig examples tests
 uv run ruff format --check browserrig examples tests
@@ -830,7 +830,9 @@ uv run pytest -m integration   # real Chrome; `-m ""` runs everything
 uv build
 ```
 
-Pre-commit hooks use the uv and npm dependencies pinned in the lockfiles.
+prek hooks use the uv and npm dependencies pinned in the lockfiles.
+The existing `.pre-commit-config.yaml` configures the checks; `--overwrite` replaces
+any previously installed pre-commit hook.
 On Linux and macOS, use `npm` instead of `npm.cmd` and `cp .env.example .env`
 instead of `Copy-Item`.
 
