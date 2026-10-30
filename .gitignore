@@ -9,3 +9,6 @@ build/
 .env
 .browserrig/
 node_modules/
+
+# Exported Phoenix traces (px trace list ./traces)
+traces/

@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import yaml
 from harnessed import Inject, Observation, Plugin, PluginState, SessionLog, hook
-from harnessed.events import ObservationsIncludedEvent
+from harnessed.events import ObservationRecordedEvent, ObservationsIncludedEvent
 
 from browserrig.browser.base import BrowserEvents
 from browserrig.core.kinds import ActionKind, ReadinessStatus
@@ -27,6 +27,7 @@ from browserrig.events import (
 )
 
 _CLICK_KINDS = {ActionKind.CLICK, ActionKind.CLICK_AT, ActionKind.DOUBLE_CLICK}
+_SOURCE = "browser.nudges"
 
 if TYPE_CHECKING:
     from browserrig.observation.models import Snapshot
@@ -37,6 +38,8 @@ class _State:
     queued: dict[str, NudgeQueuedEvent] = field(default_factory=dict)
     tabs: dict[str, _TabState] = field(default_factory=dict)
     effect_at: float = 0
+    # Whether the last recorded hint observation listed any hints.
+    shown: bool = False
 
 
 class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
@@ -60,6 +63,10 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
                     self._remove(ids)
                 case NudgeExpiredEvent(nudge_id=nudge_id):
                     self._remove((nudge_id,))
+                case ObservationRecordedEvent(observation=observation) if (
+                    observation.source == _SOURCE
+                ):
+                    self._state.shown = bool(observation.refs)
 
     async def queue(
         self,
@@ -106,10 +113,17 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
                 selected.append({"id": event.nudge_id, "text": event.text})
                 size += len(event.text)
         return Observation(
-            source="browser.nudges",
+            source=_SOURCE,
             content=yaml.safe_dump({"nudges": selected}, sort_keys=False, allow_unicode=True),
             refs=tuple(item["id"] for item in selected),
         )
+
+    async def observation(self, snapshot: Snapshot) -> Observation | None:
+        """Hints for the next step; None while there are none and none were shown last."""
+        observation = await self.project(snapshot)
+        shown, self._state.shown = self._state.shown, bool(observation.refs)
+        # One empty list after shown hints marks them as handled; later empty lists add nothing.
+        return observation if observation.refs or shown else None
 
     def _remove(self, ids: tuple[str, ...]) -> None:
         self._state.queued = {
@@ -229,7 +243,7 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         refs = {
             ref
             for observation in event.observations
-            if observation.source == "browser.nudges"
+            if observation.source == _SOURCE
             for ref in observation.refs
         }
         included = tuple(

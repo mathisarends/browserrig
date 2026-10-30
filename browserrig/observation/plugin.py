@@ -302,8 +302,8 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         state.screenshot_requested = False
         state.screenshot_region, state.screenshot_zoom = None, 1
         observations = [self.project(snapshot)]
-        if nudges is not None:
-            observations.append(await nudges.project(snapshot))
+        if nudges is not None and (hints := await nudges.observation(snapshot)) is not None:
+            observations.append(hints)
         secrets = self._secrets
         if secrets is not None:
             listed = secrets.project(snapshot)

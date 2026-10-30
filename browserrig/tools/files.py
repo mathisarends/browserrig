@@ -1,11 +1,23 @@
 import asyncio
+import hashlib
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
 import yaml
-from harnessed import Inject, Observation, Plugin, SystemSection, ToolError, ToolResult, hook
+from harnessed import (
+    Inject,
+    Observation,
+    Plugin,
+    PluginState,
+    SystemSection,
+    ToolError,
+    ToolResult,
+    hook,
+)
+from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
 from pydantic import Field
 
@@ -48,8 +60,18 @@ def has_upload_files(browser: Inject[Browser], observe: Inject[Observe]) -> bool
     return has_files(browser) and has_dom_refs(observe)
 
 
+_SOURCE = "files"
+
+
+@dataclass
+class _Delivery:
+    sent: str | None = None
+    visible: bool = False
+
+
 class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
     events = FILE_EVENTS
+    _delivery = PluginState(_Delivery)
 
     _browser: Inject[Browser]
     _events: Inject[BrowserEvents]
@@ -249,16 +271,25 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
             downloads=downloads[-20:],
             total_downloads=len(downloads),
         )
-        view = FileSystemView(file_system=state)
-        event.session.observe(
-            Observation(
-                source="files",
-                content=yaml.safe_dump(
-                    view.model_dump(mode="json"), allow_unicode=True, sort_keys=False
-                ),
-            )
+        content = yaml.safe_dump(
+            FileSystemView(file_system=state).model_dump(mode="json"),
+            allow_unicode=True,
+            sort_keys=False,
         )
+        ref = hashlib.sha256(content.encode()).hexdigest()[:16]
+        delivery = self._delivery
+        # Resend only changes, or when the model no longer sees the last copy (e.g. compaction).
+        if not (delivery.visible and delivery.sent == ref):
+            event.session.observe(Observation(source=_SOURCE, content=content, refs=(ref,)))
+            delivery.sent, delivery.visible = ref, False
         return await next_()
+
+    @hook(ObservationsIncludedEvent)
+    async def _included(self, event: ObservationsIncludedEvent) -> None:
+        delivery = self._delivery
+        delivery.visible = any(
+            item.source == _SOURCE and delivery.sent in item.refs for item in event.observations
+        )
 
     async def _open(
         self, path: Path, kind: ActionKind, source: FileSource, download_id: str = ""

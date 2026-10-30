@@ -36,9 +36,12 @@ from browserrig.core.errors import ReadinessError, StaleElement
 from browserrig.core.geometry import Geometry, Point
 from browserrig.core.kinds import ObservationKind, ReadinessPhase, ReadinessStage, ReadinessStatus
 from browserrig.events import ObservationCapturedEvent, ReadinessStartedEvent
+from browserrig.files.models import Download
+from browserrig.nudges import Nudges
 from browserrig.observation.capture import CaptureContent
 from browserrig.observation.extraction import Extraction
 from browserrig.tools import FileTools, UploadTools
+from browserrig.tools.execution import Actions
 from browserrig.tools.mouse import _image_point
 from tests.fakes import FakeChrome
 from tests.observations import has_image, image_id
@@ -85,6 +88,7 @@ def _agent(
     extra=(),
     frames=None,
     skip_unchanged=True,
+    after=(),
 ):
     holder = {}
     capture = CountingCapture(frames)
@@ -103,6 +107,7 @@ def _agent(
                 skip_unchanged=skip_unchanged,
             ),
             Approvals(default=PolicyDecision.ALLOW),
+            *after,
         ],
     )
     return agent, model, capture, holder
@@ -418,6 +423,61 @@ async def test_latest_observation_only_is_an_explicit_policy_with_native_image_l
         included = session.log.last(ObservationsIncludedEvent).observations
         assert len(included) == 1 and included[0].source == "browser"
         assert session.ctx[Observe].coordinate_source().geometry is None
+
+
+def _recorded(session, source):
+    return [
+        event
+        for event in session.events
+        if isinstance(event, ObservationRecordedEvent) and event.observation.source == source
+    ]
+
+
+def _visible(request, source):
+    return [message for message in request.messages if message.id.endswith(f":{source}")]
+
+
+async def test_file_state_is_resent_only_after_a_change():
+    download = Download(id="d1", filename="report.pdf", url="https://example.org/report.pdf")
+    agent, model, _capture, holder = _agent([*_observes(3), "Done"], after=(Actions(), FileTools()))
+    async with agent.session() as session:
+        browser = _browser_ready(holder)
+        browser.downloads = AsyncMock(side_effect=[(), (), (download,), (download,)])
+        await session.run("Inspect", max_steps=4)
+        assert [event.step for event in _recorded(session, "files")] == [1, 3]
+        assert [len(_visible(request, "files")) for request in model.requests] == [1, 1, 2, 2]
+
+
+async def test_file_state_is_resent_when_compaction_removed_the_last_copy():
+    fire = iter([False, False, False, True, *[False] * 10])
+    compaction = Compaction(
+        trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
+    )
+    agent, model, _capture, holder = _agent(
+        [*_observes(4), "Done"], extra=(compaction,), after=(Actions(), FileTools())
+    )
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect", max_steps=5)
+        visible = [len(_visible(request, "files")) for request in model.requests]
+        # The compacted request lacks the old copy; the next step sends it again.
+        assert visible[:3] == [1, 1, 1] and visible[3] == 0 and visible[4] == 1
+        assert [event.step for event in _recorded(session, "files")] == [1, 5]
+
+
+async def test_hint_observations_are_skipped_while_there_is_nothing_to_report():
+    agent, model, _capture, holder = _agent([*_observes(3), "Done"], after=(Nudges(),))
+    async with agent.session() as session:
+        _browser_ready(holder)
+        nudges = session.ctx[Nudges]
+        await session.run("Inspect", max_steps=1)
+        await nudges.queue("Inspect the page", key="hint", cause_id="action")
+        await session.run("Continue", max_steps=3)
+        recorded = [event.observation for event in _recorded(session, "browser.nudges")]
+        # Shown once, cleared once after delivery, then omitted.
+        assert [bool(observation.refs) for observation in recorded] == [True, False]
+        assert "Inspect the page" in str(recorded[0].content)
+        assert len(_visible(model.requests[0], "browser.nudges")) == 0
 
 
 class Probe(ReadinessStrategy):
