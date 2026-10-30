@@ -218,7 +218,7 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
             region = {"x": 100, "y": 150, "width": 400, "height": 200}
             yield ModelChunk(tool_call=ToolCall("screenshot", {"region": region, "zoom": 2}))
         elif step == 1:
-            captions.extend(text for text in texts if text.startswith("Latest coordinate image"))
+            captions.extend(text for text in texts if text.startswith("Screenshot "))
             # Image pixel (100, 60) at 2x zoom is viewport (150, 180), canvas offset (50, 30).
             yield ModelChunk(tool_call=ToolCall("click_at", {"x": 100, "y": 60}))
         else:

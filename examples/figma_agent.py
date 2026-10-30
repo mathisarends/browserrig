@@ -49,7 +49,8 @@ async def main() -> None:
         choices=list(ScreenshotTrigger),
         default=ScreenshotTrigger.EACH_STEP,
     )
-    parser.add_argument("--keep-latest-n-screenshots", type=int, default=3)
+    parser.add_argument("--max-images", type=int, default=6)
+    parser.add_argument("--min-images", type=int, default=3)
     args = parser.parse_args()
     if not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY first")
@@ -74,7 +75,7 @@ async def main() -> None:
             renderer=CanvasRenderer(),
             screenshots=Screenshots(trigger=args.screenshot_trigger),
         ),
-        ImageContext(keep_latest_n_screenshots=args.keep_latest_n_screenshots),
+        ImageContext(max_images=args.max_images, min_images=args.min_images),
         Actions(chain_policy=ObserveAfterInput()),
         PointerTools(),
         KeyboardTools(),

@@ -63,7 +63,7 @@ class CustomRenderer(CanvasRenderer):
         return f"Custom view: {snapshot.id}"
 
 
-def _agent(responses, trigger=ScreenshotTrigger.ON_REQUEST, keep=2, extra=()):
+def _agent(responses, trigger=ScreenshotTrigger.ON_REQUEST, keep=2, extra=(), trim_to=None):
     holder = {}
     capture = CountingCapture()
     model = ScriptedModel(responses)
@@ -76,7 +76,7 @@ def _agent(responses, trigger=ScreenshotTrigger.ON_REQUEST, keep=2, extra=()):
             Observe(
                 capture=capture, renderer=CustomRenderer(), screenshots=Screenshots(trigger=trigger)
             ),
-            ImageContext(keep_latest_n_screenshots=keep),
+            ImageContext(max_images=keep, min_images=keep if trim_to is None else trim_to),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )
@@ -112,8 +112,9 @@ async def test_image_fifo_and_one_capture_per_boundary_with_custom_strategies(tr
         ids = [message.id for message in _images(model.requests[-1])]
         assert len(ids) == len(set(ids)) == 2
         assert ids[0] == _images(model.requests[-2])[-1].id
-        assert "Historical image" in _images(model.requests[-1])[0].content[0].text
-        assert "Latest coordinate image" in _images(model.requests[-1])[1].content[0].text
+        note = model.requests[-1].messages[-1]
+        assert note.id == "browser-latest-image"
+        assert note.text == f"Latest screenshot: {ids[1].removeprefix('browser-image:')}"
         assert any("Custom view:" in str(message.content) for message in model.requests[0].messages)
         replies = [m for m in model.requests[-1].messages if isinstance(m, ToolReply)]
         assert all(isinstance(reply.content, str) for reply in replies)
@@ -162,8 +163,49 @@ async def test_image_buffer_is_session_local():
 
 @pytest.mark.parametrize("value", [0, -1, True, 1.5])
 def test_invalid_image_history_size(value):
-    with pytest.raises(ValueError, match="positive integer"):
-        ImageContext(keep_latest_n_screenshots=value)
+    with pytest.raises(ValueError, match="positive integers"):
+        ImageContext(max_images=value)
+    with pytest.raises(ValueError, match="positive integers"):
+        ImageContext(max_images=3, min_images=value)
+
+
+def test_image_history_trims_to_half_by_default_and_rejects_inverted_bounds():
+    assert (ImageContext().min_images, ImageContext(10).min_images) == (1, 5)
+    with pytest.raises(ValueError, match="must not exceed"):
+        ImageContext(max_images=2, min_images=3)
+
+
+async def test_images_stay_where_captured_and_keep_the_prompt_prefix_until_a_batch_trim():
+    agent, model, _capture, holder = _agent(
+        [call("observe")] * 5 + ["Done"], ScreenshotTrigger.EACH_STEP, keep=4, trim_to=2
+    )
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect", max_steps=6)
+    requests = [request.messages for request in model.requests]
+    for messages in requests:
+        # Each image directly follows the browser observation it was captured with.
+        for index, message in enumerate(messages):
+            if message.id.startswith("browser-image:"):
+                previous = messages[index - 1].id
+                assert previous.endswith((":browser:full", ":browser:summary"))
+        assert messages[-1].id == "browser-latest-image"
+    assert [len(_images(request)) for request in model.requests] == [1, 2, 3, 4, 2, 3]
+
+    def prefix(messages):
+        # Everything before the newest step's full observation must stay byte-identical.
+        end = next(i for i, m in enumerate(messages) if m.id.endswith(":browser:full"))
+        return [(m.id, m.text) for m in messages[:end]]
+
+    def shared(earlier, later):
+        stable = prefix(earlier)
+        return [(m.id, m.text) for m in later[: len(stable)]] == stable
+
+    # Steps 2-4 only append; earlier images keep their place and caption.
+    assert all(shared(requests[i], requests[i + 1]) for i in (1, 2))
+    # Step 5 trims from 4 to 2 images once, then appending resumes.
+    assert not shared(requests[3], requests[4])
+    assert shared(requests[4], requests[5])
 
 
 class Probe(ReadinessStrategy):

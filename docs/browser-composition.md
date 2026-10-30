@@ -33,7 +33,7 @@ agent = Agent(
             renderer=CanvasRenderer(),
             screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
         ),
-        ImageContext(keep_latest_n_screenshots=3),
+        ImageContext(max_images=6, min_images=3),
         Actions(chain_policy=ObserveAfterInput()),
         PointerTools(),
         KeyboardTools(),
@@ -63,7 +63,7 @@ work in both recipes. `DomTools` owns ref-based click, drag, typing and form too
 | --- | --- |
 | `Screenshots(trigger=ScreenshotTrigger.EACH_STEP)` | One new screenshot at the observation boundary before each model step. |
 | `Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)` | Capture at the next boundary only after the `screenshot` tool was called. This is the default for explicit composition. |
-| `ImageContext(keep_latest_n_screenshots=3)` | Include the last three actual captures, oldest first, once each per request. Default: one. Must be a positive integer. |
+| `ImageContext(max_images=6, min_images=3)` | Keep up to six actual captures; when a seventh arrives, drop the oldest until three remain. Defaults: `max_images=1`, `min_images=max_images // 2` (at least one). Both must be positive integers with `min_images <= max_images`. |
 
 Calling `screenshot` with `EACH_STEP` does not create a second image. `observe`
 refreshes text and refs without returning an image in the tool result. Internal
@@ -76,8 +76,14 @@ The current `Snapshot`, last image included in a model request, and bounded imag
 history are distinct. Images retain ID, UTC capture time, browser/tab/document,
 viewport dimensions and crop/scale. A text-only observation keeps the last shown
 image's coordinate space. Images from other documents remain comparison material;
-coordinate input rejects them until a new screenshot is shown. Historical images
-are labelled explicitly. After a layout change, request a fresh screenshot.
+coordinate input rejects them until a new screenshot is shown. The last line of each
+request names the latest screenshot. After a layout change, request a fresh screenshot.
+
+Each image sits directly after the browser observation it was captured with and keeps
+a fixed caption, so earlier requests stay a prefix of later ones and provider prompt
+caching keeps working while images accumulate. Trimming in batches changes that
+prefix once per `max_images - min_images + 1` captures instead of on every step.
+With Anthropic models, place the cache breakpoint before the newest observation.
 
 ## Extension contracts
 
