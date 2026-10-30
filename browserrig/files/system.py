@@ -103,6 +103,16 @@ class FileSystem:
             max_chars,
         )
 
+    def upload_paths(self, paths: list[str]) -> list[str]:
+        """Validate the entire selection before passing host paths to Chrome."""
+        if not paths:
+            raise ValueError("Select at least one workspace file to upload")
+        resolved = [self.resolve(path) for path in paths]
+        for path in resolved:
+            if not path.is_file():
+                raise FileNotFoundError(f"Upload requires an existing file: {path}")
+        return [str(path) for path in resolved]
+
     def write_file(self, path: str, content: str, *, overwrite: bool = False) -> FileEntry:
         resolved = self.resolve(path)
         data = content.encode("utf-8")

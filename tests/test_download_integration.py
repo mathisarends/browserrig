@@ -10,6 +10,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
 from browserrig import (
+    Browser,
     BrowserAgent,
     CanvasMode,
     ChromeBrowser,
@@ -25,6 +26,66 @@ from tests.javascript import evaluate
 from tests.observations import all_states
 
 pytestmark = pytest.mark.integration
+
+
+async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selection(site, tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    report = workspace / "report.txt"
+    report.write_text("report")
+    secret = tmp_path / "secret.txt"
+    secret.write_text("private")
+    stage = 0
+
+    async def respond(request):
+        nonlocal stage
+        page = all_states(request.messages)[-1]
+        replies = [message for message in request.messages if isinstance(message, ToolReply)]
+        if stage == 2:
+            assert not replies[-1].is_error
+            assert (
+                await evaluate(browser.active_tab, "document.querySelector('#upload').files.length")
+                == 1
+            )
+            assert (
+                await evaluate(
+                    browser.active_tab, "document.querySelector('#upload').files[0].name"
+                )
+                == "report.txt"
+            )
+            yield ModelChunk(text="Only the workspace file was uploaded")
+            return
+        if stage == 1:
+            assert replies[-1].is_error and "outside" in replies[-1].text
+            assert (
+                await evaluate(browser.active_tab, "document.querySelector('#upload').files.length")
+                == 0
+            )
+        refs = [
+            element["ref"] for element in page["elements"] if element["name"] == "Upload report"
+        ]
+        assert len(refs) == 1
+        ref = refs[0]
+        paths = ["report.txt", str(secret)] if stage == 0 else ["report.txt"]
+        stage += 1
+        yield ModelChunk(tool_call=ToolCall("upload_files", {"ref": ref, "paths": paths}))
+
+    agent = BrowserAgent(
+        model=CallbackModel(respond),
+        browser=LaunchBrowser(url=site),
+        file_system=FileSystemOptions(directory=workspace),
+        approvals=Approvals(default=PolicyDecision.ALLOW),
+    )
+    async with agent.session() as session:
+        browser = session.ctx[Browser]
+        await evaluate(
+            browser.active_tab,
+            "(() => {const input=document.createElement('input');input.type='file';"
+            "input.id='upload';input.setAttribute('aria-label','Upload report');"
+            "document.body.prepend(input);return true})()",
+        )
+        result = await session.run("Upload the report", max_steps=3)
+    assert result.text == "Only the workspace file was uploaded"
 
 
 async def test_downloaded_workbook_is_read_as_context_without_browser_preview(site, tmp_path):

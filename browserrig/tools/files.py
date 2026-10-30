@@ -32,6 +32,10 @@ def has_files(browser: Inject[Browser]) -> bool:
     return browser.files is not None
 
 
+def has_upload_files(browser: Inject[Browser], observe: Inject[Observe]) -> bool:
+    return has_files(browser) and has_dom_refs(observe)
+
+
 class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
     _browser: Inject[Browser]
     _readiness: Inject[Readiness]
@@ -42,7 +46,8 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         text=(
             "The file system observation identifies the available workspace and recent downloads. "
             "When a local workspace is available, file tools accept workspace-relative paths or "
-            "absolute paths returned by file tools. Use read_file to read downloaded documents, "
+            "absolute paths returned by file tools. Uploads are limited to existing files in "
+            "the workspace and download directory. Use read_file to read downloaded documents, "
             "spreadsheets, archives and images as text or structured tables. PDF pages and images "
             "can use local OCR. Follow next_offset with the same selectors to read further; "
             "extracted_path contains the saved full text of the selected content. "
@@ -194,14 +199,16 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         return await self._actions.run(kind=kind, operation=open_file, settle=False)
 
 
-class UploadTools(Plugin, needs=(Actions, Observe)):
+class UploadTools(Plugin, needs=(Actions, Browser, Observe)):
+    _browser: Inject[Browser]
     _observe: Inject[Observe]
 
     @tool(
         kind=ActionKind.UPLOAD,
-        enabled=has_dom_refs,
+        enabled=has_upload_files,
         description=(
-            "Set a file input using absolute paths on the browser host, not the client host."
+            "Set a file input using existing workspace/download files. Paths are relative to "
+            "the workspace or absolute paths returned by file tools."
         ),
     )
     async def upload_files(
@@ -211,14 +218,20 @@ class UploadTools(Plugin, needs=(Actions, Observe)):
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
+        selected: list[str] = []
+
         async def check(tab: Tab) -> None:
             handle = await self._observe.element(tab, ref)
             if handle.element.input_type != "file":
                 raise BrowserError("Target is not a file input")
+            files = self._browser.files
+            if files is None:
+                raise ToolError("Uploads require a shared local file system for this browser")
+            selected.extend(await _file_call(lambda: files.upload_paths(paths)))
 
         async def upload(tab: Tab) -> Effect:
             await actions.element_point(tab=tab, ref=ref)
-            await (await self._observe.element(tab, ref)).upload_files(paths)
+            await (await self._observe.element(tab, ref)).upload_files(selected)
             return Effect("Files assigned to input.")
 
         return await actions.run(

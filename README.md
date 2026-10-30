@@ -1,7 +1,7 @@
 # Browserrig
 
 Event-driven Chrome automation for AI agents and Python applications, built with
-[Harnessed 0.5.0](https://github.com/mathisarends/harnessed/releases/tag/v0.5.0),
+[Harnessed 0.6.0](https://github.com/mathisarends/harnessed/releases/tag/v0.6.0),
 cdpify, and Pydantic. Harnessed is pinned exactly in `pyproject.toml` and `uv.lock`.
 Browserrig combines direct browser access with composable agent plugins, explicit
 DOM and canvas modes, and a shared event log.
@@ -111,7 +111,7 @@ Tool decorators declare model-facing descriptions independently of developer doc
 
 ## Action chains and stable tool kinds
 
-Browserrig uses Harnessed 0.5.0's native scheduler for action chains. Deterministic
+Browserrig uses Harnessed's native scheduler for action chains. Deterministic
 form filling can combine `type_text`, `select_option`, `set_date`, and a final
 `click` in one model response. `send_keys` can also continue in DOM mode. File
 reads/writes, listings and content extraction can be chained. Browser tools run
@@ -209,7 +209,7 @@ mount closes or suspends; `SectionDelivery.IGNORE` skips it. Import `SectionDeli
 from `harnessed`. The fixed system prompt stays unchanged.
 
 Install the optional MCP client with `uv sync --locked --extra openai --extra mcp`.
-All Harnessed extras are pinned to **0.5.0**. Add MCP servers through the native plugin:
+All Harnessed extras are pinned to **0.6.0**. Add MCP servers through the native plugin:
 
 ```python
 from harnessed.plugins.mcp import MCP
@@ -222,7 +222,12 @@ agent = BrowserAgent(
 `MCP.stdio("catalog", command=..., args=[...])` starts a local server instead.
 Connections belong to each session, tool names are prefixed (for example
 `catalog__search`), and existing approval policies apply. See the
-[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.5.0/docs/guides/mcp.md).
+[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.6.0/docs/guides/mcp.md).
+
+Harnessed 0.6.0 closes failed MCP transports, hides their tools, wakes pending
+calls and drains owned tasks. Failed operations are not retried automatically;
+replace a failed connection with a fresh mount. Ordinary tool `isError` results
+keep the connection usable. HTTP termination has a five-second inactivity timeout.
 
 ## Plugin validation and diagnostics
 
@@ -253,14 +258,14 @@ For standalone kernel compositions, call `await ctx.settle()` followed by
 
 ## Upgrading existing sessions
 
-Harnessed 0.5.0 keeps session record format 2: existing 0.2.0 through 0.4.0 stores can be reused
+Harnessed 0.6.0 keeps session record format 2: existing 0.2.0 through 0.5.0 stores can be reused
 without migration. When upgrading from 0.1.0, format 1 is rejected without automatic
 migration. Back up those stores and choose a fresh directory. The OpenAI example
 writes to `.browserrig/sessions-v2`;
 existing `.browserrig/sessions` files stay available in their original directory.
 Custom `session_directory` values containing format 1 should also point to a fresh
 store. See the
-[migration guide](https://github.com/mathisarends/harnessed/blob/v0.5.0/Changelog.md).
+[migration guide](https://github.com/mathisarends/harnessed/blob/v0.6.0/Changelog.md).
 
 Version 0.5.0 adds defaulted fields to model requests, turn starts and tool results.
 Strict application schemas must accept those fields, `break_chain` and
@@ -601,13 +606,48 @@ and support targeted `cell_range` reads elsewhere in the sheet. These processing
 bounds are separate from response pagination.
 
 `open_file` and `open_downloaded_file` remain available for a visual preview.
-`switch_tab` returns to the original page. DOM uploads remain available through
-`UploadTools.upload_files`, using absolute paths on the browser host.
+`switch_tab` returns to the original page. DOM uploads through
+`UploadTools.upload_files` accept workspace-relative paths or absolute paths
+returned by file tools. Every selected file must exist within the workspace or
+configured download directory; the whole selection is checked before browser
+input. Uploads are disabled without a shared local filesystem, including remote
+browsers without explicit `FileSystemOptions`. Stage external files in the workspace
+from application code before asking the agent to upload them.
 
 Direct Python callers can use `browser.files.read_file(path, page_number=2)` and
 `await browser.open_tab(browser.files.resolve(path))`; `open_tab` opens a `Path`
 as a local file and only accepts HTTP(S) URLs as strings. Filesystem methods are synchronous; use
 `asyncio.to_thread` when processing files inside an async application.
+
+### File access boundaries and optional sandboxes
+
+Browserrig's built-in file tools confine reads, writes, listings, previews and
+uploads to the configured workspace and download directory. Path traversal and
+symlinks resolving outside those roots are rejected. Browserrig does not expose
+a shell tool. Keep the workspace dedicated to agent files; anything placed in it
+is available to the agent.
+
+This is a tool-level path policy. Chrome, document parsers, custom Python plugins
+and MCP servers still run with their process permissions. Concurrent host changes
+to links or directories are outside this boundary. Application calls such as
+`ChromeBrowser.open_tab(Path(...))` and `Frame.upload_files(...)` remain trusted
+host APIs. Use a separate OS/container boundary when the whole browser or parser
+process must be isolated.
+
+Harnessed 0.6.0 also supports a filesystem-only runtime sandbox: compose
+`DockerSandbox(...)` or `BubblewrapSandbox(...)` with `FilesystemTools()` and omit
+`ShellTools()`. The shell service is then not exposed as a model tool. This is
+opt-in and requires an application-managed Docker image or Linux rootfs; startup
+failure never falls back to host execution. See the
+[sandbox guide](https://github.com/mathisarends/harnessed/blob/v0.6.0/docs/guides/sandboxes.md).
+
+These backends do not redirect Browserrig's local `FileTools`, uploads, Chrome
+downloads or document readers. In a custom composition, omit Browserrig's
+`FileTools` and `UploadTools` before adding `FilesystemTools` to avoid duplicate
+tool names and host file access through those tools. Transfer files explicitly
+from application code; copied sandbox results must be exported before session
+close. Browserrig does not implement Harnessed's `FileSystemBackend` protocol, so
+the new `read_bytes`/`grep` backend contract needs no migration here.
 
 The file reader uses a shared `FileExtension` enum and a registry of readers with
 a common call signature and declared selection capabilities. New formats can be

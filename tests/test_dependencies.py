@@ -250,10 +250,11 @@ _REF_CALLS = (
 
 
 @pytest.mark.parametrize("mode", [DomMode(), CanvasMode()])
-async def test_ref_tools_are_exposed_only_in_dom_mode(fake_chrome, mode):
+async def test_ref_tools_are_exposed_only_in_dom_mode(fake_chrome, tmp_path, mode):
     agent = BrowserAgent(model=ScriptedModel(["unused"]), mode=mode)
     ref_tools = {call.name for call in _REF_CALLS}
     async with agent.session() as session:
+        session.ctx[Browser].files = FileSystem(FileSystemOptions(directory=tmp_path))
         tools = session.ctx[ToolRegistry]
         names = {item.name for item in tools.definitions}
         assert {"click_at", "scroll", "drag_at", "send_keys"} <= names
@@ -269,7 +270,14 @@ async def test_ref_tools_are_exposed_only_in_dom_mode(fake_chrome, mode):
 async def test_file_tools_follow_workspace_availability_and_reject_stale_calls(
     fake_chrome, tmp_path
 ):
-    workspace_tools = {"list_files", "read_file", "write_file", "open_file", "open_downloaded_file"}
+    workspace_tools = {
+        "list_files",
+        "read_file",
+        "write_file",
+        "open_file",
+        "open_downloaded_file",
+        "upload_files",
+    }
     agent = BrowserAgent(model=ScriptedModel(["unused"]))
     async with agent.session() as session:
         tools = session.ctx[ToolRegistry]
@@ -279,16 +287,20 @@ async def test_file_tools_follow_workspace_availability_and_reject_stale_calls(
             ToolCall("write_file", {"path": "note.txt", "content": "test"})
         )
         assert result.is_error and "disabled" in result.text
+        upload = ToolCall("upload_files", {"ref": "file", "paths": [str(tmp_path / "secret")]})
+        assert (await tools.execute(upload)).is_error
         browser = session.ctx[Browser]
         browser.files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
         browser.files.initialize()
         assert workspace_tools <= {item.name for item in tools.definitions}
         call = ToolCall("write_file", {"path": "note.txt", "content": "test"})
         plan = tools.plan(call)
+        upload_plan = tools.plan(upload)
         assert not (await tools.execute(call)).is_error
         assert browser.files.read_file("note.txt").text == "test"
         browser.files = None
         assert tools.check_enabled(plan, ctx=session.ctx).is_error
+        assert tools.check_enabled(upload_plan, ctx=session.ctx).is_error
         assert not workspace_tools & {item.name for item in tools.definitions}
     assert fake_chrome[0].closed
 

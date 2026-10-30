@@ -8,11 +8,13 @@ from unittest.mock import AsyncMock
 import pytest
 from harnessed import ToolError
 
+from browserrig import FileSystem, FileSystemOptions
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.events import ActionFailedEvent
 from browserrig.kinds import ActionKind
 from browserrig.tools.execution import Actions
+from browserrig.tools.files import UploadTools
 
 
 @pytest.mark.parametrize(
@@ -41,6 +43,35 @@ async def test_validation_rejects_before_dispatch():
     operation.assert_not_awaited()
     assert len(events) == 1
     assert isinstance(events[0], ActionFailedEvent) and not events[0].dispatched
+
+
+@pytest.mark.parametrize("selection", ["outside", "missing", "directory", "no_workspace"])
+async def test_upload_rejects_invalid_selection_before_any_browser_input(tmp_path, selection):
+    files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
+    files.initialize()
+    saved = files.write_file("report.txt", "report")
+    secret = tmp_path / "secret.txt"
+    secret.write_text("private")
+    invalid = {"outside": str(secret), "missing": "missing.txt", "directory": "."}
+    paths = [saved.path, invalid.get(selection, saved.path)]
+    tools, actions, handle, events = _uploads(None if selection == "no_workspace" else files)
+    with pytest.raises(ToolError):
+        await UploadTools.upload_files(tools, "input", paths, actions=actions)
+    actions.element_point.assert_not_awaited()
+    handle.upload_files.assert_not_awaited()
+    assert len(events) == 1
+    assert isinstance(events[0], ActionFailedEvent) and not events[0].dispatched
+
+
+async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path):
+    files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
+    files.initialize()
+    saved = files.write_file("report.txt", "report")
+    tools, actions, handle, _ = _uploads(files)
+    result = await UploadTools.upload_files(tools, "input", ["report.txt"], actions=actions)
+    assert result.text == "Files assigned to input."
+    handle.upload_files.assert_awaited_once_with([saved.path])
+    actions.element_point.assert_awaited_once()
 
 
 @pytest.mark.parametrize(
@@ -88,3 +119,16 @@ def _actions():
     )
     actions._fail = lambda *args: Actions._fail(actions, *args)
     return actions, events
+
+
+def _uploads(files):
+    actions, events = _actions()
+    actions.run = lambda **kwargs: Actions.run(actions, **kwargs)
+    actions.element_point = AsyncMock()
+    actions._settle = AsyncMock(return_value="")
+    handle = SimpleNamespace(element=SimpleNamespace(input_type="file"), upload_files=AsyncMock())
+    tools = SimpleNamespace(
+        _browser=SimpleNamespace(files=files),
+        _observe=SimpleNamespace(element=AsyncMock(return_value=handle)),
+    )
+    return tools, actions, handle, events

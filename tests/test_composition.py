@@ -4,6 +4,8 @@ import sys
 import pytest
 from harnessed import Agent, Plugin, PolicyDecision, SystemSection
 from harnessed.plugins import Approvals, JsonlSessions, MemorySessions
+from harnessed.plugins.filesystem import FilesystemTools
+from harnessed.plugins.shell import ShellTools
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
@@ -70,6 +72,7 @@ def test_facade_registers_the_same_tool_plugins_in_every_mode(mode):
 
 def test_facade_retains_native_memory_storage_and_approval_defaults():
     agent = BrowserAgent(model=ScriptedModel(["ok"]))
+    assert not any(isinstance(item, (ShellTools, FilesystemTools)) for item in agent.plugins)
     assert sum(isinstance(item, MemorySessions) for item in agent.plugins) == 1
     assert not any(isinstance(item, JsonlSessions) for item in agent.plugins)
     assert next(item for item in agent.plugins if isinstance(item, Approvals)).default is (

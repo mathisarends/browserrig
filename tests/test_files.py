@@ -156,6 +156,44 @@ def test_explicit_download_directory_is_accessible_without_opening_other_paths(t
         files.resolve(tmp_path / "other")
 
 
+def test_uploads_resolve_workspace_and_separate_download_paths(tmp_path):
+    files = FileSystem(
+        FileSystemOptions(directory=tmp_path / "workspace"),
+        download_directory=str(tmp_path / "downloads"),
+    )
+    files.initialize()
+    saved = files.write_file("report.txt", "report")
+    (files.pending_directory / "id").write_text("download")
+    downloaded = files.complete_download("id", "note.txt", None)
+    assert files.upload_paths(["report.txt", downloaded]) == [saved.path, downloaded]
+
+
+def test_uploads_reject_empty_missing_directory_and_outside_paths(files, tmp_path):
+    saved = files.write_file("report.txt", "report")
+    secret = tmp_path / "secret.txt"
+    secret.write_text("private")
+    for path in (str(secret), "../secret.txt"):
+        with pytest.raises(ValueError, match="outside"):
+            files.upload_paths([saved.path, path])
+    for path in ("missing.txt", "."):
+        with pytest.raises(FileNotFoundError, match="existing file"):
+            files.upload_paths([path])
+    with pytest.raises(ValueError, match="at least one"):
+        files.upload_paths([])
+
+
+def test_uploads_reject_symlinks_to_outside_files(files, tmp_path):
+    secret = tmp_path / "secret.txt"
+    secret.write_text("private")
+    link = files.directory / "report.txt"
+    try:
+        link.symlink_to(secret)
+    except OSError:
+        pytest.skip("Creating symlinks is unavailable on this host")
+    with pytest.raises(ValueError, match="outside"):
+        files.upload_paths([str(link)])
+
+
 _COMPLETED = DownloadProgressEvent(guid="id", total_bytes=8, received_bytes=8, state="completed")
 
 
