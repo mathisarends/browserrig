@@ -14,7 +14,6 @@ from browserrig import (
     Actions,
     Browser,
     BrowserAgent,
-    CanvasMode,
     DomMode,
     LaunchBrowser,
     TerminalEvents,
@@ -26,8 +25,8 @@ from tests.observations import latest
 pytestmark = pytest.mark.integration
 
 
-@pytest.mark.parametrize("canvas", [False, True])
-async def test_typing_shortcuts_stream_and_storage(site, tmp_path, canvas):
+@pytest.mark.parametrize("coordinates", [False, True])
+async def test_typing_shortcuts_stream_and_storage(site, tmp_path, coordinates):
     holder = {}
     output = io.StringIO()
 
@@ -37,9 +36,9 @@ async def test_typing_shortcuts_stream_and_storage(site, tmp_path, canvas):
 
     directory = tmp_path / "sessions"
     agent = BrowserAgent(
-        model=_typing_model(holder, canvas),
+        model=_typing_model(holder, coordinates),
         browser=LaunchBrowser(url=site),
-        mode=CanvasMode(selector="html") if canvas else DomMode(),
+        mode=DomMode(),
         session_directory=directory,
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[TerminalEvents(output), Access()],
@@ -60,7 +59,7 @@ async def test_typing_shortcuts_stream_and_storage(site, tmp_path, canvas):
         assert await evaluate(tab, "document.querySelector('#secret').value") == "Secret!"
         assert not any(isinstance(event, InputEvent) for event in session.events)
     await consumer
-    _assert_events(streamed, output.getvalue(), directory, canvas)
+    _assert_events(streamed, output.getvalue(), directory, coordinates)
 
 
 async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_action(site):
@@ -110,8 +109,8 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
     assert (cursor["x"], cursor["y"]) == (position.x, position.y)
 
 
-@pytest.mark.parametrize("canvas", [False, True])
-async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, canvas):
+@pytest.mark.parametrize("coordinates", [False, True])
+async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordinates):
     holder = {}
 
     class Panels(Plugin, needs=(Browser,)):
@@ -135,10 +134,10 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, canvas)
                     });""",
             )
 
-    # DOM mode uses a zoomed crop; canvas mode uses viewport coordinates.
+    # Exercise both a zoomed crop and viewport coordinates.
     requests = (
         []
-        if canvas
+        if coordinates
         else [
             scripted_call(
                 "screenshot", region={"x": 20, "y": 80, "width": 500, "height": 240}, zoom=2
@@ -147,9 +146,9 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, canvas)
     )
     requests.extend(
         [
-            scripted_call("move_mouse", x=70 if canvas else 100, y=160),
+            scripted_call("move_mouse", x=70 if coordinates else 100, y=160),
             scripted_call("scroll", delta_y=300),
-            scripted_call("move_mouse", x=370 if canvas else 700, y=160),
+            scripted_call("move_mouse", x=370 if coordinates else 700, y=160),
             scripted_call("scroll", delta_y=180),
             "Done",
         ]
@@ -157,7 +156,7 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, canvas)
     agent = BrowserAgent(
         model=ScriptedModel(requests),
         browser=LaunchBrowser(url=site),
-        mode=CanvasMode(selector="html") if canvas else DomMode(),
+        mode=DomMode(),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[Panels()],
     )
@@ -218,10 +217,10 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
     assert {key: highlight[key] for key in actual} == actual
 
 
-def _typing_model(holder, canvas):
+def _typing_model(holder, coordinates):
     text = "Grüße + 🙂"
     shortcut = ToolCall("send_keys", {"key": "a", "hold_control": True})
-    if canvas:
+    if coordinates:
         calls = [
             ToolCall("click_at", {"x": 80, "y": 18}),
             ToolCall("send_keys", {"text": text}),
@@ -249,7 +248,7 @@ def _typing_model(holder, canvas):
         nonlocal step
         tools = {tool.name: tool for tool in request.tools}
         assert "press_key" not in tools
-        assert ("type_text" in tools) != canvas
+        assert "type_text" in tools
         assert set(tools["send_keys"].parameters["properties"]) == {
             "text",
             "key",
@@ -281,7 +280,7 @@ async def _consume(session, streamed, ready):
         streamed.append(event)
 
 
-def _assert_events(streamed, output, directory, canvas):
+def _assert_events(streamed, output, directory, coordinates):
     live = [event for event in streamed if isinstance(event, InputEvent)]
     assert live and all(event.browser_id and event.target_id for event in live)
     assert all(event.action_id or isinstance(event, CursorStateEvent) for event in live)
@@ -290,7 +289,7 @@ def _assert_events(streamed, output, directory, canvas):
     assert keys[-7].modifiers == ("Shift",)
     records = [json.loads(line) for line in output.splitlines()]
     assert any(record["type"] == "browser.cursor.moved" for record in records)
-    assert any(record["type"] == "browser.pointer.pressed" for record in records) == canvas
+    assert any(record["type"] == "browser.pointer.pressed" for record in records) == coordinates
     assert [record["key"] for record in records if record["type"] == "browser.key.pressed"] == [
         event.key for event in keys
     ]

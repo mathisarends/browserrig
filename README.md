@@ -4,7 +4,7 @@ Event-driven Chrome automation for AI agents and Python applications, built with
 [Harnessed 0.6.0](https://github.com/mathisarends/harnessed/releases/tag/v0.6.0),
 cdpify, and Pydantic. Harnessed is pinned exactly in `pyproject.toml` and `uv.lock`.
 Browserrig combines direct browser access with composable agent plugins, explicit
-DOM and canvas modes, and a shared event log.
+DOM observations, screenshots, coordinate input, and a shared event log.
 
 - Launch Chrome or connect to a running browser through CDP.
 - Work with explicitly addressed tabs and structured, validated page observations.
@@ -137,7 +137,7 @@ it was not dispatched. Ordinary value changes and cosmetic text updates do not
 interrupt form filling. Comparison probes omit screenshots and preserve the
 delivered observation, its element references and its new-element markers.
 An incomplete or failed comparison stops the chain; it does not report successful
-input as failed. Canvas inputs require another observation after each input.
+input as failed. Coordinate inputs require another observation after each input.
 
 Each built-in tool declares its own stable `ActionKind` through immutable
 `BrowserToolMetadata`. Use `event.tool.metadata.get(BrowserToolMetadata)` in native
@@ -199,7 +199,7 @@ print(agent.prompt)
 
 `Observe` declares configuration-dependent `page_state` and `refs` sections, plus
 the shared `trust` section. DOM guidance follows screenshot, mark and page-text
-settings; canvas guidance describes image coordinates and omits DOM-ref rules.
+settings; coordinate tools describe how image pixels map to the viewport.
 `PointerTools.coordinates`, `ImageContext.usage` and `FileTools.usage` describe shared workflows.
 Single-tool instructions live in tool descriptions.
 
@@ -207,8 +207,8 @@ With a custom `browser_plugins()` composition, use the configured recipes' secti
 attributes in `SystemPrompt(sections=..., exclude=...)` to reorder or replace
 individual sections. `PluginSections()` places the remaining declarations.
 For manual compositions, configure `Observe` independently of `Readiness` and add
-`ImageContext()` to deliver captured images. The legacy mode argument is still
-supported by both plugins, but readiness no longer implicitly selects capture.
+`ImageContext()` to deliver captured images. Configure DOM observation settings
+through `Observe(DomMode(...))`; readiness is configured separately.
 Use `await session.prompt.render()` to inspect the exact session system text.
 
 Plugins mounted through `session.use()` require an explicit choice when they declare
@@ -285,9 +285,8 @@ to `BrowserAgent(system_prompt=...)`; wrap instruction lists in
 `SystemSection` or synchronous `@system_section` declarations. New recipes mount
 `PointerTools` for coordinates and `DomTools` for ref-based mouse, typing and forms.
 `MouseTools` remains a compatibility group; do not mount overlapping tool groups.
-Canvas recipes omit DOM tools instead of installing disabled tools.
 
-## Session controls and canvas mode
+## Session controls
 
 Inside an `async with agent.session() as session:` block:
 
@@ -307,12 +306,7 @@ events rather than an LLM decorator.
 
 ```powershell
 uv run --env-file .env --extra openai python -m examples.controls
-uv run --env-file .env --extra openai python -m examples.figma_agent --url YOUR_URL --record
 ```
-
-Canvas mode uses images and coordinates, with an initial check of geometry and
-pixel content. DOM mode returns compact line-based text with roles, labels, states
-and stable element refs.
 
 ## Element references and screenshot marks
 
@@ -323,8 +317,8 @@ page-text excerpts and do not capture new screenshots. Use `extract_content()`
 to read the page. The agent can call `screenshot()` to request the current view as an
 image in its next iteration. `ImageContext` keeps the latest screenshot by default,
 including during subsequent text-only steps. `observe()` refreshes page state. Use
-`DomMode(screenshots=True)` to enable images on every step; canvas mode includes
-images automatically. `DomMode(max_text_chars=N)` enables a page-text excerpt; its
+`DomMode(screenshots=True)` to enable images on every step.
+`DomMode(max_text_chars=N)` enables a page-text excerpt; its
 default is `0`.
 
 An observation looks like this:
@@ -379,7 +373,7 @@ frames and eight levels; perspective transforms are reported as unsupported.
 ## JavaScript shell and forward navigation
 
 `execute_javascript(code="1 + 1")` runs JavaScript through CDP's `Runtime.evaluate`
-in the active tab's main page context. It is available in DOM and canvas mode.
+in the active tab's main page context.
 The tool returns the last expression's value, supports top-level `await`, and keeps
 variables between calls until the page navigates. Use `await` for Promise results.
 Return plain objects and arrays
@@ -435,7 +429,7 @@ as well as clicks. Focus uses `preventScroll` to avoid an extra browser jump.
 `drag(source_ref=..., target_ref=...)`. Both drag endpoints are prepared first and
 must fit in the viewport together before the gesture starts.
 
-In both DOM and canvas mode, `PointerTools` provides `move_mouse(x=..., y=...)`,
+`PointerTools` provides `move_mouse(x=..., y=...)`,
 `scroll(delta_y=...)`,
 `click_at(x=..., y=..., count=2)` and
 `drag_at(start=Point(...), end=Point(...))`.
@@ -453,21 +447,20 @@ inspect the result before continuing.
 browser, tab, and document IDs for live UI display.
 The newest image shown to the model determines how crop coordinates map to the viewport;
 subsequent text-only observations retain that image's geometry.
-DOM and canvas screenshots include a red cursor arrow where the browser's mouse
+Screenshots include a red cursor arrow where the browser's mouse
 rests in the captured tab, with its tip at the exact input coordinate. The marker follows
 crop and zoom coordinates and is omitted when the pointer is outside the image.
-It is drawn with Pillow after capture; canvas change detection uses the image
-without the marker.
+It is drawn with Pillow after capture.
 All gestures use real CDP input and release mouse buttons even when interrupted.
-Canvas recipes do not install DOM-ref tools. Workspace tools are hidden when a connected browser has
-no shared local file system; `list_downloads` remains available.
+Workspace tools are hidden when a connected browser has no shared local file
+system; `list_downloads` remains available.
 
 ## Input choreography
 
 The browser has one mouse and one keyboard, `browser.mouse` and
 `browser.keyboard`, also available as `browser.input.mouse` and
 `browser.input.keyboard`. Both act on the active tab. `browser.input` shares the
-action context and event correlation across both devices. DOM and canvas tools
+action context and event correlation across both devices. Browser tools
 use these same devices; `Actions` owns action serialization and readiness.
 A tab is only the document: JavaScript, navigation, frames, dialogs and element
 references stay on `Tab`, which receives input through the `InputTarget`
@@ -504,7 +497,7 @@ moves at constant speed, so the harness paces the wheel events.
 Typing uses a fixed 50 ms interval, configured by the internal
 `_TYPING_INTERVAL_SECONDS` constant in `browserrig/input/keyboard.py`.
 
-`KeyboardTools` supplies `send_keys` in both modes. It addresses the current page
+`KeyboardTools` supplies `send_keys`. It addresses the current page
 focus and takes exactly one of `text` or `key`:
 
 - `send_keys(text="Hello world")` types literal text at the current selection.
@@ -618,7 +611,7 @@ File access is confined to the workspace and any explicitly configured download
 directory, including checks for path traversal and symlinks leaving those roots.
 
 The agent sees the workspace and its latest 20 downloads before every step.
-File tools are available in both DOM and canvas modes:
+File tools are available alongside the browser tools:
 
 | Tool | Behavior |
 | --- | --- |
@@ -835,6 +828,6 @@ uses ffprobe when available.
 ## Project status
 
 The core is implemented and tested against real Chrome, including transformed,
-nested, and out-of-process iframes (OOPIFs). Broader platform coverage, complex Figma
-device-frame detection, perspective-transformed frames, and recovery from process
-crashes remain areas for further validation.
+nested, and out-of-process iframes (OOPIFs). Broader platform coverage,
+perspective-transformed frames, and recovery from process crashes remain areas
+for further validation.

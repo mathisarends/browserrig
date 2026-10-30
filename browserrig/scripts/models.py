@@ -1,7 +1,7 @@
 from pydantic import ConfigDict
 from pydantic.alias_generators import to_camel
 
-from browserrig.core.geometry import Bounds, Geometry, Point
+from browserrig.core.geometry import Bounds, Point
 from browserrig.core.kinds import ElementOperation
 from browserrig.core.options import Options
 
@@ -23,11 +23,6 @@ class ScrollArgs(ScriptArgs):
 class OwnerScrollArgs(ScriptArgs):
     clip: Bounds | None = None
     target_bounds: Bounds
-
-
-class CanvasArgs(ScriptArgs):
-    selector: str
-    loading_selector: str
 
 
 class ContentArgs(ScriptArgs):
@@ -60,12 +55,6 @@ class DOMProbe(Options):
     quiet_ms: float
     width: float
     height: float
-
-
-class CanvasProbe(Options):
-    ready: bool
-    geometry: Geometry | None = None
-    reason: str = ""
 
 
 class ContentExtraction(Options):

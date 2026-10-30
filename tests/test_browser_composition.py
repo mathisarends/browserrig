@@ -1,10 +1,5 @@
 import asyncio
-import base64
-import hashlib
 from dataclasses import dataclass
-from importlib import import_module
-from io import BytesIO
-from types import SimpleNamespace
 from typing import Literal
 from unittest.mock import AsyncMock
 
@@ -16,12 +11,9 @@ from harnessed.models import ImagePart, ToolReply
 from harnessed.plugins import Approvals
 from harnessed.plugins.compaction import Compaction
 from harnessed.testing import ScriptedModel, call
-from PIL import Image
 
 from browserrig import (
-    CanvasCapture,
-    CanvasRenderer,
-    DocumentReadiness,
+    DomRenderer,
     ImageContext,
     Observe,
     Readiness,
@@ -39,14 +31,13 @@ from browserrig.core.kinds import ObservationKind, ReadinessPhase, ReadinessStag
 from browserrig.events import ObservationCapturedEvent, ReadinessStartedEvent
 from browserrig.observation.capture import CaptureContent
 from browserrig.observation.extraction import Extraction
-from browserrig.readiness.models import ReadinessReport
 from browserrig.tools import FileTools, UploadTools
 from browserrig.tools.mouse import _image_point
 from tests.fakes import FakeChrome
 
 
 class CountingCapture:
-    kind = ObservationKind.CANVAS
+    kind = ObservationKind.DOM
     provides_dom_refs = False
 
     def __init__(self, frames=None):
@@ -74,7 +65,7 @@ class CountingCapture:
         return (f"png-{count}", 2) if self.frames is None else self.frames[count - 1]
 
 
-class CustomRenderer(CanvasRenderer):
+class CustomRenderer(DomRenderer):
     def render(self, snapshot):
         return f"Custom view: {snapshot.id}"
 
@@ -347,16 +338,14 @@ class Policy:
         return Probe(context, self)
 
 
-async def test_initial_per_document_ongoing_and_file_selection_with_stream_stage():
+async def test_initial_per_document_and_ongoing_readiness_with_stream_stage():
     holder = {}
-    initial, ongoing, files = Policy(), Policy(), Policy()
+    initial, ongoing = Policy(), Policy()
     agent = Agent(
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(
-                initial=DocumentReadiness(initial, files), ongoing=DocumentReadiness(ongoing, files)
-            ),
+            Readiness(initial=initial, ongoing=ongoing),
         ],
     )
     async with agent.session() as session:
@@ -370,8 +359,8 @@ async def test_initial_per_document_ongoing_and_file_selection_with_stream_stage
         await readiness.wait(tab)
         tab.document_id, tab.url = "preview", "file:///preview.pdf"
         await readiness.wait(tab)
-        assert [doc for doc, _ in initial.checks] == ["doc-1", "doc-2", "doc-2"]
-        assert len(ongoing.checks) == 1 and len(files.checks) == 1
+        assert [doc for doc, _ in initial.checks] == ["doc-1", "doc-2", "doc-2", "preview"]
+        assert len(ongoing.checks) == 1
         starts = [e for e in session.events if isinstance(e, ReadinessStartedEvent)]
         assert [(e.stage, e.phase) for e in starts[:3]] == [
             (ReadinessStage.INITIAL, ReadinessPhase.OBSERVATION),
@@ -382,12 +371,12 @@ async def test_initial_per_document_ongoing_and_file_selection_with_stream_stage
 
 async def test_failed_initial_retries_and_navigation_reselects_policy():
     holder = {}
-    app, files = Policy(ready=False), Policy()
+    app = Policy(ready=False)
     agent = Agent(
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(initial=DocumentReadiness(app, files)),
+            Readiness(initial=app),
         ],
     )
     async with agent.session() as session:
@@ -400,7 +389,7 @@ async def test_failed_initial_retries_and_navigation_reselects_policy():
         app.ready, app.change_document = True, True
         report = await readiness.wait(tab)
         assert report.document_id == "preview" and report.status == ReadinessStatus.READY
-        assert files.checks == [("preview", ReadinessStage.INITIAL)]
+        assert app.checks[-1] == ("preview", ReadinessStage.INITIAL)
 
 
 async def test_invalidation_cancels_old_wait_and_starts_a_fresh_initial_probe():
@@ -482,51 +471,3 @@ def test_recipe_can_omit_local_file_tools():
         isinstance(plugin, (FileTools, UploadTools))
         for plugin in browser_plugins(local_files=False)
     )
-
-
-async def test_canvas_capture_uses_its_own_region_and_respects_on_request(monkeypatch):
-    area = Geometry(x=20, y=10, width=200, height=100)
-    region = SimpleNamespace(resolve=AsyncMock(return_value=area))
-    output = BytesIO()
-    Image.new("RGB", (400, 200), "white").save(output, format="PNG")
-    raw = base64.b64encode(output.getvalue()).decode("ascii")
-    screenshot = AsyncMock(return_value=raw)
-    monkeypatch.setattr(import_module("browserrig.observation.capture"), "screenshot", screenshot)
-    frame = SimpleNamespace(
-        run=AsyncMock(
-            return_value=SimpleNamespace(
-                url="https://example.org",
-                title="App",
-                width=800,
-                height=600,
-                scroll_y=0,
-            )
-        )
-    )
-    tab = SimpleNamespace(
-        main_frame=AsyncMock(return_value=frame),
-    )
-    report = ReadinessReport(
-        id="ready",
-        target_id="tab",
-        document_id="doc",
-        mode=ObservationKind.CANVAS,
-        phase=ReadinessPhase.OBSERVATION,
-        status=ReadinessStatus.READY,
-        duration=0,
-        geometry=Geometry(width=800, height=600),
-    )
-    strategy = CanvasCapture(region=region)
-    content = await strategy.collect(tab, report, screenshots=False)
-    assert content.image is None
-    region.resolve.assert_not_awaited()
-    screenshot.assert_not_awaited()
-    content = await strategy.collect(tab, report, screenshots=True, cursor=Point(x=40, y=30))
-    assert content.geometry == area
-    screenshot.assert_awaited_once_with(tab, area)
-    assert content.image_digest == hashlib.sha256(raw.encode()).hexdigest()
-    with Image.open(BytesIO(base64.b64decode(content.image))) as image:
-        assert image.size == (200, 100)
-        assert image.getpixel((20, 20)) == (30, 30, 30)
-    moved = await strategy.collect(tab, report, screenshots=True, cursor=Point(x=80, y=60))
-    assert moved.image != content.image and moved.image_digest == content.image_digest

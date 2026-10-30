@@ -7,7 +7,6 @@ from harnessed.testing import CallbackModel, ScriptedModel, call
 
 from browserrig import (
     Browser,
-    CanvasMode,
     Chrome,
     DomMode,
     ImageContext,
@@ -140,11 +139,10 @@ async def test_model_tools_yaml_and_activity(site):
         assert all(len(item.refs) == 1 and item.refs[0] in snapshots for item in observations)
 
 
-@pytest.mark.parametrize("mode", [DomMode(screenshots=True), CanvasMode()])
-async def test_visual_modes_native_image(site, mode):
+async def test_dom_screenshots_are_native_images(site):
     model = ScriptedModel(["Canvas ready"])
 
-    # Start on a canvas before the first observation: blank about:blank is intentionally not ready.
+    # Observe a real canvas page using ordinary DOM observations and screenshots.
     class Start(Plugin, needs=(Browser,)):
         async def setup(self, _ctx: Context, browser: Inject[Browser]):
             await browser.active_tab.navigate(site + "/canvas")
@@ -154,8 +152,8 @@ async def test_visual_modes_native_image(site, mode):
         plugins=[
             Chrome(),
             Start(),
-            Readiness(mode),
-            Observe(mode),
+            Readiness(),
+            Observe(DomMode(screenshots=True)),
             ImageContext(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
@@ -164,7 +162,7 @@ async def test_visual_modes_native_image(site, mode):
     assert result.text == "Canvas ready"
     assert any(msg.id.startswith("browser-image:") for msg in model.requests[0].messages)
     observations = [e for e in result.events if isinstance(e, ObservationCapturedEvent)]
-    assert observations[0].mode == mode.kind
+    assert observations[0].mode == "dom"
 
 
 async def test_no_progress_hint_is_derived_from_events(site):

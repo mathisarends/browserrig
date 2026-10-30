@@ -9,7 +9,7 @@ from harnessed.kernel import PluginLike
 from harnessed.models import Model
 from harnessed.plugins import Approvals, JsonlSessions
 
-from browserrig.core.modes import ObservationMode
+from browserrig.core.modes import DomMode
 
 from .browser.config import BrowserOptions
 from .composition import browser_plugins
@@ -37,7 +37,7 @@ class BrowserAgent(Agent):
         *,
         model: Model | str | NativeModel | None = None,
         browser: BrowserOptions | None = None,
-        mode: ObservationMode | None = None,
+        mode: DomMode | None = None,
         readiness: ReadinessOptions | Readiness | None = None,
         file_system: FileSystemOptions | None = None,
         observe: Observe | None = None,

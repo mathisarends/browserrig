@@ -1,14 +1,13 @@
 from abc import ABC, abstractmethod
 
 from browserrig.browser.tab import Tab
-from browserrig.core.geometry import Geometry
 from browserrig.core.kinds import ReadinessStatus
 
 from .config import ReadinessOptions
 
 
 class ReadinessStrategy(ABC):
-    """How one observation mode decides that a document is ready.
+    """How a readiness policy decides that a document is ready.
 
     `wait_for_page` owns the shared loop: deadline, dialogs, document changes and events.
     A strategy only probes the page and reports what it saw.
@@ -21,7 +20,6 @@ class ReadinessStrategy(ABC):
         self._options = options
         self.delay = options.poll_interval
         self.reason = ""
-        self.geometry: Geometry | None = None
 
     @abstractmethod
     async def check(self) -> bool:

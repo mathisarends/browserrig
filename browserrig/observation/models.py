@@ -184,7 +184,6 @@ class PageFingerprint(Options):
     alerts: tuple[str, ...] = ()
     modal: Modal | None = None
     scroll_y: float
-    image_digest: str | None = None
 
     def digest(self) -> str:
         return hashlib.sha256(self.model_dump_json().encode("utf-8")).hexdigest()

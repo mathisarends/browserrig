@@ -8,7 +8,7 @@ line instead of nesting on every element.
 from collections import Counter
 from urllib.parse import urlsplit
 
-from browserrig.core.kinds import ObservationKind, ReadinessStatus
+from browserrig.core.kinds import ReadinessStatus
 
 from .models import Canvas, Element, Heading, Snapshot
 
@@ -24,13 +24,10 @@ _MAX_CANVASES = 10
 def render(snapshot: Snapshot) -> str:
     """Lists only what the viewport shows; the agent scrolls to see the rest."""
     lines = _header(snapshot)
-    if snapshot.mode == ObservationKind.CANVAS:
-        lines.append("Canvas observation: no element refs; point with image coordinates.")
-    else:
-        if snapshot.elements or snapshot.headings:
-            lines.extend(_body(snapshot))
-        if snapshot.canvases:
-            lines.extend(_canvases(snapshot.canvases))
+    if snapshot.elements or snapshot.headings:
+        lines.extend(_body(snapshot))
+    if snapshot.canvases:
+        lines.extend(_canvases(snapshot.canvases))
     if snapshot.text:
         lines.extend(("", "page text:", snapshot.text))
     if snapshot.limitations:
@@ -42,7 +39,7 @@ def render(snapshot: Snapshot) -> str:
 def image_caption(snapshot: Snapshot) -> str:
     """Text placed before an observation image, naming the area it shows."""
     caption = f"Current {snapshot.mode} observation {snapshot.id}"
-    if snapshot.mode == ObservationKind.DOM and snapshot.geometry:
+    if snapshot.geometry:
         caption += f"; {_region(snapshot)}"
     return caption
 
@@ -68,7 +65,7 @@ def _header(snapshot: Snapshot) -> list[str]:
         lines.append(viewport)
     if snapshot.readiness != ReadinessStatus.READY:
         lines.append(f"readiness: {snapshot.readiness}")
-    if snapshot.mode == ObservationKind.DOM and snapshot.image and snapshot.geometry:
+    if snapshot.image and snapshot.geometry:
         lines.append(f"image: {_region(snapshot)}")
     if snapshot.modal is not None:
         name = f' "{_cut(snapshot.modal.name, 80)}"' if snapshot.modal.name else ""

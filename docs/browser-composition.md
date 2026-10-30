@@ -4,37 +4,31 @@ Harnessed `Agent` is the composition root. Browserrig plugins own session state,
 tools and hooks; ordinary Python strategies implement capture, rendering,
 readiness and action-chain decisions. Harnessed 0.6.0 needs no changes.
 
-## A visual agent
+## A browser agent with screenshots
 
 ```python
 from harnessed import Agent
 from harnessed.plugins import LatestObservationOnly
 from browserrig import (
-    Actions, Activity, CanvasCapture, CanvasReady, CanvasRegion, CanvasRenderer,
-    Chrome, DocumentReadiness, ImageContext, KeyboardTools, LaunchBrowser,
-    NavigationTools, Observe, ObserveAfterInput, PointerTools, Readiness,
-    ReadinessOptions, Screenshots, ScreenshotTrigger, TabTools, TrimInBatches,
+    Actions, Activity, Chrome, DomCapture, DomRenderer, DomTools,
+    ImageContext, KeyboardTools, LaunchBrowser, NavigationTools, Observe,
+    PointerTools, Readiness, Screenshots, ScreenshotTrigger, TabTools,
+    TrimInBatches,
 )
 
 agent = Agent(
     model=model,
     plugins=[
         Chrome(LaunchBrowser(url=url)),
-        Readiness(
-            initial=DocumentReadiness(CanvasReady(
-                options=ReadinessOptions(canvas_timeout=30),
-            )),
-            ongoing=DocumentReadiness(CanvasReady(
-                options=ReadinessOptions(timeout=2),
-            )),
-        ),
+        Readiness(),
         Observe(
-            capture=CanvasCapture(region=CanvasRegion(selector="canvas")),
-            renderer=CanvasRenderer(),
+            capture=DomCapture(),
+            renderer=DomRenderer(),
             screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
         ),
         ImageContext(TrimInBatches(max_images=6, min_images=3)),
-        Actions(chain_policy=ObserveAfterInput()),
+        Actions(),
+        DomTools(),
         PointerTools(),
         KeyboardTools(),
         NavigationTools(),
@@ -47,15 +41,15 @@ agent = Agent(
 
 Add `DialogTools`, `JavaScriptTools`, `FileTools`, `UploadTools` or `Nudges`
 from their packages as needed. `UploadTools` requires DOM refs and a
-browser file workspace. `DocumentReadiness` routes `file:` previews to `DomReady`
-by default, so opening a downloaded PDF does not wait for the application's canvas.
-`CanvasRegion` also uses the full viewport for these previews.
+browser file workspace. The same readiness checks apply to web pages and
+local document previews.
 
-For a DOM agent, use `DomCapture`, `DomRenderer` and `DomReady`, add `DomTools`, and
-use `Actions(chain_policy=DomActionChains())`. Pointer and keyboard capabilities
-work in both recipes. `DomTools` owns ref-based click, drag, typing and form tools;
-`KeyboardTools` owns input to the current focus. DOM tools validate the capture's
-`provides_dom_refs` capability at setup. Empty pages can still have that capability.
+`DomTools` owns ref-based click, drag, typing and form tools; `PointerTools`
+uses screenshot or viewport coordinates, and `KeyboardTools` sends input to the
+current focus. DOM tools validate the capture's `provides_dom_refs` capability at
+setup. Empty pages can still have that capability. `Actions()` uses
+`DomActionChains()` for captures with refs; `ObserveAfterInput()` requires a fresh
+observation after each input when selected explicitly.
 
 ## Screenshot settings
 
@@ -101,16 +95,10 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 | Contract | Implementation |
 | --- | --- |
 | `CaptureStrategy` | Declare `kind` (a presentation category) and `provides_dom_refs`; implement `collect(tab, report, *, screenshots, region=None, zoom=1) -> CaptureContent`. Honor `screenshots=False`. The runner handles dialogs, document coherence, fingerprints and snapshots. |
-| `CaptureRegion` | `async resolve(tab) -> Geometry \| None`; `None` means full viewport. Capture selection is independent of readiness geometry. |
 | `Renderer` | `instructions(screenshots)`, `refs()` and `render(snapshot)`. Pure presentation, no browser input or waits. |
-| `ReadinessPolicy` | `create(context) -> ReadinessStrategy`, returning a fresh probe. Context supplies tab, stage, phase, options and a session-owned geometry cache. Select app-specific policies here. |
-| `ReadinessStrategy` | `budget`, `delay`, `reason`, optional `geometry`; `async check() -> bool`; `timeout_status()`. The shared runner owns deadlines, dialogs, cancellation and events. |
+| `ReadinessPolicy` | `create(context) -> ReadinessStrategy`, returning a fresh probe. Context supplies tab, stage, phase and options. |
+| `ReadinessStrategy` | `budget`, `delay`, `reason`; `async check() -> bool`; `timeout_status()`. The shared runner owns deadlines, dialogs, cancellation and events. |
 | `ActionChainPolicy` (`browserrig.tools`) | `async check(observe, tab) -> str`: empty allows continuing; otherwise explain why a fresh observation is required. Failed comparison ends the chain without turning successful input into failed input. |
-
-`CanvasReady` is the existing canvas-content/geometry readiness algorithm, not a
-general visual-animation detector. App-specific `FigmaLoaded`, `FigmaViewport`,
-`VisualSettled` or `FigmaRenderer` can implement these contracts; they are not
-built-in implementations.
 
 ## Initial readiness and ongoing readiness
 
@@ -120,7 +108,7 @@ successful. State is local to a browser service mount and keyed by tab/document.
 Navigating to another document initializes that document; switching back to a tab
 with the same document does not restart initialization. Use `readiness.invalidate(tab)`
 for application resets without a document-ID change. This cancels waits for that
-document and clears its readiness geometry.
+document and requires a fresh initial readiness check.
 
 The independent event fields are:
 
@@ -170,20 +158,19 @@ custom-event support does not imply every persisted SDK event appears in a turn 
 ## Existing applications
 
 `BrowserAgent` and `browser_plugins()` remain convenience recipes. `mode=DomMode(...)`
-and `mode=CanvasMode(...)` translate to the new strategies and retain their screenshot
-defaults. New composition uses `observe=Observe(...)`, `readiness=Readiness(...)`,
+configures DOM observations and their screenshot defaults. New composition uses
+`observe=Observe(...)`, `readiness=Readiness(...)`,
 `image_context=ImageContext(...)`, `actions=Actions(...)` and `local_files=False`
 when local file tools should be omitted. Choose `mode` or `observe`, not both.
 
-The DOM recipe mounts `DomTools`; the canvas recipe omits DOM and upload tools
-entirely. Transient availability (for example a missing workspace) still uses tool
-gates, including execution-time rechecks. Existing upload path validation is retained.
+The default recipe mounts `DomTools`; custom captures without refs omit DOM and
+upload tools. Transient availability (for example a missing workspace) still uses
+tool gates, including execution-time rechecks. Existing upload path validation is retained.
 Keep file readers as ordinary functions/strategies, not one plugin per file format.
 
 For manual compositions, add `ImageContext()` explicitly: `Observe` no longer
-injects images itself. `Readiness.mode` no longer configures capture implicitly;
-configure `Observe` independently. Move `type_text` from custom `KeyboardTools`
-compositions into `DomTools`. `MouseTools` remains a compatibility group for DOM
+injects images itself. Configure `Readiness` and `Observe` independently. Move
+`type_text` from custom `KeyboardTools` compositions into `DomTools`. `MouseTools` remains a compatibility group for DOM
 and coordinate mouse tools; do not install it alongside overlapping tool groups.
 Harnessed filesystem tools can replace local file tools by selecting
 `local_files=False`; browser download paths are not automatically sandbox paths.

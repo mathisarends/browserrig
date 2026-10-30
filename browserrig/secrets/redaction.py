@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from .models import placeholder
 
 # Identifiers, digests and binary payloads are never text a secret can appear in.
-_OPAQUE_FIELDS = frozenset({"id", "ref", "type", "fingerprint", "image", "image_digest"})
+_OPAQUE_FIELDS = frozenset({"id", "ref", "type", "fingerprint", "image"})
 
 
 class Redactor:

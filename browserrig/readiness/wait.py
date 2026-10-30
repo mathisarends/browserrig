@@ -1,6 +1,5 @@
 import asyncio
 from time import monotonic
-from typing import assert_never
 from uuid import uuid4
 
 from cdpify.exceptions import CDPCommandError
@@ -8,9 +7,7 @@ from cdpify.exceptions import CDPCommandError
 from browserrig.browser.base import BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import ReadinessError
-from browserrig.core.geometry import Geometry
-from browserrig.core.kinds import ReadinessPhase, ReadinessStage, ReadinessStatus
-from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
+from browserrig.core.kinds import ObservationKind, ReadinessPhase, ReadinessStage, ReadinessStatus
 from browserrig.events import (
     BrowserEvent,
     ReadinessCancelledEvent,
@@ -20,7 +17,6 @@ from browserrig.events import (
     ReadyEvent,
 )
 
-from .canvas import CanvasReadiness
 from .config import ReadinessOptions
 from .dom import DomReadiness
 from .models import ReadinessReport
@@ -32,18 +28,13 @@ async def wait_for_page(
     tab: Tab,
     *,
     events: BrowserEvents | None = None,
-    mode: ObservationMode | None = None,
     options: ReadinessOptions | None = None,
     phase: ReadinessPhase = ReadinessPhase.INITIAL,
-    geometry_cache: dict[tuple[str, str], Geometry] | None = None,
     policy: ReadinessPolicy | None = None,
     stage: ReadinessStage | None = None,
 ) -> ReadinessReport:
     emit = events.emit if events is not None else _discard
-    selected = mode or DomMode()
     options = options or ReadinessOptions()
-    if geometry_cache is None:
-        geometry_cache = {}
     await tab.sync_document()
     started_document = tab.document_id
     started = monotonic()
@@ -56,7 +47,7 @@ async def wait_for_page(
             readiness_id=rid,
             target_id=tab.id,
             document_id=started_document,
-            mode=selected.kind,
+            mode=ObservationKind.DOM,
             phase=phase,
             stage=stage,
         )
@@ -64,9 +55,9 @@ async def wait_for_page(
     status = ReadinessStatus.READY
     try:
         strategy = (
-            policy.create(ReadinessContext(tab, phase, stage, options, geometry_cache))
+            policy.create(ReadinessContext(tab, phase, stage, options))
             if policy
-            else _readiness_strategy(selected, tab, options, phase, geometry_cache)
+            else DomReadiness(tab, options, phase)
         )
         status = await _poll(tab, strategy, started_document, reselect=policy is not None)
     except asyncio.CancelledError:
@@ -75,7 +66,7 @@ async def wait_for_page(
                 readiness_id=rid,
                 target_id=tab.id,
                 document_id=started_document,
-                mode=selected.kind,
+                mode=ObservationKind.DOM,
                 phase=phase,
                 stage=stage,
                 duration=monotonic() - started,
@@ -89,7 +80,7 @@ async def wait_for_page(
                 readiness_id=rid,
                 target_id=tab.id,
                 document_id=started_document,
-                mode=selected.kind,
+                mode=ObservationKind.DOM,
                 phase=phase,
                 stage=stage,
                 duration=monotonic() - started,
@@ -101,13 +92,12 @@ async def wait_for_page(
         id=rid,
         target_id=tab.id,
         document_id=tab.document_id,
-        mode=selected.kind,
+        mode=ObservationKind.DOM,
         phase=phase,
         stage=stage,
         status=status,
         duration=monotonic() - started,
         reason=strategy.reason if status != ReadinessStatus.READY else "",
-        geometry=strategy.geometry,
     )
     match status:
         case ReadinessStatus.READY:
@@ -121,7 +111,7 @@ async def wait_for_page(
             readiness_id=rid,
             target_id=tab.id,
             document_id=started_document,
-            mode=selected.kind,
+            mode=ObservationKind.DOM,
             phase=phase,
             stage=stage,
             duration=report.duration,
@@ -129,7 +119,7 @@ async def wait_for_page(
         )
     )
     if status == ReadinessStatus.FAILED:
-        raise ReadinessError(f"{selected.kind} readiness timed out: {strategy.reason}")
+        raise ReadinessError(f"DOM readiness timed out: {strategy.reason}")
     return report
 
 
@@ -156,25 +146,6 @@ async def _poll(
 
 async def _discard(_event: BrowserEvent) -> None:
     pass
-
-
-def _readiness_strategy(
-    mode: ObservationMode,
-    tab: Tab,
-    options: ReadinessOptions,
-    phase: ReadinessPhase,
-    geometry_cache: dict[tuple[str, str], Geometry],
-) -> ReadinessStrategy:
-    # File previews use the full viewport, even when the task tab is a canvas application.
-    if tab.url.startswith("file:"):
-        return DomReadiness(tab, options, phase)
-    match mode:
-        case DomMode():
-            return DomReadiness(tab, options, phase)
-        case CanvasMode():
-            return CanvasReadiness(tab, options, mode, geometry_cache)
-        case _:
-            assert_never(mode)
 
 
 async def _check(strategy: ReadinessStrategy) -> bool:

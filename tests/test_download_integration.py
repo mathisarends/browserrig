@@ -12,8 +12,8 @@ from harnessed.testing import CallbackModel
 from browserrig import (
     Browser,
     BrowserAgent,
-    CanvasMode,
     ChromeBrowser,
+    DomMode,
     FileSystemOptions,
     LaunchBrowser,
     ReadinessOptions,
@@ -282,7 +282,7 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(si
     assert (tmp_path / "workspace/notes/summary.md").read_text() == "Voyager 2 research"
 
 
-async def test_canvas_agent_previews_pdf_with_full_viewport_and_returns_to_canvas(
+async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab(
     site, tmp_path, pdf_document
 ):
     (tmp_path / "report.pdf").write_bytes(pdf_document)
@@ -296,7 +296,7 @@ async def test_canvas_agent_previews_pdf_with_full_viewport_and_returns_to_canva
         assert all(not reply.is_error for reply in replies)
         if stage == 0:
             original_tab = page["tab"]
-            assert "upload_files" not in {item.name for item in request.tools}
+            assert "upload_files" in {item.name for item in request.tools}
             tool_call = ToolCall("open_file", {"path": "report.pdf"})
         elif stage == 1:
             assert page["url"] == (tmp_path / "report.pdf").as_uri()
@@ -309,7 +309,7 @@ async def test_canvas_agent_previews_pdf_with_full_viewport_and_returns_to_canva
         else:
             assert page["tab"] == original_tab
             assert page["readiness"] == "ready"
-            yield ModelChunk(text="Back on canvas")
+            yield ModelChunk(text="Back on original tab")
             return
         stage += 1
         yield ModelChunk(tool_call=tool_call)
@@ -317,9 +317,9 @@ async def test_canvas_agent_previews_pdf_with_full_viewport_and_returns_to_canva
     result = await BrowserAgent(
         model=CallbackModel(respond),
         browser=LaunchBrowser(url=site + "/canvas"),
-        mode=CanvasMode(),
-        readiness=ReadinessOptions(canvas_timeout=3),
+        mode=DomMode(screenshots=True),
+        readiness=ReadinessOptions(timeout=3),
         file_system=FileSystemOptions(directory=tmp_path),
         approvals=Approvals(default=PolicyDecision.ALLOW),
-    ).run("Preview the PDF and return to the canvas", max_steps=3)
-    assert result.text == "Back on canvas"
+    ).run("Preview the PDF and return to the original tab", max_steps=3)
+    assert result.text == "Back on original tab"

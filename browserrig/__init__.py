@@ -10,12 +10,7 @@ from .files import FileSystem, FileSystemOptions
 from .kinds import MouseEventKind
 from .nudges import Nudges
 from .observation import (
-    CanvasCapture,
-    CanvasMode,
-    CanvasRegion,
-    CanvasRenderer,
     CaptureContent,
-    CaptureRegion,
     CaptureStrategy,
     DomCapture,
     DomMode,
@@ -30,8 +25,6 @@ from .observation import (
     UntilCompaction,
 )
 from .readiness import (
-    CanvasReady,
-    DocumentReadiness,
     DomReady,
     Readiness,
     ReadinessContext,
@@ -55,11 +48,7 @@ from .tools import (
 )
 
 __all__ = [
-    "CanvasCapture",
-    "CanvasRegion",
-    "CanvasRenderer",
     "CaptureContent",
-    "CaptureRegion",
     "CaptureStrategy",
     "DomCapture",
     "DomRenderer",
@@ -70,8 +59,6 @@ __all__ = [
     "Renderer",
     "Screenshots",
     "ScreenshotTrigger",
-    "CanvasReady",
-    "DocumentReadiness",
     "DomReady",
     "ReadinessContext",
     "ReadinessPolicy",
@@ -90,7 +77,6 @@ __all__ = [
     "MouseTools",
     "Browser",
     "BrowserAgent",
-    "CanvasMode",
     "Chrome",
     "ChromeBrowser",
     "ConnectBrowser",

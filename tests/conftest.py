@@ -66,9 +66,6 @@ async def site(pdf_document, xlsx_document) -> AsyncIterator[str]:
             ctx.fillStyle='white';ctx.fillRect(0,0,500,400);
             setTimeout(()=>{ctx.fillStyle='red';ctx.fillRect(0,0,200,200);},150);
             </script>""",
-        "/blank-canvas": (
-            "<!doctype html><title>Blank</title><canvas width=500 height=400></canvas>"
-        ),
         "/frames": """<!doctype html><title>Frames</title><iframe src='/inner'></iframe>""",
         "/inner": "<!doctype html><label>Inside<input id=inside></label>",
         "/frame-host": """<!doctype html><style>body{margin:0;height:3000px}

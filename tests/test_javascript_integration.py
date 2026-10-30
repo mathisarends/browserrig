@@ -7,7 +7,7 @@ from harnessed.models import ToolReply
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Browser, CanvasMode, ChromeBrowser, DomMode, LaunchBrowser, browser_plugins
+from browserrig import Browser, ChromeBrowser, LaunchBrowser, browser_plugins
 from browserrig.core.errors import BrowserError
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent
 from browserrig.kinds import ActionKind
@@ -16,11 +16,8 @@ from tests.javascript import evaluate
 pytestmark = pytest.mark.integration
 
 
-@pytest.mark.parametrize("mode", [DomMode(), CanvasMode()])
-async def test_agent_javascript_shell_retains_main_world_state_awaits_and_reports_errors(
-    site, mode
-):
-    url = site + ("/canvas" if isinstance(mode, CanvasMode) else "/")
+async def test_agent_javascript_shell_retains_main_world_state_awaits_and_reports_errors(site):
+    url = site
     model = ScriptedModel(
         [
             call("execute_javascript", code="const shellCounter = 40; shellCounter"),
@@ -42,7 +39,7 @@ async def test_agent_javascript_shell_retains_main_world_state_awaits_and_report
     agent = Agent(
         model=model,
         plugins=[
-            *browser_plugins(LaunchBrowser(url=url), mode=mode),
+            *browser_plugins(LaunchBrowser(url=url)),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

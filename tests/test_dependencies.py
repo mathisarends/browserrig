@@ -26,7 +26,6 @@ from browserrig import (
     Actions,
     Browser,
     BrowserAgent,
-    CanvasMode,
     Chrome,
     DomMode,
     FileSystem,
@@ -121,7 +120,7 @@ async def test_browser_dependency_loss_and_replacement_restart_observation_state
         assert not ctx.plugin_diagnostics()
         first_readiness, first_observe = ctx[Readiness], ctx[Observe]
         assert first_readiness._events is first_browser.events
-        first_readiness._state.geometry[("sentinel", "doc")] = object()
+        first_readiness._state.initialized.add(("sentinel", "doc"))
         first_observe._state.snapshot = object()
 
         second_browser = FakeBrowser(None)
@@ -132,7 +131,7 @@ async def test_browser_dependency_loss_and_replacement_restart_observation_state
         assert ctx[Observe]._browser is second_browser
         assert ctx[Readiness]._events is second_browser.events
         assert ctx[Observe]._readiness is ctx[Readiness]
-        assert not ctx[Readiness]._state.geometry
+        assert not ctx[Readiness]._state.initialized
         assert ctx[Observe].snapshot is None
         with pytest.raises(RuntimeError):
             _ = first_observe._browser
@@ -191,7 +190,7 @@ async def test_facade_warning_policy_keeps_deferred_plugin_until_service_is_adde
 
 @pytest.mark.parametrize(
     "mode",
-    [DomMode(), DomMode(screenshots=True, max_text_chars=1000, marks=False), CanvasMode()],
+    [DomMode(), DomMode(screenshots=True, max_text_chars=1000, marks=False)],
 )
 async def test_facade_renders_configured_prompt_and_mode_specific_sections(fake_chrome, mode):
     agent = BrowserAgent(
@@ -205,17 +204,10 @@ async def test_facade_renders_configured_prompt_and_mode_specific_sections(fake_
         assert rendered.count("## Browser observations") == 1
         assert "## Browser content and action results" in rendered
         assert "## Workspace and downloads" in rendered
-        if isinstance(mode, DomMode):
-            assert "## DOM element references" in rendered
-            assert ("labeled with its ref" in rendered) == mode.marks
-            assert ("bounded page-text excerpt" in rendered) == bool(mode.max_text_chars)
-            assert ("Every observation includes a screenshot" in rendered) == mode.screenshots
-        else:
-            assert "canvas image" in rendered
-            assert "## DOM element references" not in rendered
-            assert "labeled with its ref" not in rendered
-            assert "type_text" not in rendered
-            assert "viewport CSS pixels" not in rendered
+        assert "## DOM element references" in rendered
+        assert ("labeled with its ref" in rendered) == mode.marks
+        assert ("bounded page-text excerpt" in rendered) == bool(mode.max_text_chars)
+        assert ("Every observation includes a screenshot" in rendered) == mode.screenshots
     assert fake_chrome[0].closed
 
 
@@ -250,21 +242,15 @@ _REF_CALLS = (
 )
 
 
-@pytest.mark.parametrize("mode", [DomMode(), CanvasMode()])
-async def test_ref_tools_are_exposed_only_in_dom_mode(fake_chrome, tmp_path, mode):
-    agent = BrowserAgent(model=ScriptedModel(["unused"]), mode=mode)
+async def test_ref_and_coordinate_tools_are_exposed(fake_chrome, tmp_path):
+    agent = BrowserAgent(model=ScriptedModel(["unused"]))
     ref_tools = {call.name for call in _REF_CALLS}
     async with agent.session() as session:
         session.ctx[Browser].files = FileSystem(FileSystemOptions(directory=tmp_path))
         tools = session.ctx[ToolRegistry]
         names = {item.name for item in tools.definitions}
         assert {"move_mouse", "click_at", "scroll", "drag_at", "send_keys"} <= names
-        assert (ref_tools <= names) == isinstance(mode, DomMode)
-        if isinstance(mode, CanvasMode):
-            assert not ref_tools & names
-            for call in _REF_CALLS:
-                result = await tools.execute(call)
-                assert result.is_error and "Unknown tool" in result.text
+        assert ref_tools <= names
     assert fake_chrome[0].closed
 
 

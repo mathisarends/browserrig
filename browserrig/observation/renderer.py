@@ -66,25 +66,3 @@ class DomRenderer:
 
     def render(self, snapshot: Snapshot) -> str:
         return render(snapshot)
-
-
-@dataclass(frozen=True)
-class CanvasRenderer:
-    def instructions(self, screenshots: Screenshots) -> str:
-        return (
-            "Use the latest browser observation and canvas image as page state. "
-            "Canvas observations contain no DOM element refs. Point using image pixel "
-            "coordinates; they are mapped to the captured region in the browser viewport. "
-            "File previews use a full-viewport image. "
-            + (
-                "Each step includes a screenshot."
-                if screenshots.trigger == ScreenshotTrigger.EACH_STEP
-                else "Call screenshot to request an image before using image coordinates."
-            )
-        )
-
-    def refs(self) -> None:
-        return None
-
-    def render(self, snapshot: Snapshot) -> str:
-        return render(snapshot)

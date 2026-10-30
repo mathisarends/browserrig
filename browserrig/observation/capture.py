@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import uuid4
@@ -12,14 +11,12 @@ from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Bounds, Geometry, Point, Region
 from browserrig.core.kinds import ObservationKind, ReadinessStatus
-from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
+from browserrig.core.modes import DomMode
 from browserrig.readiness.models import ReadinessReport
-from browserrig.scripts import PAGE_FACTS
 
 from .extraction import Extraction, extract
 from .marks import annotate, blackout
 from .models import Element, ElementFingerprint, PageFingerprint, Snapshot
-from .regions import CanvasRegion, CaptureRegion
 
 # Longest side of a zoomed region image, to bound image tokens.
 _MAX_REGION_SIDE = 2000
@@ -33,7 +30,7 @@ class Redaction(Protocol):
 
 async def capture(
     tab: Tab,
-    mode: ObservationMode | CaptureStrategy,
+    mode: DomMode | CaptureStrategy,
     report: ReadinessReport,
     *,
     tabs: tuple[TabInfo, ...] = (),
@@ -50,8 +47,10 @@ async def capture(
     `cursor` is where the browser's mouse rests in `tab`; screenshots mark it.
     `redaction` hides secrets in all text and blacks out elements showing one.
     """
-    if isinstance(mode, (DomMode, CanvasMode)):
-        strategy = capture_for_mode(mode)
+    if isinstance(mode, DomMode):
+        strategy = DomCapture(
+            max_elements=mode.max_elements, max_text_chars=mode.max_text_chars, marks=mode.marks
+        )
         screenshots = mode.screenshots if screenshots is None else screenshots
     else:
         strategy = mode
@@ -97,7 +96,7 @@ async def capture(
         page_height=page.page_height,
         mode=strategy.kind,
         readiness=report.status,
-        fingerprint=_fingerprint(page, document_id, content.image_digest),
+        fingerprint=_fingerprint(page, document_id),
         tabs=tabs,
         text=page.text,
         elements=elements,
@@ -118,7 +117,6 @@ class CaptureContent:
 
     page: Extraction
     image: str | None = None
-    image_digest: str | None = None
     geometry: Geometry | None = None
     area: Bounds | None = None
     scale: float = 1
@@ -207,66 +205,6 @@ class DomCapture:
         return CaptureContent(page=page, image=image, geometry=geometry, area=area, scale=scale)
 
 
-class CanvasCapture:
-    kind = ObservationKind.CANVAS
-    provides_dom_refs = False
-
-    def __init__(self, *, region: CaptureRegion | None = None) -> None:
-        self.region = region or CanvasRegion()
-
-    async def collect(  # pylint: disable=unused-argument
-        self,
-        tab: Tab,
-        report: ReadinessReport,
-        *,
-        screenshots: bool,
-        region: Region | None = None,
-        zoom: float = 1,
-        cursor: Point | None = None,
-    ) -> CaptureContent:
-        facts = await (await tab.main_frame()).run(PAGE_FACTS)
-        geometry = await self.region.resolve(tab) if screenshots else None
-        image = await screenshot(tab, geometry) if screenshots else None
-        image_digest = hashlib.sha256(image.encode()).hexdigest() if image else None
-        if image is not None:
-            area = (
-                Bounds(x=geometry.x, y=geometry.y, width=geometry.width, height=geometry.height)
-                if geometry is not None
-                else Bounds(x=0, y=0, width=facts.width, height=facts.height)
-            )
-            image = await asyncio.to_thread(
-                annotate,
-                image,
-                (),
-                area,
-                geometry.scale if geometry is not None else 1,
-                cursor=cursor,
-            )
-        page = Extraction(
-            url=facts.url,
-            title=facts.title,
-            width=facts.width,
-            height=facts.height,
-            scroll_y=facts.scroll_y,
-            page_height=0,
-        )
-        return CaptureContent(
-            page=page,
-            image=image,
-            image_digest=image_digest,
-            geometry=geometry,
-        )
-
-
-def capture_for_mode(mode: ObservationMode) -> CaptureStrategy:
-    """Compatibility adapter for the original mode configuration."""
-    if isinstance(mode, DomMode):
-        return DomCapture(
-            max_elements=mode.max_elements, max_text_chars=mode.max_text_chars, marks=mode.marks
-        )
-    return CanvasCapture(region=CanvasRegion(selector=mode.selector))
-
-
 async def _redact(
     page: Extraction, image: str | None, content: CaptureContent, redaction: Redaction
 ) -> tuple[Extraction, str | None]:
@@ -305,7 +243,7 @@ def _mark_new(
     )
 
 
-def _fingerprint(page: Extraction, document_id: str, image_digest: str | None) -> str:
+def _fingerprint(page: Extraction, document_id: str) -> str:
     return PageFingerprint(
         url=page.url,
         document_id=document_id,
@@ -327,5 +265,4 @@ def _fingerprint(page: Extraction, document_id: str, image_digest: str | None) -
         ),
         alerts=page.alerts,
         modal=page.modal,
-        image_digest=image_digest,
     ).digest()

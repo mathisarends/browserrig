@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from harnessed import Plugin
 from harnessed.plugins import LatestObservationOnly
 
-from browserrig.core.modes import DomMode, ObservationMode
+from browserrig.core.modes import DomMode
 
 from .activity import Activity
 from .browser import Chrome
@@ -32,7 +32,7 @@ from .tools.execution import Actions
 def browser_plugins(
     options: BrowserOptions | None = None,
     *,
-    mode: ObservationMode | None = None,
+    mode: DomMode | None = None,
     readiness: ReadinessOptions | Readiness | None = None,
     file_system: FileSystemOptions | None = None,
     observe: Observe | None = None,
@@ -48,7 +48,7 @@ def browser_plugins(
     plugins: list[Plugin] = [
         Activity(),
         Chrome(options, file_system=file_system),
-        readiness if isinstance(readiness, Readiness) else Readiness(selected, readiness),
+        readiness if isinstance(readiness, Readiness) else Readiness(options=readiness),
         Nudges(),
     ]
     if secrets is not None:

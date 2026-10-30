@@ -1,4 +1,3 @@
-from browserrig.core.geometry import Geometry
 from browserrig.core.kinds import ObservationKind, ReadinessPhase, ReadinessStage, ReadinessStatus
 from browserrig.core.options import Options
 
@@ -13,4 +12,3 @@ class ReadinessReport(Options):
     status: ReadinessStatus
     duration: float
     reason: str = ""
-    geometry: Geometry | None = None

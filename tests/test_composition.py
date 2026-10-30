@@ -1,7 +1,6 @@
 import subprocess
 import sys
 
-import pytest
 from harnessed import Agent, Plugin, PolicyDecision, SystemSection
 from harnessed.plugins import Approvals, JsonlSessions, MemorySessions
 from harnessed.plugins.filesystem import FilesystemTools
@@ -10,7 +9,6 @@ from harnessed.testing import ScriptedModel
 
 from browserrig import (
     BrowserAgent,
-    CanvasMode,
     Chrome,
     DomMode,
     FileSystemOptions,
@@ -55,15 +53,13 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     assert not file_system.directory.exists()
 
 
-@pytest.mark.parametrize("mode", [DomMode(), CanvasMode()])
-def test_facade_mounts_only_the_selected_tool_capabilities(mode):
-    agent = BrowserAgent(model=ScriptedModel(["ok"]), mode=mode)
+def test_facade_mounts_dom_and_coordinate_tool_capabilities():
+    agent = BrowserAgent(model=ScriptedModel(["ok"]))
     for plugin in (PointerTools, JavaScriptTools):
         assert sum(isinstance(item, plugin) for item in agent.plugins) == 1
     for plugin in (DomTools, UploadTools):
-        assert any(isinstance(item, plugin) for item in agent.plugins) == isinstance(mode, DomMode)
+        assert any(isinstance(item, plugin) for item in agent.plugins)
     assert sum(isinstance(item, FileTools) for item in agent.plugins) == 1
-    assert next(item for item in agent.plugins if isinstance(item, Readiness)).mode == mode
 
 
 def test_facade_retains_native_memory_storage_and_approval_defaults():

@@ -21,7 +21,7 @@ from browserrig.browser.tab import Tab
 from browserrig.core.errors import StaleElement
 from browserrig.core.geometry import Region
 from browserrig.core.kinds import ActionKind, ReadinessPhase, ReadinessStatus
-from browserrig.core.modes import DomMode, ObservationMode
+from browserrig.core.modes import DomMode
 from browserrig.core.tools import browser_tool as tool
 from browserrig.events import (
     ObservationCapturedEvent,
@@ -30,13 +30,13 @@ from browserrig.nudges import Nudges
 from browserrig.readiness.plugin import Readiness
 from browserrig.secrets import Secrets
 
-from .capture import CaptureStrategy, DomCapture, capture_for_mode
+from .capture import CaptureStrategy, DomCapture
 from .capture import capture as capture_snapshot
 from .config import Screenshots, ScreenshotTrigger
 from .content import extract_content
 from .handle import ElementHandle
 from .models import CapturedImage, Snapshot
-from .renderer import CanvasRenderer, DomRenderer, Renderer
+from .renderer import DomRenderer, Renderer
 
 
 @dataclass
@@ -60,7 +60,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
 
     def __init__(
         self,
-        mode: ObservationMode | None = None,
+        mode: DomMode | None = None,
         *,
         capture: CaptureStrategy | None = None,
         renderer: Renderer | None = None,
@@ -70,19 +70,19 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         if mode is not None and capture is not None:
             raise ValueError("Choose mode or capture, not both")
         self.mode = mode or DomMode()
-        self.capture_strategy = capture or capture_for_mode(self.mode)
+        self.capture_strategy = capture or DomCapture(
+            max_elements=self.mode.max_elements,
+            max_text_chars=self.mode.max_text_chars,
+            marks=self.mode.marks,
+        )
         if renderer is None:
-            if isinstance(capture, DomCapture):
-                renderer = DomRenderer(max_text_chars=capture.max_text_chars, marks=capture.marks)
-            elif capture is not None:
-                renderer = DomRenderer() if capture.provides_dom_refs else CanvasRenderer()
-            elif isinstance(self.mode, DomMode):
+            if isinstance(self.capture_strategy, DomCapture):
                 renderer = DomRenderer(
-                    max_text_chars=self.mode.max_text_chars,
-                    marks=self.mode.marks,
+                    max_text_chars=self.capture_strategy.max_text_chars,
+                    marks=self.capture_strategy.marks,
                 )
             else:
-                renderer = CanvasRenderer()
+                renderer = DomRenderer()
         self.renderer = renderer
         self.screenshots = screenshots or Screenshots(
             trigger=ScreenshotTrigger.EACH_STEP

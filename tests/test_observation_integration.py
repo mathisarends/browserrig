@@ -13,7 +13,6 @@ from PIL import Image
 from browserrig import (
     Browser,
     BrowserAgent,
-    CanvasMode,
     ChromeBrowser,
     DomMode,
     LaunchBrowser,
@@ -121,8 +120,7 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
             )
 
 
-@pytest.mark.parametrize("mode", [DomMode(screenshots=True), CanvasMode()])
-async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site, mode):
+async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site):
     step = 0
 
     async def respond(request):
@@ -152,7 +150,7 @@ async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site,
     agent = BrowserAgent(
         model=CallbackModel(respond),
         browser=LaunchBrowser(url=site + "/canvas", viewport=Viewport(scale=2)),
-        mode=mode,
+        mode=DomMode(screenshots=True),
         approvals=Approvals(default=PolicyDecision.ALLOW),
     )
     result = await agent.run("Move, click, and inspect the cursor after each action", max_steps=3)

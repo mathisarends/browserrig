@@ -13,8 +13,6 @@ from typing import Any
 from pydantic import BaseModel, TypeAdapter
 
 from .models import (
-    CanvasArgs,
-    CanvasProbe,
     ContentArgs,
     ContentExtraction,
     CursorArgs,
@@ -86,9 +84,6 @@ SCROLL_OWNER: Script[OwnerScrollArgs, ScrollPlan | None] = Script.load(
 )
 CONTENT: Script[ContentArgs, ContentExtraction] = Script.load(
     "content", ContentArgs, ContentExtraction, uses=("composed", "visibility", "markdown")
-)
-CANVAS: Script[CanvasArgs, CanvasProbe] = Script.load(
-    "canvas", CanvasArgs, CanvasProbe, uses=("composed", "visibility")
 )
 STABILITY: Script[ScriptArgs, DOMProbe] = Script.load("stability", ScriptArgs, DOMProbe)
 SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))

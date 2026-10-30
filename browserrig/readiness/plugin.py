@@ -6,16 +6,14 @@ from harnessed.events import AgentControlChangedEvent, ControlState
 
 from browserrig.browser.base import BrowserEvents
 from browserrig.browser.tab import Tab
-from browserrig.core.geometry import Geometry
 from browserrig.core.kinds import ReadinessPhase, ReadinessStage, ReadinessStatus
-from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
 from browserrig.events import (
     READINESS_EVENTS,
 )
 
 from .config import ReadinessOptions
 from .models import ReadinessReport
-from .policies import CanvasReady, DocumentReadiness, DomReady, ReadinessPolicy
+from .policies import DomReady, ReadinessPolicy
 from .wait import wait_for_page
 
 
@@ -26,7 +24,6 @@ class _State:
     )
     cancelling: set[asyncio.Task[ReadinessReport]] = field(default_factory=set)
     initialized: set[tuple[str, str]] = field(default_factory=set)
-    geometry: dict[tuple[str, str], Geometry] = field(default_factory=dict)
 
 
 class Readiness(Plugin, provides=True, needs=(BrowserEvents,)):
@@ -36,26 +33,15 @@ class Readiness(Plugin, provides=True, needs=(BrowserEvents,)):
 
     def __init__(
         self,
-        mode: ObservationMode | None = None,
         options: ReadinessOptions | None = None,
         *,
         initial: ReadinessPolicy | None = None,
         ongoing: ReadinessPolicy | None = None,
     ) -> None:
         super().__init__()
-        self.mode = mode or DomMode()
         self.options = options or ReadinessOptions()
-        default = (
-            CanvasReady(
-                selector=self.mode.selector,
-                loading_selector=self.mode.loading_selector,
-                min_color_fraction=self.mode.min_color_fraction,
-            )
-            if isinstance(self.mode, CanvasMode)
-            else DomReady()
-        )
-        self.initial = initial or DocumentReadiness(default)
-        self.ongoing = ongoing or DocumentReadiness(default)
+        self.initial = initial or DomReady()
+        self.ongoing = ongoing or DomReady()
 
     async def setup(self, ctx: Context) -> None:
         ctx.effect(self._cancel)
@@ -89,7 +75,6 @@ class Readiness(Plugin, provides=True, needs=(BrowserEvents,)):
     def invalidate(self, tab: Tab) -> None:
         """Invalidate this document after an application-level reset (for example in an SPA)."""
         self._state.initialized.discard((tab.id, tab.document_id))
-        self._state.geometry.pop((tab.id, tab.document_id), None)
         for key, task in tuple(self._state.pending.items()):
             if key[:2] == (tab.id, tab.document_id):
                 self._state.cancelling.add(task)
@@ -116,15 +101,13 @@ class Readiness(Plugin, provides=True, needs=(BrowserEvents,)):
         report = await wait_for_page(
             tab,
             events=self._events,
-            mode=self.mode,
             options=self.options,
             phase=phase,
-            geometry_cache=self._state.geometry,
             policy=self.initial if stage == ReadinessStage.INITIAL else self.ongoing,
             stage=stage,
         )
         if (tab.id, tab.document_id) != document:
-            # Select again for the new document; do not mark it ready using the old app policy.
+            # Select again for the new document; do not mark it ready using the old readiness probe.
             return await self.wait(tab, phase=phase)
         if stage == ReadinessStage.INITIAL and report.status == ReadinessStatus.READY:
             # Keep only the live generation for this tab.

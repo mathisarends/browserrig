@@ -153,7 +153,6 @@ class FileSource(StrEnum):
 
 class ObservationKind(StrEnum):
     DOM = "dom"
-    CANVAS = "canvas"
 
 
 class ReadinessStatus(StrEnum):
