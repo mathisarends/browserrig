@@ -496,7 +496,12 @@ in an overlay spanning its tab strip and the viewport. The first tab of a
 session skips steps 1 and 2. Agent turn starts publish the current cursor state
 so live subscribers attached after browser setup can display it before the
 first model request or input action.
-Cursor movements follow bounded cubic paths; scrolling uses eased wheel steps.
+Cursor movements follow bounded cubic paths. Scrolling looks like Chrome's
+`scroll-behavior: smooth` but uses real wheel input: one trusted CDP wheel event
+per frame along Chrome's smooth scroll curve (`cubic-bezier(0.4, 0, 0, 1)`),
+lasting about one 60 Hz frame per square root of the distance (150 ms to 1.5 s).
+Chrome does not animate CDP wheel events itself, and `Input.synthesizeScrollGesture`
+moves at constant speed, so the harness paces the wheel events.
 Typing uses a fixed 50 ms interval, configured by the internal
 `_TYPING_INTERVAL_SECONDS` constant in `browserrig/input/keyboard.py`.
 

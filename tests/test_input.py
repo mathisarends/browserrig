@@ -2,6 +2,7 @@
 # pylint: disable=protected-access
 
 import asyncio
+import math
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
@@ -23,10 +24,12 @@ from browserrig.events import (
     KeyPressedEvent,
     PointerPressedEvent,
     PointerReleasedEvent,
+    ScrolledEvent,
     TabPressedEvent,
 )
 from browserrig.input import Input
 from browserrig.input.pointer import movement
+from browserrig.input.wheel import wheel_duration, wheel_progress
 from browserrig.kinds import CursorStyle, FileTransferDirection, TabGesture
 from browserrig.tools.keyboard import KeyboardTools
 
@@ -425,3 +428,31 @@ async def test_input_without_a_focused_tab_is_rejected():
         await devices.mouse.move_to(Point(x=1, y=1))
     with pytest.raises(BrowserError, match="No active tab"):
         await devices.keyboard.press_key("a")
+
+
+def test_wheel_timing_follows_chrome_smooth_scroll():
+    # Chrome's scrollBy({behavior: 'smooth'}) takes about sqrt(distance) frames at 60 Hz.
+    assert wheel_duration(600) == pytest.approx(0.408, abs=0.001)
+    assert wheel_duration(10) == 0.15 and wheel_duration(50_000) == 1.5
+    # Progress Chrome reached at 10/25/50/75% of a smooth scroll's duration.
+    assert wheel_progress(0) == 0 and wheel_progress(1) == 1
+    measured = {0.1: 0.03, 0.25: 0.40, 0.5: 0.85, 0.75: 0.97}
+    for fraction, progress in measured.items():
+        assert wheel_progress(fraction) == pytest.approx(progress, abs=0.02)
+
+
+async def test_scroll_spreads_wheel_input_over_frames_along_the_curve(monkeypatch):
+    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
+    devices, _tab, events, commands = _rig()
+    await devices.mouse.scroll(delta_y=600, delta_x=-60)
+    wheels = [c for c in commands if c["type"] == "mouseWheel"]
+    assert len(wheels) == 25
+    assert sum(c["delta_y"] for c in wheels) == pytest.approx(600)
+    assert sum(c["delta_x"] for c in wheels) == pytest.approx(-60)
+    steps = [c["delta_y"] for c in wheels]
+    assert all(step > 0 for step in steps)
+    # The largest steps come early, and the scroll settles in small ones.
+    assert steps.index(max(steps)) < len(steps) // 3 and steps[-1] < 5
+    scrolled = [event for event in events if isinstance(event, ScrolledEvent)]
+    assert [(e.delta_x, e.delta_y) for e in scrolled] == [(-60, 600)]
+    assert scrolled[0].duration == wheel_duration(math.hypot(600, 60))

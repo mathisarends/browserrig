@@ -22,8 +22,9 @@ from browserrig.events import (
     TabPressedEvent,
 )
 
-from .pointer import ease, movement
+from .pointer import movement
 from .target import Focus, InputTarget, focused
+from .wheel import FRAME_SECONDS, wheel_duration, wheel_progress
 
 # Travel to the tab strip plus the press, then the way back into the page.
 _TAB_PRESS_SECONDS = 0.45
@@ -189,25 +190,36 @@ class Mouse:
     async def scroll(
         self, *, delta_y: float, delta_x: float = 0, point: Point | None = None
     ) -> None:
-        """Turn the wheel at `point`, or where the pointer already rests."""
+        """Turn the wheel at `point`, or where the pointer already rests.
+
+        The distance is spread over one wheel event per frame along Chrome's own smooth
+        scroll curve, so the page scrolls like `scroll-behavior: smooth` but with real input.
+        """
         if delta_y == 0 and delta_x == 0:
             return
         target = focused(self._focus)
         point = point or self._rest(target).position
         await self._move(target, point)
-        duration = min(0.4, max(0.08, max(abs(delta_x), abs(delta_y)) * 0.0003))
-        steps = max(3, round(duration * 60))
-        previous = 0.0
-        for index in range(1, steps + 1):
-            current = ease(index / steps)
+        duration = wheel_duration(math.hypot(delta_x, delta_y))
+        clock = asyncio.get_running_loop()
+        started = clock.time()
+        sent = 0.0
+        frame = 0
+        while sent < 1:
+            frame += 1
+            await asyncio.sleep(max(0.0, started + frame * FRAME_SECONDS - clock.time()))
+            # Follow the clock so slow dispatches do not stretch the scroll.
+            elapsed = max(clock.time() - started, frame * FRAME_SECONDS)
+            progress = wheel_progress(elapsed / duration) if elapsed < duration else 1.0
+            if progress <= sent:
+                continue
             await target.dispatch_wheel(
                 point,
-                delta_x=delta_x * (current - previous),
-                delta_y=delta_y * (current - previous),
+                delta_x=delta_x * (progress - sent),
+                delta_y=delta_y * (progress - sent),
             )
             target.layout_changed()
-            previous = current
-            await asyncio.sleep(duration / steps)
+            sent = progress
         await self._emit(
             target,
             ScrolledEvent(
