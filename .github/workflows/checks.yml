@@ -14,7 +14,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python }}
-      - run: uv sync --locked --extra openai --extra mcp
+      - run: uv sync --locked --extra openai --extra mcp --extra otel
       - run: uv run --no-sync pre-commit validate-config
       - run: uv run --no-sync ruff check browserrig examples tests
       - run: uv run --no-sync ruff format --check browserrig examples tests

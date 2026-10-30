@@ -21,7 +21,7 @@ From a checkout of this repository:
 uv sync --locked --extra openai
 Copy-Item .env.example .env
 # Set OPENAI_API_KEY in .env.
-uv run --env-file .env --extra openai python -m examples.openai_agent --headed --record
+uv run --env-file .env --extra openai python -m examples.openai_agent --headed
 ```
 
 The example mission explores the Voyager program: compare the missions, open
@@ -39,6 +39,21 @@ Use `--quiet` to disable this output. The final answer is written to stdout.
 The examples use `OpenAIResponsesModel` with `gpt-6.1-terra` by default.
 Set `OPENAI_MODEL` to override the model ID. These examples use the Responses API
 for tool calling. Tests use scripted models and do not require an API key.
+
+## Local agent traces
+
+Run Phoenix in Docker, then capture model/tool inputs and outputs:
+
+```powershell
+docker compose up -d --wait
+uv run --extra openai --extra otel python -m examples.openai_agent --headed --trace-content
+```
+
+Open <http://127.0.0.1:6006> and select the `browserrig` project. Use `--trace` for
+metadata only. Content capture can include secrets and page content.
+See [telemetry setup](docs/telemetry.md) for a smoke test without API keys,
+configuration, storage, and troubleshooting, and
+[Harnessed integration feedback](docs/harnessed-telemetry-feedback.md) for findings.
 
 ## Direct browser access
 

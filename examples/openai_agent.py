@@ -17,6 +17,7 @@ from browserrig import (
     LaunchBrowser,
     TerminalEvents,
 )
+from examples.telemetry import add_tracing_arguments, tracing_plugins
 
 DEFAULT_TASK = (
     "Erkunde das Voyager-Programm. Vergleiche Voyager 1 und Voyager 2 nach Startdatum, "
@@ -41,22 +42,28 @@ async def main() -> None:
         "--workspace", type=Path, help="Reuse a directory for agent files and downloads"
     )
     parser.add_argument("--quiet", action="store_true", help="Disable JSON event output on stderr")
+    add_tracing_arguments(parser)
     args = parser.parse_args()
     if not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY in the environment or in .env")
 
-    agent = BrowserAgent(
-        model=OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")),
-        browser=LaunchBrowser(url=args.url, headless=not args.headed),
-        mode=DomMode(),
-        file_system=FileSystemOptions(directory=args.workspace) if args.workspace else None,
-        session_directory=Path(".browserrig/sessions-v2"),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
-        plugins=[] if args.quiet else [TerminalEvents()],
-    )
-    async with agent.session() as session:
-        result = await session.run(args.task, max_steps=20, token_budget=80000)
-        print(result.text)
+    async with tracing_plugins(
+        enabled=args.trace,
+        capture_content=args.trace_content,
+        max_content_length=args.trace_max_content_length,
+    ) as telemetry:
+        agent = BrowserAgent(
+            model=OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")),
+            browser=LaunchBrowser(url=args.url, headless=not args.headed),
+            mode=DomMode(),
+            file_system=FileSystemOptions(directory=args.workspace) if args.workspace else None,
+            session_directory=Path(".browserrig/sessions-v2"),
+            approvals=Approvals(default=PolicyDecision.ALLOW),
+            plugins=[*telemetry, *([] if args.quiet else [TerminalEvents()])],
+        )
+        async with agent.session() as session:
+            result = await session.run(args.task, max_steps=20, token_budget=80000)
+            print(result.text)
 
 
 if __name__ == "__main__":

@@ -37,6 +37,7 @@ dependencies = [
 openai = ["harnessed[openai]==0.6.0"]
 anthropic = ["harnessed[anthropic]==0.6.0"]
 mcp = ["harnessed[mcp]==0.6.0"]
+otel = ["harnessed[otel]==0.6.0"]
 
 [dependency-groups]
 dev = [
@@ -54,7 +55,7 @@ packages = ["browserrig"]
 
 [tool.hatch.build.targets.sdist]
 include = ["browserrig", "examples", "tests", "README.md",
-           "pyproject.toml", "uv.lock", ".env.example", ".github", ".gitattributes",
+           "pyproject.toml", "uv.lock", ".env.example", "compose.yml", "docs", ".github", ".gitattributes",
            ".pre-commit-config.yaml", "package.json", "package-lock.json", "eslint.config.mjs",
            ".prettierrc.json", ".prettierignore"]
 
