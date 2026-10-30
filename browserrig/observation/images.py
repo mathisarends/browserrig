@@ -1,23 +1,15 @@
-from collections import defaultdict
-from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 from harnessed import Inject, Plugin, PluginState, SystemSection, hook
-from harnessed.hooks import Next, PrepareRequest
-from harnessed.models import ImagePart, Message, ModelRequest, TextPart, User
+from harnessed.events import ObservationsIncludedEvent
+from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
+from harnessed.models import ImagePart, ImageReference, ModelRequest, TextPart, UserMessage
 
 from browserrig.events import ObservationCapturedEvent
 
 from .models import CapturedImage
 from .plugin import Observe
-
-# Harnessed names observation messages "observation:{turn}:{step}:{source}:{form}" and keeps
-# them at their place in history; only the form suffix changes from "full" to "summary".
-_OBSERVATION = "observation:"
-_SUMMARY_PREFIX = "compaction:"
-_FULL = ":browser:full"
-_SUMMARY = ":browser:summary"
 
 
 class ImageRetention(Protocol):
@@ -59,30 +51,17 @@ class UntilCompaction:
         return 0
 
 
-@dataclass(frozen=True, slots=True)
-class _Anchor:
-    """Where an image was first shown: after its browser observation."""
-
-    observation: str  # observation id without the form suffix
-    # The closest earlier conversation message; keeps the place once the observation is gone.
-    fallback: str
-
-
 @dataclass
 class _State:
     images: list[CapturedImage] = field(default_factory=list)
-    anchors: dict[str, _Anchor] = field(default_factory=dict)
-    summary: str | None = None  # id of the latest compaction summary seen in a request
 
 
 class ImageContext(Plugin, needs=(Observe,)):
-    """Keep captured images in history where they were taken.
+    """Deliver screenshots inside immutable, session-owned browser observations.
 
-    Every image stays at a fixed place with a fixed caption, so the prompt prefix stays
-    cacheable. ``retention`` decides when the oldest images are dropped. After each
-    compaction, images whose observation was summarized are dropped as well, except the
-    latest one. With
-    ``skip_unchanged``, a capture identical to the latest image is not added again.
+    Retention can remove old image parts while keeping their DOM text. Native
+    compaction removes text and images together in the request applying its summary.
+    Coordinate geometry follows final inclusion receipts, after all request hooks.
     """
 
     _state = PluginState(_State)
@@ -91,10 +70,11 @@ class ImageContext(Plugin, needs=(Observe,)):
     usage = SystemSection(
         title="Browser image history",
         text=(
-            "Each screenshot appears right after the observation it was captured with and is "
-            "labelled with capture time, tab and document. The last line of the context names "
-            "the latest screenshot. Coordinate tools use its pixels, including its crop and "
-            "zoom, while it shows the current document."
+            "Screenshots belong to the browser observations they were captured with and are "
+            "labelled with capture time, tab and document. The last context line identifies "
+            "the latest captured screenshot. Coordinate tools use the latest screenshot "
+            "included in the request, including its crop and zoom, while it shows the current "
+            "document. Without an included screenshot they use viewport CSS pixels."
         ),
     )
 
@@ -121,82 +101,81 @@ class ImageContext(Plugin, needs=(Observe,)):
         if self.skip_unchanged and images and _same_screen(images[-1], image):
             return
         images.append(image)
-        self._forget(images[: self.retention.overflow(len(images))])
+        overflow = self.retention.overflow(len(images))
+        if overflow:
+            del images[:overflow]
+
+    @hook(PreStep)
+    async def _before_step(self, event: PreStep, next_: Next[StepDecision]) -> StepDecision:
+        # Wrap capture regardless of plugin order; session.observe replaces its pending source.
+        decision = await next_()
+        snapshot = self._observe.snapshot
+        image = next(
+            (
+                image
+                for image in self._state.images
+                if snapshot is not None and image.id == snapshot.id
+            ),
+            None,
+        )
+        if image is not None and snapshot is not None:
+            observation = self._observe.project(snapshot)
+            event.session.observe(
+                replace(
+                    observation,
+                    content=(
+                        TextPart(str(observation.content)),
+                        TextPart(_caption(image)),
+                        ImagePart(f"data:image/png;base64,{image.image}"),
+                    ),
+                )
+            )
+        return decision
 
     @hook(PrepareRequest)
-    async def _prepare(self, _event: PrepareRequest, next_: Next[ModelRequest]) -> ModelRequest:
+    async def _prepare(self, event: PrepareRequest, next_: Next[ModelRequest]) -> ModelRequest:
         request = await next_()
-        if not self._state.images:
-            return request
-        self._anchor_new_images(request.messages)
-        places = _places(request.messages)
-        self._forget_compacted(request.messages, places)
-        latest = self._state.images[-1]
-        self._observe.image_delivered(latest)
-        messages = (*self._insert_images(request.messages, places), self._latest_note(latest))
+        retained = {image.id for image in self._state.images}
+        dropped = {
+            item.message_id
+            for item in event.session.log.included_observations(request)
+            if item.source == "browser" and not retained.intersection(item.refs)
+        }
+        messages = tuple(
+            replace(
+                message,
+                content=tuple(
+                    part
+                    for part in message.content
+                    if not isinstance(part, ImagePart | ImageReference)
+                ),
+            )
+            if message.id in dropped and not isinstance(message.content, str)
+            else message
+            for message in request.messages
+        )
+        if self._state.images:
+            messages = (*messages, self._latest_note(self._state.images[-1]))
         return replace(request, messages=messages)
 
-    def _anchor_new_images(self, messages: Sequence[Message]) -> None:
-        """Pin images seen for the first time to the observation of the current step."""
-        anchor = _current_anchor(messages)
-        if anchor is not None:
-            for image in self._state.images:
-                self._state.anchors.setdefault(image.id, anchor)
+    @hook(ObservationsIncludedEvent)
+    async def _included(self, event: ObservationsIncludedEvent) -> None:
+        # Receipts reflect compaction and transformations after PrepareRequest as well.
+        refs = {ref for item in event.observations if item.source == "browser" for ref in item.refs}
+        self._state.images[:] = [image for image in self._state.images if image.id in refs]
+        self._observe.image_delivered(self._state.images[-1] if self._state.images else None)
 
-    def _forget_compacted(self, messages: Sequence[Message], places: dict[str, str]) -> None:
-        """After a new compaction summary, drop images whose observation was summarized.
-
-        The latest image stays, because coordinate tools rely on it.
-        """
-        state = self._state
-        summary = next((m.id for m in messages if m.id.startswith(_SUMMARY_PREFIX)), None)
-        if summary is None or summary == state.summary:
-            return
-        state.summary = summary
-        self._forget(
-            [
-                image
-                for image in state.images[:-1]
-                if (anchor := state.anchors.get(image.id)) is not None
-                and anchor.observation not in places
-            ]
-        )
-
-    def _forget(self, dropped: Sequence[CapturedImage]) -> None:
-        ids = {image.id for image in dropped}
-        if ids:
-            self._state.images[:] = [image for image in self._state.images if image.id not in ids]
-            for image_id in ids:
-                self._state.anchors.pop(image_id, None)
-
-    def _insert_images(self, messages: Sequence[Message], places: dict[str, str]) -> list[Message]:
-        """Place each image right after its anchor; images without one go last."""
-        after: defaultdict[str, list[Message]] = defaultdict(list)
-        for image in self._state.images:
-            anchor = self._state.anchors.get(image.id)
-            target = ""
-            if anchor is not None:
-                target = places.get(anchor.observation) or places.get(anchor.fallback) or ""
-            after[target].append(_image_message(image))
-        result: list[Message] = []
-        for message in messages:
-            result.append(message)
-            result.extend(after.pop(message.id, ()))
-        result.extend(after.pop("", ()))
-        return result
-
-    def _latest_note(self, latest: CapturedImage) -> User:
+    def _latest_note(self, latest: CapturedImage) -> UserMessage:
         snapshot = self._observe.snapshot
-        text = f"Latest screenshot: {latest.id}"
+        text = f"Latest captured screenshot: {latest.id}"
         if snapshot is None or (latest.tab_id, latest.document_id) != (
             snapshot.tab_id,
             snapshot.document_id,
         ):
             text += " (another document)"
         elif snapshot.image is not None and snapshot.id != latest.id:
-            # This step captured an image, but it matched the latest one and was not added.
             text += " (screen unchanged this step)"
-        return User(text, id="browser-latest-image")
+        return UserMessage(text, id="browser-latest-image")
 
 
 def _positive(value: object) -> bool:
@@ -212,39 +191,11 @@ def _same_screen(kept: CapturedImage, new: CapturedImage) -> bool:
     )
 
 
-def _places(messages: Sequence[Message]) -> dict[str, str]:
-    """Message ids by anchor key; both forms of an observation share one key."""
-    return {_observation_key(message) or message.id: message.id for message in messages}
-
-
-def _current_anchor(messages: Sequence[Message]) -> _Anchor | None:
-    for index, message in enumerate(messages):
-        if message.id.startswith(_OBSERVATION) and message.id.endswith(_FULL):
-            earlier = (
-                m.id for m in reversed(messages[:index]) if not m.id.startswith(_OBSERVATION)
-            )
-            return _Anchor(message.id.removesuffix(_FULL), next(earlier, ""))
-    return None
-
-
-def _observation_key(message: Message) -> str | None:
-    """The id part shared by the full and summary form of a browser observation."""
-    if message.id.startswith(_OBSERVATION):
-        for suffix in (_FULL, _SUMMARY):
-            if message.id.endswith(suffix):
-                return message.id.removesuffix(suffix)
-    return None
-
-
-def _image_message(image: CapturedImage) -> User:
-    # The caption never changes, so a delivered image keeps the prompt prefix stable.
+def _caption(image: CapturedImage) -> str:
     caption = (
         f"Screenshot {image.id}; captured={image.captured_at.isoformat()}; "
         f"browser={image.browser_id}; tab={image.tab_id}; document={image.document_id}"
     )
     if image.geometry is not None:
         caption += f"; geometry={image.geometry.model_dump_json()}"
-    return User(
-        (TextPart(caption), ImagePart(f"data:image/png;base64,{image.image}")),
-        id=f"browser-image:{image.id}",
-    )
+    return caption

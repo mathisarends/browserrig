@@ -1,6 +1,6 @@
 # Telemetry: local agent traces with Docker
 
-Browserrig uses Harnessed 0.6.0's native `OpenTelemetryTracer`. Phoenix displays
+Browserrig uses Harnessed 0.7.0's native `OpenTelemetryTracer`. Phoenix displays
 the agent's turns, model requests, tool calls, timing, outcomes and available
 usage counters. Enable content capture to inspect what each model and tool
 receives and returns.
@@ -84,7 +84,7 @@ harnessed.turn                 session.id, turn ID, outcome
 ```
 
 Select a **model** or **tool** span to inspect its input/output. In Harnessed
-0.6.0, the root turn span has no input/output summary of its own. Each turn is a
+0.7.0, the root turn span has no input/output summary of its own. Each turn is a
 separate trace; use `session.id` to follow turns in the same conversation.
 
 These are agent-level traces. Individual CDP commands, browser network requests,
@@ -184,7 +184,7 @@ the trace database.**
 
 ## References
 
-- [Harnessed 0.6.0 tracing guide](https://github.com/mathisarends/harnessed/blob/v0.6.0/docs/guides/tracing.md)
+- [Harnessed 0.7.0 tracing guide](https://github.com/mathisarends/harnessed/blob/v0.7.0/docs/guides/tracing.md)
 - [Phoenix Docker and persistent SQLite setup](https://arize.com/docs/phoenix/self-hosting/deployment-options/docker)
 - [Phoenix 21 release notes](https://github.com/Arize-ai/phoenix/releases/tag/arize-phoenix-v21.0.0)
 - [Integration feedback collected for Harnessed](harnessed-telemetry-feedback.md)

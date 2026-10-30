@@ -3,11 +3,19 @@ import json
 import pytest
 from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
 from harnessed.events import ToolExecutionFinishedEvent
-from harnessed.models import ModelChunk, ToolReply
+from harnessed.models import ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
-from browserrig import Browser, DomMode, LaunchBrowser, Secret, Secrets, browser_plugins
+from browserrig import (
+    Browser,
+    DomMode,
+    LaunchBrowser,
+    Secret,
+    Secrets,
+    browser_plugins,
+    wait_for_page,
+)
 from browserrig.events import SecretEnteredEvent
 from tests.javascript import evaluate
 from tests.observations import latest
@@ -39,7 +47,7 @@ def _ref(state, name):
 
 
 def _replies(model):
-    return [m for m in model.requests[-1].messages if isinstance(m, ToolReply)]
+    return [m for m in model.requests[-1].messages if isinstance(m, ToolMessage)]
 
 
 async def _email(holder):
@@ -167,6 +175,7 @@ async def test_secret_is_refused_inside_a_cross_origin_frame_of_an_allowed_page(
 
     class CrossFrame(Plugin, needs=(Browser,)):
         async def setup(self, _ctx: Context, browser: Inject[Browser]):
+            await wait_for_page(browser.active_tab)
             leaf = site.replace("127.0.0.1", "localhost") + "/frame-leaf"
             await evaluate(
                 browser.active_tab,

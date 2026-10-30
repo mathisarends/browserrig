@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from harnessed import Agent, PluginValidation, SystemPrompt
 from harnessed.kernel import PluginLike
@@ -21,9 +20,6 @@ from .readiness.config import ReadinessOptions
 from .secrets import Secret, Secrets
 from .tools.execution import Actions
 
-if TYPE_CHECKING:
-    from pydantic_ai.models import Model as NativeModel
-
 
 class BrowserAgent(Agent):
     """Explicit provider clients remain caller-owned.
@@ -35,7 +31,7 @@ class BrowserAgent(Agent):
     def __init__(
         self,
         *,
-        model: Model | str | NativeModel | None = None,
+        model: Model | str | None = None,
         browser: BrowserOptions | None = None,
         mode: DomMode | None = None,
         readiness: ReadinessOptions | Readiness | None = None,

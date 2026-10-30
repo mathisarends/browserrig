@@ -2,13 +2,12 @@
 
 Harnessed `Agent` is the composition root. Browserrig plugins own session state,
 tools and hooks; ordinary Python strategies implement capture, rendering,
-readiness and action-chain decisions. Harnessed 0.6.0 needs no changes.
+readiness and action-chain decisions. Browserrig targets Harnessed 0.7.0.
 
 ## A browser agent with screenshots
 
 ```python
 from harnessed import Agent
-from harnessed.plugins import LatestObservationOnly
 from browserrig import (
     Actions, Activity, Chrome, DomCapture, DomRenderer, DomTools,
     ImageContext, KeyboardTools, LaunchBrowser, NavigationTools, Observe,
@@ -34,7 +33,6 @@ agent = Agent(
         NavigationTools(),
         TabTools(),
         Activity(),
-        LatestObservationOnly(),
     ],
 )
 ```
@@ -63,28 +61,65 @@ observation after each input when selected explicitly.
 
 Calling `screenshot` with `EACH_STEP` does not create a second image. `observe`
 refreshes text and refs without returning an image in the tool result. Internal
-readiness and action-comparison probes never enter image history. Without a new
-capture, the image buffer stays unchanged, including across turns in a live session.
-Unmounting the plugin or opening a new session resets that buffer; it is not a
-persisted image replay store.
+readiness and action-comparison probes never enter image history. Text-only steps
+retain included images across turns until compaction or an explicit observation
+policy removes their snapshots.
+Unmounting the plugin or opening a new session resets its live coordinate state.
+The captured observations and images remain in the durable session log for audit
+and manual replay. A new browser session obtains fresh state before acting.
 
-The current `Snapshot`, last image included in a model request, and bounded image
-history are distinct. Images retain ID, UTC capture time, browser/tab/document,
-viewport dimensions and crop/scale. A text-only observation keeps the last shown
-image's coordinate space. Images from other documents remain comparison material;
-coordinate input rejects them until a new screenshot is shown. The last line of each
-request names the latest screenshot. After a layout change, request a fresh screenshot.
+DOM text, a fixed screenshot caption and image form one native multimodal
+`Observation(content=..., refs=(snapshot.id,))`. Harnessed stores inline images as
+session-owned `ImageReference` assets before recording. JSONL stores the references;
+binary image data lives under `<session-id>.assets/` and is resolved only for
+selected provider requests. Keep that directory with the history when backing it up.
 
-Each image sits directly after the browser observation it was captured with and keeps
-a fixed caption, so earlier requests stay a prefix of later ones and provider prompt
-caching keeps working while images accumulate. Trimming in batches changes that
-prefix once per `max_images - min_images + 1` captures instead of on every step.
-After a compaction, images whose observation was summarized are dropped from the next
-request on; the latest image always stays, because coordinate tools use it. Images
-whose observation was only dropped by `LatestObservationOnly` stay in place until then.
-Custom retention implements `ImageRetention.overflow(count)`, the number of oldest
-images to drop after one was added.
-With Anthropic models, place the cache breakpoint before the newest observation.
+Text observations remain unchanged in history until native compaction removes
+their steps. `browser_plugins()` does not install `LatestObservationOnly()`.
+Ordinary steps append to a stable prefix; image batch trimming deliberately
+removes older image parts while preserving their DOM text. A modified observation
+loses its inclusion receipt. Custom retention implements
+`ImageRetention.overflow(count)`, the number of oldest images to drop after a capture.
+
+With `ImageContext(UntilCompaction())`, text and images leave together in the
+request applying the summary. There is no extra request of image retention and
+no special exemption for the latest screenshot. For long tasks, configure native
+compaction, for example:
+
+```python
+from harnessed.plugins import Compaction
+from browserrig import BrowserAgent, ImageContext, UntilCompaction
+
+agent = BrowserAgent(
+    model=model,
+    image_context=ImageContext(UntilCompaction()),
+    plugins=[Compaction(
+        trigger=lambda state: state.input_tokens >= 32000,
+        keep_steps=4,
+    )],
+)
+```
+
+The token threshold works without knowing the model's context window; tune it
+and the retained steps for the task. Without compaction, text history and
+`UntilCompaction` image history grow with the conversation. The OpenAI example
+uses this policy. To explicitly keep only the latest snapshot per source, pass
+`plugins=[LatestObservationOnly()]`, importing it from `harnessed.plugins`.
+This also removes an older screenshot when a new text-only browser snapshot
+replaces it and changes the request prefix at every replacement.
+
+Coordinate tools select the latest image confirmed by
+`ObservationsIncludedEvent`, after all request hooks and compaction. They match
+native `refs`, without parsing message IDs. Images retain ID, UTC capture time,
+browser/tab/document, viewport dimensions and crop/scale. Text-only steps keep
+the last included image's geometry while its observation remains in the request.
+If no screenshot is included, tools use viewport CSS pixels. An included image
+from another document cannot supply coordinates for the current page.
+
+The last request line names the latest *captured* screenshot, which request hooks
+or compaction may remove; final inclusion receipts determine coordinate geometry.
+After a layout change, request a fresh screenshot. With Anthropic models, place
+the cache breakpoint before the newest observation.
 
 ## Extension contracts
 

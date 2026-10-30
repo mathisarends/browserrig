@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import yaml
 from harnessed import Inject, Observation, Plugin, PluginState, SessionLog, hook
-from harnessed.events import ObservationForm, ObservationsIncludedEvent
+from harnessed.events import ObservationsIncludedEvent
 
 from browserrig.browser.base import BrowserEvents
 from browserrig.core.kinds import ActionKind, ReadinessStatus
@@ -107,8 +107,7 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
                 size += len(event.text)
         return Observation(
             source="browser.nudges",
-            full=yaml.safe_dump({"nudges": selected}, sort_keys=False, allow_unicode=True),
-            summary="Previous browser hints",
+            content=yaml.safe_dump({"nudges": selected}, sort_keys=False, allow_unicode=True),
             refs=tuple(item["id"] for item in selected),
         )
 
@@ -230,7 +229,7 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         refs = {
             ref
             for observation in event.observations
-            if observation.source == "browser.nudges" and observation.form is ObservationForm.FULL
+            if observation.source == "browser.nudges"
             for ref in observation.refs
         }
         included = tuple(

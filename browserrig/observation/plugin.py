@@ -260,6 +260,31 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             content = await extract_content(tab, max_chars=max_chars)
             return ToolResult(content.render())
 
+    def project(self, snapshot: Snapshot) -> Observation:
+        """Build the redacted text snapshot shared by text and image delivery."""
+        observation = Observation(
+            source="browser", content=self._render(snapshot), refs=(snapshot.id,)
+        )
+        return self._secrets.redact(observation) if self._secrets else observation
+
+    def image_delivered(self, image: CapturedImage | None) -> None:
+        """Select geometry from final observation inclusion receipts."""
+        self._state.delivered_image = image
+
+    def coordinate_source(self) -> Snapshot | CapturedImage:
+        snapshot = self._state.snapshot
+        if snapshot is None:
+            raise StaleElement("Observe before using coordinates")
+        image = self._state.delivered_image
+        if image is not None:
+            if (image.tab_id, image.document_id) != (snapshot.tab_id, snapshot.document_id):
+                raise StaleElement(
+                    "The last shown image belongs to another document; screenshot again"
+                )
+            return image
+        # Without an included image, coordinates refer to the textual viewport.
+        return snapshot.model_copy(update={"geometry": None})
+
     @hook(PreStep)
     async def _before_step(
         self,
@@ -276,14 +301,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         )
         state.screenshot_requested = False
         state.screenshot_region, state.screenshot_zoom = None, 1
-        observations = [
-            Observation(
-                source="browser",
-                full=self._render(snapshot),
-                summary=f"{snapshot.mode}: {snapshot.title} ({snapshot.url})",
-                refs=(snapshot.id,),
-            )
-        ]
+        observations = [self.project(snapshot)]
         if nudges is not None:
             observations.append(await nudges.project(snapshot))
         secrets = self._secrets
@@ -295,23 +313,6 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             # Nudges quote page text too; nothing reaches the session unredacted.
             event.session.observe(secrets.redact(observation) if secrets else observation)
         return await next_()
-
-    def image_delivered(self, image: CapturedImage) -> None:
-        """Called by ImageContext only when the model request includes this image."""
-        self._state.delivered_image = image
-
-    def coordinate_source(self) -> Snapshot | CapturedImage:
-        snapshot = self._state.snapshot
-        if snapshot is None:
-            raise StaleElement("Observe before using coordinates")
-        image = self._state.delivered_image
-        if image is not None:
-            if (image.tab_id, image.document_id) != (snapshot.tab_id, snapshot.document_id):
-                raise StaleElement(
-                    "The last shown image belongs to another document; screenshot again"
-                )
-            return image
-        return snapshot
 
     def _render(self, snapshot: Snapshot) -> str:
         return self.renderer.render(snapshot)

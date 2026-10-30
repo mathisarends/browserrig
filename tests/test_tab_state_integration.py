@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 
 import pytest
 from harnessed import Agent, PolicyDecision
-from harnessed.models import ToolReply
+from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
@@ -102,7 +102,7 @@ async def test_navigate_can_open_the_url_in_a_new_tab(icon_site):
     assert [(event.target_id, event.typed) for event in started] == [
         (opened[0].target_id, icon_site.removeprefix("http://"))
     ]
-    replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolReply)]
+    replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)]
     assert not any(reply.is_error for reply in replies)
     assert f"{icon_site}/inline" in str(replies[-1].content)
     assert f"{icon_site}/" in str(replies[-1].content)

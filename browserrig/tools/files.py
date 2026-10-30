@@ -253,10 +253,9 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
         event.session.observe(
             Observation(
                 source="files",
-                full=yaml.safe_dump(
+                content=yaml.safe_dump(
                     view.model_dump(mode="json"), allow_unicode=True, sort_keys=False
                 ),
-                summary=f"File system: {state.total_downloads} browser downloads.",
             )
         )
         return await next_()

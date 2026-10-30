@@ -1,6 +1,6 @@
 import pytest
 from harnessed import Agent, PolicyDecision
-from harnessed.models import ToolReply
+from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
@@ -33,7 +33,7 @@ async def test_agent_go_forward_reports_success_and_missing_or_replaced_history(
     )
     result = await agent.run("Navigate through history", max_steps=9)
     assert result.text == "Done"
-    replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolReply)]
+    replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)]
     assert [reply.is_error for reply in replies] == [
         True,
         False,

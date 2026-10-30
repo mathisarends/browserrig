@@ -9,7 +9,7 @@ description = "Event-driven Chrome automation for Harnessed."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "harnessed==0.6.0",
+    "harnessed==0.7.0",
     "cdpify[websocket]>=0.4.0,<0.5",
     "httpx2>=2.16,<3",
     "pillow>=13,<14",
@@ -34,10 +34,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-openai = ["harnessed[openai]==0.6.0"]
-anthropic = ["harnessed[anthropic]==0.6.0"]
-mcp = ["harnessed[mcp]==0.6.0"]
-otel = ["harnessed[otel]==0.6.0"]
+openai = ["harnessed[openai]==0.7.0"]
+anthropic = ["harnessed[anthropic]==0.7.0"]
+mcp = ["harnessed[mcp]==0.7.0"]
+otel = ["harnessed[otel]==0.7.0"]
 
 [dependency-groups]
 dev = [

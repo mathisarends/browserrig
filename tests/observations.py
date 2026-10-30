@@ -2,6 +2,8 @@
 
 import re
 
+from harnessed.models import ImagePart, ImageReference
+
 _ELEMENT = re.compile(
     r'^\s*(?P<new>\*?)\[(?P<ref>[^\]]+)\] (?P<role>[^\s\[]+)\S*(?: "(?P<name>[^"]*)")?'
 )
@@ -61,3 +63,17 @@ def latest(messages) -> dict | None:
 
 def all_states(messages) -> list[dict]:
     return [parse(message.text) for message in messages if is_observation(message.text)]
+
+
+def has_image(message) -> bool:
+    return not isinstance(message.content, str) and any(
+        isinstance(part, ImagePart | ImageReference) for part in message.content
+    )
+
+
+def image_id(message) -> str:
+    return next(
+        line.split(";", 1)[0].removeprefix("Screenshot ")
+        for line in message.text.splitlines()
+        if line.startswith("Screenshot ")
+    )

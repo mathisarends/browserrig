@@ -1,14 +1,21 @@
 import asyncio
-from dataclasses import dataclass
+import base64
+from dataclasses import dataclass, replace
 from typing import Literal
 from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Agent, Inject, Plugin, PolicyDecision, SessionLog, hook
-from harnessed.events import DurableEvent, TransientEvent
-from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.models import ImagePart, ToolReply
-from harnessed.plugins import Approvals
+from harnessed.events import (
+    DurableEvent,
+    ModelRequestedEvent,
+    ObservationRecordedEvent,
+    ObservationsIncludedEvent,
+    TransientEvent,
+)
+from harnessed.hooks import ConfigureRequest, Next, PreStep, StepDecision
+from harnessed.models import ImagePart, ImageReference, ModelRequest, ToolMessage
+from harnessed.plugins import Approvals, JsonlSessions, LatestObservationOnly
 from harnessed.plugins.compaction import Compaction
 from harnessed.testing import ScriptedModel, call
 
@@ -34,6 +41,7 @@ from browserrig.observation.extraction import Extraction
 from browserrig.tools import FileTools, UploadTools
 from browserrig.tools.mouse import _image_point
 from tests.fakes import FakeChrome
+from tests.observations import has_image, image_id
 
 
 class CountingCapture:
@@ -54,7 +62,7 @@ class CountingCapture:
             page=Extraction(
                 url=tab.url, title="Example", width=800, height=600, scroll_y=0, page_height=600
             ),
-            image=image,
+            image=base64.b64encode(image.encode()).decode() if image is not None else None,
             geometry=Geometry(x=100, y=50, width=200, height=100, scale=scale)
             if screenshots
             else None,
@@ -107,7 +115,7 @@ def _browser_ready(holder):
 
 
 def _images(request):
-    return [message for message in request.messages if message.id.startswith("browser-image:")]
+    return [message for message in request.messages if has_image(message)]
 
 
 @pytest.mark.parametrize(
@@ -126,14 +134,14 @@ async def test_image_fifo_and_one_capture_per_boundary_with_custom_strategies(tr
         await session.run("Inspect", max_steps=4)
         assert [len(_images(request)) for request in model.requests] == counts
         assert sum(capture.captures) == (4 if trigger == ScreenshotTrigger.EACH_STEP else 3)
-        ids = [message.id for message in _images(model.requests[-1])]
+        ids = [image_id(message) for message in _images(model.requests[-1])]
         assert len(ids) == len(set(ids)) == 2
-        assert ids[0] == _images(model.requests[-2])[-1].id
+        assert ids[0] == image_id(_images(model.requests[-2])[-1])
         note = model.requests[-1].messages[-1]
         assert note.id == "browser-latest-image"
-        assert note.text == f"Latest screenshot: {ids[1].removeprefix('browser-image:')}"
+        assert note.text == f"Latest captured screenshot: {ids[1]}"
         assert any("Custom view:" in str(message.content) for message in model.requests[0].messages)
-        replies = [m for m in model.requests[-1].messages if isinstance(m, ToolReply)]
+        replies = [m for m in model.requests[-1].messages if isinstance(m, ToolMessage)]
         assert all(isinstance(reply.content, str) for reply in replies)
 
 
@@ -204,22 +212,22 @@ async def test_images_stay_where_captured_and_keep_the_prompt_prefix_until_a_bat
         await session.run("Inspect", max_steps=6)
     requests = [request.messages for request in model.requests]
     for messages in requests:
-        # Each image directly follows the browser observation it was captured with.
-        for index, message in enumerate(messages):
-            if message.id.startswith("browser-image:"):
-                previous = messages[index - 1].id
-                assert previous.endswith((":browser:full", ":browser:summary"))
+        # DOM text and screenshot share one immutable observation.
+        for message in messages:
+            if has_image(message):
+                assert "Custom view:" in message.text
+                assert "Screenshot " in message.text
         assert messages[-1].id == "browser-latest-image"
     assert [len(_images(request)) for request in model.requests] == [1, 2, 3, 4, 2, 3]
 
     def prefix(messages):
-        # Everything before the newest step's full observation must stay byte-identical.
-        end = next(i for i, m in enumerate(messages) if m.id.endswith(":browser:full"))
-        return [(m.id, m.text) for m in messages[:end]]
+        # Earlier observations keep their entire content until a batch trim.
+        end = max(i for i, m in enumerate(messages) if "Custom view:" in m.text)
+        return [(m.id, m.content) for m in messages[:end]]
 
     def shared(earlier, later):
         stable = prefix(earlier)
-        return [(m.id, m.text) for m in later[: len(stable)]] == stable
+        return [(m.id, m.content) for m in later[: len(stable)]] == stable
 
     # Steps 2-4 only append; earlier images keep their place and caption.
     assert all(shared(requests[i], requests[i + 1]) for i in (1, 2))
@@ -248,14 +256,12 @@ async def test_unchanged_screens_are_not_added_again():
         _browser_ready(holder)
         await session.run("Inspect", max_steps=4)
     assert [len(_images(request)) for request in model.requests] == [1, 1, 2, 2]
-    first, second = (
-        message.id.removeprefix("browser-image:") for message in _images(model.requests[-1])
-    )
+    first, second = (image_id(message) for message in _images(model.requests[-1]))
     assert _notes(model) == [
-        f"Latest screenshot: {first}",
-        f"Latest screenshot: {first} (screen unchanged this step)",
-        f"Latest screenshot: {second}",
-        f"Latest screenshot: {second} (screen unchanged this step)",
+        f"Latest captured screenshot: {first}",
+        f"Latest captured screenshot: {first} (screen unchanged this step)",
+        f"Latest captured screenshot: {second}",
+        f"Latest captured screenshot: {second} (screen unchanged this step)",
     ]
 
 
@@ -301,11 +307,117 @@ async def test_until_compaction_keeps_images_until_their_steps_are_summarized():
         _browser_ready(holder)
         await session.run("Inspect", max_steps=6)
     images = [[message.id for message in _images(request)] for request in model.requests]
-    # Nothing is trimmed before the summary; the request that compacts still carries all four.
-    assert [len(ids) for ids in images[:4]] == [1, 2, 3, 4]
+    # The request applying the summary drops images with their summarized steps.
+    assert [len(ids) for ids in images[:4]] == [1, 2, 3, 2]
     # Steps 1 and 2 were summarized, so their images leave with them; later ones stay in place.
-    assert images[4] == images[3][2:] + [images[4][-1]]
+    assert images[4] == images[3] + [images[4][-1]]
     assert images[5] == images[4] + [images[5][-1]]
+
+
+async def test_multimodal_observations_use_session_assets_and_replay_receipts(tmp_path):
+    agent, model, _capture, holder = _agent(
+        [call("observe"), "Done"],
+        ScreenshotTrigger.EACH_STEP,
+        UntilCompaction(),
+        extra=(JsonlSessions(tmp_path),),
+        frames=[("same screenshot", 2), ("same screenshot", 2)],
+        skip_unchanged=False,
+    )
+    async with agent.session("screenshots") as session:
+        _browser_ready(holder)
+        await session.run("Inspect", max_steps=2)
+        observations = [
+            event for event in session.events if isinstance(event, ObservationRecordedEvent)
+        ]
+        assets = [
+            part.asset
+            for event in observations
+            for part in event.observation.content
+            if isinstance(part, ImageReference)
+        ]
+        assert len(assets) == 2 and assets[0] == assets[1]
+        assert await session.assets.read(assets[0]) == b"same screenshot"
+        request = session.log.last(ModelRequestedEvent)
+        included = session.log.included_observations(request.request)
+        assert len(included) == 2
+        for receipt, observation in zip(included, observations, strict=True):
+            assert receipt.refs == observation.observation.refs
+            assert receipt.turn_id == observation.turn_id
+            assert receipt.step == observation.step
+            assert receipt.message_id in {message.id for message in request.request.messages}
+        assert len(_images(model.requests[-1])) == 2
+    # The audit log contains asset references instead of repeated inline image data.
+    assert "data:image/png;base64," not in (tmp_path / "screenshots.jsonl").read_text()
+    async with agent.session("screenshots") as restored:
+        assert restored.log.included_observations(request.request) == included
+        replay = await restored.log.resolve_request(request.request)
+        assert _images(replay) == _images(model.requests[-1])
+
+
+class StripRequestImages(Plugin):
+    @hook(ConfigureRequest)
+    async def strip(self, _event: ConfigureRequest, next_: Next[ModelRequest]) -> ModelRequest:
+        request = await next_()
+        return replace(
+            request,
+            messages=tuple(
+                replace(
+                    message,
+                    content=tuple(
+                        part
+                        for part in message.content
+                        if not isinstance(part, ImagePart | ImageReference)
+                    ),
+                )
+                if has_image(message)
+                else message
+                for message in request.messages
+            ),
+        )
+
+
+async def test_coordinate_geometry_uses_final_receipts_after_request_image_removal():
+    agent, model, _capture, holder = _agent(
+        ["Done"], ScreenshotTrigger.EACH_STEP, extra=(StripRequestImages(),)
+    )
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect")
+        assert not _images(model.requests[0])
+        assert session.log.last(ObservationsIncludedEvent).observations == ()
+        observe = session.ctx[Observe]
+        assert observe.snapshot.geometry is not None
+        assert _image_point(observe.coordinate_source(), Point(x=20, y=30)) == Point(x=20, y=30)
+
+
+async def test_compaction_removes_last_screenshot_on_a_text_only_step():
+    fire = iter([False, False, False, True])
+    compaction = Compaction(
+        trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
+    )
+    agent, model, _capture, holder = _agent(
+        [call("screenshot"), *_observes(2), "Done"],
+        retention=UntilCompaction(),
+        extra=(compaction,),
+    )
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect", max_steps=4)
+        assert [len(_images(request)) for request in model.requests] == [0, 1, 1, 0]
+        assert session.ctx[Observe].coordinate_source().geometry is None
+
+
+async def test_latest_observation_only_is_an_explicit_policy_with_native_image_lifecycle():
+    agent, model, _capture, holder = _agent(
+        [call("screenshot"), call("observe"), "Done"], extra=(LatestObservationOnly(),)
+    )
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect", max_steps=3)
+        assert [len(_images(request)) for request in model.requests] == [0, 1, 0]
+        included = session.log.last(ObservationsIncludedEvent).observations
+        assert len(included) == 1 and included[0].source == "browser"
+        assert session.ctx[Observe].coordinate_source().geometry is None
 
 
 class Probe(ReadinessStrategy):

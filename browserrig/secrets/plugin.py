@@ -132,7 +132,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
             return None
         self._state.listed = bool(names)
         host = urlsplit(snapshot.url).hostname or snapshot.url
-        full = (
+        content = (
             f"Secrets for {host}: {', '.join(names)}\n"
             "Type them as {{secret:NAME}} with type_text or send_keys."
             if names
@@ -140,8 +140,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         )
         return Observation(
             source=_SOURCE,
-            full=full,
-            summary=f"Secrets for {host}: {', '.join(names) or 'none'}",
+            content=content,
         )
 
     async def prepare(  # pylint: disable=too-many-branches

@@ -3,7 +3,7 @@ import json
 import pytest
 from cdpify.exceptions import CDPCommandError
 from harnessed import Agent, PolicyDecision
-from harnessed.models import ToolReply
+from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
@@ -46,7 +46,7 @@ async def test_agent_javascript_shell_retains_main_world_state_awaits_and_report
     async with agent.session() as session:
         result = await session.run("Run JavaScript", max_steps=5)
         assert result.text == "Done"
-        replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolReply)]
+        replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)]
         assert [reply.is_error for reply in replies] == [False, False, True, False]
         assert replies[0].text == "JavaScript result:\n40"
         assert json.loads(replies[1].text.split("\n", 1)[1]) == {"value": 42, "marker": "main"}

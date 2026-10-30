@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 import pytest
 from harnessed import Context, Inject, Plugin, PolicyDecision
 from harnessed.events import ToolCallFinishedEvent
+from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
@@ -62,13 +63,13 @@ async def test_facade_honors_explicit_tool_policy(site):
     assert not any(isinstance(item, ActionStartedEvent) for item in result.events)
 
 
-async def test_facade_manages_supplied_native_model_context_on_reuse(site, monkeypatch):
+async def test_facade_manages_wrapped_native_model_context_on_reuse(site, monkeypatch):
     native = pytest.importorskip("pydantic_ai.models.test")
     model = native.TestModel(call_tools=[], custom_output_text="Native model adapted")
     enter, leave = AsyncMock(return_value=model), AsyncMock()
     monkeypatch.setattr(native.TestModel, "__aenter__", enter)
     monkeypatch.setattr(native.TestModel, "__aexit__", leave)
-    agent = BrowserAgent(model=model, browser=LaunchBrowser(url=site))
+    agent = BrowserAgent(model=PydanticAIModel(model), browser=LaunchBrowser(url=site))
     result = await agent.run("Inspect the page")
     assert result.text == "Native model adapted"
     assert model.last_model_request_parameters is not None

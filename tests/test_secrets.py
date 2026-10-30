@@ -411,9 +411,9 @@ async def test_project_lists_names_for_allowed_origins_only():
         assert secrets.project(snapshot("https://other.example/")) is None
         listed = secrets.project(snapshot("https://example.org/login"))
         assert listed is not None and listed.source == "browser.secrets"
-        assert "Secrets for example.org: pw, otp" in listed.full
-        assert PASSWORD not in listed.full
-        assert secrets.project(snapshot("http://example.org/")).full == (
+        assert "Secrets for example.org: pw, otp" in listed.content
+        assert PASSWORD not in listed.content
+        assert secrets.project(snapshot("http://example.org/")).content == (
             "No secrets are available for this page."
         )
         assert secrets.project(snapshot("https://other.example/")) is None

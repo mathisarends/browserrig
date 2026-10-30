@@ -1,7 +1,7 @@
 # Browserrig
 
 Event-driven Chrome automation for AI agents and Python applications, built with
-[Harnessed 0.6.0](https://github.com/mathisarends/harnessed/releases/tag/v0.6.0),
+[Harnessed 0.7.0](https://github.com/mathisarends/harnessed/releases/tag/v0.7.0),
 cdpify, and Pydantic. Harnessed is pinned exactly in `pyproject.toml` and `uv.lock`.
 Browserrig combines direct browser access with composable agent plugins, explicit
 DOM observations, screenshots, coordinate input, and a shared event log.
@@ -88,16 +88,17 @@ must already expose a CDP endpoint and stays running after disconnecting.
 
 ```python
 from harnessed import PolicyDecision
+from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import BrowserAgent, LaunchBrowser, DomMode, TerminalEvents
 
 agent = BrowserAgent(
-    model=OpenAIResponsesModel("gpt-6.1-terra"),
+    model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
     browser=LaunchBrowser(url="https://en.wikipedia.org/wiki/Voyager_program"),
     mode=DomMode(),
-    session_directory=".browserrig/sessions-v2",
+    session_directory=".browserrig/sessions-v3",
     approvals=Approvals(default=PolicyDecision.ALLOW),
     plugins=[TerminalEvents()],
 )
@@ -106,8 +107,8 @@ print(result.text)
 ```
 
 `run()`, `session()`, `sessions`, and session controls remain native Harnessed APIs.
-Native Pydantic AI models are accepted directly; Harnessed enters and exits their
-resource contexts. Explicitly supplied HTTP and provider SDK clients remain caller-owned.
+Wrap native Pydantic AI models with `PydanticAIModel(...)`; Harnessed enters and exits
+the wrapper's resource context. Model strings remain supported. Explicitly supplied HTTP and provider SDK clients remain caller-owned.
 Use `system_prompt=...` to replace the default instruction and `plugins=[...]` to
 add capabilities. Conversations stay in memory unless `session_directory` is set.
 Without explicit `approvals`, Harnessed's default `ASK` policy applies; the example
@@ -232,7 +233,7 @@ mount closes or suspends; `SectionDelivery.IGNORE` skips it. Import `SectionDeli
 from `harnessed`. The fixed system prompt stays unchanged.
 
 Install the optional MCP client with `uv sync --locked --extra openai --extra mcp`.
-All Harnessed extras are pinned to **0.6.0**. Add MCP servers through the native plugin:
+All Harnessed extras are pinned to **0.7.0**. Add MCP servers through the native plugin:
 
 ```python
 from harnessed.plugins.mcp import MCP
@@ -245,9 +246,9 @@ agent = BrowserAgent(
 `MCP.stdio("catalog", command=..., args=[...])` starts a local server instead.
 Connections belong to each session, tool names are prefixed (for example
 `catalog__search`), and existing approval policies apply. See the
-[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.6.0/docs/guides/mcp.md).
+[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.7.0/docs/guides/mcp.md).
 
-Harnessed 0.6.0 closes failed MCP transports, hides their tools, wakes pending
+Harnessed 0.7.0 closes failed MCP transports, hides their tools, wakes pending
 calls and drains owned tasks. Failed operations are not retried automatically;
 replace a failed connection with a fresh mount. Ordinary tool `isError` results
 keep the connection usable. HTTP termination has a five-second inactivity timeout.
@@ -281,25 +282,24 @@ For standalone kernel compositions, call `await ctx.settle()` followed by
 
 ## Upgrading existing sessions
 
-Harnessed 0.6.0 keeps session record format 2: existing 0.2.0 through 0.5.0 stores can be reused
-without migration. When upgrading from 0.1.0, format 1 is rejected without automatic
-migration. Back up those stores and choose a fresh directory. The OpenAI example
-writes to `.browserrig/sessions-v2`;
-existing `.browserrig/sessions` files stay available in their original directory.
-Custom `session_directory` values containing format 1 should also point to a fresh
-store. See the
-[migration guide](https://github.com/mathisarends/harnessed/blob/v0.6.0/Changelog.md).
+Harnessed 0.7.0 uses session record format **3**. Formats 1 and 2 are rejected
+without automatic migration. Back up older stores, including any `.assets` and
+`.files` directories, and choose a fresh `session_directory`. The OpenAI example
+now writes to `.browserrig/sessions-v3`; existing `.browserrig/sessions-v2` and
+`.browserrig/sessions` directories remain untouched.
 
-Version 0.5.0 adds defaulted fields to model requests, turn starts and tool results.
-Strict application schemas must accept those fields, `break_chain` and
-`ToolStatus.SKIPPED`; older Harnessed readers may reject new records.
+Screenshots are stored once per session as `ImageReference` assets under
+`<session-id>.assets/`, rather than repeated base64 strings in JSONL. Recorded
+requests retain those references. For manual replay, use
+`await session.log.resolve_request(request)`; `session.assets.read(ref)` retrieves
+individual image bytes. Keep the asset directory alongside the JSONL history.
 
-When upgrading application code from 0.3.0, rename `BrowserAgent(instructions=...)`
-to `BrowserAgent(system_prompt=...)`; wrap instruction lists in
-`SystemPrompt(sections=(...))`. Replace custom plugin `guidance` attributes with
-`SystemSection` or synchronous `@system_section` declarations. New recipes mount
-`PointerTools` for coordinates and `DomTools` for ref-based mouse, typing and forms.
-`MouseTools` remains a compatibility group; do not mount overlapping tool groups.
+Custom models expose immutable `GenerationSettings` from `harnessed.models`.
+Pass per-turn overrides with `session.run(..., settings=GenerationSettings(...))`;
+`max_tokens` belongs in settings. Message types are now `SystemMessage`,
+`UserMessage`, `AssistantMessage` and `ToolMessage`; selected model identity lives
+on `ModelRequestedEvent.model`. See the
+[migration guide](https://github.com/mathisarends/harnessed/blob/v0.7.0/Changelog.md).
 
 ## Session controls
 
@@ -331,7 +331,8 @@ that data in Python, without walking the DOM in the page. Normal observations om
 page-text excerpts and do not capture new screenshots. Use `extract_content()`
 to read the page. The agent can call `screenshot()` to request the current view as an
 image in its next iteration. `ImageContext` keeps the latest screenshot by default,
-including during subsequent text-only steps. `observe()` refreshes page state. Use
+including during subsequent text-only steps until compaction removes its snapshot.
+`observe()` refreshes page state. Use
 `DomMode(screenshots=True)` to enable images on every step.
 `DomMode(max_text_chars=N)` enables a page-text excerpt; its
 default is `0`.
@@ -722,12 +723,12 @@ to links or directories are outside this boundary. Application calls such as
 host APIs. Use a separate OS/container boundary when the whole browser or parser
 process must be isolated.
 
-Harnessed 0.6.0 also supports a filesystem-only runtime sandbox: compose
+Harnessed 0.7.0 also supports a filesystem-only runtime sandbox: compose
 `DockerSandbox(...)` or `BubblewrapSandbox(...)` with `FilesystemTools()` and omit
 `ShellTools()`. The shell service is then not exposed as a model tool. This is
 opt-in and requires an application-managed Docker image or Linux rootfs; startup
 failure never falls back to host execution. See the
-[sandbox guide](https://github.com/mathisarends/harnessed/blob/v0.6.0/docs/guides/sandboxes.md).
+[sandbox guide](https://github.com/mathisarends/harnessed/blob/v0.7.0/docs/guides/sandboxes.md).
 
 These backends do not redirect Browserrig's local `FileTools`, uploads, Chrome
 downloads or document readers. In a custom composition, omit Browserrig's
@@ -795,9 +796,12 @@ live UI activity in `finally` on cancellation or stream failure.
 
 Browser observations carry their snapshot ID in `Observation.refs`. Hints carry
 their nudge IDs and are acknowledged only by `ObservationsIncludedEvent` for the
-`browser.nudges` source in full form. Summaries and IDs appearing in ordinary text
-leave hints queued. `NudgeIncludedEvent.request_id` matches the submitted request;
+`browser.nudges` source. IDs appearing in ordinary text leave hints queued.
+Receipts carry `refs`, `turn_id`, `step` and `message_id`; observations removed or
+modified by request hooks or compaction receive no receipt. `NudgeIncludedEvent.request_id` matches the submitted request;
 `SessionLog.included_observations(request)` exposes the durable provenance on replay.
+Screenshot coordinates also follow these final receipts, rather than provisional
+request content or SDK message-ID conventions.
 
 ## Development
 

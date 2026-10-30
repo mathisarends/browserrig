@@ -1,7 +1,7 @@
 import pytest
 from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
-from harnessed.events import ModelRequestedEvent, ObservationForm, ObservationsIncludedEvent
-from harnessed.models import ImagePart, ModelChunk, ToolReply
+from harnessed.events import ModelRequestedEvent, ObservationsIncludedEvent
+from harnessed.models import ImagePart, ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel, call
 
@@ -23,7 +23,7 @@ from browserrig.events import (
     NudgeQueuedEvent,
     ObservationCapturedEvent,
 )
-from tests.observations import all_states, is_observation, latest, parse
+from tests.observations import all_states, has_image, is_observation, latest, parse
 
 pytestmark = pytest.mark.integration
 
@@ -69,15 +69,13 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(site
     for index, request in enumerate(model.requests):
         states = all_states(request.messages)
         assert states and all("text" not in state for state in states)
-        images = [
-            message for message in request.messages if message.id.startswith("browser-image:")
-        ]
+        images = [message for message in request.messages if has_image(message)]
         assert len(images) == (1 if index >= 1 else 0)
         if not images:
             continue
         assert any(isinstance(part, ImagePart) for part in images[0].content)
         assert latest(request.messages)["elements"]
-    replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolReply)]
+    replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)]
     assert len(replies) == 4
     assert all(not reply.is_error for reply in replies)
     assert all(isinstance(reply.content, str) for reply in replies)
@@ -133,9 +131,10 @@ async def test_model_tools_yaml_and_activity(site):
     snapshots = {
         item.observation_id for item in result.events if isinstance(item, ObservationCapturedEvent)
     }
-    for included in provenance:
+    for step, included in enumerate(provenance, 1):
         observations = [item for item in included.observations if item.source == "browser"]
-        assert sum(item.form is ObservationForm.FULL for item in observations) == 1
+        assert len(observations) == step
+        assert [item.step for item in observations] == list(range(1, step + 1))
         assert all(len(item.refs) == 1 and item.refs[0] in snapshots for item in observations)
 
 
@@ -160,7 +159,7 @@ async def test_dom_screenshots_are_native_images(site):
     )
     result = await agent.run("Inspect the canvas")
     assert result.text == "Canvas ready"
-    assert any(msg.id.startswith("browser-image:") for msg in model.requests[0].messages)
+    assert any(has_image(msg) for msg in model.requests[0].messages)
     observations = [e for e in result.events if isinstance(e, ObservationCapturedEvent)]
     assert observations[0].mode == "dom"
 
@@ -210,6 +209,6 @@ async def test_no_progress_hint_is_derived_from_events(site):
         if isinstance(e, ObservationsIncludedEvent) and e.request_id == receipt.request_id
     )
     assert any(
-        hint.nudge_id in item.refs and item.form is ObservationForm.FULL
+        hint.nudge_id in item.refs and item.source == "browser.nudges"
         for item in included.observations
     )

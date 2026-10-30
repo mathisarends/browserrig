@@ -1,7 +1,6 @@
 from collections.abc import Mapping
 
 from harnessed import Plugin
-from harnessed.plugins import LatestObservationOnly
 
 from browserrig.core.modes import DomMode
 
@@ -64,7 +63,6 @@ def browser_plugins(
         PointerTools(),
         TabTools(),
         DialogTools(),
-        LatestObservationOnly(),
     ]
     if observation.capture_strategy.provides_dom_refs:
         plugins.append(DomTools())

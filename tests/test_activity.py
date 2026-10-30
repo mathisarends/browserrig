@@ -22,7 +22,7 @@ from harnessed.events import (
     TurnOutcome,
     TurnStartedEvent,
 )
-from harnessed.models import Assistant, ModelRequest
+from harnessed.models import AssistantMessage, ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
 from browserrig.activity import Activity, ActivityKind, ActivityOutcome
@@ -46,7 +46,7 @@ async def test_readiness_ids_cannot_close_model_pause_or_tool_intervals(activity
     await session.emit(_readiness_started("llm"))
     assert len(activity.intervals()) == 2
     assert all(item.outcome is ActivityOutcome.RUNNING for item in activity.intervals())
-    await session.emit(AssistantMessageEvent(Assistant("ok"), request_id="request"))
+    await session.emit(AssistantMessageEvent(AssistantMessage("ok"), request_id="request"))
     await session.emit(AgentControlChangedEvent(state=ControlState.PAUSED))
     await session.emit(_readiness_started("paused"))
     await session.emit(ToolExecutionStartedEvent(call_id="shared"))
@@ -174,7 +174,7 @@ async def test_assistant_interruption_and_teardown_emit_one_finish_per_interval(
         await session.emit(_request())
         await session.emit(
             AssistantMessageEvent(
-                message=Assistant("partial"), request_id="request", interrupted=True
+                message=AssistantMessage("partial"), request_id="request", interrupted=True
             )
         )
         await session.emit(_readiness_started("pending"))
@@ -207,14 +207,14 @@ async def test_model_failure_closes_only_the_matching_request(activity_session, 
     assert intervals["first"].outcome is expected
     assert intervals["first"].reason == outcome.value
     assert intervals["retry"].outcome is ActivityOutcome.RUNNING
-    await session.emit(AssistantMessageEvent(Assistant("ok"), request_id="retry"))
+    await session.emit(AssistantMessageEvent(AssistantMessage("ok"), request_id="retry"))
     assert all(item.outcome is not ActivityOutcome.RUNNING for item in activity.intervals())
 
 
 async def test_late_assistant_reply_cannot_close_another_model_request(activity_session):
     session, activity = activity_session
     await session.emit(_request("current"))
-    await session.emit(AssistantMessageEvent(Assistant("old reply"), request_id="previous"))
+    await session.emit(AssistantMessageEvent(AssistantMessage("old reply"), request_id="previous"))
     (interval,) = activity.intervals()
     assert interval.cause_id == "current"
     assert interval.outcome is ActivityOutcome.RUNNING
@@ -321,7 +321,7 @@ async def _activity_session():
 
 def _request(request_id="request"):
     return ModelRequestedEvent(
-        request=ModelRequest(model="test", messages=()), request_id=request_id
+        request=ModelRequest(messages=()), model=ModelInfo(name="test"), request_id=request_id
     )
 
 

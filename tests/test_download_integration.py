@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 from harnessed import PolicyDecision, ToolCall
-from harnessed.models import ImagePart, ModelChunk, ToolReply
+from harnessed.models import ImagePart, ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
@@ -23,7 +23,7 @@ from browserrig.browser import DownloadState
 from browserrig.browser.images import screenshot
 from browserrig.events import DownloadCompletedEvent, DownloadStartedEvent
 from tests.javascript import evaluate
-from tests.observations import all_states
+from tests.observations import all_states, has_image
 
 pytestmark = pytest.mark.integration
 
@@ -40,7 +40,7 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
     async def respond(request):
         nonlocal stage
         page = all_states(request.messages)[-1]
-        replies = [message for message in request.messages if isinstance(message, ToolReply)]
+        replies = [message for message in request.messages if isinstance(message, ToolMessage)]
         if stage == 2:
             assert not replies[-1].is_error
             assert (
@@ -127,7 +127,7 @@ async def test_agent_reads_selected_workbook_cells_as_context(site, tmp_path, xl
                 )
             )
             return
-        replies = [message for message in request.messages if isinstance(message, ToolReply)]
+        replies = [message for message in request.messages if isinstance(message, ToolMessage)]
         assert not replies[-1].is_error and "Voyager" in replies[-1].text
         assert "=B2*2" in replies[-1].text
         assert not any(
@@ -219,7 +219,7 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(si
             for message in request.messages
             if message.text.startswith("file_system:\n")
         ][-1]
-        replies = [message for message in request.messages if isinstance(message, ToolReply)]
+        replies = [message for message in request.messages if isinstance(message, ToolMessage)]
         assert all(not reply.is_error for reply in replies)
         if stage == 0:
             assert {
@@ -292,7 +292,7 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
     async def respond(request):
         nonlocal stage, original_tab
         page = all_states(request.messages)[-1]["page"]
-        replies = [message for message in request.messages if isinstance(message, ToolReply)]
+        replies = [message for message in request.messages if isinstance(message, ToolMessage)]
         assert all(not reply.is_error for reply in replies)
         if stage == 0:
             original_tab = page["tab"]
@@ -301,9 +301,7 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
         elif stage == 1:
             assert page["url"] == (tmp_path / "report.pdf").as_uri()
             assert page["readiness"] == "ready"
-            images = [
-                message for message in request.messages if message.id.startswith("browser-image:")
-            ]
+            images = [message for message in request.messages if has_image(message)]
             assert len(images) == 1
             tool_call = ToolCall("switch_tab", {"target_id": original_tab})
         else:

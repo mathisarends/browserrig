@@ -5,7 +5,7 @@ from io import BytesIO
 import pytest
 from harnessed import Inject, Plugin, PolicyDecision, ToolCall
 from harnessed.events import ToolExecutionFinishedEvent
-from harnessed.models import ModelChunk
+from harnessed.models import ImagePart, ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 from PIL import Image
@@ -27,6 +27,7 @@ from browserrig.observation.render import render
 from browserrig.scripts import ELEMENT
 from browserrig.scripts.models import ElementArgs
 from tests.javascript import evaluate
+from tests.observations import has_image
 
 pytestmark = pytest.mark.integration
 
@@ -127,15 +128,11 @@ async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site)
         nonlocal step
         if step:
             latest_image = next(
-                (
-                    message
-                    for message in reversed(request.messages)
-                    if message.id.startswith("browser-image:")
-                ),
+                (message for message in reversed(request.messages) if has_image(message)),
                 None,
             )
             assert latest_image is not None
-            image_part = latest_image.content[1]
+            (image_part,) = [part for part in latest_image.content if isinstance(part, ImagePart)]
             encoded = image_part.url.split(",", 1)[1]
             with Image.open(BytesIO(base64.b64decode(encoded))) as image:
                 assert image.getpixel((60, 80) if step == 1 else (180, 120)) == (30, 30, 30)
@@ -263,7 +260,12 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
             region = {"x": 100, "y": 150, "width": 400, "height": 200}
             yield ModelChunk(tool_call=ToolCall("screenshot", {"region": region, "zoom": 2}))
         elif step == 1:
-            captions.extend(text for text in texts if text.startswith("Screenshot "))
+            captions.extend(
+                line
+                for text in texts
+                for line in text.splitlines()
+                if line.startswith("Screenshot ")
+            )
             # Image pixel (100, 60) at 2x zoom is viewport (150, 180), canvas offset (50, 30).
             yield ModelChunk(tool_call=ToolCall("click_at", {"x": 100, "y": 60}))
         else:

@@ -1,13 +1,14 @@
+from dataclasses import replace
+
 import pytest
 from harnessed import Agent, Context, Inject, Plugin, hook
 from harnessed.events import (
     IncludedObservation,
     ModelRequestedEvent,
-    ObservationForm,
     ObservationsIncludedEvent,
 )
-from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.models import ModelRequest, User
+from harnessed.hooks import ConfigureRequest, Next, PreStep, StepDecision
+from harnessed.models import ModelInfo, ModelRequest, UserMessage
 from harnessed.plugins import JsonlSessions
 from harnessed.testing import ScriptedModel
 
@@ -118,17 +119,14 @@ async def test_pending_actions_are_separate_per_tab_and_closed_tabs_are_forgotte
 
 
 @pytest.mark.parametrize(
-    "source,form,matching_ref,delivered",
+    "source,matching_ref,delivered",
     [
-        ("browser.nudges", ObservationForm.FULL, True, True),
-        ("browser.nudges", ObservationForm.SUMMARY, True, False),
-        ("other", ObservationForm.FULL, True, False),
-        ("browser.nudges", ObservationForm.FULL, False, False),
+        ("browser.nudges", True, True),
+        ("other", True, False),
+        ("browser.nudges", False, False),
     ],
 )
-async def test_hint_acknowledgement_requires_matching_full_provenance(
-    source, form, matching_ref, delivered
-):
+async def test_hint_acknowledgement_requires_matching_provenance(source, matching_ref, delivered):
     holder = {}
     agent = Agent(
         model=ScriptedModel(["ok"]),
@@ -142,14 +140,22 @@ async def test_hint_acknowledgement_requires_matching_full_provenance(
         # Text coincidence cannot acknowledge delivery, even in a submitted request.
         await session.emit(
             ModelRequestedEvent(
-                ModelRequest(model="test", messages=(User(nudge_id),)), request_id="request"
+                ModelRequest(messages=(UserMessage(nudge_id),)),
+                model=ModelInfo(name="test"),
+                request_id="request",
             )
         )
         assert (await nudges.project(_snapshot())).refs == (nudge_id,)
         included = ObservationsIncludedEvent(
             request_id="request",
             observations=(
-                IncludedObservation(source, (nudge_id if matching_ref else "unknown",), form),
+                IncludedObservation(
+                    source,
+                    (nudge_id if matching_ref else "unknown",),
+                    turn_id="turn",
+                    step=1,
+                    message_id="message",
+                ),
             ),
         )
         await session.emit(included)
@@ -195,14 +201,67 @@ async def test_hint_provenance_and_unselected_hints_survive_session_replay(tmp_p
         (receipt,) = [event for event in session.events if isinstance(event, NudgeIncludedEvent)]
         assert receipt.request_id == request.request_id
         assert provenance == (
-            IncludedObservation("browser.nudges", receipt.nudge_ids, ObservationForm.FULL),
+            IncludedObservation(
+                "browser.nudges",
+                receipt.nudge_ids,
+                turn_id=provenance[0].turn_id,
+                step=1,
+                message_id=provenance[0].message_id,
+            ),
         )
-        assert "Second hint" in (await nudges.project(_snapshot())).full
+        assert "Second hint" in (await nudges.project(_snapshot())).content
     async with agent.session("hints") as restored:
         assert restored.log.included_observations(request.request) == provenance
         remaining = await holder["nudges"].project(_snapshot())
-        assert "Second hint" in remaining.full
-        assert "First hint" not in remaining.full
+        assert "Second hint" in remaining.content
+        assert "First hint" not in remaining.content
+
+
+@pytest.mark.parametrize("transform", ["keep", "drop", "redact"])
+async def test_hints_stay_queued_until_the_unchanged_observation_is_submitted(transform):
+    holder = {}
+
+    class Hints(Plugin, needs=(Nudges,)):
+        @hook(PreStep)
+        async def project(self, event: PreStep, next_: Next[StepDecision], nudges: Inject[Nudges]):
+            event.session.observe(await nudges.project(_snapshot()))
+            return await next_()
+
+        @hook(ConfigureRequest)
+        async def change(self, event: ConfigureRequest, next_: Next[ModelRequest]):
+            request = await next_()
+            ids = {
+                item.message_id
+                for item in event.session.log.included_observations(request)
+                if item.source == "browser.nudges"
+            }
+            if transform == "drop":
+                return replace(
+                    request, messages=tuple(m for m in request.messages if m.id not in ids)
+                )
+            if transform == "redact":
+                return replace(
+                    request,
+                    messages=tuple(
+                        replace(message, content="Redacted hint") if message.id in ids else message
+                        for message in request.messages
+                    ),
+                )
+            return request
+
+    agent = Agent(
+        model=ScriptedModel(["ok"]),
+        plugins=[FakeChrome(holder), Nudges(), _Access(holder), Hints()],
+    )
+    async with agent.session() as session:
+        nudges = holder["nudges"]
+        await nudges.queue("Inspect the page", key="hint", cause_id="action")
+        (nudge_id,) = (await nudges.project(_snapshot())).refs
+        await session.run("Inspect")
+        receipts = [event for event in session.events if isinstance(event, NudgeIncludedEvent)]
+        delivered = transform == "keep"
+        assert len(receipts) == int(delivered)
+        assert (await nudges.project(_snapshot())).refs == (() if delivered else (nudge_id,))
 
 
 class _Access(Plugin, needs=(Nudges,)):
