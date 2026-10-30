@@ -91,7 +91,8 @@ async def test_tab_management_does_not_wait_on_current_page_dialog(kind):
     assert before.url == tab.url and before.document_id == tab.document_id
 
 
-async def test_global_keyboard_input_rejects_a_document_changed_between_calls():
+@pytest.mark.parametrize("kind", [ActionKind.PRESS, ActionKind.MOVE_MOUSE])
+async def test_input_rejects_a_document_changed_between_calls(kind):
     tab = SimpleNamespace(
         id="tab",
         document_id="new-doc",
@@ -106,7 +107,7 @@ async def test_global_keyboard_input_rejects_a_document_changed_between_calls():
         )
     )
     with pytest.raises(BrowserError, match="observe before input"):
-        await Actions._prepare(actions, tab, ActionKind.PRESS)
+        await Actions._prepare(actions, tab, kind)
 
 
 def _actions():

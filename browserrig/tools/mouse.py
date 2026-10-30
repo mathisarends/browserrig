@@ -16,6 +16,7 @@ from .execution import Actions, Effect
 type _ClickCount = Annotated[
     Literal[1, 2], Field(description="2 = native double click (open, edit, select word)")
 ]
+type _ClickButton = Annotated[Literal["left", "right"], Field(description="Mouse button to press.")]
 
 
 class PointerTools(Plugin, needs=(Actions, Observe)):
@@ -31,10 +32,31 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
     )
 
     @tool(
+        kind=ActionKind.MOVE_MOUSE,
+        description=(
+            "Move the cursor to image or viewport coordinates without clicking. "
+            "Use before scroll to target a particular scrollable area, or to hover."
+        ),
+    )
+    async def move_mouse(
+        self,
+        x: Annotated[float, Field(ge=0)],
+        y: Annotated[float, Field(ge=0)],
+        *,
+        actions: Inject[Actions],
+    ) -> ToolResult:
+        async def move(tab: Tab) -> Effect:
+            point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
+            await tab.mouse.move_to(point)
+            return Effect("Cursor moved without clicking.")
+
+        return await actions.run(kind=ActionKind.MOVE_MOUSE, operation=move)
+
+    @tool(
         kind=ActionKind.CLICK_AT,
         description=(
-            "Click image or viewport coordinates, such as inside a listed canvas; "
-            "count=2 performs a native double click."
+            "Automatically move the cursor to image or viewport coordinates and click there; "
+            "count=2 performs a native double click; button=right performs a right click."
         ),
     )
     async def click_at(
@@ -42,6 +64,7 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
         x: Annotated[float, Field(ge=0)],
         y: Annotated[float, Field(ge=0)],
         count: _ClickCount = 1,
+        button: _ClickButton = "left",
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
@@ -49,14 +72,18 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
             snapshot = self._observe.snapshot
             assert snapshot is not None
             point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
-            await tab.mouse.click(point, count=count)
-            return Effect(
-                "Double click dispatched." if count == 2 else "Coordinate click dispatched."
-            )
+            await tab.mouse.click(point, count=count, button=button)
+            return Effect(_click_message(count, button), break_chain=button == "right")
 
         return await actions.run(kind=ActionKind.CLICK_AT, operation=click, expects_change=True)
 
-    @tool(kind=ActionKind.SCROLL, description="Scroll the visible page vertically by CSS pixels.")
+    @tool(
+        kind=ActionKind.SCROLL,
+        description=(
+            "Scroll vertically by CSS pixels at the current cursor position. "
+            "Use move_mouse first to target a particular scrollable area."
+        ),
+    )
     async def scroll(
         self,
         delta_y: Annotated[float, Field(ge=-10000, le=10000)],
@@ -64,11 +91,7 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
         actions: Inject[Actions],
     ) -> ToolResult:
         async def scroll(tab: Tab) -> Effect:
-            snapshot = self._observe.snapshot
-            assert snapshot is not None
-            await tab.mouse.scroll(
-                point=Point(x=snapshot.width / 2, y=snapshot.height / 2), delta_y=delta_y
-            )
+            await tab.mouse.scroll(point=tab.mouse.position, delta_y=delta_y)
             return Effect("Scroll dispatched.")
 
         return await actions.run(
@@ -113,12 +136,17 @@ class DomPointerTools(Plugin, needs=(Actions, Observe)):
         kind=ActionKind.CLICK,
         chainable=True,
         enabled=has_dom_refs,
-        description="Click a current DOM ref; count=2 performs a native double click.",
+        description=(
+            "Automatically move the cursor to a current DOM ref and click it; "
+            "count=2 performs a native double click; "
+            "button=right performs a right click."
+        ),
     )
     async def click(
         self,
         ref: str,
         count: _ClickCount = 1,
+        button: _ClickButton = "left",
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
@@ -134,10 +162,11 @@ class DomPointerTools(Plugin, needs=(Actions, Observe)):
                 )
             # Hover may reveal an overlay or move the target; hit-test again.
             current = await actions.element_point(tab=tab, ref=ref, scroll=False)
-            await tab.mouse.click(current, count=count)
+            await tab.mouse.click(current, count=count, button=button)
             return Effect(
-                "Double click dispatched." if count == 2 else "Click dispatched.",
+                _click_message(count, button),
                 prepared_scroll=point.scrolled,
+                break_chain=button == "right",
             )
 
         return await actions.run(kind=ActionKind.CLICK, operation=click, expects_change=True)
@@ -176,6 +205,13 @@ class DomPointerTools(Plugin, needs=(Actions, Observe)):
 
 class MouseTools(PointerTools, DomPointerTools):
     """Compatibility group. New recipes mount PointerTools and DomTools explicitly."""
+
+
+def _click_message(count: Literal[1, 2], button: Literal["left", "right"]) -> str:
+    gesture = "right click" if button == "right" else "click"
+    if count == 2:
+        gesture = "double " + gesture
+    return gesture.capitalize() + " dispatched."
 
 
 def _image_point(snapshot: Snapshot | CapturedImage, point: Point) -> Point:

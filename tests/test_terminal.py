@@ -15,7 +15,7 @@ from harnessed.events import (
 from harnessed.testing import ScriptedModel
 
 from browserrig import TerminalEvents
-from browserrig.events import INPUT_EVENTS, BrowserEvent, KeyPressedEvent
+from browserrig.events import INPUT_EVENTS, BrowserEvent, KeyPressedEvent, WaitingEvent
 from browserrig.terminal import _event_record
 
 
@@ -26,6 +26,7 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
         @hook(ModelRequestedEvent)
         async def input(self, _event: ModelRequestedEvent, log: Inject[SessionLog]):
             await log.emit(KeyPressedEvent(key="x", action_id="action-1"))
+            await log.emit(WaitingEvent(duration=2, browser_id="browser-1", target_id="tab-1"))
 
     output = io.StringIO()
     model = ScriptedModel(["Final answer"])
@@ -34,9 +35,13 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
         result = await session.run("PRIVATE PROMPT")
         assert result.text == "Final answer"
         assert not any(isinstance(event, KeyPressedEvent) for event in session.events)
+        assert not any(isinstance(event, WaitingEvent) for event in session.events)
     records = [json.loads(line) for line in output.getvalue().splitlines()]
     key = next(record for record in records if record["type"] == "browser.key.pressed")
     assert key["key"] == "x" and key["action_id"] == "action-1"
+    wait = next(record for record in records if record["type"] == "browser.waiting")
+    assert wait["duration"] == 2 and wait["target_id"] == "tab-1"
+    assert wait["browser_id"] == "browser-1"
     assert any(
         record["type"] == ModelRequestedEvent.__dataclass_fields__["type"].default
         for record in records

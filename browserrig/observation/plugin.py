@@ -193,8 +193,8 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             "Request a screenshot of the active tab for visual inspection in your next iteration. "
             "The next observation includes an image and matching page state. "
             "In DOM mode, region limits the image to a viewport area in CSS pixels, such as a "
-            "listed canvas, and zoom magnifies it to read small details; click_at and drag_at "
-            "then take pixels of that image. "
+            "listed canvas, and zoom magnifies it to read small details; "
+            "move_mouse, click_at and drag_at then take pixels of that image. "
             "This does not enable automatic screenshots for later iterations."
         ),
     )

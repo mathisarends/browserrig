@@ -96,8 +96,8 @@ def test_region_image_is_described_in_render_and_caption():
     snapshot = _snapshot(image="png", geometry=geometry)
     assert "image: viewport region x=100 y=150 400x200 at 2x zoom" in render(snapshot)
     assert image_caption(snapshot).endswith(
-        "viewport region x=100 y=150 400x200 at 2x zoom; click_at and drag_at take pixels "
-        "of this image until the next observation"
+        "viewport region x=100 y=150 400x200 at 2x zoom; "
+        "move_mouse, click_at and drag_at take pixels of this image until the next observation"
     )
     assert image_caption(_snapshot(image="png")) == "Current dom observation observation"
 

@@ -441,10 +441,21 @@ as well as clicks. Focus uses `preventScroll` to avoid an extra browser jump.
 must fit in the viewport together before the gesture starts. Native `draggable`
 elements use HTML5 drag and drop with a real `DataTransfer`.
 
-In both DOM and canvas mode, `PointerTools` provides `scroll(delta_y=...)`,
+In both DOM and canvas mode, `PointerTools` provides `move_mouse(x=..., y=...)`,
+`scroll(delta_y=...)`,
 `click_at(x=..., y=..., count=2)` and
 `drag_at(start=Point(...), end=Point(...), mode=DragMode.POINTER)`.
 Use `DragMode.HTML5` for coordinate-based dragging of native HTML5 sources.
+`move_mouse` moves the cursor without clicking and can reveal hover controls.
+`scroll` sends wheel input at the current cursor position: move over a sidebar,
+panel, or other scrollable area first to scroll that area.
+Both `click` and `click_at` accept `button="right"` for a native right click;
+the default is `button="left"`. Both tools automatically move the cursor to the
+target before clicking. Right clicks end the action chain so the agent can
+inspect the result before continuing.
+`wait(seconds=...)` pauses for 0–10 seconds (default: 1) and emits a transient
+`WaitingEvent` (`browser.waiting`) before the pause, with its requested duration,
+browser, tab, and document IDs for live UI display.
 The newest image shown to the model determines how crop coordinates map to the viewport;
 subsequent text-only observations retain that image's geometry.
 All gestures use real CDP input and release mouse buttons even when interrupted.
@@ -500,7 +511,7 @@ registers these frozen event types alongside its durable browser events:
 | --- | --- |
 | `CursorMovedEvent` | Start, destination, two control points, duration, easing |
 | `CursorStateEvent` | Actual cursor position and held mouse buttons |
-| `PointerPressedEvent`, `PointerReleasedEvent` | Position and native click count |
+| `PointerPressedEvent`, `PointerReleasedEvent` | Position, mouse button and native click count |
 | `KeyPressedEvent` | Key, modifiers, duration |
 | `KeyboardVisibilityEvent` | Keyboard presentation opened or closed |
 | `ScrolledEvent` | Wheel origin, dispatched deltas, duration |

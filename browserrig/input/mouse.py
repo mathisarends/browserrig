@@ -78,16 +78,32 @@ class Mouse:
         finally:
             await self.publish_cursor()
 
-    async def click(self, point: Point, *, count: Literal[1, 2] = 1) -> None:
+    async def click(
+        self,
+        point: Point,
+        *,
+        count: Literal[1, 2] = 1,
+        button: Literal["left", "right"] = "left",
+    ) -> None:
         await self.move_to(point)
+        mouse_button = MouseButton(button)
+        buttons = 2 if button == "right" else 1
         for click_count in range(1, count + 1):
             try:
                 await self._dispatch(
-                    MouseEventKind.PRESSED, point, buttons=1, click_count=click_count
+                    MouseEventKind.PRESSED,
+                    point,
+                    button=mouse_button,
+                    buttons=buttons,
+                    click_count=click_count,
                 )
             finally:
                 await self._dispatch(
-                    MouseEventKind.RELEASED, point, buttons=0, click_count=click_count
+                    MouseEventKind.RELEASED,
+                    point,
+                    button=mouse_button,
+                    buttons=0,
+                    click_count=click_count,
                 )
 
     async def drag(
@@ -177,6 +193,7 @@ class Mouse:
         kind: Literal[MouseEventKind.MOVED, MouseEventKind.PRESSED, MouseEventKind.RELEASED],
         point: Point,
         *,
+        button: MouseButton = MouseButton.LEFT,
         buttons: int = 0,
         click_count: int = 0,
     ) -> None:
@@ -184,9 +201,7 @@ class Mouse:
             type=kind.value,
             x=point.x,
             y=point.y,
-            button=MouseButton.LEFT
-            if buttons or kind is MouseEventKind.RELEASED
-            else MouseButton.NONE,
+            button=button if buttons or kind is MouseEventKind.RELEASED else MouseButton.NONE,
             buttons=buttons,
             click_count=click_count,
         )
@@ -197,7 +212,9 @@ class Mouse:
                 await self._emit(CursorStateEvent(x=point.x, y=point.y, buttons=buttons))
             return
         event_type = PointerPressedEvent if kind is MouseEventKind.PRESSED else PointerReleasedEvent
-        await self._emit(event_type(x=point.x, y=point.y, click_count=click_count))
+        await self._emit(
+            event_type(x=point.x, y=point.y, click_count=click_count, button=button.value)
+        )
 
     async def _release_drag(
         self, point: Point, data: DragData | None, *, dropped: bool, mode: DragMode

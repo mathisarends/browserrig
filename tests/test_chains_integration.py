@@ -87,12 +87,14 @@ async def test_hover_reveals_menu_without_dispatching_click(site):
 
 
 @pytest.mark.parametrize(
-    "first", ["navigate", "click_at", "scroll", "screenshot", "observe", "execute_javascript"]
+    "first",
+    ["navigate", "move_mouse", "click_at", "scroll", "screenshot", "observe", "execute_javascript"],
 )
 async def test_static_boundaries_skip_following_browser_calls(site, first):
     arguments = {
         "navigate": {"url": site + "/other"},
         "click_at": {"x": 700, "y": 400},
+        "move_mouse": {"x": 700, "y": 400},
         "scroll": {"delta_y": 10},
         "screenshot": {},
         "observe": {},
@@ -122,6 +124,23 @@ async def test_click_navigation_dynamically_stops_a_chainable_tool(site):
     )
     assert replies[0].status is ToolStatus.OK and replies[0].break_chain
     assert replies[1].status is ToolStatus.SKIPPED
+
+
+async def test_right_click_stops_following_input_even_without_a_page_change(site):
+    markup = (
+        _FORM + "<script>document.addEventListener('contextmenu',e=>e.preventDefault())</script>"
+    )
+    values, replies, _, _ = await _run(
+        site,
+        markup,
+        lambda refs: [
+            ("click", {"ref": refs["Submit"], "button": "right"}),
+            ("type_text", {"ref": refs["Email"], "text": "skipped"}),
+        ],
+    )
+    assert replies[0].status is ToolStatus.OK and replies[0].break_chain
+    assert replies[1].status is ToolStatus.SKIPPED
+    assert values["email"] == "" and values["clicked"] is None
 
 
 async def test_invalid_input_persists_chain_break_before_skipping_submit(site):

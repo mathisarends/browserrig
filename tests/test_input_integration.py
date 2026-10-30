@@ -8,6 +8,7 @@ from harnessed.events import ModelRequestedEvent, ToolExecutionFinishedEvent
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel
+from harnessed.testing import call as scripted_call
 
 from browserrig import (
     Actions,
@@ -107,6 +108,75 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
     records = [json.loads(line) for line in output.getvalue().splitlines()]
     cursor = next(record for record in records if record["type"] == "browser.cursor.state")
     assert (cursor["x"], cursor["y"]) == (position.x, position.y)
+
+
+@pytest.mark.parametrize("canvas", [False, True])
+async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, canvas):
+    holder = {}
+
+    class Panels(Plugin, needs=(Browser,)):
+        async def setup(self, browser: Inject[Browser]):
+            tab = holder["tab"] = browser.active_tab
+            await evaluate(
+                tab,
+                """document.body.innerHTML = `<style>
+                    body{margin:0;height:2200px}
+                    .panel{position:absolute;top:80px;width:200px;height:240px;overflow:auto}
+                    #first{left:20px}#second{left:320px}
+                    .content{height:1600px;
+                        background:repeating-linear-gradient(white 0 40px,steelblue 40px 80px)}
+                    </style><div id=first class=panel><div class=content>First</div></div>
+                    <div id=second class=panel><div class=content>Second</div></div>`;
+                    window.clicks=0;window.hovered=[];
+                    document.addEventListener('click',()=>window.clicks++);
+                    document.querySelectorAll('.panel').forEach(panel=>{
+                        panel.addEventListener('mouseenter',()=>window.hovered.push(panel.id))
+                    });""",
+            )
+
+    # DOM mode uses a zoomed crop; canvas mode uses viewport coordinates.
+    requests = (
+        []
+        if canvas
+        else [
+            scripted_call(
+                "screenshot", region={"x": 20, "y": 80, "width": 500, "height": 240}, zoom=2
+            )
+        ]
+    )
+    requests.extend(
+        [
+            scripted_call("move_mouse", x=70 if canvas else 100, y=160),
+            scripted_call("scroll", delta_y=300),
+            scripted_call("move_mouse", x=370 if canvas else 700, y=160),
+            scripted_call("scroll", delta_y=180),
+            "Done",
+        ]
+    )
+    agent = BrowserAgent(
+        model=ScriptedModel(requests),
+        browser=LaunchBrowser(url=site),
+        mode=CanvasMode(selector="html") if canvas else DomMode(),
+        approvals=Approvals(default=PolicyDecision.ALLOW),
+        plugins=[Panels()],
+    )
+    async with agent.session() as session:
+        result = await session.run("Hover and scroll each panel without clicking", max_steps=6)
+        assert result.text == "Done"
+        receipts = [e for e in session.events if isinstance(e, ToolExecutionFinishedEvent)]
+        assert receipts and all(not receipt.result.is_error for receipt in receipts)
+        state = await evaluate(
+            holder["tab"],
+            "({first:document.querySelector('#first').scrollTop,"
+            "second:document.querySelector('#second').scrollTop,page:scrollY,"
+            "clicks:window.clicks,hovered:window.hovered})",
+        )
+        assert state["first"] == pytest.approx(300, abs=1)
+        assert state["second"] == pytest.approx(180, abs=1)
+        assert state["page"] == 0 and state["clicks"] == 0
+        assert {"first", "second"} <= set(state["hovered"])
+        assert holder["tab"].mouse.position.x == pytest.approx(370)
+        assert holder["tab"].mouse.position.y == pytest.approx(160)
 
 
 async def test_element_highlight_uses_live_bounds_after_scroll(site):

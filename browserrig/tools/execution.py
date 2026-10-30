@@ -41,6 +41,7 @@ _POINTER_KINDS = frozenset(
     {
         ActionKind.CLICK,
         ActionKind.CLICK_AT,
+        ActionKind.MOVE_MOUSE,
         ActionKind.DOUBLE_CLICK,
         ActionKind.DRAG,
         ActionKind.DRAG_AT,

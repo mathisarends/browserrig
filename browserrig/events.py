@@ -102,6 +102,7 @@ class PointerPressedEvent(InputEvent):
     x: float
     y: float
     click_count: int
+    button: str = "left"
     type: Literal[EventKind.POINTER_PRESSED] = field(
         default=EventKind.POINTER_PRESSED, kw_only=True
     )
@@ -112,6 +113,7 @@ class PointerReleasedEvent(InputEvent):
     x: float
     y: float
     click_count: int
+    button: str = "left"
     type: Literal[EventKind.POINTER_RELEASED] = field(
         default=EventKind.POINTER_RELEASED, kw_only=True
     )

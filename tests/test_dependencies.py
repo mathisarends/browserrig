@@ -52,6 +52,7 @@ async def test_each_browser_tool_has_a_unique_stable_kind(fake_chrome):
         "wait": ActionKind.WAIT,
         "click": ActionKind.CLICK,
         "click_at": ActionKind.CLICK_AT,
+        "move_mouse": ActionKind.MOVE_MOUSE,
         "scroll": ActionKind.SCROLL,
         "drag": ActionKind.DRAG,
         "drag_at": ActionKind.DRAG_AT,
@@ -257,7 +258,7 @@ async def test_ref_tools_are_exposed_only_in_dom_mode(fake_chrome, tmp_path, mod
         session.ctx[Browser].files = FileSystem(FileSystemOptions(directory=tmp_path))
         tools = session.ctx[ToolRegistry]
         names = {item.name for item in tools.definitions}
-        assert {"click_at", "scroll", "drag_at", "send_keys"} <= names
+        assert {"move_mouse", "click_at", "scroll", "drag_at", "send_keys"} <= names
         assert (ref_tools <= names) == isinstance(mode, DomMode)
         if isinstance(mode, CanvasMode):
             assert not ref_tools & names

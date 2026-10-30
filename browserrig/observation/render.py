@@ -125,7 +125,7 @@ def _region(snapshot: Snapshot) -> str:
     zoom = f" at {geometry.scale:g}x zoom" if geometry.scale != 1 else ""
     return (
         f"viewport region x={geometry.x:.0f} y={geometry.y:.0f} "
-        f"{geometry.width:.0f}x{geometry.height:.0f}{zoom}; click_at and drag_at take "
+        f"{geometry.width:.0f}x{geometry.height:.0f}{zoom}; move_mouse, click_at and drag_at take "
         "pixels of this image until the next observation"
     )
 

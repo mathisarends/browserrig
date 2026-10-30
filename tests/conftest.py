@@ -40,9 +40,12 @@ async def site(pdf_document, xlsx_document) -> AsyncIterator[str]:
             <div id=pointerTarget class=box role=button>Pointer target</div>
             <script>
             window.details=[];window.doubles=0;window.nativeDrop='';window.pointerDrop=false;
+            window.contexts=[];
             const double=document.querySelector('#double');
             double.addEventListener('click',e=>window.details.push(e.detail));
             double.addEventListener('dblclick',()=>window.doubles++);
+            double.addEventListener('contextmenu',e=>{e.preventDefault();
+                window.contexts.push({button:e.button,trusted:e.isTrusted})});
             const native=document.querySelector('#native');
             native.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain','payload'));
             const target=document.querySelector('#nativeTarget');

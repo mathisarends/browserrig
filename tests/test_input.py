@@ -18,6 +18,7 @@ from browserrig.events import (
     KeyboardVisibilityEvent,
     KeyPressedEvent,
     PointerPressedEvent,
+    PointerReleasedEvent,
 )
 from browserrig.input.pointer import movement
 from browserrig.tools.keyboard import KeyboardTools
@@ -69,6 +70,37 @@ async def test_mouse_and_keyboard_share_action_correlation_without_sharing_curso
     assert any(isinstance(event, KeyPressedEvent) for event in events)
     assert all(event.action_id == "shared-action" for event in events)
     assert tab.input._action_id == ""
+
+
+@pytest.mark.parametrize("button,mask", [("left", 1), ("right", 2)])
+@pytest.mark.parametrize("count", [1, 2])
+async def test_click_dispatches_selected_button_and_click_count(monkeypatch, button, mask, count):
+    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
+    tab, events, commands = _tab()
+    await tab.mouse.click(Point(x=120, y=80), button=button, count=count)
+    clicks = [command for command in commands if command["type"] != "mouseMoved"]
+    assert [(c["type"], c["buttons"], c["click_count"]) for c in clicks] == [
+        item
+        for index in range(1, count + 1)
+        for item in [("mousePressed", mask, index), ("mouseReleased", 0, index)]
+    ]
+    assert all(command["button"] == button for command in clicks)
+    receipts = [e for e in events if isinstance(e, (PointerPressedEvent, PointerReleasedEvent))]
+    assert len(receipts) == count * 2 and all(e.button == button for e in receipts)
+
+
+async def test_cancelled_right_click_releases_the_right_button(monkeypatch):
+    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
+
+    async def cancel(arguments):
+        if arguments["type"] == "mousePressed":
+            raise asyncio.CancelledError
+
+    tab, _, commands = _tab(dispatch=cancel)
+    with pytest.raises(asyncio.CancelledError):
+        await tab.mouse.click(Point(x=120, y=80), button="right")
+    assert commands[-1]["type"] == "mouseReleased"
+    assert commands[-1]["button"] == "right" and commands[-1]["buttons"] == 0
 
 
 async def test_exact_typing_emits_ordered_correlated_keys_without_persistable_text(monkeypatch):

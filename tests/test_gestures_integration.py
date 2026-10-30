@@ -25,6 +25,19 @@ async def test_double_click_dispatches_native_detail_and_dblclick(site, coordina
     assert state["details"] == [1, 2]
 
 
+@pytest.mark.parametrize("coordinates", [False, True])
+async def test_right_click_dispatches_native_contextmenu_without_a_left_click(site, coordinates):
+    def arguments(state):
+        if coordinates:
+            return {"x": 70, "y": 40, "button": "right"}
+        ref = next(e["ref"] for e in state["elements"] if e["name"] == "Double")
+        return {"ref": ref, "button": "right"}
+
+    state = await _perform(site, "click_at" if coordinates else "click", arguments)
+    assert state["contexts"] == [{"button": 2, "trusted": True}]
+    assert state["details"] == [] and state["doubles"] == 0
+
+
 @pytest.mark.parametrize("mode", [DragMode.POINTER, DragMode.HTML5])
 @pytest.mark.parametrize("coordinates", [False, True])
 async def test_drag_pointer_and_html5_transfer(site, mode, coordinates):
@@ -86,7 +99,7 @@ async def _perform(site, name, arguments):
         # deliberately runs in an isolated world, where page-owned globals are absent.
         state = await holder["browser"].active_tab.cdp.runtime.evaluate(
             expression="({doubles:window.doubles,details:window.details,"
-            "native:window.nativeDrop,pointer:window.pointerDrop})",
+            "native:window.nativeDrop,pointer:window.pointerDrop,contexts:window.contexts})",
             return_by_value=True,
         )
         return state.result.value

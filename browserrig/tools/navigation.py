@@ -97,7 +97,10 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents)):
         seconds: Annotated[float, Field(ge=0, le=10)] = 1,
     ) -> str:
         async with self._browser.action_lock:
-            await self._events.emit(WaitingEvent(duration=seconds))
+            tab = self._browser.active_tab
+            await self._events.emit(
+                WaitingEvent(duration=seconds, target_id=tab.id, document_id=tab.document_id)
+            )
             await asyncio.sleep(seconds)
         return "Wait completed; observe the current state."
 

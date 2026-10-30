@@ -40,6 +40,7 @@ class ActionKind(StrEnum):
     JAVASCRIPT = "javascript"
     CLICK = "click"
     CLICK_AT = "click_at"
+    MOVE_MOUSE = "move_mouse"
     DOUBLE_CLICK = "double_click"
     DRAG = "drag"
     DRAG_AT = "drag_at"
