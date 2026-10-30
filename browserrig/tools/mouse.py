@@ -8,7 +8,7 @@ from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Point
 from browserrig.core.kinds import ActionKind, DragMode
 from browserrig.core.tools import browser_tool as tool
-from browserrig.observation.models import Snapshot
+from browserrig.observation.models import CapturedImage, Snapshot
 from browserrig.observation.plugin import Observe, has_dom_refs
 
 from .execution import Actions, Effect
@@ -18,13 +18,13 @@ type _ClickCount = Annotated[
 ]
 
 
-class MouseTools(Plugin, needs=(Actions, Observe)):
+class PointerTools(Plugin, needs=(Actions, Observe)):
     _observe: Inject[Observe]
 
     coordinates = SystemSection(
         title="Screenshot coordinates",
         text=(
-            "Coordinates are pixels from the top-left of the current observation's image; "
+            "Coordinates are pixels from the top-left of the newest shown image for this document; "
             "region and canvas images are mapped back to the viewport automatically. "
             "Observe again if the tab or document changes before pointing."
         ),
@@ -48,7 +48,7 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
         async def click(tab: Tab) -> Effect:
             snapshot = self._observe.snapshot
             assert snapshot is not None
-            point = _image_point(snapshot, Point(x=x, y=y))
+            point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
             await tab.mouse.click(point, count=count)
             return Effect(
                 "Double click dispatched." if count == 2 else "Coordinate click dispatched."
@@ -95,14 +95,18 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
             snapshot = self._observe.snapshot
             assert snapshot is not None
             await tab.mouse.drag(
-                start=_image_point(snapshot, start),
-                end=_image_point(snapshot, end),
+                start=_image_point(self._observe.coordinate_source(), start),
+                end=_image_point(self._observe.coordinate_source(), end),
                 duration=duration,
                 mode=mode,
             )
             return Effect("Drag dispatched; inspect the destination.")
 
         return await actions.run(kind=ActionKind.DRAG_AT, operation=drag, expects_change=True)
+
+
+class DomPointerTools(Plugin, needs=(Actions, Observe)):
+    _observe: Inject[Observe]
 
     # DOM mode deliberately also supports pointing at unreferenced screenshot regions.
     @tool(
@@ -121,7 +125,7 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
         async def click(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
             await tab.mouse.move_to(point)
-            if change := await actions.page_change(tab):
+            if change := await actions.page_change(tab, after_input=False):
                 return Effect(
                     f"Hover changed the page: {change} The click was not dispatched. "
                     "Inspect the next observation before choosing a target.",
@@ -170,7 +174,11 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
         return await actions.run(kind=ActionKind.DRAG, operation=drag, expects_change=True)
 
 
-def _image_point(snapshot: Snapshot, point: Point) -> Point:
+class MouseTools(PointerTools, DomPointerTools):
+    """Compatibility group. New recipes mount PointerTools and DomTools explicitly."""
+
+
+def _image_point(snapshot: Snapshot | CapturedImage, point: Point) -> Point:
     if snapshot.geometry is not None:
         x, y = snapshot.geometry.point(point.x, point.y)
         return Point(x=x, y=y)

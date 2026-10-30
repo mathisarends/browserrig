@@ -105,3 +105,9 @@ class ReadinessPhase(StrEnum):
     OBSERVATION = "observation"
     NAVIGATION = "navigation"
     ACTION = "action"
+    AFTER_ACTION = "after_action"
+
+
+class ReadinessStage(StrEnum):
+    INITIAL = "initial"
+    ONGOING = "ongoing"

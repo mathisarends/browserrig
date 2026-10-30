@@ -14,8 +14,12 @@ from browserrig.core.modes import ObservationMode
 from .browser.config import BrowserOptions
 from .composition import browser_plugins
 from .files import FileSystemOptions
+from .observation import Observe
+from .observation.images import ImageContext
+from .readiness import Readiness
 from .readiness.config import ReadinessOptions
 from .recording import RecordingOptions
+from .tools.execution import Actions
 
 if TYPE_CHECKING:
     from pydantic_ai.models import Model as NativeModel
@@ -34,9 +38,13 @@ class BrowserAgent(Agent):
         model: Model | str | NativeModel | None = None,
         browser: BrowserOptions | None = None,
         mode: ObservationMode | None = None,
-        readiness: ReadinessOptions | None = None,
+        readiness: ReadinessOptions | Readiness | None = None,
         recording: RecordingOptions | None = None,
         file_system: FileSystemOptions | None = None,
+        observe: Observe | None = None,
+        image_context: ImageContext | None = None,
+        actions: Actions | None = None,
+        local_files: bool = True,
         session_directory: str | Path | None = None,
         approvals: Approvals | None = None,
         system_prompt: str | SystemPrompt | None = (
@@ -52,6 +60,10 @@ class BrowserAgent(Agent):
                 readiness=readiness,
                 recording=recording,
                 file_system=file_system,
+                observe=observe,
+                image_context=image_context,
+                actions=actions,
+                local_files=local_files,
             )
         )
         if session_directory is not None:

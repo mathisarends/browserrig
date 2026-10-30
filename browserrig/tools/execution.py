@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
+from typing import Protocol
 from uuid import uuid4
 
 from harnessed import (
@@ -19,7 +20,7 @@ from browserrig.browser.base import Browser, BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import ElementPoint
-from browserrig.core.kinds import ActionKind, ObservationKind, ReadinessPhase, ReadinessStatus
+from browserrig.core.kinds import ActionKind, ReadinessPhase, ReadinessStatus
 from browserrig.core.tools import BrowserToolMetadata
 from browserrig.events import (
     ACTION_EVENTS,
@@ -77,6 +78,28 @@ class Effect:
     break_chain: bool = False
 
 
+class ActionChainPolicy(Protocol):
+    async def check(self, observe: Observe, tab: Tab) -> str:
+        """Empty means continue; otherwise explain why a new observation is needed."""
+        ...
+
+
+class ObserveAfterInput:
+    async def check(self, _observe: Observe, _tab: Tab) -> str:
+        return "A fresh observation is required after this input."
+
+
+class DomActionChains:
+    async def check(self, observe: Observe, tab: Tab) -> str:
+        before = observe.snapshot
+        if before is None or not observe.capture_strategy.provides_dom_refs:
+            return "A fresh observation is required after this input."
+        after = await observe.probe(tab)
+        if after.readiness != ReadinessStatus.READY or after.limitations:
+            return "The page could not be checked completely after input."
+        return decision_change(before, after)
+
+
 class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, Observe)):
     """Own the action transaction: serialization, readiness, dispatch and receipts."""
 
@@ -85,6 +108,10 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
     _events: Inject[BrowserEvents]
     readiness: Inject[Readiness]
     observe: Inject[Observe]
+
+    def __init__(self, *, chain_policy: ActionChainPolicy | None = None) -> None:
+        super().__init__()
+        self.chain_policy = chain_policy or DomActionChains()
 
     chains = SystemSection(
         title="Browser action chains",
@@ -169,22 +196,16 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
                 hint = "; the action may have run. Observe before retrying." if dispatched else ""
                 raise ToolError(reason + hint) from error
 
-    async def page_change(self, tab: Tab) -> str:
+    async def page_change(self, tab: Tab, *, after_input: bool = True) -> str:
         """A comparison probe must never replace the refs or image the model acted on."""
-        before = self.observe.snapshot
-        if before is None or before.mode != ObservationKind.DOM:
-            return "A fresh observation is required after this input."
         if tab.closed or self.browser.active_tab.id != tab.id:
             return "The active tab changed."
         try:
-            after = await self.observe.probe(tab)
+            policy = self.chain_policy if after_input else DomActionChains()
+            return await policy.check(self.observe, tab)
         except Exception:  # pylint: disable=broad-exception-caught
-            # A diagnostic failure after successful input must not turn that input into
-            # a failed action or encourage repeating a submission.
+            # Successful input remains successful even if comparison fails.
             return "The page could not be checked after input."
-        if after.readiness != ReadinessStatus.READY or after.limitations:
-            return "The page could not be checked completely after input."
-        return decision_change(before, after)
 
     async def element_point(self, *, tab: Tab, ref: str, scroll: bool = True) -> ElementPoint:
         """Reveal a ref with wheel input, then return a hit-tested point and highlight it.
@@ -241,7 +262,9 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
         )
 
     async def _settle(self, tab: Tab, kind: ActionKind) -> str:
-        phase = ReadinessPhase.NAVIGATION if kind in _NAVIGATION_KINDS else ReadinessPhase.ACTION
+        phase = (
+            ReadinessPhase.NAVIGATION if kind in _NAVIGATION_KINDS else ReadinessPhase.AFTER_ACTION
+        )
         try:
             report = await self.readiness.wait(tab, phase=phase)
         except BrowserError as error:

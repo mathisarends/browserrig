@@ -10,6 +10,7 @@ from browserrig import (
     CanvasMode,
     Chrome,
     DomMode,
+    ImageContext,
     LaunchBrowser,
     Observe,
     Readiness,
@@ -72,7 +73,7 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(site
         images = [
             message for message in request.messages if message.id.startswith("browser-image:")
         ]
-        assert len(images) == (1 if index in (1, 4) else 0)
+        assert len(images) == (1 if index >= 1 else 0)
         if not images:
             continue
         assert any(isinstance(part, ImagePart) for part in images[0].content)
@@ -154,7 +155,8 @@ async def test_visual_modes_native_image(site, mode):
             Chrome(),
             Start(),
             Readiness(mode),
-            Observe(),
+            Observe(mode),
+            ImageContext(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

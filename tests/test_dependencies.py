@@ -263,7 +263,7 @@ async def test_ref_tools_are_exposed_only_in_dom_mode(fake_chrome, tmp_path, mod
             assert not ref_tools & names
             for call in _REF_CALLS:
                 result = await tools.execute(call)
-                assert result.is_error and "disabled" in result.text
+                assert result.is_error and "Unknown tool" in result.text
     assert fake_chrome[0].closed
 
 

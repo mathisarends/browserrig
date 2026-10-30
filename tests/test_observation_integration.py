@@ -218,7 +218,7 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
             region = {"x": 100, "y": 150, "width": 400, "height": 200}
             yield ModelChunk(tool_call=ToolCall("screenshot", {"region": region, "zoom": 2}))
         elif step == 1:
-            captions.extend(text for text in texts if text.startswith("Current dom observation"))
+            captions.extend(text for text in texts if text.startswith("Latest coordinate image"))
             # Image pixel (100, 60) at 2x zoom is viewport (150, 180), canvas offset (50, 30).
             yield ModelChunk(tool_call=ToolCall("click_at", {"x": 100, "y": 60}))
         else:
@@ -248,4 +248,11 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
         assert receipts and not any(receipt.result.is_error for receipt in receipts)
         offset = await evaluate(tab, "document.querySelector('#board').dataset.offset")
         assert offset == "50,30"
-    assert captions and "viewport region x=100 y=150 400x200 at 2x zoom" in captions[-1]
+    assert captions
+    assert json.loads(captions[-1].split("; geometry=")[1]) == {
+        "x": 100,
+        "y": 150,
+        "width": 400,
+        "height": 200,
+        "scale": 2,
+    }

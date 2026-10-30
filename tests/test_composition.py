@@ -20,7 +20,7 @@ from browserrig import (
     Recording,
     RecordingOptions,
 )
-from browserrig.tools import FileTools, FormTools, JavaScriptTools, MouseTools, UploadTools
+from browserrig.tools import DomTools, FileTools, JavaScriptTools, PointerTools, UploadTools
 
 
 def test_facade_configures_resources_without_opening_them_and_accepts_extra_plugins(tmp_path):
@@ -62,10 +62,12 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
 
 
 @pytest.mark.parametrize("mode", [DomMode(), CanvasMode()])
-def test_facade_registers_the_same_tool_plugins_in_every_mode(mode):
+def test_facade_mounts_only_the_selected_tool_capabilities(mode):
     agent = BrowserAgent(model=ScriptedModel(["ok"]), mode=mode)
-    for plugin in (MouseTools, FormTools, JavaScriptTools, UploadTools):
+    for plugin in (PointerTools, JavaScriptTools):
         assert sum(isinstance(item, plugin) for item in agent.plugins) == 1
+    for plugin in (DomTools, UploadTools):
+        assert any(isinstance(item, plugin) for item in agent.plugins) == isinstance(mode, DomMode)
     assert sum(isinstance(item, FileTools) for item in agent.plugins) == 1
     assert next(item for item in agent.plugins if isinstance(item, Readiness)).mode == mode
 

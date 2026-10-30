@@ -9,6 +9,7 @@ from .core.kinds import (
     MouseEventKind,
     ObservationKind,
     ReadinessPhase,
+    ReadinessStage,
     ReadinessStatus,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     "MouseEventKind",
     "ObservationKind",
     "ReadinessPhase",
+    "ReadinessStage",
     "ReadinessStatus",
 ]

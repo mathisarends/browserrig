@@ -8,7 +8,7 @@ from browserrig.observation.plugin import Observe, has_dom_refs
 from .execution import Actions, Effect
 
 
-class KeyboardTools(Plugin, needs=(Actions, Observe)):
+class DomKeyboardTools(Plugin, needs=(Actions, Observe)):
     _observe: Inject[Observe]
 
     @tool(
@@ -38,6 +38,10 @@ class KeyboardTools(Plugin, needs=(Actions, Observe)):
             return Effect("Text entered.")
 
         return await actions.run(kind=ActionKind.TYPE, operation=type_text)
+
+
+class KeyboardTools(Plugin, needs=(Actions, Observe)):
+    """Keyboard input to the current focus, independent of DOM references."""
 
     @tool(
         kind=ActionKind.PRESS,

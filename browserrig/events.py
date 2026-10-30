@@ -11,6 +11,7 @@ from browserrig.core.kinds import (
     ActivityOutcome,
     ObservationKind,
     ReadinessPhase,
+    ReadinessStage,
     ReadinessStatus,
 )
 
@@ -288,6 +289,7 @@ class ReadinessStartedEvent(BrowserEvent):
     readiness_id: str
     mode: ObservationKind
     phase: ReadinessPhase
+    stage: ReadinessStage = field(default=ReadinessStage.ONGOING, kw_only=True)
     type: Literal[EventKind.READINESS_STARTED] = field(
         default=EventKind.READINESS_STARTED, kw_only=True
     )
@@ -298,6 +300,7 @@ class ReadinessEndedEvent(BrowserEvent):
     readiness_id: str
     mode: ObservationKind
     phase: ReadinessPhase
+    stage: ReadinessStage = field(default=ReadinessStage.ONGOING, kw_only=True)
     duration: float
     reason: str = ""
 

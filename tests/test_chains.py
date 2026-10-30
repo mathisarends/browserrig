@@ -25,7 +25,7 @@ from browserrig.events import ActionFailedEvent, ActionFinishedEvent, PageState
 from browserrig.observation.changes import decision_change
 from browserrig.observation.models import Element, Snapshot
 from browserrig.tools import Actions, BrowserToolMetadata, browser_tool
-from browserrig.tools.execution import Effect
+from browserrig.tools.execution import DomActionChains, Effect
 
 
 def _element(**values):
@@ -194,7 +194,12 @@ async def test_failed_comparison_keeps_input_successful_and_breaks_the_chain():
         input=SimpleNamespace(action=lambda _: nullcontext()),
     )
     actions = SimpleNamespace(
-        observe=SimpleNamespace(snapshot=before, probe=AsyncMock(side_effect=RuntimeError("lost"))),
+        observe=SimpleNamespace(
+            snapshot=before,
+            capture_strategy=SimpleNamespace(provides_dom_refs=True),
+            probe=AsyncMock(side_effect=RuntimeError("lost")),
+        ),
+        chain_policy=DomActionChains(),
         browser=SimpleNamespace(active_tab=tab, action_lock=asyncio.Lock()),
         _prepare=AsyncMock(
             return_value=PageState(

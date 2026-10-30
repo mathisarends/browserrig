@@ -1,5 +1,5 @@
 from browserrig.core.geometry import Geometry
-from browserrig.core.kinds import ObservationKind, ReadinessPhase, ReadinessStatus
+from browserrig.core.kinds import ObservationKind, ReadinessPhase, ReadinessStage, ReadinessStatus
 from browserrig.core.options import Options
 
 
@@ -9,6 +9,7 @@ class ReadinessReport(Options):
     document_id: str
     mode: ObservationKind
     phase: ReadinessPhase
+    stage: ReadinessStage = ReadinessStage.ONGOING
     status: ReadinessStatus
     duration: float
     reason: str = ""

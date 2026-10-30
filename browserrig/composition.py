@@ -8,18 +8,19 @@ from .browser import Chrome
 from .browser.config import BrowserOptions
 from .files import FileSystemOptions
 from .nudges import Nudges
+from .observation.images import ImageContext
 from .observation.plugin import Observe
 from .readiness.config import ReadinessOptions
 from .readiness.plugin import Readiness
 from .recording import Recording, RecordingOptions
 from .tools import (
     DialogTools,
+    DomTools,
     FileTools,
-    FormTools,
     JavaScriptTools,
     KeyboardTools,
-    MouseTools,
     NavigationTools,
+    PointerTools,
     TabTools,
     UploadTools,
 )
@@ -30,29 +31,40 @@ def browser_plugins(
     options: BrowserOptions | None = None,
     *,
     mode: ObservationMode | None = None,
-    readiness: ReadinessOptions | None = None,
+    readiness: ReadinessOptions | Readiness | None = None,
     recording: RecordingOptions | None = None,
     file_system: FileSystemOptions | None = None,
+    observe: Observe | None = None,
+    image_context: ImageContext | None = None,
+    actions: Actions | None = None,
+    local_files: bool = True,
 ) -> list[Plugin]:
+    if mode is not None and observe is not None:
+        raise ValueError("Choose mode or observe, not both")
     selected = mode or DomMode()
+    observation = observe or Observe(selected)
     plugins: list[Plugin] = [
         Activity(),
         Chrome(options, file_system=file_system),
-        Readiness(selected, readiness),
+        readiness if isinstance(readiness, Readiness) else Readiness(selected, readiness),
         Nudges(),
-        Observe(selected),
-        Actions(),
+        observation,
+        image_context or ImageContext(),
+        actions or Actions(),
         NavigationTools(),
         JavaScriptTools(),
         KeyboardTools(),
-        MouseTools(),
+        PointerTools(),
         TabTools(),
         DialogTools(),
-        FormTools(),
-        FileTools(),
-        UploadTools(),
         LatestObservationOnly(),
     ]
+    if observation.capture_strategy.provides_dom_refs:
+        plugins.append(DomTools())
+    if local_files:
+        plugins.append(FileTools())
+        if observation.capture_strategy.provides_dom_refs:
+            plugins.append(UploadTools())
     if recording is not None:
         plugins.append(Recording(recording))
     return plugins

@@ -103,6 +103,12 @@ For custom composition, `browser_plugins()` returns an inspectable plugin list:
 `Agent(model=model, plugins=[*browser_plugins(), MyPlugin()])`.
 Individual capabilities such as `Chrome`, `Readiness`, `Observe`, `Actions`, tool
 plugins, `Nudges`, `Activity`, `Recording`, and `TerminalEvents` are also available directly.
+See [composing browser agents](docs/browser-composition.md) for the explicit plugin API:
+`Readiness(initial=..., ongoing=...)`, `Observe(capture=..., renderer=...,
+screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` and
+`ImageContext(keep_latest_n_screenshots=3)`. Capture, rendering, image retention and
+tool capabilities can be selected independently. `ScreenshotTrigger.ON_REQUEST`
+captures only after a screenshot tool call. Existing mode options remain recipe adapters.
 Shared plugin services use class-level `Inject[T]` and `provides=True`; explicit
 `needs=(...)` declarations control waiting, teardown, and restart when a provider changes.
 Injection binds values without inferring dependencies. Optional services resolve
@@ -194,13 +200,15 @@ print(agent.prompt)
 `Observe` declares configuration-dependent `page_state` and `refs` sections, plus
 the shared `trust` section. DOM guidance follows screenshot, mark and page-text
 settings; canvas guidance describes image coordinates and omits DOM-ref rules.
-`MouseTools.coordinates` and `FileTools.usage` describe shared workflows.
+`PointerTools.coordinates`, `ImageContext.usage` and `FileTools.usage` describe shared workflows.
 Single-tool instructions live in tool descriptions.
 
 With a custom `browser_plugins()` composition, use the configured recipes' section
 attributes in `SystemPrompt(sections=..., exclude=...)` to reorder or replace
 individual sections. `PluginSections()` places the remaining declarations.
-For manual compositions, pass the same mode to `Observe(mode)` and `Readiness(mode)`.
+For manual compositions, configure `Observe` independently of `Readiness` and add
+`ImageContext()` to deliver captured images. The legacy mode argument is still
+supported by both plugins, but readiness no longer implicitly selects capture.
 Use `await session.prompt.render()` to inspect the exact session system text.
 
 Plugins mounted through `session.use()` require an explicit choice when they declare
@@ -274,9 +282,10 @@ Strict application schemas must accept those fields, `break_chain` and
 When upgrading application code from 0.3.0, rename `BrowserAgent(instructions=...)`
 to `BrowserAgent(system_prompt=...)`; wrap instruction lists in
 `SystemPrompt(sections=(...))`. Replace custom plugin `guidance` attributes with
-`SystemSection` or synchronous `@system_section` declarations. Replace imports of
-`PointerTools` and `InteractionTools` with `MouseTools` from `browserrig.tools`.
-The shared mouse plugin enables DOM-ref calls only when `Observe` uses `DomMode`.
+`SystemSection` or synchronous `@system_section` declarations. New recipes mount
+`PointerTools` for coordinates and `DomTools` for ref-based mouse, typing and forms.
+`MouseTools` remains a compatibility group; do not mount overlapping tool groups.
+Canvas recipes omit DOM tools instead of installing disabled tools.
 
 ## Session controls and canvas mode
 
@@ -310,9 +319,10 @@ and stable element refs.
 DOM mode reads every frame document with one `DOMSnapshot.captureSnapshot` call per
 CDP session and derives roles, names, states, visibility and landmark sections from
 that data in Python, without walking the DOM in the page. Normal observations omit
-page-text excerpts and do not capture or attach screenshots. Use `extract_content()`
+page-text excerpts and do not capture new screenshots. Use `extract_content()`
 to read the page. The agent can call `screenshot()` to request the current view as an
-image in its next iteration. `observe()` refreshes the normal page state. Use
+image in its next iteration. `ImageContext` keeps the latest screenshot by default,
+including during subsequent text-only steps. `observe()` refreshes page state. Use
 `DomMode(screenshots=True)` to enable images on every step; canvas mode includes
 images automatically. `DomMode(max_text_chars=N)` enables a page-text excerpt; its
 default is `0`.
@@ -426,19 +436,19 @@ ancestor hit tests are refreshed after scrolling and before dispatching input.
 Typing, selecting options, setting date inputs, and uploads use this preparation
 as well as clicks. Focus uses `preventScroll` to avoid an extra browser jump.
 
-`MouseTools` provides `click(ref=..., count=2)` and
+`DomTools` provides `click(ref=..., count=2)` and
 `drag(source_ref=..., target_ref=...)`. Both drag endpoints are prepared first and
 must fit in the viewport together before the gesture starts. Native `draggable`
 elements use HTML5 drag and drop with a real `DataTransfer`.
 
-In both DOM and canvas mode, the same plugin provides `scroll(delta_y=...)`,
+In both DOM and canvas mode, `PointerTools` provides `scroll(delta_y=...)`,
 `click_at(x=..., y=..., count=2)` and
 `drag_at(start=Point(...), end=Point(...), mode=DragMode.POINTER)`.
 Use `DragMode.HTML5` for coordinate-based dragging of native HTML5 sources.
-The current observation determines how crop coordinates map to the viewport.
+The newest image shown to the model determines how crop coordinates map to the viewport;
+subsequent text-only observations retain that image's geometry.
 All gestures use real CDP input and release mouse buttons even when interrupted.
-DOM-ref calls are hidden and rejected in canvas mode through Harnessed's conditional
-tool availability. Workspace tools are likewise hidden when a connected browser has
+Canvas recipes do not install DOM-ref tools. Workspace tools are hidden when a connected browser has
 no shared local file system; `list_downloads` remains available.
 
 ## Input choreography
@@ -473,7 +483,7 @@ focus and takes exactly one of `text` or `key`:
 `hold_control`, `hold_shift`, `hold_alt`, and `hold_meta` apply to `key`. All held
 modifiers are released after the key. Literal text uses `text` without modifier flags.
 
-In DOM mode, `KeyboardTools` also supplies `type_text(ref=..., text=...)` to focus and
+For DOM input, `DomTools` supplies `type_text(ref=..., text=...)` to focus and
 replace a referenced field. Use `clear=False` to type at its current selection.
 
 Keys and modifiers are released on failure or cancellation. Unicode text is

@@ -1,5 +1,5 @@
 import asyncio
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Annotated
 
 from harnessed import (
@@ -13,8 +13,7 @@ from harnessed import (
     hook,
     system_section,
 )
-from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
-from harnessed.models import ImagePart, ModelRequest, TextPart, User
+from harnessed.hooks import Next, PreStep, StepDecision
 from pydantic import Field
 
 from browserrig.browser.base import Browser, BrowserEvents
@@ -22,7 +21,7 @@ from browserrig.browser.tab import Tab
 from browserrig.core.errors import StaleElement
 from browserrig.core.geometry import Region
 from browserrig.core.kinds import ActionKind, ObservationKind, ReadinessPhase, ReadinessStatus
-from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
+from browserrig.core.modes import DomMode, ObservationMode
 from browserrig.core.tools import browser_tool as tool
 from browserrig.events import (
     ObservationCapturedEvent,
@@ -31,16 +30,19 @@ from browserrig.nudges import Nudges
 from browserrig.readiness.plugin import Readiness
 from browserrig.recording import Recording
 
-from .capture import capture
+from .capture import CaptureStrategy, DomCapture, capture_for_mode
+from .capture import capture as capture_snapshot
+from .config import Screenshots, ScreenshotTrigger
 from .content import extract_content
 from .handle import ElementHandle
-from .models import Snapshot
-from .render import image_caption, render
+from .models import CapturedImage, Snapshot
+from .renderer import CanvasRenderer, DomRenderer, Renderer
 
 
 @dataclass
 class _State:
     snapshot: Snapshot | None = None
+    delivered_image: CapturedImage | None = None
     screenshot_requested: bool = False
     screenshot_region: Region | None = None
     screenshot_zoom: float = 1
@@ -54,66 +56,46 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
     _events: Inject[BrowserEvents]
     _readiness: Inject[Readiness]
 
-    def __init__(self, mode: ObservationMode | None = None) -> None:
+    def __init__(
+        self,
+        mode: ObservationMode | None = None,
+        *,
+        capture: CaptureStrategy | None = None,
+        renderer: Renderer | None = None,
+        screenshots: Screenshots | None = None,
+    ) -> None:
         super().__init__()
+        if mode is not None and capture is not None:
+            raise ValueError("Choose mode or capture, not both")
         self.mode = mode or DomMode()
+        self.capture_strategy = capture or capture_for_mode(self.mode)
+        if renderer is None:
+            if isinstance(capture, DomCapture):
+                renderer = DomRenderer(max_text_chars=capture.max_text_chars, marks=capture.marks)
+            elif capture is not None:
+                renderer = DomRenderer() if capture.provides_dom_refs else CanvasRenderer()
+            elif isinstance(self.mode, DomMode):
+                renderer = DomRenderer(
+                    offscreen_elements=self.mode.offscreen_elements,
+                    max_text_chars=self.mode.max_text_chars,
+                    marks=self.mode.marks,
+                )
+            else:
+                renderer = CanvasRenderer()
+        self.renderer = renderer
+        self.screenshots = screenshots or Screenshots(
+            trigger=ScreenshotTrigger.EACH_STEP
+            if mode is not None and mode.screenshots
+            else ScreenshotTrigger.ON_REQUEST
+        )
 
     @system_section(title="Browser observations")
     def page_state(self) -> str:
-        if isinstance(self.mode, CanvasMode):
-            return (
-                "Use the latest browser observation and canvas image as page state. "
-                "Canvas observations contain no DOM element refs. Point using image pixel "
-                "coordinates; they are mapped to the captured region in the browser viewport. "
-                "File previews use a full-viewport image."
-            )
-        text = (
-            "Each observation starts with the page title, URL, open tabs, viewport size and "
-            "scroll position, then any open modal and alerts. Interactive elements follow, one "
-            'per line as `[ref] role "name" states value=... -> link`, grouped under landmark '
-            'headers like [MAIN] or [DIALOG: name] and form or menu groups like <form "Login">. '
-            "Headings (## Title) show where content sits. Elements in the viewport are listed "
-            "fully; elements above and below are summarized with the nearest ones listed. "
-            "A leading * marks elements that appeared since the previous observation. "
-            "Elements covered by an overlay are counted, not listed; when a modal is open, "
-            "act inside it first. Hidden and inert controls are omitted. "
-            "Visible canvases are listed with their viewport-pixel bounds; their drawn content "
-            "has no refs, so screenshot that region and point with click_at or drag_at. "
-            "When the current observation has no image, coordinate tools take viewport CSS "
-            "pixels, the same space as those bounds. "
-        )
-        text += (
-            "Observations include a bounded page-text excerpt. "
-            if self.mode.max_text_chars
-            else "Observations omit page-text excerpts; use extract_content to read the page. "
-        )
-        text += (
-            "Every observation includes a screenshot; its pixels equal viewport CSS pixels."
-            if self.mode.screenshots
-            else "Screenshots are included only when requested; their pixels equal viewport "
-            "CSS pixels."
-        )
-        text += (
-            " A region screenshot shows only part of the viewport, optionally zoomed; its "
-            "observation states the region, and coordinate tools then take that image's pixels."
-        )
-        if self.mode.marks:
-            text += (
-                " In screenshots, each visible element is outlined with a colored dashed border "
-                "and labeled with its ref. Links are blue, buttons green, text inputs purple."
-            )
-        return text
+        return self.renderer.instructions(self.screenshots)
 
     @system_section(title="DOM element references")
     def refs(self) -> str | None:
-        if isinstance(self.mode, CanvasMode):
-            return None
-        return (
-            "Pass the ref inside the brackets, such as 482 or f1:93, to element tools, including "
-            "type_text. Refs stay valid while the element stays in the same document and tab, "
-            "even across observations. Element interactions automatically use wheel input to "
-            "bring targets into view before acting."
-        )
+        return self.renderer.refs() if self.capture_strategy.provides_dom_refs else None
 
     trust = SystemSection(
         title="Browser content and action results",
@@ -131,15 +113,13 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         """Compare current controls without publishing or replacing the delivered observation."""
         async with self._state.lock:
             report = await self._readiness.wait(tab, phase=ReadinessPhase.ACTION)
-            mode = self._readiness.mode
-            if isinstance(mode, DomMode):
-                mode = mode.model_copy(update={"screenshots": False})
-            return await capture(
+            return await capture_snapshot(
                 tab,
-                mode,
+                self.capture_strategy,
                 report,
                 tabs=tuple(await self._browser.tabs()),
                 previous=self._state.snapshot,
+                screenshots=False,
             )
 
     async def capture(
@@ -155,17 +135,17 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         async with self._state.lock:
             selected = tab or browser.active_tab
             report = await readiness.wait(selected, phase=phase)
-            mode = readiness.mode
-            if isinstance(mode, DomMode) and screenshots is not None:
-                mode = mode.model_copy(update={"screenshots": screenshots})
-            snapshot = await capture(
+            snapshot = await capture_snapshot(
                 selected,
-                mode,
+                self.capture_strategy,
                 report,
                 tabs=tuple(await browser.tabs()),
                 previous=self._state.snapshot,
                 region=region,
                 zoom=zoom,
+                screenshots=(self.screenshots.trigger == ScreenshotTrigger.EACH_STEP)
+                if screenshots is None
+                else screenshots,
             )
             self._state.snapshot = snapshot
             await self._events.emit(
@@ -203,14 +183,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         ),
     )
     async def observe(self) -> ToolResult:
-        snapshot = await self.capture()
-        if snapshot.image:
-            return ToolResult(
-                (
-                    TextPart(self._render(snapshot)),
-                    ImagePart(f"data:image/png;base64,{snapshot.image}"),
-                )
-            )
+        snapshot = await self.capture(screenshots=False)
         return ToolResult(self._render(snapshot))
 
     @tool(
@@ -242,7 +215,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         if region is None and zoom != 1:
             raise ToolError("zoom needs a region; pass the viewport area to magnify")
         if region is not None:
-            if isinstance(self.mode, CanvasMode):
+            if not self.capture_strategy.provides_dom_refs:
                 raise ToolError(
                     "Region screenshots need DOM mode; canvas observations already show the canvas"
                 )
@@ -293,7 +266,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
     ) -> StepDecision:
         state = self._state
         snapshot = await self.capture(
-            phase=ReadinessPhase.INITIAL if state.snapshot is None else ReadinessPhase.OBSERVATION,
+            phase=ReadinessPhase.OBSERVATION,
             screenshots=True if state.screenshot_requested else None,
             region=state.screenshot_region,
             zoom=state.screenshot_zoom,
@@ -318,28 +291,27 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             event.session.observe(await nudges.project(snapshot))
         return await next_()
 
-    @hook(PrepareRequest)
-    async def _prepare_image(
-        self, _event: PrepareRequest, next_: Next[ModelRequest]
-    ) -> ModelRequest:
-        request = await next_()
+    def image_delivered(self, image: CapturedImage) -> None:
+        """Called by ImageContext only when the model request includes this image."""
+        self._state.delivered_image = image
+
+    def coordinate_source(self) -> Snapshot | CapturedImage:
         snapshot = self._state.snapshot
-        if snapshot is not None and snapshot.image:
-            image = User(
-                (
-                    TextPart(image_caption(snapshot)),
-                    ImagePart(f"data:image/png;base64,{snapshot.image}"),
-                ),
-                id=f"browser-image:{snapshot.id}",
-            )
-            return replace(request, messages=(*request.messages, image))
-        return request
+        if snapshot is None:
+            raise StaleElement("Observe before using coordinates")
+        image = self._state.delivered_image
+        if image is not None:
+            if (image.tab_id, image.document_id) != (snapshot.tab_id, snapshot.document_id):
+                raise StaleElement(
+                    "The last shown image belongs to another document; screenshot again"
+                )
+            return image
+        return snapshot
 
     def _render(self, snapshot: Snapshot) -> str:
-        offscreen = self.mode.offscreen_elements if isinstance(self.mode, DomMode) else 0
-        return render(snapshot, offscreen=offscreen)
+        return self.renderer.render(snapshot)
 
 
 def has_dom_refs(observe: Inject[Observe]) -> bool:
     """Tool gate: ref-based tools only work while observations carry DOM element refs."""
-    return isinstance(observe.mode, DomMode)
+    return observe.capture_strategy.provides_dom_refs

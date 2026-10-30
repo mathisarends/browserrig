@@ -9,7 +9,7 @@ from browserrig.browser.base import BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import ReadinessError
 from browserrig.core.geometry import Geometry
-from browserrig.core.kinds import ReadinessPhase, ReadinessStatus
+from browserrig.core.kinds import ReadinessPhase, ReadinessStage, ReadinessStatus
 from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
 from browserrig.events import (
     BrowserEvent,
@@ -24,6 +24,7 @@ from .canvas import CanvasReadiness
 from .config import ReadinessOptions
 from .dom import DomReadiness
 from .models import ReadinessReport
+from .policies import ReadinessContext, ReadinessPolicy
 from .strategy import ReadinessStrategy
 
 
@@ -35,6 +36,8 @@ async def wait_for_page(
     options: ReadinessOptions | None = None,
     phase: ReadinessPhase = ReadinessPhase.INITIAL,
     geometry_cache: dict[tuple[str, str], Geometry] | None = None,
+    policy: ReadinessPolicy | None = None,
+    stage: ReadinessStage | None = None,
 ) -> ReadinessReport:
     emit = events.emit if events is not None else _discard
     selected = mode or DomMode()
@@ -45,7 +48,9 @@ async def wait_for_page(
     started_document = tab.document_id
     started = monotonic()
     rid = uuid4().hex
-    strategy = _readiness_strategy(selected, tab, options, phase, geometry_cache)
+    stage = stage or (
+        ReadinessStage.INITIAL if phase == ReadinessPhase.INITIAL else ReadinessStage.ONGOING
+    )
     await emit(
         ReadinessStartedEvent(
             readiness_id=rid,
@@ -53,21 +58,17 @@ async def wait_for_page(
             document_id=started_document,
             mode=selected.kind,
             phase=phase,
+            stage=stage,
         )
     )
     status = ReadinessStatus.READY
     try:
-        async with asyncio.timeout(strategy.budget):
-            while True:
-                if tab.dialog:
-                    status = ReadinessStatus.BLOCKED
-                    strategy.reason = "A JavaScript dialog must be handled first"
-                    break
-                if await _check(strategy):
-                    break
-                await asyncio.sleep(strategy.delay)
-    except TimeoutError:
-        status = strategy.timeout_status()
+        strategy = (
+            policy.create(ReadinessContext(tab, phase, stage, options, geometry_cache))
+            if policy
+            else _readiness_strategy(selected, tab, options, phase, geometry_cache)
+        )
+        status = await _poll(tab, strategy, started_document, reselect=policy is not None)
     except asyncio.CancelledError:
         await emit(
             ReadinessCancelledEvent(
@@ -76,6 +77,7 @@ async def wait_for_page(
                 document_id=started_document,
                 mode=selected.kind,
                 phase=phase,
+                stage=stage,
                 duration=monotonic() - started,
                 reason="cancelled",
             )
@@ -89,6 +91,7 @@ async def wait_for_page(
                 document_id=started_document,
                 mode=selected.kind,
                 phase=phase,
+                stage=stage,
                 duration=monotonic() - started,
                 reason=type(error).__name__,
             )
@@ -100,6 +103,7 @@ async def wait_for_page(
         document_id=tab.document_id,
         mode=selected.kind,
         phase=phase,
+        stage=stage,
         status=status,
         duration=monotonic() - started,
         reason=strategy.reason if status != ReadinessStatus.READY else "",
@@ -119,6 +123,7 @@ async def wait_for_page(
             document_id=started_document,
             mode=selected.kind,
             phase=phase,
+            stage=stage,
             duration=report.duration,
             reason=report.reason,
         )
@@ -126,6 +131,27 @@ async def wait_for_page(
     if status == ReadinessStatus.FAILED:
         raise ReadinessError(f"{selected.kind} readiness timed out: {strategy.reason}")
     return report
+
+
+async def _poll(
+    tab: Tab, strategy: ReadinessStrategy, document_id: str, *, reselect: bool
+) -> ReadinessStatus:
+    try:
+        async with asyncio.timeout(strategy.budget):
+            while True:
+                if tab.dialog:
+                    strategy.reason = "A JavaScript dialog must be handled first"
+                    return ReadinessStatus.BLOCKED
+                ready = await _check(strategy)
+                await tab.sync_document()
+                if reselect and tab.document_id != document_id:
+                    strategy.reason = "document changed during readiness; select policy again"
+                    return ReadinessStatus.DEGRADED
+                if ready:
+                    return ReadinessStatus.READY
+                await asyncio.sleep(strategy.delay)
+    except TimeoutError:
+        return strategy.timeout_status()
 
 
 async def _discard(_event: BrowserEvent) -> None:

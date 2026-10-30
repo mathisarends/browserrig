@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import hashlib
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import Field
@@ -106,12 +110,44 @@ class Snapshot(Options):
     image: str | None = Field(default=None, repr=False)
     # The viewport area the image shows; coordinate tools map image pixels through it.
     geometry: Geometry | None = None
+    captured_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     def element(self, ref: str) -> Element:
         for element in self.elements:
             if element.ref == ref:
                 return element
         raise StaleElement("Unknown element reference; observe again")
+
+
+@dataclass(frozen=True, slots=True)
+class CapturedImage:
+    """An image keeps its coordinate space even after a later text-only observation."""
+
+    id: str
+    browser_id: str
+    tab_id: str
+    document_id: str
+    captured_at: datetime
+    image: str
+    width: float
+    height: float
+    geometry: Geometry | None
+
+    @classmethod
+    def from_snapshot(cls, snapshot: Snapshot, browser_id: str) -> CapturedImage:
+        if snapshot.image is None:
+            raise ValueError("Snapshot has no image")
+        return cls(
+            snapshot.id,
+            browser_id,
+            snapshot.tab_id,
+            snapshot.document_id,
+            snapshot.captured_at,
+            snapshot.image,
+            snapshot.width,
+            snapshot.height,
+            snapshot.geometry,
+        )
 
 
 class ElementFingerprint(Options):

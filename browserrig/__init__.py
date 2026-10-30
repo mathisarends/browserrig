@@ -9,13 +9,74 @@ from .composition import browser_plugins
 from .files import FileSystem, FileSystemOptions
 from .kinds import DragMode, MouseEventKind
 from .nudges import Nudges
-from .observation import CanvasMode, DomMode, Observe
-from .readiness import Readiness, ReadinessOptions, wait_for_page
+from .observation import (
+    CanvasCapture,
+    CanvasMode,
+    CanvasRegion,
+    CanvasRenderer,
+    CaptureContent,
+    CaptureRegion,
+    CaptureStrategy,
+    DomCapture,
+    DomMode,
+    DomRenderer,
+    ImageContext,
+    Observe,
+    Renderer,
+    Screenshots,
+    ScreenshotTrigger,
+)
+from .readiness import (
+    CanvasReady,
+    DocumentReadiness,
+    DomReady,
+    Readiness,
+    ReadinessContext,
+    ReadinessOptions,
+    ReadinessPolicy,
+    ReadinessStrategy,
+    wait_for_page,
+)
 from .recording import Recording, RecordingOptions
 from .terminal import TerminalEvents
-from .tools import Actions, MouseTools
+from .tools import (
+    Actions,
+    DomActionChains,
+    DomTools,
+    KeyboardTools,
+    MouseTools,
+    NavigationTools,
+    ObserveAfterInput,
+    PointerTools,
+    TabTools,
+)
 
 __all__ = [
+    "CanvasCapture",
+    "CanvasRegion",
+    "CanvasRenderer",
+    "CaptureContent",
+    "CaptureRegion",
+    "CaptureStrategy",
+    "DomCapture",
+    "DomRenderer",
+    "ImageContext",
+    "Renderer",
+    "Screenshots",
+    "ScreenshotTrigger",
+    "CanvasReady",
+    "DocumentReadiness",
+    "DomReady",
+    "ReadinessContext",
+    "ReadinessPolicy",
+    "ReadinessStrategy",
+    "DomTools",
+    "PointerTools",
+    "KeyboardTools",
+    "NavigationTools",
+    "TabTools",
+    "ObserveAfterInput",
+    "DomActionChains",
     "Activity",
     "Actions",
     "Point",
