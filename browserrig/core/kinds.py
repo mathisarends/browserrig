@@ -5,6 +5,7 @@ class ActivityKind(StrEnum):
     LLM = "llm"
     TOOL = "tool"
     READINESS = "readiness"
+    COMPACTION = "compaction"
     PAUSED = "paused"
 
 
@@ -28,16 +29,41 @@ class ActivityOutcome(StrEnum):
 
 
 class ActionKind(StrEnum):
+    """Stable tool identities, independent of Python callback names and signatures."""
+
     NAVIGATE = "navigate"
+    SEARCH = "search"
+    GO_BACK = "go_back"
+    GO_FORWARD = "go_forward"
+    RELOAD = "reload"
+    WAIT = "wait"
     JAVASCRIPT = "javascript"
     CLICK = "click"
+    CLICK_AT = "click_at"
     DOUBLE_CLICK = "double_click"
     DRAG = "drag"
+    DRAG_AT = "drag_at"
     TYPE = "type"
     PRESS = "press"
     SCROLL = "scroll"
     SELECT = "select"
+    SET_DATE = "set_date"
     UPLOAD = "upload"
+    OPEN_TAB = "open_tab"
+    SWITCH_TAB = "switch_tab"
+    CLOSE_TAB = "close_tab"
+    LIST_TABS = "list_tabs"
+    HANDLE_DIALOG = "handle_dialog"
+    LIST_DOWNLOADS = "list_downloads"
+    LIST_FILES = "list_files"
+    READ_FILE = "read_file"
+    WRITE_FILE = "write_file"
+    OPEN_FILE = "open_file"
+    OPEN_DOWNLOADED_FILE = "open_downloaded_file"
+    OBSERVE = "observe"
+    SCREENSHOT = "screenshot"
+    EXTRACT_CONTENT = "extract_content"
+    # Kept readable in existing persisted action receipts.
     TAB = "tab"
 
 

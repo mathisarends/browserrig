@@ -5,7 +5,14 @@ from enum import Enum
 from typing import TextIO
 
 from harnessed import Plugin, hook
-from harnessed.events import SessionEvent
+from harnessed.events import (
+    CompactionFinishedEvent,
+    CompactionStartedEvent,
+    ModelAttemptFinishedEvent,
+    ModelAttemptStartedEvent,
+    ModelRetryScheduledEvent,
+    SessionEvent,
+)
 from harnessed.hooks import SessionAppended
 
 from .events import BrowserEvent, InputEvent
@@ -25,10 +32,31 @@ _METADATA = {
     "step",
     "model",
     "dispatched",
+    "compaction_id",
+    "retry_group_id",
+    "retry_kind",
+    "attempt",
+    "retry_count",
+    "max_retries",
+    "delay_seconds",
+    "status_code",
+    "partial",
+    "max_steps",
+    "final_step",
 }
 
+type _TerminalEvent = (
+    SessionEvent
+    | InputEvent
+    | CompactionStartedEvent
+    | CompactionFinishedEvent
+    | ModelAttemptStartedEvent
+    | ModelRetryScheduledEvent
+    | ModelAttemptFinishedEvent
+)
 
-def _event_record(event: SessionEvent | InputEvent) -> dict[str, object]:
+
+def _event_record(event: _TerminalEvent) -> dict[str, object]:
     if isinstance(event, BrowserEvent | InputEvent):
         record = asdict(event)
         # Omit page/form contents. URLs and key names remain diagnostic metadata.
@@ -38,7 +66,9 @@ def _event_record(event: SessionEvent | InputEvent) -> dict[str, object]:
     record: dict[str, object] = {"type": str(event.type)}
     for item in fields(event) if is_dataclass(event) else ():
         value = getattr(event, item.name)
-        if item.name in _METADATA and isinstance(value, str | int | float | bool | Enum):
+        if item.name in _METADATA and (
+            value is None or isinstance(value, str | int | float | bool | Enum)
+        ):
             record[item.name] = value
     call = getattr(event, "call", None)
     if call is not None:
@@ -46,6 +76,8 @@ def _event_record(event: SessionEvent | InputEvent) -> dict[str, object]:
     result = getattr(event, "result", None)
     if result is not None and hasattr(result, "is_error"):
         record["is_error"] = result.is_error
+        record["tool_status"] = result.status
+        record["break_chain"] = result.break_chain
     return record
 
 
@@ -54,7 +86,7 @@ class TerminalEvents(Plugin):
         super().__init__()
         self._output = output
 
-    def _write(self, event: SessionEvent | InputEvent) -> None:
+    def _write(self, event: _TerminalEvent) -> None:
         print(
             json.dumps(_event_record(event), ensure_ascii=True, allow_nan=False),
             file=self._output if self._output is not None else sys.stderr,
@@ -67,4 +99,24 @@ class TerminalEvents(Plugin):
 
     @hook(InputEvent)
     def _input_event(self, event: InputEvent) -> None:
+        self._write(event)
+
+    @hook(CompactionStartedEvent)
+    def _compaction_started(self, event: CompactionStartedEvent) -> None:
+        self._write(event)
+
+    @hook(CompactionFinishedEvent)
+    def _compaction_finished(self, event: CompactionFinishedEvent) -> None:
+        self._write(event)
+
+    @hook(ModelAttemptStartedEvent)
+    def _attempt_started(self, event: ModelAttemptStartedEvent) -> None:
+        self._write(event)
+
+    @hook(ModelRetryScheduledEvent)
+    def _retry_scheduled(self, event: ModelRetryScheduledEvent) -> None:
+        self._write(event)
+
+    @hook(ModelAttemptFinishedEvent)
+    def _attempt_finished(self, event: ModelAttemptFinishedEvent) -> None:
         self._write(event)

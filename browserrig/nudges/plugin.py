@@ -26,6 +26,8 @@ from browserrig.events import (
     TabOpenedEvent,
 )
 
+_CLICK_KINDS = {ActionKind.CLICK, ActionKind.CLICK_AT, ActionKind.DOUBLE_CLICK}
+
 if TYPE_CHECKING:
     from browserrig.observation.models import Snapshot
 
@@ -110,7 +112,7 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         if state.pending is not None:
             state.starts.pop(state.pending.action_id, None)
         state.pending = None
-        if not event.expects_change and event.kind != ActionKind.CLICK:
+        if not event.expects_change and event.kind not in _CLICK_KINDS:
             state.starts.pop(event.action_id, None)
             if not state.starts:
                 self._state.tabs.pop(event.target_id, None)
@@ -142,7 +144,7 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         if not same_page:
             return
         if (
-            action.kind == ActionKind.CLICK
+            action.kind in _CLICK_KINDS
             and not action.prepared_scroll
             and abs(event.scroll_y - action.before.scroll_y) >= 50
         ):

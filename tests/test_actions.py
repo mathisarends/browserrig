@@ -55,7 +55,36 @@ async def test_validation_rejects_before_dispatch():
     assert isinstance(events[0], ActionFailedEvent) and not events[0].dispatched
 
 
-async def test_tab_management_does_not_wait_on_current_page_dialog():
+@pytest.mark.parametrize(
+    "kind",
+    [
+        ActionKind.TAB,
+        ActionKind.OPEN_TAB,
+        ActionKind.SWITCH_TAB,
+        ActionKind.CLOSE_TAB,
+        ActionKind.OPEN_FILE,
+        ActionKind.OPEN_DOWNLOADED_FILE,
+    ],
+)
+async def test_tab_management_does_not_wait_on_current_page_dialog(kind):
     tab = SimpleNamespace(url="about:blank", document_id="doc", dialog=("alert", "hello"))
-    before = await Actions._prepare(SimpleNamespace(), tab, ActionKind.TAB)
+    before = await Actions._prepare(SimpleNamespace(), tab, kind)
     assert before.url == tab.url and before.document_id == tab.document_id
+
+
+async def test_global_keyboard_input_rejects_a_document_changed_between_calls():
+    tab = SimpleNamespace(
+        id="tab",
+        document_id="new-doc",
+        sync_document=AsyncMock(),
+    )
+    actions = SimpleNamespace(
+        observe=SimpleNamespace(
+            snapshot=SimpleNamespace(
+                tab_id="tab",
+                document_id="old-doc",
+            )
+        )
+    )
+    with pytest.raises(BrowserError, match="observe before input"):
+        await Actions._prepare(actions, tab, ActionKind.PRESS)

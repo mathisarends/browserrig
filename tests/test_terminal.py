@@ -2,8 +2,16 @@ import io
 import json
 from dataclasses import dataclass
 
-from harnessed import Agent, Inject, Plugin, SessionLog, hook
-from harnessed.events import ModelRequestedEvent
+from harnessed import Agent, Inject, Plugin, SessionLog, ToolCall, ToolResult, ToolStatus, hook
+from harnessed.events import (
+    CompactionFinishedEvent,
+    CompactionStartedEvent,
+    ModelAttemptFinishedEvent,
+    ModelAttemptStartedEvent,
+    ModelRequestedEvent,
+    ModelRetryScheduledEvent,
+    ToolCallFinishedEvent,
+)
 from harnessed.testing import ScriptedModel
 
 from browserrig import TerminalEvents
@@ -47,3 +55,43 @@ def test_terminal_omits_arbitrary_page_and_form_value_fields():
 
     record = _event_record(FormEvent(value="private form", message="page dialog", text="page text"))
     assert not {"text", "message", "value"} & record.keys()
+
+
+async def test_terminal_reports_correlated_compaction_and_attempts_without_inventing_counters():
+    output = io.StringIO()
+    agent = Agent(model=ScriptedModel(["ok"]), plugins=[TerminalEvents(output)])
+    events = (
+        CompactionStartedEvent("compact-1"),
+        ModelAttemptStartedEvent(request_id="request-1", retry_group_id="group-1"),
+        ModelRetryScheduledEvent(
+            request_id="request-1",
+            retry_group_id="group-1",
+            attempt=1,
+            reason="rate_limit",
+            delay_seconds=0.1,
+        ),
+        ModelAttemptFinishedEvent(
+            request_id="request-1",
+            retry_group_id="group-1",
+            outcome="retrying",
+        ),
+        CompactionFinishedEvent("compact-1", "discarded"),
+    )
+    async with agent.session() as session:
+        for event in events:
+            await session.emit(event)
+        assert not any(isinstance(item, type(event)) for item in session.events for event in events)
+    records = [json.loads(line) for line in output.getvalue().splitlines()]
+    activity = [r for r in records if r.get("compaction_id") or r.get("retry_group_id")]
+    assert len(activity) == len(events)
+    assert activity[0]["compaction_id"] == activity[-1]["compaction_id"] == "compact-1"
+    assert activity[1]["attempt"] is None and activity[1]["retry_count"] is None
+    assert activity[2]["retry_kind"] == "provider" and activity[2]["attempt"] == 1
+    assert activity[3]["outcome"] == "retrying" and activity[-1]["outcome"] == "discarded"
+
+
+def test_terminal_distinguishes_skipped_calls_and_chain_breaks_without_result_contents():
+    result = ToolResult("PRIVATE RESULT", status=ToolStatus.SKIPPED, break_chain=True)
+    record = _event_record(ToolCallFinishedEvent(ToolCall("click", {}), result))
+    assert record["tool_status"] == "skipped" and record["break_chain"] is True
+    assert "PRIVATE RESULT" not in str(record)

@@ -12,7 +12,6 @@ from harnessed import (
     ToolResult,
     hook,
     system_section,
-    tool,
 )
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
 from harnessed.models import ImagePart, ModelRequest, TextPart, User
@@ -21,8 +20,9 @@ from pydantic import Field
 from browserrig.browser.base import Browser, BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import StaleElement
-from browserrig.core.kinds import ReadinessPhase, ReadinessStatus
+from browserrig.core.kinds import ActionKind, ReadinessPhase, ReadinessStatus
 from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
+from browserrig.core.tools import browser_tool as tool
 from browserrig.events import (
     ObservationCapturedEvent,
 )
@@ -115,6 +115,21 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
     @property
     def snapshot(self) -> Snapshot | None:
         return self._state.snapshot
+
+    async def probe(self, tab: Tab) -> Snapshot:
+        """Compare current controls without publishing or replacing the delivered observation."""
+        async with self._state.lock:
+            report = await self._readiness.wait(tab, phase=ReadinessPhase.ACTION)
+            mode = self._readiness.mode
+            if isinstance(mode, DomMode):
+                mode = mode.model_copy(update={"screenshots": False})
+            return await capture(
+                tab,
+                mode,
+                report,
+                tabs=tuple(await self._browser.tabs()),
+                previous=self._state.snapshot,
+            )
 
     async def capture(
         self,
@@ -210,6 +225,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         return request
 
     @tool(
+        kind=ActionKind.OBSERVE,
         readonly=True,
         description=(
             "Refresh page metadata and interactive elements. DOM mode omits page-text excerpts "
@@ -233,6 +249,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         return render(snapshot, offscreen=offscreen)
 
     @tool(
+        kind=ActionKind.SCREENSHOT,
         readonly=True,
         description=(
             "Request a screenshot of the active tab for visual inspection in your next iteration. "
@@ -252,7 +269,9 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         )
 
     @tool(
+        kind=ActionKind.EXTRACT_CONTENT,
         readonly=True,
+        chainable=True,
         description=(
             "Extract the active page as structured Markdown with headings, lists, links, tables "
             "and code, including loaded content below the viewport. Does not scroll or navigate. "

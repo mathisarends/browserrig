@@ -36,8 +36,57 @@ from browserrig import (
     browser_plugins,
 )
 from browserrig.browser.base import BrowserEvents
-from browserrig.tools import DialogTools, KeyboardTools
+from browserrig.core.kinds import ActionKind
+from browserrig.tools import BrowserToolMetadata, DialogTools, KeyboardTools
 from tests.fakes import FakeBrowser
+
+
+async def test_each_browser_tool_has_a_unique_stable_kind(fake_chrome):
+    # The explicit mapping is an API contract, independent of callbacks and their signatures.
+    expected = {
+        "navigate": ActionKind.NAVIGATE,
+        "search": ActionKind.SEARCH,
+        "go_back": ActionKind.GO_BACK,
+        "go_forward": ActionKind.GO_FORWARD,
+        "reload": ActionKind.RELOAD,
+        "wait": ActionKind.WAIT,
+        "click": ActionKind.CLICK,
+        "click_at": ActionKind.CLICK_AT,
+        "scroll": ActionKind.SCROLL,
+        "drag": ActionKind.DRAG,
+        "drag_at": ActionKind.DRAG_AT,
+        "type_text": ActionKind.TYPE,
+        "send_keys": ActionKind.PRESS,
+        "select_option": ActionKind.SELECT,
+        "set_date": ActionKind.SET_DATE,
+        "open_tab": ActionKind.OPEN_TAB,
+        "switch_tab": ActionKind.SWITCH_TAB,
+        "close_tab": ActionKind.CLOSE_TAB,
+        "list_tabs": ActionKind.LIST_TABS,
+        "execute_javascript": ActionKind.JAVASCRIPT,
+        "handle_dialog": ActionKind.HANDLE_DIALOG,
+        "list_downloads": ActionKind.LIST_DOWNLOADS,
+        "list_files": ActionKind.LIST_FILES,
+        "read_file": ActionKind.READ_FILE,
+        "write_file": ActionKind.WRITE_FILE,
+        "open_file": ActionKind.OPEN_FILE,
+        "open_downloaded_file": ActionKind.OPEN_DOWNLOADED_FILE,
+        "upload_files": ActionKind.UPLOAD,
+        "observe": ActionKind.OBSERVE,
+        "screenshot": ActionKind.SCREENSHOT,
+        "extract_content": ActionKind.EXTRACT_CONTENT,
+    }
+    agent = BrowserAgent(model=ScriptedModel(["unused"]))
+    async with agent.session() as session:
+        tools = session.ctx[ToolRegistry]
+        kinds = []
+        for name, expected_kind in expected.items():
+            info = tools.plan(ToolCall(name, {})).tool
+            metadata = info.metadata.get(BrowserToolMetadata)
+            assert metadata is not None and metadata.kind is expected_kind
+            kinds.append(metadata.kind)
+        assert len(kinds) == len(set(kinds))
+    assert fake_chrome[0].closed
 
 
 async def test_incomplete_browser_composition_reports_transitive_dependencies_before_model_use():

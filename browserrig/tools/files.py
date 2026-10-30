@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Annotated
 
 import yaml
-from harnessed import Inject, Observation, Plugin, SystemSection, ToolError, hook, tool
+from harnessed import Inject, Observation, Plugin, SystemSection, ToolError, ToolResult, hook
 from harnessed.hooks import Next, PreStep, StepDecision
 from pydantic import Field
 
@@ -12,6 +12,7 @@ from browserrig.browser.base import Browser
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.kinds import ActionKind, ReadinessPhase
+from browserrig.core.tools import browser_tool as tool
 from browserrig.files import (
     FileContent,
     FileEntry,
@@ -76,12 +77,17 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         return await next_()
 
     @tool(
-        readonly=True, description="List recent browser downloads, their stable IDs and file paths."
+        kind=ActionKind.LIST_DOWNLOADS,
+        chainable=True,
+        readonly=True,
+        description="List recent browser downloads, their stable IDs and file paths.",
     )
     async def list_downloads(self) -> tuple[Download, ...]:
         return await self._browser.downloads()
 
     @tool(
+        kind=ActionKind.LIST_FILES,
+        chainable=True,
         enabled=_has_files,
         readonly=True,
         description="List a workspace directory. Follow next_offset for more entries.",
@@ -95,6 +101,8 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         return await _file_call(lambda: self._files().list_files(path, offset=offset, limit=limit))
 
     @tool(
+        kind=ActionKind.READ_FILE,
+        chainable=True,
         enabled=_has_files,
         readonly=True,
         description=(
@@ -118,6 +126,8 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         )
 
     @tool(
+        kind=ActionKind.WRITE_FILE,
+        chainable=True,
         enabled=_has_files,
         description="Save UTF-8 text in the workspace. Existing files require overwrite=true.",
     )
@@ -126,21 +136,23 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         return await _file_call(lambda: files.write_file(path, content, overwrite=overwrite))
 
     @tool(
+        kind=ActionKind.OPEN_FILE,
         enabled=_has_files,
         description="Open a workspace/download file in a new active browser tab, including PDFs.",
     )
-    async def open_file(self, path: str) -> str:
+    async def open_file(self, path: str) -> ToolResult:
         files = self._files()
         resolved = await _file_call(lambda: files.resolve(path))
         if not await asyncio.to_thread(resolved.is_file):
             raise ToolError(f"File not found: {path}")
-        return await self._open(resolved)
+        return await self._open(resolved, ActionKind.OPEN_FILE)
 
     @tool(
+        kind=ActionKind.OPEN_DOWNLOADED_FILE,
         enabled=_has_files,
         description="Open a completed download in a new active tab using its list_downloads ID.",
     )
-    async def open_downloaded_file(self, download_id: str) -> str:
+    async def open_downloaded_file(self, download_id: str) -> ToolResult:
         downloads = await self._browser.downloads()
         download = next((item for item in downloads if item.id == download_id), None)
         if download is None:
@@ -149,21 +161,26 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
             raise ToolError(f"Download is {download.state}; only completed downloads can be opened")
         if download.error or download.path is None:
             raise ToolError(download.error or "Download has no accessible path; download it again")
-        return await self.open_file(download.path)
+        download_path = download.path
+        resolved = await _file_call(lambda: self._files().resolve(download_path))
+        if not await asyncio.to_thread(resolved.is_file):
+            raise ToolError("Downloaded file is no longer available")
+        return await self._open(resolved, ActionKind.OPEN_DOWNLOADED_FILE)
 
-    async def _open(self, path: Path) -> str:
+    async def _open(self, path: Path, kind: ActionKind) -> ToolResult:
         async def open_file(_tab: Tab) -> Effect:
             opened = await self._browser.open_tab(path)
             await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
             return Effect(f"Opened file in tab {opened.id}: {path}")
 
-        return await self._actions.run(kind=ActionKind.TAB, operation=open_file, settle=False)
+        return await self._actions.run(kind=kind, operation=open_file, settle=False)
 
 
 class UploadTools(Plugin, needs=(Actions, Observe)):
     _observe: Inject[Observe]
 
     @tool(
+        kind=ActionKind.UPLOAD,
         enabled=has_dom_refs,
         description=(
             "Set a file input using absolute paths on the browser host, not the client host."
@@ -175,7 +192,7 @@ class UploadTools(Plugin, needs=(Actions, Observe)):
         paths: Annotated[list[str], Field(min_length=1)],
         *,
         actions: Inject[Actions],
-    ) -> str:
+    ) -> ToolResult:
         async def check(tab: Tab) -> None:
             handle = await self._observe.element(tab, ref)
             if handle.element.input_type != "file":

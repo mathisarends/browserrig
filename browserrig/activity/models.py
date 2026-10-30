@@ -22,9 +22,11 @@ class ActivityKey:
         object.__setattr__(self, "kind", ActivityKind(self.kind))
         if not isinstance(self.correlation_id, str):
             raise TypeError("Activity correlation IDs must be strings")
-        correlated = self.kind in {ActivityKind.LLM, ActivityKind.TOOL, ActivityKind.READINESS}
+        correlated = self.kind != ActivityKind.PAUSED
         if bool(self.correlation_id) != correlated:
-            raise ValueError("Model, tool and readiness activities require a correlation ID")
+            raise ValueError(
+                "Model, tool, readiness and compaction activities require a correlation ID"
+            )
 
 
 def step_outcome(reason: StepOutcome) -> ActivityOutcome:

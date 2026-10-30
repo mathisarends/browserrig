@@ -1,7 +1,8 @@
-from harnessed import Inject, Plugin, ToolError, tool
+from harnessed import Inject, Plugin, ToolError, ToolResult
 
 from browserrig.browser.tab import Tab
 from browserrig.core.kinds import ActionKind
+from browserrig.core.tools import browser_tool as tool
 from browserrig.observation.plugin import Observe, has_dom_refs
 
 from .execution import Actions, Effect
@@ -11,6 +12,8 @@ class KeyboardTools(Plugin, needs=(Actions, Observe)):
     _observe: Inject[Observe]
 
     @tool(
+        kind=ActionKind.TYPE,
+        chainable=True,
         enabled=has_dom_refs,
         description="Type exact text into a DOM ref; clear replaces its value by default.",
     )
@@ -21,7 +24,7 @@ class KeyboardTools(Plugin, needs=(Actions, Observe)):
         clear: bool = True,
         *,
         actions: Inject[Actions],
-    ) -> str:
+    ) -> ToolResult:
         async def type_text(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
             await tab.mouse.move_to(point)
@@ -37,12 +40,14 @@ class KeyboardTools(Plugin, needs=(Actions, Observe)):
         return await actions.run(kind=ActionKind.TYPE, operation=type_text)
 
     @tool(
+        kind=ActionKind.PRESS,
+        chainable=True,
         description=(
             "Send keyboard input to the current page focus. Provide exactly one of "
             "text for literal text, or key for one character or a named key such as "
             "Escape, Enter or Tab. Use hold_control, hold_shift, hold_alt and hold_meta "
             "for shortcuts, e.g. key='a', hold_control=true selects all."
-        )
+        ),
     )
     async def send_keys(
         self,
@@ -54,7 +59,7 @@ class KeyboardTools(Plugin, needs=(Actions, Observe)):
         hold_meta: bool = False,
         *,
         actions: Inject[Actions],
-    ) -> str:
+    ) -> ToolResult:
         if (text is None) == (key is None):
             raise ToolError("Provide exactly one of text or key")
         if text is not None and any((hold_control, hold_shift, hold_alt, hold_meta)):
@@ -74,6 +79,4 @@ class KeyboardTools(Plugin, needs=(Actions, Observe)):
             await tab.keyboard.type_text(text)
             return Effect("Text entered.")
 
-        return await actions.run(
-            kind=ActionKind.PRESS if key is not None else ActionKind.TYPE, operation=send
-        )
+        return await actions.run(kind=ActionKind.PRESS, operation=send)

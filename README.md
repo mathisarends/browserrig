@@ -1,7 +1,7 @@
 # Browserrig
 
 Event-driven Chrome automation for AI agents and Python applications, built with
-[Harnessed 0.4.0](https://github.com/mathisarends/harnessed/releases/tag/v0.4.0),
+[Harnessed 0.5.0](https://github.com/mathisarends/harnessed/releases/tag/v0.5.0),
 cdpify, and Pydantic. Harnessed is pinned exactly in `pyproject.toml` and `uv.lock`.
 Browserrig combines direct browser access with composable agent plugins, explicit
 DOM and canvas modes, and a shared event log.
@@ -109,6 +109,70 @@ Injection binds values without inferring dependencies. Optional services resolve
 on each hook invocation and remain optional unless explicitly listed in `needs`.
 Tool decorators declare model-facing descriptions independently of developer docstrings.
 
+## Action chains and stable tool kinds
+
+Browserrig uses Harnessed 0.5.0's native scheduler for action chains. Deterministic
+form filling can combine `type_text`, `select_option`, `set_date`, and a final
+`click` in one model response. `send_keys` can also continue in DOM mode. File
+reads/writes, listings and content extraction can be chained. Browser tools run
+sequentially against explicitly addressed tabs.
+
+Navigation, search, history, reload, tab changes, file previews, scrolling, drags,
+coordinate actions, JavaScript, uploads, dialogs, waiting, `observe` and `screenshot`
+use `ToolChain.STOP_AFTER`. The tool executes first; unstarted calls after it receive
+`ToolStatus.SKIPPED`. The next model step can continue. Denied or disabled tools
+retain Harnessed's native approval semantics and do not themselves stop the chain.
+
+DOM inputs dynamically stop the chain after navigation, changed tabs, a changed
+modal, a new alert, expanded controls or newly available interactive elements.
+Typing that reveals suggestions retains the entered text and skips later calls.
+Hover that reveals controls defers the original click and explicitly reports that
+it was not dispatched. Ordinary value changes and cosmetic text updates do not
+interrupt form filling. Comparison probes omit screenshots and preserve the
+delivered observation, its element references and its new-element markers.
+An incomplete or failed comparison stops the chain; it does not report successful
+input as failed. Canvas inputs require another observation after each input.
+
+Each built-in tool declares its own stable `ActionKind` through immutable
+`BrowserToolMetadata`. Use `event.tool.metadata.get(BrowserToolMetadata)` in native
+policy, execution or result-review hooks; the registration is captured when the
+call is scheduled. Kinds are explicit constants, never derived from callback names
+or signatures. In particular, `OPEN_TAB`, `SWITCH_TAB`, `CLOSE_TAB`, `LIST_TABS`,
+`OPEN_FILE` and `OPEN_DOWNLOADED_FILE` are distinct. Coordinate clicks/drags and
+DOM clicks/drags also have separate kinds. Existing semantic names `TYPE`, `PRESS`,
+`SELECT`, `UPLOAD` and `JAVASCRIPT` identify their respective tools; date inputs use
+`SET_DATE`. Click count remains an input parameter rather than changing tool kind.
+Older `TAB` and `DOUBLE_CLICK` receipt values remain readable.
+
+Import `ActionKind` from `browserrig.kinds` and `BrowserToolMetadata` or
+`browser_tool` from `browserrig.tools`. The small `browser_tool` decorator requires
+an explicit kind and defaults to ending the chain. Metadata stays process-local;
+mutation receipts persist their stable action kind. `Actions.run()` returns the
+native `ToolResult`, exposing both `.text` and `.break_chain` to direct callers.
+
+## Step limits and optional final summaries
+
+Configure Harnessed's native loop through the existing plugin interface:
+
+```python
+from harnessed.plugins import AgentLoop, FinalStepPolicy
+
+agent = BrowserAgent(
+    model=model,
+    plugins=[AgentLoop(max_steps=20, final_step=FinalStepPolicy.SUMMARIZE)],
+)
+result = await agent.run("Investigate the page")
+print(result.text)
+```
+
+This reserves the last available step for a text summary: a limit of 20 permits
+at most 19 tool steps. Per-run `max_steps=` overrides determine the effective
+limit. Summaries remain opt-in because they consume that allowance. A reserved
+summary returns `completed=False` and `StopReason.MAX_STEPS`, and cannot execute
+tools. For structured output, read `.text` on incomplete results; `.output` raises
+`OutputUnavailable`. Native `PreStep` hooks expose `max_steps`, `remaining_steps`,
+`is_last_step` and `is_final_step`; manually constructed events require `max_steps=`.
+
 ## System prompts and optional MCP tools
 
 `BrowserAgent(system_prompt="...")` appends browser plugin sections automatically.
@@ -145,7 +209,7 @@ mount closes or suspends; `SectionDelivery.IGNORE` skips it. Import `SectionDeli
 from `harnessed`. The fixed system prompt stays unchanged.
 
 Install the optional MCP client with `uv sync --locked --extra openai --extra mcp`.
-All Harnessed extras are pinned to **0.4.0**. Add MCP servers through the native plugin:
+All Harnessed extras are pinned to **0.5.0**. Add MCP servers through the native plugin:
 
 ```python
 from harnessed.plugins.mcp import MCP
@@ -158,7 +222,7 @@ agent = BrowserAgent(
 `MCP.stdio("catalog", command=..., args=[...])` starts a local server instead.
 Connections belong to each session, tool names are prefixed (for example
 `catalog__search`), and existing approval policies apply. See the
-[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.4.0/docs/guides/mcp.md).
+[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.5.0/docs/guides/mcp.md).
 
 ## Plugin validation and diagnostics
 
@@ -189,14 +253,18 @@ For standalone kernel compositions, call `await ctx.settle()` followed by
 
 ## Upgrading existing sessions
 
-Harnessed 0.4.0 keeps session record format 2: existing 0.2.0 and 0.3.0 stores can be reused
+Harnessed 0.5.0 keeps session record format 2: existing 0.2.0 through 0.4.0 stores can be reused
 without migration. When upgrading from 0.1.0, format 1 is rejected without automatic
 migration. Back up those stores and choose a fresh directory. The OpenAI example
 writes to `.browserrig/sessions-v2`;
 existing `.browserrig/sessions` files stay available in their original directory.
 Custom `session_directory` values containing format 1 should also point to a fresh
 store. See the
-[migration guide](https://github.com/mathisarends/harnessed/blob/v0.4.0/Changelog.md).
+[migration guide](https://github.com/mathisarends/harnessed/blob/v0.5.0/Changelog.md).
+
+Version 0.5.0 adds defaulted fields to model requests, turn starts and tool results.
+Strict application schemas must accept those fields, `break_chain` and
+`ToolStatus.SKIPPED`; older Harnessed readers may reject new records.
 
 When upgrading application code from 0.3.0, rename `BrowserAgent(instructions=...)`
 to `BrowserAgent(system_prompt=...)`; wrap instruction lists in
@@ -439,7 +507,11 @@ available for replay.
 
 `TerminalEvents()` prints one JSON object per event to stderr using native hooks,
 without a background consumer task. It includes session lifecycle, model/tool
-metadata, browser actions, and live input events. Prompts, tool arguments, model
+metadata, browser actions, live input events, correlated compaction attempts and
+typed model retry activity. Tool records include `tool_status` and `break_chain`.
+Retry records retain `request_id`, `retry_group_id` and `retry_kind`; unknown
+attempt/retry counters remain JSON `null`. Provider attempts, context recovery and
+output correction have separate scopes. Prompts, tool arguments, model
 output, and screenshots are omitted. Pass `TerminalEvents(output=file)` to select
 another text stream.
 Page text, dialog messages and form value fields are omitted; URLs, filenames and
@@ -539,6 +611,15 @@ reviewed result, including denied calls. Activity intervals use execution receip
 for tool timing and the SDK's `request_id` for model timing, including failures,
 cancellations, and context-limit retries. Tool cancellation and timeout have
 separate activity outcomes.
+
+Compaction intervals use their own `compaction_id` and distinguish applied,
+discarded, failed and cancelled attempts. They do not close an outstanding model
+request. Live model attempts and compaction notifications are transient and are
+not replayed. Applied compactions remain durable native history events.
+`session.stream()` forwards native model request/failure, attempt/retry and
+compaction activity. A request, attempt or compaction finishing does not finish
+the turn; use `TurnFinishedEvent.result` on normal stream exhaustion and release
+live UI activity in `finally` on cancellation or stream failure.
 
 Browser observations carry their snapshot ID in `Observation.refs`. Hints carry
 their nudge IDs and are acknowledged only by `ObservationsIncludedEvent` for the

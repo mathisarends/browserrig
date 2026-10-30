@@ -106,10 +106,10 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "cdpify", extras = ["websocket"], specifier = ">=0.4.0,<0.5" },
-    { name = "harnessed", specifier = "==0.4.0" },
-    { name = "harnessed", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = "==0.4.0" },
-    { name = "harnessed", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==0.4.0" },
-    { name = "harnessed", extras = ["openai"], marker = "extra == 'openai'", specifier = "==0.4.0" },
+    { name = "harnessed", specifier = "==0.5.0" },
+    { name = "harnessed", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = "==0.5.0" },
+    { name = "harnessed", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==0.5.0" },
+    { name = "harnessed", extras = ["openai"], marker = "extra == 'openai'", specifier = "==0.5.0" },
     { name = "httpx2", specifier = ">=2.16,<3" },
     { name = "pillow", specifier = ">=13,<14" },
     { name = "pydantic", specifier = ">=2.12,<3" },
@@ -527,14 +527,14 @@ wheels = [
 
 [[package]]
 name = "harnessed"
-version = "0.4.0"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d0/65/8f9eb3465ffd65f6120406efc7aed95e330571b2603fb4d6611957ebee84/harnessed-0.4.0.tar.gz", hash = "sha256:4a514ad76f35853e07600b25e6aa5c00c374a7fe41f4a5f52d73f62d3e72756b", size = 151959, upload-time = "2026-10-29T21:49:12.355Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/17/39/73dd5328262bb1743fa9beed00dba515419a78cf83c0a6c85bf5b8709b8c/harnessed-0.5.0.tar.gz", hash = "sha256:abae3ec11a20f878850aabd02d7bda0185aa506f25484ed613debb62a081ffb5", size = 159899, upload-time = "2026-10-30T07:59:14.454Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/a7/ceaf88c69d0acf4d393096c96319e3d92aedf001fec96def756c0509404f/harnessed-0.4.0-py3-none-any.whl", hash = "sha256:82cd3e0c7c2dc8572d33610d81ee4d812bbadde8721665aacbc445d8016425c9", size = 181543, upload-time = "2026-10-29T21:49:10.902Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/44/f3805100e6d24c97c08eed8015e8ece03c862ecae2ebcdf848d23d0904cc/harnessed-0.5.0-py3-none-any.whl", hash = "sha256:aec40b6000fa8e50e431685d7f47a87277da38a0ed830862d80be6362bc2aa4b", size = 191418, upload-time = "2026-10-30T07:59:12.805Z" },
 ]
 
 [package.optional-dependencies]

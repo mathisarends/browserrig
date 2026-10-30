@@ -1,15 +1,26 @@
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import uuid4
 
-from harnessed import Inject, Plugin, ToolError
+from harnessed import (
+    Inject,
+    Plugin,
+    SystemSection,
+    ToolError,
+    ToolInfo,
+    ToolResult,
+    ToolStatus,
+    hook,
+)
+from harnessed.hooks import ExecuteTool, Next, ReviewToolResult
 
 from browserrig.browser.base import Browser, BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import ElementPoint
-from browserrig.core.kinds import ActionKind, ReadinessPhase, ReadinessStatus
+from browserrig.core.kinds import ActionKind, ObservationKind, ReadinessPhase, ReadinessStatus
+from browserrig.core.tools import BrowserToolMetadata
 from browserrig.events import (
     ACTION_EVENTS,
     ActionFailedEvent,
@@ -17,6 +28,7 @@ from browserrig.events import (
     ActionStartedEvent,
     PageState,
 )
+from browserrig.observation.changes import decision_change
 from browserrig.observation.models import Snapshot
 from browserrig.observation.plugin import Observe
 from browserrig.readiness.plugin import Readiness
@@ -24,13 +36,57 @@ from browserrig.readiness.plugin import Readiness
 from .scrolling import prepare_element
 
 # Pointer actions aim at coordinates from the last observation, so it must still be current.
-_POINTER_KINDS = frozenset({ActionKind.CLICK, ActionKind.DOUBLE_CLICK, ActionKind.DRAG})
+_POINTER_KINDS = frozenset(
+    {
+        ActionKind.CLICK,
+        ActionKind.CLICK_AT,
+        ActionKind.DOUBLE_CLICK,
+        ActionKind.DRAG,
+        ActionKind.DRAG_AT,
+    }
+)
+_CHAINABLE_KINDS = {
+    ActionKind.CLICK,
+    ActionKind.DOUBLE_CLICK,
+    ActionKind.TYPE,
+    ActionKind.PRESS,
+    ActionKind.SELECT,
+    ActionKind.SET_DATE,
+}
+_TAB_KINDS = {
+    ActionKind.TAB,
+    ActionKind.OPEN_TAB,
+    ActionKind.SWITCH_TAB,
+    ActionKind.CLOSE_TAB,
+    ActionKind.OPEN_FILE,
+    ActionKind.OPEN_DOWNLOADED_FILE,
+}
+_NAVIGATION_KINDS = {
+    ActionKind.NAVIGATE,
+    ActionKind.SEARCH,
+    ActionKind.GO_BACK,
+    ActionKind.GO_FORWARD,
+    ActionKind.RELOAD,
+}
+
+
+def _stop_on_failure(result: ToolResult, tool: ToolInfo | None) -> ToolResult:
+    metadata = tool.metadata.get(BrowserToolMetadata) if tool else None
+    # Calls denied, disabled or skipped before execution retain native approval semantics.
+    if (
+        metadata is not None
+        and result.is_error
+        and result.status not in {ToolStatus.DENIED, ToolStatus.UNAVAILABLE, ToolStatus.SKIPPED}
+    ):
+        return replace(result, break_chain=True)
+    return result
 
 
 @dataclass(frozen=True, slots=True)
 class Effect:
     text: str
     prepared_scroll: bool = False
+    break_chain: bool = False
 
 
 class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, Observe)):
@@ -42,6 +98,32 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
     readiness: Inject[Readiness]
     observe: Inject[Observe]
 
+    chains = SystemSection(
+        title="Browser action chains",
+        text=(
+            "Combine actions only when no intermediate observation is needed, and put "
+            "submission last. Inputs may continue while the page remains suitable. "
+            "Navigation, tab changes, scrolling, "
+            "drags, coordinates, JavaScript, uploads, dialogs, observe and screenshot end the "
+            "remaining chain. Use coordinate actions alone with a fresh screenshot. A navigation, "
+            "new menu, suggestions, modal, alert or input failure interrupts remaining actions; "
+            "skipped calls were not executed. Inspect the next observation before continuing."
+        ),
+    )
+
+    @hook(ExecuteTool)
+    async def _execute_browser_result(
+        self, event: ExecuteTool, next_: Next[ToolResult]
+    ) -> ToolResult:
+        # Set the signal before the execution receipt is persisted, including on errors.
+        return _stop_on_failure(await next_(), event.tool)
+
+    @hook(ReviewToolResult)
+    async def _review_browser_result(
+        self, event: ReviewToolResult, next_: Next[ToolResult]
+    ) -> ToolResult:
+        return _stop_on_failure(await next_(), event.tool)
+
     async def run(
         self,
         *,
@@ -50,7 +132,7 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
         check: Callable[[Tab], Awaitable[None]] | None = None,
         expects_change: bool = False,
         settle: bool = True,
-    ) -> str:
+    ) -> ToolResult:
         """Run one mutation once. Its addressed tab cannot change with global focus."""
         async with self.browser.action_lock:
             tab = self.browser.active_tab
@@ -84,7 +166,16 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
                         expects_change=expects_change,
                     )
                 )
-                return effect.text + note
+                change = ""
+                if not effect.break_chain and not note and kind in _CHAINABLE_KINDS:
+                    change = await self.page_change(tab)
+                result = ToolResult(
+                    effect.text + note,
+                    break_chain=effect.break_chain or bool(note) or bool(change),
+                )
+                return (
+                    result.with_note(change + " Observe before continuing.") if change else result
+                )
             except asyncio.CancelledError:
                 reason = (
                     "cancelled; side effects may already have occurred"
@@ -105,13 +196,17 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
 
     async def _prepare(self, tab: Tab, kind: ActionKind) -> PageState:
         """Return the pre-action baseline once the page accepts input."""
-        if kind == ActionKind.TAB:
+        if kind in _TAB_KINDS:
             # Tab management must work even when the current page has a blocking dialog.
             return PageState(url=tab.url, document_id=tab.document_id)
         await tab.sync_document()
         before = self.observe.snapshot
-        if before is not None and kind in _POINTER_KINDS and not _observes(before, tab):
-            raise BrowserError("The observed tab or document changed; observe before pointing")
+        if (
+            before is not None
+            and kind in _POINTER_KINDS | _CHAINABLE_KINDS
+            and not _observes(before, tab)
+        ):
+            raise BrowserError("The observed tab or document changed; observe before input")
         if before is None or before.tab_id != tab.id:
             before = await self.observe.capture(tab)
         report = await self.readiness.wait(tab, phase=ReadinessPhase.ACTION)
@@ -124,8 +219,25 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
             scroll_y=before.scroll_y,
         )
 
+    async def page_change(self, tab: Tab) -> str:
+        """A comparison probe must never replace the refs or image the model acted on."""
+        before = self.observe.snapshot
+        if before is None or before.mode != ObservationKind.DOM:
+            return "A fresh observation is required after this input."
+        if tab.closed or self.browser.active_tab.id != tab.id:
+            return "The active tab changed."
+        try:
+            after = await self.observe.probe(tab)
+        except Exception:  # pylint: disable=broad-exception-caught
+            # A diagnostic failure after successful input must not turn that input into
+            # a failed action or encourage repeating a submission.
+            return "The page could not be checked after input."
+        if after.readiness != ReadinessStatus.READY or after.limitations:
+            return "The page could not be checked completely after input."
+        return decision_change(before, after)
+
     async def _settle(self, tab: Tab, kind: ActionKind) -> str:
-        phase = ReadinessPhase.NAVIGATION if kind == ActionKind.NAVIGATE else ReadinessPhase.ACTION
+        phase = ReadinessPhase.NAVIGATION if kind in _NAVIGATION_KINDS else ReadinessPhase.ACTION
         try:
             report = await self.readiness.wait(tab, phase=phase)
         except BrowserError as error:

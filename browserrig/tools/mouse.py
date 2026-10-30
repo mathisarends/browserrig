@@ -1,12 +1,13 @@
 from typing import Annotated, Literal
 
-from harnessed import Inject, Plugin, SystemSection, tool
+from harnessed import Inject, Plugin, SystemSection, ToolResult
 from pydantic import Field
 
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Point
 from browserrig.core.kinds import ActionKind, DragMode
+from browserrig.core.tools import browser_tool as tool
 from browserrig.observation.models import Snapshot
 from browserrig.observation.plugin import Observe, has_dom_refs
 
@@ -28,7 +29,10 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
         ),
     )
 
-    @tool(description="Click screenshot coordinates; count=2 performs a native double click.")
+    @tool(
+        kind=ActionKind.CLICK_AT,
+        description="Click screenshot coordinates; count=2 performs a native double click.",
+    )
     async def click_at(
         self,
         x: Annotated[float, Field(ge=0)],
@@ -36,7 +40,7 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
         count: _ClickCount = 1,
         *,
         actions: Inject[Actions],
-    ) -> str:
+    ) -> ToolResult:
         async def click(tab: Tab) -> Effect:
             snapshot = self._observe.snapshot
             assert snapshot is not None
@@ -46,15 +50,15 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
                 "Double click dispatched." if count == 2 else "Coordinate click dispatched."
             )
 
-        return await actions.run(kind=_click_kind(count), operation=click, expects_change=True)
+        return await actions.run(kind=ActionKind.CLICK_AT, operation=click, expects_change=True)
 
-    @tool(description="Scroll the visible page vertically by CSS pixels.")
+    @tool(kind=ActionKind.SCROLL, description="Scroll the visible page vertically by CSS pixels.")
     async def scroll(
         self,
         delta_y: Annotated[float, Field(ge=-10000, le=10000)],
         *,
         actions: Inject[Actions],
-    ) -> str:
+    ) -> ToolResult:
         async def scroll(tab: Tab) -> Effect:
             snapshot = self._observe.snapshot
             assert snapshot is not None
@@ -69,9 +73,10 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
         )
 
     @tool(
+        kind=ActionKind.DRAG_AT,
         description=(
             "Drag between screenshot points. Use html5 for a native draggable/DataTransfer source."
-        )
+        ),
     )
     async def drag_at(
         self,
@@ -81,7 +86,7 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
         mode: DragMode = DragMode.POINTER,
         *,
         actions: Inject[Actions],
-    ) -> str:
+    ) -> ToolResult:
         async def drag(tab: Tab) -> Effect:
             snapshot = self._observe.snapshot
             assert snapshot is not None
@@ -93,10 +98,12 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
             )
             return Effect("Drag dispatched; inspect the destination.")
 
-        return await actions.run(kind=ActionKind.DRAG, operation=drag, expects_change=True)
+        return await actions.run(kind=ActionKind.DRAG_AT, operation=drag, expects_change=True)
 
     # DOM mode deliberately also supports pointing at unreferenced screenshot regions.
     @tool(
+        kind=ActionKind.CLICK,
+        chainable=True,
         enabled=has_dom_refs,
         description="Click a current DOM ref; count=2 performs a native double click.",
     )
@@ -106,10 +113,17 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
         count: _ClickCount = 1,
         *,
         actions: Inject[Actions],
-    ) -> str:
+    ) -> ToolResult:
         async def click(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
             await tab.mouse.move_to(point)
+            if change := await actions.page_change(tab):
+                return Effect(
+                    f"Hover changed the page: {change} The click was not dispatched. "
+                    "Inspect the next observation before choosing a target.",
+                    prepared_scroll=point.scrolled,
+                    break_chain=True,
+                )
             # Hover may reveal an overlay or move the target; hit-test again.
             current = await actions.element_point(tab=tab, ref=ref, scroll=False)
             await tab.mouse.click(current, count=count)
@@ -118,9 +132,10 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
                 prepared_scroll=point.scrolled,
             )
 
-        return await actions.run(kind=_click_kind(count), operation=click, expects_change=True)
+        return await actions.run(kind=ActionKind.CLICK, operation=click, expects_change=True)
 
     @tool(
+        kind=ActionKind.DRAG,
         enabled=has_dom_refs,
         description=(
             "Drag between DOM refs, scrolling them into view first. Both endpoints must fit "
@@ -134,7 +149,7 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
         duration: Annotated[float, Field(ge=0.05, le=5)] = 0.5,
         *,
         actions: Inject[Actions],
-    ) -> str:
+    ) -> ToolResult:
         async def drag(tab: Tab) -> Effect:
             source = (await self._observe.element(tab, source_ref)).element
             prepared = await actions.element_point(tab=tab, ref=source_ref)
@@ -149,10 +164,6 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
             )
 
         return await actions.run(kind=ActionKind.DRAG, operation=drag, expects_change=True)
-
-
-def _click_kind(count: _ClickCount) -> ActionKind:
-    return ActionKind.DOUBLE_CLICK if count == 2 else ActionKind.CLICK
 
 
 def _image_point(snapshot: Snapshot, point: Point) -> Point:

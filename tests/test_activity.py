@@ -6,6 +6,8 @@ from harnessed.core.errors import SessionFormatError
 from harnessed.events import (
     AgentControlChangedEvent,
     AssistantMessageEvent,
+    CompactionFinishedEvent,
+    CompactionStartedEvent,
     ControlState,
     EventRegistry,
     ModelRequestedEvent,
@@ -316,3 +318,26 @@ def test_existing_known_outcomes_load_without_the_new_reason_field():
 def test_activity_keys_reject_invalid_singleton_or_correlated_combinations(kind, correlation_id):
     with pytest.raises(ValueError):
         ActivityKey(kind, correlation_id)
+
+
+@pytest.mark.parametrize(
+    "outcome,expected",
+    [
+        ("applied", ActivityOutcome.COMPLETED),
+        ("discarded", ActivityOutcome.DISCARDED),
+        ("failed", ActivityOutcome.FAILED),
+        ("cancelled", ActivityOutcome.CANCELLED),
+    ],
+)
+async def test_compaction_activity_is_correlated_and_does_not_finish_model_request(
+    activity_session, outcome, expected
+):
+    session, activity = activity_session
+    await session.emit(_request("model"))
+    await session.emit(CompactionStartedEvent("compact"))
+    await session.emit(CompactionFinishedEvent("compact", outcome))
+    intervals = activity.intervals()
+    compaction = next(i for i in intervals if i.kind is ActivityKind.COMPACTION)
+    model = next(i for i in intervals if i.kind is ActivityKind.LLM)
+    assert compaction.cause_id == "compact" and compaction.outcome is expected
+    assert model.outcome is ActivityOutcome.RUNNING

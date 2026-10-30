@@ -6,6 +6,9 @@ from harnessed import Context, Inject, Plugin, PluginState, SessionLog, ToolStat
 from harnessed.events import (
     AgentControlChangedEvent,
     AssistantMessageEvent,
+    CompactionFinishedEvent,
+    CompactionOutcome,
+    CompactionStartedEvent,
     ControlState,
     ModelRequestedEvent,
     ModelRequestFailedEvent,
@@ -109,6 +112,26 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
                 assert_never(event.outcome)
         await self._finish(
             ActivityKey(ActivityKind.LLM, event.request_id), outcome, reason=event.outcome.value
+        )
+
+    @hook(CompactionStartedEvent)
+    async def _on_compaction(self, event: CompactionStartedEvent) -> None:
+        await self._start(
+            ActivityKey(ActivityKind.COMPACTION, event.compaction_id), cause_id=event.compaction_id
+        )
+
+    @hook(CompactionFinishedEvent)
+    async def _on_compaction_finished(self, event: CompactionFinishedEvent) -> None:
+        outcome = {
+            CompactionOutcome.APPLIED: ActivityOutcome.COMPLETED,
+            CompactionOutcome.DISCARDED: ActivityOutcome.DISCARDED,
+            CompactionOutcome.FAILED: ActivityOutcome.FAILED,
+            CompactionOutcome.CANCELLED: ActivityOutcome.CANCELLED,
+        }[event.outcome]
+        await self._finish(
+            ActivityKey(ActivityKind.COMPACTION, event.compaction_id),
+            outcome,
+            reason=event.outcome.value,
         )
 
     @hook(ToolExecutionStartedEvent)

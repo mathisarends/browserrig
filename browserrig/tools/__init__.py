@@ -1,3 +1,5 @@
+from browserrig.core.tools import BrowserToolMetadata, browser_tool
+
 from .dialogs import DialogTools
 from .execution import Actions
 from .files import FileTools, UploadTools
@@ -9,6 +11,8 @@ from .navigation import NavigationTools
 from .tabs import TabTools
 
 __all__ = [
+    "BrowserToolMetadata",
+    "browser_tool",
     "Actions",
     "DialogTools",
     "FileTools",
