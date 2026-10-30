@@ -89,7 +89,7 @@ async def test_drag_uses_browser_behavior_for_draggable_ancestor(site, prevented
             })()""".replace("PREVENTED", str(prevented).lower()),
         )
         assert await evaluate(tab, "document.elementFromPoint(70, 140).draggable") is False
-        await tab.mouse.drag(start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1)
+        await browser.mouse.drag(start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1)
         assert await evaluate(tab, "window.dragStarts") == 1
         assert await evaluate(tab, "window.nativeDrop") == ("" if prevented else "payload")
 
@@ -112,7 +112,7 @@ async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site)
             });""",
         )
         task = asyncio.create_task(
-            tab.mouse.drag(start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1)
+            browser.mouse.drag(start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1)
         )
         try:
             await asyncio.wait_for(reached_target.wait(), timeout=5)
@@ -122,7 +122,7 @@ async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site)
                 await task
         assert await evaluate(tab, "window.nativeDrop") == ""
         assert await evaluate(tab, "window.dragEnds") == ["none"]
-        await tab.mouse.click(Point(x=70, y=40))
+        await browser.mouse.click(Point(x=70, y=40))
         assert await evaluate(tab, "window.details") == [1]
 
 

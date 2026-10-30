@@ -36,7 +36,7 @@ async def test_runtime_evaluation_returns_javascript_values_and_releases_handles
     assert arguments["timeout"] == 2000
     assert "context_id" not in arguments
     runtime.release_object_group.assert_awaited_once_with(object_group=arguments["object_group"])
-    tab.invalidate_frames.assert_called_once()
+    tab.layout_changed.assert_called_once()
 
 
 async def test_javascript_exception_is_reported_without_retrying():
@@ -57,7 +57,7 @@ async def test_javascript_exception_is_reported_without_retrying():
         await tab.evaluate("expression")
     runtime.evaluate.assert_awaited_once()
     runtime.release_object_group.assert_awaited_once()
-    tab.invalidate_frames.assert_called_once()
+    tab.layout_changed.assert_called_once()
 
 
 async def test_pending_javascript_has_a_deadline_and_releases_handles():
@@ -71,7 +71,7 @@ async def test_pending_javascript_has_a_deadline_and_releases_handles():
         await tab.evaluate("expression", timeout=0.01)
     runtime.evaluate.assert_awaited_once()
     runtime.release_object_group.assert_awaited_once()
-    tab.invalidate_frames.assert_called_once()
+    tab.layout_changed.assert_called_once()
 
 
 async def test_unserializable_result_is_reported_without_reexecuting_the_code():
@@ -91,5 +91,5 @@ def _tab(result):
         release_object_group=AsyncMock(),
     )
     tab = Tab("tab", SimpleNamespace(runtime=runtime))
-    tab.invalidate_frames = Mock()
+    tab.layout_changed = Mock()
     return tab, runtime

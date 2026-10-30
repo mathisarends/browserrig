@@ -4,7 +4,8 @@ import pytest
 
 from browserrig import ChromeBrowser, ConnectBrowser
 from browserrig.core.geometry import Point
-from browserrig.events import CursorStateEvent, TabOpenedEvent
+from browserrig.events import CursorEnteredEvent, CursorStateEvent, TabOpenedEvent, TabPressedEvent
+from browserrig.kinds import TabGesture
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
@@ -23,7 +24,7 @@ async def test_tabs_seed_centered_cursor_and_activation_republishes_existing_pos
         assert len(initial) == 1 and initial[0].target_id == first.id
         assert 0.4 * viewport.client_width <= initial[0].x <= 0.6 * viewport.client_width
         assert 0.4 * viewport.client_height <= initial[0].y <= 0.6 * viewport.client_height
-        await first.mouse.move_to(Point(x=100, y=120))
+        await browser.mouse.move_to(Point(x=100, y=120))
         second = await browser.open_tab(site)
         assert (
             len(
@@ -35,8 +36,16 @@ async def test_tabs_seed_centered_cursor_and_activation_republishes_existing_pos
             )
             == 1
         )
-        assert second.mouse.position != Point(x=0, y=0)
+        assert browser.mouse.position_in(second.id) is not None
+        opened = next(event for event in events if isinstance(event, TabPressedEvent))
+        assert opened.gesture is TabGesture.OPEN and opened.target_id == first.id
+        assert opened.from_position == (100, 120)
         await browser.activate_tab(first.id)
+        pressed = [event for event in events if isinstance(event, TabPressedEvent)][-1]
+        assert pressed.gesture is TabGesture.ACTIVATE and pressed.tab_id == first.id
+        assert pressed.target_id == second.id
+        entered = [event for event in events if isinstance(event, CursorEnteredEvent)][-1]
+        assert entered.target_id == first.id and entered.to_position == (100, 120)
         last = next(event for event in reversed(events) if isinstance(event, CursorStateEvent))
         assert last.target_id == first.id and (last.x, last.y) == (100, 120)
 

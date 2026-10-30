@@ -28,6 +28,7 @@ from browserrig.events import (
     FileWrittenEvent,
 )
 from browserrig.files.models import DownloadState
+from browserrig.input import Input
 from browserrig.kinds import FileSource, FileTransferDirection
 from browserrig.tools.files import FileTools, _file_call
 
@@ -294,7 +295,9 @@ async def test_open_file_moves_the_file_out_of_the_current_tab_before_reporting_
         assert not settle
         return (await operation(current)).text
 
-    tools._browser = SimpleNamespace(open_tab=AsyncMock(return_value=opened))
+    tools._browser = SimpleNamespace(
+        open_tab=AsyncMock(return_value=opened), input=Input(lambda: current)
+    )
     tools._readiness = SimpleNamespace(wait=AsyncMock())
     tools._actions = SimpleNamespace(run=run)
     tools._open = lambda *args: FileTools._open(tools, *args)

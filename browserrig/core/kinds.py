@@ -138,6 +138,14 @@ class FileTransferDirection(StrEnum):
     UPLOAD = "upload"
 
 
+class TabGesture(StrEnum):
+    """Which tab-strip control the pointer presses: a tab, the new-tab button or a tab's close."""
+
+    ACTIVATE = "activate"
+    OPEN = "open"
+    CLOSE = "close"
+
+
 class FileSource(StrEnum):
     WORKSPACE = "workspace"
     DOWNLOAD = "download"

@@ -13,6 +13,7 @@ from .core.kinds import (
     ReadinessPhase,
     ReadinessStage,
     ReadinessStatus,
+    TabGesture,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "ReadinessPhase",
     "ReadinessStage",
     "ReadinessStatus",
+    "TabGesture",
 ]

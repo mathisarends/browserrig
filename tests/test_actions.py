@@ -18,6 +18,7 @@ from browserrig.events import (
     FilesUploadedEvent,
     FileTransferEvent,
 )
+from browserrig.input import Input
 from browserrig.kinds import ActionKind, FileTransferDirection
 from browserrig.tools.execution import Actions
 from browserrig.tools.files import UploadTools
@@ -137,7 +138,9 @@ def _actions():
     cdp = SimpleNamespace(input=SimpleNamespace(dispatch_mouse_event=AsyncMock()))
     tab = Tab("tab", cdp, emit=emit)
     actions = SimpleNamespace(
-        browser=SimpleNamespace(action_lock=asyncio.Lock(), active_tab=tab),
+        browser=SimpleNamespace(
+            action_lock=asyncio.Lock(), active_tab=tab, input=Input(lambda: tab)
+        ),
         _events=SimpleNamespace(emit=AsyncMock(side_effect=events.append)),
         _prepare=AsyncMock(return_value=SimpleNamespace()),
     )
@@ -152,7 +155,9 @@ def _uploads(files):
     actions._settle = AsyncMock(return_value="")
     handle = SimpleNamespace(element=SimpleNamespace(input_type="file"), upload_files=AsyncMock())
     tools = SimpleNamespace(
-        _browser=SimpleNamespace(files=files),
+        _browser=SimpleNamespace(
+            files=files, mouse=actions.browser.input.mouse, input=actions.browser.input
+        ),
         _events=SimpleNamespace(emit=AsyncMock(side_effect=events.append)),
         _observe=SimpleNamespace(element=AsyncMock(return_value=handle)),
     )

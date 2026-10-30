@@ -5,11 +5,12 @@ import json
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlsplit
 from uuid import uuid4
 
 from cdpify import CdpSession
+from cdpify.domains.input import MouseButton
 from cdpify.domains.page import (
     FrameNavigatedEvent,
     FrameTree,
@@ -24,7 +25,7 @@ from pydantic import BaseModel
 from browserrig.browser.screen import ScreenRecorder
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Bounds, FrameTransform, Point
-from browserrig.core.kinds import CursorStyle
+from browserrig.core.kinds import CursorStyle, MouseEventKind
 from browserrig.events import (
     BrowserEvent,
     DialogHandledEvent,
@@ -32,7 +33,7 @@ from browserrig.events import (
     LiveEvent,
     NavigationCommittedEvent,
 )
-from browserrig.input import Input, Keyboard, Mouse
+from browserrig.input.target import KeyEventType
 from browserrig.scripts import CURSOR, OWNER_HITS, Script, failure
 from browserrig.scripts.models import CursorArgs, OwnerHitsArgs
 
@@ -164,7 +165,7 @@ class Frame:
 type FrameDiscovery = Callable[[Tab], Awaitable[tuple[tuple[Frame, ...], tuple[str, ...]]]]
 
 
-class Tab:
+class Tab:  # pylint: disable=too-many-public-methods  # document API plus InputTarget
     def __init__(
         self,
         target_id: str,
@@ -173,6 +174,7 @@ class Tab:
         emit: Callable[[BrowserEvent | LiveEvent], Awaitable[None]] | None = None,
         worlds: Worlds | None = None,
         discover_frames: FrameDiscovery | None = None,
+        current_action: Callable[[], str] = lambda: "",
     ) -> None:
         self.id = target_id
         self.cdp = cdp
@@ -189,21 +191,8 @@ class Tab:
         self._layout_revision = 0
         self._frames_key: tuple[str, str, int] | None = None
         self._frames: tuple[Frame, ...] = ()
-        self.input = Input(
-            self.cdp,
-            self.emit,
-            layout_changed=self.invalidate_frames,
-            cursor_style=self.cursor_style,
-        )
+        self._current_action = current_action
         self.screen = ScreenRecorder(self.cdp)
-
-    @property
-    def mouse(self) -> Mouse:
-        return self.input.mouse
-
-    @property
-    def keyboard(self) -> Keyboard:
-        return self.input.keyboard
 
     async def emit(self, event: BrowserEvent | LiveEvent) -> None:
         if self._emit is not None:
@@ -222,9 +211,59 @@ class Tab:
             return None
         return CursorStyle.parse(style)
 
-    def invalidate_frames(self) -> None:
+    def layout_changed(self) -> None:
         """Forget cached frame geometry after input, scrolling or navigation moved content."""
         self._layout_revision += 1
+
+    # Native input lands here; the browser's mouse and keyboard aim at the focused tab.
+    async def dispatch_mouse(
+        self,
+        kind: Literal[MouseEventKind.MOVED, MouseEventKind.PRESSED, MouseEventKind.RELEASED],
+        point: Point,
+        *,
+        button: MouseButton,
+        buttons: int,
+        click_count: int,
+    ) -> None:
+        await self.cdp.input.dispatch_mouse_event(
+            type=kind.value,
+            x=point.x,
+            y=point.y,
+            button=button,
+            buttons=buttons,
+            click_count=click_count,
+        )
+
+    async def dispatch_wheel(self, point: Point, *, delta_x: float, delta_y: float) -> None:
+        await self.cdp.input.dispatch_mouse_event(
+            type=MouseEventKind.WHEEL.value, x=point.x, y=point.y, delta_x=delta_x, delta_y=delta_y
+        )
+
+    async def dispatch_key(
+        self,
+        kind: KeyEventType,
+        *,
+        modifiers: int,
+        key: str,
+        code: str,
+        windows_virtual_key_code: int,
+        text: str | None = None,
+    ) -> None:
+        await self.cdp.input.dispatch_key_event(
+            type=kind,
+            modifiers=modifiers,
+            key=key,
+            code=code,
+            windows_virtual_key_code=windows_virtual_key_code,
+            text=text,
+        )
+
+    async def cancel_drag(self) -> None:
+        await self.cdp.input.cancel_dragging()
+
+    async def viewport_size(self) -> tuple[float, float]:
+        viewport = (await self.cdp.page.get_layout_metrics()).css_layout_viewport
+        return viewport.client_width, viewport.client_height
 
     async def frames(self) -> tuple[Frame, ...]:
         """Return every frame with its viewport transform; `frame_limitations` explains gaps.
@@ -233,11 +272,11 @@ class Tab:
         """
         if self._discover_frames is None:
             raise BrowserError("Frame discovery is unavailable for this tab")
-        key = (self.document_id, self.input.action_id, self._layout_revision)
+        key = (self.document_id, self._current_action(), self._layout_revision)
         if key[1] and key == self._frames_key:
             return self._frames
         frames, self.frame_limitations = await self._discover_frames(self)
-        if key[1] and key == (self.document_id, self.input.action_id, self._layout_revision):
+        if key[1] and key == (self.document_id, self._current_action(), self._layout_revision):
             self._frames_key, self._frames = key, frames
         return frames
 
@@ -270,7 +309,7 @@ class Tab:
         tree = await self.frame_tree()
         if self.document_id != tree.frame.loader_id:
             self.worlds.invalidate(frame_id=tree.frame.id)
-            self.invalidate_frames()
+            self.layout_changed()
         self.document_id, self.url = tree.frame.loader_id, tree.frame.url
 
     async def go_back(self) -> bool:
@@ -318,7 +357,7 @@ class Tab:
                 ) from error
             raise
         finally:
-            self.invalidate_frames()
+            self.layout_changed()
             with suppress(CDPCommandError):
                 await self.cdp.runtime.release_object_group(object_group=group)
 

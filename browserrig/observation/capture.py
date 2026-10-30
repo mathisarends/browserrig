@@ -10,7 +10,7 @@ from browserrig.browser.images import screenshot
 from browserrig.browser.models import TabInfo
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import Bounds, Geometry, Region
+from browserrig.core.geometry import Bounds, Geometry, Point, Region
 from browserrig.core.kinds import ObservationKind, ReadinessStatus
 from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
 from browserrig.readiness.models import ReadinessReport
@@ -35,10 +35,12 @@ async def capture(
     region: Region | None = None,
     zoom: float = 1,
     screenshots: bool | None = None,
+    cursor: Point | None = None,
 ) -> Snapshot:
     """Observe `tab`. With `previous` from the same document, unseen elements get `new`.
 
     `region` crops a DOM-mode screenshot to a viewport area, magnified by `zoom`.
+    `cursor` is where the browser's mouse rests in `tab`; screenshots mark it.
     """
     if isinstance(mode, (DomMode, CanvasMode)):
         strategy = capture_for_mode(mode)
@@ -65,7 +67,9 @@ async def capture(
         )
     await tab.sync_document()
     document_id = tab.document_id
-    content = await strategy.collect(tab, report, screenshots=screenshots, region=region, zoom=zoom)
+    content = await strategy.collect(
+        tab, report, screenshots=screenshots, region=region, zoom=zoom, cursor=cursor
+    )
     await tab.sync_document()
     if tab.document_id != document_id:
         raise BrowserError("Document changed during capture; observe again before acting")
@@ -124,6 +128,7 @@ class CaptureStrategy(Protocol):
         screenshots: bool,
         region: Region | None = None,
         zoom: float = 1,
+        cursor: Point | None = None,
     ) -> CaptureContent: ...
 
 
@@ -152,6 +157,7 @@ class DomCapture:
         screenshots: bool,
         region: Region | None = None,
         zoom: float = 1,
+        cursor: Point | None = None,
     ) -> CaptureContent:
         frames = await tab.frames()
         page = await extract(
@@ -182,7 +188,7 @@ class DomCapture:
             marked,
             area,
             scale,
-            cursor=tab.mouse.position,
+            cursor=cursor,
         )
         return CaptureContent(page=page, image=image, geometry=geometry)
 
@@ -202,6 +208,7 @@ class CanvasCapture:
         screenshots: bool,
         region: Region | None = None,
         zoom: float = 1,
+        cursor: Point | None = None,
     ) -> CaptureContent:
         facts = await (await tab.main_frame()).run(PAGE_FACTS)
         geometry = await self.region.resolve(tab) if screenshots else None
@@ -219,7 +226,7 @@ class CanvasCapture:
                 (),
                 area,
                 geometry.scale if geometry is not None else 1,
-                cursor=tab.mouse.position,
+                cursor=cursor,
             )
         page = Extraction(
             url=facts.url,

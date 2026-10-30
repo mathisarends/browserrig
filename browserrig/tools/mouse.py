@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 from harnessed import Inject, Plugin, SystemSection, ToolResult
 from pydantic import Field
 
+from browserrig.browser.base import Browser
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Point
@@ -19,7 +20,8 @@ type _ClickCount = Annotated[
 type _ClickButton = Annotated[Literal["left", "right"], Field(description="Mouse button to press.")]
 
 
-class PointerTools(Plugin, needs=(Actions, Observe)):
+class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
+    _browser: Inject[Browser]
     _observe: Inject[Observe]
 
     coordinates = SystemSection(
@@ -47,9 +49,9 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
-        async def move(tab: Tab) -> Effect:
+        async def move(_tab: Tab) -> Effect:
             point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
-            await tab.mouse.move_to(point)
+            await self._browser.mouse.move_to(point)
             return Effect("Cursor moved without clicking.")
 
         return await actions.run(kind=ActionKind.MOVE_MOUSE, operation=move)
@@ -70,11 +72,11 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
-        async def click(tab: Tab) -> Effect:
+        async def click(_tab: Tab) -> Effect:
             snapshot = self._observe.snapshot
             assert snapshot is not None
             point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
-            await tab.mouse.click(point, count=count, button=button)
+            await self._browser.mouse.click(point, count=count, button=button)
             return Effect(_click_message(count, button), break_chain=button == "right")
 
         return await actions.run(kind=ActionKind.CLICK_AT, operation=click, expects_change=True)
@@ -92,8 +94,8 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
-        async def scroll(tab: Tab) -> Effect:
-            await tab.mouse.scroll(point=tab.mouse.position, delta_y=delta_y)
+        async def scroll(_tab: Tab) -> Effect:
+            await self._browser.mouse.scroll(delta_y=delta_y)
             return Effect("Scroll dispatched.")
 
         return await actions.run(
@@ -113,10 +115,10 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
-        async def drag(tab: Tab) -> Effect:
+        async def drag(_tab: Tab) -> Effect:
             snapshot = self._observe.snapshot
             assert snapshot is not None
-            await tab.mouse.drag(
+            await self._browser.mouse.drag(
                 start=_image_point(self._observe.coordinate_source(), start),
                 end=_image_point(self._observe.coordinate_source(), end),
                 duration=duration,
@@ -126,7 +128,8 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
         return await actions.run(kind=ActionKind.DRAG_AT, operation=drag, expects_change=True)
 
 
-class DomPointerTools(Plugin, needs=(Actions, Observe)):
+class DomPointerTools(Plugin, needs=(Actions, Browser, Observe)):
+    _browser: Inject[Browser]
     _observe: Inject[Observe]
 
     # DOM mode deliberately also supports pointing at unreferenced screenshot regions.
@@ -150,7 +153,7 @@ class DomPointerTools(Plugin, needs=(Actions, Observe)):
     ) -> ToolResult:
         async def click(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
-            await tab.mouse.move_to(point)
+            await self._browser.mouse.move_to(point)
             if change := await actions.page_change(tab, after_input=False):
                 return Effect(
                     f"Hover changed the page: {change} The click was not dispatched. "
@@ -160,7 +163,7 @@ class DomPointerTools(Plugin, needs=(Actions, Observe)):
                 )
             # Hover may reveal an overlay or move the target; hit-test again.
             current = await actions.element_point(tab=tab, ref=ref, scroll=False)
-            await tab.mouse.click(current, count=count, button=button)
+            await self._browser.mouse.click(current, count=count, button=button)
             return Effect(
                 _click_message(count, button),
                 prepared_scroll=point.scrolled,
@@ -190,7 +193,7 @@ class DomPointerTools(Plugin, needs=(Actions, Observe)):
             target = await actions.element_point(tab=tab, ref=target_ref)
             start = await actions.element_point(tab=tab, ref=source_ref, scroll=False)
             end = await actions.element_point(tab=tab, ref=target_ref, scroll=False)
-            await tab.mouse.drag(start=start, end=end, duration=duration)
+            await self._browser.mouse.drag(start=start, end=end, duration=duration)
             return Effect(
                 "Drag dispatched; inspect the destination.",
                 prepared_scroll=prepared.scrolled or target.scrolled,

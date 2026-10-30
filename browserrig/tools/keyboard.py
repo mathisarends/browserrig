@@ -1,5 +1,6 @@
 from harnessed import Inject, Plugin, ToolError, ToolResult
 
+from browserrig.browser.base import Browser
 from browserrig.browser.tab import Tab
 from browserrig.core.kinds import ActionKind
 from browserrig.core.tools import browser_tool as tool
@@ -8,7 +9,8 @@ from browserrig.observation.plugin import Observe, has_dom_refs
 from .execution import Actions, Effect
 
 
-class DomKeyboardTools(Plugin, needs=(Actions, Observe)):
+class DomKeyboardTools(Plugin, needs=(Actions, Browser, Observe)):
+    _browser: Inject[Browser]
     _observe: Inject[Observe]
 
     @tool(
@@ -27,21 +29,23 @@ class DomKeyboardTools(Plugin, needs=(Actions, Observe)):
     ) -> ToolResult:
         async def type_text(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
-            await tab.mouse.move_to(point)
+            await self._browser.mouse.move_to(point)
             # Hover may reveal an overlay over the field; hit-test before focusing it.
             await actions.element_point(tab=tab, ref=ref, scroll=False)
             field = await self._observe.element(tab, ref)
             await field.focus(select_all=clear)
             if clear:
-                await tab.keyboard.press_key("Backspace")
-            await tab.keyboard.type_text(text)
+                await self._browser.keyboard.press_key("Backspace")
+            await self._browser.keyboard.type_text(text)
             return Effect("Text entered.")
 
         return await actions.run(kind=ActionKind.TYPE, operation=type_text)
 
 
-class KeyboardTools(Plugin, needs=(Actions, Observe)):
+class KeyboardTools(Plugin, needs=(Actions, Browser, Observe)):
     """Keyboard input to the current focus, independent of DOM references."""
+
+    _browser: Inject[Browser]
 
     @tool(
         kind=ActionKind.PRESS,
@@ -69,9 +73,9 @@ class KeyboardTools(Plugin, needs=(Actions, Observe)):
         if text is not None and any((hold_control, hold_shift, hold_alt, hold_meta)):
             raise ToolError("Modifier flags require key")
 
-        async def send(tab: Tab) -> Effect:
+        async def send(_tab: Tab) -> Effect:
             if key is not None:
-                await tab.keyboard.press_key(
+                await self._browser.keyboard.press_key(
                     key,
                     hold_control=hold_control,
                     hold_shift=hold_shift,
@@ -80,7 +84,7 @@ class KeyboardTools(Plugin, needs=(Actions, Observe)):
                 )
                 return Effect("Key dispatched.")
             assert text is not None
-            await tab.keyboard.type_text(text)
+            await self._browser.keyboard.type_text(text)
             return Effect("Text entered.")
 
         return await actions.run(kind=ActionKind.PRESS, operation=send)

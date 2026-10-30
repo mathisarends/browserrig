@@ -89,7 +89,7 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
         tab = browser.active_tab
         report = await wait_for_page(tab)
         before = await evaluate(tab, "document.documentElement.outerHTML")
-        await tab.mouse.move_to(Point(x=700, y=200))
+        await browser.mouse.move_to(Point(x=700, y=200))
         state = await capture(tab, DomMode(screenshots=True, marks=marks), report)
         assert await evaluate(tab, "document.documentElement.outerHTML") == before
         assert state.image is not None
@@ -210,7 +210,7 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(_CANVASES)}")
         await evaluate(tab, "document.querySelector('#board').addEventListener('click', () => {})")
         report = await wait_for_page(tab)
-        await tab.mouse.move_to(Point(x=150, y=180))
+        await browser.mouse.move_to(Point(x=150, y=180))
         state = await capture(
             tab,
             DomMode(screenshots=True),

@@ -264,9 +264,9 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
     async def _open(
         self, path: Path, kind: ActionKind, source: FileSource, download_id: str = ""
     ) -> ToolResult:
-        async def open_file(tab: Tab) -> Effect:
+        async def open_file(_tab: Tab) -> Effect:
             # The file leaves the current tab first, so viewers can follow it into the new one.
-            await tab.input.transfer(FileTransferDirection.OPEN, (str(path),))
+            await self._browser.input.transfer(FileTransferDirection.OPEN, (str(path),))
             opened = await self._browser.open_tab(path)
             await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
             await self._events.emit(
@@ -318,8 +318,8 @@ class UploadTools(Plugin, needs=(Actions, Browser, BrowserEvents, Observe)):
 
         async def upload(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
-            await tab.mouse.move_to(point)
-            await tab.input.transfer(FileTransferDirection.UPLOAD, tuple(selected), point)
+            await self._browser.mouse.move_to(point)
+            await self._browser.input.transfer(FileTransferDirection.UPLOAD, tuple(selected), point)
             await (await self._observe.element(tab, ref)).upload_files(selected)
             await self._events.emit(
                 FilesUploadedEvent(

@@ -55,7 +55,7 @@ class CountingCapture:
         self.frames = frames
 
     async def collect(  # pylint: disable=unused-argument
-        self, tab, _report, *, screenshots, region=None, zoom=1
+        self, tab, _report, *, screenshots, region=None, zoom=1, cursor=None
     ):
         self.captures.append(screenshots)
         image, scale = self._frame() if screenshots else (None, 2)
@@ -504,7 +504,7 @@ async def test_canvas_capture_uses_its_own_region_and_respects_on_request(monkey
         )
     )
     tab = SimpleNamespace(
-        main_frame=AsyncMock(return_value=frame), mouse=SimpleNamespace(position=Point(x=40, y=30))
+        main_frame=AsyncMock(return_value=frame),
     )
     report = ReadinessReport(
         id="ready",
@@ -521,13 +521,12 @@ async def test_canvas_capture_uses_its_own_region_and_respects_on_request(monkey
     assert content.image is None
     region.resolve.assert_not_awaited()
     screenshot.assert_not_awaited()
-    content = await strategy.collect(tab, report, screenshots=True)
+    content = await strategy.collect(tab, report, screenshots=True, cursor=Point(x=40, y=30))
     assert content.geometry == area
     screenshot.assert_awaited_once_with(tab, area)
     assert content.image_digest == hashlib.sha256(raw.encode()).hexdigest()
     with Image.open(BytesIO(base64.b64decode(content.image))) as image:
         assert image.size == (200, 100)
         assert image.getpixel((20, 20)) == (30, 30, 30)
-    tab.mouse.position = Point(x=80, y=60)
-    moved = await strategy.collect(tab, report, screenshots=True)
+    moved = await strategy.collect(tab, report, screenshots=True, cursor=Point(x=80, y=60))
     assert moved.image != content.image and moved.image_digest == content.image_digest

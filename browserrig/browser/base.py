@@ -8,6 +8,7 @@ from browserrig.browser.models import TabInfo
 from browserrig.events import BrowserEvent, LiveEvent
 from browserrig.files import FileSystem
 from browserrig.files.models import Download
+from browserrig.input import Input, Keyboard, Mouse
 
 from .tab import Tab
 
@@ -29,16 +30,23 @@ class Browser(Protocol):
     # Shared by Observe and Actions; it cannot live in either without a dependency cycle.
     action_lock: asyncio.Lock
     files: FileSystem | None
+    # The browser's one mouse and keyboard; they act on the active tab.
+    input: Input
 
     @property
     def active_tab(self) -> Tab: ...
+
+    @property
+    def mouse(self) -> Mouse: ...
+
+    @property
+    def keyboard(self) -> Keyboard: ...
 
     async def tabs(self) -> tuple[TabInfo, ...]: ...
     async def open_tab(self, target: str | Path = "about:blank") -> Tab: ...
     async def activate_tab(self, target_id: str) -> Tab: ...
     async def close_tab(self, target_id: str) -> Tab: ...
     async def downloads(self) -> tuple[Download, ...]: ...
-    async def publish_cursor(self) -> None: ...
 
 
 async def _discard(_event: BrowserEvent | LiveEvent) -> None:

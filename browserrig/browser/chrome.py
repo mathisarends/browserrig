@@ -19,6 +19,7 @@ from cdpify.domains.target import TargetDestroyedEvent, TargetInfo, TargetInfoCh
 
 from browserrig.browser.models import TabInfo
 from browserrig.core.errors import BrowserClosed, BrowserError
+from browserrig.core.kinds import TabGesture
 from browserrig.events import (
     ConnectedEvent,
     DisconnectedEvent,
@@ -28,6 +29,7 @@ from browserrig.events import (
 )
 from browserrig.files import FileSystem, FileSystemOptions
 from browserrig.files.models import Download
+from browserrig.input import Input, Keyboard, Mouse
 
 from .base import BrowserEvents, EventSink, _discard
 from .config import BrowserOptions, ConnectBrowser, LaunchBrowser, Viewport
@@ -83,6 +85,8 @@ class ChromeBrowser:
         self._worlds = Worlds()
         self._attach_lock = asyncio.Lock()
         self.action_lock = asyncio.Lock()
+        # One mouse and keyboard for the whole browser, aimed at the active tab.
+        self.input = Input(self._focused)
         self._close_task: asyncio.Task[None] | None = None
         self.client: CdpClient
 
@@ -109,8 +113,9 @@ class ChromeBrowser:
                 await self.client.target.set_discover_targets(discover=True)
                 if isinstance(options, ConnectBrowser) and options.target_id:
                     tab = await self._attach(options.target_id)
-                    self._active = tab.id
-                    await tab.mouse.initialize_cursor()
+                    await self.mouse.switch_tab(
+                        TabGesture.ACTIVATE, tab.id, lambda: self._focus(tab, front=False)
+                    )
                 else:
                     await self.open_tab(options.url)
                 self._connected = True
@@ -127,11 +132,18 @@ class ChromeBrowser:
 
     @property
     def active_tab(self) -> Tab:
-        self._check()
-        tab = self._tabs.get(self._active)
-        if tab is None or tab.closed:
+        tab = self._focused()
+        if tab is None:
             raise BrowserError("No active tab; open or explicitly activate one")
         return tab
+
+    @property
+    def mouse(self) -> Mouse:
+        return self.input.mouse
+
+    @property
+    def keyboard(self) -> Keyboard:
+        return self.input.keyboard
 
     async def tabs(self) -> tuple[TabInfo, ...]:
         self._check()
@@ -165,38 +177,48 @@ class ChromeBrowser:
         """
         url = target.absolute().as_uri() if isinstance(target, Path) else validated_url(target)
         self._check()
-        result = await self.client.target.create_target(url=url, browser_context_id=self._context)
-        tab = await self._attach(result.target_id, opened=True)
-        self._active = tab.id
-        await self.events.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
-        await tab.mouse.initialize_cursor()
-        return tab
+        opened: list[Tab] = []
+
+        async def open_new() -> None:
+            opened.append(await self._create(url))
+            await self._focus(opened[0], front=False)
+
+        await self.mouse.switch_tab(TabGesture.OPEN, "", open_new)
+        return opened[0]
 
     async def activate_tab(self, target_id: str) -> Tab:
         if target_id not in {tab.id for tab in await self.tabs()}:
             raise BrowserError("Target is outside this browser's controlled scope")
         tab = await self._attach(target_id)
-        await tab.bring_to_front()
-        self._active = tab.id
-        await self.events.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
-        await tab.mouse.initialize_cursor()
+        if tab.id == self._active:
+            # Already in front: nothing to press, but late viewers still need the cursor.
+            await tab.bring_to_front()
+            await self.events.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
+            await self.mouse.publish_cursor()
+            return tab
+        await self.mouse.switch_tab(TabGesture.ACTIVATE, tab.id, lambda: self._focus(tab))
         return tab
 
     async def close_tab(self, target_id: str) -> Tab:
         if target_id not in {tab.id for tab in await self.tabs()}:
             raise BrowserError("Target is outside this browser's controlled scope")
-        await self.client.target.close_target(target_id=target_id)
-        await self._forget(target_id)
-        if self._active and self._active in self._tabs:
-            return self.active_tab
-        remaining = [tab for tab in await self.tabs() if tab.id != target_id]
-        return await self.activate_tab(remaining[0].id) if remaining else await self.open_tab()
+
+        async def close() -> None:
+            await self.client.target.close_target(target_id=target_id)
+            await self._forget(target_id)
+            if self._focused() is not None:
+                return
+            remaining = [tab for tab in await self.tabs() if tab.id != target_id]
+            if remaining:
+                await self._focus(await self._attach(remaining[0].id))
+            else:
+                await self._focus(await self._create("about:blank"), front=False)
+
+        await self.mouse.switch_tab(TabGesture.CLOSE, target_id, close)
+        return self.active_tab
 
     async def downloads(self) -> tuple[Download, ...]:
         return self._downloads.all()
-
-    async def publish_cursor(self) -> None:
-        await self.active_tab.mouse.publish_cursor()
 
     async def aclose(self) -> None:
         if self._close_task is None:
@@ -243,6 +265,21 @@ class ChromeBrowser:
                 "Browser event listener failed; reconnect before continuing"
             ) from self._failure
 
+    def _focused(self) -> Tab | None:
+        self._check()
+        tab = self._tabs.get(self._active)
+        return None if tab is None or tab.closed else tab
+
+    async def _create(self, url: str) -> Tab:
+        result = await self.client.target.create_target(url=url, browser_context_id=self._context)
+        return await self._attach(result.target_id, opened=True)
+
+    async def _focus(self, tab: Tab, *, front: bool = True) -> None:
+        if front:
+            await tab.bring_to_front()
+        self._active = tab.id
+        await self.events.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
+
     async def _attach(self, target_id: str, *, opened: bool = False, opener_id: str = "") -> Tab:
         async with self._attach_lock:
             if target_id in self._tabs:
@@ -259,6 +296,7 @@ class ChromeBrowser:
                     emit=self.events.emit,
                     worlds=self._worlds,
                     discover_frames=self._discover_frames,
+                    current_action=lambda: self.input.action_id,
                 )
                 await tab.sync_document()
                 if target_id in self._closed_targets:
@@ -294,6 +332,7 @@ class ChromeBrowser:
                 self._worlds.invalidate(session_id=sid)
         if self._active == target_id:
             self._active = ""
+        self.mouse.forget(target_id)
         if tab is not None:
             tab.closed = True
             await self.events.emit(TabClosedEvent(target_id=target_id))
@@ -372,7 +411,7 @@ class ChromeBrowser:
             case FrameNavigatedEvent(frame=frame):
                 self._worlds.invalidate(frame_id=frame.id)
                 for tab in self._tabs.values():
-                    tab.invalidate_frames()
+                    tab.layout_changed()
 
     async def _on_target_info(self, info: TargetInfo) -> None:
         if known := self._tabs.get(info.target_id):

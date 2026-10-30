@@ -454,8 +454,8 @@ inspect the result before continuing.
 browser, tab, and document IDs for live UI display.
 The newest image shown to the model determines how crop coordinates map to the viewport;
 subsequent text-only observations retain that image's geometry.
-DOM and canvas screenshots include a red cursor arrow at the pointer position at
-capture time, with its tip at the exact input coordinate. The marker follows
+DOM and canvas screenshots include a red cursor arrow where the browser's mouse
+rests in the captured tab, with its tip at the exact input coordinate. The marker follows
 crop and zoom coordinates and is omitted when the pointer is outside the image.
 It is drawn with Pillow after capture; canvas change detection uses the image
 without the marker.
@@ -465,19 +465,37 @@ no shared local file system; `list_downloads` remains available.
 
 ## Input choreography
 
-Each tab exposes separate `tab.mouse` and `tab.keyboard` controllers, also
-available as `tab.input.mouse` and `tab.input.keyboard`. `tab.input` shares the
+The browser has one mouse and one keyboard, `browser.mouse` and
+`browser.keyboard`, also available as `browser.input.mouse` and
+`browser.input.keyboard`. Both act on the active tab. `browser.input` shares the
 action context and event correlation across both devices. DOM and canvas tools
-use these same controllers; `Actions` owns action serialization and readiness.
-New tabs initialize the native cursor at a random position within the central
-40–60% of the actual viewport on each axis and immediately emit
-`browser.cursor.state`. There is no initial animation from the top-left corner.
-Activating an existing tab republishes its current position. Agent turn starts
-also publish the current cursor state so live subscribers attached after browser
-setup can display it before the first model request or input action.
-Low-level pointer dispatch uses `MouseEventKind`, available from `browserrig` or
-`browserrig.kinds`: `await tab.mouse.dispatch(MouseEventKind.MOVED, Point(x=100, y=120))`.
-The enum also provides `PRESSED`, `RELEASED`, and `WHEEL`; use `scroll()` for wheel input.
+use these same devices; `Actions` owns action serialization and readiness.
+A tab is only the document: JavaScript, navigation, frames, dialogs and element
+references stay on `Tab`, which receives input through the `InputTarget`
+protocol. Each gesture resolves the active tab once when it starts, so a click or
+drag never splits across tabs; without an active tab, input raises `BrowserError`.
+
+The mouse remembers where it last rested in each tab (`browser.mouse.position_in(tab.id)`)
+and returns there when that tab comes back to the front. The first time a tab
+receives the pointer, it lands at a random position within the central 40–60% of
+the actual viewport on each axis. There is no animation from the top-left corner.
+Opening, activating and closing tabs play a tab-strip gesture:
+
+1. `TabPressedEvent` (`browser.tab.pressed`) belongs to the tab the pointer
+   leaves. It carries `gesture` (`TabGesture.OPEN`, `ACTIVATE` or `CLOSE`), the
+   pressed `tab_id` (empty for the new-tab button), `from_position` and
+   `duration`. The harness waits `duration`, then switches tabs.
+2. `CursorEnteredEvent` (`browser.cursor.entered`) belongs to the new tab. The
+   pointer travels from the tab strip to `to_position`; the harness waits again.
+3. A native mouse move lands at that position, so hover in the new page is real,
+   followed by `browser.cursor.state`.
+
+The backend does not know the viewer's layout. A viewer places the tab chip
+itself, for example through a `data-target-id` attribute, and draws the gesture
+in an overlay spanning its tab strip and the viewport. The first tab of a
+session skips steps 1 and 2. Agent turn starts publish the current cursor state
+so live subscribers attached after browser setup can display it before the
+first model request or input action.
 Cursor movements follow bounded cubic paths; scrolling uses eased wheel steps.
 Typing uses a fixed 50 ms interval, configured by the internal
 `_TYPING_INTERVAL_SECONDS` constant in `browserrig/input/keyboard.py`.
@@ -500,9 +518,9 @@ replace a referenced field. Use `clear=False` to type at its current selection.
 
 Keys and modifiers are released on failure or cancellation. Unicode text is
 dispatched once per character, without simulated typos. Empty replacement text
-clears the field. Direct Python callers can use `tab.keyboard.type_text(...)`,
-`tab.keyboard.press_key(...)`, `tab.mouse.move_to(Point(...))`, and
-`tab.mouse.scroll(point=Point(...), delta_y=...)`. Acquire `browser.action_lock`
+clears the field. Direct Python callers can use `browser.keyboard.type_text(...)`,
+`browser.keyboard.press_key(...)`, `browser.mouse.move_to(Point(...))`, and
+`browser.mouse.scroll(delta_y=..., point=Point(...))`. Acquire `browser.action_lock`
 when combining direct inputs with other browser actions.
 
 The choreography uses Harnessed's native transient event extension. `Chrome`
@@ -512,6 +530,8 @@ registers these frozen event types alongside its durable browser events:
 | --- | --- |
 | `CursorMovedEvent` | Start, destination, two control points, duration, easing |
 | `CursorStateEvent` | Actual cursor position and held mouse buttons |
+| `TabPressedEvent` | Tab-strip gesture, pressed tab ID, start position, duration |
+| `CursorEnteredEvent` | Landing position in the new tab, duration, easing |
 | `CursorStyleEvent` | CSS cursor under the pointer (`CursorStyle`, such as `pointer` or `text`) |
 | `PointerPressedEvent`, `PointerReleasedEvent` | Position, mouse button and native click count |
 | `KeyPressedEvent` | Key, modifiers, duration |
@@ -532,7 +552,7 @@ interrupted sequences. Key events contain the dispatched key and modifiers.
 The harness paces its choreography: events with a `duration` describe an
 animation the browser waits through before continuing. `open_file` and
 `open_downloaded_file` emit a `FileTransferEvent` in the current tab, wait for it,
-and only then open the new tab. Uploads move the cursor onto the file input, emit
+and only then open the new tab, which plays the tab-strip gesture. Uploads move the cursor onto the file input, emit
 the transfer with that point, wait, and then assign the files.
 `CursorStyleEvent` follows cursor movement and scrolling and is only emitted when
 the style changes. It reads the page's computed CSS cursor and treats text inputs,

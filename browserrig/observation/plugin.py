@@ -142,6 +142,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 previous=self._state.snapshot,
                 region=region,
                 zoom=zoom,
+                cursor=browser.mouse.position_in(selected.id),
                 screenshots=(self.screenshots.trigger == ScreenshotTrigger.EACH_STEP)
                 if screenshots is None
                 else screenshots,

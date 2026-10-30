@@ -4,12 +4,13 @@ from dataclasses import replace
 from browserrig.browser.tab import Frame, Tab
 from browserrig.core.errors import BrowserError, StaleElement
 from browserrig.core.geometry import Point
+from browserrig.input import Mouse
 from browserrig.observation.handle import ElementHandle
 from browserrig.scripts import SCROLL, SCROLL_OWNER
 from browserrig.scripts.models import OwnerScrollArgs, ScrollArgs, ScrollPlan
 
 
-async def prepare_element(tab: Tab, handle: ElementHandle) -> bool:
+async def prepare_element(tab: Tab, handle: ElementHandle, mouse: Mouse) -> bool:
     """Bring a DOM target into a comfortable view using native wheel input, outer frames first."""
     scrolled = False
     previous = None
@@ -34,9 +35,7 @@ async def prepare_element(tab: Tab, handle: ElementHandle) -> bool:
             previous = signature
             x, y = owner.transform.to_viewport(plan.x, plan.y)
             await owner.check_point(x, y)
-            await tab.mouse.scroll(
-                point=Point(x=x, y=y), delta_x=plan.delta_x, delta_y=plan.delta_y
-            )
+            await mouse.scroll(point=Point(x=x, y=y), delta_x=plan.delta_x, delta_y=plan.delta_y)
             scrolled = True
             await asyncio.sleep(0.05)
     raise BrowserError("Element could not be brought into view using wheel input; observe again")

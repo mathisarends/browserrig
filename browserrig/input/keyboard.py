@@ -6,10 +6,10 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from typing import TypedDict
 
-from cdpify import CdpSession
-
 from browserrig.core.errors import BrowserError
 from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
+
+from .target import Focus, InputTarget, focused
 
 _TYPING_INTERVAL_SECONDS = 0.05
 
@@ -53,8 +53,12 @@ _SHIFTED_BY_BASE = {base: shifted for shifted, base in _SHIFTED.items()}
 
 
 class Keyboard:
-    def __init__(self, cdp: CdpSession, *, emit: Callable[[InputEvent], Awaitable[None]]) -> None:
-        self._cdp = cdp
+    """The browser's one keyboard; each key or text goes to the tab focused when it starts."""
+
+    def __init__(
+        self, focus: Focus, *, emit: Callable[[InputTarget, InputEvent], Awaitable[None]]
+    ) -> None:
+        self._focus = focus
         self._emit = emit
 
     async def press_key(
@@ -77,41 +81,41 @@ class Keyboard:
             if enabled
         )
         stroke = _key_stroke(key, modifiers)
+        target = focused(self._focus)
         try:
-            await self._emit(KeyboardVisibilityEvent(visible=True))
-            await self._stroke(stroke)
+            await self._emit(target, KeyboardVisibilityEvent(visible=True))
+            await self._stroke(target, stroke)
         finally:
-            await self._emit(KeyboardVisibilityEvent(visible=False))
+            await self._emit(target, KeyboardVisibilityEvent(visible=False))
 
     async def type_text(self, text: str) -> None:
+        target = focused(self._focus)
         try:
-            await self._emit(KeyboardVisibilityEvent(visible=True))
+            await self._emit(target, KeyboardVisibilityEvent(visible=True))
             # CRLF is one line break. Other Unicode characters are inserted unchanged.
             for value in text.replace("\r\n", "\n"):
-                await self._stroke(_character(value), duration=_TYPING_INTERVAL_SECONDS)
+                await self._stroke(target, _character(value), duration=_TYPING_INTERVAL_SECONDS)
                 await asyncio.sleep(_TYPING_INTERVAL_SECONDS)
         finally:
-            await self._emit(KeyboardVisibilityEvent(visible=False))
+            await self._emit(target, KeyboardVisibilityEvent(visible=False))
 
-    async def _stroke(self, stroke: _Stroke, *, duration: float = 0) -> None:
+    async def _stroke(self, target: InputTarget, stroke: _Stroke, *, duration: float = 0) -> None:
         async with AsyncExitStack() as held:
             flags = 0
             for modifier in stroke.modifiers:
                 arguments = _Stroke(modifier).arguments()
                 held.push_async_callback(
-                    self._cdp.input.dispatch_key_event,
-                    type="keyUp",
+                    target.dispatch_key,
+                    "keyUp",
                     modifiers=flags,
                     **arguments,
                 )
                 flags |= _MODIFIERS[modifier]
-                await self._cdp.input.dispatch_key_event(
-                    type="rawKeyDown", modifiers=flags, **arguments
-                )
+                await target.dispatch_key("rawKeyDown", modifiers=flags, **arguments)
             arguments = stroke.arguments()
             held.push_async_callback(
-                self._cdp.input.dispatch_key_event,
-                type="keyUp",
+                target.dispatch_key,
+                "keyUp",
                 modifiers=flags,
                 **arguments,
             )
@@ -123,22 +127,21 @@ class Keyboard:
                 )
             # Separate rawKeyDown and char so text is inserted once, including
             # Unicode without a physical mapping. Enter keeps native semantics.
-            await self._cdp.input.dispatch_key_event(
-                type="keyDown" if stroke.key == "Enter" and not shortcut else "rawKeyDown",
+            await target.dispatch_key(
+                "keyDown" if stroke.key == "Enter" and not shortcut else "rawKeyDown",
                 modifiers=flags,
                 text="\r" if stroke.key == "Enter" and not shortcut else "",
                 **arguments,
             )
             if text and stroke.key != "Enter":
-                await self._cdp.input.dispatch_key_event(
-                    type="char", modifiers=flags, text=text, **arguments
-                )
+                await target.dispatch_key("char", modifiers=flags, text=text, **arguments)
         await self._emit(
+            target,
             KeyPressedEvent(
                 key=stroke.key,
                 modifiers=stroke.modifiers,
                 duration=duration,
-            )
+            ),
         )
 
 

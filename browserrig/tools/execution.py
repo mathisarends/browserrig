@@ -154,7 +154,7 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
                     )
                 )
                 dispatched = True
-                with tab.input.action(action_id):
+                with self.browser.input.action(action_id):
                     effect = await operation(tab)
                 note = await self._settle(tab, kind) if settle and not tab.closed else ""
                 await self._events.emit(
@@ -216,12 +216,12 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
         handle = await self.observe.element(tab, ref)
         scrolled = False
         if scroll:
-            scrolled = await prepare_element(tab, handle)
+            scrolled = await prepare_element(tab, handle, self.browser.mouse)
             # Wheel input may have moved ancestor documents; refresh their transforms.
             handle = await self.observe.element(tab, ref)
         point = await handle.locate()
         if point.bounds is not None:
-            await tab.input.highlight(ref, point.bounds)
+            await self.browser.input.highlight(ref, point.bounds)
         return point.model_copy(update={"scrolled": scrolled})
 
     @hook(ExecuteTool)

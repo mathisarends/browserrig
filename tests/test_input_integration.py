@@ -82,13 +82,13 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
         consumer = asyncio.create_task(_consume(session, streamed, ready))
         await ready.wait()
         tab = holder["browser"].active_tab
-        position = tab.mouse.position
+        position = holder["browser"].mouse.position
         width, height = await evaluate(tab, "[innerWidth, innerHeight]")
         assert 0.35 * width <= position.x <= 0.65 * width
         assert 0.35 * height <= position.y <= 0.65 * height
         await session.run("Inspect without moving")
         await session.run("Continue without moving")
-        assert tab.mouse.position == position
+        assert holder["browser"].mouse.position == position
         assert not any(isinstance(event, InputEvent) for event in session.events)
     await consumer
     states = [event for event in streamed if isinstance(event, CursorStateEvent)]
@@ -116,6 +116,7 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, canvas)
 
     class Panels(Plugin, needs=(Browser,)):
         async def setup(self, browser: Inject[Browser]):
+            holder["browser"] = browser
             tab = holder["tab"] = browser.active_tab
             await evaluate(
                 tab,
@@ -175,8 +176,8 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, canvas)
         assert state["second"] == pytest.approx(180, abs=1)
         assert state["page"] == 0 and state["clicks"] == 0
         assert {"first", "second"} <= set(state["hovered"])
-        assert holder["tab"].mouse.position.x == pytest.approx(370)
-        assert holder["tab"].mouse.position.y == pytest.approx(160)
+        assert holder["browser"].mouse.position.x == pytest.approx(370)
+        assert holder["browser"].mouse.position.y == pytest.approx(160)
 
 
 async def test_element_highlight_uses_live_bounds_after_scroll(site):

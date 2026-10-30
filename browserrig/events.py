@@ -16,6 +16,7 @@ from browserrig.core.kinds import (
     ReadinessPhase,
     ReadinessStage,
     ReadinessStatus,
+    TabGesture,
 )
 
 
@@ -66,6 +67,8 @@ class EventKind(StrEnum):
     CURSOR_MOVED = "browser.cursor.moved"
     CURSOR_STATE = "browser.cursor.state"
     CURSOR_STYLE = "browser.cursor.style"
+    CURSOR_ENTERED = "browser.cursor.entered"
+    TAB_PRESSED = "browser.tab.pressed"
     POINTER_PRESSED = "browser.pointer.pressed"
     POINTER_RELEASED = "browser.pointer.released"
     KEY_PRESSED = "browser.key.pressed"
@@ -201,6 +204,36 @@ class FileTransferEvent(InputEvent):
     x: float | None = None
     y: float | None = None
     type: Literal[EventKind.FILE_TRANSFER] = field(default=EventKind.FILE_TRANSFER, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
+class TabPressedEvent(InputEvent):
+    """The pointer leaves the page and presses a control in the viewer's tab strip.
+
+    The event belongs to the tab the pointer leaves, starting at `from_position`.
+    `tab_id` names the pressed tab; it is empty for the new-tab button. Viewers place
+    the control themselves; the harness waits `duration` before switching tabs.
+    """
+
+    gesture: TabGesture
+    tab_id: str
+    from_position: tuple[float, float]
+    duration: float
+    type: Literal[EventKind.TAB_PRESSED] = field(default=EventKind.TAB_PRESSED, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
+class CursorEnteredEvent(InputEvent):
+    """After a tab press, the pointer returns from the tab strip into this tab's page.
+
+    It travels to `to_position`, where this tab last had the pointer; the harness waits
+    `duration` before dispatching native input there.
+    """
+
+    to_position: tuple[float, float]
+    duration: float
+    easing: Literal["easeInOutCubic"] = "easeInOutCubic"
+    type: Literal[EventKind.CURSOR_ENTERED] = field(default=EventKind.CURSOR_ENTERED, kw_only=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -640,4 +673,6 @@ INPUT_EVENTS = (
     HighlightElementEvent,
     WaitingEvent,
     FileTransferEvent,
+    TabPressedEvent,
+    CursorEnteredEvent,
 )

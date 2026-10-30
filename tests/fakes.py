@@ -4,6 +4,7 @@ from harnessed import Context, Inject, Plugin, SessionLog
 
 from browserrig import Browser
 from browserrig.browser.base import BrowserEvents
+from browserrig.input import Input
 from browserrig.scripts.models import DOMProbe
 
 
@@ -38,6 +39,9 @@ class FakeBrowser:
         self.log = log
         self.files = None
         self.events = BrowserEvents(self.id, self._emit)
+        self.input = Input(lambda: self.active_tab)
+        self.mouse = self.input.mouse
+        self.keyboard = self.input.keyboard
 
     async def downloads(self):
         return ()

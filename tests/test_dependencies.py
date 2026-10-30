@@ -100,7 +100,7 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
         await agent.run("Inspect the page")
     missing = {issue.plugin.name: issue.missing for issue in caught.value.issues}
     assert missing == {
-        "KeyboardTools": (Actions, Observe),
+        "KeyboardTools": (Actions, Browser, Observe),
         "Actions": (Browser, BrowserEvents, Readiness, Observe),
         "Observe": (Browser, BrowserEvents, Readiness),
         "Readiness": (BrowserEvents,),

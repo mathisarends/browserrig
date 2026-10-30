@@ -191,7 +191,6 @@ async def test_failed_comparison_keeps_input_successful_and_breaks_the_chain():
         document_id="doc",
         url=before.url,
         closed=False,
-        input=SimpleNamespace(action=lambda _: nullcontext()),
     )
     actions = SimpleNamespace(
         observe=SimpleNamespace(
@@ -200,7 +199,11 @@ async def test_failed_comparison_keeps_input_successful_and_breaks_the_chain():
             probe=AsyncMock(side_effect=RuntimeError("lost")),
         ),
         chain_policy=DomActionChains(),
-        browser=SimpleNamespace(active_tab=tab, action_lock=asyncio.Lock()),
+        browser=SimpleNamespace(
+            active_tab=tab,
+            action_lock=asyncio.Lock(),
+            input=SimpleNamespace(action=lambda _: nullcontext()),
+        ),
         _prepare=AsyncMock(
             return_value=PageState(
                 url=before.url,

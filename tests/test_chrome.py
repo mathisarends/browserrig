@@ -19,6 +19,7 @@ from browserrig.events import (
     TabClosedEvent,
     TabOpenedEvent,
 )
+from browserrig.kinds import TabGesture
 
 
 async def test_event_handler_failure_does_not_stop_subscription(monkeypatch, caplog):
@@ -78,7 +79,7 @@ async def test_concurrent_attaches_publish_exactly_one_open_event():
 async def test_close_forgets_sessions_and_ignores_stale_target_listing(monkeypatch):
     browser, events = _browser()
     closed = await browser._attach("closing")
-    remaining = Tab("remaining", SimpleNamespace())
+    remaining = Tab("remaining", SimpleNamespace(page=SimpleNamespace(bring_to_front=AsyncMock())))
     browser._active = closed.id
     browser.client.target.get_targets.return_value = SimpleNamespace(
         target_infos=[
@@ -87,10 +88,17 @@ async def test_close_forgets_sessions_and_ignores_stale_target_listing(monkeypat
         ]
     )
     browser._tabs[remaining.id] = remaining
-    activate = AsyncMock(return_value=remaining)
-    monkeypatch.setattr(browser, "activate_tab", activate)
+    gestures = []
+
+    async def switch_tab(gesture, tab_id, switch):
+        gestures.append((gesture, tab_id))
+        await switch()
+
+    monkeypatch.setattr(browser.mouse, "switch_tab", switch_tab)
     assert await browser.close_tab(closed.id) is remaining
-    activate.assert_awaited_once_with("remaining")
+    assert gestures == [(TabGesture.CLOSE, "closing")]
+    remaining.cdp.page.bring_to_front.assert_awaited_once_with()
+    assert browser.active_tab is remaining
     assert closed.closed and closed.id not in browser._tabs
     assert "session" not in browser._sessions
     await browser._forget(closed.id)
@@ -109,11 +117,11 @@ async def test_frame_cache_is_action_scoped_and_invalidated_by_layout_and_docume
     browser.client.target.get_targets.return_value = SimpleNamespace(target_infos=[])
     discover = AsyncMock(return_value=((), ()))
     monkeypatch.setattr("browserrig.browser.chrome.discover_frames", discover)
-    with tab.input.action("action"):
+    with browser.input.action("action"):
         await tab.frames()
         await tab.frames()
         assert discover.await_count == 1
-        tab.invalidate_frames()
+        tab.layout_changed()
         await tab.frames()
         assert discover.await_count == 2
         tab.document_id = "another-document"

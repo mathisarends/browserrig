@@ -28,6 +28,6 @@ class Chrome(Plugin, needs=(SessionLog,)):
 
         async def publish_cursor(_event: TurnStartedEvent) -> None:
             # Live subscribers often attach after setup, so seed their animation at turn start.
-            await browser.publish_cursor()
+            await browser.mouse.publish_cursor()
 
         ctx.on(TurnStartedEvent, publish_cursor)
