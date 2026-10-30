@@ -82,3 +82,10 @@ class PageFacts(Options):
     width: float
     height: float
     scroll_y: float
+
+
+class TabStrip(Options):
+    """The document title and best icon URL; `icon` is empty for non-web pages."""
+
+    title: str
+    icon: str

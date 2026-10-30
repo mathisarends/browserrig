@@ -1,6 +1,6 @@
 import asyncio
 from typing import Annotated
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlsplit
 
 from harnessed import Inject, Plugin, ToolResult
 from pydantic import Field
@@ -8,25 +8,38 @@ from pydantic import Field
 from browserrig.browser.base import Browser, BrowserEvents
 from browserrig.browser.tab import Tab, validated_url
 from browserrig.core.errors import BrowserError
-from browserrig.core.kinds import ActionKind
+from browserrig.core.kinds import ActionKind, ReadinessPhase
 from browserrig.core.tools import browser_tool as tool
 from browserrig.events import NavigationStartedEvent, WaitingEvent
+from browserrig.readiness.plugin import Readiness
 
 from .execution import Actions, Effect
 
+# Where a new tab lands when the agent gives no URL.
+NEW_TAB_URL = "https://duckduckgo.com/"
 
-class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents)):
+
+class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
     _browser: Inject[Browser]
     _events: Inject[BrowserEvents]
+    _readiness: Inject[Readiness]
 
-    @tool(kind=ActionKind.NAVIGATE, description="Navigate the active tab to an HTTP(S) URL.")
+    @tool(
+        kind=ActionKind.NAVIGATE,
+        description=(
+            "Navigate to an HTTP(S) URL in the active tab, or in a new tab with new_tab=true."
+        ),
+    )
     async def navigate(
         self,
         url: str,
+        new_tab: bool = False,
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
-        return await self._navigate(url, actions, ActionKind.NAVIGATE)
+        return await self._navigate(
+            url, actions, ActionKind.NAVIGATE, typed=typed_address(url), new_tab=new_tab
+        )
 
     @tool(kind=ActionKind.SEARCH, description="Search the web with DuckDuckGo in the active tab.")
     async def search(
@@ -39,6 +52,7 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents)):
             f"https://duckduckgo.com/?q={quote_plus(query)}",
             actions,
             ActionKind.SEARCH,
+            typed=query,
         )
 
     @tool(kind=ActionKind.GO_BACK, description="Go to the previous browser history entry.")
@@ -104,15 +118,34 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents)):
             await asyncio.sleep(seconds)
         return "Wait completed; observe the current state."
 
-    async def _navigate(self, url: str, actions: Actions, kind: ActionKind) -> ToolResult:
+    async def _navigate(
+        self, url: str, actions: Actions, kind: ActionKind, *, typed: str, new_tab: bool = False
+    ) -> ToolResult:
         validated_url(url)
 
         async def navigate(tab: Tab) -> Effect:
-            await self._events.emit(NavigationStartedEvent(target_id=tab.id, url=url))
+            await self._events.emit(NavigationStartedEvent(target_id=tab.id, url=url, typed=typed))
             await tab.navigate(url)
             return Effect("Navigation executed.")
 
-        return await actions.run(
-            kind=kind,
-            operation=navigate,
-        )
+        async def navigate_new(_tab: Tab) -> Effect:
+            # An empty tab first, so viewers see the address typed into a fresh tab.
+            opened = await self._browser.open_tab()
+            await navigate(opened)
+            await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
+            return Effect(f"Opened tab {opened.id} and navigated.")
+
+        if new_tab:
+            return await actions.run(kind=kind, operation=navigate_new, settle=False)
+        return await actions.run(kind=kind, operation=navigate)
+
+
+def typed_address(url: str) -> str:
+    """What a person types into the address bar for `url`: no scheme, no lone trailing slash."""
+    parts = urlsplit(url)
+    if parts.scheme not in {"http", "https"}:
+        return url
+    typed = url.split("://", 1)[1]
+    if parts.path == "/" and not parts.query and not parts.fragment:
+        typed = typed.removesuffix("/")
+    return typed

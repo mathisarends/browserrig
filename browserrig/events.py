@@ -28,6 +28,7 @@ class EventKind(StrEnum):
     TAB_OPENED = "browser.tab.opened"
     TAB_ACTIVATED = "browser.tab.activated"
     TAB_CLOSED = "browser.tab.closed"
+    TAB_UPDATED = "browser.tab.updated"
     NAVIGATION_STARTED = "browser.navigation.started"
     NAVIGATION_COMMITTED = "browser.navigation.committed"
     DIALOG_OPENED = "browser.dialog.opened"
@@ -249,6 +250,21 @@ class DownloadProgressedEvent(LiveEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class TabUpdatedEvent(LiveEvent):
+    """What a viewer's tab strip shows for one tab, sent whenever any field changes.
+
+    `favicon` is a `data:` URI loaded through the browser, or empty when the page has
+    none. A loading tab keeps its previous icon until the new page settles.
+    """
+
+    url: str
+    title: str
+    loading: bool
+    favicon: str = ""
+    type: Literal[EventKind.TAB_UPDATED] = field(default=EventKind.TAB_UPDATED, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
 class ConnectedEvent(BrowserEvent):
     owned_process: bool
     type: Literal[EventKind.CONNECTED] = field(default=EventKind.CONNECTED, kw_only=True)
@@ -278,7 +294,13 @@ class TabClosedEvent(BrowserEvent):
 
 @dataclass(frozen=True, slots=True)
 class NavigationStartedEvent(BrowserEvent):
+    """`typed` is what a person would enter in the address bar to get to `url`.
+
+    It drops the scheme of web URLs; for a search it is the query itself.
+    """
+
     url: str
+    typed: str = ""
     type: Literal[EventKind.NAVIGATION_STARTED] = field(
         default=EventKind.NAVIGATION_STARTED, kw_only=True
     )
@@ -625,6 +647,7 @@ BROWSER_EVENTS = (
     TabOpenedEvent,
     TabActivatedEvent,
     TabClosedEvent,
+    TabUpdatedEvent,
     NavigationStartedEvent,
     NavigationCommittedEvent,
     DialogOpenedEvent,

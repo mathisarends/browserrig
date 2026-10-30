@@ -10,6 +10,8 @@ from cdpify import CdpClient, CdpSession, EventSubscription, ReceivedEvent
 from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
 from cdpify.domains.page import (
     FrameNavigatedEvent,
+    FrameStartedLoadingEvent,
+    FrameStoppedLoadingEvent,
     JavascriptDialogClosedEvent,
     JavascriptDialogOpeningEvent,
     NavigatedWithinDocumentEvent,
@@ -45,6 +47,8 @@ logger = logging.getLogger(__name__)
 _EVENTS = (
     FrameNavigatedEvent,
     NavigatedWithinDocumentEvent,
+    FrameStartedLoadingEvent,
+    FrameStoppedLoadingEvent,
     JavascriptDialogOpeningEvent,
     JavascriptDialogClosedEvent,
     ExecutionContextDestroyedEvent,
@@ -307,6 +311,7 @@ class ChromeBrowser:
                     await self.events.emit(
                         TabOpenedEvent(target_id=tab.id, url=tab.url, opener_id=opener_id)
                     )
+                tab.refresh_strip()
                 if self._context is None:
                     assert self._stack is not None
                     self._stack.push_async_callback(self._detach, attached.session_id)
@@ -334,7 +339,7 @@ class ChromeBrowser:
             self._active = ""
         self.mouse.forget(target_id)
         if tab is not None:
-            tab.closed = True
+            tab.discard()
             await self.events.emit(TabClosedEvent(target_id=target_id))
 
     async def _discover_frames(self, tab: Tab) -> tuple[tuple[Frame, ...], tuple[str, ...]]:
@@ -416,6 +421,7 @@ class ChromeBrowser:
     async def _on_target_info(self, info: TargetInfo) -> None:
         if known := self._tabs.get(info.target_id):
             known.url, known.title = info.url, info.title
+            await known.publish_state()
         elif info.type == "page" and self._context and info.browser_context_id == self._context:
             await self._attach(info.target_id, opened=True, opener_id=info.opener_id or "")
 
@@ -432,7 +438,7 @@ class ChromeBrowser:
                 await stack.aclose()
             finally:
                 for tab in self._tabs.values():
-                    tab.closed = True
+                    tab.discard()
                 if self._connected:
                     self._connected = False
                     await self.events.emit(DisconnectedEvent())

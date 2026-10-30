@@ -13,6 +13,8 @@ from cdpify import CdpSession
 from cdpify.domains.input import MouseButton
 from cdpify.domains.page import (
     FrameNavigatedEvent,
+    FrameStartedLoadingEvent,
+    FrameStoppedLoadingEvent,
     FrameTree,
     JavascriptDialogClosedEvent,
     JavascriptDialogOpeningEvent,
@@ -32,15 +34,18 @@ from browserrig.events import (
     DialogOpenedEvent,
     LiveEvent,
     NavigationCommittedEvent,
+    TabUpdatedEvent,
 )
 from browserrig.input.target import KeyEventType
-from browserrig.scripts import CURSOR, OWNER_HITS, Script, failure
+from browserrig.scripts import CURSOR, OWNER_HITS, TAB_STRIP, Script, failure
 from browserrig.scripts.models import CursorArgs, OwnerHitsArgs
 
+from .favicon import load_favicon
 from .worlds import Worlds
 
 # A cursor shape is presentation only and must never hold up input.
 _CURSOR_PROBE_SECONDS = 0.25
+_STRIP_SECONDS = 10
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,6 +188,13 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         self.title = ""
         self.dialog: tuple[str, str] | None = None
         self.closed = False
+        # Tab-strip state for live viewers; see `TabUpdatedEvent`.
+        self.loading = False
+        self.favicon = ""
+        self._main_frame_id = target_id
+        self._icon_url = ""
+        self._strip_task: asyncio.Task[None] | None = None
+        self._shown: tuple[str, str, bool, str] | None = None
         self.changed = asyncio.Event()
         self.frame_limitations: tuple[str, ...] = ()
         self.worlds = worlds if worlds is not None else Worlds()
@@ -197,6 +209,53 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
     async def emit(self, event: BrowserEvent | LiveEvent) -> None:
         if self._emit is not None:
             await self._emit(replace(event, target_id=self.id, document_id=self.document_id))
+
+    async def publish_state(self) -> None:
+        """Tell live viewers what the tab strip shows, once per distinct state."""
+        state = (self.url, self.title, self.loading, self.favicon)
+        if self._emit is None or self.closed or state == self._shown:
+            return
+        self._shown = state
+        await self.emit(
+            TabUpdatedEvent(
+                url=self.url, title=self.title, loading=self.loading, favicon=self.favicon
+            )
+        )
+
+    def refresh_strip(self) -> None:
+        """Read title and icon in the background; a slow icon host never holds up events."""
+        if self._emit is None or self.closed:
+            return
+        if self._strip_task is not None:
+            self._strip_task.cancel()
+        self._strip_task = asyncio.create_task(
+            self._load_strip(), name=f"browserrig:tab-strip:{self.id}"
+        )
+
+    def discard(self) -> None:
+        self.closed = True
+        if self._strip_task is not None:
+            self._strip_task.cancel()
+            self._strip_task = None
+
+    async def _load_strip(self) -> None:
+        try:
+            async with asyncio.timeout(_STRIP_SECONDS):
+                if self.dialog is None:
+                    frame = await self.main_frame()
+                    strip = await frame.run(TAB_STRIP)
+                    # Chrome's target info often keeps the host as title; the document knows.
+                    self.title = strip.title or self.title
+                    if strip.icon != self._icon_url:
+                        await self.publish_state()
+                        self._icon_url = strip.icon
+                        self.favicon = (
+                            await load_favicon(self.cdp, frame.id, strip.icon) if strip.icon else ""
+                        )
+                await self.publish_state()
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Navigation, dialogs and detached sessions only cost the strip state, never the tab.
+            return
 
     async def cursor_style(self, point: Point) -> CursorStyle | None:
         """Return the CSS cursor under a viewport point, or None when the page cannot say."""
@@ -285,12 +344,22 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         match event:
             case FrameNavigatedEvent(frame=frame) if not frame.parent_id:
                 self.document_id, self.url = frame.loader_id, frame.url
+                self._main_frame_id = frame.id
                 self.changed.set()
                 await self.emit(NavigationCommittedEvent(url=self.url))
+                await self.publish_state()
             case NavigatedWithinDocumentEvent(url=url):
                 self.url = url
                 self.changed.set()
                 await self.emit(NavigationCommittedEvent(url=self.url))
+                await self.publish_state()
+            case FrameStartedLoadingEvent(frame_id=frame_id) if frame_id == self._main_frame_id:
+                self.loading = True
+                await self.publish_state()
+            case FrameStoppedLoadingEvent(frame_id=frame_id) if frame_id == self._main_frame_id:
+                self.loading = False
+                await self.publish_state()
+                self.refresh_strip()
             case JavascriptDialogOpeningEvent(type=kind, message=message):
                 self.dialog = (str(kind), message)
                 await self.emit(DialogOpenedEvent(kind=str(kind), message=message[:1000]))
@@ -311,6 +380,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
             self.worlds.invalidate(frame_id=tree.frame.id)
             self.layout_changed()
         self.document_id, self.url = tree.frame.loader_id, tree.frame.url
+        self._main_frame_id = tree.frame.id
 
     async def go_back(self) -> bool:
         return await self._history(-1)

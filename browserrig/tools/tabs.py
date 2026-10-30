@@ -8,6 +8,7 @@ from browserrig.core.tools import browser_tool as tool
 from browserrig.readiness.plugin import Readiness
 
 from .execution import Actions, Effect
+from .navigation import NEW_TAB_URL
 
 
 class TabTools(Plugin, needs=(Actions, Browser, Readiness)):
@@ -23,10 +24,13 @@ class TabTools(Plugin, needs=(Actions, Browser, Readiness)):
     async def list_tabs(self) -> tuple[TabInfo, ...]:
         return await self._browser.tabs()
 
-    @tool(kind=ActionKind.OPEN_TAB, description="Open and activate a new tab.")
+    @tool(
+        kind=ActionKind.OPEN_TAB,
+        description="Open and activate a new tab; without a URL it starts on DuckDuckGo.",
+    )
     async def open_tab(
         self,
-        url: str = "about:blank",
+        url: str = NEW_TAB_URL,
         *,
         actions: Inject[Actions],
     ) -> ToolResult:

@@ -27,6 +27,7 @@ from .models import (
     ScrollArgs,
     ScrollPlan,
     SeedArgs,
+    TabStrip,
 )
 
 
@@ -90,6 +91,7 @@ SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))
 RESET: Script[ScriptArgs, None] = Script.load("reset", ScriptArgs, type(None))
 FOCUSED: Script[ScriptArgs, Any] = Script.load("focused", ScriptArgs, Any)
 CURSOR: Script[CursorArgs, str] = Script.load("cursor", CursorArgs, str)
+TAB_STRIP: Script[ScriptArgs, TabStrip] = Script.load("tab_strip", ScriptArgs, TabStrip)
 PAGE_FACTS: Script[ScriptArgs, PageFacts] = Script.load("page_facts", ScriptArgs, PageFacts)
 VIEWPORT: Script[ScriptArgs, tuple[float, float]] = Script.load(
     "viewport", ScriptArgs, tuple[float, float]

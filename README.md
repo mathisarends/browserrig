@@ -546,6 +546,7 @@ registers these frozen event types alongside its durable browser events:
 | `WaitingEvent` | Requested wait duration |
 | `FileTransferEvent` | `open` or `upload`, file paths, duration and the upload target point |
 | `DownloadProgressedEvent` | Download ID, received bytes and total bytes when known |
+| `TabUpdatedEvent` | URL, document title, `loading` flag and favicon as a `data:` URI |
 
 Coordinates use viewport CSS pixels; durations use seconds. Events carry
 `browser_id`, `target_id`, `document_id`, and `at`. Inputs inside an action also
@@ -565,6 +566,17 @@ editable content and plain text as `text`; custom cursor images show `default`.
 The probe is best-effort and never delays input by more than 250 ms.
 `DownloadProgressedEvent` is sent at most every 200 ms per download; completion,
 failure and cancellation remain durable events.
+
+`TabUpdatedEvent` lets a viewer draw its own tab strip. It is sent whenever a field
+changes: `loading` follows the main frame, and the title and icon are read from the
+page once it stops loading. Icons are fetched through the browser without cookies,
+capped at 64 KiB, typed from their bytes and dropped otherwise. SVG icons are safe
+only when rendered through `<img>`. A loading tab keeps its previous icon.
+
+`navigate(url, new_tab=True)` opens the URL in a new tab; `open_tab` without a URL
+starts on DuckDuckGo. The durable `NavigationStartedEvent` carries `typed`, the text
+a person would enter in the address bar: the URL without `https://` (and without a
+bare trailing `/`), or the query for `search`.
 
 Navigation, tab changes, downloads, and model/tool/readiness/pause intervals keep
 their existing typed events. Consumers can use those together with input events
