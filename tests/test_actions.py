@@ -11,8 +11,14 @@ from harnessed import ToolError
 from browserrig import FileSystem, FileSystemOptions
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
-from browserrig.events import ActionFailedEvent
-from browserrig.kinds import ActionKind
+from browserrig.core.geometry import ElementPoint
+from browserrig.events import (
+    ActionFailedEvent,
+    CursorMovedEvent,
+    FilesUploadedEvent,
+    FileTransferEvent,
+)
+from browserrig.kinds import ActionKind, FileTransferDirection
 from browserrig.tools.execution import Actions
 from browserrig.tools.files import UploadTools
 
@@ -63,15 +69,27 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(tmp_pat
     assert isinstance(events[0], ActionFailedEvent) and not events[0].dispatched
 
 
-async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path):
+async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path, monkeypatch):
+    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", AsyncMock())
     files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
     files.initialize()
     saved = files.write_file("report.txt", "report")
-    tools, actions, handle, _ = _uploads(files)
+    tools, actions, handle, events = _uploads(files)
     result = await UploadTools.upload_files(tools, "input", ["report.txt"], actions=actions)
     assert result.text == "Files assigned to input."
     handle.upload_files.assert_awaited_once_with([saved.path])
     actions.element_point.assert_awaited_once()
+    moved, transfer, uploaded = (
+        next(event for event in events if isinstance(event, kind))
+        for kind in (CursorMovedEvent, FileTransferEvent, FilesUploadedEvent)
+    )
+    assert moved.to_position == (40, 30)
+    assert transfer.direction == FileTransferDirection.UPLOAD
+    assert transfer.paths == (saved.path,) and (transfer.x, transfer.y) == (40, 30)
+    assert events.index(moved) < events.index(transfer) < events.index(uploaded)
+    assert uploaded.paths == (saved.path,) and uploaded.ref == "input"
+    assert uploaded.target_id == "tab"
 
 
 @pytest.mark.parametrize(
@@ -112,7 +130,12 @@ async def test_input_rejects_a_document_changed_between_calls(kind):
 
 def _actions():
     events = []
-    tab = Tab("tab", SimpleNamespace())
+
+    async def emit(event):
+        events.append(event)
+
+    cdp = SimpleNamespace(input=SimpleNamespace(dispatch_mouse_event=AsyncMock()))
+    tab = Tab("tab", cdp, emit=emit)
     actions = SimpleNamespace(
         browser=SimpleNamespace(action_lock=asyncio.Lock(), active_tab=tab),
         _events=SimpleNamespace(emit=AsyncMock(side_effect=events.append)),
@@ -125,11 +148,12 @@ def _actions():
 def _uploads(files):
     actions, events = _actions()
     actions.run = lambda **kwargs: Actions.run(actions, **kwargs)
-    actions.element_point = AsyncMock()
+    actions.element_point = AsyncMock(return_value=ElementPoint(x=40, y=30))
     actions._settle = AsyncMock(return_value="")
     handle = SimpleNamespace(element=SimpleNamespace(input_type="file"), upload_files=AsyncMock())
     tools = SimpleNamespace(
         _browser=SimpleNamespace(files=files),
+        _events=SimpleNamespace(emit=AsyncMock(side_effect=events.append)),
         _observe=SimpleNamespace(element=AsyncMock(return_value=handle)),
     )
     return tools, actions, handle, events

@@ -17,6 +17,7 @@ from .models import (
     CanvasProbe,
     ContentArgs,
     ContentExtraction,
+    CursorArgs,
     DOMProbe,
     ElementArgs,
     OwnerHitsArgs,
@@ -88,6 +89,7 @@ STABILITY: Script[ScriptArgs, DOMProbe] = Script.load("stability", ScriptArgs, D
 SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))
 RESET: Script[ScriptArgs, None] = Script.load("reset", ScriptArgs, type(None))
 FOCUSED: Script[ScriptArgs, Any] = Script.load("focused", ScriptArgs, Any)
+CURSOR: Script[CursorArgs, str] = Script.load("cursor", CursorArgs, str)
 PAGE_FACTS: Script[ScriptArgs, PageFacts] = Script.load("page_facts", ScriptArgs, PageFacts)
 VIEWPORT: Script[ScriptArgs, tuple[float, float]] = Script.load(
     "viewport", ScriptArgs, tuple[float, float]

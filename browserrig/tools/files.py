@@ -2,17 +2,29 @@ import asyncio
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
+from uuid import uuid4
 
 import yaml
 from harnessed import Inject, Observation, Plugin, SystemSection, ToolError, ToolResult, hook
 from harnessed.hooks import Next, PreStep, StepDecision
 from pydantic import Field
 
-from browserrig.browser.base import Browser
+from browserrig.browser.base import Browser, BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
-from browserrig.core.kinds import ActionKind, ReadinessPhase
+from browserrig.core.kinds import ActionKind, FileSource, FileTransferDirection, ReadinessPhase
 from browserrig.core.tools import browser_tool as tool
+from browserrig.events import (
+    FILE_EVENTS,
+    UPLOAD_EVENTS,
+    FileOpenedEvent,
+    FileReadFailedEvent,
+    FileReadFinishedEvent,
+    FileReadStartedEvent,
+    FilesListedEvent,
+    FilesUploadedEvent,
+    FileWrittenEvent,
+)
 from browserrig.files import (
     FileContent,
     FileEntry,
@@ -36,8 +48,11 @@ def has_upload_files(browser: Inject[Browser], observe: Inject[Observe]) -> bool
     return has_files(browser) and has_dom_refs(observe)
 
 
-class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
+class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
+    events = FILE_EVENTS
+
     _browser: Inject[Browser]
+    _events: Inject[BrowserEvents]
     _readiness: Inject[Readiness]
 
     _actions: Inject[Actions]
@@ -78,7 +93,17 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         offset: Annotated[int, Field(ge=0)] = 0,
         limit: Annotated[int, Field(ge=1, le=200)] = 100,
     ) -> FileListing:
-        return await _file_call(lambda: self._files().list_files(path, offset=offset, limit=limit))
+        files = self._files()
+        listing = await _file_call(lambda: files.list_files(path, offset=offset, limit=limit))
+        await self._events.emit(
+            FilesListedEvent(
+                directory=listing.directory,
+                entries=len(listing.entries),
+                offset=offset,
+                next_offset=listing.next_offset,
+            )
+        )
+        return listing
 
     @tool(
         kind=ActionKind.READ_FILE,
@@ -107,7 +132,20 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         max_chars: Annotated[int, Field(ge=1, le=200000)] = 20000,
     ) -> FileContent:
         files = self._files()
-        return await _file_call(
+        read_id = uuid4().hex
+        await self._events.emit(
+            FileReadStartedEvent(
+                read_id=read_id,
+                path=path,
+                page_number=page_number,
+                sheet=sheet,
+                cell_range=cell_range,
+                member=member,
+                ocr=ocr,
+                offset=offset,
+            )
+        )
+        read = _file_call(
             lambda: files.read_file(
                 path,
                 page_number=page_number,
@@ -119,6 +157,29 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
                 max_chars=max_chars,
             )
         )
+        try:
+            content = await read
+        except (ToolError, asyncio.CancelledError) as error:
+            # Viewers must never keep a reading indicator for a read that ended.
+            reason = "Read cancelled" if isinstance(error, asyncio.CancelledError) else str(error)
+            await self._events.emit(FileReadFailedEvent(read_id=read_id, path=path, reason=reason))
+            raise
+        await self._events.emit(
+            FileReadFinishedEvent(
+                read_id=read_id,
+                path=content.path,
+                format=content.format,
+                status=content.status,
+                characters=len(content.text),
+                offset=content.offset,
+                next_offset=content.next_offset,
+                page_number=content.page_number,
+                page_count=content.page_count,
+                sheet=content.sheet,
+                member=content.member,
+            )
+        )
+        return content
 
     @tool(
         kind=ActionKind.WRITE_FILE,
@@ -128,7 +189,15 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
     )
     async def write_file(self, path: str, content: str, overwrite: bool = False) -> FileEntry:
         files = self._files()
-        return await _file_call(lambda: files.write_file(path, content, overwrite=overwrite))
+
+        def write() -> tuple[FileEntry, bool]:
+            created = not files.resolve(path).exists()
+            return files.write_file(path, content, overwrite=overwrite), created
+
+        entry, created = await _file_call(write)
+        size = entry.size if entry.size is not None else len(content.encode("utf-8"))
+        await self._events.emit(FileWrittenEvent(path=entry.path, size=size, created=created))
+        return entry
 
     @tool(
         kind=ActionKind.OPEN_FILE,
@@ -140,7 +209,7 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         resolved = await _file_call(lambda: files.resolve(path))
         if not await asyncio.to_thread(resolved.is_file):
             raise ToolError(f"File not found: {path}")
-        return await self._open(resolved, ActionKind.OPEN_FILE)
+        return await self._open(resolved, ActionKind.OPEN_FILE, FileSource.WORKSPACE)
 
     @tool(
         kind=ActionKind.OPEN_DOWNLOADED_FILE,
@@ -160,7 +229,9 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         resolved = await _file_call(lambda: self._files().resolve(download_path))
         if not await asyncio.to_thread(resolved.is_file):
             raise ToolError("Downloaded file is no longer available")
-        return await self._open(resolved, ActionKind.OPEN_DOWNLOADED_FILE)
+        return await self._open(
+            resolved, ActionKind.OPEN_DOWNLOADED_FILE, FileSource.DOWNLOAD, download.id
+        )
 
     def _files(self) -> FileSystem:
         files = self._browser.files
@@ -190,17 +261,33 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         )
         return await next_()
 
-    async def _open(self, path: Path, kind: ActionKind) -> ToolResult:
-        async def open_file(_tab: Tab) -> Effect:
+    async def _open(
+        self, path: Path, kind: ActionKind, source: FileSource, download_id: str = ""
+    ) -> ToolResult:
+        async def open_file(tab: Tab) -> Effect:
+            # The file leaves the current tab first, so viewers can follow it into the new one.
+            await tab.input.transfer(FileTransferDirection.OPEN, (str(path),))
             opened = await self._browser.open_tab(path)
             await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
+            await self._events.emit(
+                FileOpenedEvent(
+                    target_id=opened.id,
+                    document_id=opened.document_id,
+                    path=str(path),
+                    source=source,
+                    download_id=download_id,
+                )
+            )
             return Effect(f"Opened file in tab {opened.id}: {path}")
 
         return await self._actions.run(kind=kind, operation=open_file, settle=False)
 
 
-class UploadTools(Plugin, needs=(Actions, Browser, Observe)):
+class UploadTools(Plugin, needs=(Actions, Browser, BrowserEvents, Observe)):
+    events = UPLOAD_EVENTS
+
     _browser: Inject[Browser]
+    _events: Inject[BrowserEvents]
     _observe: Inject[Observe]
 
     @tool(
@@ -230,8 +317,18 @@ class UploadTools(Plugin, needs=(Actions, Browser, Observe)):
             selected.extend(await _file_call(lambda: files.upload_paths(paths)))
 
         async def upload(tab: Tab) -> Effect:
-            await actions.element_point(tab=tab, ref=ref)
+            point = await actions.element_point(tab=tab, ref=ref)
+            await tab.mouse.move_to(point)
+            await tab.input.transfer(FileTransferDirection.UPLOAD, tuple(selected), point)
             await (await self._observe.element(tab, ref)).upload_files(selected)
+            await self._events.emit(
+                FilesUploadedEvent(
+                    target_id=tab.id,
+                    document_id=tab.document_id,
+                    paths=tuple(selected),
+                    ref=ref,
+                )
+            )
             return Effect("Files assigned to input.")
 
         return await actions.run(

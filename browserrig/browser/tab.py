@@ -23,19 +23,23 @@ from pydantic import BaseModel
 
 from browserrig.browser.screen import ScreenRecorder
 from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import Bounds, FrameTransform
+from browserrig.core.geometry import Bounds, FrameTransform, Point
+from browserrig.core.kinds import CursorStyle
 from browserrig.events import (
     BrowserEvent,
     DialogHandledEvent,
     DialogOpenedEvent,
-    InputEvent,
+    LiveEvent,
     NavigationCommittedEvent,
 )
 from browserrig.input import Input, Keyboard, Mouse
-from browserrig.scripts import OWNER_HITS, Script, failure
-from browserrig.scripts.models import OwnerHitsArgs
+from browserrig.scripts import CURSOR, OWNER_HITS, Script, failure
+from browserrig.scripts.models import CursorArgs, OwnerHitsArgs
 
 from .worlds import Worlds
+
+# A cursor shape is presentation only and must never hold up input.
+_CURSOR_PROBE_SECONDS = 0.25
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,7 +170,7 @@ class Tab:
         target_id: str,
         cdp: CdpSession,
         *,
-        emit: Callable[[BrowserEvent | InputEvent], Awaitable[None]] | None = None,
+        emit: Callable[[BrowserEvent | LiveEvent], Awaitable[None]] | None = None,
         worlds: Worlds | None = None,
         discover_frames: FrameDiscovery | None = None,
     ) -> None:
@@ -185,7 +189,12 @@ class Tab:
         self._layout_revision = 0
         self._frames_key: tuple[str, str, int] | None = None
         self._frames: tuple[Frame, ...] = ()
-        self.input = Input(self.cdp, self.emit, layout_changed=self.invalidate_frames)
+        self.input = Input(
+            self.cdp,
+            self.emit,
+            layout_changed=self.invalidate_frames,
+            cursor_style=self.cursor_style,
+        )
         self.screen = ScreenRecorder(self.cdp)
 
     @property
@@ -196,9 +205,22 @@ class Tab:
     def keyboard(self) -> Keyboard:
         return self.input.keyboard
 
-    async def emit(self, event: BrowserEvent | InputEvent) -> None:
+    async def emit(self, event: BrowserEvent | LiveEvent) -> None:
         if self._emit is not None:
             await self._emit(replace(event, target_id=self.id, document_id=self.document_id))
+
+    async def cursor_style(self, point: Point) -> CursorStyle | None:
+        """Return the CSS cursor under a viewport point, or None when the page cannot say."""
+        if self._emit is None or self.dialog is not None:
+            return None
+        try:
+            async with asyncio.timeout(_CURSOR_PROBE_SECONDS):
+                frame = await self.main_frame()
+                style = await frame.run(CURSOR, CursorArgs(x=point.x, y=point.y))
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Navigation, dialogs and detached sessions must not fail the input itself.
+            return None
+        return CursorStyle.parse(style)
 
     def invalidate_frames(self) -> None:
         """Forget cached frame geometry after input, scrolling or navigation moved content."""

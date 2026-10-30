@@ -9,6 +9,9 @@ from browserrig.core.kinds import (
     ActionKind,
     ActivityKind,
     ActivityOutcome,
+    CursorStyle,
+    FileSource,
+    FileTransferDirection,
     ObservationKind,
     ReadinessPhase,
     ReadinessStage,
@@ -31,6 +34,16 @@ class EventKind(StrEnum):
     DOWNLOAD_COMPLETED = "browser.download.completed"
     DOWNLOAD_STARTED = "browser.download.started"
     DOWNLOAD_FAILED = "browser.download.failed"
+    DOWNLOAD_CANCELED = "browser.download.canceled"
+    DOWNLOAD_PROGRESS = "browser.download.progress"
+    FILES_LISTED = "browser.files.listed"
+    FILE_READ_STARTED = "browser.files.read.started"
+    FILE_READ_FINISHED = "browser.files.read.finished"
+    FILE_READ_FAILED = "browser.files.read.failed"
+    FILE_WRITTEN = "browser.files.written"
+    FILE_OPENED = "browser.files.opened"
+    FILES_UPLOADED = "browser.files.uploaded"
+    FILE_TRANSFER = "browser.files.transfer"
     ACTION_STARTED = "browser.action.started"
     ACTION_FINISHED = "browser.action.finished"
     ACTION_FAILED = "browser.action.failed"
@@ -52,6 +65,7 @@ class EventKind(StrEnum):
     ACTIVITY_FINISHED = "browser.activity.finished"
     CURSOR_MOVED = "browser.cursor.moved"
     CURSOR_STATE = "browser.cursor.state"
+    CURSOR_STYLE = "browser.cursor.style"
     POINTER_PRESSED = "browser.pointer.pressed"
     POINTER_RELEASED = "browser.pointer.released"
     KEY_PRESSED = "browser.key.pressed"
@@ -70,12 +84,18 @@ class BrowserEvent(DurableEvent):
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class InputEvent(TransientEvent):
+class LiveEvent(TransientEvent):
+    """Live presentation detail that is streamed to subscribers but never persisted."""
+
     browser_id: str = ""
     target_id: str = ""
     document_id: str = ""
-    action_id: str = ""
     at: float = field(default_factory=monotonic)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class InputEvent(LiveEvent):
+    action_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +115,14 @@ class CursorStateEvent(InputEvent):
     y: float
     buttons: int = 0
     type: Literal[EventKind.CURSOR_STATE] = field(default=EventKind.CURSOR_STATE, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
+class CursorStyleEvent(InputEvent):
+    """The CSS cursor under the pointer changed, for example to a hand over a link."""
+
+    style: CursorStyle
+    type: Literal[EventKind.CURSOR_STYLE] = field(default=EventKind.CURSOR_STYLE, kw_only=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +189,30 @@ class HighlightElementEvent(InputEvent):
 class WaitingEvent(InputEvent):
     duration: float
     type: Literal[EventKind.WAITING] = field(default=EventKind.WAITING, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
+class FileTransferEvent(InputEvent):
+    """Files move into a new tab or onto a page element; the harness waits for `duration`."""
+
+    direction: FileTransferDirection
+    paths: tuple[str, ...]
+    duration: float
+    x: float | None = None
+    y: float | None = None
+    type: Literal[EventKind.FILE_TRANSFER] = field(default=EventKind.FILE_TRANSFER, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
+class DownloadProgressedEvent(LiveEvent):
+    """Byte progress reported by the browser; completion is only a separate durable event."""
+
+    download_id: str
+    received_bytes: int
+    total_bytes: int | None = None
+    type: Literal[EventKind.DOWNLOAD_PROGRESS] = field(
+        default=EventKind.DOWNLOAD_PROGRESS, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,6 +299,93 @@ class DownloadFailedEvent(BrowserEvent):
     type: Literal[EventKind.DOWNLOAD_FAILED] = field(
         default=EventKind.DOWNLOAD_FAILED, kw_only=True
     )
+
+
+@dataclass(frozen=True, slots=True)
+class DownloadCanceledEvent(BrowserEvent):
+    download_id: str
+    type: Literal[EventKind.DOWNLOAD_CANCELED] = field(
+        default=EventKind.DOWNLOAD_CANCELED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class FilesListedEvent(BrowserEvent):
+    directory: str
+    entries: int
+    offset: int = 0
+    next_offset: int | None = None
+    type: Literal[EventKind.FILES_LISTED] = field(default=EventKind.FILES_LISTED, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
+class FileReadStartedEvent(BrowserEvent):
+    """A read was requested; extraction and OCR may take seconds before it finishes."""
+
+    read_id: str
+    path: str
+    page_number: int | None = None
+    sheet: str | None = None
+    cell_range: str | None = None
+    member: str | None = None
+    ocr: bool | None = None
+    offset: int = 0
+    type: Literal[EventKind.FILE_READ_STARTED] = field(
+        default=EventKind.FILE_READ_STARTED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class FileReadFinishedEvent(BrowserEvent):
+    read_id: str
+    path: str
+    format: str
+    status: str
+    characters: int
+    offset: int = 0
+    next_offset: int | None = None
+    page_number: int | None = None
+    page_count: int | None = None
+    sheet: str | None = None
+    member: str | None = None
+    type: Literal[EventKind.FILE_READ_FINISHED] = field(
+        default=EventKind.FILE_READ_FINISHED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class FileReadFailedEvent(BrowserEvent):
+    read_id: str
+    path: str
+    reason: str
+    type: Literal[EventKind.FILE_READ_FAILED] = field(
+        default=EventKind.FILE_READ_FAILED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class FileWrittenEvent(BrowserEvent):
+    path: str
+    size: int
+    created: bool
+    type: Literal[EventKind.FILE_WRITTEN] = field(default=EventKind.FILE_WRITTEN, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
+class FileOpenedEvent(BrowserEvent):
+    """A file was opened in the tab identified by `target_id`."""
+
+    path: str
+    source: FileSource
+    download_id: str = ""
+    type: Literal[EventKind.FILE_OPENED] = field(default=EventKind.FILE_OPENED, kw_only=True)
+
+
+@dataclass(frozen=True, slots=True)
+class FilesUploadedEvent(BrowserEvent):
+    paths: tuple[str, ...]
+    ref: str
+    type: Literal[EventKind.FILES_UPLOADED] = field(default=EventKind.FILES_UPLOADED, kw_only=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -460,7 +599,18 @@ BROWSER_EVENTS = (
     DownloadCompletedEvent,
     DownloadStartedEvent,
     DownloadFailedEvent,
+    DownloadCanceledEvent,
+    DownloadProgressedEvent,
 )
+FILE_EVENTS = (
+    FilesListedEvent,
+    FileReadStartedEvent,
+    FileReadFinishedEvent,
+    FileReadFailedEvent,
+    FileWrittenEvent,
+    FileOpenedEvent,
+)
+UPLOAD_EVENTS = (FilesUploadedEvent,)
 ACTION_EVENTS = (ActionStartedEvent, ActionFinishedEvent, ActionFailedEvent)
 READINESS_EVENTS = (
     ReadinessStartedEvent,
@@ -481,6 +631,7 @@ ACTIVITY_EVENTS = (ActivityStartedEvent, ActivityFinishedEvent)
 INPUT_EVENTS = (
     CursorMovedEvent,
     CursorStateEvent,
+    CursorStyleEvent,
     PointerPressedEvent,
     PointerReleasedEvent,
     KeyPressedEvent,
@@ -488,4 +639,5 @@ INPUT_EVENTS = (
     ScrolledEvent,
     HighlightElementEvent,
     WaitingEvent,
+    FileTransferEvent,
 )

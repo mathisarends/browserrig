@@ -5,13 +5,13 @@ from pathlib import Path
 from typing import Protocol
 
 from browserrig.browser.models import TabInfo
-from browserrig.events import BrowserEvent, InputEvent
+from browserrig.events import BrowserEvent, LiveEvent
 from browserrig.files import FileSystem
 from browserrig.files.models import Download
 
 from .tab import Tab
 
-type EventSink = Callable[[BrowserEvent | InputEvent], Awaitable[None]]
+type EventSink = Callable[[BrowserEvent | LiveEvent], Awaitable[None]]
 
 
 class BrowserEvents:
@@ -21,7 +21,7 @@ class BrowserEvents:
         self.browser_id = browser_id
         self._sink = sink
 
-    async def emit(self, event: BrowserEvent | InputEvent) -> None:
+    async def emit(self, event: BrowserEvent | LiveEvent) -> None:
         await self._sink(replace(event, browser_id=self.browser_id))
 
 
@@ -41,5 +41,5 @@ class Browser(Protocol):
     async def publish_cursor(self) -> None: ...
 
 
-async def _discard(_event: BrowserEvent | InputEvent) -> None:
+async def _discard(_event: BrowserEvent | LiveEvent) -> None:
     pass

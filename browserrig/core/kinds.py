@@ -1,4 +1,5 @@
 from enum import StrEnum
+from typing import Self
 
 
 class ActivityKind(StrEnum):
@@ -86,6 +87,65 @@ class MouseEventKind(StrEnum):
     PRESSED = "mousePressed"
     RELEASED = "mouseReleased"
     WHEEL = "mouseWheel"
+
+
+class CursorStyle(StrEnum):
+    """CSS cursor keywords that a live viewer can draw for the agent's pointer."""
+
+    DEFAULT = "default"
+    POINTER = "pointer"
+    TEXT = "text"
+    VERTICAL_TEXT = "vertical-text"
+    CROSSHAIR = "crosshair"
+    CELL = "cell"
+    MOVE = "move"
+    GRAB = "grab"
+    GRABBING = "grabbing"
+    ALL_SCROLL = "all-scroll"
+    NOT_ALLOWED = "not-allowed"
+    NO_DROP = "no-drop"
+    COPY = "copy"
+    ALIAS = "alias"
+    CONTEXT_MENU = "context-menu"
+    HELP = "help"
+    PROGRESS = "progress"
+    WAIT = "wait"
+    ZOOM_IN = "zoom-in"
+    ZOOM_OUT = "zoom-out"
+    COL_RESIZE = "col-resize"
+    ROW_RESIZE = "row-resize"
+    N_RESIZE = "n-resize"
+    E_RESIZE = "e-resize"
+    S_RESIZE = "s-resize"
+    W_RESIZE = "w-resize"
+    NE_RESIZE = "ne-resize"
+    NW_RESIZE = "nw-resize"
+    SE_RESIZE = "se-resize"
+    SW_RESIZE = "sw-resize"
+    EW_RESIZE = "ew-resize"
+    NS_RESIZE = "ns-resize"
+    NESW_RESIZE = "nesw-resize"
+    NWSE_RESIZE = "nwse-resize"
+    NONE = "none"
+
+    @classmethod
+    def parse(cls, value: str) -> Self:
+        """Unknown, custom-image and fallback-only values show the default arrow."""
+        keyword = value.rsplit(",", 1)[-1].strip().lower()
+        try:
+            return cls(keyword)
+        except ValueError:
+            return cls(cls.DEFAULT)
+
+
+class FileTransferDirection(StrEnum):
+    OPEN = "open"
+    UPLOAD = "upload"
+
+
+class FileSource(StrEnum):
+    WORKSPACE = "workspace"
+    DOWNLOAD = "download"
 
 
 class ObservationKind(StrEnum):

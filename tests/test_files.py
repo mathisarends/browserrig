@@ -3,6 +3,7 @@
 
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -12,9 +13,23 @@ from pypdf import PdfReader, PdfWriter
 
 from browserrig import ChromeBrowser, ConnectBrowser, FileSystem, FileSystemOptions, LaunchBrowser
 from browserrig.browser.downloads import Downloads
-from browserrig.events import DownloadCompletedEvent, DownloadFailedEvent
+from browserrig.browser.tab import Tab
+from browserrig.events import (
+    DownloadCanceledEvent,
+    DownloadCompletedEvent,
+    DownloadFailedEvent,
+    DownloadProgressedEvent,
+    FileOpenedEvent,
+    FileReadFailedEvent,
+    FileReadFinishedEvent,
+    FileReadStartedEvent,
+    FilesListedEvent,
+    FileTransferEvent,
+    FileWrittenEvent,
+)
 from browserrig.files.models import DownloadState
-from browserrig.tools.files import _file_call
+from browserrig.kinds import FileSource, FileTransferDirection
+from browserrig.tools.files import FileTools, _file_call
 
 
 def test_workspace_text_round_trip_pagination_and_explicit_overwrite(files):
@@ -219,6 +234,81 @@ async def test_missing_download_fails_without_raising(tmp_path):
     assert isinstance(emit.await_args.args[0], DownloadFailedEvent)
 
 
+async def test_download_progress_is_throttled_and_cancel_is_not_a_failure(tmp_path, monkeypatch):
+    clock = iter([10.0, 10.05, 10.3])
+    monkeypatch.setattr("browserrig.browser.downloads.monotonic", lambda: next(clock))
+    _, downloads, emit = await _started_download(tmp_path)
+    for received in (2, 4, 6):
+        await downloads.handle(_progress(received, "inProgress"))
+    await downloads.handle(_progress(6, "canceled"))
+    emitted = [call.args[0] for call in emit.await_args_list]
+    progress = [event for event in emitted if isinstance(event, DownloadProgressedEvent)]
+    assert [(event.received_bytes, event.total_bytes) for event in progress] == [(2, 8), (6, 8)]
+    assert isinstance(emitted[-1], DownloadCanceledEvent)
+    assert not any(isinstance(event, DownloadFailedEvent) for event in emitted)
+    (download,) = downloads.all()
+    assert download.state is DownloadState.CANCELED and download.total_bytes == 8
+
+
+async def test_download_progress_without_a_known_size_reports_no_total(tmp_path):
+    _, downloads, emit = await _started_download(tmp_path)
+    await downloads.handle(_progress(3, "inProgress", total=0))
+    assert emit.await_args.args[0].total_bytes is None
+    assert downloads.all()[0].received_bytes == 3
+
+
+async def test_file_tools_report_listing_reads_and_writes(files):
+    saved = files.write_file("a.txt", "hello")
+    tools = _file_tools(files)
+    listing = files.list_files()
+    await FileTools.list_files(tools)
+    await FileTools.read_file(tools, "a.txt")
+    with pytest.raises(ToolError):
+        await FileTools.read_file(tools, "missing.txt")
+    await FileTools.write_file(tools, "b.txt", "new")
+    await FileTools.write_file(tools, "b.txt", "again", overwrite=True)
+    listed, started, finished, missing, failed, created, replaced = _emitted(tools)
+    assert isinstance(listed, FilesListedEvent)
+    assert listed.entries == len(listing.entries)
+    assert isinstance(started, FileReadStartedEvent) and started.path == "a.txt"
+    assert isinstance(finished, FileReadFinishedEvent) and finished.read_id == started.read_id
+    assert finished.path == saved.path and finished.characters == 5
+    assert isinstance(missing, FileReadStartedEvent)
+    assert isinstance(failed, FileReadFailedEvent) and failed.read_id == missing.read_id
+    assert missing.read_id != started.read_id
+    assert isinstance(created, FileWrittenEvent) and created.created and created.size == 3
+    assert isinstance(replaced, FileWrittenEvent) and not replaced.created
+
+
+async def test_open_file_moves_the_file_out_of_the_current_tab_before_reporting_it(
+    files, monkeypatch
+):
+    sleep = AsyncMock()
+    monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", sleep)
+    saved = files.write_file("report.txt", "report")
+    tools = _file_tools(files)
+    opened = SimpleNamespace(id="new", document_id="new-document")
+    current = Tab("current", SimpleNamespace(), emit=tools._events.emit)
+
+    async def run(*, operation, settle, **_):
+        assert not settle
+        return (await operation(current)).text
+
+    tools._browser = SimpleNamespace(open_tab=AsyncMock(return_value=opened))
+    tools._readiness = SimpleNamespace(wait=AsyncMock())
+    tools._actions = SimpleNamespace(run=run)
+    tools._open = lambda *args: FileTools._open(tools, *args)
+    await FileTools.open_file(tools, "report.txt")
+    transfer, report = _emitted(tools)
+    assert isinstance(transfer, FileTransferEvent) and transfer.target_id == "current"
+    assert transfer.direction == FileTransferDirection.OPEN
+    assert transfer.paths == (saved.path,)
+    sleep.assert_awaited_once_with(transfer.duration)
+    assert isinstance(report, FileOpenedEvent) and report.source == FileSource.WORKSPACE
+    assert (report.target_id, report.document_id) == ("new", "new-document")
+    assert report.path == saved.path
+
+
 def test_remote_browser_requires_explicit_shared_filesystem(tmp_path):
     remote = ConnectBrowser(endpoint="http://127.0.0.1:9222")
     assert ChromeBrowser(remote).files is None
@@ -241,6 +331,18 @@ def _files(tmp_path):
     assert not workspace.directory.exists()
     workspace.initialize()
     return workspace
+
+
+def _progress(received, state, total=8):
+    return DownloadProgressEvent(guid="id", total_bytes=total, received_bytes=received, state=state)
+
+
+def _file_tools(files):
+    return SimpleNamespace(_files=lambda: files, _events=SimpleNamespace(emit=AsyncMock()))
+
+
+def _emitted(tools):
+    return [call.args[0] for call in tools._events.emit.await_args_list]
 
 
 async def _started_download(tmp_path):

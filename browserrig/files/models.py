@@ -21,6 +21,7 @@ class Download(Options):
     url: str
     state: DownloadState = DownloadState.IN_PROGRESS
     received_bytes: int = 0
+    total_bytes: int | None = None
     path: str | None = None
     error: str | None = None
 

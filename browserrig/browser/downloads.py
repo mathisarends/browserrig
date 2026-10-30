@@ -1,13 +1,23 @@
 import asyncio
+from time import monotonic
 
 from cdpify import CdpClient
 from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
 
-from browserrig.events import DownloadCompletedEvent, DownloadFailedEvent, DownloadStartedEvent
+from browserrig.events import (
+    DownloadCanceledEvent,
+    DownloadCompletedEvent,
+    DownloadFailedEvent,
+    DownloadProgressedEvent,
+    DownloadStartedEvent,
+)
 from browserrig.files import FileSystem
 from browserrig.files.models import Download, DownloadState
 
 from .base import EventSink
+
+# Chrome reports every received chunk; viewers only need a smooth progress ring.
+_PROGRESS_INTERVAL_SECONDS = 0.2
 
 
 class Downloads:
@@ -18,6 +28,7 @@ class Downloads:
         self._directory = directory
         self._emit = emit
         self._items: dict[str, Download] = {}
+        self._progress_at: dict[str, float] = {}
 
     async def enable(self, client: CdpClient, context_id: str | None) -> None:
         directory = str(self._files.pending_directory) if self._files else self._directory
@@ -52,6 +63,10 @@ class Downloads:
         # Terminal CDP events can be repeated; never move an already completed file twice.
         if previous.state != DownloadState.IN_PROGRESS:
             return
+        total = int(event.total_bytes) if event.total_bytes > 0 else None
+        if event.state == DownloadState.IN_PROGRESS:
+            await self._report_progress(previous, int(event.received_bytes), total)
+            return
         path, error = event.file_path, None
         if event.state == DownloadState.COMPLETED and self._files is not None:
             try:
@@ -67,10 +82,12 @@ class Downloads:
             filename=previous.filename,
             state=DownloadState(event.state),
             received_bytes=int(event.received_bytes),
+            total_bytes=total,
             path=path,
             error=error,
         )
         self._items[guid] = download
+        self._progress_at.pop(guid, None)
         match download.state:
             case DownloadState.COMPLETED if error is not None:
                 await self._emit(DownloadFailedEvent(download_id=guid, reason=error))
@@ -83,6 +100,18 @@ class Downloads:
                     )
                 )
             case DownloadState.CANCELED:
-                await self._emit(
-                    DownloadFailedEvent(download_id=guid, reason="Download canceled by browser")
-                )
+                await self._emit(DownloadCanceledEvent(download_id=guid))
+
+    async def _report_progress(self, download: Download, received: int, total: int | None) -> None:
+        self._items[download.id] = download.model_copy(
+            update={"received_bytes": received, "total_bytes": total}
+        )
+        now = monotonic()
+        if now - self._progress_at.get(download.id, float("-inf")) < _PROGRESS_INTERVAL_SECONDS:
+            return
+        self._progress_at[download.id] = now
+        await self._emit(
+            DownloadProgressedEvent(
+                download_id=download.id, received_bytes=received, total_bytes=total
+            )
+        )

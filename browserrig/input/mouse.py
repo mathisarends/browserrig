@@ -9,10 +9,11 @@ from cdpify.domains.input import DragData, DragInterceptedEvent, MouseButton
 
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Point
-from browserrig.core.kinds import DragMode, MouseEventKind
+from browserrig.core.kinds import CursorStyle, DragMode, MouseEventKind
 from browserrig.events import (
     CursorMovedEvent,
     CursorStateEvent,
+    CursorStyleEvent,
     InputEvent,
     PointerPressedEvent,
     PointerReleasedEvent,
@@ -29,12 +30,16 @@ class Mouse:
         *,
         emit: Callable[[InputEvent], Awaitable[None]],
         layout_changed: Callable[[], None] = lambda: None,
+        cursor_style: Callable[[Point], Awaitable[CursorStyle | None]] | None = None,
     ) -> None:
         self._cdp = cdp
         self._emit = emit
+        self._cursor_style = cursor_style
         # Hover, presses, drags and wheel input can move content, including iframes.
         self._layout_changed = layout_changed
         self.position = Point(x=0, y=0)
+        # Last CSS cursor reported to viewers; None until the page has been asked.
+        self.style: CursorStyle | None = None
         self._cursor_initialized = False
 
     async def initialize_cursor(self) -> None:
@@ -53,7 +58,10 @@ class Mouse:
         await self.publish_cursor()
 
     async def publish_cursor(self) -> None:
-        await self._emit(CursorStateEvent(x=self.position.x, y=self.position.y))
+        """Republish position and known cursor shape for viewers that attached late."""
+        await self._publish_position()
+        if self.style is not None:
+            await self._emit(CursorStyleEvent(style=self.style))
 
     async def move_to(self, point: Point) -> None:
         path = movement(self.position, point)
@@ -74,7 +82,8 @@ class Mouse:
                 if path.duration:
                     await asyncio.sleep(path.duration / path.steps)
         finally:
-            await self.publish_cursor()
+            await self._publish_position()
+        await self._refresh_style()
 
     async def click(
         self,
@@ -185,6 +194,19 @@ class Mouse:
         await self._emit(
             ScrolledEvent(x=point.x, y=point.y, delta_x=delta_x, delta_y=delta_y, duration=duration)
         )
+        # Scrolled content can put a different element under the resting pointer.
+        await self._refresh_style()
+
+    async def _publish_position(self) -> None:
+        await self._emit(CursorStateEvent(x=self.position.x, y=self.position.y))
+
+    async def _refresh_style(self) -> None:
+        if self._cursor_style is None:
+            return
+        style = await self._cursor_style(self.position)
+        if style is not None and style != self.style:
+            self.style = style
+            await self._emit(CursorStyleEvent(style=style))
 
     async def _dispatch(
         self,

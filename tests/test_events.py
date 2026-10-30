@@ -15,6 +15,8 @@ def test_enum_tags_and_registry_roundtrip():
         + events.NUDGE_EVENTS
         + events.RECORDING_EVENTS
         + events.ACTIVITY_EVENTS
+        + events.FILE_EVENTS
+        + events.UPLOAD_EVENTS
         + (events.ObservationCapturedEvent,)
     )
     event = events.ConnectedEvent(owned_process=True, browser_id="browser-1")
@@ -46,6 +48,8 @@ def test_action_page_state_roundtrips_as_a_typed_nested_value():
     + events.RECORDING_EVENTS
     + events.ACTIVITY_EVENTS
     + events.INPUT_EVENTS
+    + events.FILE_EVENTS
+    + events.UPLOAD_EVENTS
     + (events.ObservationCapturedEvent,),
 )
 def test_each_tag_has_one_literal_enum_and_matching_default(kind):

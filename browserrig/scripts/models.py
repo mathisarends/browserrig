@@ -38,6 +38,11 @@ class OwnerHitsArgs(ScriptArgs):
     points: tuple[tuple[float, float], ...]
 
 
+class CursorArgs(ScriptArgs):
+    x: float
+    y: float
+
+
 class SeedArgs(ScriptArgs):
     clickable: tuple[bool, ...]
 

@@ -517,12 +517,15 @@ registers these frozen event types alongside its durable browser events:
 | --- | --- |
 | `CursorMovedEvent` | Start, destination, two control points, duration, easing |
 | `CursorStateEvent` | Actual cursor position and held mouse buttons |
+| `CursorStyleEvent` | CSS cursor under the pointer (`CursorStyle`, such as `pointer` or `text`) |
 | `PointerPressedEvent`, `PointerReleasedEvent` | Position, mouse button and native click count |
 | `KeyPressedEvent` | Key, modifiers, duration |
 | `KeyboardVisibilityEvent` | Keyboard presentation opened or closed |
 | `ScrolledEvent` | Wheel origin, dispatched deltas, duration |
 | `HighlightElementEvent` | DOM reference and viewport bounds |
 | `WaitingEvent` | Requested wait duration |
+| `FileTransferEvent` | `open` or `upload`, file paths, duration and the upload target point |
+| `DownloadProgressedEvent` | Download ID, received bytes and total bytes when known |
 
 Coordinates use viewport CSS pixels; durations use seconds. Events carry
 `browser_id`, `target_id`, `document_id`, and `at`. Inputs inside an action also
@@ -530,6 +533,18 @@ carry its `action_id`. `CursorMovedEvent` describes the path before execution;
 `CursorStateEvent` reports the actual endpoint, including after cancellation.
 Key and pointer receipts follow successful dispatch. Action failure events close
 interrupted sequences. Key events contain the dispatched key and modifiers.
+
+The harness paces its choreography: events with a `duration` describe an
+animation the browser waits through before continuing. `open_file` and
+`open_downloaded_file` emit a `FileTransferEvent` in the current tab, wait for it,
+and only then open the new tab. Uploads move the cursor onto the file input, emit
+the transfer with that point, wait, and then assign the files.
+`CursorStyleEvent` follows cursor movement and scrolling and is only emitted when
+the style changes. It reads the page's computed CSS cursor and treats text inputs,
+editable content and plain text as `text`; custom cursor images show `default`.
+The probe is best-effort and never delays input by more than 250 ms.
+`DownloadProgressedEvent` is sent at most every 200 ms per download; completion,
+failure and cancellation remain durable events.
 
 Navigation, tab changes, downloads, and model/tool/readiness/pause intervals keep
 their existing typed events. Consumers can use those together with input events
@@ -632,6 +647,23 @@ Very large or sparse XLSX sheets expose a bounded initial view with a limitation
 and support targeted `cell_range` reads elsewhere in the sheet. These processing
 bounds are separate from response pagination.
 
+File tools report facts as durable `browser.files.*` events, registered by
+`FileTools` (`FILE_EVENTS`) and `UploadTools` (`UPLOAD_EVENTS`). Presentation,
+such as a file drawer, is left to the viewer:
+
+| Event | Emitted by | Payload |
+| --- | --- | --- |
+| `FilesListedEvent` | `list_files` | Directory, entry count and pagination offsets |
+| `FileReadStartedEvent` | `read_file` | `read_id`, requested path and selectors |
+| `FileReadFinishedEvent` | `read_file` | `read_id`, path, format, status, character count, pages and offsets |
+| `FileReadFailedEvent` | `read_file` | `read_id`, requested path and reason, including cancellation |
+| `FileWrittenEvent` | `write_file` | Path, size and whether the file was created |
+| `FileOpenedEvent` | `open_file`, `open_downloaded_file` | Path, `FileSource` and download ID; `target_id` is the new tab |
+| `FilesUploadedEvent` | `upload_files` | Paths and the file input reference |
+
+Reads can take seconds for OCR or large documents; `read_id` pairs the start with
+exactly one finished or failed event.
+
 `open_file` and `open_downloaded_file` remain available for a visual preview.
 `switch_tab` returns to the original page. DOM uploads through
 `UploadTools.upload_files` accept workspace-relative paths or absolute paths
@@ -687,6 +719,8 @@ download location. Downloads first use `.pending/` and then move into a folder
 named by their stable download ID, preserving their filename and extension.
 Duplicate filenames get separate folders. `DownloadState` includes `IN_PROGRESS`,
 `COMPLETED`, and `CANCELED`; download events use the `browser.download.*` namespace.
+`Download.total_bytes` is `None` when the server does not announce a size.
+Canceled downloads emit `DownloadCanceledEvent` instead of `DownloadFailedEvent`.
 
 Connected browsers keep their existing host semantics: `ConnectBrowser` enables
 workspace tools only when `file_system=FileSystemOptions(...)` explicitly identifies

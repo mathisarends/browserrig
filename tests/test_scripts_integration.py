@@ -4,6 +4,8 @@ import re
 import pytest
 
 from browserrig import ChromeBrowser, DomMode, LaunchBrowser, wait_for_page
+from browserrig.core.geometry import Point
+from browserrig.kinds import CursorStyle
 from browserrig.observation import capture
 from browserrig.observation.content import extract_content
 from tests.javascript import evaluate
@@ -54,3 +56,37 @@ async def test_frame_heading_budget_does_not_reopen_a_truncated_code_fence(site)
         content = await extract_content(tab, max_chars=200)
         assert len(content.markdown) <= 200
         assert len(re.findall(r"^`{3,}", content.markdown, flags=re.M)) % 2 == 0
+
+
+async def test_cursor_probe_reads_css_and_text_cursors_through_shadow_roots(site):
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        markup = (
+            "<style>body{margin:0} div,a,input,p{position:absolute;margin:0;width:100px;"
+            "height:30px;left:0}</style>"
+            '<a href="#" style="top:0">Link</a>'
+            '<input style="top:40px">'
+            '<p style="top:80px;width:auto">Plain text</p>'
+            '<div style="top:120px;cursor:grab">Grab</div>'
+            '<div style="top:160px;cursor:url(x.cur),not-allowed"></div>'
+            '<div id=host style="top:200px"></div>'
+            '<div style="top:240px"></div>'
+        )
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
+        await evaluate(
+            tab,
+            "document.querySelector('#host').attachShadow({mode:'open'}).innerHTML ="
+            " '<button style=\"cursor:pointer;width:100px;height:30px\">Shadow</button>'",
+        )
+        styles = [
+            await tab.cursor_style(Point(x=10, y=y)) for y in (10, 50, 90, 130, 170, 210, 250)
+        ]
+        assert styles == [
+            CursorStyle.POINTER,
+            CursorStyle.TEXT,
+            CursorStyle.TEXT,
+            CursorStyle.GRAB,
+            CursorStyle.NOT_ALLOWED,
+            CursorStyle.POINTER,
+            CursorStyle.DEFAULT,
+        ]

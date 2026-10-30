@@ -15,12 +15,15 @@ from browserrig.events import (
     INPUT_EVENTS,
     CursorMovedEvent,
     CursorStateEvent,
+    CursorStyleEvent,
+    FileTransferEvent,
     KeyboardVisibilityEvent,
     KeyPressedEvent,
     PointerPressedEvent,
     PointerReleasedEvent,
 )
 from browserrig.input.pointer import movement
+from browserrig.kinds import CursorStyle, FileTransferDirection
 from browserrig.tools.keyboard import KeyboardTools
 
 
@@ -216,6 +219,52 @@ async def test_cancelled_cursor_reports_actual_position():
     assert isinstance(events[-1], CursorStateEvent)
     assert (events[-1].x, events[-1].y) == (commands[-1]["x"], commands[-1]["y"])
     assert tab.mouse.position != Point(x=200, y=200)
+
+
+async def test_cursor_style_is_reported_only_when_it_changes(monkeypatch):
+    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
+    tab, events, _ = _tab()
+    styles = iter([CursorStyle.POINTER, CursorStyle.POINTER, None, CursorStyle.TEXT])
+    probe = AsyncMock(side_effect=lambda point: next(styles))
+    tab.mouse._cursor_style = probe
+    for x in (10, 20, 30, 40):
+        await tab.mouse.move_to(Point(x=x, y=10))
+    reported = [event.style for event in events if isinstance(event, CursorStyleEvent)]
+    assert reported == [CursorStyle.POINTER, CursorStyle.TEXT]
+    assert probe.await_args_list[-1].args == (Point(x=40, y=10),)
+    events.clear()
+    await tab.mouse.publish_cursor()
+    assert [type(event) for event in events] == [CursorStateEvent, CursorStyleEvent]
+    assert events[-1].style == CursorStyle.TEXT
+
+
+@pytest.mark.parametrize(
+    "value,style",
+    [
+        ("pointer", CursorStyle.POINTER),
+        ("url(hand.png) 4 4, Pointer", CursorStyle.POINTER),
+        ("url(custom.cur)", CursorStyle.DEFAULT),
+        ("-webkit-grab", CursorStyle.DEFAULT),
+    ],
+)
+def test_cursor_style_parse_keeps_the_keyword_fallback(value, style):
+    assert CursorStyle.parse(value) is style
+
+
+async def test_file_transfer_is_correlated_and_holds_for_its_animation(monkeypatch):
+    sleep = AsyncMock()
+    monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", sleep)
+    tab, events, _ = _tab()
+    with tab.input.action("upload-1"):
+        await tab.input.transfer(
+            FileTransferDirection.UPLOAD, ("a.pdf", "b.png"), Point(x=12, y=34)
+        )
+    assert len(events) == 1
+    event = events[0]
+    assert isinstance(event, FileTransferEvent)
+    assert event.paths == ("a.pdf", "b.png") and (event.x, event.y) == (12, 34)
+    assert event.action_id == "upload-1" and event.target_id == "tab-1"
+    sleep.assert_awaited_once_with(event.duration)
 
 
 @pytest.mark.parametrize("end", [Point(x=0, y=400), Point(x=400, y=0), Point(x=1, y=400)])
