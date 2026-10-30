@@ -91,7 +91,7 @@ def test_pdf_pages_and_character_continuation(files, pdf_document):
     assert "First page" not in second.text
     with pytest.raises(ValueError, match="2 pages"):
         files.read_file(str(path), page_number=3)
-    with pytest.raises(ValueError, match="2 pages"):
+    with pytest.raises(ValueError, match="at least 1"):
         files.read_file(str(path), page_number=0)
 
 
@@ -101,8 +101,8 @@ def test_empty_encrypted_and_invalid_pdf_report_usable_errors(files):
     writer.add_blank_page(width=100, height=100)
     writer.write(path)
     empty = files.read_file(str(path))
-    assert not empty.text
-    assert "No extractable text" in empty.limitations[0]
+    assert empty.status == "partial"
+    assert any("No extractable text" in item for item in empty.limitations)
     writer.encrypt("secret")
     writer.write(path)
     with pytest.raises(ValueError, match="encrypted"):
@@ -115,7 +115,7 @@ def test_empty_encrypted_and_invalid_pdf_report_usable_errors(files):
 def test_binary_missing_and_oversized_files_are_not_read_as_text(files):
     path = files.directory / "image.png"
     path.write_bytes(b"\x89PNG\x00\x01")
-    with pytest.raises(ValueError, match="visual inspection"):
+    with pytest.raises(OSError, match="identify image"):
         files.read_file(str(path))
     with pytest.raises(FileNotFoundError):
         files.read_file("missing.txt")

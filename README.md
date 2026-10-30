@@ -555,23 +555,65 @@ File tools are available in both DOM and canvas modes:
 | Tool | Behavior |
 | --- | --- |
 | `list_files(path=".", offset=0, limit=100)` | List a directory; follow `next_offset` for more. |
-| `read_file(path, page_number=None, offset=0, max_chars=20000)` | Read UTF-8 text or one PDF page, defaulting to page 1. Returns `page_count` for PDFs and `next_offset` for longer text. |
+| `read_file(path, page_number=None, sheet=None, cell_range=None, member=None, ocr=None, offset=0, max_chars=20000)` | Read native document content, worksheet cells, archive members or OCR text. Returns structure, limitations, a saved extraction path and continuation offsets. |
 | `write_file(path, content, overwrite=False)` | Save UTF-8 text and create parent directories; overwriting requires an explicit flag. |
 | `list_downloads()` | List download IDs, status, saved paths, and file errors. |
 | `open_downloaded_file(download_id)` | Open a completed download in a new active tab. |
 | `open_file(path)` | Open a workspace/download file in a new active tab. |
 
 Pass paths returned by `list_files` or `list_downloads`, or paths relative to the
-workspace. To inspect a PDF, use `read_file` for its text and `open_downloaded_file`
-followed by `screenshot` for its appearance. PDFs without extractable text report
-that limitation; OCR is not performed. `max_file_bytes` defaults to 50 MB for reads
-and writes. `switch_tab` returns to the original page. DOM uploads remain available
-through `UploadTools.upload_files`, using absolute paths on the browser host.
+workspace. The normal installation (`uv sync --locked`) includes all file readers
+and local CPU OCR; no separate parser extras, browser preview or screenshots are
+needed to read supported content.
+
+| Format | Content and selection |
+| --- | --- |
+| Text, Markdown, source code, JSON, XML, YAML, logs, subtitles | Text with encoding detection and character offsets. |
+| CSV, TSV; XLSX/XLSM/XLTX/XLTM, XLS, ODS | Worksheet names and cell addresses; choose `sheet` and an A1 `cell_range`. XLSX includes formulas, stored results, number formats, merged and hidden ranges. |
+| PDF | One page, defaulting to page 1; `page_count` exposes the remaining pages. Pages without native text use local OCR automatically. `ocr=True` explicitly requests full-page OCR; `ocr=False` disables it. |
+| PNG, JPEG, TIFF, GIF, BMP, WEBP, ICO | Image metadata and local OCR text; `page_number` selects a frame in a multi-frame image. |
+| DOCX, PPTX, ODT, ODP, RTF | Document text and tables; PPTX also exposes speaker notes and optional slide selection with `page_number`. |
+| HTML/XHTML/SVG, MHTML, EPUB | Readable text; EPUB follows chapter order. Embedded images and document-specific resources have explicit limitations. |
+| ZIP, TAR and compressed TAR; GZ, BZ2, XZ; EML, MBOX | Entry or attachment listings. Select `member="report.xlsx"`, `member="#1"`, or nested `member="bundle.zip!/report.xlsx"`; the same readers process the selected content. |
+| SQLite | Table names and values; select a table with `sheet`. Binary BLOBs are identified by size. |
+| Audio and video | Metadata only; no transcription or video understanding. |
+
+`max_chars` limits each response, independently of the saved extraction. Converted
+content is saved under the workspace's `.content/` directory and returned as
+`extracted_path`. It contains the full selected page, sheet, range, member or
+document, including extraction limitations. Follow `next_offset` with the same
+selection to continue, or read `extracted_path` as text. Plain text streams directly
+from the original file. Changing the source invalidates its derived cache.
+
+`status` distinguishes `complete`, `partial`, `metadata_only` and `unsupported`;
+`limitations` identifies missing content. Office graphics, comments and annotations
+are not fully represented. OCR can make recognition and reading-order errors.
+Formulas are never recalculated and stored results may be stale. Source files
+are preserved; macros and scripts are not executed. Legacy DOC/PPT, XLSB, MSG,
+7Z/RAR, iWork, MOBI/AZW and specialized binary datasets currently report missing
+reader support explicitly.
+
+`max_file_bytes` defaults to 50 MB for document parser inputs and writes; plain
+text reads stream beyond that size. `max_expanded_bytes` defaults to 200 MB and
+`max_archive_depth` to 8. Exceeding a processing bound raises an explicit error.
+Very large or sparse XLSX sheets expose a bounded initial view with a limitation
+and support targeted `cell_range` reads elsewhere in the sheet. These processing
+bounds are separate from response pagination.
+
+`open_file` and `open_downloaded_file` remain available for a visual preview.
+`switch_tab` returns to the original page. DOM uploads remain available through
+`UploadTools.upload_files`, using absolute paths on the browser host.
 
 Direct Python callers can use `browser.files.read_file(path, page_number=2)` and
 `await browser.open_tab(browser.files.resolve(path))`; `open_tab` opens a `Path`
 as a local file and only accepts HTTP(S) URLs as strings. Filesystem methods are synchronous; use
 `asyncio.to_thread` when processing files inside an async application.
+
+The file reader uses a shared `FileExtension` enum and a registry of readers with
+a common call signature and declared selection capabilities. New formats can be
+registered without extending a central parser dispatch chain. See
+[the validation report](file-reader-validation.md) for real-document coverage and
+the command to repeat the public corpus check.
 
 `LaunchBrowser(download_directory="ABSOLUTE_PATH_ON_BROWSER_HOST")` overrides the
 download location. Downloads first use `.pending/` and then move into a folder

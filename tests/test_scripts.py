@@ -13,7 +13,15 @@ from tests.fakes import FakeTab
 
 _ROOT = Path(__file__).resolve().parents[1] / "browserrig"
 _SCRIPTS = _ROOT / "scripts"
-_JS_HINT = re.compile(r"\bfunction\s*\(|=>|globalThis\.|document\.\w|innerWidth")
+_JS_HINT = re.compile(r"\bfunction\s*\(|=>|globalThis\.|(?<![\\/])\bdocument\.\w|innerWidth")
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [("document.body", True), ("word/document.xml", False), (r"word\document.xml", False)],
+)
+def test_javascript_hint_distinguishes_ooxml_part_paths(text, expected):
+    assert bool(_JS_HINT.search(text)) is expected
 
 
 def test_python_contains_no_inline_javascript_except_loader_glue():

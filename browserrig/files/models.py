@@ -1,9 +1,12 @@
 from enum import StrEnum
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 
 from browserrig.core.options import Options
+
+type FileReadStatus = Literal["complete", "partial", "metadata_only", "unsupported"]
 
 
 class DownloadState(StrEnum):
@@ -55,3 +58,13 @@ class FileContent(Options):
     page_number: int | None = None
     page_count: int | None = None
     limitations: tuple[str, ...] = ()
+    format: str = "text"
+    status: FileReadStatus = "complete"
+    size: int | None = None
+    encoding: str | None = None
+    extracted_path: str | None = None
+    sheet: str | None = None
+    sheets: tuple[str, ...] = ()
+    cell_range: str | None = None
+    member: str | None = None
+    entry_count: int | None = None

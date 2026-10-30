@@ -3,8 +3,21 @@ from collections.abc import AsyncIterator
 from io import BytesIO
 
 import pytest
+from openpyxl import Workbook
 from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+
+@pytest.fixture(name="xlsx_document")
+def _xlsx_document() -> bytes:
+    book = Workbook()
+    sheet = book.active
+    sheet.title = "Revenue"
+    sheet.append(["Mission", "Value", "Formula"])
+    sheet.append(["Voyager", 42, "=B2*2"])
+    output = BytesIO()
+    book.save(output)
+    return output.getvalue()
 
 
 @pytest.fixture(name="pdf_document")
@@ -31,7 +44,7 @@ def _pdf_document() -> bytes:
 
 
 @pytest.fixture
-async def site(pdf_document) -> AsyncIterator[str]:
+async def site(pdf_document, xlsx_document) -> AsyncIterator[str]:
     pages = {
         "/": """<!doctype html><title>Test form</title>
             <label>Email<input id=email></label>
@@ -120,6 +133,13 @@ async def site(pdf_document) -> AsyncIterator[str]:
                 content_type = (
                     b"Content-Type: application/octet-stream\r\n"
                     b"Content-Disposition: attachment; filename=example.txt\r\n"
+                )
+            elif path == "/download-xlsx":
+                body = xlsx_document
+                content_type = (
+                    b"Content-Type: application/vnd.openxmlformats-officedocument."
+                    b"spreadsheetml.sheet\r\n"
+                    b"Content-Disposition: attachment; filename=report.xlsx\r\n"
                 )
             elif path == "/download-pdf":
                 body = pdf_document

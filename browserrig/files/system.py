@@ -1,13 +1,11 @@
-import mimetypes
 import re
 from pathlib import Path
 from uuid import uuid4
 
-from pypdf import PdfReader
-from pypdf.errors import PyPdfError
-
 from .config import FileSystemOptions
+from .content import ReadRequest
 from .models import FileContent, FileEntry, FileListing
+from .reading import FileReader
 
 
 class FileSystem:
@@ -33,6 +31,7 @@ class FileSystem:
             else self.directory / "downloads"
         )
         self.pending_directory = self.download_directory / ".pending"
+        self._reader = FileReader(self.directory / ".content", self._options)
 
     def initialize(self) -> None:
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -81,69 +80,27 @@ class FileSystem:
         path: str,
         *,
         page_number: int | None = None,
+        sheet: str | None = None,
+        cell_range: str | None = None,
+        member: str | None = None,
+        ocr: bool | None = None,
         offset: int = 0,
         max_chars: int = 20000,
     ) -> FileContent:
         if offset < 0 or not 1 <= max_chars <= 200000:
             raise ValueError("Use offset >= 0 and max_chars between 1 and 200000")
+        if page_number is not None and page_number < 1:
+            raise ValueError("page_number must be at least 1")
         resolved = self.resolve(path)
         if not resolved.is_file():
             raise FileNotFoundError(f"File not found: {path}")
-        if resolved.stat().st_size > self._options.max_file_bytes:
-            raise ValueError("File exceeds max_file_bytes; use open_file to view it in the browser")
-        if resolved.suffix.lower() == ".pdf":
-            return self._read_pdf(
-                resolved, 1 if page_number is None else page_number, offset, max_chars
-            )
-        if page_number is not None:
-            raise ValueError("page_number is only supported for PDF files")
-        try:
-            with resolved.open(encoding="utf-8-sig", newline="") as stream:
-                # Read characters rather than seeking into a possibly multibyte encoding.
-                remaining = offset
-                while remaining:
-                    chunk = stream.read(min(remaining, 65536))
-                    if not chunk:
-                        break
-                    remaining -= len(chunk)
-                text = stream.read(max_chars + 1)
-        except UnicodeError as error:
-            raise ValueError(
-                "File is not UTF-8 text; use open_file for visual inspection"
-            ) from error
-        if "\x00" in text:
-            raise ValueError("File is binary; use open_file for visual inspection")
-        return FileContent(
-            path=str(resolved),
-            media_type=mimetypes.guess_type(resolved.name)[0] or "text/plain",
-            text=text[:max_chars],
-            offset=offset,
-            next_offset=offset + max_chars if len(text) > max_chars else None,
-        )
-
-    def _read_pdf(self, path: Path, page_number: int, offset: int, max_chars: int) -> FileContent:
-        try:
-            with path.open("rb") as stream:
-                reader = PdfReader(stream)
-                if reader.is_encrypted:
-                    raise ValueError("PDF is encrypted; use open_file to inspect it in the browser")
-                page_count = len(reader.pages)
-                if not 1 <= page_number <= page_count:
-                    raise ValueError(f"PDF has {page_count} pages; choose an existing page_number")
-                text = reader.pages[page_number - 1].extract_text() or ""
-        except PyPdfError as error:
-            raise ValueError(f"Could not read PDF: {error}") from error
-        return FileContent(
-            path=str(path),
-            media_type="application/pdf",
-            text=text[offset : offset + max_chars],
-            offset=offset,
-            next_offset=offset + max_chars if len(text) > offset + max_chars else None,
-            page_number=page_number,
-            page_count=page_count,
-            limitations=()
-            if text.strip()
-            else ("No extractable text on this page. Use open_file and screenshot to inspect it.",),
+        return self._reader.read(
+            resolved,
+            ReadRequest(
+                page_number=page_number, sheet=sheet, cell_range=cell_range, member=member, ocr=ocr
+            ),
+            offset,
+            max_chars,
         )
 
     def write_file(self, path: str, content: str, *, overwrite: bool = False) -> FileEntry:

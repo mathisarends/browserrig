@@ -1,0 +1,330 @@
+[
+  {
+    "name": "xls-Formate.xls",
+    "url": "https://raw.githubusercontent.com/python-excel/xlrd/master/tests/samples/Formate.xls",
+    "sha256": "ec916bcdf0df1b98fb9eda822aae06dd1b7bc80b8fbaf8cd93a8c8768e810e0e",
+    "expected_status": "partial",
+    "expected_views": 4,
+    "contains": [
+      "Huber"
+    ]
+  },
+  {
+    "name": "xls-formula_test_sjmachin.xls",
+    "url": "https://raw.githubusercontent.com/python-excel/xlrd/master/tests/samples/formula_test_sjmachin.xls",
+    "sha256": "318ce6ee18977add9852993aea79e41a9ddea9131e3f9bcc85febbca3e4059e0",
+    "expected_status": "partial",
+    "expected_views": 3,
+    "contains": [
+      "#DIV/0!",
+      "ABCDEF"
+    ]
+  },
+  {
+    "name": "xls-ragged.xls",
+    "url": "https://raw.githubusercontent.com/python-excel/xlrd/master/tests/samples/ragged.xls",
+    "sha256": "a144c284163641c2cb7dfc17d0116006aeffc3dff2b4878f039d4dbab6e2b07e",
+    "expected_status": "partial",
+    "expected_views": 3,
+    "contains": []
+  },
+  {
+    "name": "xls-picture_in_cell.xls",
+    "url": "https://raw.githubusercontent.com/python-excel/xlrd/master/tests/samples/picture_in_cell.xls",
+    "sha256": "497fdab68fed04541e4ed7f5284ba1ee0a927290206000158a20fda5efbca80f",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": []
+  },
+  {
+    "name": "xls-biff4_no_format_no_window2.xls",
+    "url": "https://raw.githubusercontent.com/python-excel/xlrd/master/tests/samples/biff4_no_format_no_window2.xls",
+    "sha256": "ff5be7a32b8a8f85dba86c7b5ae88069c6ddb4753968f9f5941497e6e207018b",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "TOTAL"
+    ]
+  },
+  {
+    "name": "xls-corrupted_error.xls",
+    "url": "https://raw.githubusercontent.com/python-excel/xlrd/master/tests/samples/corrupted_error.xls",
+    "sha256": "1b079f55d57bcc5c75f892853282c43da2749aa7f740f898006ac13612168dad",
+    "expected_error": "Workbook corruption"
+  },
+  {
+    "name": "xls-sample.xlsx",
+    "url": "https://raw.githubusercontent.com/python-excel/xlrd/master/tests/samples/sample.xlsx",
+    "sha256": "7607b5495dd7452a91bac6a755133e8228fb37f91526fdaee5363ef365c05a96",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": []
+  },
+  {
+    "name": "xls-sample.ods",
+    "url": "https://raw.githubusercontent.com/python-excel/xlrd/master/tests/samples/sample.ods",
+    "sha256": "1404f611c3afd1eff878875c2283987e9d7b28353745552e06959437fa2635fc",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": []
+  },
+  {
+    "name": "docx-blk-inner-content.docx",
+    "url": "https://raw.githubusercontent.com/python-openxml/python-docx/master/tests/test_files/blk-inner-content.docx",
+    "sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "P1",
+      "P3",
+      "T2"
+    ]
+  },
+  {
+    "name": "docx-sct-inner-content.docx",
+    "url": "https://raw.githubusercontent.com/python-openxml/python-docx/master/tests/test_files/sct-inner-content.docx",
+    "sha256": "d92e9ca7b09fab7b475c57dfba08f6acba2742aff2691cc7284649c640059c73",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "P1",
+      "P7",
+      "T4"
+    ]
+  },
+  {
+    "name": "docx-having-images.docx",
+    "url": "https://raw.githubusercontent.com/python-openxml/python-docx/master/tests/test_files/having-images.docx",
+    "sha256": "72f40baa1b89e4849e817121dbbf148ed78e51be9bf04d8e6f4bc1494aa517b7",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": []
+  },
+  {
+    "name": "docx-test.docx",
+    "url": "https://raw.githubusercontent.com/python-openxml/python-docx/master/tests/test_files/test.docx",
+    "sha256": "fba1c76b66ff30982e5281941ca1111eaeaeb092abb6dfbe1730bed3774f40b6",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "python-docx was here"
+    ]
+  },
+  {
+    "name": "pptx-test.pptx",
+    "url": "https://raw.githubusercontent.com/scanny/python-pptx/master/tests/test_files/test.pptx",
+    "sha256": "8765677cdf43181ef41657cedf28485b5f2cbf166667218c217af07f8336c96f",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "Presentation Title Text"
+    ]
+  },
+  {
+    "name": "pptx-test_slides.pptx",
+    "url": "https://raw.githubusercontent.com/scanny/python-pptx/master/tests/test_files/test_slides.pptx",
+    "sha256": "8442cac5daafd3211a6a1fff393640cbe5f01faed54d4e00d9aa4fdcba23f7e0",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "Group test text",
+      "Cell text 1"
+    ]
+  },
+  {
+    "name": "pptx-no-slides.pptx",
+    "url": "https://raw.githubusercontent.com/scanny/python-pptx/master/tests/test_files/no-slides.pptx",
+    "sha256": "76b8a109c450fedce7a44bf03b385a327ad0bf99d583e492fa49b760860a77db",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": []
+  },
+  {
+    "name": "pptx-missing_rels_item.pptx",
+    "url": "https://raw.githubusercontent.com/scanny/python-pptx/master/tests/test_files/missing_rels_item.pptx",
+    "sha256": "9a156f00b5faeaf15d12ea44bc49dc8f0c5dd7411352445b4908630bc6a2db28",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "Presentation Title Text"
+    ]
+  },
+  {
+    "name": "pptx-no-core-props.pptx",
+    "url": "https://raw.githubusercontent.com/scanny/python-pptx/master/tests/test_files/no-core-props.pptx",
+    "sha256": "93289b5e951a7256ef783651e1245284472c77512fc3d8df17680dd693fc5c6c",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "Minimal Deck"
+    ]
+  },
+  {
+    "name": "lo-TableEmptyHeaders.xlsx",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/xlsx/TableEmptyHeaders.xlsx",
+    "sha256": "1b46aa492d18ab18f8718befaf23249fbf9ebe45312d4b4b1960c891bae38fd0",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": []
+  },
+  {
+    "name": "lo-empty.xlsx",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/xlsx/empty.xlsx",
+    "sha256": "b8eb7e2482679660a4c10e39fd670a107658af56b6c83ef978dfd1db6950c0b9",
+    "expected_status": "partial",
+    "expected_views": 2,
+    "contains": []
+  },
+  {
+    "name": "lo-formats.xlsx",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/xlsx/formats.xlsx",
+    "sha256": "7bc3a117aa8f74fa1093376581fec69a0128415f60474455ae27c5ad2440f3f3",
+    "expected_status": "partial",
+    "expected_views": 4,
+    "contains": []
+  },
+  {
+    "name": "lo-hidden_sheets.xlsx",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/xlsx/hidden_sheets.xlsx",
+    "sha256": "837080e7711525b62104cc8a675d26b5903365ea25c0bb016ce3caa17f13761d",
+    "expected_status": "partial",
+    "expected_views": 3,
+    "contains": []
+  },
+  {
+    "name": "lo-hyperlink_formula.xlsx",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/xlsx/hyperlink_formula.xlsx",
+    "sha256": "b274b5c39ef21247ea0c4076c5f9f15153428e0b134f6e28fdb3074a96c2fb3a",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "=A1 [stored result: formula]"
+    ]
+  },
+  {
+    "name": "lo-dateAutofilter.xlsx",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+    "sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": []
+  },
+  {
+    "name": "lo-ArrayFormulasStatic.ods",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/ods/ArrayFormulasStatic.ods",
+    "sha256": "91f37853e912bd8c5359e7a573de9f32895e74836192fdc1af22013a03d7ff88",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "of:=AND"
+    ]
+  },
+  {
+    "name": "lo-formats.ods",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/ods/formats.ods",
+    "sha256": "7bc8c21dac01ab99502e19403d8d70047cbf3ef128f9f2d21b0cd64409225634",
+    "expected_status": "partial",
+    "expected_views": 3,
+    "contains": []
+  },
+  {
+    "name": "lo-hidden-empty-rows.ods",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/ods/hidden-empty-rows.ods",
+    "sha256": "ad7331366f56515c84a219a6cab692f32e6d29a42a06bac238966c08e66a08c9",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "A4: row with data"
+    ]
+  },
+  {
+    "name": "lo-merged.ods",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/ods/merged.ods",
+    "sha256": "9ea4b0215ad4b4df5b4f295039ce5728e0b4b903ac6f58d9a9a748c1f568680d",
+    "expected_status": "partial",
+    "expected_views": 2,
+    "contains": [
+      "merged: 6 columns"
+    ]
+  },
+  {
+    "name": "lo-formula-across-sheets.ods",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/ods/formula-across-sheets.ods",
+    "sha256": "e63f058d75938fc5e4b1f39002100e0fdc1b21d3ef208a6ce41339cefc7f5434",
+    "expected_status": "partial",
+    "expected_views": 3,
+    "contains": []
+  },
+  {
+    "name": "lo-miscemptyrepeatedrowheights.ods",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/ods/miscemptyrepeatedrowheights.ods",
+    "sha256": "366b4f611c4a18e95fc5f115eaa8266d81214111c964820ccc3cb45bf4dcdede",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": []
+  },
+  {
+    "name": "lo-vba-user-function.xlsm",
+    "url": "https://raw.githubusercontent.com/LibreOffice/core/master/sc/qa/unit/data/xlsm/vba-user-function.xlsm",
+    "sha256": "20ae63044d0f5edbbdd522cc710a4ef0333e9391cc33aafed875287b91452d4c",
+    "expected_status": "partial",
+    "expected_views": 3,
+    "contains": [
+      "=myfunc() [stored result: 42]"
+    ]
+  },
+  {
+    "name": "attention-paper.pdf",
+    "url": "https://arxiv.org/pdf/1706.03762",
+    "sha256": "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+    "expected_status": "complete",
+    "expected_views": 15,
+    "contains": [
+      "Attention"
+    ]
+  },
+  {
+    "name": "ocr-ccitt.pdf",
+    "url": "https://raw.githubusercontent.com/ocrmypdf/OCRmyPDF/main/tests/resources/ccitt.pdf",
+    "sha256": "5f4b129bf0eb0d32358a917cd1754c6fd68cac589ad79076b6d0191ebe84f0f1",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "LinnSequencer",
+      "32 Track"
+    ]
+  },
+  {
+    "name": "ocr-jbig2.pdf",
+    "url": "https://raw.githubusercontent.com/ocrmypdf/OCRmyPDF/main/tests/resources/jbig2.pdf",
+    "sha256": "210b845b62eab7118bc1e6076a3235a37eb947218254198c6102d06422f35037",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "LinnSequencer",
+      "32 Track"
+    ]
+  },
+  {
+    "name": "ocr-rotated_skew.pdf",
+    "url": "https://raw.githubusercontent.com/ocrmypdf/OCRmyPDF/main/tests/resources/rotated_skew.pdf",
+    "sha256": "5122c07d05a61219eb9f8305776ef16def6b34c29358e05c5ae2e884a351438f",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "LinnSequencer",
+      "32 Track"
+    ]
+  },
+  {
+    "name": "ocr-skew.pdf",
+    "url": "https://raw.githubusercontent.com/ocrmypdf/OCRmyPDF/main/tests/resources/skew.pdf",
+    "sha256": "6be6b54d49df71351974774404e299b756d8d3cbeb2c4a31f15fae8dd983d72f",
+    "expected_status": "partial",
+    "expected_views": 1,
+    "contains": [
+      "LinnSequencer",
+      "32 Track"
+    ]
+  }
+]

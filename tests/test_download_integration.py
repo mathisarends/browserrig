@@ -27,6 +27,65 @@ from tests.observations import all_states
 pytestmark = pytest.mark.integration
 
 
+async def test_downloaded_workbook_is_read_as_context_without_browser_preview(site, tmp_path):
+    async with ChromeBrowser(
+        LaunchBrowser(url=site), file_system=FileSystemOptions(directory=tmp_path / "workspace")
+    ) as browser:
+        tab = browser.active_tab
+        await wait_for_page(tab)
+        await evaluate(
+            tab,
+            "(() => {const a=document.createElement('a');a.href='/download-xlsx';"
+            "a.download='report.xlsx';a.click();return true})()",
+        )
+        async with asyncio.timeout(10):
+            while (
+                not (downloads := await browser.downloads())
+                or downloads[-1].state != DownloadState.COMPLETED
+            ):
+                await asyncio.sleep(0.02)
+        document = await asyncio.to_thread(
+            browser.files.read_file, downloads[-1].path, sheet="Revenue", cell_range="A1:C2"
+        )
+        assert "Voyager" in document.text and "=B2*2" in document.text
+        assert document.extracted_path and Path(document.extracted_path).is_file()
+        assert len(await browser.tabs()) == 1 and browser.active_tab.id == tab.id
+
+
+async def test_agent_reads_selected_workbook_cells_as_context(site, tmp_path, xlsx_document):
+    (tmp_path / "report.xlsx").write_bytes(xlsx_document)
+    stage = 0
+
+    async def respond(request):
+        nonlocal stage
+        if stage == 0:
+            stage += 1
+            yield ModelChunk(
+                tool_call=ToolCall(
+                    "read_file", {"path": "report.xlsx", "sheet": "Revenue", "cell_range": "A1:C2"}
+                )
+            )
+            return
+        replies = [message for message in request.messages if isinstance(message, ToolReply)]
+        assert not replies[-1].is_error and "Voyager" in replies[-1].text
+        assert "=B2*2" in replies[-1].text
+        assert not any(
+            isinstance(part, ImagePart)
+            for message in request.messages
+            if not isinstance(message.content, str)
+            for part in message.content
+        )
+        yield ModelChunk(text="Workbook read as context")
+
+    result = await BrowserAgent(
+        model=CallbackModel(respond),
+        browser=LaunchBrowser(url=site),
+        file_system=FileSystemOptions(directory=tmp_path),
+        approvals=Approvals(default=PolicyDecision.ALLOW),
+    ).run("Read the downloaded workbook", max_steps=2)
+    assert result.text == "Workbook read as context"
+
+
 async def test_scoped_download_has_enum_state_and_namespaced_events(site, tmp_path):
     received = []
 
