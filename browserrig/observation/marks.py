@@ -4,7 +4,7 @@ from io import BytesIO
 
 from PIL import Image, ImageDraw, ImageFont
 
-from browserrig.core.geometry import Bounds
+from browserrig.core.geometry import Bounds, Point
 
 from .models import Element
 
@@ -19,6 +19,7 @@ class _Color(StrEnum):
     GRAY = "#6b7280"
     DARK = "#1e1e1e"
     WHITE = "#ffffff"
+    CURSOR = "#ef4444"
 
 
 _COLORS = {
@@ -34,8 +35,15 @@ _COLORS = {
 }
 
 
-def annotate(image: str, elements: tuple[Element, ...], area: Bounds, scale: float = 1) -> str:
-    """Label visible elements with their refs without inserting an overlay into the page.
+def annotate(
+    image: str,
+    elements: tuple[Element, ...],
+    area: Bounds,
+    scale: float = 1,
+    *,
+    cursor: Point | None = None,
+) -> str:
+    """Draw element refs and the cursor without inserting an overlay into the page.
 
     `area` is the viewport region the image shows; each image pixel is 1/`scale` CSS pixels.
     """
@@ -67,18 +75,33 @@ def annotate(image: str, elements: tuple[Element, ...], area: Bounds, scale: flo
         x = min(max(0, bounds.x), max(0, canvas.width - width))
         y = max(0, bounds.y - height - 2)
         for _ in range(8):
-            area = Bounds(x=x, y=y, width=width, height=height)
+            label_area = Bounds(x=x, y=y, width=width, height=height)
             if not any(
-                area.intersect(other).width * area.intersect(other).height for other in labels
+                label_area.intersect(other).width * label_area.intersect(other).height
+                for other in labels
             ):
                 break
             y = min(y + height + 2, max(0, canvas.height - height))
         labels.append(Bounds(x=x, y=y, width=width, height=height))
         draw.rectangle((x, y, x + width, y + height), fill=_Color.DARK, outline=color)
         draw.text((x + 4 - left, y + 2 - top), label, font=font, fill=_Color.WHITE)
+    if cursor is not None and area.contains(cursor.x, cursor.y):
+        _cursor(draw, cursor, area, scale)
     output = BytesIO()
     canvas.save(output, format="PNG")
     return base64.b64encode(output.getvalue()).decode("ascii")
+
+
+def _cursor(draw: ImageDraw.ImageDraw, cursor: Point, area: Bounds, scale: float) -> None:
+    # The arrow's tip is the exact input coordinate, including in zoomed crops.
+    x, y = (cursor.x - area.x) * scale, (cursor.y - area.y) * scale
+    size = 1.3 * scale
+    points = [
+        (x + dx * size, y + dy * size)
+        for dx, dy in ((0, 0), (0, 20), (5, 16), (9, 25), (13, 23), (9, 14), (16, 14))
+    ]
+    draw.line(points + points[:1], fill=_Color.WHITE, width=max(1, round(4 * size)), joint="curve")
+    draw.polygon(points, fill=_Color.CURSOR, outline=_Color.DARK, width=max(1, round(size)))
 
 
 def _border(draw: ImageDraw.ImageDraw, bounds: Bounds, color: _Color) -> None:

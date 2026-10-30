@@ -27,6 +27,8 @@ class PointerTools(Plugin, needs=(Actions, Observe)):
         text=(
             "Coordinates are pixels from the top-left of the newest shown image for this document; "
             "region and canvas images are mapped back to the viewport automatically. "
+            "A red cursor marker shows the pointer position when the screenshot was captured; "
+            "it is omitted when outside the image. "
             "Observe again if the tab or document changes before pointing."
         ),
     )

@@ -458,6 +458,11 @@ inspect the result before continuing.
 browser, tab, and document IDs for live UI display.
 The newest image shown to the model determines how crop coordinates map to the viewport;
 subsequent text-only observations retain that image's geometry.
+DOM and canvas screenshots include a red cursor arrow at the pointer position at
+capture time, with its tip at the exact input coordinate. The marker follows
+crop and zoom coordinates and is omitted when the pointer is outside the image.
+It is drawn with Pillow after capture; canvas change detection uses the image
+without the marker.
 All gestures use real CDP input and release mouse buttons even when interrupted.
 Canvas recipes do not install DOM-ref tools. Workspace tools are hidden when a connected browser has
 no shared local file system; `list_downloads` remains available.

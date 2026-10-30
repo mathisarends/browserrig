@@ -13,6 +13,7 @@ from PIL import Image
 from browserrig import (
     Browser,
     BrowserAgent,
+    CanvasMode,
     ChromeBrowser,
     DomMode,
     LaunchBrowser,
@@ -20,7 +21,7 @@ from browserrig import (
     wait_for_page,
 )
 from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import Bounds, Geometry, Region
+from browserrig.core.geometry import Bounds, Geometry, Point, Region
 from browserrig.kinds import ElementOperation
 from browserrig.observation import capture
 from browserrig.observation.render import render
@@ -90,11 +91,13 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
         tab = browser.active_tab
         report = await wait_for_page(tab)
         before = await evaluate(tab, "document.documentElement.outerHTML")
+        await tab.mouse.move_to(Point(x=700, y=200))
         state = await capture(tab, DomMode(screenshots=True, marks=marks), report)
         assert await evaluate(tab, "document.documentElement.outerHTML") == before
         assert state.image is not None
         with Image.open(BytesIO(base64.b64decode(state.image))) as image:
             assert image.size == (state.width, state.height)
+            assert image.getpixel((700, 200)) == (30, 30, 30)
         refs = [element.ref for element in state.elements]
         assert len(set(refs)) == len(refs)
         rendered = render(state)
@@ -113,6 +116,44 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
                 ElementArgs(operation=ElementOperation.POINT, value=False),
                 user_gesture=True,
             )
+
+
+@pytest.mark.parametrize("mode", [DomMode(screenshots=True), CanvasMode()])
+async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site, mode):
+    step = 0
+
+    async def respond(request):
+        nonlocal step
+        if step:
+            latest_image = next(
+                (
+                    message
+                    for message in reversed(request.messages)
+                    if message.id.startswith("browser-image:")
+                ),
+                None,
+            )
+            assert latest_image is not None
+            image_part = latest_image.content[1]
+            encoded = image_part.url.split(",", 1)[1]
+            with Image.open(BytesIO(base64.b64decode(encoded))) as image:
+                assert image.getpixel((60, 80) if step == 1 else (180, 120)) == (30, 30, 30)
+        if step == 0:
+            yield ModelChunk(tool_call=ToolCall("move_mouse", {"x": 60, "y": 80}))
+        elif step == 1:
+            yield ModelChunk(tool_call=ToolCall("click_at", {"x": 180, "y": 120}))
+        else:
+            yield ModelChunk(text="Done")
+        step += 1
+
+    agent = BrowserAgent(
+        model=CallbackModel(respond),
+        browser=LaunchBrowser(url=site + "/canvas", viewport=Viewport(scale=2)),
+        mode=mode,
+        approvals=Approvals(default=PolicyDecision.ALLOW),
+    )
+    result = await agent.run("Move, click, and inspect the cursor after each action", max_steps=3)
+    assert result.text == "Done" and step == 3
 
 
 async def test_limits_are_reported_and_checkbox_state_changes_fingerprint(site):
@@ -171,6 +212,7 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(_CANVASES)}")
         await evaluate(tab, "document.querySelector('#board').addEventListener('click', () => {})")
         report = await wait_for_page(tab)
+        await tab.mouse.move_to(Point(x=150, y=180))
         state = await capture(
             tab,
             DomMode(screenshots=True),
@@ -187,6 +229,7 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
         assert state.image is not None
         with Image.open(BytesIO(base64.b64decode(state.image))) as image:
             assert image.size == (800, 400)
+            assert image.getpixel((100, 60)) == (30, 30, 30)
         rendered = render(state)
         assert f"canvas (ref {board.ref}) x=100 y=150 400x200 center=300,250" in rendered
         assert "image: viewport region x=100 y=150 400x200 at 2x zoom" in rendered

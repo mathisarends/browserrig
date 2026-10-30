@@ -176,7 +176,12 @@ class DomCapture:
             area = Bounds(x=geometry.x, y=geometry.y, width=geometry.width, height=geometry.height)
             scale = geometry.scale
         image = await asyncio.to_thread(
-            annotate, await screenshot(tab, geometry), marked, area, scale
+            annotate,
+            await screenshot(tab, geometry),
+            marked,
+            area,
+            scale,
+            cursor=tab.mouse.position,
         )
         return CaptureContent(page=page, image=image, geometry=geometry)
 
@@ -200,6 +205,21 @@ class CanvasCapture:
         facts = await (await tab.main_frame()).run(PAGE_FACTS)
         geometry = await self.region.resolve(tab) if screenshots else None
         image = await screenshot(tab, geometry) if screenshots else None
+        image_digest = hashlib.sha256(image.encode()).hexdigest() if image else None
+        if image is not None:
+            area = (
+                Bounds(x=geometry.x, y=geometry.y, width=geometry.width, height=geometry.height)
+                if geometry is not None
+                else Bounds(x=0, y=0, width=facts.width, height=facts.height)
+            )
+            image = await asyncio.to_thread(
+                annotate,
+                image,
+                (),
+                area,
+                geometry.scale if geometry is not None else 1,
+                cursor=tab.mouse.position,
+            )
         page = Extraction(
             url=facts.url,
             title=facts.title,
@@ -211,7 +231,7 @@ class CanvasCapture:
         return CaptureContent(
             page=page,
             image=image,
-            image_digest=hashlib.sha256(image.encode()).hexdigest() if image else None,
+            image_digest=image_digest,
             geometry=geometry,
         )
 

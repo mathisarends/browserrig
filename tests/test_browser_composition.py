@@ -1,6 +1,9 @@
 import asyncio
+import base64
+import hashlib
 from dataclasses import dataclass
 from importlib import import_module
+from io import BytesIO
 from types import SimpleNamespace
 from typing import Literal
 from unittest.mock import AsyncMock
@@ -12,6 +15,7 @@ from harnessed.hooks import Next, PreStep, StepDecision
 from harnessed.models import ImagePart, ToolReply
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
+from PIL import Image
 
 from browserrig import (
     CanvasCapture,
@@ -378,7 +382,10 @@ def test_recipe_can_omit_local_file_tools():
 async def test_canvas_capture_uses_its_own_region_and_respects_on_request(monkeypatch):
     area = Geometry(x=20, y=10, width=200, height=100)
     region = SimpleNamespace(resolve=AsyncMock(return_value=area))
-    screenshot = AsyncMock(return_value="png")
+    output = BytesIO()
+    Image.new("RGB", (400, 200), "white").save(output, format="PNG")
+    raw = base64.b64encode(output.getvalue()).decode("ascii")
+    screenshot = AsyncMock(return_value=raw)
     monkeypatch.setattr(import_module("browserrig.observation.capture"), "screenshot", screenshot)
     frame = SimpleNamespace(
         run=AsyncMock(
@@ -391,7 +398,9 @@ async def test_canvas_capture_uses_its_own_region_and_respects_on_request(monkey
             )
         )
     )
-    tab = SimpleNamespace(main_frame=AsyncMock(return_value=frame))
+    tab = SimpleNamespace(
+        main_frame=AsyncMock(return_value=frame), mouse=SimpleNamespace(position=Point(x=40, y=30))
+    )
     report = ReadinessReport(
         id="ready",
         target_id="tab",
@@ -410,3 +419,10 @@ async def test_canvas_capture_uses_its_own_region_and_respects_on_request(monkey
     content = await strategy.collect(tab, report, screenshots=True)
     assert content.geometry == area
     screenshot.assert_awaited_once_with(tab, area)
+    assert content.image_digest == hashlib.sha256(raw.encode()).hexdigest()
+    with Image.open(BytesIO(base64.b64decode(content.image))) as image:
+        assert image.size == (200, 100)
+        assert image.getpixel((20, 20)) == (30, 30, 30)
+    tab.mouse.position = Point(x=80, y=60)
+    moved = await strategy.collect(tab, report, screenshots=True)
+    assert moved.image != content.image and moved.image_digest == content.image_digest
