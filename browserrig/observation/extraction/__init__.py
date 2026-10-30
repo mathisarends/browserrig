@@ -2,7 +2,8 @@
 
 Every frame document is captured by `DOMSnapshot.captureSnapshot`, which already
 carries layout, paint order, computed styles, form state and click listeners.
-Roles, names and states are derived from that data in Python.
+Roles, names and states are derived from that data in Python; Chrome's accessibility
+tree then supplies the names of the listed controls.
 """
 
 import asyncio
@@ -18,6 +19,7 @@ from browserrig.core.errors import BrowserError
 from browserrig.scripts import FOCUSED
 
 from ..models import Canvas, Element, Heading, Modal, Offscreen
+from .accessibility import chrome_names, preferred
 from .document import Document
 from .elements import FrameExtraction, extract_frame
 from .styles import STYLES
@@ -74,7 +76,16 @@ async def extract(
         for frame, value in zip(_session_roots(frames), focused, strict=True)
         if isinstance(value, int)
     }
-    return _Assembler(frames, documents, focus, limitations).run(max_elements, max_text)
+    extraction = _Assembler(frames, documents, focus, limitations).run(max_elements, max_text)
+    names = await chrome_names({frame.id: frame.cdp for frame in frames}, extraction.elements)
+    if names:
+        extraction.elements = tuple(
+            element.model_copy(update={"name": preferred(element.name, names[element.ref])})
+            if element.ref in names
+            else element
+            for element in extraction.elements
+        )
+    return extraction
 
 
 class _Assembler:

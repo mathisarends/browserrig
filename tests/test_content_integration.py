@@ -156,6 +156,22 @@ async def test_links_are_compact_and_controls_are_left_to_observe(site):
     assert not re.search(r"[ \t]+$", text, flags=re.M)
 
 
+async def test_search_results_and_cards_read_as_compact_list_items(site):
+    markup = """<h2><span></span></h2><ol><li></li>
+        <li><h2><a href='https://www.google.com/url?q=https://docs.example.org/a&amp;sa=U'>
+        Result</a></h2></li>
+        <li><a href='/card'><h3>Card title</h3><p>Card text</p></a></li></ol>"""
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
+        await wait_for_page(tab)
+        text = (await extract_content(tab)).markdown
+    assert text.splitlines()[:2] == [
+        "1. ## [Result](<https://docs.example.org/a>)",
+        "2. [Card title · Card text](</card>)",
+    ]
+
+
 @pytest.mark.parametrize("cross_origin", [False, True])
 async def test_markdown_includes_available_frame_documents(site, cross_origin):
     async with ChromeBrowser(

@@ -83,6 +83,25 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
         assert next(e for e in state.elements if e.name == "Disabled by fieldset").disabled
 
 
+async def test_element_names_come_from_chrome_accessibility_tree(site):
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        await evaluate(
+            tab,
+            """document.body.innerHTML = `
+            <button><svg width=16 height=16><title>Close</title></svg></button>
+            <input placeholder='Search the web'>
+            <a href='/price'><span style='position:absolute;clip:rect(0 0 0 0)'>7,99 €</span>
+                <span aria-hidden=true>7<sup>99</sup></span> per piece</a>
+            <a href='/home' style='text-transform:uppercase'>Home</a>
+            <label><input type=radio name=size>Small</label>`;
+        """,
+        )
+        report = await wait_for_page(tab)
+        names = {element.name for element in (await capture(tab, DomMode(), report)).elements}
+    assert {"Close", "Search the web", "7,99 € per piece", "Home", "Small"} <= names
+
+
 @pytest.mark.parametrize("marks", [False, True])
 async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site, marks):
     async with ChromeBrowser(LaunchBrowser(url=site, viewport=Viewport(scale=2))) as browser:

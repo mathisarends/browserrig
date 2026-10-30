@@ -106,9 +106,10 @@ function browserrigContent({maxChars, mainOnly, origin}) {
       if (child.nodeType !== Node.ELEMENT_NODE || child.localName !== 'li') {
         continue;
       }
-      const marker = node.localName === 'ol' ? `${number++}. ` : '- ';
       const value = render(child, depth + 1).trim();
       if (value) {
+        // Hidden or empty items do not take a number.
+        const marker = node.localName === 'ol' ? `${number++}. ` : '- ';
         items.push(marker + value.replace(/\n/g, '\n' + ' '.repeat(marker.length)));
       }
     }
@@ -144,22 +145,35 @@ function browserrigContent({maxChars, mainOnly, origin}) {
     );
   }
 
+  function oneLine(value) {
+    // Cards wrap whole blocks in a link or heading; Markdown needs their text on one line.
+    const lines = value.trim().split(/\s*\n+\s*/);
+    if (lines.length === 1) {
+      return lines[0];
+    }
+    return lines
+      .map((line) => line.replace(/^(?:#{1,6}|[-*>]|\d+\.) +/, ''))
+      .filter(Boolean)
+      .join(' · ');
+  }
+
   function format(node, value) {
     const tag = node.localName;
     if (/^h[1-6]$/.test(tag)) {
-      return '\n\n' + '#'.repeat(Number(tag[1])) + ' ' + value.trim() + '\n\n';
+      const title = oneLine(value);
+      return title ? '\n\n' + '#'.repeat(Number(tag[1])) + ' ' + title + '\n\n' : '\n\n';
     }
     if (tag === 'a') {
       const href = node.hasAttribute('href') ? destination(node.getAttribute('href')) : '';
       if (!href || !value.trim()) {
         return value;
       }
-      // An image link and its caption link often repeat the same destination.
-      if (href === lastHref) {
+      // An image link and its caption link often repeat the same destination; titles keep it.
+      if (href === lastHref && !node.closest('h1, h2, h3, h4, h5, h6')) {
         return value.trim();
       }
       lastHref = href;
-      return `[${value.trim()}](<${href}>)`;
+      return `[${oneLine(value)}](<${href}>)`;
     }
     if (tag === 'strong' || tag === 'b') {
       return value.trim() ? `**${value.trim()}**` : '';

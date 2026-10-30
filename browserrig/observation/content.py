@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from cdpify.exceptions import CDPCommandError
@@ -11,6 +11,9 @@ from browserrig.scripts import CONTENT
 from browserrig.scripts.models import ContentArgs, ContentExtraction
 
 from .dom import seed_frame
+from .redirects import unwrap_redirect
+
+_LINK = re.compile(r"\]\(<([^<>\s]+)>\)")
 
 
 class PageContent(Options):
@@ -81,7 +84,7 @@ async def extract_content(
             if len(body) > available:
                 # Let the script close code fences using the actual body budget.
                 body = (await frame.run(CONTENT, args(available))).markdown if available else ""
-            parts.append(prefix[:remaining] + body)
+            parts.append(prefix[:remaining] + _unwrap_links(body, state.url, origin))
             remaining -= len(parts[-1])
         except (CDPCommandError, BrowserError, TimeoutError):
             if frame.parent is None:
@@ -109,6 +112,21 @@ async def extract_content(
 
 def _heading(text: str) -> str:
     return re.sub(r"([\\`*_[\]<>#])", r"\\\1", " ".join(text.split()))
+
+
+def _unwrap_links(markdown: str, base: str, origin: str) -> str:
+    """Replace search-engine tracking links with the destinations they redirect to."""
+
+    def replace(match: re.Match[str]) -> str:
+        href = urljoin(base, match.group(1))
+        target = unwrap_redirect(href)
+        if target == href:
+            return match.group(0)
+        if origin and target.startswith(origin + "/"):
+            target = target[len(origin) :]
+        return f"](<{_source(target)}>)"
+
+    return _LINK.sub(replace, markdown)
 
 
 def _source(url: str) -> str:

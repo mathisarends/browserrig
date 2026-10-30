@@ -56,6 +56,30 @@ def test_render_lists_visible_elements_by_section_and_group_without_routing_data
     assert not any("internal-frame" in line for line in lines)
 
 
+def test_render_merges_link_headings_and_unwraps_search_redirects():
+    snapshot = _snapshot(
+        _element(
+            "1",
+            1,
+            role="link",
+            tag="a",
+            name="Result",
+            href="https://www.google.com/url?q=https://docs.example.org/a&sa=U",
+        ),
+        _element("2", 3, role="link", tag="a", name="More", href="https://example.org/more"),
+        headings=(
+            Heading(level=2, text="Result", frame_id="internal-frame", order=0),
+            Heading(level=3, text="Section", frame_id="internal-frame", order=2),
+        ),
+    )
+    lines = render(snapshot).splitlines()
+    assert lines[lines.index("in viewport:") + 1 :] == [
+        '  ## [1] link "Result" -> https://docs.example.org/a',
+        "  ### Section",
+        '  [2] link "More" -> /more',
+    ]
+
+
 def test_render_lists_only_the_viewport_and_reports_modal():
     snapshot = _snapshot(_element("1", 0), modal=Modal(role="dialog", name="Cookies"))
     text = render(snapshot)

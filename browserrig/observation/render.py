@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 from browserrig.core.kinds import ReadinessStatus
 
 from .models import Canvas, Element, Heading, Snapshot
+from .redirects import unwrap_redirect
 
 _CHECKABLE = frozenset({"checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio"})
 _PLAIN_TYPES = frozenset({"", "text", "checkbox", "radio", "submit", "button", "search"})
@@ -126,7 +127,8 @@ def _blocks(items: list[Element | Heading], url: str) -> list[str]:
     lines: list[str] = []
     section: str | None = None
     group = ""
-    for item in sorted(items, key=lambda entry: entry.order):
+    ordered = sorted(items, key=lambda entry: entry.order)
+    for position, item in enumerate(ordered):
         if item.section != section:
             section, group = item.section, ""
             if item.section:
@@ -138,10 +140,24 @@ def _blocks(items: list[Element | Heading], url: str) -> list[str]:
                 lines.append(f"    <{group}>")
         indent = "  " * (1 + bool(section) + bool(group))
         if isinstance(item, Heading):
-            lines.append(f"{indent}{'#' * min(item.level, 6)} {_cut(item.text, 100)}")
+            # A heading that is just a link, as on search result pages, is the link's line.
+            if not _titles(item, ordered[position + 1 : position + 2]):
+                lines.append(f"{indent}{'#' * min(item.level, 6)} {_cut(item.text, 100)}")
         else:
-            lines.append(indent + _element(item, url))
+            heading = _titles(ordered[position - 1] if position else None, [item])
+            prefix = f"{'#' * min(heading.level, 6)} " if heading else ""
+            lines.append(indent + prefix + _element(item, url))
     return lines
+
+
+def _titles(
+    heading: Element | Heading | None, following: list[Element | Heading]
+) -> Heading | None:
+    """`heading` when the next item is an element named exactly like it."""
+    if not isinstance(heading, Heading) or not following:
+        return None
+    element = following[0]
+    return heading if isinstance(element, Element) and element.name == heading.text else None
 
 
 def _element(element: Element, url: str) -> str:
@@ -197,6 +213,7 @@ def _tristate(value: object, on: str, off: str, mixed: str) -> str:
 
 def _link(href: str, url: str) -> str:
     """Same-page links as fragments, same-origin links as paths; script links are omitted."""
+    href = unwrap_redirect(href)
     parts = urlsplit(href)
     if parts.scheme not in ("http", "https", "mailto", "tel"):
         return ""

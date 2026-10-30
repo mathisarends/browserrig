@@ -1,7 +1,8 @@
 """ARIA roles, accessible names, values and states derived from the DOM snapshot.
 
 This follows the parts of HTML-AAM and accname that matter for acting on a page,
-without the cost of fetching Chrome's full accessibility tree.
+without the cost of fetching Chrome's full accessibility tree. Chrome's own names
+replace these for the controls an observation lists; see `accessibility`.
 """
 
 from ..models import Option, Tristate
