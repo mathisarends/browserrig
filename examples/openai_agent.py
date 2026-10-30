@@ -15,7 +15,6 @@ from browserrig import (
     DomMode,
     FileSystemOptions,
     LaunchBrowser,
-    RecordingOptions,
     TerminalEvents,
 )
 
@@ -38,7 +37,6 @@ async def main() -> None:
         "--task", default=DEFAULT_TASK, help="Override the Voyager research mission"
     )
     parser.add_argument("--headed", action="store_true")
-    parser.add_argument("--record", action="store_true")
     parser.add_argument(
         "--workspace", type=Path, help="Reuse a directory for agent files and downloads"
     )
@@ -51,7 +49,6 @@ async def main() -> None:
         model=OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")),
         browser=LaunchBrowser(url=args.url, headless=not args.headed),
         mode=DomMode(),
-        recording=RecordingOptions() if args.record else None,
         file_system=FileSystemOptions(directory=args.workspace) if args.workspace else None,
         session_directory=Path(".browserrig/sessions-v2"),
         approvals=Approvals(default=PolicyDecision.ALLOW),

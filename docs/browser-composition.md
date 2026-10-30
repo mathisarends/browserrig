@@ -45,8 +45,8 @@ agent = Agent(
 )
 ```
 
-Add `DialogTools`, `JavaScriptTools`, `FileTools`, `UploadTools`, `Nudges` or
-`Recording` from their packages as needed. `UploadTools` requires DOM refs and a
+Add `DialogTools`, `JavaScriptTools`, `FileTools`, `UploadTools` or `Nudges`
+from their packages as needed. `UploadTools` requires DOM refs and a
 browser file workspace. `DocumentReadiness` routes `file:` previews to `DomReady`
 by default, so opening a downloaded PDF does not wait for the application's canvas.
 `CanvasRegion` also uses the full viewport for these previews.

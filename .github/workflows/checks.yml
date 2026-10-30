@@ -65,7 +65,6 @@ jobs:
         env:
           BROWSERRIG_CHROME: ${{ steps.chrome.outputs.chrome-path }}
         run: timeout 20s "$BROWSERRIG_CHROME" --headless=new --dump-dom about:blank
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: uv sync --locked
       - run: uv run --no-sync pytest -m integration
         env:

@@ -24,7 +24,6 @@ from cdpify.domains.runtime import CallArgument, RemoteObject
 from cdpify.exceptions import CDPCommandError
 from pydantic import BaseModel
 
-from browserrig.browser.screen import ScreenRecorder
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Bounds, FrameTransform, Point
 from browserrig.core.kinds import CursorStyle, MouseEventKind
@@ -204,7 +203,6 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         self._frames_key: tuple[str, str, int] | None = None
         self._frames: tuple[Frame, ...] = ()
         self._current_action = current_action
-        self.screen = ScreenRecorder(self.cdp)
 
     async def emit(self, event: BrowserEvent | LiveEvent) -> None:
         if self._emit is not None:

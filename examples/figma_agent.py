@@ -26,8 +26,6 @@ from browserrig import (
     PointerTools,
     Readiness,
     ReadinessOptions,
-    Recording,
-    RecordingOptions,
     Screenshots,
     ScreenshotTrigger,
     TabTools,
@@ -43,7 +41,6 @@ async def main() -> None:
     parser.add_argument("--url", required=True)
     parser.add_argument("--selector", default="canvas")
     parser.add_argument("--task", default="Inspect the visible screen and describe its controls.")
-    parser.add_argument("--record", action="store_true")
     parser.add_argument(
         "--screenshot-trigger",
         type=ScreenshotTrigger,
@@ -87,8 +84,6 @@ async def main() -> None:
         LatestObservationOnly(),
         Approvals(default=PolicyDecision.ALLOW),
     ]
-    if args.record:
-        plugins.append(Recording(RecordingOptions()))
     agent = Agent(
         model=OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")),
         plugins=plugins,

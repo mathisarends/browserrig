@@ -14,7 +14,6 @@ from .observation.images import ImageContext
 from .observation.plugin import Observe
 from .readiness.config import ReadinessOptions
 from .readiness.plugin import Readiness
-from .recording import Recording, RecordingOptions
 from .secrets import Secret, Secrets
 from .tools import (
     DialogTools,
@@ -35,7 +34,6 @@ def browser_plugins(
     *,
     mode: ObservationMode | None = None,
     readiness: ReadinessOptions | Readiness | None = None,
-    recording: RecordingOptions | None = None,
     file_system: FileSystemOptions | None = None,
     observe: Observe | None = None,
     image_context: ImageContext | None = None,
@@ -74,6 +72,4 @@ def browser_plugins(
         plugins.append(FileTools())
         if observation.capture_strategy.provides_dom_refs:
             plugins.append(UploadTools())
-    if recording is not None:
-        plugins.append(Recording(recording))
     return plugins

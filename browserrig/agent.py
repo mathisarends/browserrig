@@ -18,7 +18,6 @@ from .observation import Observe
 from .observation.images import ImageContext
 from .readiness import Readiness
 from .readiness.config import ReadinessOptions
-from .recording import RecordingOptions
 from .secrets import Secret, Secrets
 from .tools.execution import Actions
 
@@ -40,7 +39,6 @@ class BrowserAgent(Agent):
         browser: BrowserOptions | None = None,
         mode: ObservationMode | None = None,
         readiness: ReadinessOptions | Readiness | None = None,
-        recording: RecordingOptions | None = None,
         file_system: FileSystemOptions | None = None,
         observe: Observe | None = None,
         image_context: ImageContext | None = None,
@@ -60,7 +58,6 @@ class BrowserAgent(Agent):
                 browser,
                 mode=mode,
                 readiness=readiness,
-                recording=recording,
                 file_system=file_system,
                 observe=observe,
                 image_context=image_context,

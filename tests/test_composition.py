@@ -17,8 +17,6 @@ from browserrig import (
     LaunchBrowser,
     Readiness,
     ReadinessOptions,
-    Recording,
-    RecordingOptions,
 )
 from browserrig.tools import DomTools, FileTools, JavaScriptTools, PointerTools, UploadTools
 
@@ -29,7 +27,6 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
 
     options = LaunchBrowser(url="https://example.com", headless=False)
     readiness = ReadinessOptions(quiet_ms=123)
-    recording = RecordingOptions(directory=tmp_path / "recordings")
     file_system = FileSystemOptions(directory=tmp_path / "files")
     approvals = Approvals(default=PolicyDecision.DENY)
     extension = Extension()
@@ -38,7 +35,6 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
         browser=options,
         mode=DomMode(screenshots=True),
         readiness=readiness,
-        recording=recording,
         file_system=file_system,
         session_directory=tmp_path / "sessions",
         approvals=approvals,
@@ -48,7 +44,6 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     assert isinstance(agent, Agent)
     assert next(item for item in agent.plugins if isinstance(item, Chrome)).options == options
     assert next(item for item in agent.plugins if isinstance(item, Readiness)).options == readiness
-    assert next(item for item in agent.plugins if isinstance(item, Recording)).options == recording
     assert (
         next(item for item in agent.plugins if isinstance(item, Chrome)).file_system == file_system
     )
@@ -57,7 +52,6 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     assert sum(isinstance(item, JsonlSessions) for item in agent.plugins) == 1
     assert not any(isinstance(item, MemorySessions) for item in agent.plugins)
     assert not (tmp_path / "sessions").exists()
-    assert not recording.directory.exists()
     assert not file_system.directory.exists()
 
 

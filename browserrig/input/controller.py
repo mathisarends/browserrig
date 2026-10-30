@@ -39,7 +39,7 @@ class Input:
             self._action_id = previous
 
     async def highlight(self, ref: str, bounds: Bounds) -> None:
-        """Show which element the next input targets, for recordings and live viewers."""
+        """Show which element the next input targets, for live viewers."""
         await self._emit(
             focused(self._focus),
             HighlightElementEvent(

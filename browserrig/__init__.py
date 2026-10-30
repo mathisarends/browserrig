@@ -40,7 +40,6 @@ from .readiness import (
     ReadinessStrategy,
     wait_for_page,
 )
-from .recording import Recording, RecordingOptions
 from .secrets import Secret, Secrets, Totp, env, totp
 from .terminal import TerminalEvents
 from .tools import (
@@ -103,8 +102,6 @@ __all__ = [
     "Observe",
     "Readiness",
     "ReadinessOptions",
-    "Recording",
-    "RecordingOptions",
     "Secret",
     "Secrets",
     "Totp",

@@ -1,7 +1,7 @@
 function maskSecretField(element) {
   const state = (globalThis.__browserrig ||= {});
   state.secretFields ||= new WeakSet();
-  // Screenshots and recordings show discs instead of the typed characters.
+  // Screenshots show discs instead of the typed characters.
   element.style.setProperty('-webkit-text-security', 'disc', 'important');
   if (state.secretFields.has(element)) {
     return;

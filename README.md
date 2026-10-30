@@ -76,13 +76,12 @@ from harnessed import PolicyDecision
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import BrowserAgent, LaunchBrowser, RecordingOptions, DomMode, TerminalEvents
+from browserrig import BrowserAgent, LaunchBrowser, DomMode, TerminalEvents
 
 agent = BrowserAgent(
     model=OpenAIResponsesModel("gpt-6.1-terra"),
     browser=LaunchBrowser(url="https://en.wikipedia.org/wiki/Voyager_program"),
     mode=DomMode(),
-    recording=RecordingOptions(),
     session_directory=".browserrig/sessions-v2",
     approvals=Approvals(default=PolicyDecision.ALLOW),
     plugins=[TerminalEvents()],
@@ -102,7 +101,7 @@ above allows actions automatically. The constructor does not open Chrome or file
 For custom composition, `browser_plugins()` returns an inspectable plugin list:
 `Agent(model=model, plugins=[*browser_plugins(), MyPlugin()])`.
 Individual capabilities such as `Chrome`, `Readiness`, `Observe`, `Actions`, tool
-plugins, `Nudges`, `Activity`, `Recording`, and `TerminalEvents` are also available directly.
+plugins, `Nudges`, `Activity`, and `TerminalEvents` are also available directly.
 See [composing browser agents](docs/browser-composition.md) for the explicit plugin API:
 `Readiness(initial=..., ongoing=...)`, `Observe(capture=..., renderer=...,
 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` and
@@ -596,17 +595,7 @@ another text stream.
 Page text, dialog messages and form value fields are omitted; URLs, filenames and
 dispatched key names remain diagnostic metadata.
 
-## Recording, downloads, and events
-
-Native recording uses `Page.startScreenRecording` / `stopScreenRecording` through
-cdpify. Recordings under `.browserrig/recordings/` include segments and a validated
-manifest with checksums, timing references, and periods spent waiting only for the
-model. The media container is checked; ffmpeg is not a runtime dependency.
-The manifest distinguishes canvas crops from native viewport recordings.
-Lost segments are reported by `RecordingSegmentLostEvent` and the manifest's
-`lost_segments` field. Recording can continue on later tabs after a tab closes or
-a segment exceeds `max_bytes`; partial files are removed. `required=True` treats
-backend start failures as fatal.
+## Downloads and events
 
 Launched browsers automatically get a workspace under `.browserrig/files/<unique-id>/`
 and save downloads in its `downloads/` directory. Files remain available after the

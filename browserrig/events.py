@@ -59,11 +59,6 @@ class EventKind(StrEnum):
     NUDGE_INCLUDED = "browser.nudge.included"
     NUDGE_EXPIRED = "browser.nudge.expired"
     SECRET_ENTERED = "browser.secret.entered"
-    RECORDING_STARTED = "browser.recording.started"
-    RECORDING_SEGMENT_CLOSED = "browser.recording.segment.closed"
-    RECORDING_SEGMENT_LOST = "browser.recording.segment.lost"
-    RECORDING_FINISHED = "browser.recording.finished"
-    RECORDING_FAILED = "browser.recording.failed"
     ACTIVITY_STARTED = "browser.activity.started"
     ACTIVITY_FINISHED = "browser.activity.finished"
     CURSOR_MOVED = "browser.cursor.moved"
@@ -575,51 +570,6 @@ class SecretEnteredEvent(BrowserEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class RecordingStartedEvent(BrowserEvent):
-    recording_id: str
-    type: Literal[EventKind.RECORDING_STARTED] = field(
-        default=EventKind.RECORDING_STARTED, kw_only=True
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class RecordingSegmentClosedEvent(BrowserEvent):
-    recording_id: str
-    path: str
-    sha256: str
-    started_at: float
-    size: int
-    type: Literal[EventKind.RECORDING_SEGMENT_CLOSED] = field(
-        default=EventKind.RECORDING_SEGMENT_CLOSED, kw_only=True
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class RecordingSegmentLostEvent(BrowserEvent):
-    recording_id: str
-    reason: str
-    type: Literal[EventKind.RECORDING_SEGMENT_LOST] = field(
-        default=EventKind.RECORDING_SEGMENT_LOST, kw_only=True
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class RecordingFinishedEvent(BrowserEvent):
-    manifest: str
-    type: Literal[EventKind.RECORDING_FINISHED] = field(
-        default=EventKind.RECORDING_FINISHED, kw_only=True
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class RecordingFailedEvent(BrowserEvent):
-    reason: str
-    type: Literal[EventKind.RECORDING_FAILED] = field(
-        default=EventKind.RECORDING_FAILED, kw_only=True
-    )
-
-
-@dataclass(frozen=True, slots=True)
 class ActivityStartedEvent(BrowserEvent):
     interval_id: str
     kind: ActivityKind
@@ -687,13 +637,6 @@ READINESS_EVENTS = (
 )
 NUDGE_EVENTS = (NudgeQueuedEvent, NudgeIncludedEvent, NudgeExpiredEvent)
 SECRET_EVENTS = (SecretEnteredEvent,)
-RECORDING_EVENTS = (
-    RecordingStartedEvent,
-    RecordingSegmentClosedEvent,
-    RecordingSegmentLostEvent,
-    RecordingFinishedEvent,
-    RecordingFailedEvent,
-)
 ACTIVITY_EVENTS = (ActivityStartedEvent, ActivityFinishedEvent)
 INPUT_EVENTS = (
     CursorMovedEvent,

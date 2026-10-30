@@ -20,7 +20,7 @@ from browserrig.browser.base import Browser, BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import StaleElement
 from browserrig.core.geometry import Region
-from browserrig.core.kinds import ActionKind, ObservationKind, ReadinessPhase, ReadinessStatus
+from browserrig.core.kinds import ActionKind, ReadinessPhase, ReadinessStatus
 from browserrig.core.modes import DomMode, ObservationMode
 from browserrig.core.tools import browser_tool as tool
 from browserrig.events import (
@@ -28,7 +28,6 @@ from browserrig.events import (
 )
 from browserrig.nudges import Nudges
 from browserrig.readiness.plugin import Readiness
-from browserrig.recording import Recording
 from browserrig.secrets import Secrets
 
 from .capture import CaptureStrategy, DomCapture, capture_for_mode
@@ -267,7 +266,6 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         event: PreStep,
         next_: Next[StepDecision],
         nudges: Inject[Nudges | None],
-        recording: Inject[Recording | None],
     ) -> StepDecision:
         state = self._state
         snapshot = await self.capture(
@@ -278,12 +276,6 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         )
         state.screenshot_requested = False
         state.screenshot_region, state.screenshot_zoom = None, 1
-        if recording is not None and snapshot.readiness == ReadinessStatus.READY:
-            # Recordings follow the canvas, never a one-off screenshot region.
-            await recording.ensure_started(
-                self._browser.active_tab,
-                geometry=snapshot.geometry if snapshot.mode == ObservationKind.CANVAS else None,
-            )
         observations = [
             Observation(
                 source="browser",
