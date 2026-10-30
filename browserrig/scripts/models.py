@@ -21,7 +21,7 @@ class ElementArgs(ScriptArgs):
     token: str
     index: int
     operation: ElementOperation
-    value: object = None
+    value: str | bool | None = None
     clip: Bounds | None = None
 
 

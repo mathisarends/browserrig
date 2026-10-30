@@ -70,17 +70,17 @@ async def test_plugin_state_is_per_session():
     )
     async with agent.session("first"):
         first = holder["readiness"]
-        first_browser = first._browser
-        assert first_browser is holder["browser"]
+        first_events = first._events
+        assert first_events is holder["browser"].events
         first._state.geometry[("sentinel", "doc")] = object()
     async with agent.session("second"):
         second = holder["readiness"]
         assert second is not first
-        assert second._browser is holder["browser"]
-        assert second._browser is not first_browser
+        assert second._events is holder["browser"].events
+        assert second._events is not first_events
         assert not second._state.geometry
     with pytest.raises(RuntimeError):
-        _ = first._browser
+        _ = first._events
 
 
 @pytest.mark.parametrize("changed", [False, True])
@@ -98,7 +98,6 @@ async def test_canvas_reuses_cached_geometry_and_rechecks_pixels_only_after_geom
     monkeypatch.setattr("browserrig.readiness.canvas._locate_canvas", locate)
     monkeypatch.setattr("browserrig.readiness.canvas._probe_canvas", pixels)
     report = await wait_for_page(
-        browser,
         tab,
         mode=CanvasMode(),
         options=ReadinessOptions(timeout=2),
@@ -129,7 +128,7 @@ async def test_readiness_events_keep_start_document_when_navigation_finishes(mon
         return True
 
     monkeypatch.setattr("browserrig.readiness.wait._check", check)
-    report = await wait_for_page(browser, tab)
+    report = await wait_for_page(tab, events=browser.events)
     start = next(event for event in events if isinstance(event, ReadinessStartedEvent))
     end = next(event for event in events if isinstance(event, ReadyEvent))
     assert start.readiness_id == end.readiness_id

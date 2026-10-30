@@ -43,13 +43,13 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
                 '<h2>Closed shadow</h2><p>Closed root text</p>';
         """,
         )
-        report = await wait_for_page(browser, tab)
-        snapshot = await capture(browser, tab, DomMode(), report)
+        report = await wait_for_page(tab)
+        snapshot = await capture(tab, DomMode(), report)
         assert snapshot.image is None
         assert snapshot.text == ""
         assert not snapshot.limitations
         before = await evaluate(tab, "[document.documentElement.outerHTML, scrollY]")
-        content = await extract_content(browser, tab)
+        content = await extract_content(tab)
         assert await evaluate(tab, "[document.documentElement.outerHTML, scrollY]") == before
         assert content.url == site + "/" and content.title == "Test form"
         assert not content.limitations
@@ -103,7 +103,7 @@ async def test_markdown_limits_are_explicit_and_output_is_bounded(site):
         await evaluate(
             tab, "document.body.innerHTML = '<h1>Heading</h1><p>'+'x'.repeat(500)+'</p>'"
         )
-        content = await extract_content(browser, tab, max_chars=40)
+        content = await extract_content(tab, max_chars=40)
         assert len(content.markdown) <= 40
         assert "# Heading" in content.markdown
         assert any("truncated" in item for item in content.limitations)
@@ -121,8 +121,8 @@ async def test_markdown_includes_available_frame_documents(site, cross_origin):
         await evaluate(
             tab, f"document.querySelector('iframe').src = {json.dumps(origin + '/other')}"
         )
-        await wait_for_page(browser, tab)
-        content = await extract_content(browser, tab)
+        await wait_for_page(tab)
+        content = await extract_content(tab)
         assert "## Frame: Other" in content.markdown
         assert f"Source: <{origin}/other>" in content.markdown
         assert "# Other page" in content.markdown

@@ -3,7 +3,6 @@ import re
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from cdpify.exceptions import CDPCommandError
 
-from browserrig.browser.base import Browser
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.options import Options
@@ -38,7 +37,7 @@ class PageContent(Options):
         return text
 
 
-async def extract_content(browser: Browser, tab: Tab, *, max_chars: int = 50000) -> PageContent:
+async def extract_content(tab: Tab, *, max_chars: int = 50000) -> PageContent:
     """Read loaded document content without scrolling or replacing interactive element refs."""
     if not 1 <= max_chars <= 200000:
         raise ValueError("max_chars must be between 1 and 200000")
@@ -46,7 +45,7 @@ async def extract_content(browser: Browser, tab: Tab, *, max_chars: int = 50000)
         raise BrowserError("Handle the open dialog before extracting page content")
     await tab.sync_document()
     document_id = tab.document_id
-    frames = await browser.frames(tab)
+    frames = await tab.frames()
     limitations = list(tab.frame_limitations)
     metadata: dict[str, CaptureSnapshotResult | None] = {}
     main: ContentExtraction | None = None

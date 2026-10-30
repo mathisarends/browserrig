@@ -35,6 +35,7 @@ from browserrig import (
     Readiness,
     browser_plugins,
 )
+from browserrig.browser.base import BrowserEvents
 from browserrig.tools import DialogTools, KeyboardTools
 from tests.fakes import FakeBrowser
 
@@ -49,10 +50,10 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
         await agent.run("Inspect the page")
     missing = {issue.plugin.name: issue.missing for issue in caught.value.issues}
     assert missing == {
-        "KeyboardTools": (Actions,),
-        "Actions": (Browser, Readiness, Observe),
-        "Observe": (Browser, Readiness),
-        "Readiness": (Browser,),
+        "KeyboardTools": (Actions, Observe),
+        "Actions": (Browser, BrowserEvents, Readiness, Observe),
+        "Observe": (Browser, BrowserEvents, Readiness),
+        "Readiness": (BrowserEvents,),
         "DialogTools": (Browser,),
     }
     assert not model.requests
@@ -65,20 +66,21 @@ async def test_browser_dependency_loss_and_replacement_restart_observation_state
         assert {issue.plugin.name for issue in ctx.plugin_diagnostics()} == {"Observe", "Readiness"}
 
         first_browser = FakeBrowser(None)
-        remove_first = ctx.provide(Browser, first_browser)
+        remove_first = _provide(ctx, first_browser)
         await ctx.settle()
         assert not ctx.plugin_diagnostics()
         first_readiness, first_observe = ctx[Readiness], ctx[Observe]
-        assert first_readiness._browser is first_browser
+        assert first_readiness._events is first_browser.events
         first_readiness._state.geometry[("sentinel", "doc")] = object()
         first_observe._state.snapshot = object()
 
         second_browser = FakeBrowser(None)
-        remove_second = ctx.provide(Browser, second_browser)
+        remove_second = _provide(ctx, second_browser)
         await ctx.settle()
         assert ctx[Readiness] is not first_readiness
         assert ctx[Observe] is not first_observe
-        assert ctx[Observe]._browser is ctx[Readiness]._browser is second_browser
+        assert ctx[Observe]._browser is second_browser
+        assert ctx[Readiness]._events is second_browser.events
         assert ctx[Observe]._readiness is ctx[Readiness]
         assert not ctx[Readiness]._state.geometry
         assert ctx[Observe].snapshot is None
@@ -87,12 +89,25 @@ async def test_browser_dependency_loss_and_replacement_restart_observation_state
 
         await remove_second()
         await ctx.settle()
-        assert ctx[Readiness]._browser is first_browser
+        assert ctx[Readiness]._events is first_browser.events
         await remove_first()
         await ctx.settle()
         assert Readiness not in ctx and Observe not in ctx
         missing = {issue.plugin.name: issue.missing for issue in ctx.plugin_diagnostics()}
-        assert missing == {"Readiness": (Browser,), "Observe": (Browser, Readiness)}
+        assert missing == {
+            "Readiness": (BrowserEvents,),
+            "Observe": (Browser, BrowserEvents, Readiness),
+        }
+
+
+def _provide(ctx, browser):
+    removals = (ctx.provide(Browser, browser), ctx.provide(BrowserEvents, browser.events))
+
+    async def remove():
+        for removal in reversed(removals):
+            await removal()
+
+    return remove
 
 
 class _DeferredService:
@@ -207,20 +222,28 @@ async def test_native_composition_can_place_and_exclude_browser_sections(fake_ch
     assert fake_chrome[0].closed
 
 
+_REF_CALLS = (
+    ToolCall("click", {"ref": "stale-ref"}),
+    ToolCall("drag", {"source_ref": "a", "target_ref": "b"}),
+    ToolCall("type_text", {"ref": "stale-ref", "text": "x"}),
+    ToolCall("select_option", {"ref": "stale-ref", "value": "x"}),
+    ToolCall("set_date", {"ref": "stale-ref", "value": "2026-01-01"}),
+    ToolCall("upload_files", {"ref": "stale-ref", "paths": ["/tmp/x"]}),
+)
+
+
 @pytest.mark.parametrize("mode", [DomMode(), CanvasMode()])
-async def test_mouse_tools_expose_dom_calls_only_in_dom_mode(fake_chrome, mode):
+async def test_ref_tools_are_exposed_only_in_dom_mode(fake_chrome, mode):
     agent = BrowserAgent(model=ScriptedModel(["unused"]), mode=mode)
+    ref_tools = {call.name for call in _REF_CALLS}
     async with agent.session() as session:
         tools = session.ctx[ToolRegistry]
         names = {item.name for item in tools.definitions}
-        assert {"click_at", "scroll", "drag_at"} <= names
-        assert ({"click", "drag"} <= names) == isinstance(mode, DomMode)
+        assert {"click_at", "scroll", "drag_at", "send_keys"} <= names
+        assert (ref_tools <= names) == isinstance(mode, DomMode)
         if isinstance(mode, CanvasMode):
-            assert not {"click", "drag"} & names
-            for call in (
-                ToolCall("click", {"ref": "stale-ref"}),
-                ToolCall("drag", {"source_ref": "a", "target_ref": "b"}),
-            ):
+            assert not ref_tools & names
+            for call in _REF_CALLS:
                 result = await tools.execute(call)
                 assert result.is_error and "disabled" in result.text
     assert fake_chrome[0].closed

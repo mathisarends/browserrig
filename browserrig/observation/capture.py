@@ -8,7 +8,6 @@ from uuid import uuid4
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from cdpify.exceptions import CDPCommandError
 
-from browserrig.browser.base import Browser
 from browserrig.browser.images import screenshot
 from browserrig.browser.tab import Frame, Tab
 from browserrig.core.errors import BrowserError
@@ -45,9 +44,7 @@ class _CaptureStrategy(ABC):
     """
 
     @abstractmethod
-    async def collect(
-        self, browser: Browser, tab: Tab, snapshot_id: str, report: ReadinessReport
-    ) -> _Content: ...
+    async def collect(self, tab: Tab, snapshot_id: str, report: ReadinessReport) -> _Content: ...
 
 
 class _DomCapture(_CaptureStrategy):
@@ -70,16 +67,14 @@ class _DomCapture(_CaptureStrategy):
                 token=snapshot_id,
                 max_elements=max_elements,
                 max_text=max_text,
-                clip=frame.local_clip,
+                clip=frame.local_visible,
             ),
         )
 
-    async def collect(
-        self, browser: Browser, tab: Tab, snapshot_id: str, report: ReadinessReport
-    ) -> _Content:
+    async def collect(self, tab: Tab, snapshot_id: str, report: ReadinessReport) -> _Content:
         elements: list[Element] = []
         text: list[str] = []
-        frames = await browser.frames(tab)
+        frames = await tab.frames()
         limitations = list(tab.frame_limitations)
         for frame in frames:
             try:
@@ -96,7 +91,9 @@ class _DomCapture(_CaptureStrategy):
                     limitations.append(
                         "DOM extraction was truncated by the configured content limits"
                     )
-                points = tuple(frame.projection.point(item.x, item.y) for item in state.elements)
+                points = tuple(
+                    frame.transform.to_viewport(item.x, item.y) for item in state.elements
+                )
                 visible = await frame.visible_points(points) if points else ()
                 if state.text:
                     text.append(state.text)
@@ -106,10 +103,10 @@ class _DomCapture(_CaptureStrategy):
                     if included or not item.in_viewport
                 )
                 for item in included_elements:
-                    bounds = frame.projection.box(item.bounds)
+                    bounds = frame.transform.bounds_to_viewport(item.bounds)
                     bounds = (
-                        bounds.intersect(frame.projection.clip)
-                        if item.in_viewport and frame.projection.clip is not None
+                        bounds.intersect(frame.visible)
+                        if item.in_viewport and frame.visible is not None
                         else bounds
                     )
                     elements.append(
@@ -139,7 +136,7 @@ class _DomCapture(_CaptureStrategy):
                 limitations.append(f"Frame {frame.id} changed or could not be inspected")
         image = None
         if self._mode.screenshots:
-            viewport = frames[0].projection.clip
+            viewport = frames[0].visible
             assert viewport is not None
             image = await asyncio.to_thread(
                 annotate, await screenshot(tab), tuple(elements), viewport
@@ -156,9 +153,7 @@ class _CanvasCapture(_CaptureStrategy):
     def __init__(self, mode: CanvasMode) -> None:
         self._mode = mode
 
-    async def collect(
-        self, browser: Browser, tab: Tab, snapshot_id: str, report: ReadinessReport
-    ) -> _Content:
+    async def collect(self, tab: Tab, snapshot_id: str, report: ReadinessReport) -> _Content:
         image = await screenshot(tab, report.geometry)
         return _Content(image=image, image_digest=hashlib.sha256(image.encode()).hexdigest())
 
@@ -173,9 +168,7 @@ def _capture_strategy(mode: ObservationMode) -> _CaptureStrategy:
             assert_never(mode)
 
 
-async def capture(
-    browser: Browser, tab: Tab, mode: ObservationMode, report: ReadinessReport
-) -> Snapshot:
+async def capture(tab: Tab, mode: ObservationMode, report: ReadinessReport) -> Snapshot:
     snapshot_id = uuid4().hex
     if tab.dialog:
         return Snapshot(
@@ -196,7 +189,7 @@ async def capture(
     main = await tab.main_frame()
     document_id = tab.document_id
     facts = await main.run(PAGE_FACTS)
-    content = await _capture_strategy(mode).collect(browser, tab, snapshot_id, report)
+    content = await _capture_strategy(mode).collect(tab, snapshot_id, report)
     await tab.sync_document()
     if tab.document_id != document_id:
         raise BrowserError("Document changed during capture; observe again before acting")

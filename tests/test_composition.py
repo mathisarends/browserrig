@@ -60,12 +60,10 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
 
 
 @pytest.mark.parametrize("mode", [DomMode(), CanvasMode()])
-def test_facade_uses_shared_mouse_tools_and_keeps_forms_dom_only(mode):
+def test_facade_registers_the_same_tool_plugins_in_every_mode(mode):
     agent = BrowserAgent(model=ScriptedModel(["ok"]), mode=mode)
-    assert sum(isinstance(item, MouseTools) for item in agent.plugins) == 1
-    has_forms = any(isinstance(item, FormTools) for item in agent.plugins)
-    has_uploads = any(isinstance(item, UploadTools) for item in agent.plugins)
-    assert has_forms == has_uploads == isinstance(mode, DomMode)
+    for plugin in (MouseTools, FormTools, UploadTools):
+        assert sum(isinstance(item, plugin) for item in agent.plugins) == 1
     assert sum(isinstance(item, FileTools) for item in agent.plugins) == 1
     assert next(item for item in agent.plugins if isinstance(item, Readiness)).mode == mode
 

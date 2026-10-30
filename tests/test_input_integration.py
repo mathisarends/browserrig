@@ -236,7 +236,5 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
         assert point.scrolled
         assert point.bounds.model_dump() == actual
     records = [json.loads(line) for line in output.getvalue().splitlines()]
-    highlight = next(
-        record for record in records if record["type"] == "browser.element.highlighted"
-    )
+    highlight = next(record for record in records if record["type"] == "browser.element.highlight")
     assert {key: highlight[key] for key in actual} == actual

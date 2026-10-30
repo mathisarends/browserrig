@@ -14,7 +14,7 @@ pytestmark = pytest.mark.integration
 async def test_select_notifies_bubbling_listeners_and_rejects_disabled_options(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
-        report = await wait_for_page(browser, tab)
+        report = await wait_for_page(tab)
         frame = await tab.main_frame()
         await evaluate(
             frame,
@@ -31,7 +31,7 @@ async def test_select_notifies_bubbling_listeners_and_rejects_disabled_options(s
             "  });"
             "}",
         )
-        snapshot = await capture(browser, tab, DomMode(), report)
+        snapshot = await capture(tab, DomMode(), report)
         select = next(element for element in snapshot.elements if element.tag == "select")
         result = await frame.run(
             ELEMENT,
@@ -65,11 +65,11 @@ async def test_select_notifies_bubbling_listeners_and_rejects_disabled_options(s
 async def test_focus_selects_text_in_native_and_contenteditable_controls(site, markup):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
-        report = await wait_for_page(browser, tab)
+        report = await wait_for_page(tab)
         frame = await tab.main_frame()
         # Both tags are fixed test cases, with no page-controlled JavaScript.
         await evaluate(frame, f"document.body.innerHTML = '{markup}'")
-        snapshot = await capture(browser, tab, DomMode(), report)
+        snapshot = await capture(tab, DomMode(), report)
         element = snapshot.elements[0]
         assert await frame.run(
             ELEMENT,
@@ -92,8 +92,8 @@ async def test_focus_selects_text_in_native_and_contenteditable_controls(site, m
 async def test_native_value_setter_preserves_password_redaction_and_value_validation(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
-        report = await wait_for_page(browser, tab)
-        snapshot = await capture(browser, tab, DomMode(), report)
+        report = await wait_for_page(tab)
+        snapshot = await capture(tab, DomMode(), report)
         frame = await tab.main_frame()
         secret = next(element for element in snapshot.elements if element.input_type == "password")
         assert secret.value is None

@@ -11,7 +11,7 @@ from harnessed.models import ModelRequest, User
 from harnessed.plugins import JsonlSessions
 from harnessed.testing import ScriptedModel
 
-from browserrig import Browser, Nudges
+from browserrig import Nudges
 from browserrig.events import (
     ActionFinishedEvent,
     ActionStartedEvent,
@@ -162,9 +162,9 @@ async def test_hint_acknowledgement_requires_matching_full_provenance(
         plugins=[FakeChrome(holder), Nudges(), _Access(holder)],
     )
     async with agent.session() as session:
-        nudges, browser = holder["nudges"], holder["browser"]
-        await nudges.queue(browser, "Inspect the page", key="hint", cause_id="action")
-        observation = await nudges.project(_snapshot(), browser)
+        nudges = holder["nudges"]
+        await nudges.queue("Inspect the page", key="hint", cause_id="action")
+        observation = await nudges.project(_snapshot())
         (nudge_id,) = observation.refs
         # Text coincidence cannot acknowledge delivery, even in a submitted request.
         await session.emit(
@@ -172,7 +172,7 @@ async def test_hint_acknowledgement_requires_matching_full_provenance(
                 ModelRequest(model="test", messages=(User(nudge_id),)), request_id="request"
             )
         )
-        assert (await nudges.project(_snapshot(), browser)).refs == (nudge_id,)
+        assert (await nudges.project(_snapshot())).refs == (nudge_id,)
         included = ObservationsIncludedEvent(
             request_id="request",
             observations=(
@@ -183,9 +183,7 @@ async def test_hint_acknowledgement_requires_matching_full_provenance(
         await session.emit(included)
         receipts = [event for event in session.events if isinstance(event, NudgeIncludedEvent)]
         assert len(receipts) == int(delivered)
-        assert (await nudges.project(_snapshot(), browser)).refs == (
-            () if delivered else (nudge_id,)
-        )
+        assert (await nudges.project(_snapshot())).refs == (() if delivered else (nudge_id,))
         if delivered:
             assert receipts[0].request_id == "request"
 
@@ -193,16 +191,15 @@ async def test_hint_acknowledgement_requires_matching_full_provenance(
 async def test_hint_provenance_and_unselected_hints_survive_session_replay(tmp_path):
     holder = {}
 
-    class Hints(Plugin, needs=(Nudges, Browser)):
+    class Hints(Plugin, needs=(Nudges,)):
         @hook(PreStep)
         async def observe_hints(
             self,
             event: PreStep,
             next_: Next[StepDecision],
             nudges: Inject[Nudges],
-            browser: Inject[Browser],
         ) -> StepDecision:
-            event.session.observe(await nudges.project(_snapshot(), browser))
+            event.session.observe(await nudges.project(_snapshot()))
             return await next_()
 
     agent = Agent(
@@ -216,9 +213,9 @@ async def test_hint_provenance_and_unselected_hints_survive_session_replay(tmp_p
         ],
     )
     async with agent.session("hints") as session:
-        nudges, browser = holder["nudges"], holder["browser"]
-        await nudges.queue(browser, "First hint", key="first", cause_id="first-action")
-        await nudges.queue(browser, "Second hint", key="second", cause_id="second-action")
+        nudges = holder["nudges"]
+        await nudges.queue("First hint", key="first", cause_id="first-action")
+        await nudges.queue("Second hint", key="second", cause_id="second-action")
         await session.run("Inspect")
         request = next(event for event in session.events if isinstance(event, ModelRequestedEvent))
         provenance = session.log.included_observations(request.request)
@@ -227,9 +224,9 @@ async def test_hint_provenance_and_unselected_hints_survive_session_replay(tmp_p
         assert provenance == (
             IncludedObservation("browser.nudges", receipt.nudge_ids, ObservationForm.FULL),
         )
-        assert "Second hint" in (await nudges.project(_snapshot(), browser)).full
+        assert "Second hint" in (await nudges.project(_snapshot())).full
     async with agent.session("hints") as restored:
         assert restored.log.included_observations(request.request) == provenance
-        remaining = await holder["nudges"].project(_snapshot(), holder["browser"])
+        remaining = await holder["nudges"].project(_snapshot())
         assert "Second hint" in remaining.full
         assert "First hint" not in remaining.full

@@ -46,11 +46,11 @@ def browser_plugins(
         MouseTools(),
         TabTools(),
         DialogTools(),
+        FormTools(),
         FileTools(),
+        UploadTools(),
         LatestObservationOnly(),
     ]
-    if isinstance(selected, DomMode):
-        plugins.extend((FormTools(), UploadTools()))
     if recording is not None:
         plugins.append(Recording(recording))
     return plugins

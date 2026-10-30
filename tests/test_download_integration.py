@@ -36,7 +36,7 @@ async def test_scoped_download_has_enum_state_and_namespaced_events(site, tmp_pa
         LaunchBrowser(url=site, download_directory=str(tmp_path)), emit=collect
     ) as browser:
         tab = browser.active_tab
-        await wait_for_page(browser, tab)
+        await wait_for_page(tab)
         await evaluate(
             tab,
             "(() => {const a=document.createElement('a');a.href='/download';"
@@ -60,7 +60,7 @@ async def test_default_downloads_can_be_read_and_viewed_as_pdf_in_a_new_tab(site
         LaunchBrowser(url=site), file_system=FileSystemOptions(directory=tmp_path / "workspace")
     ) as browser:
         original = browser.active_tab
-        await wait_for_page(browser, original)
+        await wait_for_page(original)
         await evaluate(original, "document.querySelector('#download').click()")
         async with asyncio.timeout(10):
             while (
@@ -72,8 +72,8 @@ async def test_default_downloads_can_be_read_and_viewed_as_pdf_in_a_new_tab(site
         assert downloaded.error is None
         document = browser.files.read_file(downloaded.path, page_number=2)
         assert "Second page: Voyager 2" in document.text
-        opened = await browser.open_file(downloaded.path)
-        await wait_for_page(browser, opened)
+        opened = await browser.open_tab(browser.files.resolve(downloaded.path))
+        await wait_for_page(opened)
         assert opened.id != original.id
         assert opened.url == Path(downloaded.path).as_uri()
         assert await evaluate(opened, "document.contentType") == "application/pdf"

@@ -30,63 +30,66 @@ class Bounds(Options):
 
 
 @dataclass(frozen=True, slots=True)
-class Projection:
-    """Map one frame's viewport to the top-level viewport with an affine transform."""
+class FrameTransform:
+    """Affine map from one frame's CSS pixels to the top-level viewport.
+
+    The fields are the CSS matrix(a, b, c, d, e, f) of the frame's content box.
+    """
 
     scale_x: float = 1
     skew_y: float = 0
     skew_x: float = 0
     scale_y: float = 1
-    x: float = 0
-    y: float = 0
-    clip: Bounds | None = None
+    offset_x: float = 0
+    offset_y: float = 0
 
-    def point(self, x: float, y: float) -> tuple[float, float]:
-        return self.scale_x * x + self.skew_x * y + self.x, (
-            self.skew_y * x + self.scale_y * y + self.y
+    def to_viewport(self, x: float, y: float) -> tuple[float, float]:
+        return self.scale_x * x + self.skew_x * y + self.offset_x, (
+            self.skew_y * x + self.scale_y * y + self.offset_y
         )
 
-    def inverse(self, x: float, y: float) -> tuple[float, float]:
+    def to_local(self, x: float, y: float) -> tuple[float, float]:
         determinant = self.scale_x * self.scale_y - self.skew_x * self.skew_y
         if abs(determinant) < 1e-9:
             raise ValueError("Frame transform has no visible area")
-        x, y = x - self.x, y - self.y
+        x, y = x - self.offset_x, y - self.offset_y
         return (
             (self.scale_y * x - self.skew_x * y) / determinant,
             (self.scale_x * y - self.skew_y * x) / determinant,
         )
 
-    def box(self, bounds: Bounds) -> Bounds:
-        return self._box(bounds, self.point)
+    def bounds_to_viewport(self, bounds: Bounds) -> Bounds:
+        return _enclosing(bounds, self.to_viewport)
 
-    def local_box(self, bounds: Bounds) -> Bounds:
-        return self._box(bounds, self.inverse)
+    def bounds_to_local(self, bounds: Bounds) -> Bounds:
+        return _enclosing(bounds, self.to_local)
 
-    @staticmethod
-    def _box(bounds: Bounds, transform: Callable[[float, float], tuple[float, float]]) -> Bounds:
-        points = [
-            transform(x, y)
-            for x in (bounds.x, bounds.x + bounds.width)
-            for y in (bounds.y, bounds.y + bounds.height)
-        ]
-        xs, ys = zip(*points, strict=True)
-        return Bounds(x=min(xs), y=min(ys), width=max(xs) - min(xs), height=max(ys) - min(ys))
-
-    def embed(self, quad: list[float], width: float, height: float) -> Projection:
+    def child(self, quad: list[float], width: float, height: float) -> FrameTransform:
+        """Compose an embedded frame's transform from its content quad in this space."""
         # Perspective needs a homography. Reject it instead of dispatching a wrong click.
         if any(abs(quad[i] + quad[i + 4] - quad[i + 2] - quad[(i + 6) % 8]) > 0.5 for i in (0, 1)):
             raise ValueError("Perspective-transformed frames are not supported")
-        origin = self.point(quad[0], quad[1])
-        right = self.point(quad[2], quad[3])
-        bottom = self.point(quad[6], quad[7])
-        return Projection(
+        origin = self.to_viewport(quad[0], quad[1])
+        right = self.to_viewport(quad[2], quad[3])
+        bottom = self.to_viewport(quad[6], quad[7])
+        return FrameTransform(
             scale_x=(right[0] - origin[0]) / width,
             skew_y=(right[1] - origin[1]) / width,
             skew_x=(bottom[0] - origin[0]) / height,
             scale_y=(bottom[1] - origin[1]) / height,
-            x=origin[0],
-            y=origin[1],
+            offset_x=origin[0],
+            offset_y=origin[1],
         )
+
+
+def _enclosing(bounds: Bounds, transform: Callable[[float, float], tuple[float, float]]) -> Bounds:
+    points = [
+        transform(x, y)
+        for x in (bounds.x, bounds.x + bounds.width)
+        for y in (bounds.y, bounds.y + bounds.height)
+    ]
+    xs, ys = zip(*points, strict=True)
+    return Bounds(x=min(xs), y=min(ys), width=max(xs) - min(xs), height=max(ys) - min(ys))
 
 
 class Point(Options):

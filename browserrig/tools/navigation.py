@@ -5,7 +5,7 @@ from urllib.parse import quote_plus
 from harnessed import Inject, Plugin, tool
 from pydantic import Field
 
-from browserrig.browser.base import Browser
+from browserrig.browser.base import Browser, BrowserEvents
 from browserrig.browser.tab import Tab, validated_url
 from browserrig.core.errors import BrowserError
 from browserrig.core.kinds import ActionKind
@@ -14,8 +14,9 @@ from browserrig.events import NavigationStartedEvent, WaitingEvent
 from .execution import Actions, Effect
 
 
-class NavigationTools(Plugin, needs=(Actions, Browser)):
+class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents)):
     _browser: Inject[Browser]
+    _events: Inject[BrowserEvents]
 
     @tool(description="Navigate the active tab to an HTTP(S) URL.")
     async def navigate(
@@ -27,7 +28,7 @@ class NavigationTools(Plugin, needs=(Actions, Browser)):
         validated_url(url)
 
         async def navigate(tab: Tab) -> Effect:
-            await self._browser.emit(NavigationStartedEvent(target_id=tab.id, url=url))
+            await self._events.emit(NavigationStartedEvent(target_id=tab.id, url=url))
             await tab.navigate(url)
             return Effect("Navigation executed.")
 
@@ -80,6 +81,6 @@ class NavigationTools(Plugin, needs=(Actions, Browser)):
         seconds: Annotated[float, Field(ge=0, le=10)] = 1,
     ) -> str:
         async with self._browser.action_lock:
-            await self._browser.emit(WaitingEvent(duration=seconds))
+            await self._events.emit(WaitingEvent(duration=seconds))
             await asyncio.sleep(seconds)
         return "Wait completed; observe the current state."

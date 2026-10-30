@@ -2,8 +2,8 @@ from harnessed import Inject, Plugin, tool
 
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
-from browserrig.core.kinds import ActionKind, ElementOperation
-from browserrig.observation.plugin import Observe
+from browserrig.core.kinds import ActionKind
+from browserrig.observation.plugin import Observe, has_dom_refs
 
 from .execution import Actions, Effect
 
@@ -11,30 +11,10 @@ from .execution import Actions, Effect
 class FormTools(Plugin, needs=(Actions, Observe)):
     _observe: Inject[Observe]
 
-    @tool(description="Type exact text into a DOM ref; clear replaces its value by default.")
-    async def type_text(
-        self,
-        ref: str,
-        text: str,
-        clear: bool = True,
-        *,
-        actions: Inject[Actions],
-    ) -> str:
-        async def type_text(tab: Tab) -> Effect:
-            point = await actions.element_point(tab=tab, ref=ref)
-            await tab.mouse.move_to(point)
-            await actions.element_point(tab=tab, ref=ref, scroll=False)
-            await actions.element_call(
-                tab=tab, ref=ref, operation=ElementOperation.FOCUS, value=clear
-            )
-            if clear:
-                await tab.keyboard.press_key("Backspace")
-            await tab.keyboard.type_text(text)
-            return Effect("Text entered.")
-
-        return await actions.run(kind=ActionKind.TYPE, operation=type_text)
-
-    @tool(description="Select an exact option label or value in a native select element.")
+    @tool(
+        enabled=has_dom_refs,
+        description="Select an exact option label or value in a native select element.",
+    )
     async def select_option(
         self,
         ref: str,
@@ -43,12 +23,8 @@ class FormTools(Plugin, needs=(Actions, Observe)):
         actions: Inject[Actions],
     ) -> str:
         async def select(tab: Tab) -> Effect:
-            await actions.element_call(
-                tab=tab,
-                ref=ref,
-                operation=ElementOperation.SELECT,
-                value=value,
-            )
+            await actions.element_point(tab=tab, ref=ref)
+            await (await self._observe.element(tab, ref)).select(value)
             return Effect("Option selected.")
 
         return await actions.run(
@@ -56,7 +32,10 @@ class FormTools(Plugin, needs=(Actions, Observe)):
             operation=select,
         )
 
-    @tool(description="Set a native date/time input in its HTML format, such as YYYY-MM-DD.")
+    @tool(
+        enabled=has_dom_refs,
+        description="Set a native date/time input in its HTML format, such as YYYY-MM-DD.",
+    )
     async def set_date(
         self,
         ref: str,
@@ -65,17 +44,13 @@ class FormTools(Plugin, needs=(Actions, Observe)):
         actions: Inject[Actions],
     ) -> str:
         async def check(tab: Tab) -> None:
-            _, element = await self._observe.element(tab, ref)
-            if element.input_type not in {"date", "time", "datetime-local", "month", "week"}:
+            handle = await self._observe.element(tab, ref)
+            if handle.element.input_type not in {"date", "time", "datetime-local", "month", "week"}:
                 raise BrowserError("Element is not a native date/time input")
 
         async def set_date(tab: Tab) -> Effect:
-            await actions.element_call(
-                tab=tab,
-                ref=ref,
-                operation=ElementOperation.SET_VALUE,
-                value=value,
-            )
+            await actions.element_point(tab=tab, ref=ref)
+            await (await self._observe.element(tab, ref)).set_value(value)
             return Effect("Date/time value set and verified.")
 
         return await actions.run(

@@ -1,29 +1,25 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
 from uuid import uuid4
 
 from harnessed import Inject, Plugin, ToolError
 
-from browserrig.browser.base import Browser
-from browserrig.browser.tab import Frame, Tab
+from browserrig.browser.base import Browser, BrowserEvents
+from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import Bounds, ElementPoint
-from browserrig.core.kinds import ActionKind, ElementOperation, ReadinessPhase, ReadinessStatus
+from browserrig.core.geometry import ElementPoint
+from browserrig.core.kinds import ActionKind, ReadinessPhase, ReadinessStatus
 from browserrig.events import (
     ACTION_EVENTS,
     ActionFailedEvent,
     ActionFinishedEvent,
     ActionStartedEvent,
-    ElementHighlightedEvent,
     PageState,
 )
-from browserrig.observation.models import Element, Snapshot
+from browserrig.observation.models import Snapshot
 from browserrig.observation.plugin import Observe
 from browserrig.readiness.plugin import Readiness
-from browserrig.scripts import ELEMENT
-from browserrig.scripts.models import ElementArgs
 
 from .scrolling import prepare_element
 
@@ -37,11 +33,12 @@ class Effect:
     prepared_scroll: bool = False
 
 
-class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
+class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, Observe)):
     """Own the action transaction: serialization, readiness, dispatch and receipts."""
 
     events = ACTION_EVENTS
     browser: Inject[Browser]
+    _events: Inject[BrowserEvents]
     readiness: Inject[Readiness]
     observe: Inject[Observe]
 
@@ -63,7 +60,7 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
                 before = await self._prepare(tab, kind)
                 if check is not None:
                     await check(tab)
-                await self.browser.emit(
+                await self._events.emit(
                     ActionStartedEvent(
                         action_id=action_id,
                         kind=kind,
@@ -75,7 +72,7 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
                 with tab.input.action(action_id):
                     effect = await operation(tab)
                 note = await self._settle(tab, kind) if settle and not tab.closed else ""
-                await self.browser.emit(
+                await self._events.emit(
                     ActionFinishedEvent(
                         action_id=action_id,
                         kind=kind,
@@ -143,7 +140,7 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
     async def _fail(
         self, tab: Tab, action_id: str, kind: ActionKind, dispatched: bool, reason: str
     ) -> None:
-        await self.browser.emit(
+        await self._events.emit(
             ActionFailedEvent(
                 action_id=action_id,
                 kind=kind,
@@ -154,70 +151,21 @@ class Actions(Plugin, provides=True, needs=(Browser, Readiness, Observe)):
             )
         )
 
-    async def element_call(
-        self,
-        *,
-        tab: Tab,
-        ref: str,
-        operation: ElementOperation,
-        value: object = None,
-        by_value: bool = True,
-    ) -> Any:
-        if operation in {
-            ElementOperation.SELECT,
-            ElementOperation.SET_VALUE,
-            ElementOperation.NODE,
-        }:
-            await self.element_point(tab=tab, ref=ref)
-        frame, element = await self.observe.element(tab, ref)
-        return await self._call(frame, element, operation, value, by_value=by_value)
-
     async def element_point(self, *, tab: Tab, ref: str, scroll: bool = True) -> ElementPoint:
-        frame, element = await self.observe.element(tab, ref)
+        """Reveal a ref with wheel input, then return a hit-tested point and highlight it.
+
+        Use `scroll=False` to re-check the target after hover or other input moved it.
+        """
+        handle = await self.observe.element(tab, ref)
         scrolled = False
         if scroll:
-            snapshot = self.observe.snapshot
-            assert snapshot is not None
-            scrolled = await prepare_element(self.browser, tab, snapshot, element)
+            scrolled = await prepare_element(tab, handle)
             # Wheel input may have moved ancestor documents; refresh their transforms.
-            frame, _ = await self.observe.element(tab, ref)
-        current = await self._locate(frame, element)
-        x, y = frame.projection.point(current.x, current.y)
-        await frame.check_point(x, y)
-        bounds = frame.projection.box(current.bounds) if current.bounds is not None else None
-        if bounds is not None:
-            await tab.input.emit(
-                ElementHighlightedEvent(
-                    ref=ref, x=bounds.x, y=bounds.y, width=bounds.width, height=bounds.height
-                )
-            )
-        return ElementPoint(x=x, y=y, scrolled=scrolled, bounds=bounds)
-
-    async def _locate(self, frame: Frame, element: Element) -> ElementPoint:
-        clip = frame.local_clip
-        raw = await self._call(frame, element, ElementOperation.POINT, False, clip)
-        return ElementPoint.model_validate(raw)
-
-    async def _call(
-        self,
-        frame: Frame,
-        element: Element,
-        operation: ElementOperation,
-        value: object = None,
-        clip: Bounds | None = None,
-        *,
-        by_value: bool = True,
-    ) -> Any:
-        snapshot = self.observe.snapshot
-        assert snapshot is not None
-        return await frame.run(
-            ELEMENT,
-            ElementArgs(
-                token=snapshot.id, index=element.index, operation=operation, value=value, clip=clip
-            ),
-            by_value=by_value,
-            user_gesture=True,
-        )
+            handle = await self.observe.element(tab, ref)
+        point = await handle.locate()
+        if point.bounds is not None:
+            await tab.input.highlight(ref, point.bounds)
+        return point.model_copy(update={"scrolled": scrolled})
 
 
 def _observes(snapshot: Snapshot, tab: Tab) -> bool:

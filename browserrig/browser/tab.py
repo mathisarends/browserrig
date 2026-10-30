@@ -8,14 +8,27 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from cdpify import CdpSession
-from cdpify.domains.page import FrameTree
+from cdpify.domains.page import (
+    FrameNavigatedEvent,
+    FrameTree,
+    JavascriptDialogClosedEvent,
+    JavascriptDialogOpeningEvent,
+    NavigatedWithinDocumentEvent,
+)
 from cdpify.domains.runtime import CallArgument
 from cdpify.exceptions import CDPCommandError
 from pydantic import BaseModel
 
+from browserrig.browser.screen import ScreenRecorder
 from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import Bounds, Projection
-from browserrig.events import BrowserEvent, CursorStateEvent, InputEvent, ScrolledEvent
+from browserrig.core.geometry import Bounds, FrameTransform
+from browserrig.events import (
+    BrowserEvent,
+    DialogHandledEvent,
+    DialogOpenedEvent,
+    InputEvent,
+    NavigationCommittedEvent,
+)
 from browserrig.input import Input, Keyboard, Mouse
 from browserrig.scripts import OWNER_HITS, Script, failure
 from browserrig.scripts.models import OwnerHitsArgs
@@ -28,33 +41,23 @@ class Frame:
     """A CDP page frame: the top-level document or one embedded iframe.
 
     Its isolated JavaScript world belongs to that frame, not to browser focus.
-    Its projection maps frame-local CSS pixels to the containing tab's viewport.
+    `transform` maps frame-local CSS pixels to the tab's viewport; `visible` is the
+    part of the frame left unclipped by its ancestors, in viewport pixels.
     """
 
     id: str
     cdp: CdpSession
-    projection: Projection = Projection()
+    transform: FrameTransform = FrameTransform()
+    visible: Bounds | None = None
     parent: Frame | None = None
     owner_id: int | None = None
     document_id: str = ""
     worlds: Worlds = field(default_factory=Worlds, repr=False, compare=False)
 
     @property
-    def x(self) -> float:
-        return self.projection.x
-
-    @property
-    def y(self) -> float:
-        return self.projection.y
-
-    @property
-    def local_clip(self) -> Bounds | None:
-        clip = self.projection.clip
-        return self.projection.local_box(clip) if clip is not None else None
-
-    @property
-    def clip_payload(self) -> dict[str, float] | None:
-        return self.local_clip.model_dump() if self.local_clip is not None else None
+    def local_visible(self) -> Bounds | None:
+        """The visible area in this frame's own CSS pixels, for in-page scripts."""
+        return self.transform.bounds_to_local(self.visible) if self.visible is not None else None
 
     async def frame_tree(self) -> FrameTree:
         return await _frame_tree(self.cdp)
@@ -102,15 +105,15 @@ class Frame:
         visible = [True] * len(points)
         current = self
         while current.parent is not None:
-            clip = current.projection.clip
+            visible_area = current.visible
             hits = await current.run_on_owner(
                 OWNER_HITS,
                 OwnerHitsArgs(
-                    points=tuple(current.parent.projection.inverse(x, y) for x, y in points)
+                    points=tuple(current.parent.transform.to_local(x, y) for x, y in points)
                 ),
             )
             visible = [
-                before and hit and (clip is None or clip.contains(*point))
+                before and hit and (visible_area is None or visible_area.contains(*point))
                 for before, hit, point in zip(visible, hits, points, strict=True)
             ]
             current = current.parent
@@ -145,6 +148,9 @@ class Frame:
         )
 
 
+type FrameDiscovery = Callable[[Tab], Awaitable[tuple[tuple[Frame, ...], tuple[str, ...]]]]
+
+
 class Tab:
     def __init__(
         self,
@@ -153,6 +159,7 @@ class Tab:
         *,
         emit: Callable[[BrowserEvent | InputEvent], Awaitable[None]] | None = None,
         worlds: Worlds | None = None,
+        discover_frames: FrameDiscovery | None = None,
     ) -> None:
         self.id = target_id
         self.cdp = cdp
@@ -163,10 +170,14 @@ class Tab:
         self.closed = False
         self.changed = asyncio.Event()
         self.frame_limitations: tuple[str, ...] = ()
-        self.frame_revision = 0
         self.worlds = worlds if worlds is not None else Worlds()
         self._emit = emit
-        self.input = Input(self.cdp, self.emit)
+        self._discover_frames = discover_frames
+        self._layout_revision = 0
+        self._frames_key: tuple[str, str, int] | None = None
+        self._frames: tuple[Frame, ...] = ()
+        self.input = Input(self.cdp, self.emit, layout_changed=self.invalidate_frames)
+        self.screen = ScreenRecorder(self.cdp)
 
     @property
     def mouse(self) -> Mouse:
@@ -177,10 +188,45 @@ class Tab:
         return self.input.keyboard
 
     async def emit(self, event: BrowserEvent | InputEvent) -> None:
-        if isinstance(event, (CursorStateEvent, ScrolledEvent)):
-            self.frame_revision += 1
         if self._emit is not None:
             await self._emit(replace(event, target_id=self.id, document_id=self.document_id))
+
+    def invalidate_frames(self) -> None:
+        """Forget cached frame geometry after input, scrolling or navigation moved content."""
+        self._layout_revision += 1
+
+    async def frames(self) -> tuple[Frame, ...]:
+        """Return every frame with its viewport transform; `frame_limitations` explains gaps.
+
+        One discovery is reused within an action until input or navigation invalidates it.
+        """
+        if self._discover_frames is None:
+            raise BrowserError("Frame discovery is unavailable for this tab")
+        key = (self.document_id, self.input.action_id, self._layout_revision)
+        if key[1] and key == self._frames_key:
+            return self._frames
+        frames, self.frame_limitations = await self._discover_frames(self)
+        if key[1] and key == (self.document_id, self.input.action_id, self._layout_revision):
+            self._frames_key, self._frames = key, frames
+        return frames
+
+    async def handle(self, event: object) -> None:
+        """Apply a page event that arrived on this tab's own CDP session."""
+        match event:
+            case FrameNavigatedEvent(frame=frame) if not frame.parent_id:
+                self.document_id, self.url = frame.loader_id, frame.url
+                self.changed.set()
+                await self.emit(NavigationCommittedEvent(url=self.url))
+            case NavigatedWithinDocumentEvent(url=url):
+                self.url = url
+                self.changed.set()
+                await self.emit(NavigationCommittedEvent(url=self.url))
+            case JavascriptDialogOpeningEvent(type=kind, message=message):
+                self.dialog = (str(kind), message)
+                await self.emit(DialogOpenedEvent(kind=str(kind), message=message[:1000]))
+            case JavascriptDialogClosedEvent(result=accepted):
+                self.dialog = None
+                await self.emit(DialogHandledEvent(accepted=accepted))
 
     async def main_frame(self) -> Frame:
         tree = await self.frame_tree()
@@ -193,7 +239,7 @@ class Tab:
         tree = await self.frame_tree()
         if self.document_id != tree.frame.loader_id:
             self.worlds.invalidate(frame_id=tree.frame.id)
-            self.frame_revision += 1
+            self.invalidate_frames()
         self.document_id, self.url = tree.frame.loader_id, tree.frame.url
 
     async def go_back(self) -> bool:

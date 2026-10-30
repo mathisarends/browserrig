@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from harnessed import Context, Inject, Plugin, PluginState, hook
 from harnessed.events import AgentControlChangedEvent, ControlState
 
-from browserrig.browser.base import Browser
+from browserrig.browser.base import BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.geometry import Geometry
 from browserrig.core.kinds import ReadinessPhase
@@ -24,10 +24,10 @@ class _State:
     geometry: dict[tuple[str, str], Geometry] = field(default_factory=dict)
 
 
-class Readiness(Plugin, provides=True, needs=(Browser,)):
+class Readiness(Plugin, provides=True, needs=(BrowserEvents,)):
     events = READINESS_EVENTS
     _state = PluginState(_State)
-    _browser: Inject[Browser]
+    _events: Inject[BrowserEvents]
 
     def __init__(
         self, mode: ObservationMode | None = None, options: ReadinessOptions | None = None
@@ -70,8 +70,8 @@ class Readiness(Plugin, provides=True, needs=(Browser,)):
 
     async def _wait(self, tab: Tab, phase: ReadinessPhase) -> ReadinessReport:
         return await wait_for_page(
-            self._browser,
             tab,
+            events=self._events,
             mode=self.mode,
             options=self.options,
             phase=phase,

@@ -50,8 +50,8 @@ async def test_all_rendered_controls_are_listed_with_explicit_viewport_flags(sit
                 '<button hidden>Hidden</button><div inert><button>Inert</button></div>';
         """,
         )
-        report = await wait_for_page(browser, tab)
-        state = await capture(browser, tab, DomMode(), report)
+        report = await wait_for_page(tab)
+        state = await capture(tab, DomMode(), report)
         assert len(state.elements) == 300
         assert any(element.in_viewport for element in state.elements)
         assert not state.elements[-1].in_viewport
@@ -60,9 +60,9 @@ async def test_all_rendered_controls_are_listed_with_explicit_viewport_flags(sit
         assert all(isinstance(entry["in_viewport"], bool) for entry in entries)
         assert "text" not in yaml.safe_load(render(state))
         assert await evaluate(tab, "scrollY") == 0
-        visual = await capture(browser, tab, DomMode(screenshots=True), report)
+        visual = await capture(tab, DomMode(screenshots=True), report)
         assert all((element.mark is not None) == element.in_viewport for element in visual.elements)
-        limited = await capture(browser, tab, DomMode(max_elements=10), report)
+        limited = await capture(tab, DomMode(max_elements=10), report)
         assert len(limited.elements) == 10
         assert any("truncated" in item for item in limited.limitations)
 
@@ -249,7 +249,7 @@ async def test_offscreen_frame_is_scrolled_into_view_before_interaction(
                         'position:absolute;top:100px;left:0;width:100vw;height:2400px;border:0';
                 """,
                 )
-                frames = await actions.browser.frames(actions.browser.active_tab)
+                frames = await actions.browser.active_tab.frames()
                 child = next(frame for frame in frames if frame.parent is not None)
                 await evaluate(
                     child,
@@ -284,7 +284,7 @@ async def test_offscreen_frame_is_scrolled_into_view_before_interaction(
         actions = holder["actions"]
         tab = actions.browser.active_tab
         element = next(el for el in actions.observe.snapshot.elements if el.name == "Frame button")
-        frame, _ = await actions.observe.element(tab, element.ref)
+        frame = (await actions.observe.element(tab, element.ref)).frame
         assert await evaluate(frame, "document.body.dataset.clicked") == "true"
         assert await evaluate(tab, "scrollY") > 1000
 

@@ -25,9 +25,17 @@ from .pointer import ease, movement
 
 
 class Mouse:
-    def __init__(self, cdp: CdpSession, *, emit: Callable[[InputEvent], Awaitable[None]]) -> None:
+    def __init__(
+        self,
+        cdp: CdpSession,
+        *,
+        emit: Callable[[InputEvent], Awaitable[None]],
+        layout_changed: Callable[[], None] = lambda: None,
+    ) -> None:
         self._cdp = cdp
         self._emit = emit
+        # Hover, presses, drags and wheel input can move content, including iframes.
+        self._layout_changed = layout_changed
         self.position = Point(x=0, y=0)
         self._cursor_initialized = False
 
@@ -36,7 +44,7 @@ class Mouse:
         if not self._cursor_initialized:
             metrics = await self._cdp.page.get_layout_metrics()
             viewport = metrics.css_layout_viewport
-            await self.dispatch(
+            await self._dispatch(
                 MouseEventKind.MOVED,
                 Point(
                     x=random.uniform(viewport.client_width * 0.4, viewport.client_width * 0.6),
@@ -64,13 +72,13 @@ class Mouse:
         try:
             for step in range(1, path.steps + 1):
                 current = path.point(step / path.steps)
-                await self.dispatch(MouseEventKind.MOVED, current)
+                await self._dispatch(MouseEventKind.MOVED, current)
                 if path.duration:
                     await asyncio.sleep(path.duration / path.steps)
         finally:
             await self.publish_cursor()
 
-    async def dispatch(
+    async def _dispatch(
         self,
         kind: Literal[MouseEventKind.MOVED, MouseEventKind.PRESSED, MouseEventKind.RELEASED],
         point: Point,
@@ -78,38 +86,34 @@ class Mouse:
         buttons: int = 0,
         click_count: int = 0,
     ) -> None:
-        event_kind = MouseEventKind(kind)
-        if event_kind is MouseEventKind.WHEEL:
-            raise ValueError("Use scroll() for wheel input")
         await self._cdp.input.dispatch_mouse_event(
-            type=event_kind.value,
+            type=kind.value,
             x=point.x,
             y=point.y,
             button=MouseButton.LEFT
-            if buttons or event_kind is MouseEventKind.RELEASED
+            if buttons or kind is MouseEventKind.RELEASED
             else MouseButton.NONE,
             buttons=buttons,
             click_count=click_count,
         )
         self.position = point
-        if event_kind is MouseEventKind.MOVED:
+        self._layout_changed()
+        if kind is MouseEventKind.MOVED:
             if buttons:
                 await self._emit(CursorStateEvent(x=point.x, y=point.y, buttons=buttons))
             return
-        event_type = (
-            PointerPressedEvent if event_kind is MouseEventKind.PRESSED else PointerReleasedEvent
-        )
+        event_type = PointerPressedEvent if kind is MouseEventKind.PRESSED else PointerReleasedEvent
         await self._emit(event_type(x=point.x, y=point.y, click_count=click_count))
 
     async def click(self, point: Point, *, count: Literal[1, 2] = 1) -> None:
         await self.move_to(point)
         for click_count in range(1, count + 1):
             try:
-                await self.dispatch(
+                await self._dispatch(
                     MouseEventKind.PRESSED, point, buttons=1, click_count=click_count
                 )
             finally:
-                await self.dispatch(
+                await self._dispatch(
                     MouseEventKind.RELEASED, point, buttons=0, click_count=click_count
                 )
 
@@ -134,7 +138,7 @@ class Mouse:
         try:
             if mode is DragMode.HTML5:
                 await cdp.input.set_intercept_drags(enabled=True)
-            await self.dispatch(MouseEventKind.PRESSED, start, buttons=1, click_count=1)
+            await self._dispatch(MouseEventKind.PRESSED, start, buttons=1, click_count=1)
             if mode is DragMode.HTML5:
                 # Subscribe before crossing the native drag threshold.
                 async with cdp.listen(DragInterceptedEvent, timeout=2) as subscription:
@@ -143,7 +147,7 @@ class Mouse:
                         x=start.x + (end.x - start.x) * start_fraction,
                         y=start.y + (end.y - start.y) * start_fraction,
                     )
-                    await self.dispatch(MouseEventKind.MOVED, current, buttons=1)
+                    await self._dispatch(MouseEventKind.MOVED, current, buttons=1)
                     data = (await anext(subscription)).data
                 await cdp.input.dispatch_drag_event(
                     type="dragEnter", x=current.x, y=current.y, data=data
@@ -160,13 +164,15 @@ class Mouse:
                         type="dragOver", x=current.x, y=current.y, data=data
                     )
                     self.position = current
+                    self._layout_changed()
                     await self._emit(CursorStateEvent(x=current.x, y=current.y, buttons=1))
                 else:
-                    await self.dispatch(MouseEventKind.MOVED, current, buttons=1)
+                    await self._dispatch(MouseEventKind.MOVED, current, buttons=1)
                 await asyncio.sleep(duration / steps)
             if data is not None:
                 await cdp.input.dispatch_drag_event(type="drop", x=end.x, y=end.y, data=data)
                 dropped = True
+                self._layout_changed()
         finally:
             await self._release_drag(current, data, dropped=dropped, mode=mode)
 
@@ -180,7 +186,7 @@ class Mouse:
                 )
         finally:
             try:
-                await self.dispatch(MouseEventKind.RELEASED, point, buttons=0, click_count=1)
+                await self._dispatch(MouseEventKind.RELEASED, point, buttons=0, click_count=1)
             finally:
                 if mode is DragMode.HTML5:
                     await self._cdp.input.set_intercept_drags(enabled=False)
@@ -201,6 +207,7 @@ class Mouse:
                 delta_x=delta_x * (current - previous),
                 delta_y=delta_y * (current - previous),
             )
+            self._layout_changed()
             previous = current
             await asyncio.sleep(duration / steps)
         await self._emit(

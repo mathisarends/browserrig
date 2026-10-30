@@ -8,7 +8,7 @@ import yaml
 from harnessed import Inject, Observation, Plugin, PluginState, SessionLog, hook
 from harnessed.events import ObservationForm, ObservationsIncludedEvent
 
-from browserrig.browser.base import Browser
+from browserrig.browser.base import BrowserEvents
 from browserrig.core.kinds import ActionKind, ReadinessStatus
 from browserrig.events import (
     NUDGE_EVENTS,
@@ -43,9 +43,10 @@ class _State:
     effect_at: float = 0
 
 
-class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
+class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
     events = NUDGE_EVENTS
     _state = PluginState(_State)
+    _events: Inject[BrowserEvents]
 
     def __init__(self, *, max_hints: int = 5, max_chars: int = 2000) -> None:
         super().__init__()
@@ -71,7 +72,6 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
 
     async def queue(
         self,
-        browser: Browser,
         text: str,
         *,
         key: str,
@@ -82,13 +82,13 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
         if previous := self._state.queued.get(key):
             if previous.text == text:
                 return
-            await browser.emit(NudgeExpiredEvent(nudge_id=previous.nudge_id))
+            await self._events.emit(NudgeExpiredEvent(nudge_id=previous.nudge_id))
         event = NudgeQueuedEvent(
             nudge_id=uuid4().hex,
             key=key,
             text=text[: self._max_chars],
             cause_id=cause_id,
-            browser_id=browser.id,
+            browser_id=self._events.browser_id,
             target_id=target_id,
             document_id=document_id,
         )
@@ -96,8 +96,8 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
         while len(self._state.queued) > self._max_hints * 4:
             oldest = next(iter(self._state.queued))
             removed = self._state.queued.pop(oldest)
-            await browser.emit(NudgeExpiredEvent(nudge_id=removed.nudge_id))
-        await browser.emit(event)
+            await self._events.emit(NudgeExpiredEvent(nudge_id=removed.nudge_id))
+        await self._events.emit(event)
 
     @hook(ActionStartedEvent)
     async def _on_start(self, event: ActionStartedEvent) -> None:
@@ -126,9 +126,7 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
         self._state.tabs.pop(event.target_id, None)
 
     @hook(ObservationCapturedEvent)
-    async def _on_observation(
-        self, event: ObservationCapturedEvent, browser: Inject[Browser]
-    ) -> None:
+    async def _on_observation(self, event: ObservationCapturedEvent) -> None:
         state = self._state.tabs.get(event.target_id)
         if state is None or state.pending is None:
             return
@@ -150,7 +148,6 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
         ):
             delta = event.scroll_y - action.before.scroll_y
             await self.queue(
-                browser,
                 f"The page scrolled {abs(delta):.0f}px "
                 f"{'down' if delta > 0 else 'up'} after the click.",
                 key="unexpected_scroll",
@@ -165,7 +162,6 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
             and event.readiness == ReadinessStatus.READY
         ):
             await self.queue(
-                browser,
                 "The last action produced no observable page change; inspect before repeating it.",
                 key="no_progress",
                 cause_id=action.action_id,
@@ -174,30 +170,27 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
             )
 
     @hook(TabOpenedEvent)
-    async def _on_tab(self, event: TabOpenedEvent, browser: Inject[Browser]) -> None:
+    async def _on_tab(self, event: TabOpenedEvent) -> None:
         self._state.effect_at = event.at
         await self.queue(
-            browser,
             f"A tab opened: {event.target_id}. The active tab changes only when selected.",
             key=f"tab:{event.target_id}",
             cause_id=event.target_id,
         )
 
     @hook(DownloadCompletedEvent)
-    async def _on_download(self, event: DownloadCompletedEvent, browser: Inject[Browser]) -> None:
+    async def _on_download(self, event: DownloadCompletedEvent) -> None:
         self._state.effect_at = event.at
         await self.queue(
-            browser,
             f"Download completed: {event.filename} ({event.size} bytes).",
             key=f"download:{event.download_id}",
             cause_id=event.download_id,
         )
 
     @hook(DialogOpenedEvent)
-    async def _on_dialog(self, event: DialogOpenedEvent, browser: Inject[Browser]) -> None:
+    async def _on_dialog(self, event: DialogOpenedEvent) -> None:
         self._state.effect_at = event.at
         await self.queue(
-            browser,
             f"A {event.kind} dialog blocks this tab: {event.message}",
             key=f"dialog:{event.target_id}",
             cause_id=event.target_id,
@@ -205,9 +198,8 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
         )
 
     @hook(ReadinessDegradedEvent)
-    async def _on_degraded(self, event: ReadinessDegradedEvent, browser: Inject[Browser]) -> None:
+    async def _on_degraded(self, event: ReadinessDegradedEvent) -> None:
         await self.queue(
-            browser,
             f"Readiness is limited: {event.reason}",
             key="readiness",
             cause_id=event.readiness_id,
@@ -215,17 +207,17 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
             document_id=event.document_id,
         )
 
-    async def project(self, snapshot: Snapshot, browser: Browser) -> Observation:
+    async def project(self, snapshot: Snapshot) -> Observation:
         selected, size = [], 0
         for key, event in tuple(self._state.queued.items()):
             expired = (
-                event.browser_id != browser.id
+                event.browser_id != self._events.browser_id
                 or bool(event.target_id and event.target_id != snapshot.tab_id)
                 or bool(event.document_id and event.document_id != snapshot.document_id)
             )
             if expired:
                 self._state.queued.pop(key, None)
-                await browser.emit(NudgeExpiredEvent(nudge_id=event.nudge_id))
+                await self._events.emit(NudgeExpiredEvent(nudge_id=event.nudge_id))
                 continue
             if size + len(event.text) <= self._max_chars and len(selected) < self._max_hints:
                 selected.append({"id": event.nudge_id, "text": event.text})
@@ -238,7 +230,7 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
         )
 
     @hook(ObservationsIncludedEvent)
-    async def _on_request(self, event: ObservationsIncludedEvent, browser: Inject[Browser]) -> None:
+    async def _on_request(self, event: ObservationsIncludedEvent) -> None:
         refs = {
             ref
             for observation in event.observations
@@ -249,5 +241,7 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, Browser)):
             item.nudge_id for item in self._state.queued.values() if item.nudge_id in refs
         )
         if included:
-            await browser.emit(NudgeIncludedEvent(nudge_ids=included, request_id=event.request_id))
+            await self._events.emit(
+                NudgeIncludedEvent(nudge_ids=included, request_id=event.request_id)
+            )
             self._remove(included)

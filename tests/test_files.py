@@ -3,14 +3,17 @@
 
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
-from cdpify.domains.browser import DownloadProgressEvent
+from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
 from harnessed import ToolError
 from pypdf import PdfReader, PdfWriter
 
 from browserrig import ChromeBrowser, ConnectBrowser, FileSystem, FileSystemOptions, LaunchBrowser
-from browserrig.files.models import Download, DownloadState
+from browserrig.browser.downloads import Downloads
+from browserrig.events import DownloadCompletedEvent, DownloadFailedEvent
+from browserrig.files.models import DownloadState
 from browserrig.tools.files import _file_call
 
 
@@ -161,31 +164,42 @@ def test_explicit_download_directory_is_accessible_without_opening_other_paths(t
         files.resolve(tmp_path / "other")
 
 
-async def test_download_completion_falls_back_to_guid_and_tolerates_repeated_events(tmp_path):
-    browser = ChromeBrowser(file_system=FileSystemOptions(directory=tmp_path))
-    browser.files.initialize()
-    (browser.files.pending_directory / "id").write_text("download")
-    browser._downloads["id"] = Download(id="id", filename="note.txt", url="https://example.org")
-    event = DownloadProgressEvent(guid="id", total_bytes=8, received_bytes=8, state="completed")
-    await browser._download_progress(event)
-    await browser._download_progress(event)
-    download = (await browser.downloads())[0]
-    assert download.state is DownloadState.COMPLETED
-    assert browser.files.read_file(download.path).text == "download"
-    assert download.error is None
-
-
-async def test_missing_download_does_not_break_browser_listener(tmp_path):
-    browser = ChromeBrowser(file_system=FileSystemOptions(directory=tmp_path))
-    browser.files.initialize()
-    browser._downloads["id"] = Download(id="id", filename="note.txt", url="https://example.org")
-    await browser._download_progress(
-        DownloadProgressEvent(guid="id", total_bytes=8, received_bytes=8, state="completed")
+async def _started_download(tmp_path):
+    files = FileSystem(FileSystemOptions(directory=tmp_path))
+    files.initialize()
+    emit = AsyncMock()
+    downloads = Downloads(files, None, emit)
+    await downloads.handle(
+        DownloadWillBeginEvent(
+            frame_id="frame", guid="id", url="https://example.org", suggested_filename="note.txt"
+        )
     )
-    download = (await browser.downloads())[0]
+    return files, downloads, emit
+
+
+_COMPLETED = DownloadProgressEvent(guid="id", total_bytes=8, received_bytes=8, state="completed")
+
+
+async def test_download_completion_falls_back_to_guid_and_tolerates_repeated_events(tmp_path):
+    files, downloads, emit = await _started_download(tmp_path)
+    (files.pending_directory / "id").write_text("download")
+    await downloads.handle(_COMPLETED)
+    await downloads.handle(_COMPLETED)
+    (download,) = downloads.all()
+    assert download.state is DownloadState.COMPLETED
+    assert files.read_file(download.path).text == "download"
+    assert download.error is None
+    completed = [call.args[0] for call in emit.await_args_list]
+    assert [type(event) for event in completed].count(DownloadCompletedEvent) == 1
+
+
+async def test_missing_download_fails_without_raising(tmp_path):
+    _, downloads, emit = await _started_download(tmp_path)
+    await downloads.handle(_COMPLETED)
+    (download,) = downloads.all()
     assert download.path is None
     assert "could not be saved" in download.error
-    assert browser._failure is None
+    assert isinstance(emit.await_args.args[0], DownloadFailedEvent)
 
 
 def test_remote_browser_requires_explicit_shared_filesystem(tmp_path):

@@ -1,9 +1,9 @@
 import asyncio
-from dataclasses import replace
 
 from harnessed import Context, Inject, Plugin, SessionLog
 
 from browserrig import Browser
+from browserrig.browser.base import BrowserEvents
 from browserrig.scripts.models import DOMProbe
 
 
@@ -37,12 +37,14 @@ class FakeBrowser:
         self.action_lock = asyncio.Lock()
         self.log = log
         self.files = None
+        self.events = BrowserEvents(self.id, self._emit)
+
+    async def _emit(self, event):
+        # Some tests build the fake without a log and never emit.
+        await self.log.emit(event)
 
     async def downloads(self):
         return ()
-
-    async def emit(self, event):
-        await self.log.emit(replace(event, browser_id=self.id))
 
 
 class FakeChrome(Plugin, needs=(SessionLog,)):
@@ -54,3 +56,4 @@ class FakeChrome(Plugin, needs=(SessionLog,)):
         browser = FakeBrowser(log)
         self.holder["browser"] = browser
         ctx.provide(Browser, browser)
+        ctx.provide(BrowserEvents, browser.events)

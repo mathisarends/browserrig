@@ -1,13 +1,12 @@
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
 from contextlib import AsyncExitStack, suppress
-from dataclasses import replace
+from pathlib import Path
 from typing import Any, Self
 from uuid import uuid4
 
 import httpx2
-from cdpify import CdpClient, CdpSession
+from cdpify import CdpClient, CdpSession, EventSubscription, ReceivedEvent
 from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
 from cdpify.domains.page import (
     FrameNavigatedEvent,
@@ -23,23 +22,18 @@ from browserrig.core.errors import BrowserClosed, BrowserError
 from browserrig.events import (
     BrowserEvent,
     ConnectedEvent,
-    DialogHandledEvent,
-    DialogOpenedEvent,
     DisconnectedEvent,
-    DownloadCompletedEvent,
-    DownloadFailedEvent,
-    DownloadStartedEvent,
     InputEvent,
-    NavigationCommittedEvent,
     TabActivatedEvent,
     TabClosedEvent,
     TabOpenedEvent,
 )
 from browserrig.files import FileSystem, FileSystemOptions
-from browserrig.files.models import Download, DownloadState
+from browserrig.files.models import Download
 
-from .base import EventSink
-from .config import BrowserOptions, ConnectBrowser, LaunchBrowser
+from .base import BrowserEvents, EventSink
+from .config import BrowserOptions, ConnectBrowser, LaunchBrowser, Viewport
+from .downloads import Downloads
 from .frames import discover_frames
 from .process import ChromeProcess
 from .tab import Frame, Tab, validated_url
@@ -51,6 +45,20 @@ async def _discard(_event: BrowserEvent | InputEvent) -> None:
 
 
 logger = logging.getLogger(__name__)
+
+# Page and runtime events arrive on tab sessions; target and download events on the root.
+_EVENTS = (
+    FrameNavigatedEvent,
+    NavigatedWithinDocumentEvent,
+    JavascriptDialogOpeningEvent,
+    JavascriptDialogClosedEvent,
+    ExecutionContextDestroyedEvent,
+    ExecutionContextsClearedEvent,
+    TargetInfoChangedEvent,
+    TargetDestroyedEvent,
+    DownloadWillBeginEvent,
+    DownloadProgressEvent,
+)
 
 
 class ChromeBrowser:
@@ -68,20 +76,18 @@ class ChromeBrowser:
             else None
         )
         self.id = uuid4().hex
-        self._emit = emit
+        self.events = BrowserEvents(self.id, emit)
         self._stack: AsyncExitStack | None = None
         self._tabs: dict[str, Tab] = {}
         self._active = ""
         self._context: str | None = None
         self._sessions: dict[str, str] = {}
-        self._downloads: dict[str, Download] = {}
+        self._downloads = Downloads(self.files, self._options.download_directory, self.events.emit)
         self._tasks: list[asyncio.Task[None]] = []
         self._failure: Exception | None = None
         self._connected = False
         self._closed_targets: set[str] = set()
         self._worlds = Worlds()
-        self._frames_key: tuple[str, str, str, int] | None = None
-        self._frames: tuple[Frame, ...] = ()
         self._attach_lock = asyncio.Lock()
         self.action_lock = asyncio.Lock()
         self._close_task: asyncio.Task[None] | None = None
@@ -115,7 +121,9 @@ class ChromeBrowser:
                 else:
                     await self.open_tab(options.url)
                 self._connected = True
-                await self.emit(ConnectedEvent(owned_process=isinstance(options, LaunchBrowser)))
+                await self.events.emit(
+                    ConnectedEvent(owned_process=isinstance(options, LaunchBrowser))
+                )
             return self
         except (Exception, asyncio.CancelledError):
             await self.aclose()
@@ -151,19 +159,7 @@ class ChromeBrowser:
         self._stack.push_async_callback(
             self.client.target.dispose_browser_context, browser_context_id=self._context
         )
-        await self._configure_downloads()
-
-    async def _configure_downloads(self) -> None:
-        directory = (
-            str(self.files.pending_directory) if self.files else self._options.download_directory
-        )
-        if directory is not None:
-            await self.client.browser.set_download_behavior(
-                behavior="allowAndName",
-                download_path=directory,
-                browser_context_id=self._context,
-                events_enabled=True,
-            )
+        await self._downloads.enable(self.client, self._context)
 
     async def __aexit__(self, *_: object) -> None:
         await self.aclose()
@@ -184,9 +180,6 @@ class ChromeBrowser:
                 "Browser event listener failed; reconnect before continuing"
             ) from self._failure
 
-    async def emit(self, event: BrowserEvent | InputEvent) -> None:
-        await self._emit(replace(event, browser_id=self.id))
-
     async def _attach(self, target_id: str, *, opened: bool = False, opener_id: str = "") -> Tab:
         async with self._attach_lock:
             if target_id in self._tabs:
@@ -196,25 +189,21 @@ class ChromeBrowser:
             attached = await self.client.target.attach_to_target(target_id=target_id, flatten=True)
             cdp = self.client.session(attached.session_id)
             try:
-                await cdp.page.enable()
-                await cdp.runtime.enable()
-                options = self._options
-                if options.viewport:
-                    size = options.viewport
-                    await cdp.emulation.set_device_metrics_override(
-                        width=size.width,
-                        height=size.height,
-                        device_scale_factor=size.scale,
-                        mobile=False,
-                    )
-                tab = Tab(target_id, cdp, emit=self.emit, worlds=self._worlds)
+                await _enable_session(cdp, self._options.viewport)
+                tab = Tab(
+                    target_id,
+                    cdp,
+                    emit=self.events.emit,
+                    worlds=self._worlds,
+                    discover_frames=self._discover_frames,
+                )
                 await tab.sync_document()
                 if target_id in self._closed_targets:
                     raise BrowserError("Target closed while attaching")
                 self._tabs[target_id] = tab
                 self._sessions[attached.session_id] = target_id
                 if opened:
-                    await self.emit(
+                    await self.events.emit(
                         TabOpenedEvent(target_id=tab.id, url=tab.url, opener_id=opener_id)
                     )
                 if self._context is None:
@@ -257,23 +246,18 @@ class ChromeBrowser:
             )
         return tuple(found)
 
-    async def open_tab(self, url: str = "about:blank") -> Tab:
-        return await self._open_tab(validated_url(url))
+    async def open_tab(self, target: str | Path = "about:blank") -> Tab:
+        """Open a URL, or a local file that calling code has already vetted.
 
-    async def open_file(self, path: str) -> Tab:
-        if self.files is None:
-            raise BrowserError("A shared local file system must be configured for this browser")
-        resolved = self.files.resolve(path)
-        if not await asyncio.to_thread(resolved.is_file):
-            raise BrowserError(f"File not found: {path}")
-        return await self._open_tab(resolved.as_uri())
-
-    async def _open_tab(self, url: str) -> Tab:
+        Strings may come from the model and are limited to HTTP(S) and about:blank.
+        A `Path` opens as file:// without checks; resolve it through `files` first.
+        """
+        url = target.absolute().as_uri() if isinstance(target, Path) else validated_url(target)
         self._check()
         result = await self.client.target.create_target(url=url, browser_context_id=self._context)
         tab = await self._attach(result.target_id, opened=True)
         self._active = tab.id
-        await self.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
+        await self.events.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
         await tab.mouse.initialize_cursor()
         return tab
 
@@ -283,7 +267,7 @@ class ChromeBrowser:
         tab = await self._attach(target_id)
         await tab.bring_to_front()
         self._active = tab.id
-        await self.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
+        await self.events.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
         await tab.mouse.initialize_cursor()
         return tab
 
@@ -304,29 +288,21 @@ class ChromeBrowser:
             if tid == target_id:
                 self._sessions.pop(sid, None)
                 self._worlds.invalidate(session_id=sid)
-        self._frames_key, self._frames = None, ()
         if self._active == target_id:
             self._active = ""
         if tab is not None:
             tab.closed = True
-            await self.emit(TabClosedEvent(target_id=target_id))
+            await self.events.emit(TabClosedEvent(target_id=target_id))
 
-    async def frames(self, tab: Tab) -> tuple[Frame, ...]:
+    async def _discover_frames(self, tab: Tab) -> tuple[tuple[Frame, ...], tuple[str, ...]]:
         """Resolve each frame to its own session, including cross-process targets."""
         self._check()
-        key = (tab.id, tab.document_id, tab.input.action_id, tab.frame_revision)
-        if key[2] and self._frames_key == key:
-            return self._frames
         targets = await self._targets()
         live = {info.target_id for info in targets if info.type == "iframe"}
         for sid, target_id in tuple(self._sessions.items()):
             if target_id not in self._tabs and target_id not in live:
                 await self._detach(sid)
-        frames = await discover_frames(tab, targets, self._frame_session)
-        current = (tab.id, tab.document_id, tab.input.action_id, tab.frame_revision)
-        if key[2] and key == current:
-            self._frames_key, self._frames = key, frames
-        return frames
+        return await discover_frames(tab, targets, self._frame_session)
 
     async def _targets(self) -> tuple[TargetInfo, ...]:
         result = await self.client.target.get_targets()
@@ -344,62 +320,50 @@ class ChromeBrowser:
                 self._sessions[sid] = frame_id
                 assert self._stack is not None
                 self._stack.push_async_callback(self._detach, sid)
-                cdp = self.client.session(sid)
-                await cdp.page.enable()
-                await cdp.runtime.enable()
+                await _enable_session(self.client.session(sid))
             return self.client.session(sid)
 
     async def downloads(self) -> tuple[Download, ...]:
-        return tuple(self._downloads.values())
+        return self._downloads.all()
 
     async def publish_cursor(self) -> None:
         await self.active_tab.mouse.publish_cursor()
 
     def _start_listeners(self) -> None:
-        for event_type in (
-            FrameNavigatedEvent,
-            NavigatedWithinDocumentEvent,
-            JavascriptDialogOpeningEvent,
-            JavascriptDialogClosedEvent,
-            ExecutionContextDestroyedEvent,
-            ExecutionContextsClearedEvent,
-        ):
+        for event_type in _EVENTS:
             subscription = self.client.listen_all(event_type)
             self._tasks.append(
                 asyncio.create_task(
-                    self._consume(subscription, True), name=f"browserrig:{event_type.__name__}"
-                )
-            )
-        for event_type in (
-            TargetInfoChangedEvent,
-            TargetDestroyedEvent,
-            DownloadWillBeginEvent,
-            DownloadProgressEvent,
-        ):
-            subscription = self.client.listen(event_type)
-            self._tasks.append(
-                asyncio.create_task(
-                    self._consume(subscription, False), name=f"browserrig:{event_type.__name__}"
+                    self._consume(subscription), name=f"browserrig:{event_type.__name__}"
                 )
             )
 
-    async def _consume(self, subscription: Any, scoped: bool) -> None:
+    async def _consume(self, subscription: EventSubscription[ReceivedEvent[Any]]) -> None:
         try:
             async with subscription:
                 async for received in subscription:
-                    event = received.value if scoped else received
-                    target_id = self._sessions.get(received.session_id, "") if scoped else ""
-                    tab = self._tabs.get(target_id)
                     try:
-                        if scoped:
-                            self._invalidate_contexts(event, received.session_id)
-                        await self._dispatch(event, tab)
+                        await self._handle(received.value, received.session_id)
                     except Exception:  # pylint: disable=broad-exception-caught
                         # A target can disappear while its event is being handled.
-                        logger.exception("Browser event %s failed", type(event).__name__)
+                        logger.exception("Browser event %s failed", type(received.value).__name__)
         except Exception as error:  # pylint: disable=broad-exception-caught
             # Surface listener failures on the next browser operation.
             self._failure = error
+
+    async def _handle(self, event: Any, session_id: str | None) -> None:
+        if session_id is None:
+            match event:
+                case TargetInfoChangedEvent(target_info=info):
+                    await self._on_target_info(info)
+                case TargetDestroyedEvent(target_id=target_id):
+                    await self._forget(target_id)
+                case DownloadWillBeginEvent() | DownloadProgressEvent():
+                    await self._downloads.handle(event)
+            return
+        self._invalidate_contexts(event, session_id)
+        if tab := self._tabs.get(self._sessions.get(session_id, "")):
+            await tab.handle(event)
 
     def _invalidate_contexts(self, event: Any, session_id: str) -> None:
         match event:
@@ -410,119 +374,13 @@ class ChromeBrowser:
             case FrameNavigatedEvent(frame=frame):
                 self._worlds.invalidate(frame_id=frame.id)
                 for tab in self._tabs.values():
-                    tab.frame_revision += 1
+                    tab.invalidate_frames()
 
-    async def _dispatch(self, event: Any, tab: Tab | None) -> None:
-        handlers: dict[type, Callable[[Any, Tab | None], Awaitable[None]]] = {
-            FrameNavigatedEvent: self._on_frame_navigated,
-            NavigatedWithinDocumentEvent: self._on_within_document,
-            JavascriptDialogOpeningEvent: self._on_dialog_opened,
-            JavascriptDialogClosedEvent: self._on_dialog_closed,
-            TargetInfoChangedEvent: self._on_target_info,
-            TargetDestroyedEvent: self._on_target_destroyed,
-            DownloadWillBeginEvent: self._on_download_started,
-            DownloadProgressEvent: self._on_download_progress,
-        }
-        if handler := handlers.get(type(event)):
-            await handler(event, tab)
-
-    async def _on_frame_navigated(self, event: FrameNavigatedEvent, tab: Tab | None) -> None:
-        if tab is not None and not event.frame.parent_id:
-            tab.document_id, tab.url = event.frame.loader_id, event.frame.url
-            tab.changed.set()
-            await self.emit(
-                NavigationCommittedEvent(target_id=tab.id, document_id=tab.document_id, url=tab.url)
-            )
-
-    async def _on_within_document(
-        self, event: NavigatedWithinDocumentEvent, tab: Tab | None
-    ) -> None:
-        if tab is not None:
-            tab.url = event.url
-            tab.changed.set()
-            await self.emit(
-                NavigationCommittedEvent(target_id=tab.id, document_id=tab.document_id, url=tab.url)
-            )
-
-    async def _on_dialog_opened(self, event: JavascriptDialogOpeningEvent, tab: Tab | None) -> None:
-        if tab is not None:
-            tab.dialog = (str(event.type), event.message)
-            await self.emit(
-                DialogOpenedEvent(
-                    target_id=tab.id, kind=str(event.type), message=event.message[:1000]
-                )
-            )
-
-    async def _on_dialog_closed(self, event: JavascriptDialogClosedEvent, tab: Tab | None) -> None:
-        if tab is not None:
-            tab.dialog = None
-            await self.emit(DialogHandledEvent(target_id=tab.id, accepted=event.result))
-
-    async def _on_target_info(self, event: TargetInfoChangedEvent, _tab: Tab | None) -> None:
-        info = event.target_info
+    async def _on_target_info(self, info: TargetInfo) -> None:
         if known := self._tabs.get(info.target_id):
             known.url, known.title = info.url, info.title
         elif info.type == "page" and self._context and info.browser_context_id == self._context:
             await self._attach(info.target_id, opened=True, opener_id=info.opener_id or "")
-
-    async def _on_target_destroyed(self, event: TargetDestroyedEvent, _tab: Tab | None) -> None:
-        await self._forget(event.target_id)
-
-    async def _on_download_started(self, event: DownloadWillBeginEvent, _tab: Tab | None) -> None:
-        self._downloads[event.guid] = Download(
-            id=event.guid, url=event.url, filename=event.suggested_filename
-        )
-        await self.emit(
-            DownloadStartedEvent(
-                download_id=event.guid, filename=event.suggested_filename, url=event.url
-            )
-        )
-
-    async def _on_download_progress(self, event: DownloadProgressEvent, _tab: Tab | None) -> None:
-        if event.guid in self._downloads:
-            await self._download_progress(event)
-
-    async def _download_progress(self, event: DownloadProgressEvent) -> None:
-        guid = event.guid
-        previous = self._downloads[guid]
-        # Terminal CDP events can be repeated; never move an already completed file twice.
-        if previous.state != DownloadState.IN_PROGRESS:
-            return
-        path, error = event.file_path, None
-        if event.state == DownloadState.COMPLETED and self.files is not None:
-            try:
-                path = await asyncio.to_thread(
-                    self.files.complete_download, guid, previous.filename, path
-                )
-            except (OSError, ValueError) as failure:
-                # A single missing file must not stop browser event processing.
-                path, error = None, f"Downloaded file could not be saved: {failure}"
-        download = Download(
-            id=guid,
-            url=previous.url,
-            filename=previous.filename,
-            state=DownloadState(event.state),
-            received_bytes=int(event.received_bytes),
-            path=path,
-            error=error,
-        )
-        self._downloads[guid] = download
-        match download.state:
-            case DownloadState.COMPLETED:
-                if error is not None:
-                    await self.emit(DownloadFailedEvent(download_id=guid, reason=error))
-                    return
-                await self.emit(
-                    DownloadCompletedEvent(
-                        download_id=guid,
-                        filename=download.filename,
-                        size=download.received_bytes,
-                    )
-                )
-            case DownloadState.CANCELED:
-                await self.emit(
-                    DownloadFailedEvent(download_id=guid, reason="Download canceled by browser")
-                )
 
     async def _stop_listeners(self) -> None:
         for task in self._tasks:
@@ -545,4 +403,19 @@ class ChromeBrowser:
                     tab.closed = True
                 if self._connected:
                     self._connected = False
-                    await self.emit(DisconnectedEvent())
+                    await self.events.emit(DisconnectedEvent())
+
+
+async def _enable_session(cdp: CdpSession, viewport: Viewport | None = None) -> None:
+    """Enable the domains browserrig listens to, plus optional viewport emulation."""
+    steps = [cdp.page.enable(), cdp.runtime.enable()]
+    if viewport:
+        steps.append(
+            cdp.emulation.set_device_metrics_override(
+                width=viewport.width,
+                height=viewport.height,
+                device_scale_factor=viewport.scale,
+                mobile=False,
+            )
+        )
+    await asyncio.gather(*steps)

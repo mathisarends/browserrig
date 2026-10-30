@@ -4,7 +4,7 @@ from harnessed.events import TurnStartedEvent
 from browserrig.events import BROWSER_EVENTS, INPUT_EVENTS
 from browserrig.files import FileSystemOptions
 
-from .base import Browser
+from .base import Browser, BrowserEvents
 from .chrome import ChromeBrowser
 from .config import BrowserOptions, LaunchBrowser
 
@@ -24,6 +24,7 @@ class Chrome(Plugin, needs=(SessionLog,)):
             ChromeBrowser(self.options, file_system=self.file_system, emit=log.emit)
         )
         ctx.provide(Browser, browser)
+        ctx.provide(BrowserEvents, browser.events)
 
         async def publish_cursor(_event: TurnStartedEvent) -> None:
             # Live subscribers often attach after setup, so seed their animation at turn start.

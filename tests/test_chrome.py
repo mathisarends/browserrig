@@ -7,10 +7,18 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from cdpify import ReceivedEvent
+from cdpify.domains.browser import DownloadWillBeginEvent
+from cdpify.domains.page import JavascriptDialogOpeningEvent
 
 from browserrig import ChromeBrowser, ConnectBrowser
 from browserrig.browser.tab import Tab
-from browserrig.events import CursorStateEvent, DisconnectedEvent, TabClosedEvent, TabOpenedEvent
+from browserrig.events import (
+    DialogOpenedEvent,
+    DisconnectedEvent,
+    TabClosedEvent,
+    TabOpenedEvent,
+)
 
 
 class _Subscription:
@@ -69,21 +77,46 @@ def _browser():
 
 async def test_event_handler_failure_does_not_stop_subscription(monkeypatch, caplog):
     browser, _ = _browser()
-    dispatch = AsyncMock(side_effect=[RuntimeError("popup vanished"), None])
-    monkeypatch.setattr(browser, "_dispatch", dispatch)
-    await browser._consume(_Subscription(["first", "second"]), False)
-    assert dispatch.await_count == 2
+    handle = AsyncMock(side_effect=[RuntimeError("popup vanished"), None])
+    monkeypatch.setattr(browser, "_handle", handle)
+    items = [ReceivedEvent("first", None), ReceivedEvent("second", "session")]
+    await browser._consume(_Subscription(items))
+    assert handle.await_count == 2
     assert browser._failure is None
     assert "popup vanished" in caplog.text
+
+
+async def test_root_events_reach_downloads_and_session_events_reach_their_tab():
+    browser, events = _browser()
+    tab = await browser._attach("tab")
+    dialog = JavascriptDialogOpeningEvent(
+        url="about:blank",
+        frame_id="frame",
+        message="Sure?",
+        type="confirm",
+        has_browser_handler=False,
+    )
+    await browser._handle(dialog, "session")
+    await browser._handle(dialog, "unknown-session")
+    await browser._handle(
+        DownloadWillBeginEvent(
+            frame_id="frame", guid="id", url="https://example.org", suggested_filename="a.txt"
+        ),
+        None,
+    )
+    assert tab.dialog == ("confirm", "Sure?")
+    opened = [event for event in events if isinstance(event, DialogOpenedEvent)]
+    assert [(event.target_id, event.document_id) for event in opened] == [("tab", "doc")]
+    assert [download.id for download in await browser.downloads()] == ["id"]
 
 
 async def test_subscription_failure_is_fatal_but_cancellation_propagates():
     browser, _ = _browser()
     failure = RuntimeError("connection lost")
-    await browser._consume(_Subscription([], failure), False)
+    await browser._consume(_Subscription([], failure))
     assert browser._failure is failure
     with pytest.raises(asyncio.CancelledError):
-        await browser._consume(_Subscription([], asyncio.CancelledError()), False)
+        await browser._consume(_Subscription([], asyncio.CancelledError()))
 
 
 async def test_concurrent_attaches_publish_exactly_one_open_event():
@@ -124,24 +157,24 @@ async def test_failed_startup_does_not_emit_disconnected():
     assert not any(isinstance(event, DisconnectedEvent) for event in events)
 
 
-async def test_frame_cache_is_action_scoped_and_invalidated_by_geometry_and_document(monkeypatch):
+async def test_frame_cache_is_action_scoped_and_invalidated_by_layout_and_document(monkeypatch):
     browser, _ = _browser()
     tab = await browser._attach("tab")
     browser.client.target.get_targets.return_value = SimpleNamespace(target_infos=[])
-    discover = AsyncMock(return_value=())
+    discover = AsyncMock(return_value=((), ()))
     monkeypatch.setattr("browserrig.browser.chrome.discover_frames", discover)
     with tab.input.action("action"):
-        await browser.frames(tab)
-        await browser.frames(tab)
+        await tab.frames()
+        await tab.frames()
         assert discover.await_count == 1
-        await tab.emit(CursorStateEvent(x=1, y=2))
-        await browser.frames(tab)
+        tab.invalidate_frames()
+        await tab.frames()
         assert discover.await_count == 2
         tab.document_id = "another-document"
-        await browser.frames(tab)
+        await tab.frames()
         assert discover.await_count == 3
-    await browser.frames(tab)
-    await browser.frames(tab)
+    await tab.frames()
+    await tab.frames()
     assert discover.await_count == 5
 
 

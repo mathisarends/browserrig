@@ -50,7 +50,7 @@ from browserrig.scripts import PAGE_FACTS
 
 async with ChromeBrowser(LaunchBrowser(url="https://example.com")) as browser:
     tab = browser.active_tab
-    await wait_for_page(browser, tab)
+    await wait_for_page(tab)
     frame = await tab.main_frame()
     facts = await frame.run(PAGE_FACTS)
     print(facts.title)
@@ -365,7 +365,7 @@ focus and takes exactly one of `text` or `key`:
 `hold_control`, `hold_shift`, `hold_alt`, and `hold_meta` apply to `key`. All held
 modifiers are released after the key. Literal text uses `text` without modifier flags.
 
-In DOM mode, `FormTools` also supplies `type_text(ref=..., text=...)` to focus and
+In DOM mode, `KeyboardTools` also supplies `type_text(ref=..., text=...)` to focus and
 replace a referenced field. Use `clear=False` to type at its current selection.
 
 Keys and modifiers are released on failure or cancellation. Unicode text is
@@ -386,7 +386,7 @@ registers these frozen event types alongside its durable browser events:
 | `KeyPressedEvent` | Key, modifiers, duration |
 | `KeyboardVisibilityEvent` | Keyboard presentation opened or closed |
 | `ScrolledEvent` | Wheel origin, dispatched deltas, duration |
-| `ElementHighlightedEvent` | DOM reference and viewport bounds |
+| `HighlightElementEvent` | DOM reference and viewport bounds |
 | `WaitingEvent` | Requested wait duration |
 
 Coordinates use viewport CSS pixels; durations use seconds. Events carry
@@ -462,7 +462,8 @@ and writes. `switch_tab` returns to the original page. DOM uploads remain availa
 through `UploadTools.upload_files`, using absolute paths on the browser host.
 
 Direct Python callers can use `browser.files.read_file(path, page_number=2)` and
-`await browser.open_file(path)`. Filesystem methods are synchronous; use
+`await browser.open_tab(browser.files.resolve(path))`; `open_tab` opens a `Path`
+as a local file and only accepts HTTP(S) URLs as strings. Filesystem methods are synchronous; use
 `asyncio.to_thread` when processing files inside an async application.
 
 `LaunchBrowser(download_directory="ABSOLUTE_PATH_ON_BROWSER_HOST")` overrides the

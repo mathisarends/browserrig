@@ -7,9 +7,8 @@ from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Point
 from browserrig.core.kinds import ActionKind, DragMode
-from browserrig.core.modes import DomMode
 from browserrig.observation.models import Snapshot
-from browserrig.observation.plugin import Observe
+from browserrig.observation.plugin import Observe, has_dom_refs
 
 from .execution import Actions, Effect
 
@@ -28,9 +27,6 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
             "Observe again if the tab or document changes before pointing."
         ),
     )
-
-    def _dom_enabled(self) -> bool:
-        return isinstance(self._observe.mode, DomMode)
 
     @tool(description="Click screenshot coordinates; count=2 performs a native double click.")
     async def click_at(
@@ -101,7 +97,7 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
 
     # DOM mode deliberately also supports pointing at unreferenced screenshot regions.
     @tool(
-        enabled=_dom_enabled,
+        enabled=has_dom_refs,
         description="Click a current DOM ref; count=2 performs a native double click.",
     )
     async def click(
@@ -125,7 +121,7 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
         return await actions.run(kind=_click_kind(count), operation=click, expects_change=True)
 
     @tool(
-        enabled=_dom_enabled,
+        enabled=has_dom_refs,
         description=(
             "Drag between DOM refs, scrolling them into view first. Both endpoints must fit "
             "in the viewport together; native draggable sources use HTML5 DataTransfer."
@@ -140,7 +136,7 @@ class MouseTools(Plugin, needs=(Actions, Observe)):
         actions: Inject[Actions],
     ) -> str:
         async def drag(tab: Tab) -> Effect:
-            _, source = await self._observe.element(tab, source_ref)
+            source = (await self._observe.element(tab, source_ref)).element
             prepared = await actions.element_point(tab=tab, ref=source_ref)
             target = await actions.element_point(tab=tab, ref=target_ref)
             start = await actions.element_point(tab=tab, ref=source_ref, scroll=False)

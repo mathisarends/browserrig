@@ -14,8 +14,8 @@ async def main() -> None:
     args = parser.parse_args()
     async with ChromeBrowser(LaunchBrowser(url=args.url, headless=not args.headed)) as browser:
         tab = browser.active_tab
-        report = await wait_for_page(browser, tab)
-        snapshot = await capture(browser, tab, DomMode(), report)
+        report = await wait_for_page(tab)
+        snapshot = await capture(tab, DomMode(), report)
         print(render(snapshot))
 
 

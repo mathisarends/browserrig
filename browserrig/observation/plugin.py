@@ -18,8 +18,8 @@ from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
 from harnessed.models import ImagePart, ModelRequest, TextPart, User
 from pydantic import Field
 
-from browserrig.browser.base import Browser
-from browserrig.browser.tab import Frame, Tab
+from browserrig.browser.base import Browser, BrowserEvents
+from browserrig.browser.tab import Tab
 from browserrig.core.errors import StaleElement
 from browserrig.core.kinds import ReadinessPhase, ReadinessStatus
 from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
@@ -32,7 +32,8 @@ from browserrig.recording import Recording
 
 from .capture import capture
 from .content import extract_content
-from .models import Element, Snapshot
+from .handle import ElementHandle
+from .models import Snapshot
 from .render import render
 
 
@@ -43,10 +44,11 @@ class _State:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
-class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
+class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
     events = (ObservationCapturedEvent,)
     _state = PluginState(_State)
     _browser: Inject[Browser]
+    _events: Inject[BrowserEvents]
     _readiness: Inject[Readiness]
 
     def __init__(self, mode: ObservationMode | None = None) -> None:
@@ -126,9 +128,9 @@ class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
             mode = readiness.mode
             if isinstance(mode, DomMode) and screenshots is not None:
                 mode = mode.model_copy(update={"screenshots": screenshots})
-            snapshot = await capture(browser, selected, mode, report)
+            snapshot = await capture(selected, mode, report)
             self._state.snapshot = snapshot
-            await browser.emit(
+            await self._events.emit(
                 ObservationCapturedEvent(
                     observation_id=snapshot.id,
                     target_id=snapshot.tab_id,
@@ -142,15 +144,15 @@ class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
             )
             return snapshot
 
-    async def element(self, tab: Tab, ref: str) -> tuple[Frame, Element]:
+    async def element(self, tab: Tab, ref: str) -> ElementHandle:
         snapshot = self._state.snapshot
         await tab.sync_document()
         if snapshot is None or snapshot.tab_id != tab.id or snapshot.document_id != tab.document_id:
             raise StaleElement("Observation belongs to another tab or document; observe again")
         element = snapshot.element(ref)
-        for frame in await self._browser.frames(tab):
+        for frame in await tab.frames():
             if frame.id == element.frame_id:
-                return frame, element
+                return ElementHandle(frame, element, snapshot)
         raise StaleElement("Element frame no longer exists; observe again")
 
     @hook(PreStep)
@@ -179,7 +181,7 @@ class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
             )
         )
         if nudges is not None:
-            event.session.observe(await nudges.project(snapshot, self._browser))
+            event.session.observe(await nudges.project(snapshot))
         return await next_()
 
     @hook(PrepareRequest)
@@ -250,5 +252,10 @@ class Observe(Plugin, provides=True, needs=(Browser, Readiness)):
             report = await self._readiness.wait(tab)
             if report.status == ReadinessStatus.BLOCKED:
                 raise ToolError(report.reason)
-            content = await extract_content(self._browser, tab, max_chars=max_chars)
+            content = await extract_content(tab, max_chars=max_chars)
             return ToolResult(content.render())
+
+
+def has_dom_refs(observe: Inject[Observe]) -> bool:
+    """Tool gate: ref-based tools only work while observations carry DOM element refs."""
+    return isinstance(observe.mode, DomMode)

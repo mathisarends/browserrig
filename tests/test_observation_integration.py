@@ -47,8 +47,8 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
                 '<button><slot name=label></slot></button>';
         """,
         )
-        report = await wait_for_page(browser, tab)
-        state = await capture(browser, tab, DomMode(max_text_chars=12000), report)
+        report = await wait_for_page(tab)
+        state = await capture(tab, DomMode(max_text_chars=12000), report)
         names = [element.name for element in state.elements]
         for expected in ("Wrapped", "Check", "Listener only", "Switch", "Editor", "Closed shadow"):
             assert names.count(expected) == 1
@@ -74,9 +74,9 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
 async def test_marks_match_yaml_and_hidpi_screenshot_without_page_mutation(site, marks):
     async with ChromeBrowser(LaunchBrowser(url=site, viewport=Viewport(scale=2))) as browser:
         tab = browser.active_tab
-        report = await wait_for_page(browser, tab)
+        report = await wait_for_page(tab)
         before = await evaluate(tab, "document.documentElement.outerHTML")
-        state = await capture(browser, tab, DomMode(screenshots=True, marks=marks), report)
+        state = await capture(tab, DomMode(screenshots=True, marks=marks), report)
         assert await evaluate(tab, "document.documentElement.outerHTML") == before
         assert state.image is not None
         with Image.open(BytesIO(base64.b64decode(state.image))) as image:
@@ -88,7 +88,7 @@ async def test_marks_match_yaml_and_hidpi_screenshot_without_page_mutation(site,
         else:
             assert all("mark" not in e for e in entries)
         assert "never-echo-this" not in render(state)
-        fresh = await capture(browser, tab, DomMode(screenshots=True, marks=marks), report)
+        fresh = await capture(tab, DomMode(screenshots=True, marks=marks), report)
         assert fresh.fingerprint == state.fingerprint
         assert fresh.elements[0].ref != state.elements[0].ref
         with pytest.raises(BrowserError, match="STALE_ELEMENT"):
@@ -107,18 +107,18 @@ async def test_marks_match_yaml_and_hidpi_screenshot_without_page_mutation(site,
 async def test_limits_are_reported_and_checkbox_state_changes_fingerprint(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
-        report = await wait_for_page(browser, tab)
+        report = await wait_for_page(tab)
         await evaluate(
             tab, "document.body.innerHTML = '<label>Toggle<input type=checkbox></label>'"
         )
-        before = await capture(browser, tab, DomMode(screenshots=False), report)
+        before = await capture(tab, DomMode(screenshots=False), report)
         await evaluate(tab, "document.querySelector('input').checked = true")
-        after = await capture(browser, tab, DomMode(screenshots=False), report)
+        after = await capture(tab, DomMode(screenshots=False), report)
         assert before.fingerprint != after.fingerprint
         await evaluate(
             tab, "document.body.innerHTML = '<button>First</button><button>Second</button>'"
         )
-        limited = await capture(browser, tab, DomMode(max_elements=1, max_text_chars=2), report)
+        limited = await capture(tab, DomMode(max_elements=1, max_text_chars=2), report)
         assert len(limited.elements) == 1 and len(limited.text) <= 2
         assert any("truncated" in limitation for limitation in limited.limitations)
 
@@ -131,8 +131,8 @@ async def test_partially_covered_element_uses_exposed_hit_point(site):
             height:80px;
             background:white'></div>"""
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
-        report = await wait_for_page(browser, tab)
-        state = await capture(browser, tab, DomMode(screenshots=False), report)
+        report = await wait_for_page(tab)
+        state = await capture(tab, DomMode(screenshots=False), report)
         element = next(e for e in state.elements if e.name == "Partial")
         point = await (await tab.main_frame()).run(
             ELEMENT,

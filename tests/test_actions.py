@@ -19,9 +19,8 @@ def _actions():
     events = []
     tab = Tab("tab", SimpleNamespace())
     actions = SimpleNamespace(
-        browser=SimpleNamespace(
-            action_lock=asyncio.Lock(), active_tab=tab, emit=AsyncMock(side_effect=events.append)
-        ),
+        browser=SimpleNamespace(action_lock=asyncio.Lock(), active_tab=tab),
+        _events=SimpleNamespace(emit=AsyncMock(side_effect=events.append)),
         _prepare=AsyncMock(return_value=SimpleNamespace()),
     )
     actions._fail = lambda *args: Actions._fail(actions, *args)

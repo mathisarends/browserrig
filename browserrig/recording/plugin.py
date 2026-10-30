@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import hashlib
 import os
 from collections.abc import Callable
@@ -13,7 +12,7 @@ from harnessed import Context, Inject, Plugin, PluginState, SessionLog, hook
 from harnessed.events import AgentControlChangedEvent, ControlState
 
 from browserrig.activity.models import inference_only, project_intervals
-from browserrig.browser.base import Browser
+from browserrig.browser.base import Browser, BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError, RecordingError
 from browserrig.core.geometry import Geometry
@@ -50,10 +49,11 @@ class _State:
     lost_segments: list[RecordingSegmentLostEvent] = field(default_factory=list)
 
 
-class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
+class Recording(Plugin, needs=(Browser, BrowserEvents, SessionLog, Readiness), provides=True):
     events = RECORDING_EVENTS
     _state = PluginState(_State)
     _browser: Inject[Browser]
+    _events: Inject[BrowserEvents]
     _log: Inject[SessionLog]
 
     def __init__(self, options: RecordingOptions | None = None) -> None:
@@ -63,7 +63,7 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
     async def setup(self, ctx: Context) -> None:
         self._state.log_offset = len(self._log.events)
         self._state.directory = (
-            self.options.directory.resolve() / f"{self._log.id}-{self._browser.id[:12]}"
+            self.options.directory.resolve() / f"{self._log.id}-{self._events.browser_id[:12]}"
         )
         await asyncio.to_thread(self._state.directory.mkdir, parents=True, exist_ok=False)
         ctx.effect(self._finalize)
@@ -100,17 +100,16 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
                 await self._stop()
             try:
                 async with asyncio.timeout(self.options.timeout):
-                    result = await tab.cdp.page.start_screen_recording(
-                        audio=False,
+                    stream = await tab.screen.start(
                         max_width=self.options.max_width,
                         max_height=self.options.max_height,
                         frame_rate=self.options.frame_rate,
                     )
-                self._state.tab, self._state.stream = tab, result.stream
+                self._state.tab, self._state.stream = tab, stream
                 self._state.geometry = geometry
                 self._state.recording_id = uuid4().hex
                 self._state.started_at = monotonic()
-                await self._browser.emit(
+                await self._events.emit(
                     RecordingStartedEvent(
                         recording_id=self._state.recording_id,
                         target_id=tab.id,
@@ -125,20 +124,20 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
 
     async def _failed(self, reason: str) -> None:
         self._state.failed = True
-        await self._browser.emit(RecordingFailedEvent(reason=reason))
+        await self._events.emit(RecordingFailedEvent(reason=reason))
         if self.options.required:
             raise RecordingError(reason)
 
     async def _lost(self, tab: Tab, reason: str) -> None:
         event = RecordingSegmentLostEvent(
             recording_id=self._state.recording_id,
-            browser_id=self._browser.id,
+            browser_id=self._events.browser_id,
             reason=reason,
             target_id=tab.id,
             document_id=tab.document_id,
         )
         self._state.lost_segments.append(event)
-        await self._browser.emit(event)
+        await self._events.emit(event)
 
     @hook(TabClosedEvent)
     async def _on_tab_closed(self, event: TabClosedEvent) -> None:
@@ -161,9 +160,9 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
         handles = {stream} if stream else set()
         try:
             async with asyncio.timeout(self.options.timeout):
-                stopped = await tab.cdp.page.stop_screen_recording()
-                handles.add(stopped.stream)
-                checksum, size = await self._read_stream(tab, stopped.stream, partial)
+                stopped = await tab.screen.stop()
+                handles.add(stopped)
+                checksum, size = await self._read_stream(tab, stopped, partial)
                 extension, mime = _container(await asyncio.to_thread(_header, partial))
                 target = partial.with_suffix(extension)
                 await asyncio.to_thread(partial.replace, target)
@@ -179,7 +178,7 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
                     geometry=self._state.geometry,
                 )
                 self._state.segments.append(segment)
-                await self._browser.emit(
+                await self._events.emit(
                     RecordingSegmentClosedEvent(
                         recording_id=segment.id,
                         path=str(target),
@@ -202,7 +201,7 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
             for handle in handles:
                 with suppress(Exception):
                     async with asyncio.timeout(5):
-                        await tab.cdp.io.close(handle=handle)
+                        await tab.screen.close(handle)
 
     async def _read_stream(self, tab: Tab, stream: str, partial: Path) -> tuple[str, int]:
         digest, size = hashlib.sha256(), 0
@@ -210,18 +209,13 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
         output = partial.open("xb")
         try:
             while True:
-                chunk = await tab.cdp.io.read(handle=stream, size=64 * 1024)
-                data = (
-                    base64.b64decode(chunk.data, validate=True)
-                    if chunk.base64_encoded
-                    else chunk.data.encode("utf-8")
-                )
+                data, eof = await tab.screen.read(stream)
                 size += len(data)
                 if size > self.options.max_bytes:
                     raise RecordingError("Native recording exceeds max_bytes")
                 digest.update(data)
                 await _disk(output.write, data)
-                if chunk.eof:
+                if eof:
                     break
             await _disk(output.flush)
             await _disk(os.fsync, output.fileno())
@@ -248,7 +242,7 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
             assert self._state.directory is not None
             intervals = project_intervals(self._log.events[self._state.log_offset :])
             payload = RecordingManifest(
-                browser_id=self._browser.id,
+                browser_id=self._events.browser_id,
                 segments=tuple(self._state.segments),
                 failed=self._state.failed,
                 lost_segments=tuple(self._state.lost_segments),
@@ -257,7 +251,7 @@ class Recording(Plugin, needs=(Browser, SessionLog, Readiness), provides=True):
             )
             manifest = self._state.directory / "manifest.json"
             await asyncio.to_thread(_write_manifest, manifest, payload)
-            await self._browser.emit(RecordingFinishedEvent(manifest=str(manifest)))
+            await self._events.emit(RecordingFinishedEvent(manifest=str(manifest)))
 
 
 async def _disk[**P, R](function: Callable[P, R], *arguments: P.args, **kwargs: P.kwargs) -> R:

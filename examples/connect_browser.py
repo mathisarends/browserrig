@@ -19,7 +19,7 @@ async def main() -> None:
     options = ConnectBrowser(endpoint=args.endpoint, target_id=args.target_id, url=args.url)
     async with ChromeBrowser(options) as browser:
         tab = browser.active_tab
-        await wait_for_page(browser, tab)
+        await wait_for_page(tab)
         print((await (await tab.main_frame()).run(PAGE_FACTS)).title)
         print(await browser.tabs())
     # This disconnects our client. The external Chrome process remains alive.

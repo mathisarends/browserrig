@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import Callable
+from pathlib import Path
 from typing import Annotated
 
 import yaml
@@ -10,7 +11,7 @@ from pydantic import Field
 from browserrig.browser.base import Browser
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
-from browserrig.core.kinds import ActionKind, ElementOperation, ReadinessPhase
+from browserrig.core.kinds import ActionKind, ReadinessPhase
 from browserrig.files import (
     FileContent,
     FileEntry,
@@ -20,7 +21,7 @@ from browserrig.files import (
     FileSystemView,
 )
 from browserrig.files.models import Download, DownloadState
-from browserrig.observation.plugin import Observe
+from browserrig.observation.plugin import Observe, has_dom_refs
 from browserrig.readiness.plugin import Readiness
 
 from .execution import Actions, Effect
@@ -131,7 +132,9 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
     async def open_file(self, path: str) -> str:
         files = self._files()
         resolved = await _file_call(lambda: files.resolve(path))
-        return await self._open(str(resolved))
+        if not await asyncio.to_thread(resolved.is_file):
+            raise ToolError(f"File not found: {path}")
+        return await self._open(resolved)
 
     @tool(
         enabled=_has_files,
@@ -148,9 +151,9 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
             raise ToolError(download.error or "Download has no accessible path; download it again")
         return await self.open_file(download.path)
 
-    async def _open(self, path: str) -> str:
+    async def _open(self, path: Path) -> str:
         async def open_file(_tab: Tab) -> Effect:
-            opened = await self._browser.open_file(path)
+            opened = await self._browser.open_tab(path)
             await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
             return Effect(f"Opened file in tab {opened.id}: {path}")
 
@@ -161,9 +164,10 @@ class UploadTools(Plugin, needs=(Actions, Observe)):
     _observe: Inject[Observe]
 
     @tool(
+        enabled=has_dom_refs,
         description=(
             "Set a file input using absolute paths on the browser host, not the client host."
-        )
+        ),
     )
     async def upload_files(
         self,
@@ -173,16 +177,13 @@ class UploadTools(Plugin, needs=(Actions, Observe)):
         actions: Inject[Actions],
     ) -> str:
         async def check(tab: Tab) -> None:
-            _, element = await self._observe.element(tab, ref)
-            if element.input_type != "file":
+            handle = await self._observe.element(tab, ref)
+            if handle.element.input_type != "file":
                 raise BrowserError("Target is not a file input")
 
         async def upload(tab: Tab) -> Effect:
-            frame, _ = await self._observe.element(tab, ref)
-            node = await actions.element_call(
-                tab=tab, ref=ref, operation=ElementOperation.NODE, by_value=False
-            )
-            await frame.upload_files(node.object_id, paths)
+            await actions.element_point(tab=tab, ref=ref)
+            await (await self._observe.element(tab, ref)).upload_files(paths)
             return Effect("Files assigned to input.")
 
         return await actions.run(

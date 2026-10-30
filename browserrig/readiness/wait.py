@@ -5,13 +5,14 @@ from uuid import uuid4
 
 from cdpify.exceptions import CDPCommandError
 
-from browserrig.browser.base import Browser
+from browserrig.browser.base import BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import ReadinessError
 from browserrig.core.geometry import Geometry
 from browserrig.core.kinds import ReadinessPhase, ReadinessStatus
 from browserrig.core.modes import CanvasMode, DomMode, ObservationMode
 from browserrig.events import (
+    BrowserEvent,
     ReadinessCancelledEvent,
     ReadinessDegradedEvent,
     ReadinessFailedEvent,
@@ -24,6 +25,10 @@ from .config import ReadinessOptions
 from .dom import DomReadiness
 from .models import ReadinessReport
 from .strategy import ReadinessStrategy
+
+
+async def _discard(_event: BrowserEvent) -> None:
+    pass
 
 
 def _readiness_strategy(
@@ -46,14 +51,15 @@ def _readiness_strategy(
 
 
 async def wait_for_page(
-    browser: Browser,
     tab: Tab,
     *,
+    events: BrowserEvents | None = None,
     mode: ObservationMode | None = None,
     options: ReadinessOptions | None = None,
     phase: ReadinessPhase = ReadinessPhase.INITIAL,
     geometry_cache: dict[tuple[str, str], Geometry] | None = None,
 ) -> ReadinessReport:
+    emit = events.emit if events is not None else _discard
     selected = mode or DomMode()
     options = options or ReadinessOptions()
     if geometry_cache is None:
@@ -63,7 +69,7 @@ async def wait_for_page(
     started = monotonic()
     rid = uuid4().hex
     strategy = _readiness_strategy(selected, tab, options, phase, geometry_cache)
-    await browser.emit(
+    await emit(
         ReadinessStartedEvent(
             readiness_id=rid,
             target_id=tab.id,
@@ -86,7 +92,7 @@ async def wait_for_page(
     except TimeoutError:
         status = strategy.timeout_status()
     except asyncio.CancelledError:
-        await browser.emit(
+        await emit(
             ReadinessCancelledEvent(
                 readiness_id=rid,
                 target_id=tab.id,
@@ -99,7 +105,7 @@ async def wait_for_page(
         )
         raise
     except Exception as error:
-        await browser.emit(
+        await emit(
             ReadinessFailedEvent(
                 readiness_id=rid,
                 target_id=tab.id,
@@ -129,7 +135,7 @@ async def wait_for_page(
             event_type = ReadinessDegradedEvent
         case _:
             event_type = ReadinessFailedEvent
-    await browser.emit(
+    await emit(
         event_type(
             readiness_id=rid,
             target_id=tab.id,

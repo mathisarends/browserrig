@@ -56,7 +56,7 @@ class EventKind(StrEnum):
     KEY_PRESSED = "browser.key.pressed"
     KEYBOARD_VISIBILITY = "browser.keyboard.visibility"
     SCROLLED = "browser.scrolled"
-    ELEMENT_HIGHLIGHTED = "browser.element.highlighted"
+    HIGHLIGHT_ELEMENT = "browser.element.highlight"
     WAITING = "browser.waiting"
 
 
@@ -143,14 +143,14 @@ class ScrolledEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class ElementHighlightedEvent(InputEvent):
+class HighlightElementEvent(InputEvent):
     ref: str
     x: float
     y: float
     width: float
     height: float
-    type: Literal[EventKind.ELEMENT_HIGHLIGHTED] = field(
-        default=EventKind.ELEMENT_HIGHLIGHTED, kw_only=True
+    type: Literal[EventKind.HIGHLIGHT_ELEMENT] = field(
+        default=EventKind.HIGHLIGHT_ELEMENT, kw_only=True
     )
 
 
@@ -481,6 +481,6 @@ INPUT_EVENTS = (
     KeyPressedEvent,
     KeyboardVisibilityEvent,
     ScrolledEvent,
-    ElementHighlightedEvent,
+    HighlightElementEvent,
     WaitingEvent,
 )

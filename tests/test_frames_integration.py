@@ -31,11 +31,11 @@ pytestmark = pytest.mark.integration
 async def test_frame_extraction_and_old_reference_is_rejected(site):
     async with ChromeBrowser(LaunchBrowser(url=site + "/frames")) as browser:
         tab = browser.active_tab
-        report = await wait_for_page(browser, tab)
-        snapshot = await capture(browser, tab, DomMode(), report)
+        report = await wait_for_page(tab)
+        snapshot = await capture(tab, DomMode(), report)
         inside = next(element for element in snapshot.elements if element.name == "Inside")
         assert inside.frame_id != (await tab.main_frame()).id
-        frame = next(frame for frame in await browser.frames(tab) if frame.id == inside.frame_id)
+        frame = next(frame for frame in await tab.frames() if frame.id == inside.frame_id)
         await frame.run(
             ELEMENT,
             ElementArgs(
@@ -140,7 +140,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
         assert len(receipts) == 2 and all(not event.result.is_error for event in receipts)
         browser, actions = holder["browser"], holder["actions"]
         entry = next(e for e in actions.observe.snapshot.elements if e.name == "Frame button")
-        frame, _ = await actions.observe.element(browser.active_tab, entry.ref)
+        frame = (await actions.observe.element(browser.active_tab, entry.ref)).frame
         assert await evaluate(frame, "document.querySelector('input').value") == "Across frames"
         assert await evaluate(frame, "document.body.dataset.clicked") == "true"
         if cross and not nested:
@@ -150,12 +150,12 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
 async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_discovered(site):
     async with ChromeBrowser(LaunchBrowser(url=site + "/frame-host")) as browser:
         tab = browser.active_tab
-        report = await wait_for_page(browser, tab)
-        before = await capture(browser, tab, DomMode(screenshots=False), report)
+        report = await wait_for_page(tab)
+        before = await capture(tab, DomMode(screenshots=False), report)
         assert all(e.tag != "iframe" for e in before.elements)
         entry = next(e for e in before.elements if e.name == "Frame button")
-        frame = next(frame for frame in await browser.frames(tab) if frame.id == entry.frame_id)
-        x, y = frame.projection.point(140, 80)
+        frame = next(frame for frame in await tab.frames() if frame.id == entry.frame_id)
+        x, y = frame.transform.to_viewport(140, 80)
         await frame.check_point(x, y)
         await evaluate(
             tab,
@@ -164,18 +164,18 @@ async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_d
         )
         with pytest.raises(BrowserError, match="ELEMENT_BLOCKED"):
             await frame.check_point(x, y)
-        covered = await capture(browser, tab, DomMode(screenshots=False), report)
+        covered = await capture(tab, DomMode(screenshots=False), report)
         assert not covered.elements
         await evaluate(
             tab,
             "document.body.lastElementChild.remove();document.querySelector('iframe').style.display='none'",
         )
-        assert len(await browser.frames(tab)) == 1
+        assert len(await tab.frames()) == 1
         await evaluate(
             tab, "document.querySelector('iframe').style.cssText='display:block;top:2000px'"
         )
-        assert len(await browser.frames(tab)) == 2
-        offscreen = await capture(browser, tab, DomMode(), report)
+        assert len(await tab.frames()) == 2
+        offscreen = await capture(tab, DomMode(), report)
         assert offscreen.elements and all(not element.in_viewport for element in offscreen.elements)
 
 
@@ -187,8 +187,8 @@ async def test_unrendered_sibling_does_not_discard_usable_frame(site):
             "document.body.insertAdjacentHTML('beforeend', "
             '\'<iframe style="display:none" src="/frame-leaf"></iframe>\')',
         )
-        report = await wait_for_page(browser, tab)
-        state = await capture(browser, tab, DomMode(screenshots=False), report)
+        report = await wait_for_page(tab)
+        state = await capture(tab, DomMode(screenshots=False), report)
         assert sum(e.name == "Frame button" for e in state.elements) == 1
         assert not state.limitations
 
@@ -202,7 +202,7 @@ async def test_detaching_sibling_retains_root_and_other_frame(site, monkeypatch)
             "'<button>Root button</button><iframe id=gone src=/frame-leaf "
             'style="left:750px"></iframe>\')',
         )
-        report = await wait_for_page(browser, tab)
+        report = await wait_for_page(tab)
         tree = (await tab.cdp.page.get_frame_tree()).frame_tree
         removed_id = tree.child_frames[1].frame.id
         original = type(tab.cdp.dom).get_frame_owner
@@ -213,7 +213,7 @@ async def test_detaching_sibling_retains_root_and_other_frame(site, monkeypatch)
             return await original(domain, frame_id=frame_id)
 
         monkeypatch.setattr(type(tab.cdp.dom), "get_frame_owner", detach_during_inspection)
-        state = await capture(browser, tab, DomMode(screenshots=False), report)
+        state = await capture(tab, DomMode(screenshots=False), report)
         assert {"Root button", "Frame button"} <= {e.name for e in state.elements}
         assert any(removed_id in limitation for limitation in state.limitations)
 
@@ -221,13 +221,13 @@ async def test_detaching_sibling_retains_root_and_other_frame(site, monkeypatch)
 async def test_dom_metadata_failure_keeps_native_controls(site, monkeypatch):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
-        report = await wait_for_page(browser, tab)
+        report = await wait_for_page(tab)
 
         async def unavailable(_domain, **_kwargs):
             raise CDPCommandError("DOMSnapshot.captureSnapshot", -32000, "unavailable")
 
         monkeypatch.setattr(type(tab.cdp.dom_snapshot), "capture_snapshot", unavailable)
-        state = await capture(browser, tab, DomMode(screenshots=False), report)
+        state = await capture(tab, DomMode(screenshots=False), report)
         assert any(e.name == "Email" for e in state.elements)
         assert any(e.name == "Shadow button" for e in state.elements)
         assert any("metadata unavailable" in limitation for limitation in state.limitations)
