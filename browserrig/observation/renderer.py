@@ -14,7 +14,6 @@ class Renderer(Protocol):
 
 @dataclass(frozen=True)
 class DomRenderer:
-    offscreen_elements: int = 40
     max_text_chars: int = 0
     marks: bool = True
 
@@ -24,8 +23,8 @@ class DomRenderer:
             "scroll position, then any open modal and alerts. Interactive elements follow, one "
             'per line as `[ref] role "name" states value=... -> link`, grouped under landmark '
             'headers like [MAIN] or [DIALOG: name] and form or menu groups like <form "Login">. '
-            "Headings (## Title) show where content sits. Elements in the viewport are listed "
-            "fully; elements above and below are summarized with the nearest ones listed. "
+            "Headings (## Title) show where content sits. Only the viewport is listed; scroll "
+            "to see more. "
             "A leading * marks elements that appeared since the previous observation. "
             "Elements covered by an overlay are counted, not listed; when a modal is open, "
             "act inside it first. Hidden and inert controls are omitted. "
@@ -66,7 +65,7 @@ class DomRenderer:
         )
 
     def render(self, snapshot: Snapshot) -> str:
-        return render(snapshot, offscreen=self.offscreen_elements)
+        return render(snapshot)
 
 
 @dataclass(frozen=True)
@@ -88,4 +87,4 @@ class CanvasRenderer:
         return None
 
     def render(self, snapshot: Snapshot) -> str:
-        return render(snapshot, offscreen=0)
+        return render(snapshot)

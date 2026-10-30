@@ -87,6 +87,7 @@ async def capture(
         tabs=tabs,
         text=page.text,
         elements=elements,
+        offscreen=page.offscreen,
         headings=page.headings,
         alerts=page.alerts,
         modal=page.modal,
@@ -250,9 +251,9 @@ def _mark_new(
 ) -> tuple[Element, ...]:
     if previous is None or previous.tab_id != tab_id or previous.document_id != document_id:
         return elements
-    if not previous.elements:
+    seen = {control.ref for control in (*previous.elements, *previous.offscreen)}
+    if not seen:
         return elements
-    seen = {element.ref for element in previous.elements}
     return tuple(
         element if element.ref in seen else element.model_copy(update={"new": True})
         for element in elements

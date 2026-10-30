@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 
 from browserrig.core.geometry import Bounds, FrameTransform
 
-from ..models import Canvas, Element, Heading, Modal
+from ..models import Canvas, Element, Heading, Modal, Offscreen
 from . import semantics
 from .document import Document, Rect, clean
 from .styles import Style
@@ -95,6 +95,7 @@ class FrameExtraction:
     elements: list[tuple[int, Element]] = field(default_factory=list)
     headings: list[tuple[int, Heading]] = field(default_factory=list)
     canvases: list[tuple[int, Canvas]] = field(default_factory=list)
+    offscreen: list[Offscreen] = field(default_factory=list)
     alerts: list[str] = field(default_factory=list)
     modal: tuple[int, Modal] | None = None
     text: str = ""
@@ -159,7 +160,7 @@ class _FrameExtractor:
         if modal is not None:
             self._modal = modal[1]
             result.modal = (modal[0], self._modal_view(modal[1]))
-        result.elements = self._elements()
+        result.elements, result.offscreen = self._elements()
         result.headings, result.alerts = self._headings_and_alerts()
         result.canvases = self._canvases({index for index, _ in result.elements})
         if text_limit > 0:
@@ -168,7 +169,12 @@ class _FrameExtractor:
 
     # Elements
 
-    def _elements(self) -> list[tuple[int, Element]]:
+    def _elements(self) -> tuple[list[tuple[int, Element]], list[Offscreen]]:
+        """Controls the viewport shows, and the identities of the rest.
+
+        Names, values and states are derived only for shown controls; that work dominates
+        extraction on long pages.
+        """
         document = self._document
         candidates: dict[int, bool] = {}
         placements: dict[int, tuple[Rect, Rect | None, bool]] = {}
@@ -190,13 +196,26 @@ class _FrameExtractor:
                 candidates[index] = semantic
                 placements[index] = placement
         proxies = self._label_proxies(labels, candidates, placements)
-        kept = self._deduplicate(candidates)
-        built = [(index, self._element(index, placements[index], None)) for index in kept]
-        built.extend(
-            (index, self._element(index, placements[index], control)) for index, control in proxies
-        )
+        kept: list[tuple[int, int | None]] = [
+            (index, None) for index in self._deduplicate(candidates)
+        ]
+        kept.extend(proxies)
+        built: list[tuple[int, Element]] = []
+        offscreen: list[Offscreen] = []
+        for index, control in kept:
+            if placements[index][1] is not None:
+                built.append((index, self._element(index, placements[index], control)))
+                continue
+            backend_id = document.backend_ids[index]
+            offscreen.append(
+                Offscreen.model_construct(
+                    ref=f"{self._prefix}{backend_id}",
+                    frame_id=self._frame_id,
+                    backend_id=backend_id,
+                )
+            )
         built.sort(key=lambda item: item[0])
-        return built
+        return built, offscreen
 
     def _candidate(self, index: int, tag: str) -> bool | None:
         """True for semantic controls, False for generic clickable boxes, None otherwise."""
@@ -418,8 +437,8 @@ class _FrameExtractor:
             text = clean(document.attributes(index).get("aria-label", "")) or document.text(
                 index, 120
             )
-            if text:
-                area = visible_area(document, index, rect, self._viewport)
+            area = visible_area(document, index, rect, self._viewport)
+            if text and area is not None and not self._occluded(index, area):
                 headings.append(
                     (
                         index,
@@ -427,7 +446,6 @@ class _FrameExtractor:
                             level=semantics.heading_level(document, index),
                             text=text,
                             frame_id=self._frame_id,
-                            in_viewport=area is not None and not self._occluded(index, area),
                             section=self._context(index)[0],
                         ),
                     )

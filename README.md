@@ -347,17 +347,12 @@ in viewport:
       [51] combobox "Country" options=[Germany*, France, Spain]
       *[57] checkbox "Save address" unchecked
     [60] button "Continue"
-
-below viewport: 14 elements (9 link, 3 button, 2 textbox)
-  headings: Payment · Order summary
-    [71] textbox "Card number"
 ```
 
-All rendered interactive elements on the loaded page are found, including controls
-below the fold and inside offscreen frames or scrollable containers. Elements
-outside the viewport are summarized, and the 40 nearest are listed individually
-(`DomMode(offscreen_elements=N)`). A leading `*` marks elements that were not in the
-previous observation of the same document. There is no default element-count limit;
+Only the elements and headings inside the viewport are listed and described; the
+header's scroll position says how much of the page lies above and below, and the
+agent scrolls to see more. A leading
+`*` marks elements that were not in the previous observation of the same document. There is no default element-count limit;
 `DomMode(max_elements=N)` keeps the elements nearest to the viewport and reports
 the truncation. Hidden, inert and fully clipped controls are omitted. Controls behind
 a positioned overlay are reported as covered and are not listed individually.

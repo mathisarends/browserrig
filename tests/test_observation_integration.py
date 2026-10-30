@@ -73,9 +73,7 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
         } & set(names)
         covered = next(element for element in state.elements if element.name == "Covered")
         assert covered.covered and not covered.in_viewport
-        assert not next(
-            element for element in state.elements if element.name == "Offscreen"
-        ).in_viewport
+        assert "Offscreen" not in names and state.offscreen
         assert next(element for element in state.elements if element.name == "Wrapped").in_viewport
         assert "Slotted label" in state.text and "Closed shadow" in state.text
         assert "Offscreen text" not in state.text

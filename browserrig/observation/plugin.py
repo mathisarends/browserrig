@@ -76,7 +76,6 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 renderer = DomRenderer() if capture.provides_dom_refs else CanvasRenderer()
             elif isinstance(self.mode, DomMode):
                 renderer = DomRenderer(
-                    offscreen_elements=self.mode.offscreen_elements,
                     max_text_chars=self.mode.max_text_chars,
                     marks=self.mode.marks,
                 )

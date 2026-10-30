@@ -17,7 +17,7 @@ from browserrig.browser.tab import Frame
 from browserrig.core.errors import BrowserError
 from browserrig.scripts import FOCUSED
 
-from ..models import Canvas, Element, Heading, Modal
+from ..models import Canvas, Element, Heading, Modal, Offscreen
 from .document import Document
 from .elements import FrameExtraction, extract_frame
 from .styles import STYLES
@@ -36,6 +36,7 @@ class Extraction:
     scroll_y: float
     page_height: float
     elements: tuple[Element, ...] = ()
+    offscreen: tuple[Offscreen, ...] = ()
     headings: tuple[Heading, ...] = ()
     alerts: tuple[str, ...] = ()
     modal: Modal | None = None
@@ -113,6 +114,9 @@ class _Assembler:
             scroll_y=document.scroll[1],
             page_height=document.content_height,
             elements=tuple(elements),
+            offscreen=tuple(
+                control for result in self._results.values() for control in result.offscreen
+            ),
             headings=tuple(headings),
             alerts=tuple(
                 dict.fromkeys(alert for result in self._results.values() for alert in result.alerts)

@@ -9,6 +9,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
 from browserrig import Actions, BrowserAgent, ChromeBrowser, DomMode, LaunchBrowser, wait_for_page
+from browserrig.core.errors import StaleElement
 from browserrig.events import ActionFinishedEvent
 from browserrig.observation.capture import capture
 from browserrig.observation.render import render
@@ -20,7 +21,7 @@ pytestmark = pytest.mark.integration
 _LINE = re.compile(r'^\s*\*?\[(?P<ref>[^\]]+)\] \S+ "(?P<name>[^"]*)"')
 
 
-async def test_all_rendered_controls_are_listed_with_explicit_viewport_flags(site):
+async def test_only_viewport_controls_are_described_and_the_rest_are_known(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(
@@ -33,12 +34,15 @@ async def test_all_rendered_controls_are_listed_with_explicit_viewport_flags(sit
         )
         report = await wait_for_page(tab)
         state = await capture(tab, DomMode(), report)
-        assert len(state.elements) == 300
-        assert any(element.in_viewport for element in state.elements)
-        assert not state.elements[-1].in_viewport
+        assert 0 < len(state.elements) < 300
+        assert all(element.in_viewport for element in state.elements)
+        assert len(state.elements) + len(state.offscreen) == 300
         assert not any("truncated" in item for item in state.limitations)
         rendered = render(state)
-        assert "below viewport:" in rendered and "page text:" not in rendered
+        assert '"Button 0"' in rendered and '"Button 299"' not in rendered
+        assert "below viewport" not in rendered and "page text:" not in rendered
+        with pytest.raises(StaleElement, match="outside the viewport"):
+            state.element(state.offscreen[-1].ref)
         assert await evaluate(tab, "scrollY") == 0
         visual = await capture(tab, DomMode(screenshots=True), report)
         assert visual.image is not None
@@ -51,14 +55,13 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
     holder = {}
     positions = []
     markup = """<style>body{margin:0;min-height:6000px}
-        form{position:absolute;top:1800px;left:40px;width:400px;height:220px}
-        label{display:block;margin:12px}#pinned{position:fixed;top:20px;right:20px}
-        #far{position:absolute;top:4000px;left:40px}</style>
+        form{position:absolute;top:calc(100vh - 36px);left:40px;width:400px;height:220px}
+        label{display:block;margin:12px}#pinned{position:fixed;top:20px;right:20px}</style>
         <form><label>Far field<input id=field></label>
         <label>Far choice<select id=choice aria-label='Far choice'>
             <option>One</option><option>Two</option></select></label>
         <label>Far date<input id=date type=date></label></form>
-        <button id=pinned>Pinned</button><button id=far>Far button</button>"""
+        <button id=pinned>Pinned</button>"""
 
     class Prepare(Plugin, needs=(Actions,)):
         async def setup(self, actions: Inject[Actions]):
@@ -87,7 +90,6 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
         ("select_option", "Far choice", {"value": "Two"}),
         ("set_date", "Far date", {"value": "2026-10-29"}),
         ("click", "Pinned", {}),
-        ("click", "Far button", {}),
     ]
 
     async def respond(request):
@@ -99,8 +101,6 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
             return
         name, label, arguments = calls[index]
         entry = _element(request, label)
-        if index == 0:
-            assert not entry["in_viewport"]
         yield ModelChunk(tool_call=ToolCall(name, {"ref": entry["ref"], **arguments}))
 
     agent = BrowserAgent(
@@ -110,7 +110,7 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
         plugins=[Prepare()],
     )
     async with agent.session() as session:
-        result = await session.run("Interact with offscreen and pinned controls", max_steps=6)
+        result = await session.run("Interact with edge and pinned controls", max_steps=5)
         assert result.text == "Done"
         _assert_tools_succeeded(result)
         tab = holder["actions"].browser.active_tab
@@ -120,26 +120,25 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
         wheels = await evaluate(tab, "wheels")
         clicks = await evaluate(tab, "clicks")
         assert len(wheels) > 6 and all(event["trusted"] for event in wheels)
-        assert [event["id"] for event in clicks] == ["pinned", "far"]
+        assert [event["id"] for event in clicks] == ["pinned"]
         assert all(event["trusted"] for event in clicks)
-        assert positions[1] > 1000
-        assert all(abs(position - positions[1]) < 1 for position in positions[2:5])
-        assert positions[-1] > 3000
+        assert positions[1] > 100
+        assert all(abs(position - positions[1]) < 1 for position in positions[2:])
         receipts = [event for event in result.events if isinstance(event, ActionFinishedEvent)]
-        assert len(receipts) == 5
-        assert receipts[-1].prepared_scroll
-        assert not receipts[-2].prepared_scroll
+        assert len(receipts) == 4
+        assert not receipts[-1].prepared_scroll
 
 
 @pytest.mark.parametrize("modal,horizontal_only", [(False, False), (True, False), (True, True)])
-async def test_offscreen_control_inside_vertical_and_horizontal_scroll_container(
+async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
     site, modal, horizontal_only
 ):
     holder = {}
     markup = """<style>body{margin:0;height:5000px}
-        #outer{position:absolute;top:1800px;left:50px;width:500px;height:300px;overflow:auto}
+        #outer{position:absolute;top:calc(100vh - 40px);left:50px;width:500px;height:300px;
+            overflow:auto}
         #inner{position:relative;width:1200px;height:1400px}
-        button{position:absolute;top:1100px;left:900px}</style>
+        button{position:absolute;top:20px;left:480px}</style>
         <div id=outer><div id=inner><button onclick='document.body.dataset.clicked=event.isTrusted'>
         Nested target</button></div></div>"""
 
@@ -157,6 +156,7 @@ async def test_offscreen_control_inside_vertical_and_horizontal_scroll_container
                     document.body.style.cssText = 'margin:0;height:100vh;overflow:hidden';
                     document.querySelector('#outer').style.cssText =
                         'position:fixed;top:100px;left:50px;width:500px;height:300px;overflow:auto';
+                    document.querySelector('button').style.top = '290px';
                 """,
                 )
             if horizontal_only:
@@ -164,7 +164,7 @@ async def test_offscreen_control_inside_vertical_and_horizontal_scroll_container
                     actions.browser.active_tab,
                     """
                     document.querySelector('#outer').style.overflowY = 'hidden';
-                    document.querySelector('button').style.top = '270px';
+                    document.querySelector('button').style.top = '100px';
                 """,
                 )
 
@@ -175,7 +175,6 @@ async def test_offscreen_control_inside_vertical_and_horizontal_scroll_container
         entry = _element(request, "Nested target")
         count += 1
         if count == 1:
-            assert not entry["in_viewport"]
             yield ModelChunk(tool_call=ToolCall("click", {"ref": entry["ref"]}))
         else:
             assert entry["in_viewport"]
@@ -188,24 +187,22 @@ async def test_offscreen_control_inside_vertical_and_horizontal_scroll_container
         plugins=[Prepare()],
     )
     async with agent.session() as session:
-        result = await session.run("Click the nested offscreen target", max_steps=2)
+        result = await session.run("Click the clipped nested target", max_steps=2)
         assert result.text == "Done"
         _assert_tools_succeeded(result)
         tab = holder["actions"].browser.active_tab
         assert await evaluate(tab, "document.body.dataset.clicked") == "true"
         inner_y = await evaluate(tab, "document.querySelector('#outer').scrollTop")
-        assert inner_y == 0 if horizontal_only else inner_y > 800
-        assert await evaluate(tab, "document.querySelector('#outer').scrollLeft") > 500
+        assert inner_y > 0 if modal and not horizontal_only else inner_y == 0
+        assert await evaluate(tab, "document.querySelector('#outer').scrollLeft") > 0
         scroll_y = await evaluate(tab, "scrollY")
-        assert scroll_y == 0 if modal else scroll_y > 1000
+        assert scroll_y == 0 if modal else scroll_y > 0
 
 
 @pytest.mark.parametrize(
     "cross_origin,oversized", [(False, False), (True, False), (False, True), (True, True)]
 )
-async def test_offscreen_frame_is_scrolled_into_view_before_interaction(
-    site, cross_origin, oversized
-):
+async def test_edge_frame_is_scrolled_into_view_before_interaction(site, cross_origin, oversized):
     holder = {}
 
     class Prepare(Plugin, needs=(Actions,)):
@@ -216,7 +213,7 @@ async def test_offscreen_frame_is_scrolled_into_view_before_interaction(
                 actions.browser.active_tab,
                 "document.body.style.height='5000px';"
                 "document.querySelector('iframe').style.cssText="
-                "'position:absolute;top:1800px;left:100px;width:600px;height:240px';"
+                "'position:absolute;top:calc(100vh - 80px);left:100px;width:600px;height:240px';"
                 "new Promise(resolve => {const frame=document.querySelector('iframe');"
                 "frame.addEventListener('load', () => resolve(), {once:true});"
                 f"frame.src={json.dumps(origin + '/frame-leaf')};" + "})",
@@ -229,13 +226,11 @@ async def test_offscreen_frame_is_scrolled_into_view_before_interaction(
                         'position:absolute;top:100px;left:0;width:100vw;height:2400px;border:0';
                 """,
                 )
+                height = await evaluate(actions.browser.active_tab, "innerHeight")
                 frames = await actions.browser.active_tab.frames()
                 child = next(frame for frame in frames if frame.parent is not None)
                 await evaluate(
-                    child,
-                    """
-                    document.querySelector('button').style.top='1800px';
-                """,
+                    child, f"document.querySelector('button').style.top='{height - 120}px'"
                 )
 
     count = 0
@@ -245,7 +240,6 @@ async def test_offscreen_frame_is_scrolled_into_view_before_interaction(
         entry = _element(request, "Frame button")
         count += 1
         if count == 1:
-            assert not entry["in_viewport"]
             yield ModelChunk(tool_call=ToolCall("click", {"ref": entry["ref"]}))
         else:
             assert entry["in_viewport"]
@@ -258,7 +252,7 @@ async def test_offscreen_frame_is_scrolled_into_view_before_interaction(
         plugins=[Prepare()],
     )
     async with agent.session() as session:
-        result = await session.run("Click the target in an offscreen frame", max_steps=2)
+        result = await session.run("Click the target in an edge frame", max_steps=2)
         assert result.text == "Done"
         _assert_tools_succeeded(result)
         actions = holder["actions"]
@@ -266,7 +260,7 @@ async def test_offscreen_frame_is_scrolled_into_view_before_interaction(
         element = next(el for el in actions.observe.snapshot.elements if el.name == "Frame button")
         frame = (await actions.observe.element(tab, element.ref)).frame
         assert await evaluate(frame, "document.body.dataset.clicked") == "true"
-        assert await evaluate(tab, "scrollY") > 1000
+        assert await evaluate(tab, "scrollY") > 0
 
 
 async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target(site):
@@ -278,7 +272,8 @@ async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target
             await evaluate(
                 actions.browser.active_tab,
                 """
-                document.body.innerHTML = '<button style="position:absolute;top:3000px" ' +
+                document.body.innerHTML =
+                    '<button style="position:absolute;top:calc(100vh - 6px)" ' +
                     'onclick="document.body.dataset.clicked=true">Unreached</button>';
                 document.body.style.height='5000px';
                 addEventListener('wheel', event => event.preventDefault(), {passive:false});

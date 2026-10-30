@@ -13,6 +13,7 @@ from browserrig.observation.models import (
     ElementFingerprint,
     Heading,
     Modal,
+    Offscreen,
     PageFingerprint,
     Snapshot,
 )
@@ -55,21 +56,11 @@ def test_render_lists_visible_elements_by_section_and_group_without_routing_data
     assert not any("internal-frame" in line for line in lines)
 
 
-def test_render_summarizes_offscreen_elements_and_reports_modal():
-    below = [
-        _element(
-            str(index),
-            index,
-            in_viewport=False,
-            bounds=Bounds(x=0, y=900 + index, width=10, height=10),
-        )
-        for index in range(5)
-    ]
-    snapshot = _snapshot(*below, modal=Modal(role="dialog", name="Cookies"))
-    text = render(snapshot, offscreen=2)
+def test_render_lists_only_the_viewport_and_reports_modal():
+    snapshot = _snapshot(_element("1", 0), modal=Modal(role="dialog", name="Cookies"))
+    text = render(snapshot)
     assert 'modal: dialog "Cookies" is open; interact with it first' in text
-    assert "below viewport: 5 elements (5 button)" in text
-    assert "[0] button" in text and "[1] button" in text and "[2] button" not in text
+    assert "[1] button" in text and "[2]" not in text and "below viewport" not in text
     assert "scroll 0 of 4000px (0.0 pages above, 4.0 below)" in text
 
 
@@ -119,8 +110,13 @@ def test_zoomed_geometry_maps_image_pixels_back_to_viewport():
 
 
 def test_unknown_ref_is_stale():
-    with pytest.raises(StaleElement):
+    with pytest.raises(StaleElement, match="Unknown"):
         _snapshot(_element("1", 0)).element("2")
+    offscreen = _snapshot(_element("1", 0)).model_copy(
+        update={"offscreen": (Offscreen(ref="2", frame_id="f", backend_id=2),)}
+    )
+    with pytest.raises(StaleElement, match="outside the viewport"):
+        offscreen.element("2")
 
 
 def test_fingerprint_changes_with_semantics_and_url():

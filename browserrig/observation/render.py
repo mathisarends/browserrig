@@ -18,18 +18,17 @@ _FLAGS = ("required", "readonly", "invalid", "focused", "draggable")
 _MAX_NAME = 100
 _MAX_HREF = 80
 _MAX_OPTIONS = 10
-_MAX_HEADINGS = 30
 _MAX_CANVASES = 10
 
 
-def render(snapshot: Snapshot, *, offscreen: int = 40) -> str:
-    """`offscreen` caps how many elements outside the viewport are listed individually."""
+def render(snapshot: Snapshot) -> str:
+    """Lists only what the viewport shows; the agent scrolls to see the rest."""
     lines = _header(snapshot)
     if snapshot.mode == ObservationKind.CANVAS:
         lines.append("Canvas observation: no element refs; point with image coordinates.")
     else:
         if snapshot.elements or snapshot.headings:
-            lines.extend(_body(snapshot, offscreen))
+            lines.extend(_body(snapshot))
         if snapshot.canvases:
             lines.extend(_canvases(snapshot.canvases))
     if snapshot.text:
@@ -79,41 +78,15 @@ def _header(snapshot: Snapshot) -> list[str]:
     return lines
 
 
-def _body(snapshot: Snapshot, offscreen: int) -> list[str]:
-    visible = [element for element in snapshot.elements if element.in_viewport]
-    covered = [element for element in snapshot.elements if element.covered]
-    hidden = [
-        element for element in snapshot.elements if not element.in_viewport and not element.covered
+def _body(snapshot: Snapshot) -> list[str]:
+    """Only what the viewport shows; the header's scroll position tells what lies beyond."""
+    items: list[Element | Heading] = [
+        *(element for element in snapshot.elements if element.in_viewport),
+        *(heading for heading in snapshot.headings if heading.in_viewport),
     ]
-    above = [element for element in hidden if _side(element, snapshot.height) < 0]
-    below = [element for element in hidden if _side(element, snapshot.height) > 0]
-    aside = [element for element in hidden if _side(element, snapshot.height) == 0]
-    listed = set(map(id, _nearest(hidden, snapshot.height, offscreen)))
-    url = snapshot.url
-    shown = [item.order for item in (*visible, *snapshot.headings) if item.in_viewport]
-    first, last = (min(shown), max(shown)) if shown else (-1, -1)
-
     lines = ["", "in viewport:"]
-    items: list[Element | Heading] = [*visible, *(h for h in snapshot.headings if h.in_viewport)]
-    lines.extend(_blocks(items, url) or ["  (no interactive elements)"])
-    for label, group in (("above viewport", above), ("below viewport", below)):
-        if not group:
-            continue
-        lines.extend(("", f"{label}: {_summary(group)}"))
-        headings = [
-            heading
-            for heading in snapshot.headings
-            if not heading.in_viewport
-            and (heading.order > last if label.startswith("below") else heading.order < first)
-        ]
-        if headings:
-            shown = " · ".join(_cut(heading.text, 60) for heading in headings[:_MAX_HEADINGS])
-            more = f" · …+{len(headings) - _MAX_HEADINGS}" if len(headings) > _MAX_HEADINGS else ""
-            lines.append(f"  headings: {shown}{more}")
-        lines.extend(_blocks([element for element in group if id(element) in listed], url))
-    if aside:
-        lines.extend(("", f"inside scrollable areas or beside the viewport: {_summary(aside)}"))
-        lines.extend(_blocks([element for element in aside if id(element) in listed], url))
+    lines.extend(_blocks(items, snapshot.url) or ["  (no interactive elements)"])
+    covered = [element for element in snapshot.elements if element.covered]
     if covered:
         lines.extend(("", f"covered by an overlay: {_summary(covered)}"))
     return lines
@@ -249,29 +222,6 @@ def _summary(elements: list[Element]) -> str:
     detail = ", ".join(f"{count} {role}" for role, count in counts.most_common(6))
     noun = "element" if len(elements) == 1 else "elements"
     return f"{len(elements)} {noun} ({detail})"
-
-
-def _nearest(elements: list[Element], height: float, limit: int) -> list[Element]:
-    def distance(element: Element) -> float:
-        if element.bounds is None:
-            return float("inf")
-        if element.bounds.y >= height:
-            return element.bounds.y - height
-        bottom = element.bounds.y + element.bounds.height
-        return -bottom if bottom <= 0 else abs(element.bounds.x)
-
-    return sorted(elements, key=distance)[: max(0, limit)]
-
-
-def _side(element: Element, height: float) -> int:
-    """-1 above the viewport, 1 below it, 0 beside it or inside a scroll container."""
-    if element.bounds is None:
-        return 0
-    if element.bounds.y >= height:
-        return 1
-    if element.bounds.y + element.bounds.height <= 0:
-        return -1
-    return 0
 
 
 def _tab(tab_id: str, title: str, current: bool) -> str:

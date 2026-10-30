@@ -58,6 +58,14 @@ class Element(Options):
     draggable: bool = False
 
 
+class Offscreen(Options):
+    """A control outside the viewport, known only by identity until it is scrolled in."""
+
+    ref: str
+    frame_id: str
+    backend_id: int
+
+
 class Heading(Options):
     level: int
     text: str
@@ -101,7 +109,9 @@ class Snapshot(Options):
     fingerprint: str
     tabs: tuple[TabInfo, ...] = ()
     text: str = ""
+    # Only controls the viewport shows are described; the rest are known by identity.
     elements: tuple[Element, ...] = ()
+    offscreen: tuple[Offscreen, ...] = Field(default=(), repr=False)
     headings: tuple[Heading, ...] = ()
     alerts: tuple[str, ...] = ()
     modal: Modal | None = None
@@ -116,6 +126,8 @@ class Snapshot(Options):
         for element in self.elements:
             if element.ref == ref:
                 return element
+        if any(control.ref == ref for control in self.offscreen):
+            raise StaleElement("Element is outside the viewport; scroll to it first")
         raise StaleElement("Unknown element reference; observe again")
 
 

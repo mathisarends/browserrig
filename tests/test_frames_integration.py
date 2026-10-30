@@ -167,7 +167,7 @@ async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_d
         )
         assert len(await tab.frames()) == 2
         offscreen = await capture(tab, DomMode(), report)
-        assert offscreen.elements and all(not element.in_viewport for element in offscreen.elements)
+        assert not offscreen.elements and offscreen.offscreen
 
 
 async def test_unrendered_sibling_does_not_discard_usable_frame(site):

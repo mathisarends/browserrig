@@ -23,7 +23,7 @@ from harnessed.testing import ScriptedModel, call
 from browserrig.core.kinds import ActionKind
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent, PageState
 from browserrig.observation.changes import decision_change
-from browserrig.observation.models import Element, Snapshot
+from browserrig.observation.models import Element, Offscreen, Snapshot
 from browserrig.tools import Actions, BrowserToolMetadata, browser_tool
 from browserrig.tools.execution import DomActionChains, Effect
 
@@ -43,7 +43,7 @@ def _element(**values):
 
 
 def test_probe_changes_ignore_values_cosmetic_text_ref_renaming_and_prepared_scroll():
-    before = _snapshot(elements=(_element(in_viewport=False),))
+    before = _snapshot(offscreen=(Offscreen(ref="first-ref", frame_id="frame", backend_id=10),))
     after = _snapshot(
         id="after",
         title="Cosmetic title",
