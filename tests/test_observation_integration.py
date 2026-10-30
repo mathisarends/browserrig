@@ -90,7 +90,12 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
         report = await wait_for_page(tab)
         before = await evaluate(tab, "document.documentElement.outerHTML")
         await browser.mouse.move_to(Point(x=700, y=200))
-        state = await capture(tab, DomMode(screenshots=True, marks=marks), report)
+        state = await capture(
+            tab,
+            DomMode(screenshots=True, marks=marks),
+            report,
+            cursor=browser.mouse.position,
+        )
         assert await evaluate(tab, "document.documentElement.outerHTML") == before
         assert state.image is not None
         with Image.open(BytesIO(base64.b64decode(state.image))) as image:
@@ -217,6 +222,7 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
             report,
             region=Region(x=100, y=150, width=400, height=200),
             zoom=2,
+            cursor=browser.mouse.position,
         )
         assert [canvas.bounds for canvas in state.canvases] == [
             Bounds(x=100, y=150, width=400, height=200)
