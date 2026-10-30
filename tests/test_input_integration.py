@@ -3,7 +3,6 @@ import io
 import json
 
 import pytest
-import yaml
 from harnessed import Inject, Plugin, PolicyDecision, ToolCall
 from harnessed.events import ModelRequestedEvent, ToolExecutionFinishedEvent
 from harnessed.models import ModelChunk
@@ -21,6 +20,7 @@ from browserrig import (
 )
 from browserrig.events import CursorMovedEvent, CursorStateEvent, InputEvent
 from tests.javascript import evaluate
+from tests.observations import latest
 
 pytestmark = pytest.mark.integration
 
@@ -194,11 +194,7 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
 
 
 def _ref(request, name):
-    state = next(
-        yaml.safe_load(message.text)
-        for message in reversed(request.messages)
-        if message.text.startswith("page:\n")
-    )
+    state = latest(request.messages)
     return next(element["ref"] for element in state["elements"] if element["name"] == name)
 
 

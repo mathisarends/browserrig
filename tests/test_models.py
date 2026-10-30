@@ -1,44 +1,104 @@
 import pytest
-import yaml
 from pydantic import ValidationError
 
 from browserrig.activity.models import TimeRange, inference_only
 from browserrig.browser.config import BrowserKind, ConnectBrowser, LaunchBrowser
+from browserrig.core.errors import StaleElement
+from browserrig.core.geometry import Bounds
 from browserrig.events import ActivityFinishedEvent
 from browserrig.kinds import ActivityKind, ActivityOutcome
-from browserrig.observation.models import Element, ElementFingerprint, PageFingerprint, Snapshot
-from browserrig.observation.render import SnapshotView, render
+from browserrig.observation.models import (
+    Element,
+    ElementFingerprint,
+    Heading,
+    Modal,
+    PageFingerprint,
+    Snapshot,
+)
+from browserrig.observation.render import render
 
 
-def test_yaml_projection_is_typed_and_omits_internal_routing():
-    snapshot = Snapshot(
+def _snapshot(*elements: Element, **fields) -> Snapshot:
+    return Snapshot(
         id="observation",
         tab_id="tab",
         document_id="document",
-        url="https://example.org",
-        title="A: title",
+        url="https://example.org/shop",
+        title="Shop",
         mode="dom",
         readiness="ready",
         width=1280,
         height=800,
         scroll_y=0,
+        page_height=4000,
         fingerprint="fingerprint",
-        elements=(
-            Element(
-                ref="obs:0",
-                frame_id="internal-frame",
-                index=42,
-                role="button",
-                name="!!python/object: surprise",
-                tag="button",
-            ),
+        elements=elements,
+        **fields,
+    )
+
+
+def _element(ref: str, order: int, **fields) -> Element:
+    defaults = {"frame_id": "internal-frame", "backend_id": 1, "role": "button", "tag": "button"}
+    return Element(ref=ref, order=order, name=fields.pop("name", ref), **(defaults | fields))
+
+
+def test_render_lists_visible_elements_by_section_and_group_without_routing_data():
+    snapshot = _snapshot(
+        _element(
+            "1", 0, role="link", tag="a", href="https://example.org/cart?x=1", section="HEADER"
+        ),
+        _element(
+            "2",
+            2,
+            role="textbox",
+            tag="input",
+            input_type="email",
+            name='Say "hi"',
+            required=True,
+            section="MAIN",
+            group='form "Login"',
+            new=True,
+        ),
+        _element("3", 3, role="checkbox", tag="input", checked=False, section="MAIN"),
+        headings=(
+            Heading(level=2, text="Login", frame_id="internal-frame", order=1, section="MAIN"),
         ),
     )
-    text = render(snapshot)
-    parsed = SnapshotView.model_validate(yaml.safe_load(text))
-    assert parsed.page.title == snapshot.title
-    assert "frame_id" not in text and "internal-frame" not in text and "index:" not in text
-    assert parsed.elements[0].name == snapshot.elements[0].name
+    lines = render(snapshot).splitlines()
+    body = lines[lines.index("in viewport:") + 1 :]
+    assert body == [
+        "  [HEADER]",
+        '    [1] link "1" -> /cart?x=1',
+        "  [MAIN]",
+        "    ## Login",
+        '    <form "Login">',
+        "      *[2] textbox[type=email] \"Say 'hi'\" required",
+        '    [3] checkbox "3" unchecked',
+    ]
+    assert not any("internal-frame" in line for line in lines)
+
+
+def test_render_summarizes_offscreen_elements_and_reports_modal():
+    below = [
+        _element(
+            str(index),
+            index,
+            in_viewport=False,
+            bounds=Bounds(x=0, y=900 + index, width=10, height=10),
+        )
+        for index in range(5)
+    ]
+    snapshot = _snapshot(*below, modal=Modal(role="dialog", name="Cookies"))
+    text = render(snapshot, offscreen=2)
+    assert 'modal: dialog "Cookies" is open; interact with it first' in text
+    assert "below viewport: 5 elements (5 button)" in text
+    assert "[0] button" in text and "[1] button" in text and "[2] button" not in text
+    assert "scroll 0 of 4000px (0.0 pages above, 4.0 below)" in text
+
+
+def test_unknown_ref_is_stale():
+    with pytest.raises(StaleElement):
+        _snapshot(_element("1", 0)).element("2")
 
 
 def test_fingerprint_changes_with_semantics_and_url():

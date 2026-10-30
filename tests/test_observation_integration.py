@@ -3,7 +3,6 @@ import json
 from io import BytesIO
 
 import pytest
-import yaml
 from PIL import Image
 
 from browserrig import ChromeBrowser, DomMode, LaunchBrowser, Viewport, wait_for_page
@@ -56,8 +55,9 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
             "Transparent ancestor",
             "Inert ancestor",
             "Clipped",
-            "Covered",
         } & set(names)
+        covered = next(element for element in state.elements if element.name == "Covered")
+        assert covered.covered and not covered.in_viewport
         assert not next(
             element for element in state.elements if element.name == "Offscreen"
         ).in_viewport
@@ -71,7 +71,7 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
 
 
 @pytest.mark.parametrize("marks", [False, True])
-async def test_marks_match_yaml_and_hidpi_screenshot_without_page_mutation(site, marks):
+async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site, marks):
     async with ChromeBrowser(LaunchBrowser(url=site, viewport=Viewport(scale=2))) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
@@ -81,25 +81,22 @@ async def test_marks_match_yaml_and_hidpi_screenshot_without_page_mutation(site,
         assert state.image is not None
         with Image.open(BytesIO(base64.b64decode(state.image))) as image:
             assert image.size == (state.width, state.height)
-        entries = yaml.safe_load(render(state))["elements"]
-        assert len({e["ref"] for e in entries}) == len(entries)
-        if marks:
-            assert [e["mark"] for e in entries] == list(range(len(entries)))
-        else:
-            assert all("mark" not in e for e in entries)
-        assert "never-echo-this" not in render(state)
-        fresh = await capture(tab, DomMode(screenshots=True, marks=marks), report)
+        refs = [element.ref for element in state.elements]
+        assert len(set(refs)) == len(refs)
+        rendered = render(state)
+        assert all(f"[{element.ref}]" in rendered for element in state.elements)
+        assert "never-echo-this" not in rendered
+        fresh = await capture(tab, DomMode(screenshots=True, marks=marks), report, previous=state)
         assert fresh.fingerprint == state.fingerprint
-        assert fresh.elements[0].ref != state.elements[0].ref
+        assert [element.ref for element in fresh.elements] == refs
+        assert not any(element.new for element in fresh.elements)
+        first = state.elements[0]
+        await evaluate(tab, "document.body.replaceChildren()")
         with pytest.raises(BrowserError, match="STALE_ELEMENT"):
-            await (await tab.main_frame()).run(
+            await (await tab.main_frame()).run_on_node(
+                first.backend_id,
                 ELEMENT,
-                ElementArgs(
-                    token=state.id,
-                    index=state.elements[0].index,
-                    operation=ElementOperation.POINT,
-                    value=False,
-                ),
+                ElementArgs(operation=ElementOperation.POINT, value=False),
                 user_gesture=True,
             )
 
@@ -134,11 +131,10 @@ async def test_partially_covered_element_uses_exposed_hit_point(site):
         report = await wait_for_page(tab)
         state = await capture(tab, DomMode(screenshots=False), report)
         element = next(e for e in state.elements if e.name == "Partial")
-        point = await (await tab.main_frame()).run(
+        point = await (await tab.main_frame()).run_on_node(
+            element.backend_id,
             ELEMENT,
-            ElementArgs(
-                token=state.id, index=element.index, operation=ElementOperation.POINT, value=False
-            ),
+            ElementArgs(operation=ElementOperation.POINT, value=False),
             user_gesture=True,
         )
         assert 20 <= point["x"] < 80

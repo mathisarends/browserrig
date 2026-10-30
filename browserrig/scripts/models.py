@@ -10,24 +10,13 @@ class ScriptArgs(Options):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
-class SnapshotArgs(ScriptArgs):
-    token: str
-    max_elements: int | None
-    max_text: int
-    clip: Bounds | None = None
-
-
 class ElementArgs(ScriptArgs):
-    token: str
-    index: int
     operation: ElementOperation
     value: str | bool | None = None
     clip: Bounds | None = None
 
 
 class ScrollArgs(ScriptArgs):
-    token: str
-    index: int
     clip: Bounds | None = None
 
 
@@ -88,26 +77,3 @@ class PageFacts(Options):
     width: float
     height: float
     scroll_y: float
-
-
-class ExtractedElement(Options):
-    index: int
-    in_viewport: bool
-    role: str
-    name: str
-    tag: str
-    input_type: str = ""
-    value: str | None = None
-    disabled: bool = False
-    checked: bool | None = None
-    draggable: bool = False
-    options: tuple[str, ...] = ()
-    bounds: Bounds
-    x: float
-    y: float
-
-
-class DOMExtraction(PageFacts):
-    text: str
-    elements: tuple[ExtractedElement, ...]
-    truncated: bool = False

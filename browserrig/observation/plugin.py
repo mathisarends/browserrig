@@ -59,36 +59,37 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
     def page_state(self) -> str:
         if isinstance(self.mode, CanvasMode):
             return (
-                "Use the latest browser YAML and canvas image as page state. "
+                "Use the latest browser observation and canvas image as page state. "
                 "Canvas observations contain no DOM element refs. Point using image pixel "
                 "coordinates; they are mapped to the captured region in the browser viewport. "
                 "File previews use a full-viewport image."
             )
         text = (
-            "Use the latest browser YAML and any accompanying image as page state. "
-            "DOM screenshot pixels equal viewport CSS pixels. "
-            "DOM observations contain page metadata and interactive elements, including "
-            "rendered controls below the fold. Each element's in_viewport flag reports "
-            "whether it is currently visible. Hidden and inert controls are omitted. "
+            "Each observation starts with the page title, URL, open tabs, viewport size and "
+            "scroll position, then any open modal and alerts. Interactive elements follow, one "
+            'per line as `[ref] role "name" states value=... -> link`, grouped under landmark '
+            'headers like [MAIN] or [DIALOG: name] and form or menu groups like <form "Login">. '
+            "Headings (## Title) show where content sits. Elements in the viewport are listed "
+            "fully; elements above and below are summarized with the nearest ones listed. "
+            "A leading * marks elements that appeared since the previous observation. "
+            "Elements covered by an overlay are counted, not listed; when a modal is open, "
+            "act inside it first. Hidden and inert controls are omitted. "
         )
         text += (
             "Observations include a bounded page-text excerpt. "
             if self.mode.max_text_chars
-            else "Observations omit page-text excerpts. "
+            else "Observations omit page-text excerpts; use extract_content to read the page. "
         )
         text += (
-            "Every observation includes a screenshot."
+            "Every observation includes a screenshot; its pixels equal viewport CSS pixels."
             if self.mode.screenshots
-            else "Screenshots are included only when requested."
+            else "Screenshots are included only when requested; their pixels equal viewport "
+            "CSS pixels."
         )
         if self.mode.marks:
             text += (
-                " In DOM screenshots, numbered labels and colored dashed borders identify "
-                "interactive elements. Match a screenshot number to the YAML element's mark, "
-                "then pass its complete ref to element tools. Never use a mark number as a ref. "
-                "Links are blue, buttons green, text inputs purple. Marks follow document "
-                "order within each frame, not pixel position, and can change after each "
-                "observation."
+                " In screenshots, each visible element is outlined with a colored dashed border "
+                "and labeled with its ref. Links are blue, buttons green, text inputs purple."
             )
         return text
 
@@ -97,9 +98,10 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         if isinstance(self.mode, CanvasMode):
             return None
         return (
-            "Element refs are valid only for the latest observation and its tab. Pass complete "
-            "refs to element tools, including type_text. Element interactions automatically "
-            "use wheel input to bring targets into view before acting."
+            "Pass the ref inside the brackets, such as 482 or f1:93, to element tools, including "
+            "type_text. Refs stay valid while the element stays in the same document and tab, "
+            "even across observations. Element interactions automatically use wheel input to "
+            "bring targets into view before acting."
         )
 
     trust = SystemSection(
@@ -128,7 +130,13 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             mode = readiness.mode
             if isinstance(mode, DomMode) and screenshots is not None:
                 mode = mode.model_copy(update={"screenshots": screenshots})
-            snapshot = await capture(selected, mode, report)
+            snapshot = await capture(
+                selected,
+                mode,
+                report,
+                tabs=tuple(await browser.tabs()),
+                previous=self._state.snapshot,
+            )
             self._state.snapshot = snapshot
             await self._events.emit(
                 ObservationCapturedEvent(
@@ -175,7 +183,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         event.session.observe(
             Observation(
                 source="browser",
-                full=render(snapshot),
+                full=self._render(snapshot),
                 summary=f"{snapshot.mode}: {snapshot.title} ({snapshot.url})",
                 refs=(snapshot.id,),
             )
@@ -213,9 +221,16 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         snapshot = await self.capture()
         if snapshot.image:
             return ToolResult(
-                (TextPart(render(snapshot)), ImagePart(f"data:image/png;base64,{snapshot.image}"))
+                (
+                    TextPart(self._render(snapshot)),
+                    ImagePart(f"data:image/png;base64,{snapshot.image}"),
+                )
             )
-        return ToolResult(render(snapshot))
+        return ToolResult(self._render(snapshot))
+
+    def _render(self, snapshot: Snapshot) -> str:
+        offscreen = self.mode.offscreen_elements if isinstance(self.mode, DomMode) else 0
+        return render(snapshot, offscreen=offscreen)
 
     @tool(
         readonly=True,

@@ -88,11 +88,10 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
         ):
             assert excluded not in text
         button = next(element for element in snapshot.elements if element.name == "Continue")
-        await (await tab.main_frame()).run(
+        await (await tab.main_frame()).run_on_node(
+            button.backend_id,
             ELEMENT,
-            ElementArgs(
-                token=snapshot.id, index=button.index, operation=ElementOperation.POINT, value=False
-            ),
+            ElementArgs(operation=ElementOperation.POINT, value=False),
             user_gesture=True,
         )
 

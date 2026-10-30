@@ -1,29 +1,71 @@
 import hashlib
+from typing import Literal
 
 from pydantic import Field
 
+from browserrig.browser.models import TabInfo
 from browserrig.core.errors import StaleElement
 from browserrig.core.geometry import Bounds, Geometry
 from browserrig.core.kinds import ObservationKind, ReadinessStatus
 from browserrig.core.options import Options
 
+type Tristate = bool | Literal["mixed"] | None
+
+
+class Option(Options):
+    label: str
+    selected: bool = False
+    disabled: bool = False
+
 
 class Element(Options):
+    """One interactive element. `ref` stays valid while the element stays in its document."""
+
     ref: str
-    in_viewport: bool = True
-    mark: int | None = None
     frame_id: str
-    index: int
+    backend_id: int
+    order: int = 0
     role: str
     name: str
     tag: str
     input_type: str = ""
     value: str | None = None
-    disabled: bool = False
-    checked: bool | None = None
-    draggable: bool = False
-    options: tuple[str, ...] = ()
+    placeholder: str = ""
+    href: str = ""
+    options: tuple[Option, ...] = ()
+    section: str = ""
+    group: str = ""
+    in_viewport: bool = True
+    covered: bool = False
+    pinned: bool = False
+    new: bool = False
     bounds: Bounds | None = None
+    disabled: bool = False
+    checked: Tristate = None
+    selected: bool = False
+    expanded: bool | None = None
+    pressed: Tristate = None
+    required: bool = False
+    readonly: bool = False
+    invalid: bool = False
+    focused: bool = False
+    has_popup: str = ""
+    current: str = ""
+    draggable: bool = False
+
+
+class Heading(Options):
+    level: int
+    text: str
+    frame_id: str
+    order: int = 0
+    in_viewport: bool = True
+    section: str = ""
+
+
+class Modal(Options):
+    role: str
+    name: str
 
 
 class Snapshot(Options):
@@ -37,9 +79,14 @@ class Snapshot(Options):
     width: float
     height: float
     scroll_y: float
+    page_height: float = 0
     fingerprint: str
+    tabs: tuple[TabInfo, ...] = ()
     text: str = ""
     elements: tuple[Element, ...] = ()
+    headings: tuple[Heading, ...] = ()
+    alerts: tuple[str, ...] = ()
+    modal: Modal | None = None
     limitations: tuple[str, ...] = ()
     image: str | None = Field(default=None, repr=False)
     geometry: Geometry | None = None
@@ -48,7 +95,7 @@ class Snapshot(Options):
         for element in self.elements:
             if element.ref == ref:
                 return element
-        raise StaleElement("Unknown or expired element reference; observe again")
+        raise StaleElement("Unknown element reference; observe again")
 
 
 class ElementFingerprint(Options):
@@ -57,16 +104,21 @@ class ElementFingerprint(Options):
     in_viewport: bool = True
     value: str | None
     disabled: bool
-    checked: bool | None = None
+    checked: Tristate = None
+    expanded: bool | None = None
+    selected: bool = False
+    pressed: Tristate = None
 
 
 class PageFingerprint(Options):
-    """Typed comparison data; ephemeral element refs never affect equality."""
+    """Typed comparison data; element refs never affect equality."""
 
     url: str
     document_id: str
     text: tuple[str, ...]
     elements: tuple[ElementFingerprint, ...]
+    alerts: tuple[str, ...] = ()
+    modal: Modal | None = None
     scroll_y: float
     image_digest: str | None = None
 

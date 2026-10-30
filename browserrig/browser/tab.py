@@ -64,39 +64,46 @@ class Frame:
     async def frame_tree(self) -> FrameTree:
         return await _frame_tree(self.cdp)
 
-    async def upload_files(self, object_id: str, paths: list[str]) -> None:
+    async def upload_files(self, backend_node_id: int, paths: list[str]) -> None:
         try:
-            await self.cdp.dom.set_file_input_files(files=paths, object_id=object_id)
-        finally:
-            await self.cdp.runtime.release_object(object_id=object_id)
+            await self.cdp.dom.set_file_input_files(files=paths, backend_node_id=backend_node_id)
+        except CDPCommandError as error:
+            raise BrowserError("STALE_ELEMENT") from error
+
+    async def run_on_node[A: BaseModel, R](
+        self,
+        backend_node_id: int,
+        script: Script[A, R],
+        args: A | None = None,
+        *,
+        by_value: bool = True,
+        user_gesture: bool = False,
+    ) -> R:
+        """Run with one of this frame's DOM nodes as `this`, resolved by backend node id."""
+        return await self.worlds.run(
+            self.cdp,
+            self.id,
+            self.document_id,
+            lambda context: _call_on_node(
+                self.cdp,
+                backend_node_id,
+                script,
+                args,
+                context,
+                by_value=by_value,
+                user_gesture=user_gesture,
+            ),
+        )
 
     async def run_on_owner[A: BaseModel, R](self, script: Script[A, R], args: A | None = None) -> R:
         """Run with this frame's embedding element as `this`, using the same error policy."""
         assert self.parent is not None and self.owner_id is not None
-        parent = self.parent
-        return await parent.worlds.run(
-            parent.cdp,
-            parent.id,
-            parent.document_id,
-            lambda context: self._owner_call(script, args, context),
-        )
-
-    async def _owner_call[A: BaseModel, R](
-        self, script: Script[A, R], args: A | None, context: int
-    ) -> R:
-        assert self.parent is not None and self.owner_id is not None
-        cdp = self.parent.cdp
-        resolved = await cdp.dom.resolve_node(
-            backend_node_id=self.owner_id, execution_context_id=context
-        )
-        object_id = resolved.object.object_id
-        if object_id is None:
-            raise BrowserError("Element frame no longer exists; observe again")
         try:
-            return await _call(cdp, script, args, object_id=object_id)
-        finally:
-            with suppress(CDPCommandError):
-                await cdp.runtime.release_object(object_id=object_id)
+            return await self.parent.run_on_node(self.owner_id, script, args)
+        except BrowserError as error:
+            if str(error) == "STALE_ELEMENT":
+                raise BrowserError("Element frame no longer exists; observe again") from error
+            raise
 
     async def check_point(self, x: float, y: float) -> None:
         """A child hit test cannot see blockers in ancestor documents."""
@@ -333,6 +340,34 @@ def validated_url(url: str) -> str:
     if url == "about:blank" or (parsed.scheme in {"http", "https"} and parsed.hostname):
         return url
     raise BrowserError("Navigation requires an HTTP(S) URL or about:blank")
+
+
+async def _call_on_node[A: BaseModel, R](
+    cdp: CdpSession,
+    backend_node_id: int,
+    script: Script[A, R],
+    args: A | None,
+    context: int,
+    *,
+    by_value: bool,
+    user_gesture: bool,
+) -> Any:
+    try:
+        resolved = await cdp.dom.resolve_node(
+            backend_node_id=backend_node_id, execution_context_id=context
+        )
+    except CDPCommandError as error:
+        raise BrowserError("STALE_ELEMENT") from error
+    object_id = resolved.object.object_id
+    if object_id is None:
+        raise BrowserError("STALE_ELEMENT")
+    try:
+        return await _call(
+            cdp, script, args, object_id=object_id, by_value=by_value, user_gesture=user_gesture
+        )
+    finally:
+        with suppress(CDPCommandError):
+            await cdp.runtime.release_object(object_id=object_id)
 
 
 async def _call[A: BaseModel, R](

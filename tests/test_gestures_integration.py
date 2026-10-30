@@ -1,5 +1,4 @@
 import pytest
-import yaml
 from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
 from harnessed.events import ToolExecutionFinishedEvent
 from harnessed.models import ModelChunk
@@ -8,6 +7,7 @@ from harnessed.testing import CallbackModel
 
 from browserrig import Browser, LaunchBrowser, browser_plugins
 from browserrig.kinds import DragMode
+from tests.observations import latest
 
 pytestmark = pytest.mark.integration
 
@@ -23,14 +23,7 @@ async def _perform(site, name, arguments):
     async def respond(request):
         nonlocal count
         if count == 0:
-            state = next(
-                (
-                    yaml.safe_load(msg.text)
-                    for msg in reversed(request.messages)
-                    if msg.text.startswith("page:\n")
-                ),
-                None,
-            )
+            state = latest(request.messages)
             assert state is not None
             count += 1
             yield ModelChunk(tool_call=ToolCall(name, arguments(state)))

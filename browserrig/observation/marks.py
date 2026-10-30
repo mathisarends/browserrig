@@ -35,7 +35,7 @@ _COLORS = {
 
 
 def annotate(image: str, elements: tuple[Element, ...], viewport: Bounds) -> str:
-    """Draw observation-local marks without inserting an overlay into the page."""
+    """Label visible elements with their refs without inserting an overlay into the page."""
     with Image.open(BytesIO(base64.b64decode(image))) as source:
         # Keep screenshot pixels and viewport CSS coordinates identical, including on HiDPI.
         canvas = source.convert("RGB").resize(
@@ -45,14 +45,14 @@ def annotate(image: str, elements: tuple[Element, ...], viewport: Bounds) -> str
     font = ImageFont.load_default(size=14)
     labels: list[Bounds] = []
     for element in elements:
-        if element.mark is None or element.bounds is None:
+        if not element.in_viewport or element.bounds is None:
             continue
         bounds = element.bounds.intersect(viewport)
         if bounds.width <= 0 or bounds.height <= 0:
             continue
         color = _COLORS.get(element.role, _Color.GRAY)
         _border(draw, bounds, color)
-        label = str(element.mark)
+        label = element.ref
         left, top, right, bottom = draw.textbbox((0, 0), label, font=font)
         width, height = right - left + 8, bottom - top + 4
         x = min(max(0, bounds.x), max(0, canvas.width - width))

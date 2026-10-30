@@ -17,7 +17,6 @@ from .models import (
     CanvasProbe,
     ContentArgs,
     ContentExtraction,
-    DOMExtraction,
     DOMProbe,
     ElementArgs,
     OwnerHitsArgs,
@@ -27,7 +26,6 @@ from .models import (
     ScrollArgs,
     ScrollPlan,
     SeedArgs,
-    SnapshotArgs,
 )
 
 
@@ -68,9 +66,6 @@ class Script[A: BaseModel, R]:
         return cls(name, main, arguments, adapter.validate_python)
 
 
-SNAPSHOT: Script[SnapshotArgs, DOMExtraction] = Script.load(
-    "snapshot", SnapshotArgs, DOMExtraction, uses=("geometry", "composed", "visibility", "hit")
-)
 ELEMENT: Script[ElementArgs, Any] = Script.load(
     "element", ElementArgs, Any, uses=("geometry", "composed", "visibility", "hit", "elements")
 )
@@ -92,6 +87,7 @@ CANVAS: Script[CanvasArgs, CanvasProbe] = Script.load(
 STABILITY: Script[ScriptArgs, DOMProbe] = Script.load("stability", ScriptArgs, DOMProbe)
 SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))
 RESET: Script[ScriptArgs, None] = Script.load("reset", ScriptArgs, type(None))
+FOCUSED: Script[ScriptArgs, Any] = Script.load("focused", ScriptArgs, Any)
 PAGE_FACTS: Script[ScriptArgs, PageFacts] = Script.load("page_facts", ScriptArgs, PageFacts)
 VIEWPORT: Script[ScriptArgs, tuple[float, float]] = Script.load(
     "viewport", ScriptArgs, tuple[float, float]

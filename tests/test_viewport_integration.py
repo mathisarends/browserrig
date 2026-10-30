@@ -1,7 +1,7 @@
 import json
+import re
 
 import pytest
-import yaml
 from harnessed import Inject, Plugin, PolicyDecision, ToolCall
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.models import ModelChunk
@@ -17,16 +17,28 @@ from tests.javascript import evaluate
 pytestmark = pytest.mark.integration
 
 
+_LINE = re.compile(r'^\s*\*?\[(?P<ref>[^\]]+)\] \S+ "(?P<name>[^"]*)"')
+
+
 def _state(request):
-    return next(
-        yaml.safe_load(message.text)
+    text = next(
+        message.text
         for message in reversed(request.messages)
-        if message.text.startswith("page:\n")
+        if message.text.startswith("# ") and "\nurl: " in message.text
     )
+    elements = []
+    in_viewport = False
+    for line in text.splitlines():
+        if not line.startswith(" "):
+            in_viewport = line == "in viewport:"
+        match = _LINE.match(line)
+        if match:
+            elements.append({**match.groupdict(), "in_viewport": in_viewport})
+    return elements
 
 
 def _element(request, name):
-    elements = _state(request)["elements"]
+    elements = _state(request)
     entry = next((item for item in elements if item["name"] == name), None)
     assert entry is not None, [item["name"] for item in elements]
     return entry
@@ -56,12 +68,11 @@ async def test_all_rendered_controls_are_listed_with_explicit_viewport_flags(sit
         assert any(element.in_viewport for element in state.elements)
         assert not state.elements[-1].in_viewport
         assert not any("truncated" in item for item in state.limitations)
-        entries = yaml.safe_load(render(state))["elements"]
-        assert all(isinstance(entry["in_viewport"], bool) for entry in entries)
-        assert "text" not in yaml.safe_load(render(state))
+        rendered = render(state)
+        assert "below viewport:" in rendered and "page text:" not in rendered
         assert await evaluate(tab, "scrollY") == 0
         visual = await capture(tab, DomMode(screenshots=True), report)
-        assert all((element.mark is not None) == element.in_viewport for element in visual.elements)
+        assert visual.image is not None
         limited = await capture(tab, DomMode(max_elements=10), report)
         assert len(limited.elements) == 10
         assert any("truncated" in item for item in limited.limitations)

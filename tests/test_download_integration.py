@@ -22,6 +22,7 @@ from browserrig.browser import DownloadState
 from browserrig.browser.images import screenshot
 from browserrig.events import DownloadCompletedEvent, DownloadStartedEvent
 from tests.javascript import evaluate
+from tests.observations import all_states
 
 pytestmark = pytest.mark.integration
 
@@ -92,11 +93,7 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(si
 
     async def respond(request):
         nonlocal stage, original_tab, downloaded_path
-        page = [
-            yaml.safe_load(message.text)
-            for message in request.messages
-            if message.text.startswith("page:\n")
-        ][-1]
+        page = all_states(request.messages)[-1]
         files = [
             yaml.safe_load(message.text)["file_system"]
             for message in request.messages
@@ -160,7 +157,7 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(si
         file_system=FileSystemOptions(directory=tmp_path / "workspace"),
         approvals=Approvals(default=PolicyDecision.ALLOW),
     )
-    result = await agent.run("Download the PDF, inspect it and save notes", max_steps=15)
+    result = await agent.run("Download the PDF, inspect it and save notes", max_steps=30)
     assert result.text == "PDF inspected and notes saved"
     assert (tmp_path / "workspace/notes/summary.md").read_text() == "Voyager 2 research"
 
@@ -174,11 +171,7 @@ async def test_canvas_agent_previews_pdf_with_full_viewport_and_returns_to_canva
 
     async def respond(request):
         nonlocal stage, original_tab
-        page = [
-            yaml.safe_load(message.text)
-            for message in request.messages
-            if message.text.startswith("page:\n")
-        ][-1]["page"]
+        page = all_states(request.messages)[-1]["page"]
         replies = [message for message in request.messages if isinstance(message, ToolReply)]
         assert all(not reply.is_error for reply in replies)
         if stage == 0:

@@ -1,5 +1,5 @@
 /* global planScroll, resolveElement */
-function browserrigScroll({token, index, clip = null}) {
-  const el = resolveElement({token, index});
+function browserrigScroll({clip = null}) {
+  const el = resolveElement(this);
   return planScroll(el, {clip});
 }

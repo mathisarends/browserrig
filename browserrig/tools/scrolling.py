@@ -31,9 +31,7 @@ async def _plan(handle: ElementHandle) -> tuple[Frame, ScrollPlan] | None:
         if raw is not None:
             return parent, raw
     clip = frame.local_visible
-    raw = await frame.run(
-        SCROLL, ScrollArgs(token=handle.snapshot.id, index=handle.element.index, clip=clip)
-    )
+    raw = await handle.run(SCROLL, ScrollArgs(clip=clip))
     return (frame, raw) if raw is not None else None
 
 

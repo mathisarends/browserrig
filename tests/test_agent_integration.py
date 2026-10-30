@@ -1,5 +1,4 @@
 import pytest
-import yaml
 from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
 from harnessed.events import ModelRequestedEvent, ObservationForm, ObservationsIncludedEvent
 from harnessed.models import ImagePart, ModelChunk, ToolReply
@@ -24,6 +23,7 @@ from browserrig.events import (
     NudgeQueuedEvent,
     ObservationCapturedEvent,
 )
+from tests.observations import all_states, is_observation, latest, parse
 
 pytestmark = pytest.mark.integration
 
@@ -67,11 +67,7 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(site
         for part in message.content
     )
     for index, request in enumerate(model.requests):
-        states = [
-            yaml.safe_load(message.text)
-            for message in request.messages
-            if message.text.startswith("page:\n")
-        ]
+        states = all_states(request.messages)
         assert states and all("text" not in state for state in states)
         images = [
             message for message in request.messages if message.id.startswith("browser-image:")
@@ -80,25 +76,13 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(site
         if not images:
             continue
         assert any(isinstance(part, ImagePart) for part in images[0].content)
-        state = next(
-            yaml.safe_load(message.text)
-            for message in reversed(request.messages)
-            if message.text.startswith("page:\n")
-        )
-        assert [element["mark"] for element in state["elements"]] == list(
-            range(len(state["elements"]))
-        )
-        assert (
-            images[0]
-            .id.removeprefix("browser-image:")
-            .startswith(state["elements"][0]["ref"].split(":")[0])
-        )
+        assert latest(request.messages)["elements"]
     replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolReply)]
     assert len(replies) == 4
     assert all(not reply.is_error for reply in replies)
     assert all(isinstance(reply.content, str) for reply in replies)
-    assert isinstance(replies[1].content, str) and "page:" in replies[1].text
-    assert "text" not in yaml.safe_load(replies[1].text)
+    assert isinstance(replies[1].content, str) and is_observation(replies[1].text)
+    assert "text" not in parse(replies[1].text)
     assert isinstance(replies[2].content, str) and "# Test form" in replies[2].text
 
 
@@ -110,14 +94,7 @@ async def test_model_tools_yaml_and_activity(site):
         if count == 0:
             result = ToolCall("navigate", {"url": site})
         else:
-            state = next(
-                (
-                    yaml.safe_load(msg.text)
-                    for msg in reversed(request.messages)
-                    if msg.text.startswith("page:\n")
-                ),
-                None,
-            )
+            state = latest(request.messages)
             assert state is not None
             if count == 1:
                 email = next((el for el in state["elements"] if el.get("name") == "Email"), None)
@@ -196,14 +173,7 @@ async def test_no_progress_hint_is_derived_from_events(site):
         if count == 0:
             result = ToolCall("navigate", {"url": site})
         elif count == 1:
-            state = next(
-                (
-                    yaml.safe_load(msg.text)
-                    for msg in reversed(request.messages)
-                    if msg.text.startswith("page:\n")
-                ),
-                None,
-            )
+            state = latest(request.messages)
             assert state is not None
             element = next((el for el in state["elements"] if el.get("name") == "Nothing"), None)
             assert element is not None

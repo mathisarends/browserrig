@@ -47,7 +47,8 @@ include = ["browserrig", "examples", "tests", "README.md",
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = "--import-mode=importlib"
+# Integration tests start Chrome; run them explicitly with `pytest -m integration`.
+addopts = "--import-mode=importlib -m \"not integration\""
 markers = ["integration: runs a real local Chrome browser"]
 
 [tool.ruff]

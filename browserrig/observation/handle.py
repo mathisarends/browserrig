@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import BaseModel
+
 from browserrig.browser.tab import Frame
 from browserrig.core.geometry import Bounds, ElementPoint
 from browserrig.core.kinds import ElementOperation
-from browserrig.scripts import ELEMENT
+from browserrig.scripts import ELEMENT, Script
 from browserrig.scripts.models import ElementArgs
 
 from .models import Element, Snapshot
@@ -12,7 +14,7 @@ from .models import Element, Snapshot
 
 @dataclass(frozen=True, slots=True)
 class ElementHandle:
-    """An element ref from the latest observation, bound to the frame it currently lives in.
+    """An element from the latest observation, bound to the frame it lives in.
 
     Methods run in the element's own document; only `locate` returns viewport coordinates.
     """
@@ -50,8 +52,15 @@ class ElementHandle:
         await self._run(ElementOperation.SET_VALUE, value)
 
     async def upload_files(self, paths: list[str]) -> None:
-        node = await self._run(ElementOperation.NODE, by_value=False)
-        await self.frame.upload_files(node.object_id, paths)
+        await self.frame.upload_files(self.element.backend_id, paths)
+
+    async def run[A: BaseModel, R](
+        self, script: Script[A, R], args: A | None = None, *, user_gesture: bool = False
+    ) -> R:
+        """Run a script with this element as `this` in its own document."""
+        return await self.frame.run_on_node(
+            self.element.backend_id, script, args, user_gesture=user_gesture
+        )
 
     async def _run(
         self,
@@ -59,17 +68,7 @@ class ElementHandle:
         value: str | bool | None = None,
         *,
         clip: Bounds | None = None,
-        by_value: bool = True,
     ) -> Any:
-        return await self.frame.run(
-            ELEMENT,
-            ElementArgs(
-                token=self.snapshot.id,
-                index=self.element.index,
-                operation=operation,
-                value=value,
-                clip=clip,
-            ),
-            by_value=by_value,
-            user_gesture=True,
+        return await self.run(
+            ELEMENT, ElementArgs(operation=operation, value=value, clip=clip), user_gesture=True
         )

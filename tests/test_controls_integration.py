@@ -1,7 +1,6 @@
 import asyncio
 
 import pytest
-import yaml
 from harnessed import Context, Inject, Plugin, PolicyDecision, tool
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
@@ -9,6 +8,7 @@ from harnessed.testing import ScriptedModel, call
 from browserrig import Browser, BrowserAgent, LaunchBrowser
 from browserrig.events import ActivityFinishedEvent
 from tests.javascript import evaluate
+from tests.observations import latest
 
 pytestmark = pytest.mark.integration
 
@@ -48,12 +48,8 @@ async def test_pause_steer_resume_observes_external_page_change(site):
             await session.resume()
             result = await handle.result()
         assert result.text == "Resumed"
-        latest = next(
-            yaml.safe_load(msg.text)
-            for msg in reversed(model.requests[-1].messages)
-            if msg.text.startswith("page:\n")
-        )
-        assert latest["page"]["title"] == "Changed during pause"
+        state = latest(model.requests[-1].messages)
+        assert state["page"]["title"] == "Changed during pause"
         assert any("Look for the changed title" in msg.text for msg in model.requests[-1].messages)
         assert any(
             isinstance(e, ActivityFinishedEvent) and e.kind == "paused" for e in session.events

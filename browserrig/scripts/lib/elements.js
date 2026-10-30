@@ -1,7 +1,5 @@
-function resolveElement({token, index}) {
-  const state = globalThis.__browserrig?.elements;
-  const el = state?.token === token ? state.nodes[index] : null;
-  if (!el?.isConnected) {
+function resolveElement(el) {
+  if (!(el instanceof Element) || !el.isConnected) {
     throw new Error('STALE_ELEMENT');
   }
   if (el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true') {

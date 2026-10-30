@@ -1,6 +1,6 @@
 /* global resolveElement, pointFor */
-function browserrigElement({token, index, operation, value, clip = null}) {
-  const el = resolveElement({token, index});
+function browserrigElement({operation, value, clip = null}) {
+  const el = resolveElement(this);
   function selectOption() {
     if (el.localName !== 'select') {
       throw new Error('NOT_A_SELECT');
@@ -48,9 +48,6 @@ function browserrigElement({token, index, operation, value, clip = null}) {
     return true;
   }
 
-  if (operation === 'node') {
-    return el;
-  }
   if (operation === 'bounds') {
     const box = el.getBoundingClientRect();
     return {x: box.x, y: box.y, width: box.width, height: box.height};

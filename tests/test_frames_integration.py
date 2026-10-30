@@ -1,7 +1,6 @@
 import json
 
 import pytest
-import yaml
 from cdpify.exceptions import CDPCommandError
 from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
 from harnessed.events import ToolExecutionFinishedEvent
@@ -24,6 +23,7 @@ from browserrig.observation import capture
 from browserrig.scripts import ELEMENT
 from browserrig.scripts.models import ElementArgs
 from tests.javascript import evaluate
+from tests.observations import latest
 
 pytestmark = pytest.mark.integration
 
@@ -36,22 +36,20 @@ async def test_frame_extraction_and_old_reference_is_rejected(site):
         inside = next(element for element in snapshot.elements if element.name == "Inside")
         assert inside.frame_id != (await tab.main_frame()).id
         frame = next(frame for frame in await tab.frames() if frame.id == inside.frame_id)
-        await frame.run(
+        await frame.run_on_node(
+            inside.backend_id,
             ELEMENT,
-            ElementArgs(
-                token=snapshot.id, index=inside.index, operation=ElementOperation.FOCUS, value=True
-            ),
+            ElementArgs(operation=ElementOperation.FOCUS, value=True),
             user_gesture=True,
         )
         await tab.cdp.input.insert_text(text="in an iframe")
         assert await evaluate(frame, "document.querySelector('input').value") == "in an iframe"
         await evaluate(frame, "document.querySelector('input').remove()")
         with pytest.raises(BrowserError, match="STALE_ELEMENT"):
-            await frame.run(
+            await frame.run_on_node(
+                inside.backend_id,
                 ELEMENT,
                 ElementArgs(
-                    token=snapshot.id,
-                    index=inside.index,
                     operation=ElementOperation.POINT,
                     value=None,
                 ),
@@ -97,16 +95,9 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
 
     async def respond(request):
         nonlocal count
-        state = next(
-            (
-                yaml.safe_load(message.text)
-                for message in reversed(request.messages)
-                if message.text.startswith("page:\n")
-            ),
-            None,
-        )
+        state = latest(request.messages)
         assert state is not None
-        assert not state.get("limitations")
+        assert not state["notes"]
         count += 1
         if count == 1:
             entry = next((e for e in state["elements"] if e["name"] == "Frame input"), None)
@@ -165,7 +156,7 @@ async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_d
         with pytest.raises(BrowserError, match="ELEMENT_BLOCKED"):
             await frame.check_point(x, y)
         covered = await capture(tab, DomMode(screenshots=False), report)
-        assert not covered.elements
+        assert covered.elements and all(element.covered for element in covered.elements)
         await evaluate(
             tab,
             "document.body.lastElementChild.remove();document.querySelector('iframe').style.display='none'",
@@ -218,7 +209,7 @@ async def test_detaching_sibling_retains_root_and_other_frame(site, monkeypatch)
         assert any(removed_id in limitation for limitation in state.limitations)
 
 
-async def test_dom_metadata_failure_keeps_native_controls(site, monkeypatch):
+async def test_main_snapshot_failure_asks_to_observe_again(site, monkeypatch):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
@@ -227,7 +218,5 @@ async def test_dom_metadata_failure_keeps_native_controls(site, monkeypatch):
             raise CDPCommandError("DOMSnapshot.captureSnapshot", -32000, "unavailable")
 
         monkeypatch.setattr(type(tab.cdp.dom_snapshot), "capture_snapshot", unavailable)
-        state = await capture(tab, DomMode(screenshots=False), report)
-        assert any(e.name == "Email" for e in state.elements)
-        assert any(e.name == "Shadow button" for e in state.elements)
-        assert any("metadata unavailable" in limitation for limitation in state.limitations)
+        with pytest.raises(BrowserError, match="observe again"):
+            await capture(tab, DomMode(screenshots=False), report)

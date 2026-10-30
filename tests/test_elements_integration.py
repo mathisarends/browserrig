@@ -33,11 +33,10 @@ async def test_select_notifies_bubbling_listeners_and_rejects_disabled_options(s
         )
         snapshot = await capture(tab, DomMode(), report)
         select = next(element for element in snapshot.elements if element.tag == "select")
-        result = await frame.run(
+        result = await frame.run_on_node(
+            select.backend_id,
             ELEMENT,
             ElementArgs(
-                token=snapshot.id,
-                index=select.index,
                 operation=ElementOperation.SELECT,
                 value="Second",
             ),
@@ -47,11 +46,10 @@ async def test_select_notifies_bubbling_listeners_and_rejects_disabled_options(s
         assert await evaluate(frame, "document.body.dataset.events") == "input,change,"
         for value in ("Unavailable", "Missing"):
             with pytest.raises(BrowserError, match="OPTION_NOT_FOUND"):
-                await frame.run(
+                await frame.run_on_node(
+                    select.backend_id,
                     ELEMENT,
                     ElementArgs(
-                        token=snapshot.id,
-                        index=select.index,
                         operation=ElementOperation.SELECT,
                         value=value,
                     ),
@@ -71,11 +69,10 @@ async def test_focus_selects_text_in_native_and_contenteditable_controls(site, m
         await evaluate(frame, f"document.body.innerHTML = '{markup}'")
         snapshot = await capture(tab, DomMode(), report)
         element = snapshot.elements[0]
-        assert await frame.run(
+        assert await frame.run_on_node(
+            element.backend_id,
             ELEMENT,
-            ElementArgs(
-                token=snapshot.id, index=element.index, operation=ElementOperation.FOCUS, value=True
-            ),
+            ElementArgs(operation=ElementOperation.FOCUS, value=True),
             user_gesture=True,
         )
         assert await evaluate(frame, "document.activeElement === document.body.firstElementChild")
@@ -97,11 +94,10 @@ async def test_native_value_setter_preserves_password_redaction_and_value_valida
         frame = await tab.main_frame()
         secret = next(element for element in snapshot.elements if element.input_type == "password")
         assert secret.value is None
-        assert await frame.run(
+        assert await frame.run_on_node(
+            secret.backend_id,
             ELEMENT,
             ElementArgs(
-                token=snapshot.id,
-                index=secret.index,
                 operation=ElementOperation.SET_VALUE,
                 value="new-secret",
             ),
@@ -110,11 +106,10 @@ async def test_native_value_setter_preserves_password_redaction_and_value_valida
         assert await evaluate(frame, "document.querySelector('#secret').value") == "new-secret"
         date = next(element for element in snapshot.elements if element.input_type == "date")
         with pytest.raises(BrowserError, match="INVALID_VALUE"):
-            await frame.run(
+            await frame.run_on_node(
+                date.backend_id,
                 ELEMENT,
                 ElementArgs(
-                    token=snapshot.id,
-                    index=date.index,
                     operation=ElementOperation.SET_VALUE,
                     value="invalid-date",
                 ),

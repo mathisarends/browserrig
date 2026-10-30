@@ -169,6 +169,7 @@ used only by tool or hook parameters. Custom plugins must do the same:
 from harnessed import Inject, Plugin
 from browserrig import Browser
 
+
 class Extension(Plugin, needs=(Browser,)):
     browser: Inject[Browser]
 ```
@@ -228,66 +229,74 @@ uv run --env-file .env --extra openai python -m examples.figma_agent --url YOUR_
 ```
 
 Canvas mode uses images and coordinates, with an initial check of geometry and
-pixel content. DOM mode returns Pydantic-validated YAML with roles, labels, and
-references tied to the current observation.
+pixel content. DOM mode returns compact line-based text with roles, labels, states
+and stable element refs.
 
 ## Element references and screenshot marks
 
-DOM mode returns structured YAML with page metadata and interactive elements by
-default. Normal observations omit page-text excerpts and do not capture or attach
-screenshots. Use `extract_content()` to read the page. The agent can call
-`screenshot()` to request the current view as an image in its next iteration. The
-image and element refs are captured together at that step boundary and stay in sync. This does not
-enable automatic screenshots for subsequent observations. `observe()` refreshes
-the normal page state. Use `DomMode(screenshots=True)` to explicitly enable images
-on every step; canvas mode continues to include images automatically.
-`DomMode(max_text_chars=N)` explicitly enables a page-text excerpt; its default is `0`.
+DOM mode reads every frame document with one `DOMSnapshot.captureSnapshot` call per
+CDP session and derives roles, names, states, visibility and landmark sections from
+that data in Python, without walking the DOM in the page. Normal observations omit
+page-text excerpts and do not capture or attach screenshots. Use `extract_content()`
+to read the page. The agent can call `screenshot()` to request the current view as an
+image in its next iteration. `observe()` refreshes the normal page state. Use
+`DomMode(screenshots=True)` to enable images on every step; canvas mode includes
+images automatically. `DomMode(max_text_chars=N)` enables a page-text excerpt; its
+default is `0`.
 
-All rendered interactive elements on the loaded page are listed, including controls
-below the fold and inside offscreen frames or scrollable containers. Every YAML
-element explicitly includes `in_viewport: true` or `in_viewport: false`:
+An observation looks like this:
 
-```yaml
-elements:
-- ref: a1b2c3d4:0
-  in_viewport: true
-  role: button
-  name: Search
-  tag: button
-- ref: a1b2c3d4:1
-  in_viewport: false
-  role: textbox
-  name: Email
-  tag: input
+```text
+# Checkout
+url: https://shop.example/checkout
+tab: 3F2A9C...
+viewport: 1280x800, scroll 0 of 2400px (0.0 pages above, 2.0 below)
+modal: dialog "Cookie settings" is open; interact with it first
+
+in viewport:
+  [HEADER]
+    [12] link "Cart" -> /cart
+  [MAIN]
+    ## Shipping address
+    <form "Shipping">
+      [48] textbox "Email" required placeholder="you@example.com"
+      [51] combobox "Country" options=[Germany*, France, Spain]
+      *[57] checkbox "Save address" unchecked
+    [60] button "Continue"
+
+below viewport: 14 elements (9 link, 3 button, 2 textbox)
+  headings: Payment · Order summary
+    [71] textbox "Card number"
 ```
 
-There is no default element-count limit. Use `DomMode(max_elements=N)` to set one;
-the DOM walk remains bounded to 50000 nodes and reports any truncation. Hidden,
-inert, and fully clipped controls are omitted. Controls behind another element
-are excluded when an overlap can be measured in the viewport.
+All rendered interactive elements on the loaded page are found, including controls
+below the fold and inside offscreen frames or scrollable containers. Elements
+outside the viewport are summarized, and the 40 nearest are listed individually
+(`DomMode(offscreen_elements=N)`). A leading `*` marks elements that were not in the
+previous observation of the same document. There is no default element-count limit;
+`DomMode(max_elements=N)` keeps the elements nearest to the viewport and reports
+the truncation. Hidden, inert and fully clipped controls are omitted. Controls behind
+a positioned overlay are reported as covered and are not listed individually.
 
-Requested DOM screenshots annotate elements with `in_viewport: true` by default.
-Numbered labels and colored
-dashed borders identify interactive elements. Each label matches an element's
-`mark` in the YAML; pass that element's full `ref`, such as `a1b2c3d4:7`, to
-`click`, `type_text`, and other element tools. A mark is a visual lookup number;
-the ref addresses the observed DOM node in its own frame. Both belong to the
-latest observation and can change after observing again.
+Refs such as `482` or `f1:93` are CDP backend node ids, prefixed for out-of-process
+frames. They stay valid across observations as long as the element stays in the same
+document, and an action on a removed element fails with a stale-element error. Pass
+the ref to `click`, `type_text` and other element tools.
 
-Links use blue borders, buttons green, text inputs purple, and selection controls
-pink or orange. Marks follow document order within each frame. Screenshots use
+Requested DOM screenshots draw a labeled, colored dashed border around every element
+in the viewport; each label is the element's ref. Links use blue borders, buttons
+green, text inputs purple, and selection controls pink or orange. Screenshots use
 viewport CSS pixels even on HiDPI displays. Annotations are drawn on the image
-without changing the page. Use `DomMode(marks=False)` for plain screenshots or
-`DomMode(screenshots=False)` (the default) for YAML only between screenshot requests.
+without changing the page. Use `DomMode(marks=False)` for plain screenshots.
 
-Extraction follows the composed DOM, including slots, open and closed shadow
-roots, and CDP click-listener metadata. It checks viewport visibility, clipping,
-and overlapping controls without scrolling during observation. Nested same-origin
-and cross-origin frames use their own isolated worlds and CDP sessions where needed. Frame transforms account for
-borders, scrolling, scaling, and rotation; ancestor hit tests reject covered
-frames before clicking. Unreachable frames and content limits are reported in
-`limitations`, while usable frames remain available. Frame discovery is bounded
-to 64 frames and eight levels; perspective transforms are reported as unsupported.
+Extraction follows the composed DOM, including slots, open and closed shadow roots,
+and CDP click-listener metadata. It checks viewport visibility, clipping and
+overlays without scrolling during observation. Nested same-origin and cross-origin
+frames use their own CDP sessions where needed. Frame transforms account for
+borders, scrolling, scaling and rotation; ancestor hit tests reject covered frames
+before clicking. Unreachable frames and content limits are reported as `note:`
+lines, while usable frames remain available. Frame discovery is bounded to 64
+frames and eight levels; perspective transforms are reported as unsupported.
 
 ## JavaScript shell and forward navigation
 
@@ -554,8 +563,8 @@ uv run pylint browserrig examples tests
 uv run ty check
 npm.cmd run lint
 npm.cmd run format:check
-uv run pytest -m "not integration"
-uv run pytest -m integration
+uv run pytest                  # unit tests only (default)
+uv run pytest -m integration   # real Chrome; `-m ""` runs everything
 uv build
 ```
 
