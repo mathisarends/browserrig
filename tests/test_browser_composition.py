@@ -40,6 +40,7 @@ from browserrig.files.models import Download
 from browserrig.nudges import Nudges
 from browserrig.observation.capture import CaptureContent
 from browserrig.observation.extraction import Extraction
+from browserrig.observation.models import Element, Snapshot
 from browserrig.tools import FileTools, UploadTools
 from browserrig.tools.execution import Actions
 from browserrig.tools.mouse import _image_point
@@ -81,6 +82,22 @@ class CustomRenderer(DomRenderer):
         return f"Custom view: {snapshot.id}"
 
 
+class PageRenderer:
+    """Renders the same text for every capture until the test changes the page."""
+
+    def __init__(self):
+        self.text = "Page A"
+
+    def instructions(self, _screenshots):
+        return ""
+
+    def refs(self):
+        return None
+
+    def render(self, _snapshot):
+        return self.text
+
+
 def _agent(
     responses,
     trigger=ScreenshotTrigger.ON_REQUEST,
@@ -89,6 +106,7 @@ def _agent(
     frames=None,
     skip_unchanged=True,
     after=(),
+    renderer=None,
 ):
     holder = {}
     capture = CountingCapture(frames)
@@ -100,7 +118,9 @@ def _agent(
             FakeChrome(holder),
             Readiness(options=ReadinessOptions(navigation_min_ms=0)),
             Observe(
-                capture=capture, renderer=CustomRenderer(), screenshots=Screenshots(trigger=trigger)
+                capture=capture,
+                renderer=renderer or CustomRenderer(),
+                screenshots=Screenshots(trigger=trigger),
             ),
             ImageContext(
                 retention or TrimInBatches(max_images=2, min_images=2),
@@ -643,3 +663,59 @@ def test_recipe_can_omit_local_file_tools():
         isinstance(plugin, (FileTools, UploadTools))
         for plugin in browser_plugins(local_files=False)
     )
+
+
+async def test_unchanged_page_is_not_repeated_while_the_model_still_sees_it():
+    renderer = PageRenderer()
+    agent, model, _capture, holder = _agent([*_observes(4), "Done"], renderer=renderer)
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect", max_steps=2)
+        renderer.text = "Page B"
+        await session.run("Continue", max_steps=3)
+        recorded = [event.observation.content for event in _recorded(session, "browser")]
+        assert recorded == ["Page A", "Page B"]
+        assert [len(_visible(request, "browser")) for request in model.requests] == [1, 1, 2, 2, 2]
+
+
+async def test_page_is_resent_with_a_screenshot_and_after_compaction():
+    fire = iter([False, False, False, True, *[False] * 10])
+    compaction = Compaction(
+        trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
+    )
+    agent, model, _capture, holder = _agent(
+        [call("screenshot"), *_observes(3), "Done"], extra=(compaction,), renderer=PageRenderer()
+    )
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect", max_steps=5)
+        # Step 2 carries the requested image; step 5 restores the page compaction removed.
+        assert [event.step for event in _recorded(session, "browser")] == [1, 2, 5]
+        visible = [len(_visible(request, "browser")) for request in model.requests]
+        assert visible[3] == 0 and visible[4] == 1
+
+
+def test_page_comparison_ignores_new_element_marks():
+    observe = Observe()
+    button = Element(ref="e1", frame_id="f", backend_id=1, role="button", name="Go", tag="button")
+    snapshot = Snapshot(
+        id="obs-1",
+        tab_id="tab-1",
+        document_id="doc-1",
+        url="https://example.org/",
+        title="Example",
+        mode="dom",
+        readiness="ready",
+        width=1280,
+        height=800,
+        scroll_y=0,
+        fingerprint="page",
+        elements=(button,),
+    )
+    marked = snapshot.model_copy(update={"elements": (button.model_copy(update={"new": True}),)})
+    renamed = snapshot.model_copy(
+        update={"elements": (button.model_copy(update={"name": "Stop"}),)}
+    )
+    # pylint: disable=protected-access
+    assert observe._page_key(marked) == observe._page_key(snapshot)
+    assert observe._page_key(renamed) != observe._page_key(snapshot)

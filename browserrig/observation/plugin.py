@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from dataclasses import dataclass, field
 from typing import Annotated
 
@@ -13,6 +14,7 @@ from harnessed import (
     hook,
     system_section,
 )
+from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
 from pydantic import Field
 
@@ -47,6 +49,10 @@ class _State:
     screenshot_region: Region | None = None
     screenshot_zoom: float = 1
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    # The last page state handed to the session, and whether the last request still showed it.
+    sent_key: str | None = None
+    sent_ref: str | None = None
+    visible: bool = False
 
 
 class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
@@ -301,7 +307,12 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         )
         state.screenshot_requested = False
         state.screenshot_region, state.screenshot_zoom = None, 1
-        observations = [self.project(snapshot)]
+        observations = []
+        key = self._page_key(snapshot)
+        # Text-only pages the model still sees are not repeated; images are always delivered.
+        if snapshot.image is not None or not (state.visible and state.sent_key == key):
+            observations.append(self.project(snapshot))
+            state.sent_key, state.sent_ref, state.visible = key, snapshot.id, False
         if nudges is not None and (hints := await nudges.observation(snapshot)) is not None:
             observations.append(hints)
         secrets = self._secrets
@@ -313,6 +324,22 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             # Nudges quote page text too; nothing reaches the session unredacted.
             event.session.observe(secrets.redact(observation) if secrets else observation)
         return await next_()
+
+    @hook(ObservationsIncludedEvent)
+    async def _included(self, event: ObservationsIncludedEvent) -> None:
+        state = self._state
+        state.visible = any(
+            item.source == "browser" and state.sent_ref in item.refs for item in event.observations
+        )
+
+    def _page_key(self, snapshot: Snapshot) -> str:
+        # New-element marks depend on the previous capture, not on the page itself.
+        elements = tuple(
+            element.model_copy(update={"new": False}) if element.new else element
+            for element in snapshot.elements
+        )
+        text = self._render(snapshot.model_copy(update={"elements": elements}))
+        return hashlib.sha256(text.encode()).hexdigest()
 
     def _render(self, snapshot: Snapshot) -> str:
         return self.renderer.render(snapshot)
