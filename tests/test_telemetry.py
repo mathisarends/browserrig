@@ -1,4 +1,5 @@
 import asyncio
+import os
 import subprocess
 import sys
 
@@ -81,7 +82,8 @@ async def test_otlp_export_contains_correlated_model_and_tool_spans(collector, c
             model=ScriptedModel([call("echo", value="TOOL INPUT"), "MODEL OUTPUT"]),
             plugins=[*plugins, Echo(), Approvals(default=PolicyDecision.ALLOW)],
         )
-        async with agent.session("telemetry-test") as session:
+        async with agent.session() as session:
+            session_id = session.id
             result = await session.run("MODEL INPUT")
             assert result.text == "MODEL OUTPUT"
 
@@ -101,7 +103,7 @@ async def test_otlp_export_contains_correlated_model_and_tool_spans(collector, c
     assert all(span.parent_span_id in {step.span_id for step in steps} for span in models)
     assert tool_span.parent_span_id in {step.span_id for step in steps}
     assert _attributes(tool_span.attributes)["tool.name"] == "echo"
-    assert all(_attributes(span.attributes)["session.id"] == "telemetry-test" for span in spans)
+    assert all(_attributes(span.attributes)["session.id"] == session_id for span in spans)
     contents = str([_attributes(span.attributes) for span in spans])
     for content in ("MODEL INPUT", "MODEL OUTPUT", "TOOL INPUT"):
         assert (content in contents) is capture_content
@@ -128,3 +130,30 @@ async def test_content_is_bounded_and_batches_flush_when_host_fails(collector):
         assert len(model[f"{direction}.value"]) == 20
         assert model[f"harnessed.{direction}.truncated"] is True
         assert model[f"{direction}.mime_type"] == "text/plain"
+
+
+async def test_shared_provider_keeps_exporting_after_sessions_close(collector, monkeypatch):
+    from opentelemetry import trace  # pylint: disable=import-outside-toplevel
+
+    # Exercise the standard base endpoint as well as the signal-specific URL above.
+    endpoint = os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"]
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint.removesuffix("/v1/traces"))
+    global_provider = trace.get_tracer_provider()
+    async with tracing_plugins(enabled=True) as plugins:
+        first = await Agent(model=ScriptedModel(["first"]), plugins=plugins).run("one")
+        second = await Agent(model=ScriptedModel(["second"]), plugins=plugins).run("two")
+        assert first.text == "first" and second.text == "second"
+        assert trace.get_tracer_provider() is global_provider
+    assert trace.get_tracer_provider() is global_provider
+    turns = [
+        span
+        for path, request in collector
+        if path == "POST /v1/traces HTTP/1.1"
+        for resource in request.resource_spans
+        for scope in resource.scope_spans
+        for span in scope.spans
+        if span.name == "harnessed.turn"
+    ]
+    assert len(turns) == 2
+    assert len({_attributes(span.attributes)["session.id"] for span in turns}) == 2

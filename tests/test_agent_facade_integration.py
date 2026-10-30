@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Context, Inject, Plugin, PolicyDecision
+from harnessed import Context, Inject, Plugin, PolicyDecision, SessionState
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
@@ -14,38 +14,49 @@ from browserrig.kinds import ActivityKind
 pytestmark = pytest.mark.integration
 
 
-async def test_facade_reopens_native_sessions_and_owns_a_fresh_browser_per_session(site, tmp_path):
+async def test_facade_continues_explicit_state_and_owns_a_fresh_browser_per_session(site, tmp_path):
     browsers = []
 
     class Access(Plugin, needs=(Browser,)):
         async def setup(self, _ctx: Context, browser: Inject[Browser]):
             browsers.append(browser)
 
-    model = ScriptedModel(["First answer", "Restored answer"])
+    model = ScriptedModel(["First answer", "Restored answer", "Independent answer"])
     agent = BrowserAgent(
         model=model,
         browser=LaunchBrowser(url=site),
-        session_directory=tmp_path / "sessions",
         plugins=[Access()],
     )
-    async with agent.session("conversation") as session:
+    async with agent.session() as session:
+        first_id = session.id
         first = await session.run("Remember this page")
         assert first.text == "First answer"
+        assert session.snapshot() == first.state
+        assert first.events and not session.events
     assert not browsers[0].client.is_connected
-    assert (tmp_path / "sessions" / "conversation.jsonl").is_file()
-    async with agent.session("conversation") as session:
+    state_file = tmp_path / "conversation.json"
+    state_file.write_text(first.state.to_json(), encoding="utf-8")
+    state = SessionState.from_json(state_file.read_text(encoding="utf-8"))
+    original_payload = state.to_json()
+    async with agent.session(state=state) as session:
+        assert session.id != first_id
         second = await session.run("Continue the conversation")
         assert second.text == "Restored answer"
         assert any("First answer" in msg.text for msg in model.requests[-1].messages)
         epochs = {
             item.epoch_id
-            for item in session.events
+            for item in second.events
             if isinstance(item, ActivityStartedEvent) and item.kind is ActivityKind.LLM
         }
-        assert len(epochs) == 2
-    assert len(browsers) == 2
-    assert browsers[0].id != browsers[1].id
-    assert not browsers[1].client.is_connected
+        assert len(epochs) == 1
+    independent = await agent.run("Explore another approach", state=state)
+    assert independent.text == "Independent answer"
+    assert "First answer" in repr(model.requests[-1].messages)
+    assert "Restored answer" not in repr(model.requests[-1].messages)
+    assert "Continue the conversation" not in repr(model.requests[-1].messages)
+    assert state.to_json() == original_payload
+    assert len(browsers) == 3 and len({browser.id for browser in browsers}) == 3
+    assert all(not browser.client.is_connected for browser in browsers)
 
 
 async def test_facade_honors_explicit_tool_policy(site):

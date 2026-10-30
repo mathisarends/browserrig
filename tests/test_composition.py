@@ -2,7 +2,7 @@ import subprocess
 import sys
 
 from harnessed import Agent, Plugin, PolicyDecision, SystemSection
-from harnessed.plugins import Approvals, JsonlSessions, MemorySessions
+from harnessed.plugins import Approvals
 from harnessed.plugins.filesystem import FilesystemTools
 from harnessed.plugins.shell import ShellTools
 from harnessed.testing import ScriptedModel
@@ -34,7 +34,6 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
         mode=DomMode(screenshots=True),
         readiness=readiness,
         file_system=file_system,
-        session_directory=tmp_path / "sessions",
         approvals=approvals,
         system_prompt="Custom instructions.",
         plugins=iter([extension]),
@@ -47,8 +46,6 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     )
     assert extension in agent.plugins
     assert [item for item in agent.plugins if isinstance(item, Approvals)] == [approvals]
-    assert sum(isinstance(item, JsonlSessions) for item in agent.plugins) == 1
-    assert not any(isinstance(item, MemorySessions) for item in agent.plugins)
     assert not (tmp_path / "sessions").exists()
     assert not file_system.directory.exists()
 
@@ -62,11 +59,9 @@ def test_facade_mounts_dom_and_coordinate_tool_capabilities():
     assert sum(isinstance(item, FileTools) for item in agent.plugins) == 1
 
 
-def test_facade_retains_native_memory_storage_and_approval_defaults():
+def test_facade_retains_native_approval_defaults():
     agent = BrowserAgent(model=ScriptedModel(["ok"]))
     assert not any(isinstance(item, (ShellTools, FilesystemTools)) for item in agent.plugins)
-    assert sum(isinstance(item, MemorySessions) for item in agent.plugins) == 1
-    assert not any(isinstance(item, JsonlSessions) for item in agent.plugins)
     assert next(item for item in agent.plugins if isinstance(item, Approvals)).default is (
         PolicyDecision.ASK
     )

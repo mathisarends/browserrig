@@ -8,7 +8,6 @@ tracer or global provider is needed. Imports stay lazy for runs without --trace.
 # pylint: disable=import-outside-toplevel
 
 import argparse
-import asyncio
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -53,32 +52,24 @@ async def tracing_plugins(
 
     # Optional dependencies belong to application startup, never Browserrig imports.
     try:
-        from harnessed.integrations.opentelemetry import OpenTelemetryTracer
-        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-        from opentelemetry.sdk.resources import Resource
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from harnessed.integrations.opentelemetry import OpenTelemetryTracer, otlp_provider
     except ImportError as error:
         raise RuntimeError("Tracing requires the otel extra: uv sync --extra otel") from error
 
-    provider = TracerProvider(
-        resource=Resource.create(
-            {
-                "service.name": os.getenv("OTEL_SERVICE_NAME", "browserrig"),
-                "openinference.project.name": os.getenv("PHOENIX_PROJECT_NAME", "browserrig"),
-            }
-        )
+    # Supply a local default only when neither standard endpoint is configured.
+    endpoint = (
+        None
+        if os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+        or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+        else "http://127.0.0.1:6006/v1/traces"
     )
-    try:
-        # Standard endpoint/header/timeout variables remain exporter-owned. Only
-        # supply a local default when neither standard endpoint is configured.
-        exporter = (
-            OTLPSpanExporter()
-            if os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
-            or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-            else OTLPSpanExporter(endpoint="http://127.0.0.1:6006/v1/traces")
-        )
-        provider.add_span_processor(BatchSpanProcessor(exporter))
+    async with otlp_provider(
+        service_name=os.getenv("OTEL_SERVICE_NAME", "browserrig"),
+        endpoint=endpoint,
+        resource_attributes={
+            "openinference.project.name": os.getenv("PHOENIX_PROJECT_NAME", "browserrig"),
+        },
+    ) as provider:
         yield [
             OpenTelemetryTracer(
                 tracer_provider=provider,
@@ -86,7 +77,3 @@ async def tracing_plugins(
                 max_content_length=max_content_length,
             )
         ]
-    finally:
-        # Close sessions first; flush the batch outside the event loop, including
-        # on errors. Never replace or shut down a host's global provider.
-        await asyncio.to_thread(provider.shutdown)

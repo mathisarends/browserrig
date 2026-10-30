@@ -1,7 +1,7 @@
 from dataclasses import replace
 
 import pytest
-from harnessed import Agent, Context, Inject, Plugin, ToolResult, ToolStatus
+from harnessed import Agent, Context, Inject, Plugin, ToolResult, ToolStatus, hook
 from harnessed.core.errors import SessionFormatError
 from harnessed.events import (
     AgentControlChangedEvent,
@@ -152,13 +152,21 @@ async def test_each_step_outcome_closes_model_wait_with_a_typed_outcome(activity
 @pytest.mark.parametrize("reason", list(TurnOutcome))
 async def test_turn_end_closes_correlated_activities_but_keeps_pause_open(activity_session, reason):
     session, activity = activity_session
+    finished = []
+
+    class Collect(Plugin):
+        @hook(ActivityFinishedEvent)
+        async def collect(self, event: ActivityFinishedEvent):
+            finished.append(event)
+
+    await session.use(Collect())
     await session.emit(TurnStartedEvent(turn_id="turn"))
     await session.emit(ToolExecutionStartedEvent(call_id="pending"))
     await session.emit(_readiness_started("probe"))
     await session.emit(AgentControlChangedEvent(state=ControlState.PAUSED))
     await session.emit(TurnEndedEvent(turn_id="turn", reason=reason))
     intervals = activity.intervals()
-    closed = [item for item in intervals if item.kind is not ActivityKind.PAUSED]
+    closed = [item for item in finished if item.kind is not ActivityKind.PAUSED]
     assert len(closed) == 2
     assert all(isinstance(item.outcome, ActivityOutcome) for item in closed)
     assert all(item.outcome.value == reason.value for item in closed)

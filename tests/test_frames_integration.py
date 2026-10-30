@@ -126,7 +126,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
         result = await session.run("Fill and click inside the frame", max_steps=3)
         assert result.text == "Done"
         receipts = [
-            event for event in session.events if isinstance(event, ToolExecutionFinishedEvent)
+            event for event in result.events if isinstance(event, ToolExecutionFinishedEvent)
         ]
         assert len(receipts) == 2 and all(not event.result.is_error for event in receipts)
         browser, actions = holder["browser"], holder["actions"]

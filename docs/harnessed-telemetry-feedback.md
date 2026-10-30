@@ -4,6 +4,20 @@ Collected while integrating **Harnessed 0.6.0** with Browserrig and **Phoenix
 21.0.0** on Windows/Docker Desktop, 2026-10-30. These are local integration notes
 for upstream discussion; no issue has been submitted.
 
+## Follow-up: Harnessed 0.8.0
+
+Browserrig now uses the native `otlp_provider()` helper for application-owned
+batching and cleanup. This replaces the example's manual SDK/exporter setup;
+existing providers can still be passed directly to `OpenTelemetryTracer`. Tests
+check local HTTP ingestion, shared-provider reuse, unchanged global provider,
+standard endpoint variables and flushing after application errors. The original
+capture and span-detail findings below remain applicable to 0.8.0; the helper
+does not add turn summaries, request schemas or a redaction callback.
+
+Automatic session archives have been removed. Use explicit `SessionState` for
+continuation and subscriptions or hooks for a complete application-owned audit.
+The remaining sections describe the original 0.6.0 investigation.
+
 ## Integration effort and abstraction fit
 
 The existing `plugins=[OpenTelemetryTracer(tracer_provider=provider)]` interface

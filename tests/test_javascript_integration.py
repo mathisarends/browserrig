@@ -55,10 +55,10 @@ async def test_agent_javascript_shell_retains_main_world_state_awaits_and_report
         tab = session.ctx[Browser].active_tab
         assert await evaluate(tab, "document.title") == "From JavaScript"
         assert await evaluate(tab, "typeof window.shellMarker") == "undefined"
-        finished = [event for event in session.events if isinstance(event, ActionFinishedEvent)]
+        finished = [event for event in result.events if isinstance(event, ActionFinishedEvent)]
         assert len(finished) == 3
         assert all(event.kind == ActionKind.JAVASCRIPT for event in finished)
-        failed = [event for event in session.events if isinstance(event, ActionFailedEvent)]
+        failed = [event for event in result.events if isinstance(event, ActionFailedEvent)]
         assert len(failed) == 1 and failed[0].dispatched
 
 

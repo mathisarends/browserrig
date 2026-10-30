@@ -34,8 +34,8 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
     async with agent.session() as session:
         result = await session.run("PRIVATE PROMPT")
         assert result.text == "Final answer"
-        assert not any(isinstance(event, KeyPressedEvent) for event in session.events)
-        assert not any(isinstance(event, WaitingEvent) for event in session.events)
+        assert not any(isinstance(event, KeyPressedEvent) for event in result.events)
+        assert not any(isinstance(event, WaitingEvent) for event in result.events)
     records = [json.loads(line) for line in output.getvalue().splitlines()]
     key = next(record for record in records if record["type"] == "browser.key.pressed")
     assert key["key"] == "x" and key["action_id"] == "action-1"

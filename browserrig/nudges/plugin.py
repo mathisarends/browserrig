@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import yaml
-from harnessed import Inject, Observation, Plugin, PluginState, SessionLog, hook
+from harnessed import Inject, Observation, Plugin, PluginState, hook
 from harnessed.events import ObservationsIncludedEvent
 
 from browserrig.browser.base import BrowserEvents
@@ -39,7 +39,7 @@ class _State:
     effect_at: float = 0
 
 
-class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
+class Nudges(Plugin, provides=True, needs=(BrowserEvents,)):
     events = NUDGE_EVENTS
     _state = PluginState(_State)
     _events: Inject[BrowserEvents]
@@ -49,17 +49,6 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         if not 1 <= max_hints <= 20 or not 100 <= max_chars <= 10000:
             raise ValueError("Invalid nudge limits")
         self._max_hints, self._max_chars = max_hints, max_chars
-
-    async def setup(self, log: Inject[SessionLog]) -> None:
-        # Reconstruct audit state without redispatching live browser side effects.
-        for event in log.events:
-            match event:
-                case NudgeQueuedEvent(key=key):
-                    self._state.queued[key] = event
-                case NudgeIncludedEvent(nudge_ids=ids):
-                    self._remove(ids)
-                case NudgeExpiredEvent(nudge_id=nudge_id):
-                    self._remove((nudge_id,))
 
     async def queue(
         self,

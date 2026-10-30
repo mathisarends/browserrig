@@ -5,17 +5,18 @@ from typing import Literal
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent, Inject, Plugin, PolicyDecision, SessionLog, hook
+from harnessed import Agent, Inject, Plugin, PolicyDecision, SessionLog, SessionState, hook
 from harnessed.events import (
     DurableEvent,
     ModelRequestedEvent,
     ObservationRecordedEvent,
     ObservationsIncludedEvent,
     TransientEvent,
+    TurnFinishedEvent,
 )
 from harnessed.hooks import ConfigureRequest, Next, PreStep, StepDecision
 from harnessed.models import ImagePart, ImageReference, ModelRequest, ToolMessage
-from harnessed.plugins import Approvals, JsonlSessions, LatestObservationOnly
+from harnessed.plugins import Approvals, LatestObservationOnly
 from harnessed.plugins.compaction import Compaction
 from harnessed.testing import ScriptedModel, call
 
@@ -314,20 +315,19 @@ async def test_until_compaction_keeps_images_until_their_steps_are_summarized():
     assert images[5] == images[4] + [images[5][-1]]
 
 
-async def test_multimodal_observations_use_session_assets_and_replay_receipts(tmp_path):
+async def test_multimodal_state_owns_assets_and_provenance_after_original_session_closes():
     agent, model, _capture, holder = _agent(
         [call("observe"), "Done"],
         ScreenshotTrigger.EACH_STEP,
         UntilCompaction(),
-        extra=(JsonlSessions(tmp_path),),
         frames=[("same screenshot", 2), ("same screenshot", 2)],
         skip_unchanged=False,
     )
-    async with agent.session("screenshots") as session:
+    async with agent.session() as session:
         _browser_ready(holder)
-        await session.run("Inspect", max_steps=2)
+        result = await session.run("Inspect", max_steps=2)
         observations = [
-            event for event in session.events if isinstance(event, ObservationRecordedEvent)
+            event for event in result.events if isinstance(event, ObservationRecordedEvent)
         ]
         assets = [
             part.asset
@@ -346,9 +346,10 @@ async def test_multimodal_observations_use_session_assets_and_replay_receipts(tm
             assert receipt.step == observation.step
             assert receipt.message_id in {message.id for message in request.request.messages}
         assert len(_images(model.requests[-1])) == 2
-    # The audit log contains asset references instead of repeated inline image data.
-    assert "data:image/png;base64," not in (tmp_path / "screenshots.jsonl").read_text()
-    async with agent.session("screenshots") as restored:
+    state = SessionState.from_json(result.state.to_json())
+    async with agent.session(state=state) as restored:
+        assert not restored.events
+        assert await restored.assets.read(assets[0]) == b"same screenshot"
         assert restored.log.included_observations(request.request) == included
         replay = await restored.log.resolve_request(request.request)
         assert _images(replay) == _images(model.requests[-1])
@@ -574,8 +575,10 @@ async def test_native_stream_forwards_custom_events_and_browser_readiness_withou
         assert any(isinstance(e, ReadinessStartedEvent) for e in streamed)
         observations = [e for e in streamed if isinstance(e, ObservationCapturedEvent)]
         assert len(observations) == 1 and not hasattr(observations[0], "image")
-        assert any(isinstance(e, AppFact) for e in session.events)
-        assert not any(isinstance(e, AppProgress) for e in session.events)
+        result = next(event.result for event in streamed if isinstance(event, TurnFinishedEvent))
+        assert any(isinstance(e, AppFact) for e in result.events)
+        assert not any(isinstance(e, AppProgress) for e in result.events)
+        assert not session.events
 
 
 def test_recipe_can_omit_local_file_tools():

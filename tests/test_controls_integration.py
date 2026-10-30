@@ -52,5 +52,5 @@ async def test_pause_steer_resume_observes_external_page_change(site):
         assert state["page"]["title"] == "Changed during pause"
         assert any("Look for the changed title" in msg.text for msg in model.requests[-1].messages)
         assert any(
-            isinstance(e, ActivityFinishedEvent) and e.kind == "paused" for e in session.events
+            isinstance(e, ActivityFinishedEvent) and e.kind == "paused" for e in result.events
         )

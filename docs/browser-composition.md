@@ -2,7 +2,7 @@
 
 Harnessed `Agent` is the composition root. Browserrig plugins own session state,
 tools and hooks; ordinary Python strategies implement capture, rendering,
-readiness and action-chain decisions. Browserrig targets Harnessed 0.7.0.
+readiness and action-chain decisions. Browserrig targets Harnessed 0.8.0.
 
 ## A browser agent with screenshots
 
@@ -65,14 +65,16 @@ readiness and action-comparison probes never enter image history. Text-only step
 retain included images across turns until compaction or an explicit observation
 policy removes their snapshots.
 Unmounting the plugin or opening a new session resets its live coordinate state.
-The captured observations and images remain in the durable session log for audit
-and manual replay. A new browser session obtains fresh state before acting.
+Retained observations and images belong to explicit `SessionState` snapshots;
+complete audits belong to application-owned subscriptions or hooks. A new browser
+session obtains fresh page state before acting.
 
 DOM text, a fixed screenshot caption and image form one native multimodal
 `Observation(content=..., refs=(snapshot.id,))`. Harnessed stores inline images as
-session-owned `ImageReference` assets before recording. JSONL stores the references;
-binary image data lives under `<session-id>.assets/` and is resolved only for
-selected provider requests. Keep that directory with the history when backing it up.
+session-owned `ImageReference` assets before recording. State JSON includes referenced
+image bytes and validates their size/hash on import, without sidecar directories.
+Only selected images are resolved for provider requests. Closing the original
+session does not invalidate an exported snapshot.
 
 Text observations remain unchanged in history until native compaction removes
 their steps. `browser_plugins()` does not install `LatestObservationOnly()`.
@@ -188,7 +190,10 @@ Browserrig observations and readiness use durable events; pointer/keyboard motio
 uses transient events. `ObservationCapturedEvent` carries identity and metadata,
 not screenshot Base64. Setup events emitted before the stream begins are not
 replayed automatically. Native SDK bookkeeping has its own stream projection;
-custom-event support does not imply every persisted SDK event appears in a turn stream.
+custom-event support does not imply every SDK event appears in a turn stream.
+After terminal delivery, use `TurnFinishedEvent.result.events` or `result.events`;
+the session's execution buffer is released. Custom audit facts are not restored
+as plugin state when importing a conversation snapshot.
 
 ## Existing applications
 

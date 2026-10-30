@@ -52,15 +52,20 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         ctx.effect(self._close_all)
 
     def intervals(self, *, now: float | None = None) -> tuple[ActivityFinishedEvent, ...]:
-        return project_intervals(
-            (
-                event
-                for event in self._log.events
-                if isinstance(event, ActivityStartedEvent | ActivityFinishedEvent)
-                and event.epoch_id == self._state.epoch
-            ),
-            now=now,
+        events = [
+            event
+            for event in self._log.events
+            if isinstance(event, ActivityStartedEvent | ActivityFinishedEvent)
+            and event.epoch_id == self._state.epoch
+        ]
+        recorded = {
+            event.interval_id for event in events if isinstance(event, ActivityStartedEvent)
+        }
+        # Terminal delivery releases the log buffer; open live activities still exist.
+        events.extend(
+            event for event in self._state.open.values() if event.interval_id not in recorded
         )
+        return project_intervals(events, now=now)
 
     async def _start(self, key: ActivityKey, *, cause_id: str) -> None:
         """A new interval in the same slot supersedes only that slot's previous interval."""

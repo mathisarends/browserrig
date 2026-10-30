@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from pathlib import Path
 
 from harnessed import Agent, PluginValidation, SystemPrompt
 from harnessed.kernel import PluginLike
 from harnessed.models import Model
-from harnessed.plugins import Approvals, JsonlSessions
+from harnessed.plugins import Approvals
 
 from browserrig.core.modes import DomMode
 
@@ -24,7 +23,7 @@ from .tools.execution import Actions
 class BrowserAgent(Agent):
     """Explicit provider clients remain caller-owned.
 
-    Sessions stay in memory unless session_directory is supplied.
+    Conversations use Harnessed's explicit SessionState import/export.
     Approvals use Harnessed's defaults unless configured.
     """
 
@@ -41,7 +40,6 @@ class BrowserAgent(Agent):
         actions: Actions | None = None,
         local_files: bool = True,
         secrets: Secrets | Mapping[str, Secret] | None = None,
-        session_directory: str | Path | None = None,
         approvals: Approvals | None = None,
         system_prompt: str | SystemPrompt | None = (
             "Complete the requested browser task using the observed page state."
@@ -62,8 +60,6 @@ class BrowserAgent(Agent):
                 secrets=secrets,
             )
         )
-        if session_directory is not None:
-            composed.append(JsonlSessions(session_directory))
         if approvals is not None:
             composed.append(approvals)
         composed.extend(plugins)

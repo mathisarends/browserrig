@@ -1,7 +1,9 @@
 # Telemetry: local agent traces with Docker
 
-Browserrig uses Harnessed 0.7.0's native `OpenTelemetryTracer`. Phoenix displays
-the agent's turns, model requests, tool calls, timing, outcomes and available
+Browserrig uses Harnessed 0.8.0's native `OpenTelemetryTracer` and `otlp_provider()`.
+The helper owns batched OTLP/HTTP export and shuts down outside the event loop,
+including on errors or cancellation, while leaving the global provider unchanged.
+Phoenix displays the agent's turns, model requests, tool calls, timing, outcomes and available
 usage counters. Enable content capture to inspect what each model and tool
 receives and returns.
 
@@ -84,13 +86,16 @@ harnessed.turn                 session.id, turn ID, outcome
 ```
 
 Select a **model** or **tool** span to inspect its input/output. In Harnessed
-0.7.0, the root turn span has no input/output summary of its own. Each turn is a
-separate trace; use `session.id` to follow turns in the same conversation.
+0.8.0, the root turn span has no input/output summary of its own. Each turn is a
+separate trace; use `session.id` to follow turns in one live session. Continuing
+a saved `SessionState` opens a new runtime session ID; correlate saved conversations
+using an application-owned conversation key in your own telemetry.
 
 These are agent-level traces. Individual CDP commands, browser network requests,
 provider HTTP requests and provider-internal retries do not get separate spans.
 Browser observations are visible inside model inputs when content capture is
-enabled. Terminal events and durable session logs remain available separately.
+enabled. Terminal events, `result.events` and application-owned audit subscribers
+remain available separately. Conversation snapshots retain working context.
 Tool schemas and arbitrary provider settings are not included in the captured
 model input; it is a portable conversation snapshot, not a raw HTTP request.
 
@@ -121,28 +126,17 @@ Install `browserrig[otel]` plus the extra for your model provider. Supply the
 Harnessed plugin directly; `BrowserAgent` needs no telemetry-specific argument:
 
 ```python
-import asyncio
-
-from harnessed.integrations.opentelemetry import OpenTelemetryTracer
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from harnessed.integrations.opentelemetry import OpenTelemetryTracer, otlp_provider
 
 from browserrig import BrowserAgent
 
 
 async def run_traced(model):
-    provider = TracerProvider(
-        resource=Resource.create({
-            "service.name": "browserrig",
-            "openinference.project.name": "browserrig",
-        })
-    )
-    try:
-        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(
-            endpoint="http://127.0.0.1:6006/v1/traces",
-        )))
+    async with otlp_provider(
+        service_name="browserrig",
+        endpoint="http://127.0.0.1:6006/v1/traces",
+        resource_attributes={"openinference.project.name": "browserrig"},
+    ) as provider:
         agent = BrowserAgent(model=model, plugins=[OpenTelemetryTracer(
             tracer_provider=provider,
             capture_content=True,
@@ -150,15 +144,19 @@ async def run_traced(model):
         )])
         async with agent.session() as session:
             return await session.run("Describe the current page.")
-    finally:
-        await asyncio.to_thread(provider.shutdown)
 ```
 
-The application owns its provider. Reuse an existing provider when integrating
-into a backend, and shut it down once after its active sessions close. Do not
-flush after every model call or shut down a shared provider per session. The
-examples keep this startup/cleanup code in `examples/telemetry.py`; Browserrig
-does not install a global provider or add a second tracer abstraction.
+Open the helper once around all agents and sessions sharing its provider, and
+close sessions before leaving it. Standard OTel environment variables configure
+resources, sampling and exporter settings; explicit helper arguments take precedence.
+The examples pass `OTEL_SERVICE_NAME` as `service_name` and use the local Phoenix
+endpoint only when neither standard endpoint variable is configured.
+
+Existing application-owned providers remain supported: pass one directly to
+`OpenTelemetryTracer(tracer_provider=provider)` and keep its lifecycle in the host
+application. Closing a session does not shut down a shared provider. The examples
+keep startup/cleanup in `examples/telemetry.py`; Browserrig installs no global provider.
+Shutdown attempts to export pending batches; verify delivery in Phoenix.
 
 ## Stop, retain data and troubleshoot
 
@@ -184,7 +182,7 @@ the trace database.**
 
 ## References
 
-- [Harnessed 0.7.0 tracing guide](https://github.com/mathisarends/harnessed/blob/v0.7.0/docs/guides/tracing.md)
+- [Harnessed 0.8.0 tracing guide](https://github.com/mathisarends/harnessed/blob/v0.8.0/docs/guides/tracing.md)
 - [Phoenix Docker and persistent SQLite setup](https://arize.com/docs/phoenix/self-hosting/deployment-options/docker)
 - [Phoenix 21 release notes](https://github.com/Arize-ai/phoenix/releases/tag/arize-phoenix-v21.0.0)
 - [Integration feedback collected for Harnessed](harnessed-telemetry-feedback.md)

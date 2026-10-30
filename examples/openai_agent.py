@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from harnessed import PolicyDecision
+from harnessed import PolicyDecision, SessionState
 from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals, Compaction
 from pydantic_ai.models.openai import OpenAIResponsesModel
@@ -44,11 +44,19 @@ async def main() -> None:
     parser.add_argument(
         "--workspace", type=Path, help="Reuse a directory for agent files and downloads"
     )
+    parser.add_argument(
+        "--state", type=Path, help="Load and save a conversation snapshot in this JSON file"
+    )
     parser.add_argument("--quiet", action="store_true", help="Disable JSON event output on stderr")
     add_tracing_arguments(parser)
     args = parser.parse_args()
     if not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY in the environment or in .env")
+    state = (
+        SessionState.from_json(args.state.read_text(encoding="utf-8"))
+        if args.state and args.state.exists()
+        else None
+    )
 
     async with tracing_plugins(
         enabled=args.trace,
@@ -61,7 +69,6 @@ async def main() -> None:
             mode=DomMode(),
             image_context=ImageContext(UntilCompaction()),
             file_system=FileSystemOptions(directory=args.workspace) if args.workspace else None,
-            session_directory=Path(".browserrig/sessions-v3"),
             approvals=Approvals(default=PolicyDecision.ALLOW),
             plugins=[
                 Compaction(trigger=lambda state: state.input_tokens >= 32000, keep_steps=4),
@@ -69,8 +76,13 @@ async def main() -> None:
                 *([] if args.quiet else [TerminalEvents()]),
             ],
         )
-        async with agent.session() as session:
+        async with agent.session(state=state) as session:
             result = await session.run(args.task, max_steps=20, token_budget=80000)
+            if args.state:
+                args.state.parent.mkdir(parents=True, exist_ok=True)
+                pending = args.state.with_suffix(args.state.suffix + ".tmp")
+                pending.write_text(result.state.to_json(), encoding="utf-8")
+                pending.replace(args.state)
             print(result.text)
 
 

@@ -12,7 +12,6 @@ from harnessed import (
     Observation,
     Plugin,
     PluginState,
-    SessionLog,
     SystemSection,
     ToolInfo,
     ToolResult,
@@ -62,7 +61,7 @@ class SecretEntry:
     guard: Callable[[], Awaitable[None]] = dataclass_field(repr=False)
 
 
-class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
+class Secrets(Plugin, provides=True, needs=(BrowserEvents,)):
     """Let the agent type credentials as `{{secret:NAME}}` without ever seeing them.
 
     Values live only in this plugin. Each secret is typed only on its domains; every text
@@ -99,7 +98,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         ),
     )
 
-    async def setup(self, ctx: Context, log: Inject[SessionLog]) -> None:
+    async def setup(self, ctx: Context) -> None:
         # Imported here: observation imports this package to redact snapshots.
         from browserrig.observation.plugin import (  # pylint: disable=import-outside-toplevel,cyclic-import
             Observe,
@@ -111,7 +110,6 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         for name, secret in self._secrets.items():
             if not secret.rotating:
                 self._learn(name, await resolve(name, secret.value))
-        self._state.entered = any(isinstance(event, SecretEnteredEvent) for event in log.events)
         ctx.effect(self._events.add_filter(self._filter_event))
 
     def redact[T](self, value: T) -> T:

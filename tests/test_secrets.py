@@ -364,16 +364,17 @@ async def test_javascript_is_blocked_once_a_secret_was_entered(monkeypatch):
     assert [(event.names, event.origin) for event in events] == [(("pw",), "https://example.org")]
 
 
-async def test_entered_secrets_are_restored_from_the_session_log():
+async def test_secret_entry_guard_is_local_to_the_live_browser_session():
     model = ScriptedModel([call("execute_javascript", code="1"), "done"])
     agent, holder = _agent(_secrets(), model=model, plugins=[Leaky()])
     async with agent.session() as session:
         await holder["browser"].events.emit(
             SecretEnteredEvent(names=("pw",), origin="https://example.org")
         )
-    async with agent.session(session.id) as resumed:
+        state = session.snapshot()
+    async with agent.session(state=state) as resumed:
         await resumed.run("go", max_steps=3)
-    assert "JavaScript execution is unavailable" in repr(model.requests[-1].messages)
+    assert "ran 1" in repr(model.requests[-1].messages)
 
 
 async def test_browser_events_are_redacted_before_they_are_logged():
