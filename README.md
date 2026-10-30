@@ -106,7 +106,8 @@ plugins, `Nudges`, `Activity`, `Recording`, and `TerminalEvents` are also availa
 See [composing browser agents](docs/browser-composition.md) for the explicit plugin API:
 `Readiness(initial=..., ongoing=...)`, `Observe(capture=..., renderer=...,
 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` and
-`ImageContext(max_images=6, min_images=3)`. Capture, rendering, image retention and
+`ImageContext(TrimInBatches(max_images=6, min_images=3))` or
+`ImageContext(UntilCompaction())`. Capture, rendering, image retention and
 tool capabilities can be selected independently. `ScreenshotTrigger.ON_REQUEST`
 captures only after a screenshot tool call. Existing mode options remain recipe adapters.
 Shared plugin services use class-level `Inject[T]` and `provides=True`; explicit

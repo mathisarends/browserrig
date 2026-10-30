@@ -14,6 +14,7 @@ from harnessed.events import DurableEvent, TransientEvent
 from harnessed.hooks import Next, PreStep, StepDecision
 from harnessed.models import ImagePart, ToolReply
 from harnessed.plugins import Approvals
+from harnessed.plugins.compaction import Compaction
 from harnessed.testing import ScriptedModel, call
 from PIL import Image
 
@@ -28,6 +29,8 @@ from browserrig import (
     ReadinessStrategy,
     Screenshots,
     ScreenshotTrigger,
+    TrimInBatches,
+    UntilCompaction,
     browser_plugins,
 )
 from browserrig.core.errors import ReadinessError, StaleElement
@@ -46,20 +49,29 @@ class CountingCapture:
     kind = ObservationKind.CANVAS
     provides_dom_refs = False
 
-    def __init__(self):
+    def __init__(self, frames=None):
         self.captures = []
+        # (image, geometry scale) per capture; by default every capture shows a new screen.
+        self.frames = frames
 
     async def collect(  # pylint: disable=unused-argument
         self, tab, _report, *, screenshots, region=None, zoom=1
     ):
         self.captures.append(screenshots)
+        image, scale = self._frame() if screenshots else (None, 2)
         return CaptureContent(
             page=Extraction(
                 url=tab.url, title="Example", width=800, height=600, scroll_y=0, page_height=600
             ),
-            image=f"png-{len(self.captures)}" if screenshots else None,
-            geometry=Geometry(x=100, y=50, width=200, height=100, scale=2) if screenshots else None,
+            image=image,
+            geometry=Geometry(x=100, y=50, width=200, height=100, scale=scale)
+            if screenshots
+            else None,
         )
+
+    def _frame(self):
+        count = sum(self.captures)
+        return (f"png-{count}", 2) if self.frames is None else self.frames[count - 1]
 
 
 class CustomRenderer(CanvasRenderer):
@@ -67,9 +79,16 @@ class CustomRenderer(CanvasRenderer):
         return f"Custom view: {snapshot.id}"
 
 
-def _agent(responses, trigger=ScreenshotTrigger.ON_REQUEST, keep=2, extra=(), trim_to=None):
+def _agent(
+    responses,
+    trigger=ScreenshotTrigger.ON_REQUEST,
+    retention=None,
+    extra=(),
+    frames=None,
+    skip_unchanged=True,
+):
     holder = {}
-    capture = CountingCapture()
+    capture = CountingCapture(frames)
     model = ScriptedModel(responses)
     agent = Agent(
         model=model,
@@ -80,7 +99,10 @@ def _agent(responses, trigger=ScreenshotTrigger.ON_REQUEST, keep=2, extra=(), tr
             Observe(
                 capture=capture, renderer=CustomRenderer(), screenshots=Screenshots(trigger=trigger)
             ),
-            ImageContext(max_images=keep, min_images=keep if trim_to is None else trim_to),
+            ImageContext(
+                retention or TrimInBatches(max_images=2, min_images=2),
+                skip_unchanged=skip_unchanged,
+            ),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )
@@ -168,20 +190,23 @@ async def test_image_buffer_is_session_local():
 @pytest.mark.parametrize("value", [0, -1, True, 1.5])
 def test_invalid_image_history_size(value):
     with pytest.raises(ValueError, match="positive integers"):
-        ImageContext(max_images=value)
+        TrimInBatches(max_images=value)
     with pytest.raises(ValueError, match="positive integers"):
-        ImageContext(max_images=3, min_images=value)
+        TrimInBatches(max_images=3, min_images=value)
 
 
 def test_image_history_trims_to_half_by_default_and_rejects_inverted_bounds():
-    assert (ImageContext().min_images, ImageContext(10).min_images) == (1, 5)
+    assert ImageContext().retention == TrimInBatches(max_images=1, min_images=1)
+    assert TrimInBatches(10).min_images == 5
     with pytest.raises(ValueError, match="must not exceed"):
-        ImageContext(max_images=2, min_images=3)
+        TrimInBatches(max_images=2, min_images=3)
 
 
 async def test_images_stay_where_captured_and_keep_the_prompt_prefix_until_a_batch_trim():
     agent, model, _capture, holder = _agent(
-        [call("observe")] * 5 + ["Done"], ScreenshotTrigger.EACH_STEP, keep=4, trim_to=2
+        [call("observe")] * 5 + ["Done"],
+        ScreenshotTrigger.EACH_STEP,
+        TrimInBatches(max_images=4, min_images=2),
     )
     async with agent.session() as session:
         _browser_ready(holder)
@@ -210,6 +235,86 @@ async def test_images_stay_where_captured_and_keep_the_prompt_prefix_until_a_bat
     # Step 5 trims from 4 to 2 images once, then appending resumes.
     assert not shared(requests[3], requests[4])
     assert shared(requests[4], requests[5])
+
+
+def _observes(count):
+    # Distinct calls, so every step gets its own tool call id.
+    return [call("observe") for _ in range(count)]
+
+
+def _notes(model):
+    return [request.messages[-1].text for request in model.requests]
+
+
+async def test_unchanged_screens_are_not_added_again():
+    agent, model, _capture, holder = _agent(
+        [*_observes(3), "Done"],
+        ScreenshotTrigger.EACH_STEP,
+        TrimInBatches(max_images=4, min_images=4),
+        frames=[("a", 2), ("a", 2), ("b", 2), ("b", 2)],
+    )
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect", max_steps=4)
+    assert [len(_images(request)) for request in model.requests] == [1, 1, 2, 2]
+    first, second = (
+        message.id.removeprefix("browser-image:") for message in _images(model.requests[-1])
+    )
+    assert _notes(model) == [
+        f"Latest screenshot: {first}",
+        f"Latest screenshot: {first} (screen unchanged this step)",
+        f"Latest screenshot: {second}",
+        f"Latest screenshot: {second} (screen unchanged this step)",
+    ]
+
+
+async def test_same_pixels_with_other_geometry_or_disabled_skipping_are_added():
+    agent, model, _capture, holder = _agent(
+        [*_observes(2), "Done"],
+        ScreenshotTrigger.EACH_STEP,
+        TrimInBatches(max_images=4, min_images=4),
+        frames=[("a", 2), ("a", 3), ("a", 3)],
+        skip_unchanged=False,
+    )
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect", max_steps=3)
+    assert [len(_images(request)) for request in model.requests] == [1, 2, 3]
+
+    agent, model, _capture, holder = _agent(
+        [*_observes(1), "Done"],
+        ScreenshotTrigger.EACH_STEP,
+        TrimInBatches(max_images=4, min_images=4),
+        frames=[("a", 2), ("a", 3)],
+    )
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect", max_steps=2)
+    assert [len(_images(request)) for request in model.requests] == [1, 2]
+
+
+class _Summary:
+    async def summarize(self, messages, *, max_tokens):  # pylint: disable=unused-argument
+        return "summary"
+
+
+async def test_until_compaction_keeps_images_until_their_steps_are_summarized():
+    fire = iter([False, False, False, True, *[False] * 10])
+    compaction = Compaction(
+        trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
+    )
+    agent, model, _capture, holder = _agent(
+        [*_observes(5), "Done"], ScreenshotTrigger.EACH_STEP, UntilCompaction(), extra=(compaction,)
+    )
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect", max_steps=6)
+    images = [[message.id for message in _images(request)] for request in model.requests]
+    # Nothing is trimmed before the summary; the request that compacts still carries all four.
+    assert [len(ids) for ids in images[:4]] == [1, 2, 3, 4]
+    # Steps 1 and 2 were summarized, so their images leave with them; later ones stay in place.
+    assert images[4] == images[3][2:] + [images[4][-1]]
+    assert images[5] == images[4] + [images[5][-1]]
 
 
 class Probe(ReadinessStrategy):

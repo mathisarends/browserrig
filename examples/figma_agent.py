@@ -31,6 +31,7 @@ from browserrig import (
     Screenshots,
     ScreenshotTrigger,
     TabTools,
+    TrimInBatches,
 )
 from browserrig.tools import DialogTools
 
@@ -75,7 +76,7 @@ async def main() -> None:
             renderer=CanvasRenderer(),
             screenshots=Screenshots(trigger=args.screenshot_trigger),
         ),
-        ImageContext(max_images=args.max_images, min_images=args.min_images),
+        ImageContext(TrimInBatches(max_images=args.max_images, min_images=args.min_images)),
         Actions(chain_policy=ObserveAfterInput()),
         PointerTools(),
         KeyboardTools(),

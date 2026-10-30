@@ -3,7 +3,7 @@ from browserrig.core.modes import CanvasMode, DomMode
 from .capture import CanvasCapture, CaptureContent, CaptureStrategy, DomCapture, capture
 from .config import Screenshots, ScreenshotTrigger
 from .handle import ElementHandle
-from .images import ImageContext
+from .images import ImageContext, ImageRetention, TrimInBatches, UntilCompaction
 from .models import CapturedImage, Element, Snapshot
 from .plugin import Observe
 from .regions import CanvasRegion, CaptureRegion
@@ -18,6 +18,9 @@ __all__ = [
     "Screenshots",
     "ScreenshotTrigger",
     "ImageContext",
+    "ImageRetention",
+    "TrimInBatches",
+    "UntilCompaction",
     "CapturedImage",
     "CanvasRegion",
     "CaptureRegion",

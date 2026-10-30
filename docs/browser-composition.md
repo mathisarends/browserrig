@@ -13,7 +13,7 @@ from browserrig import (
     Actions, Activity, CanvasCapture, CanvasReady, CanvasRegion, CanvasRenderer,
     Chrome, DocumentReadiness, ImageContext, KeyboardTools, LaunchBrowser,
     NavigationTools, Observe, ObserveAfterInput, PointerTools, Readiness,
-    ReadinessOptions, Screenshots, ScreenshotTrigger, TabTools,
+    ReadinessOptions, Screenshots, ScreenshotTrigger, TabTools, TrimInBatches,
 )
 
 agent = Agent(
@@ -33,7 +33,7 @@ agent = Agent(
             renderer=CanvasRenderer(),
             screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
         ),
-        ImageContext(max_images=6, min_images=3),
+        ImageContext(TrimInBatches(max_images=6, min_images=3)),
         Actions(chain_policy=ObserveAfterInput()),
         PointerTools(),
         KeyboardTools(),
@@ -57,13 +57,15 @@ work in both recipes. `DomTools` owns ref-based click, drag, typing and form too
 `KeyboardTools` owns input to the current focus. DOM tools validate the capture's
 `provides_dom_refs` capability at setup. Empty pages can still have that capability.
 
-## The two screenshot settings
+## Screenshot settings
 
 | Setting | Meaning |
 | --- | --- |
 | `Screenshots(trigger=ScreenshotTrigger.EACH_STEP)` | One new screenshot at the observation boundary before each model step. |
 | `Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)` | Capture at the next boundary only after the `screenshot` tool was called. This is the default for explicit composition. |
-| `ImageContext(max_images=6, min_images=3)` | Keep up to six actual captures; when a seventh arrives, drop the oldest until three remain. Defaults: `max_images=1`, `min_images=max_images // 2` (at least one). Both must be positive integers with `min_images <= max_images`. |
+| `ImageContext(TrimInBatches(max_images=6, min_images=3))` | Keep up to six captures; when a seventh arrives, drop the oldest until three remain. Defaults: `max_images=1`, `min_images=max_images // 2` (at least one). Both must be positive integers with `min_images <= max_images`. `ImageContext()` keeps one image. |
+| `ImageContext(UntilCompaction())` | Never trim. Images leave history when compaction summarizes the steps they were captured in. Use it with a `Compaction` plugin, otherwise image history grows without limit. |
+| `ImageContext(..., skip_unchanged=False)` | Also add captures identical to the latest image. By default, a capture with the same pixels, crop, tab and document is not added again, and the last line of the request says the screen is unchanged. |
 
 Calling `screenshot` with `EACH_STEP` does not create a second image. `observe`
 refreshes text and refs without returning an image in the tool result. Internal
@@ -83,6 +85,11 @@ Each image sits directly after the browser observation it was captured with and 
 a fixed caption, so earlier requests stay a prefix of later ones and provider prompt
 caching keeps working while images accumulate. Trimming in batches changes that
 prefix once per `max_images - min_images + 1` captures instead of on every step.
+After a compaction, images whose observation was summarized are dropped from the next
+request on; the latest image always stays, because coordinate tools use it. Images
+whose observation was only dropped by `LatestObservationOnly` stay in place until then.
+Custom retention implements `ImageRetention.overflow(count)`, the number of oldest
+images to drop after one was added.
 With Anthropic models, place the cache breakpoint before the newest observation.
 
 ## Extension contracts

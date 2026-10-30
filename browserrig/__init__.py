@@ -21,10 +21,13 @@ from .observation import (
     DomMode,
     DomRenderer,
     ImageContext,
+    ImageRetention,
     Observe,
     Renderer,
     Screenshots,
     ScreenshotTrigger,
+    TrimInBatches,
+    UntilCompaction,
 )
 from .readiness import (
     CanvasReady,
@@ -61,6 +64,9 @@ __all__ = [
     "DomCapture",
     "DomRenderer",
     "ImageContext",
+    "ImageRetention",
+    "TrimInBatches",
+    "UntilCompaction",
     "Renderer",
     "Screenshots",
     "ScreenshotTrigger",
