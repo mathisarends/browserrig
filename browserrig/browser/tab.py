@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from typing import Any
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 from cdpify import CdpSession
 from cdpify.domains.page import (
@@ -15,7 +17,7 @@ from cdpify.domains.page import (
     JavascriptDialogOpeningEvent,
     NavigatedWithinDocumentEvent,
 )
-from cdpify.domains.runtime import CallArgument
+from cdpify.domains.runtime import CallArgument, RemoteObject
 from cdpify.exceptions import CDPCommandError
 from pydantic import BaseModel
 
@@ -248,6 +250,10 @@ class Tab:
     async def go_forward(self) -> bool:
         return await self._history(1)
 
+    async def can_go_forward(self) -> bool:
+        history = await self.cdp.page.get_navigation_history()
+        return history.current_index + 1 < len(history.entries)
+
     async def _history(self, offset: int) -> bool:
         history = await self.cdp.page.get_navigation_history()
         index = history.current_index + offset
@@ -258,6 +264,42 @@ class Tab:
 
     async def reload(self) -> None:
         await self.cdp.page.reload()
+
+    async def evaluate(self, expression: str, *, timeout: float = 10) -> str:
+        """Evaluate once in the main page world and render its completion value."""
+        group = f"browserrig-evaluate-{uuid4().hex}"
+        try:
+            async with asyncio.timeout(timeout):
+                result = await self.cdp.runtime.evaluate(
+                    expression=expression,
+                    object_group=group,
+                    return_by_value=True,
+                    await_promise=True,
+                    repl_mode=True,
+                    user_gesture=True,
+                    timeout=timeout * 1000,
+                )
+            if details := result.exception_details:
+                message = (
+                    _javascript_value(details.exception)
+                    if details.exception is not None
+                    else details.text
+                )
+                raise BrowserError(f"JavaScript failed: {message}")
+            return _javascript_value(result.result)
+        except TimeoutError as error:
+            raise BrowserError(f"JavaScript timed out after {timeout:g} seconds") from error
+        except CDPCommandError as error:
+            if error.message == "Object couldn't be returned by value":
+                raise BrowserError(
+                    "JavaScript executed, but its result cannot be returned by value; "
+                    "return JSON-serializable data"
+                ) from error
+            raise
+        finally:
+            self.invalidate_frames()
+            with suppress(CDPCommandError):
+                await self.cdp.runtime.release_object_group(object_group=group)
 
     async def handle_dialog(self, *, accept: bool, text: str = "") -> None:
         await self.cdp.page.handle_java_script_dialog(accept=accept, prompt_text=text)
@@ -274,6 +316,16 @@ class Tab:
 async def _frame_tree(cdp: CdpSession) -> FrameTree:
     result = await cdp.page.get_frame_tree()
     return result.frame_tree
+
+
+def _javascript_value(value: RemoteObject) -> str:
+    if value.unserializable_value is not None:
+        return value.unserializable_value
+    if value.type == "undefined":
+        return "undefined"
+    if value.value is None and value.subtype != "null" and value.description is not None:
+        return value.description
+    return json.dumps(value.value, ensure_ascii=False)
 
 
 def validated_url(url: str) -> str:

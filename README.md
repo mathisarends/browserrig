@@ -289,6 +289,32 @@ frames before clicking. Unreachable frames and content limits are reported in
 `limitations`, while usable frames remain available. Frame discovery is bounded
 to 64 frames and eight levels; perspective transforms are reported as unsupported.
 
+## JavaScript shell and forward navigation
+
+`execute_javascript(code="1 + 1")` runs JavaScript through CDP's `Runtime.evaluate`
+in the active tab's main page context. It is available in DOM and canvas mode.
+The tool returns the last expression's value, supports top-level `await`, and keeps
+variables between calls until the page navigates. Use `await` for Promise results.
+Return plain objects and arrays
+for JSON results; `undefined`, `NaN`, infinities, and BigInts retain their JavaScript
+representation. JavaScript exceptions and execution timeouts become tool errors.
+`timeout` is in seconds, defaults to 10, and accepts up to 30. A timeout can leave
+asynchronous side effects pending; observe the page before retrying.
+
+```javascript
+const heading = document.querySelector('h1');
+({ title: document.title, heading: heading?.textContent });
+```
+
+`go_forward()` navigates to the next browser history entry, complementing
+`go_back()`. Its tool result confirms `Navigated forward.` or reports
+`Cannot go forward: no next history entry` when no forward navigation is possible.
+
+Direct Python callers can use `await tab.evaluate("1 + 1")` for a rendered result,
+`await tab.can_go_forward()` to check availability, and `await tab.go_forward()`
+for a boolean indicating whether a history navigation was dispatched. Agent tools
+use the shared action lock, readiness checks, and action receipts.
+
 ## Page content as Markdown
 
 The agent can call `extract_content(max_chars=50000)` to read the active page as

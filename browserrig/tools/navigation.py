@@ -61,6 +61,28 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents)):
             operation=back,
         )
 
+    @tool(
+        description=(
+            "Go to the next browser history entry. Reports an error if forward navigation "
+            "is unavailable."
+        )
+    )
+    async def go_forward(self, *, actions: Inject[Actions]) -> str:
+        async def check(tab: Tab) -> None:
+            if not await tab.can_go_forward():
+                raise BrowserError("Cannot go forward: no next history entry")
+
+        async def forward(tab: Tab) -> Effect:
+            if not await tab.go_forward():
+                raise BrowserError("Cannot go forward: no next history entry")
+            return Effect("Navigated forward.")
+
+        return await actions.run(
+            kind=ActionKind.NAVIGATE,
+            operation=forward,
+            check=check,
+        )
+
     @tool(description="Reload the active tab.")
     async def reload(self, *, actions: Inject[Actions]) -> str:
         async def reload(tab: Tab) -> Effect:

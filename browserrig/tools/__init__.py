@@ -2,6 +2,7 @@ from .dialogs import DialogTools
 from .execution import Actions
 from .files import FileTools, UploadTools
 from .forms import FormTools
+from .javascript import JavaScriptTools
 from .keyboard import KeyboardTools
 from .mouse import MouseTools
 from .navigation import NavigationTools
@@ -12,6 +13,7 @@ __all__ = [
     "DialogTools",
     "FileTools",
     "FormTools",
+    "JavaScriptTools",
     "KeyboardTools",
     "MouseTools",
     "NavigationTools",

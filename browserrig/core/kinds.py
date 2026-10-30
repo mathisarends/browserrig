@@ -29,6 +29,7 @@ class ActivityOutcome(StrEnum):
 
 class ActionKind(StrEnum):
     NAVIGATE = "navigate"
+    JAVASCRIPT = "javascript"
     CLICK = "click"
     DOUBLE_CLICK = "double_click"
     DRAG = "drag"
