@@ -68,22 +68,6 @@ class Recording(Plugin, needs=(Browser, BrowserEvents, SessionLog, Readiness), p
         await asyncio.to_thread(self._state.directory.mkdir, parents=True, exist_ok=False)
         ctx.effect(self._finalize)
 
-    @hook(ReadyEvent)
-    async def _on_ready(self, event: ReadyEvent) -> None:
-        browser = self._browser
-        try:
-            active = browser.active_tab
-        except BrowserError:
-            return
-        if event.target_id != active.id or self._state.paused:
-            return
-        if self._state.start_task is not None and not self._state.start_task.done():
-            return
-        self._state.start_task = asyncio.create_task(
-            self.ensure_started(active), name="browserrig:recording-start"
-        )
-        self._state.start_task.add_done_callback(_retrieve_failure)
-
     async def ensure_started(self, tab: Tab, *, geometry: Geometry | None = None) -> None:
         async with self._state.lock:
             if tab.closed:
@@ -121,6 +105,22 @@ class Recording(Plugin, needs=(Browser, BrowserEvents, SessionLog, Readiness), p
                 await self._failed(
                     f"Native recording start failed ({type(error).__name__}: {error})"
                 )
+
+    @hook(ReadyEvent)
+    async def _on_ready(self, event: ReadyEvent) -> None:
+        browser = self._browser
+        try:
+            active = browser.active_tab
+        except BrowserError:
+            return
+        if event.target_id != active.id or self._state.paused:
+            return
+        if self._state.start_task is not None and not self._state.start_task.done():
+            return
+        self._state.start_task = asyncio.create_task(
+            self.ensure_started(active), name="browserrig:recording-start"
+        )
+        self._state.start_task.add_done_callback(_retrieve_failure)
 
     async def _failed(self, reason: str) -> None:
         self._state.failed = True

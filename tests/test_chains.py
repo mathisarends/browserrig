@@ -42,32 +42,6 @@ def _element(**values):
     )
 
 
-def _snapshot(**values):
-    fields = {
-        "id": "before",
-        "tab_id": "tab",
-        "document_id": "doc",
-        "url": "https://example.org/",
-        "title": "Form",
-        "mode": "dom",
-        "readiness": "ready",
-        "width": 800,
-        "height": 600,
-        "scroll_y": 0,
-        "fingerprint": "first",
-        "elements": (_element(),),
-    }
-    return Snapshot.model_validate(fields | values)
-
-
-def _batch(*responses):
-    return [
-        ModelChunk(tool_call=tool_call)
-        for response in responses
-        for tool_call in response.message.tool_calls
-    ]
-
-
 def test_probe_changes_ignore_values_cosmetic_text_ref_renaming_and_prepared_scroll():
     before = _snapshot(elements=(_element(in_viewport=False),))
     after = _snapshot(
@@ -241,3 +215,29 @@ async def test_failed_comparison_keeps_input_successful_and_breaks_the_chain():
     assert "Entered once" in result.text and "could not be checked" in result.text
     assert any(isinstance(event, ActionFinishedEvent) for event in events)
     assert not any(isinstance(event, ActionFailedEvent) for event in events)
+
+
+def _snapshot(**values):
+    fields = {
+        "id": "before",
+        "tab_id": "tab",
+        "document_id": "doc",
+        "url": "https://example.org/",
+        "title": "Form",
+        "mode": "dom",
+        "readiness": "ready",
+        "width": 800,
+        "height": 600,
+        "scroll_y": 0,
+        "fingerprint": "first",
+        "elements": (_element(),),
+    }
+    return Snapshot.model_validate(fields | values)
+
+
+def _batch(*responses):
+    return [
+        ModelChunk(tool_call=tool_call)
+        for response in responses
+        for tool_call in response.message.tool_calls
+    ]

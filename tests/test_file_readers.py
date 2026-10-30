@@ -21,13 +21,6 @@ from pptx import Presentation
 from browserrig import FileSystem, FileSystemOptions
 
 
-@pytest.fixture(name="files")
-def _files(tmp_path):
-    result = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
-    result.initialize()
-    return result
-
-
 def test_xlsx_preserves_coordinates_formulas_formats_and_hidden_content(files):
     path = files.directory / "report.xlsx"
     book = Workbook()
@@ -422,3 +415,10 @@ def test_derived_cache_cannot_follow_a_directory_symlink_outside_workspace(files
     with pytest.raises(ValueError, match="outside the workspace"):
         files.read_file("page.html")
     assert not list(outside.iterdir())
+
+
+@pytest.fixture(name="files")
+def _files(tmp_path):
+    result = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
+    result.initialize()
+    return result

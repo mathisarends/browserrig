@@ -12,6 +12,33 @@ from browserrig import FileSystem, FileSystemOptions
 _MANIFEST = Path(__file__).with_name("file_corpus.json")
 
 
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("directory", type=Path)
+    parser.add_argument("--download", action="store_true")
+    parser.add_argument("--worker", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--workspace", type=Path, help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    directory = args.directory.resolve()
+    manifest = json.loads(_MANIFEST.read_text(encoding="utf-8"))
+    if args.worker is not None:
+        entry = manifest[args.worker]
+        print(json.dumps(_worker(directory / entry["name"], args.workspace, entry)))
+        return 0
+    directory.mkdir(parents=True, exist_ok=True)
+    workspace = directory / ".validation" / uuid4().hex
+    results = []
+    for index, entry in enumerate(manifest):
+        _source(directory, entry, args.download)
+        result = _run(directory, workspace, index, entry)
+        results.append(result)
+        print(json.dumps(result), flush=True)
+        (directory / "corpus-results.json").write_text(
+            json.dumps(results, indent=2) + "\n", encoding="utf-8"
+        )
+    return int(any(not result["passed"] for result in results))
+
+
 def _source(directory: Path, entry: dict, download: bool) -> Path:
     path = directory / entry["name"]
     if not path.exists() and download:
@@ -96,33 +123,6 @@ def _run(directory: Path, workspace: Path, index: int, entry: dict) -> dict:
         return json.loads(process.stdout.strip().splitlines()[-1])
     except (subprocess.SubprocessError, ValueError) as error:
         return {"name": entry["name"], "passed": False, "error": str(error)}
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("directory", type=Path)
-    parser.add_argument("--download", action="store_true")
-    parser.add_argument("--worker", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("--workspace", type=Path, help=argparse.SUPPRESS)
-    args = parser.parse_args()
-    directory = args.directory.resolve()
-    manifest = json.loads(_MANIFEST.read_text(encoding="utf-8"))
-    if args.worker is not None:
-        entry = manifest[args.worker]
-        print(json.dumps(_worker(directory / entry["name"], args.workspace, entry)))
-        return 0
-    directory.mkdir(parents=True, exist_ok=True)
-    workspace = directory / ".validation" / uuid4().hex
-    results = []
-    for index, entry in enumerate(manifest):
-        _source(directory, entry, args.download)
-        result = _run(directory, workspace, index, entry)
-        results.append(result)
-        print(json.dumps(result), flush=True)
-        (directory / "corpus-results.json").write_text(
-            json.dumps(results, indent=2) + "\n", encoding="utf-8"
-        )
-    return int(any(not result["passed"] for result in results))
 
 
 if __name__ == "__main__":

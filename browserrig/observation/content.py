@@ -12,14 +12,6 @@ from browserrig.scripts.models import ContentArgs, ContentExtraction
 from .dom import seed_frame
 
 
-def _heading(text: str) -> str:
-    return re.sub(r"([\\`*_[\]<>#])", r"\\\1", " ".join(text.split()))
-
-
-def _source(url: str) -> str:
-    return url.replace("<", "%3C").replace(">", "%3E").replace("\n", "%0A").replace("\r", "%0D")
-
-
 class PageContent(Options):
     url: str
     title: str
@@ -99,3 +91,11 @@ async def extract_content(tab: Tab, *, max_chars: int = 50000) -> PageContent:
         markdown="".join(parts).strip(),
         limitations=tuple(dict.fromkeys(limitations)),
     )
+
+
+def _heading(text: str) -> str:
+    return re.sub(r"([\\`*_[\]<>#])", r"\\\1", " ".join(text.split()))
+
+
+def _source(url: str) -> str:
+    return url.replace("<", "%3C").replace(">", "%3E").replace("\n", "%0A").replace("\r", "%0D")

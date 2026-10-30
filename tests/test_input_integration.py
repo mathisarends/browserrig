@@ -62,6 +62,91 @@ async def test_typing_shortcuts_stream_and_storage(site, tmp_path, canvas):
     _assert_events(streamed, output.getvalue(), directory, canvas)
 
 
+async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_action(site):
+    holder = {}
+    output = io.StringIO()
+
+    class Access(Plugin, needs=(Browser,)):
+        async def setup(self, browser: Inject[Browser]):
+            holder["browser"] = browser
+
+    agent = BrowserAgent(
+        model=ScriptedModel(["First", "Second"]),
+        browser=LaunchBrowser(url=site),
+        plugins=[TerminalEvents(output), Access()],
+    )
+    async with agent.session() as session:
+        streamed = []
+        ready = asyncio.Event()
+        consumer = asyncio.create_task(_consume(session, streamed, ready))
+        await ready.wait()
+        tab = holder["browser"].active_tab
+        position = tab.mouse.position
+        width, height = await evaluate(tab, "[innerWidth, innerHeight]")
+        assert 0.35 * width <= position.x <= 0.65 * width
+        assert 0.35 * height <= position.y <= 0.65 * height
+        await session.run("Inspect without moving")
+        await session.run("Continue without moving")
+        assert tab.mouse.position == position
+        assert not any(isinstance(event, InputEvent) for event in session.events)
+    await consumer
+    states = [event for event in streamed if isinstance(event, CursorStateEvent)]
+    assert len(states) == 2
+    assert all((event.x, event.y) == (position.x, position.y) for event in states)
+    assert all(
+        event.browser_id and event.target_id == tab.id and not event.action_id for event in states
+    )
+    assert not any(isinstance(event, CursorMovedEvent) for event in streamed)
+    first_cursor = next(
+        index for index, event in enumerate(streamed) if isinstance(event, CursorStateEvent)
+    )
+    first_model = next(
+        index for index, event in enumerate(streamed) if isinstance(event, ModelRequestedEvent)
+    )
+    assert first_cursor < first_model
+    records = [json.loads(line) for line in output.getvalue().splitlines()]
+    cursor = next(record for record in records if record["type"] == "browser.cursor.state")
+    assert (cursor["x"], cursor["y"]) == (position.x, position.y)
+
+
+async def test_element_highlight_uses_live_bounds_after_scroll(site):
+    holder = {}
+    output = io.StringIO()
+
+    class Access(Plugin, needs=(Actions,)):
+        async def setup(self, actions: Inject[Actions]):
+            holder["actions"] = actions
+
+    agent = BrowserAgent(
+        model=ScriptedModel(["Observed"]),
+        browser=LaunchBrowser(url=site),
+        plugins=[TerminalEvents(output), Access()],
+    )
+    async with agent.session() as session:
+        await session.run("Observe")
+        actions = holder["actions"]
+        tab = actions.browser.active_tab
+        ref = next(
+            element.ref for element in actions.observe.snapshot.elements if element.name == "Email"
+        )
+        await evaluate(
+            tab,
+            "Object.assign(document.querySelector('#email').style, "
+            "{position:'absolute',top:'1800px',left:'30px'})",
+        )
+        point = await actions.element_point(tab=tab, ref=ref)
+        actual = await evaluate(
+            tab,
+            "(() => { const r = document.querySelector('#email').getBoundingClientRect();"
+            "return {x:r.x,y:r.y,width:r.width,height:r.height}; })()",
+        )
+        assert point.scrolled
+        assert point.bounds.model_dump() == actual
+    records = [json.loads(line) for line in output.getvalue().splitlines()]
+    highlight = next(record for record in records if record["type"] == "browser.element.highlight")
+    assert {key: highlight[key] for key in actual} == actual
+
+
 def _typing_model(holder, canvas):
     text = "Grüße + 🙂"
     shortcut = ToolCall("send_keys", {"key": "a", "hold_control": True})
@@ -146,91 +231,6 @@ def _assert_events(streamed, output, directory, canvas):
         assert '"browser.cursor.moved"' not in stored
 
 
-async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_action(site):
-    holder = {}
-    output = io.StringIO()
-
-    class Access(Plugin, needs=(Browser,)):
-        async def setup(self, browser: Inject[Browser]):
-            holder["browser"] = browser
-
-    agent = BrowserAgent(
-        model=ScriptedModel(["First", "Second"]),
-        browser=LaunchBrowser(url=site),
-        plugins=[TerminalEvents(output), Access()],
-    )
-    async with agent.session() as session:
-        streamed = []
-        ready = asyncio.Event()
-        consumer = asyncio.create_task(_consume(session, streamed, ready))
-        await ready.wait()
-        tab = holder["browser"].active_tab
-        position = tab.mouse.position
-        width, height = await evaluate(tab, "[innerWidth, innerHeight]")
-        assert 0.35 * width <= position.x <= 0.65 * width
-        assert 0.35 * height <= position.y <= 0.65 * height
-        await session.run("Inspect without moving")
-        await session.run("Continue without moving")
-        assert tab.mouse.position == position
-        assert not any(isinstance(event, InputEvent) for event in session.events)
-    await consumer
-    states = [event for event in streamed if isinstance(event, CursorStateEvent)]
-    assert len(states) == 2
-    assert all((event.x, event.y) == (position.x, position.y) for event in states)
-    assert all(
-        event.browser_id and event.target_id == tab.id and not event.action_id for event in states
-    )
-    assert not any(isinstance(event, CursorMovedEvent) for event in streamed)
-    first_cursor = next(
-        index for index, event in enumerate(streamed) if isinstance(event, CursorStateEvent)
-    )
-    first_model = next(
-        index for index, event in enumerate(streamed) if isinstance(event, ModelRequestedEvent)
-    )
-    assert first_cursor < first_model
-    records = [json.loads(line) for line in output.getvalue().splitlines()]
-    cursor = next(record for record in records if record["type"] == "browser.cursor.state")
-    assert (cursor["x"], cursor["y"]) == (position.x, position.y)
-
-
 def _ref(request, name):
     state = latest(request.messages)
     return next(element["ref"] for element in state["elements"] if element["name"] == name)
-
-
-async def test_element_highlight_uses_live_bounds_after_scroll(site):
-    holder = {}
-    output = io.StringIO()
-
-    class Access(Plugin, needs=(Actions,)):
-        async def setup(self, actions: Inject[Actions]):
-            holder["actions"] = actions
-
-    agent = BrowserAgent(
-        model=ScriptedModel(["Observed"]),
-        browser=LaunchBrowser(url=site),
-        plugins=[TerminalEvents(output), Access()],
-    )
-    async with agent.session() as session:
-        await session.run("Observe")
-        actions = holder["actions"]
-        tab = actions.browser.active_tab
-        ref = next(
-            element.ref for element in actions.observe.snapshot.elements if element.name == "Email"
-        )
-        await evaluate(
-            tab,
-            "Object.assign(document.querySelector('#email').style, "
-            "{position:'absolute',top:'1800px',left:'30px'})",
-        )
-        point = await actions.element_point(tab=tab, ref=ref)
-        actual = await evaluate(
-            tab,
-            "(() => { const r = document.querySelector('#email').getBoundingClientRect();"
-            "return {x:r.x,y:r.y,width:r.width,height:r.height}; })()",
-        )
-        assert point.scrolled
-        assert point.bounds.model_dump() == actual
-    records = [json.loads(line) for line in output.getvalue().splitlines()]
-    highlight = next(record for record in records if record["type"] == "browser.element.highlight")
-    assert {key: highlight[key] for key in actual} == actual

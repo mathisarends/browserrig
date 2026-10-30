@@ -1,31 +1,12 @@
-from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
 
-from . import containers, data, documents, imaging, spreadsheets
-from .config import FileSystemOptions
-from .content import ParsedContent, ReadRequest
+from . import data, documents, imaging, spreadsheets
+from ._adapters import Reader
+from ._adapters import container as _container
+from ._adapters import document as _document
+from ._adapters import ocr as _ocr
+from ._adapters import selected as _selected
 from .kinds import FileExtension as Ext
-
-type Reader = Callable[[Path, ReadRequest, FileSystemOptions], ParsedContent]
-
-
-def _document(reader: Callable[[Path], ParsedContent]) -> Reader:
-    return lambda path, _request, _options: reader(path)
-
-
-def _selected(reader: Callable[[Path, ReadRequest], ParsedContent]) -> Reader:
-    return lambda path, request, _options: reader(path, request)
-
-
-def _ocr(reader: Callable[[Path, ReadRequest, bool], ParsedContent]) -> Reader:
-    return lambda path, request, options: reader(path, request, options.ocr)
-
-
-def _container(format_: str) -> Reader:
-    return lambda path, _request, options: containers.container_index(
-        path, format_, options.max_expanded_bytes
-    )
 
 
 @dataclass(frozen=True, slots=True)

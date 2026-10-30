@@ -8,41 +8,6 @@ from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 
-@pytest.fixture(name="xlsx_document")
-def _xlsx_document() -> bytes:
-    book = Workbook()
-    sheet = book.active
-    sheet.title = "Revenue"
-    sheet.append(["Mission", "Value", "Formula"])
-    sheet.append(["Voyager", 42, "=B2*2"])
-    output = BytesIO()
-    book.save(output)
-    return output.getvalue()
-
-
-@pytest.fixture(name="pdf_document")
-def _pdf_document() -> bytes:
-    writer = PdfWriter()
-    for text in ("First page: Voyager 1", "Second page: Voyager 2"):
-        page = writer.add_blank_page(width=612, height=792)
-        font = DictionaryObject(
-            {
-                NameObject("/Type"): NameObject("/Font"),
-                NameObject("/Subtype"): NameObject("/Type1"),
-                NameObject("/BaseFont"): NameObject("/Helvetica"),
-            }
-        )
-        page[NameObject("/Resources")] = DictionaryObject(
-            {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})}
-        )
-        stream = DecodedStreamObject()
-        stream.set_data(f"BT /F1 18 Tf 72 720 Td ({text}) Tj ET".encode())
-        page.replace_contents(stream)
-    output = BytesIO()
-    writer.write(output)
-    return output.getvalue()
-
-
 @pytest.fixture
 async def site(pdf_document, xlsx_document) -> AsyncIterator[str]:
     pages = {
@@ -168,3 +133,38 @@ async def site(pdf_document, xlsx_document) -> AsyncIterator[str]:
     finally:
         server.close()
         await server.wait_closed()
+
+
+@pytest.fixture(name="xlsx_document")
+def _xlsx_document() -> bytes:
+    book = Workbook()
+    sheet = book.active
+    sheet.title = "Revenue"
+    sheet.append(["Mission", "Value", "Formula"])
+    sheet.append(["Voyager", 42, "=B2*2"])
+    output = BytesIO()
+    book.save(output)
+    return output.getvalue()
+
+
+@pytest.fixture(name="pdf_document")
+def _pdf_document() -> bytes:
+    writer = PdfWriter()
+    for text in ("First page: Voyager 1", "Second page: Voyager 2"):
+        page = writer.add_blank_page(width=612, height=792)
+        font = DictionaryObject(
+            {
+                NameObject("/Type"): NameObject("/Font"),
+                NameObject("/Subtype"): NameObject("/Type1"),
+                NameObject("/BaseFont"): NameObject("/Helvetica"),
+            }
+        )
+        page[NameObject("/Resources")] = DictionaryObject(
+            {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})}
+        )
+        stream = DecodedStreamObject()
+        stream.set_data(f"BT /F1 18 Tf 72 720 Td ({text}) Tj ET".encode())
+        page.replace_contents(stream)
+    output = BytesIO()
+    writer.write(output)
+    return output.getvalue()

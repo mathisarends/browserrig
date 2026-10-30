@@ -31,26 +31,6 @@ def read_html(path: Path) -> ParsedContent:
     return ParsedContent((html_text(path.read_bytes()),), "html")
 
 
-def _docx_table(table: Table) -> Iterator[str]:
-    for index, row in enumerate(table.rows, 1):
-        yield f"### Table row {index}\n\n"
-        for column, cell in enumerate(row.cells, 1):
-            yield f"Cell {index},{column}:\n\n"
-            yield from _docx_blocks(cell)
-
-
-def _docx_blocks(parent) -> Iterator[str]:
-    for block in parent.iter_inner_content():
-        if isinstance(block, Table):
-            yield from _docx_table(block)
-        else:
-            style = block.style.name if block.style is not None else ""
-            prefix = ""
-            if style.startswith("Heading ") and style[-1:].isdigit():
-                prefix = "#" * min(6, int(style[-1:])) + " "
-            yield prefix + block.text + "\n\n"
-
-
 def read_docx(path: Path) -> ParsedContent:
     document = Document(str(path))
 
@@ -215,3 +195,23 @@ def read_mhtml(path: Path) -> ParsedContent:
         if part.get_content_type() == "text/html":
             blocks.append(html_text(part.get_content()) + "\n\n")
     return ParsedContent(blocks, "mhtml", ["Non-HTML embedded resources are not extracted"])
+
+
+def _docx_table(table: Table) -> Iterator[str]:
+    for index, row in enumerate(table.rows, 1):
+        yield f"### Table row {index}\n\n"
+        for column, cell in enumerate(row.cells, 1):
+            yield f"Cell {index},{column}:\n\n"
+            yield from _docx_blocks(cell)
+
+
+def _docx_blocks(parent) -> Iterator[str]:
+    for block in parent.iter_inner_content():
+        if isinstance(block, Table):
+            yield from _docx_table(block)
+        else:
+            style = block.style.name if block.style is not None else ""
+            prefix = ""
+            if style.startswith("Heading ") and style[-1:].isdigit():
+                prefix = "#" * min(6, int(style[-1:])) + " "
+            yield prefix + block.text + "\n\n"

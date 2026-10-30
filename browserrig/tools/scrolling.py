@@ -9,32 +9,6 @@ from browserrig.scripts import SCROLL, SCROLL_OWNER
 from browserrig.scripts.models import OwnerScrollArgs, ScrollArgs, ScrollPlan
 
 
-async def _plan(handle: ElementHandle) -> tuple[Frame, ScrollPlan] | None:
-    frame = handle.frame
-    ancestors: list[Frame] = []
-    current = frame
-    while current.parent is not None:
-        ancestors.append(current)
-        current = current.parent
-    target = None
-    if ancestors:
-        target = frame.transform.bounds_to_viewport(await handle.bounds())
-    for child in reversed(ancestors):
-        parent = child.parent
-        assert parent is not None
-        clip = parent.local_visible
-        assert target is not None
-        local = parent.transform.bounds_to_local(target)
-        raw = await child.run_on_owner(
-            SCROLL_OWNER, OwnerScrollArgs(clip=clip, target_bounds=local)
-        )
-        if raw is not None:
-            return parent, raw
-    clip = frame.local_visible
-    raw = await handle.run(SCROLL, ScrollArgs(clip=clip))
-    return (frame, raw) if raw is not None else None
-
-
 async def prepare_element(tab: Tab, handle: ElementHandle) -> bool:
     """Bring a DOM target into a comfortable view using native wheel input, outer frames first."""
     scrolled = False
@@ -66,3 +40,29 @@ async def prepare_element(tab: Tab, handle: ElementHandle) -> bool:
             scrolled = True
             await asyncio.sleep(0.05)
     raise BrowserError("Element could not be brought into view using wheel input; observe again")
+
+
+async def _plan(handle: ElementHandle) -> tuple[Frame, ScrollPlan] | None:
+    frame = handle.frame
+    ancestors: list[Frame] = []
+    current = frame
+    while current.parent is not None:
+        ancestors.append(current)
+        current = current.parent
+    target = None
+    if ancestors:
+        target = frame.transform.bounds_to_viewport(await handle.bounds())
+    for child in reversed(ancestors):
+        parent = child.parent
+        assert parent is not None
+        clip = parent.local_visible
+        assert target is not None
+        local = parent.transform.bounds_to_local(target)
+        raw = await child.run_on_owner(
+            SCROLL_OWNER, OwnerScrollArgs(clip=clip, target_bounds=local)
+        )
+        if raw is not None:
+            return parent, raw
+    clip = frame.local_visible
+    raw = await handle.run(SCROLL, ScrollArgs(clip=clip))
+    return (frame, raw) if raw is not None else None

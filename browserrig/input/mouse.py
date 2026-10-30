@@ -78,33 +78,6 @@ class Mouse:
         finally:
             await self.publish_cursor()
 
-    async def _dispatch(
-        self,
-        kind: Literal[MouseEventKind.MOVED, MouseEventKind.PRESSED, MouseEventKind.RELEASED],
-        point: Point,
-        *,
-        buttons: int = 0,
-        click_count: int = 0,
-    ) -> None:
-        await self._cdp.input.dispatch_mouse_event(
-            type=kind.value,
-            x=point.x,
-            y=point.y,
-            button=MouseButton.LEFT
-            if buttons or kind is MouseEventKind.RELEASED
-            else MouseButton.NONE,
-            buttons=buttons,
-            click_count=click_count,
-        )
-        self.position = point
-        self._layout_changed()
-        if kind is MouseEventKind.MOVED:
-            if buttons:
-                await self._emit(CursorStateEvent(x=point.x, y=point.y, buttons=buttons))
-            return
-        event_type = PointerPressedEvent if kind is MouseEventKind.PRESSED else PointerReleasedEvent
-        await self._emit(event_type(x=point.x, y=point.y, click_count=click_count))
-
     async def click(self, point: Point, *, count: Literal[1, 2] = 1) -> None:
         await self.move_to(point)
         for click_count in range(1, count + 1):
@@ -176,21 +149,6 @@ class Mouse:
         finally:
             await self._release_drag(current, data, dropped=dropped, mode=mode)
 
-    async def _release_drag(
-        self, point: Point, data: DragData | None, *, dropped: bool, mode: DragMode
-    ) -> None:
-        try:
-            if data is not None and not dropped:
-                await self._cdp.input.dispatch_drag_event(
-                    type="dragCancel", x=point.x, y=point.y, data=data
-                )
-        finally:
-            try:
-                await self._dispatch(MouseEventKind.RELEASED, point, buttons=0, click_count=1)
-            finally:
-                if mode is DragMode.HTML5:
-                    await self._cdp.input.set_intercept_drags(enabled=False)
-
     async def scroll(self, *, point: Point, delta_y: float, delta_x: float = 0) -> None:
         if delta_y == 0 and delta_x == 0:
             return
@@ -213,3 +171,45 @@ class Mouse:
         await self._emit(
             ScrolledEvent(x=point.x, y=point.y, delta_x=delta_x, delta_y=delta_y, duration=duration)
         )
+
+    async def _dispatch(
+        self,
+        kind: Literal[MouseEventKind.MOVED, MouseEventKind.PRESSED, MouseEventKind.RELEASED],
+        point: Point,
+        *,
+        buttons: int = 0,
+        click_count: int = 0,
+    ) -> None:
+        await self._cdp.input.dispatch_mouse_event(
+            type=kind.value,
+            x=point.x,
+            y=point.y,
+            button=MouseButton.LEFT
+            if buttons or kind is MouseEventKind.RELEASED
+            else MouseButton.NONE,
+            buttons=buttons,
+            click_count=click_count,
+        )
+        self.position = point
+        self._layout_changed()
+        if kind is MouseEventKind.MOVED:
+            if buttons:
+                await self._emit(CursorStateEvent(x=point.x, y=point.y, buttons=buttons))
+            return
+        event_type = PointerPressedEvent if kind is MouseEventKind.PRESSED else PointerReleasedEvent
+        await self._emit(event_type(x=point.x, y=point.y, click_count=click_count))
+
+    async def _release_drag(
+        self, point: Point, data: DragData | None, *, dropped: bool, mode: DragMode
+    ) -> None:
+        try:
+            if data is not None and not dropped:
+                await self._cdp.input.dispatch_drag_event(
+                    type="dragCancel", x=point.x, y=point.y, data=data
+                )
+        finally:
+            try:
+                await self._dispatch(MouseEventKind.RELEASED, point, buttons=0, click_count=1)
+            finally:
+                if mode is DragMode.HTML5:
+                    await self._cdp.input.set_intercept_drags(enabled=False)

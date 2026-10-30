@@ -22,17 +22,6 @@ _OCR_LOCK = Lock()
 _PDF_LOCK = Lock()
 
 
-@cache
-def _engine() -> RapidOCR:
-    return import_module("rapidocr").RapidOCR(
-        params={
-            "Global.log_level": "error",
-            "EngineConfig.onnxruntime.intra_op_num_threads": 2,
-            "EngineConfig.onnxruntime.inter_op_num_threads": 1,
-        }
-    )
-
-
 def image_text(image: Image.Image) -> str:
     image = ImageOps.exif_transpose(image).convert("RGB")
     image.thumbnail((4000, 4000))
@@ -41,21 +30,6 @@ def image_text(image: Image.Image) -> str:
     with _OCR_LOCK:
         result = _engine()(buffer.getvalue())
     return "\n".join(getattr(result, "txts", None) or ())
-
-
-def _pdf_image(path: Path, number: int) -> Image.Image:
-    # PDFium is not thread-safe even for different documents.
-    with _PDF_LOCK, pypdfium2.PdfDocument(str(path)) as document:
-        page = document[number - 1]
-        try:
-            scale = min(2, 4000 / max(page.get_size()))
-            bitmap = page.render(scale=scale)
-            try:
-                return bitmap.to_pil().copy()
-            finally:
-                bitmap.close()
-        finally:
-            page.close()
 
 
 def read_pdf(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedContent:
@@ -123,3 +97,29 @@ def read_image(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedCont
         details.status = "metadata_only"
         details.limitations.append("No readable text was recognized in this image")
     return details
+
+
+@cache
+def _engine() -> RapidOCR:
+    return import_module("rapidocr").RapidOCR(
+        params={
+            "Global.log_level": "error",
+            "EngineConfig.onnxruntime.intra_op_num_threads": 2,
+            "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+        }
+    )
+
+
+def _pdf_image(path: Path, number: int) -> Image.Image:
+    # PDFium is not thread-safe even for different documents.
+    with _PDF_LOCK, pypdfium2.PdfDocument(str(path)) as document:
+        page = document[number - 1]
+        try:
+            scale = min(2, 4000 / max(page.get_size()))
+            bitmap = page.render(scale=scale)
+            try:
+                return bitmap.to_pil().copy()
+            finally:
+                bitmap.close()
+        finally:
+            page.close()

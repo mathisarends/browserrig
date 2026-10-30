@@ -33,12 +33,6 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class _TabState:
-    pending: ActionFinishedEvent | None = None
-    starts: dict[str, float] = field(default_factory=dict)
-
-
-@dataclass
 class _State:
     queued: dict[str, NudgeQueuedEvent] = field(default_factory=dict)
     tabs: dict[str, _TabState] = field(default_factory=dict)
@@ -66,11 +60,6 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
                     self._remove(ids)
                 case NudgeExpiredEvent(nudge_id=nudge_id):
                     self._remove((nudge_id,))
-
-    def _remove(self, ids: tuple[str, ...]) -> None:
-        self._state.queued = {
-            key: value for key, value in self._state.queued.items() if value.nudge_id not in ids
-        }
 
     async def queue(
         self,
@@ -100,6 +89,33 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
             removed = self._state.queued.pop(oldest)
             await self._events.emit(NudgeExpiredEvent(nudge_id=removed.nudge_id))
         await self._events.emit(event)
+
+    async def project(self, snapshot: Snapshot) -> Observation:
+        selected, size = [], 0
+        for key, event in tuple(self._state.queued.items()):
+            expired = (
+                event.browser_id != self._events.browser_id
+                or bool(event.target_id and event.target_id != snapshot.tab_id)
+                or bool(event.document_id and event.document_id != snapshot.document_id)
+            )
+            if expired:
+                self._state.queued.pop(key, None)
+                await self._events.emit(NudgeExpiredEvent(nudge_id=event.nudge_id))
+                continue
+            if size + len(event.text) <= self._max_chars and len(selected) < self._max_hints:
+                selected.append({"id": event.nudge_id, "text": event.text})
+                size += len(event.text)
+        return Observation(
+            source="browser.nudges",
+            full=yaml.safe_dump({"nudges": selected}, sort_keys=False, allow_unicode=True),
+            summary="Previous browser hints",
+            refs=tuple(item["id"] for item in selected),
+        )
+
+    def _remove(self, ids: tuple[str, ...]) -> None:
+        self._state.queued = {
+            key: value for key, value in self._state.queued.items() if value.nudge_id not in ids
+        }
 
     @hook(ActionStartedEvent)
     async def _on_start(self, event: ActionStartedEvent) -> None:
@@ -209,28 +225,6 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
             document_id=event.document_id,
         )
 
-    async def project(self, snapshot: Snapshot) -> Observation:
-        selected, size = [], 0
-        for key, event in tuple(self._state.queued.items()):
-            expired = (
-                event.browser_id != self._events.browser_id
-                or bool(event.target_id and event.target_id != snapshot.tab_id)
-                or bool(event.document_id and event.document_id != snapshot.document_id)
-            )
-            if expired:
-                self._state.queued.pop(key, None)
-                await self._events.emit(NudgeExpiredEvent(nudge_id=event.nudge_id))
-                continue
-            if size + len(event.text) <= self._max_chars and len(selected) < self._max_hints:
-                selected.append({"id": event.nudge_id, "text": event.text})
-                size += len(event.text)
-        return Observation(
-            source="browser.nudges",
-            full=yaml.safe_dump({"nudges": selected}, sort_keys=False, allow_unicode=True),
-            summary="Previous browser hints",
-            refs=tuple(item["id"] for item in selected),
-        )
-
     @hook(ObservationsIncludedEvent)
     async def _on_request(self, event: ObservationsIncludedEvent) -> None:
         refs = {
@@ -247,3 +241,9 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
                 NudgeIncludedEvent(nudge_ids=included, request_id=event.request_id)
             )
             self._remove(included)
+
+
+@dataclass
+class _TabState:
+    pending: ActionFinishedEvent | None = None
+    starts: dict[str, float] = field(default_factory=dict)

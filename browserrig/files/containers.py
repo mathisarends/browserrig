@@ -15,39 +15,6 @@ from zipfile import ZipFile
 from .content import ParsedContent, cell_text
 
 
-class _ByteSource(Protocol):
-    def read(self, size: int = -1, /) -> bytes: ...
-
-
-def _copy(source: _ByteSource, target: IO[bytes], limit: int) -> None:
-    remaining = limit
-    while data := source.read(min(65536, remaining + 1)):
-        remaining -= len(data)
-        if remaining < 0:
-            raise ValueError("Container entry exceeds max_expanded_bytes")
-        target.write(data)
-
-
-def _safe_member(name: str) -> None:
-    normalized = name.replace("\\", "/")
-    if (
-        "\0" in name
-        or PurePosixPath(normalized).is_absolute()
-        or PureWindowsPath(name).drive
-        or ".." in PurePosixPath(normalized).parts
-    ):
-        raise ValueError("Container member must be a relative path without traversal")
-
-
-def _tar_entries(archive: tarfile.TarFile, limit: int) -> Iterator[tarfile.TarInfo]:
-    expanded = 0
-    for entry in archive:
-        expanded += entry.size
-        if expanded > limit:
-            raise ValueError("Expanded TAR content exceeds max_expanded_bytes")
-        yield entry
-
-
 def container_index(path: Path, format_: str, limit: int) -> ParsedContent:
     details = ParsedContent((), format_)
 
@@ -140,6 +107,39 @@ def copy_entry(path: Path, format_: str, name: str, target: IO[bytes], limit: in
     else:
         raise ValueError("member is only supported for containers and email attachments")
     return name
+
+
+class _ByteSource(Protocol):
+    def read(self, size: int = -1, /) -> bytes: ...
+
+
+def _copy(source: _ByteSource, target: IO[bytes], limit: int) -> None:
+    remaining = limit
+    while data := source.read(min(65536, remaining + 1)):
+        remaining -= len(data)
+        if remaining < 0:
+            raise ValueError("Container entry exceeds max_expanded_bytes")
+        target.write(data)
+
+
+def _safe_member(name: str) -> None:
+    normalized = name.replace("\\", "/")
+    if (
+        "\0" in name
+        or PurePosixPath(normalized).is_absolute()
+        or PureWindowsPath(name).drive
+        or ".." in PurePosixPath(normalized).parts
+    ):
+        raise ValueError("Container member must be a relative path without traversal")
+
+
+def _tar_entries(archive: tarfile.TarFile, limit: int) -> Iterator[tarfile.TarInfo]:
+    expanded = 0
+    for entry in archive:
+        expanded += entry.size
+        if expanded > limit:
+            raise ValueError("Expanded TAR content exceeds max_expanded_bytes")
+        yield entry
 
 
 def _copy_message(path: Path, format_: str, name: str, target: IO[bytes], limit: int) -> str:

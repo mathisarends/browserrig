@@ -39,18 +39,6 @@ class Readiness(Plugin, provides=True, needs=(BrowserEvents,)):
     async def setup(self, ctx: Context) -> None:
         ctx.effect(self._cancel)
 
-    async def _cancel(self) -> None:
-        tasks = tuple(self._state.pending.values())
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        self._state.pending.clear()
-
-    @hook(AgentControlChangedEvent)
-    async def _on_control(self, event: AgentControlChangedEvent) -> None:
-        if event.state in (ControlState.ABORTING, ControlState.STOPPED):
-            await self._cancel()
-
     async def wait(
         self, tab: Tab, *, phase: ReadinessPhase = ReadinessPhase.OBSERVATION
     ) -> ReadinessReport:
@@ -67,6 +55,18 @@ class Readiness(Plugin, provides=True, needs=(BrowserEvents,)):
 
             task.add_done_callback(finished)
         return await asyncio.shield(self._state.pending[key])
+
+    async def _cancel(self) -> None:
+        tasks = tuple(self._state.pending.values())
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        self._state.pending.clear()
+
+    @hook(AgentControlChangedEvent)
+    async def _on_control(self, event: AgentControlChangedEvent) -> None:
+        if event.state in (ControlState.ABORTING, ControlState.STOPPED):
+            await self._cancel()
 
     async def _wait(self, tab: Tab, phase: ReadinessPhase) -> ReadinessReport:
         return await wait_for_page(

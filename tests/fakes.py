@@ -39,12 +39,12 @@ class FakeBrowser:
         self.files = None
         self.events = BrowserEvents(self.id, self._emit)
 
+    async def downloads(self):
+        return ()
+
     async def _emit(self, event):
         # Some tests build the fake without a log and never emit.
         await self.log.emit(event)
-
-    async def downloads(self):
-        return ()
 
 
 class FakeChrome(Plugin, needs=(SessionLog,)):

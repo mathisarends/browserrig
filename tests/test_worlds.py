@@ -10,28 +10,6 @@ from browserrig.browser.worlds import Worlds
 from browserrig.scripts import RESET
 
 
-def _frame():
-    cdp = SimpleNamespace(
-        session_id="session",
-        page=SimpleNamespace(
-            create_isolated_world=AsyncMock(
-                side_effect=[
-                    SimpleNamespace(execution_context_id=1),
-                    SimpleNamespace(execution_context_id=2),
-                ]
-            )
-        ),
-        runtime=SimpleNamespace(
-            call_function_on=AsyncMock(
-                return_value=SimpleNamespace(
-                    exception_details=None, result=SimpleNamespace(value=None)
-                )
-            )
-        ),
-    )
-    return Frame("frame", cdp, document_id="document", worlds=Worlds()), cdp
-
-
 async def test_world_is_shared_across_frame_discoveries_and_bound_to_document():
     frame, cdp = _frame()
     assert await frame.context() == await replace(frame).context() == 1
@@ -68,3 +46,25 @@ async def test_other_cdp_failures_are_not_retried():
     with pytest.raises(CDPCommandError):
         await frame.run(RESET)
     assert cdp.runtime.call_function_on.await_count == 1
+
+
+def _frame():
+    cdp = SimpleNamespace(
+        session_id="session",
+        page=SimpleNamespace(
+            create_isolated_world=AsyncMock(
+                side_effect=[
+                    SimpleNamespace(execution_context_id=1),
+                    SimpleNamespace(execution_context_id=2),
+                ]
+            )
+        ),
+        runtime=SimpleNamespace(
+            call_function_on=AsyncMock(
+                return_value=SimpleNamespace(
+                    exception_details=None, result=SimpleNamespace(value=None)
+                )
+            )
+        ),
+    )
+    return Frame("frame", cdp, document_id="document", worlds=Worlds()), cdp

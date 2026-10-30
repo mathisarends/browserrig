@@ -99,33 +99,6 @@ def role(document: Document, index: int) -> str:
     return _implicit_role(document, index)
 
 
-def _implicit_role(document: Document, index: int) -> str:
-    tag = document.tag(index)
-    attributes = document.attributes(index)
-    if tag in ("a", "area"):
-        return "link" if "href" in attributes else ""
-    if tag == "input":
-        default = "combobox" if "list" in attributes else "textbox"
-        return _INPUT_ROLES.get(input_type(document, index), default)
-    if tag == "select":
-        multiple = "multiple" in attributes or _number(attributes.get("size")) > 1
-        return "listbox" if multiple else "combobox"
-    if tag in ("img", "header", "footer", "section"):
-        return _conditional_role(document, index, tag, attributes)
-    return "textbox" if editable(document, index) else _TAG_ROLES.get(tag, "")
-
-
-def _conditional_role(document: Document, index: int, tag: str, attributes: dict[str, str]) -> str:
-    """Roles that images, headers, footers and sections only get in some contexts."""
-    if tag == "img":
-        return "img" if attributes.get("alt") != "" else ""
-    if tag == "section":
-        return "region" if "aria-label" in attributes or "aria-labelledby" in attributes else ""
-    if any(document.tag(parent) in _SCOPING for parent in document.ancestors(index)):
-        return ""
-    return "banner" if tag == "header" else "contentinfo"
-
-
 def name(document: Document, index: int, element_role: str) -> str:
     """Accessible name: aria-labelledby, aria-label, native labels, content, then title."""
     attributes = document.attributes(index)
@@ -135,30 +108,6 @@ def name(document: Document, index: int, element_role: str) -> str:
         or _own_name(document, index, element_role, attributes)
         or clean(attributes.get("title", ""))
     )
-
-
-def _own_name(document: Document, index: int, element_role: str, attributes: dict[str, str]) -> str:
-    tag = document.tag(index)
-    if tag in ("input", "select", "textarea", "meter", "progress"):
-        return _control_name(document, index, attributes)
-    if tag == "img":
-        return clean(attributes.get("alt", ""))
-    if tag == "fieldset":
-        legends = document.descendants(index, frozenset({"legend"}))
-        return document.text(legends[0]) if legends else ""
-    return "" if element_role in _NAME_FROM_CONTENT_EXCLUDED else document.text(index)
-
-
-def _control_name(document: Document, index: int, attributes: dict[str, str]) -> str:
-    labels = clean(" ".join(document.text(label) for label in document.labels(index)))
-    if labels:
-        return labels
-    kind = input_type(document, index)
-    if kind in ("button", "submit", "reset"):
-        return clean(attributes.get("value", _BUTTON_DEFAULTS.get(kind, "")))
-    if kind == "image":
-        return clean(attributes.get("alt", "") or attributes.get("value", ""))
-    return _BUTTON_DEFAULTS["file"] if kind == "file" else ""
 
 
 def labelled_by(document: Document, index: int) -> str:
@@ -300,6 +249,57 @@ def heading_level(document: Document, index: int) -> int:
         return level
     tag = document.tag(index)
     return int(tag[1]) if len(tag) == 2 and tag[0] == "h" and tag[1].isdigit() else 2
+
+
+def _implicit_role(document: Document, index: int) -> str:
+    tag = document.tag(index)
+    attributes = document.attributes(index)
+    if tag in ("a", "area"):
+        return "link" if "href" in attributes else ""
+    if tag == "input":
+        default = "combobox" if "list" in attributes else "textbox"
+        return _INPUT_ROLES.get(input_type(document, index), default)
+    if tag == "select":
+        multiple = "multiple" in attributes or _number(attributes.get("size")) > 1
+        return "listbox" if multiple else "combobox"
+    if tag in ("img", "header", "footer", "section"):
+        return _conditional_role(document, index, tag, attributes)
+    return "textbox" if editable(document, index) else _TAG_ROLES.get(tag, "")
+
+
+def _conditional_role(document: Document, index: int, tag: str, attributes: dict[str, str]) -> str:
+    """Roles that images, headers, footers and sections only get in some contexts."""
+    if tag == "img":
+        return "img" if attributes.get("alt") != "" else ""
+    if tag == "section":
+        return "region" if "aria-label" in attributes or "aria-labelledby" in attributes else ""
+    if any(document.tag(parent) in _SCOPING for parent in document.ancestors(index)):
+        return ""
+    return "banner" if tag == "header" else "contentinfo"
+
+
+def _own_name(document: Document, index: int, element_role: str, attributes: dict[str, str]) -> str:
+    tag = document.tag(index)
+    if tag in ("input", "select", "textarea", "meter", "progress"):
+        return _control_name(document, index, attributes)
+    if tag == "img":
+        return clean(attributes.get("alt", ""))
+    if tag == "fieldset":
+        legends = document.descendants(index, frozenset({"legend"}))
+        return document.text(legends[0]) if legends else ""
+    return "" if element_role in _NAME_FROM_CONTENT_EXCLUDED else document.text(index)
+
+
+def _control_name(document: Document, index: int, attributes: dict[str, str]) -> str:
+    labels = clean(" ".join(document.text(label) for label in document.labels(index)))
+    if labels:
+        return labels
+    kind = input_type(document, index)
+    if kind in ("button", "submit", "reset"):
+        return clean(attributes.get("value", _BUTTON_DEFAULTS.get(kind, "")))
+    if kind == "image":
+        return clean(attributes.get("alt", "") or attributes.get("value", ""))
+    return _BUTTON_DEFAULTS["file"] if kind == "file" else ""
 
 
 def _tristate(raw: str | None) -> Tristate:

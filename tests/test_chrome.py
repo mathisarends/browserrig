@@ -21,60 +21,6 @@ from browserrig.events import (
 )
 
 
-class _Subscription:
-    def __init__(self, items, error=None):
-        self.items = items
-        self.error = error
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *_args):
-        return None
-
-    def __aiter__(self):
-        return self._iterate()
-
-    async def _iterate(self):
-        for item in self.items:
-            yield item
-        if self.error is not None:
-            raise self.error
-
-
-def _browser():
-    events = []
-    browser = ChromeBrowser(
-        ConnectBrowser(endpoint="ws://localhost/devtools/browser/test"),
-        emit=AsyncMock(side_effect=events.append),
-    )
-    browser._stack = AsyncExitStack()
-    cdp = SimpleNamespace(
-        page=SimpleNamespace(
-            enable=AsyncMock(),
-            get_frame_tree=AsyncMock(
-                return_value=SimpleNamespace(
-                    frame_tree=SimpleNamespace(
-                        frame=SimpleNamespace(id="frame", loader_id="doc", url="about:blank")
-                    )
-                )
-            ),
-        ),
-        runtime=SimpleNamespace(enable=AsyncMock()),
-    )
-    browser.client = SimpleNamespace(
-        is_connected=True,
-        session=Mock(return_value=cdp),
-        target=SimpleNamespace(
-            attach_to_target=AsyncMock(return_value=SimpleNamespace(session_id="session")),
-            detach_from_target=AsyncMock(),
-            close_target=AsyncMock(),
-            get_targets=AsyncMock(),
-        ),
-    )
-    return browser, events
-
-
 async def test_event_handler_failure_does_not_stop_subscription(monkeypatch, caplog):
     browser, _ = _browser()
     handle = AsyncMock(side_effect=[RuntimeError("popup vanished"), None])
@@ -189,3 +135,57 @@ async def test_main_frame_query_does_not_update_document_metadata():
     assert tab.document_id == "doc" and tab.url == "about:blank"
     await tab.sync_document()
     assert tab.document_id == "new-document" and tab.url == "https://example.org"
+
+
+class _Subscription:
+    def __init__(self, items, error=None):
+        self.items = items
+        self.error = error
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return None
+
+    def __aiter__(self):
+        return self._iterate()
+
+    async def _iterate(self):
+        for item in self.items:
+            yield item
+        if self.error is not None:
+            raise self.error
+
+
+def _browser():
+    events = []
+    browser = ChromeBrowser(
+        ConnectBrowser(endpoint="ws://localhost/devtools/browser/test"),
+        emit=AsyncMock(side_effect=events.append),
+    )
+    browser._stack = AsyncExitStack()
+    cdp = SimpleNamespace(
+        page=SimpleNamespace(
+            enable=AsyncMock(),
+            get_frame_tree=AsyncMock(
+                return_value=SimpleNamespace(
+                    frame_tree=SimpleNamespace(
+                        frame=SimpleNamespace(id="frame", loader_id="doc", url="about:blank")
+                    )
+                )
+            ),
+        ),
+        runtime=SimpleNamespace(enable=AsyncMock()),
+    )
+    browser.client = SimpleNamespace(
+        is_connected=True,
+        session=Mock(return_value=cdp),
+        target=SimpleNamespace(
+            attach_to_target=AsyncMock(return_value=SimpleNamespace(session_id="session")),
+            detach_from_target=AsyncMock(),
+            close_target=AsyncMock(),
+            get_targets=AsyncMock(),
+        ),
+    )
+    return browser, events

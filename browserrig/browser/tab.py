@@ -261,14 +261,6 @@ class Tab:
         history = await self.cdp.page.get_navigation_history()
         return history.current_index + 1 < len(history.entries)
 
-    async def _history(self, offset: int) -> bool:
-        history = await self.cdp.page.get_navigation_history()
-        index = history.current_index + offset
-        if not 0 <= index < len(history.entries):
-            return False
-        await self.cdp.page.navigate_to_history_entry(entry_id=history.entries[index].id)
-        return True
-
     async def reload(self) -> None:
         await self.cdp.page.reload()
 
@@ -319,6 +311,21 @@ class Tab:
         if result.error_text:
             raise BrowserError(f"Navigation failed: {result.error_text}")
 
+    async def _history(self, offset: int) -> bool:
+        history = await self.cdp.page.get_navigation_history()
+        index = history.current_index + offset
+        if not 0 <= index < len(history.entries):
+            return False
+        await self.cdp.page.navigate_to_history_entry(entry_id=history.entries[index].id)
+        return True
+
+
+def validated_url(url: str) -> str:
+    parsed = urlsplit(url)
+    if url == "about:blank" or (parsed.scheme in {"http", "https"} and parsed.hostname):
+        return url
+    raise BrowserError("Navigation requires an HTTP(S) URL or about:blank")
+
 
 async def _frame_tree(cdp: CdpSession) -> FrameTree:
     result = await cdp.page.get_frame_tree()
@@ -333,13 +340,6 @@ def _javascript_value(value: RemoteObject) -> str:
     if value.value is None and value.subtype != "null" and value.description is not None:
         return value.description
     return json.dumps(value.value, ensure_ascii=False)
-
-
-def validated_url(url: str) -> str:
-    parsed = urlsplit(url)
-    if url == "about:blank" or (parsed.scheme in {"http", "https"} and parsed.hostname):
-        return url
-    raise BrowserError("Navigation requires an HTTP(S) URL or about:blank")
 
 
 async def _call_on_node[A: BaseModel, R](

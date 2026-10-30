@@ -193,58 +193,6 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 return ElementHandle(frame, element, snapshot)
         raise StaleElement("Element frame no longer exists; observe again")
 
-    @hook(PreStep)
-    async def _before_step(
-        self,
-        event: PreStep,
-        next_: Next[StepDecision],
-        nudges: Inject[Nudges | None],
-        recording: Inject[Recording | None],
-    ) -> StepDecision:
-        state = self._state
-        snapshot = await self.capture(
-            phase=ReadinessPhase.INITIAL if state.snapshot is None else ReadinessPhase.OBSERVATION,
-            screenshots=True if state.screenshot_requested else None,
-            region=state.screenshot_region,
-            zoom=state.screenshot_zoom,
-        )
-        state.screenshot_requested = False
-        state.screenshot_region, state.screenshot_zoom = None, 1
-        if recording is not None and snapshot.readiness == ReadinessStatus.READY:
-            # Recordings follow the canvas, never a one-off screenshot region.
-            await recording.ensure_started(
-                self._browser.active_tab,
-                geometry=snapshot.geometry if snapshot.mode == ObservationKind.CANVAS else None,
-            )
-        event.session.observe(
-            Observation(
-                source="browser",
-                full=self._render(snapshot),
-                summary=f"{snapshot.mode}: {snapshot.title} ({snapshot.url})",
-                refs=(snapshot.id,),
-            )
-        )
-        if nudges is not None:
-            event.session.observe(await nudges.project(snapshot))
-        return await next_()
-
-    @hook(PrepareRequest)
-    async def _prepare_image(
-        self, _event: PrepareRequest, next_: Next[ModelRequest]
-    ) -> ModelRequest:
-        request = await next_()
-        snapshot = self._state.snapshot
-        if snapshot is not None and snapshot.image:
-            image = User(
-                (
-                    TextPart(image_caption(snapshot)),
-                    ImagePart(f"data:image/png;base64,{snapshot.image}"),
-                ),
-                id=f"browser-image:{snapshot.id}",
-            )
-            return replace(request, messages=(*request.messages, image))
-        return request
-
     @tool(
         kind=ActionKind.OBSERVE,
         readonly=True,
@@ -264,10 +212,6 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 )
             )
         return ToolResult(self._render(snapshot))
-
-    def _render(self, snapshot: Snapshot) -> str:
-        offscreen = self.mode.offscreen_elements if isinstance(self.mode, DomMode) else 0
-        return render(snapshot, offscreen=offscreen)
 
     @tool(
         kind=ActionKind.SCREENSHOT,
@@ -338,6 +282,62 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 raise ToolError(report.reason)
             content = await extract_content(tab, max_chars=max_chars)
             return ToolResult(content.render())
+
+    @hook(PreStep)
+    async def _before_step(
+        self,
+        event: PreStep,
+        next_: Next[StepDecision],
+        nudges: Inject[Nudges | None],
+        recording: Inject[Recording | None],
+    ) -> StepDecision:
+        state = self._state
+        snapshot = await self.capture(
+            phase=ReadinessPhase.INITIAL if state.snapshot is None else ReadinessPhase.OBSERVATION,
+            screenshots=True if state.screenshot_requested else None,
+            region=state.screenshot_region,
+            zoom=state.screenshot_zoom,
+        )
+        state.screenshot_requested = False
+        state.screenshot_region, state.screenshot_zoom = None, 1
+        if recording is not None and snapshot.readiness == ReadinessStatus.READY:
+            # Recordings follow the canvas, never a one-off screenshot region.
+            await recording.ensure_started(
+                self._browser.active_tab,
+                geometry=snapshot.geometry if snapshot.mode == ObservationKind.CANVAS else None,
+            )
+        event.session.observe(
+            Observation(
+                source="browser",
+                full=self._render(snapshot),
+                summary=f"{snapshot.mode}: {snapshot.title} ({snapshot.url})",
+                refs=(snapshot.id,),
+            )
+        )
+        if nudges is not None:
+            event.session.observe(await nudges.project(snapshot))
+        return await next_()
+
+    @hook(PrepareRequest)
+    async def _prepare_image(
+        self, _event: PrepareRequest, next_: Next[ModelRequest]
+    ) -> ModelRequest:
+        request = await next_()
+        snapshot = self._state.snapshot
+        if snapshot is not None and snapshot.image:
+            image = User(
+                (
+                    TextPart(image_caption(snapshot)),
+                    ImagePart(f"data:image/png;base64,{snapshot.image}"),
+                ),
+                id=f"browser-image:{snapshot.id}",
+            )
+            return replace(request, messages=(*request.messages, image))
+        return request
+
+    def _render(self, snapshot: Snapshot) -> str:
+        offscreen = self.mode.offscreen_elements if isinstance(self.mode, DomMode) else 0
+        return render(snapshot, offscreen=offscreen)
 
 
 def has_dom_refs(observe: Inject[Observe]) -> bool:

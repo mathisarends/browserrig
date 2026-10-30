@@ -40,49 +40,6 @@ from browserrig.events import (
 from browserrig.kinds import ObservationKind, ReadinessPhase
 
 
-class _Access(Plugin, needs=(Activity,)):
-    events = READINESS_EVENTS
-
-    def __init__(self, holder):
-        super().__init__()
-        self.holder = holder
-
-    async def setup(self, _ctx: Context, activity: Inject[Activity]):
-        self.holder["activity"] = activity
-
-
-@pytest.fixture(name="activity_session")
-async def _activity_session():
-    holder = {}
-    agent = Agent(model=ScriptedModel(["ok"]), plugins=[Activity(), _Access(holder)])
-    async with agent.session() as session:
-        yield session, holder["activity"]
-
-
-def _request(request_id="request"):
-    return ModelRequestedEvent(
-        request=ModelRequest(model="test", messages=()), request_id=request_id
-    )
-
-
-def _readiness_started(readiness_id):
-    return ReadinessStartedEvent(
-        readiness_id=readiness_id,
-        mode=ObservationKind.DOM,
-        phase=ReadinessPhase.ACTION,
-    )
-
-
-def _readiness_ended(kind, readiness_id, reason=""):
-    return kind(
-        readiness_id=readiness_id,
-        mode=ObservationKind.DOM,
-        phase=ReadinessPhase.ACTION,
-        duration=0.1,
-        reason=reason,
-    )
-
-
 async def test_readiness_ids_cannot_close_model_pause_or_tool_intervals(activity_session):
     session, activity = activity_session
     await session.emit(_request())
@@ -341,3 +298,46 @@ async def test_compaction_activity_is_correlated_and_does_not_finish_model_reque
     model = next(i for i in intervals if i.kind is ActivityKind.LLM)
     assert compaction.cause_id == "compact" and compaction.outcome is expected
     assert model.outcome is ActivityOutcome.RUNNING
+
+
+class _Access(Plugin, needs=(Activity,)):
+    events = READINESS_EVENTS
+
+    def __init__(self, holder):
+        super().__init__()
+        self.holder = holder
+
+    async def setup(self, _ctx: Context, activity: Inject[Activity]):
+        self.holder["activity"] = activity
+
+
+@pytest.fixture(name="activity_session")
+async def _activity_session():
+    holder = {}
+    agent = Agent(model=ScriptedModel(["ok"]), plugins=[Activity(), _Access(holder)])
+    async with agent.session() as session:
+        yield session, holder["activity"]
+
+
+def _request(request_id="request"):
+    return ModelRequestedEvent(
+        request=ModelRequest(model="test", messages=()), request_id=request_id
+    )
+
+
+def _readiness_started(readiness_id):
+    return ReadinessStartedEvent(
+        readiness_id=readiness_id,
+        mode=ObservationKind.DOM,
+        phase=ReadinessPhase.ACTION,
+    )
+
+
+def _readiness_ended(kind, readiness_id, reason=""):
+    return kind(
+        readiness_id=readiness_id,
+        mode=ObservationKind.DOM,
+        phase=ReadinessPhase.ACTION,
+        duration=0.1,
+        reason=reason,
+    )

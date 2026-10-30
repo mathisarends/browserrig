@@ -18,87 +18,6 @@ from .text import text_encoding
 from .xlsx import value_source
 
 
-def _bounds(selection: str | None, rows: int, columns: int) -> tuple[int, int, int, int]:
-    if selection is None:
-        return 1, 1, max(1, columns), max(1, rows)
-    try:
-        bounds = range_boundaries(selection.upper())
-        left, top, right, bottom = bounds
-        if any(value is None for value in bounds) or min(bounds) < 1:
-            raise ValueError
-        if right < left or bottom < top or right > 16384 or bottom > 1048576:
-            raise ValueError
-        return left, top, right, bottom
-    except (ValueError, TypeError) as error:
-        raise ValueError("cell_range must be an A1 range, for example B2:F100") from error
-
-
-def _value(value: object) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, (datetime, date, time)):
-        return value.isoformat()
-    return cell_text(value)
-
-
-def _table_header(left: int, right: int) -> str:
-    columns = ["Row", *(get_column_letter(index) for index in range(left, right + 1))]
-    return "| " + " | ".join(columns) + " |\n| " + " | ".join("---" for _ in columns) + " |\n"
-
-
-def _xlsx_layout(path: Path, name: str) -> tuple[list[str], int, int]:
-    notes = []
-    max_row = max_column = 1
-    row = column = 0
-    has_content = False
-    with ZipFile(path) as archive:
-        with archive.open("xl/workbook.xml") as stream:
-            book = parse(stream).getroot()
-        relationship = next(
-            node.attrib["{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"]
-            for node in book.iter()
-            if node.tag.endswith("}sheet") and node.get("name") == name
-        )
-        with archive.open("xl/_rels/workbook.xml.rels") as stream:
-            target = next(
-                node.attrib["Target"]
-                for node in parse(stream).getroot()
-                if node.get("Id") == relationship
-            )
-        target = (
-            posixpath.normpath(posixpath.join("xl", target))
-            if not target.startswith("/")
-            else target[1:]
-        )
-        with archive.open(target) as stream:
-            for event, node in iterparse(stream, events=("start", "end")):
-                tag = node.tag.rsplit("}", 1)[-1]
-                if event == "start":
-                    if tag == "row":
-                        row, column = int(node.get("r", row + 1)), 0
-                    elif tag == "c":
-                        coordinate = node.get("r")
-                        row, column = (
-                            coordinate_to_tuple(coordinate) if coordinate else (row, column + 1)
-                        )
-                        has_content = False
-                    continue
-                if tag in {"v", "f", "t"} and node.text is not None:
-                    has_content = True
-                if tag == "c" and has_content:
-                    max_row, max_column = max(max_row, row), max(max_column, column)
-                if tag == "mergeCell":
-                    notes.append(f"Merged cells: {node.get('ref')}\n\n")
-                elif tag == "row" and node.get("hidden") in {"1", "true"}:
-                    notes.append(f"Hidden row: {row} (included in this read)\n\n")
-                elif tag == "col" and node.get("hidden") in {"1", "true"}:
-                    notes.append(
-                        f"Hidden columns: {node.get('min')}–{node.get('max')} (included)\n\n"
-                    )
-                node.clear()
-    return notes, max_row, max_column
-
-
 def read_xlsx(path: Path, request: ReadRequest) -> ParsedContent:
     extension = path.suffix.lower().lstrip(".")
     details = ParsedContent(
@@ -214,6 +133,148 @@ def read_xls(path: Path, request: ReadRequest) -> ParsedContent:
     return details
 
 
+def read_ods(path: Path, request: ReadRequest) -> ParsedContent:
+    document = load_odf(str(path))
+    tables = [node for node in document.spreadsheet.childNodes if node.qname[1] == "table"]
+    names = tuple(table.getAttribute("name") for table in tables)
+    selected = request.sheet or names[0]
+    if selected not in names:
+        raise ValueError(f"Unknown sheet {selected!r}; available: {', '.join(names)}")
+    details = ParsedContent((), "ods", sheet=selected, sheets=names, cell_range=request.cell_range)
+
+    def blocks() -> Iterator[str]:
+        yield "# Workbook\n\nSheets: " + ", ".join(names) + f"\n\n## Sheet: {selected}\n\n"
+        bounds = _bounds(request.cell_range, 1048576, 16384)
+        yield from _odf_values(tables[names.index(selected)], bounds)
+
+    details.blocks = blocks()
+    details.limitations.append(
+        "Stored values and formulas only; formatting, images and charts are not extracted"
+    )
+    return details
+
+
+def read_delimited(path: Path, request: ReadRequest) -> ParsedContent:
+    with path.open("rb") as source:
+        sample = source.read(65536)
+    encoding = text_encoding(sample)
+    if encoding is None:
+        raise ValueError("Cannot determine the table's text encoding")
+    delimiter = "\t" if path.suffix.lower() == ".tsv" else ","
+    if delimiter == ",":
+        with suppress(csv.Error):
+            delimiter = (
+                csv.Sniffer()
+                .sniff(sample.decode(encoding, errors="ignore"), delimiters=",;\t|")
+                .delimiter
+            )
+    if request.sheet not in {None, "Data"}:
+        raise ValueError("Delimited files have one sheet: Data")
+    details = ParsedContent((), path.suffix.lower().lstrip("."), sheet="Data", sheets=("Data",))
+
+    def blocks() -> Iterable[str]:
+        with path.open(encoding=encoding, newline="") as source:
+            rows = csv.reader(source, delimiter=delimiter)
+            bounds = _bounds(request.cell_range, 1048576, 1) if request.cell_range else None
+            for index, row in enumerate(rows, 1):
+                if bounds and index > bounds[3]:
+                    break
+                if bounds and index < bounds[1]:
+                    continue
+                left, right = (bounds[0], bounds[2]) if bounds else (1, len(row))
+                if index == (bounds[1] if bounds else 1):
+                    yield _table_header(left, right)
+                cells = [
+                    _value(row[column]) if column < len(row) else ""
+                    for column in range(left - 1, right)
+                ]
+                yield "| " + str(index) + " | " + " | ".join(cells) + " |\n"
+
+    details.blocks = blocks()
+    return details
+
+
+def _bounds(selection: str | None, rows: int, columns: int) -> tuple[int, int, int, int]:
+    if selection is None:
+        return 1, 1, max(1, columns), max(1, rows)
+    try:
+        bounds = range_boundaries(selection.upper())
+        left, top, right, bottom = bounds
+        if any(value is None for value in bounds) or min(bounds) < 1:
+            raise ValueError
+        if right < left or bottom < top or right > 16384 or bottom > 1048576:
+            raise ValueError
+        return left, top, right, bottom
+    except (ValueError, TypeError) as error:
+        raise ValueError("cell_range must be an A1 range, for example B2:F100") from error
+
+
+def _value(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+    return cell_text(value)
+
+
+def _table_header(left: int, right: int) -> str:
+    columns = ["Row", *(get_column_letter(index) for index in range(left, right + 1))]
+    return "| " + " | ".join(columns) + " |\n| " + " | ".join("---" for _ in columns) + " |\n"
+
+
+def _xlsx_layout(path: Path, name: str) -> tuple[list[str], int, int]:
+    notes = []
+    max_row = max_column = 1
+    row = column = 0
+    has_content = False
+    with ZipFile(path) as archive:
+        with archive.open("xl/workbook.xml") as stream:
+            book = parse(stream).getroot()
+        relationship = next(
+            node.attrib["{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"]
+            for node in book.iter()
+            if node.tag.endswith("}sheet") and node.get("name") == name
+        )
+        with archive.open("xl/_rels/workbook.xml.rels") as stream:
+            target = next(
+                node.attrib["Target"]
+                for node in parse(stream).getroot()
+                if node.get("Id") == relationship
+            )
+        target = (
+            posixpath.normpath(posixpath.join("xl", target))
+            if not target.startswith("/")
+            else target[1:]
+        )
+        with archive.open(target) as stream:
+            for event, node in iterparse(stream, events=("start", "end")):
+                tag = node.tag.rsplit("}", 1)[-1]
+                if event == "start":
+                    if tag == "row":
+                        row, column = int(node.get("r", row + 1)), 0
+                    elif tag == "c":
+                        coordinate = node.get("r")
+                        row, column = (
+                            coordinate_to_tuple(coordinate) if coordinate else (row, column + 1)
+                        )
+                        has_content = False
+                    continue
+                if tag in {"v", "f", "t"} and node.text is not None:
+                    has_content = True
+                if tag == "c" and has_content:
+                    max_row, max_column = max(max_row, row), max(max_column, column)
+                if tag == "mergeCell":
+                    notes.append(f"Merged cells: {node.get('ref')}\n\n")
+                elif tag == "row" and node.get("hidden") in {"1", "true"}:
+                    notes.append(f"Hidden row: {row} (included in this read)\n\n")
+                elif tag == "col" and node.get("hidden") in {"1", "true"}:
+                    notes.append(
+                        f"Hidden columns: {node.get('min')}–{node.get('max')} (included)\n\n"
+                    )
+                node.clear()
+    return notes, max_row, max_column
+
+
 def _xls_value(cell, datemode: int) -> object:
     if cell is None:
         return None
@@ -293,64 +354,3 @@ def _odf_values(table, bounds: tuple[int, int, int, int]) -> Iterator[str]:
                 yield from _odf_row_text(row, cells, number, bounds[0], bounds[2])
         if index >= bounds[3]:
             return
-
-
-def read_ods(path: Path, request: ReadRequest) -> ParsedContent:
-    document = load_odf(str(path))
-    tables = [node for node in document.spreadsheet.childNodes if node.qname[1] == "table"]
-    names = tuple(table.getAttribute("name") for table in tables)
-    selected = request.sheet or names[0]
-    if selected not in names:
-        raise ValueError(f"Unknown sheet {selected!r}; available: {', '.join(names)}")
-    details = ParsedContent((), "ods", sheet=selected, sheets=names, cell_range=request.cell_range)
-
-    def blocks() -> Iterator[str]:
-        yield "# Workbook\n\nSheets: " + ", ".join(names) + f"\n\n## Sheet: {selected}\n\n"
-        bounds = _bounds(request.cell_range, 1048576, 16384)
-        yield from _odf_values(tables[names.index(selected)], bounds)
-
-    details.blocks = blocks()
-    details.limitations.append(
-        "Stored values and formulas only; formatting, images and charts are not extracted"
-    )
-    return details
-
-
-def read_delimited(path: Path, request: ReadRequest) -> ParsedContent:
-    with path.open("rb") as source:
-        sample = source.read(65536)
-    encoding = text_encoding(sample)
-    if encoding is None:
-        raise ValueError("Cannot determine the table's text encoding")
-    delimiter = "\t" if path.suffix.lower() == ".tsv" else ","
-    if delimiter == ",":
-        with suppress(csv.Error):
-            delimiter = (
-                csv.Sniffer()
-                .sniff(sample.decode(encoding, errors="ignore"), delimiters=",;\t|")
-                .delimiter
-            )
-    if request.sheet not in {None, "Data"}:
-        raise ValueError("Delimited files have one sheet: Data")
-    details = ParsedContent((), path.suffix.lower().lstrip("."), sheet="Data", sheets=("Data",))
-
-    def blocks() -> Iterable[str]:
-        with path.open(encoding=encoding, newline="") as source:
-            rows = csv.reader(source, delimiter=delimiter)
-            bounds = _bounds(request.cell_range, 1048576, 1) if request.cell_range else None
-            for index, row in enumerate(rows, 1):
-                if bounds and index > bounds[3]:
-                    break
-                if bounds and index < bounds[1]:
-                    continue
-                left, right = (bounds[0], bounds[2]) if bounds else (1, len(row))
-                if index == (bounds[1] if bounds else 1):
-                    yield _table_header(left, right)
-                cells = [
-                    _value(row[column]) if column < len(row) else ""
-                    for column in range(left - 1, right)
-                ]
-                yield "| " + str(index) + " | " + " | ".join(cells) + " |\n"
-
-    details.blocks = blocks()
-    return details

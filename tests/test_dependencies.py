@@ -149,38 +149,6 @@ async def test_browser_dependency_loss_and_replacement_restart_observation_state
         }
 
 
-def _provide(ctx, browser):
-    removals = (ctx.provide(Browser, browser), ctx.provide(BrowserEvents, browser.events))
-
-    async def remove():
-        for removal in reversed(removals):
-            await removal()
-
-    return remove
-
-
-class _DeferredService:
-    pass
-
-
-@pytest.fixture(name="fake_chrome")
-def _fake_chrome(monkeypatch):
-    resources = []
-
-    @asynccontextmanager
-    async def open_browser(_options, *, emit, file_system):
-        assert file_system is None
-        resource = SimpleNamespace(browser=FakeBrowser(SimpleNamespace(emit=emit)), closed=False)
-        resources.append(resource)
-        try:
-            yield resource.browser
-        finally:
-            resource.closed = True
-
-    monkeypatch.setattr("browserrig.browser.plugin.ChromeBrowser", open_browser)
-    return resources
-
-
 @pytest.mark.parametrize("use_run", [False, True])
 async def test_facade_rejects_missing_services_and_closes_acquired_browser(fake_chrome, use_run):
     model = ScriptedModel(["unused"])
@@ -377,3 +345,35 @@ async def test_facade_owns_a_fresh_mcp_stdio_server_per_session(fake_chrome, tmp
             assert "1: Voyager" in result.text
         assert "catalog__search" not in {item.name for item in tools.definitions}
     assert len(fake_chrome) == 2 and all(item.closed for item in fake_chrome)
+
+
+def _provide(ctx, browser):
+    removals = (ctx.provide(Browser, browser), ctx.provide(BrowserEvents, browser.events))
+
+    async def remove():
+        for removal in reversed(removals):
+            await removal()
+
+    return remove
+
+
+class _DeferredService:
+    pass
+
+
+@pytest.fixture(name="fake_chrome")
+def _fake_chrome(monkeypatch):
+    resources = []
+
+    @asynccontextmanager
+    async def open_browser(_options, *, emit, file_system):
+        assert file_system is None
+        resource = SimpleNamespace(browser=FakeBrowser(SimpleNamespace(emit=emit)), closed=False)
+        resources.append(resource)
+        try:
+            yield resource.browser
+        finally:
+            resource.closed = True
+
+    monkeypatch.setattr("browserrig.browser.plugin.ChromeBrowser", open_browser)
+    return resources

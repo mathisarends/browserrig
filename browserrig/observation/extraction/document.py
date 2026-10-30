@@ -263,9 +263,6 @@ class Document:  # pylint: disable=too-many-public-methods
             node += 1
         return clean("".join(parts), limit)
 
-    def _inline(self, index: int) -> bool:
-        return self.style(index, Style.DISPLAY).startswith("inline")
-
     def own_text(self, index: int, limit: int = 150) -> str:
         """All text nodes, rendered or not, for option labels inside closed selects."""
         return clean(
@@ -294,6 +291,9 @@ class Document:  # pylint: disable=too-many-public-methods
                 runs.append((node, value, (x, y, x + width, y + height)))
         runs.sort()
         return runs
+
+    def _inline(self, index: int) -> bool:
+        return self.style(index, Style.DISPLAY).startswith("inline")
 
     def _replacement_text(self, node: int, tag: str) -> str | None:
         if tag in _REPLACED and node not in self._layout:

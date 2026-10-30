@@ -23,24 +23,6 @@ from browserrig.input.pointer import movement
 from browserrig.tools.keyboard import KeyboardTools
 
 
-def _tab(*, dispatch=None):
-    events, commands = [], []
-
-    async def emit(event):
-        EventRegistry(INPUT_EVENTS).validate(event)
-        events.append(event)
-
-    async def send(**arguments):
-        commands.append(arguments)
-        if dispatch is not None:
-            await dispatch(arguments)
-
-    cdp = SimpleNamespace(
-        input=SimpleNamespace(dispatch_key_event=send, insert_text=send, dispatch_mouse_event=send)
-    )
-    return Tab("tab-1", cdp, emit=emit), events, commands
-
-
 async def test_initial_cursor_seeds_native_pointer_and_stream_without_origin_animation(monkeypatch):
     tab, events, commands = _tab()
     tab.document_id = "document-1"
@@ -230,3 +212,21 @@ async def test_cancelled_drag_releases_mouse_button():
         await task
     assert commands[-1]["type"] == "mouseReleased"
     assert commands[-1]["buttons"] == 0
+
+
+def _tab(*, dispatch=None):
+    events, commands = [], []
+
+    async def emit(event):
+        EventRegistry(INPUT_EVENTS).validate(event)
+        events.append(event)
+
+    async def send(**arguments):
+        commands.append(arguments)
+        if dispatch is not None:
+            await dispatch(arguments)
+
+    cdp = SimpleNamespace(
+        input=SimpleNamespace(dispatch_key_event=send, insert_text=send, dispatch_mouse_event=send)
+    )
+    return Tab("tab-1", cdp, emit=emit), events, commands

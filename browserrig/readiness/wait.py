@@ -27,29 +27,6 @@ from .models import ReadinessReport
 from .strategy import ReadinessStrategy
 
 
-async def _discard(_event: BrowserEvent) -> None:
-    pass
-
-
-def _readiness_strategy(
-    mode: ObservationMode,
-    tab: Tab,
-    options: ReadinessOptions,
-    phase: ReadinessPhase,
-    geometry_cache: dict[tuple[str, str], Geometry],
-) -> ReadinessStrategy:
-    # File previews use the full viewport, even when the task tab is a canvas application.
-    if tab.url.startswith("file:"):
-        return DomReadiness(tab, options, phase)
-    match mode:
-        case DomMode():
-            return DomReadiness(tab, options, phase)
-        case CanvasMode():
-            return CanvasReadiness(tab, options, mode, geometry_cache)
-        case _:
-            assert_never(mode)
-
-
 async def wait_for_page(
     tab: Tab,
     *,
@@ -149,6 +126,29 @@ async def wait_for_page(
     if status == ReadinessStatus.FAILED:
         raise ReadinessError(f"{selected.kind} readiness timed out: {strategy.reason}")
     return report
+
+
+async def _discard(_event: BrowserEvent) -> None:
+    pass
+
+
+def _readiness_strategy(
+    mode: ObservationMode,
+    tab: Tab,
+    options: ReadinessOptions,
+    phase: ReadinessPhase,
+    geometry_cache: dict[tuple[str, str], Geometry],
+) -> ReadinessStrategy:
+    # File previews use the full viewport, even when the task tab is a canvas application.
+    if tab.url.startswith("file:"):
+        return DomReadiness(tab, options, phase)
+    match mode:
+        case DomMode():
+            return DomReadiness(tab, options, phase)
+        case CanvasMode():
+            return CanvasReadiness(tab, options, mode, geometry_cache)
+        case _:
+            assert_never(mode)
 
 
 async def _check(strategy: ReadinessStrategy) -> bool:

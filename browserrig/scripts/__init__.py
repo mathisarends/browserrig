@@ -39,11 +39,6 @@ class ScriptError(StrEnum):
     INVALID_VALUE = "INVALID_VALUE"
 
 
-@cache
-def _source(path: str) -> str:
-    return files(__package__).joinpath(path).read_text(encoding="utf-8")
-
-
 @dataclass(frozen=True, slots=True)
 class Script[A: BaseModel, R]:
     name: str
@@ -55,15 +50,20 @@ class Script[A: BaseModel, R]:
     def load(
         cls, name: str, arguments: type[A], result: Any, *, uses: tuple[str, ...] = ()
     ) -> Script[A, R]:
-        main = _source(f"{name}.js")
+        main = cls._source(f"{name}.js")
         if uses:
-            helpers = "\n".join(_source(f"lib/{helper}.js") for helper in uses)
+            helpers = "\n".join(cls._source(f"lib/{helper}.js") for helper in uses)
             main = (
                 f"function(args, ...nodes) {{\n{helpers}\n"
                 f"return ({main}).call(this, args, ...nodes);\n}}"
             )
         adapter: TypeAdapter[R] = TypeAdapter(result)
         return cls(name, main, arguments, adapter.validate_python)
+
+    @staticmethod
+    @cache
+    def _source(path: str) -> str:
+        return files(__package__).joinpath(path).read_text(encoding="utf-8")
 
 
 ELEMENT: Script[ElementArgs, Any] = Script.load(

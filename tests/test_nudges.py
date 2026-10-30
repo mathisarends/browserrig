@@ -117,33 +117,6 @@ async def test_pending_actions_are_separate_per_tab_and_closed_tabs_are_forgotte
         assert len(scrolls) == 1 and scrolls[0].target_id == "second"
 
 
-class _Access(Plugin, needs=(Nudges,)):
-    nudges: Inject[Nudges]
-
-    def __init__(self, holder):
-        super().__init__()
-        self.holder = holder
-
-    async def setup(self, _ctx: Context):
-        self.holder["nudges"] = self.nudges
-
-
-def _snapshot():
-    return Snapshot(
-        id="obs-1",
-        tab_id="tab-1",
-        document_id="doc-1",
-        url="https://example.org/",
-        title="Example",
-        mode="dom",
-        readiness="ready",
-        width=1280,
-        height=800,
-        scroll_y=0,
-        fingerprint="page",
-    )
-
-
 @pytest.mark.parametrize(
     "source,form,matching_ref,delivered",
     [
@@ -230,3 +203,30 @@ async def test_hint_provenance_and_unselected_hints_survive_session_replay(tmp_p
         remaining = await holder["nudges"].project(_snapshot())
         assert "Second hint" in remaining.full
         assert "First hint" not in remaining.full
+
+
+class _Access(Plugin, needs=(Nudges,)):
+    nudges: Inject[Nudges]
+
+    def __init__(self, holder):
+        super().__init__()
+        self.holder = holder
+
+    async def setup(self, _ctx: Context):
+        self.holder["nudges"] = self.nudges
+
+
+def _snapshot():
+    return Snapshot(
+        id="obs-1",
+        tab_id="tab-1",
+        document_id="doc-1",
+        url="https://example.org/",
+        title="Example",
+        mode="dom",
+        readiness="ready",
+        width=1280,
+        height=800,
+        scroll_y=0,
+        fingerprint="page",
+    )

@@ -28,19 +28,6 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents)):
     ) -> ToolResult:
         return await self._navigate(url, actions, ActionKind.NAVIGATE)
 
-    async def _navigate(self, url: str, actions: Actions, kind: ActionKind) -> ToolResult:
-        validated_url(url)
-
-        async def navigate(tab: Tab) -> Effect:
-            await self._events.emit(NavigationStartedEvent(target_id=tab.id, url=url))
-            await tab.navigate(url)
-            return Effect("Navigation executed.")
-
-        return await actions.run(
-            kind=kind,
-            operation=navigate,
-        )
-
     @tool(kind=ActionKind.SEARCH, description="Search the web with DuckDuckGo in the active tab.")
     async def search(
         self,
@@ -113,3 +100,16 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents)):
             await self._events.emit(WaitingEvent(duration=seconds))
             await asyncio.sleep(seconds)
         return "Wait completed; observe the current state."
+
+    async def _navigate(self, url: str, actions: Actions, kind: ActionKind) -> ToolResult:
+        validated_url(url)
+
+        async def navigate(tab: Tab) -> Effect:
+            await self._events.emit(NavigationStartedEvent(target_id=tab.id, url=url))
+            await tab.navigate(url)
+            return Effect("Navigation executed.")
+
+        return await actions.run(
+            kind=kind,
+            operation=navigate,
+        )

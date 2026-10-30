@@ -40,6 +40,14 @@ def render(snapshot: Snapshot, *, offscreen: int = 40) -> str:
     return "\n".join(lines)
 
 
+def image_caption(snapshot: Snapshot) -> str:
+    """Text placed before an observation image, naming the area it shows."""
+    caption = f"Current {snapshot.mode} observation {snapshot.id}"
+    if snapshot.mode == ObservationKind.DOM and snapshot.geometry:
+        caption += f"; {_region(snapshot)}"
+    return caption
+
+
 def _header(snapshot: Snapshot) -> list[str]:
     lines = [f"# {snapshot.title or '(untitled)'}", f"url: {snapshot.url}"]
     if len(snapshot.tabs) > 1:
@@ -109,14 +117,6 @@ def _body(snapshot: Snapshot, offscreen: int) -> list[str]:
     if covered:
         lines.extend(("", f"covered by an overlay: {_summary(covered)}"))
     return lines
-
-
-def image_caption(snapshot: Snapshot) -> str:
-    """Text placed before an observation image, naming the area it shows."""
-    caption = f"Current {snapshot.mode} observation {snapshot.id}"
-    if snapshot.mode == ObservationKind.DOM and snapshot.geometry:
-        caption += f"; {_region(snapshot)}"
-    return caption
 
 
 def _region(snapshot: Snapshot) -> str:

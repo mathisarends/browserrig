@@ -56,31 +56,6 @@ type _TerminalEvent = (
 )
 
 
-def _event_record(event: _TerminalEvent) -> dict[str, object]:
-    if isinstance(event, BrowserEvent | InputEvent):
-        record = asdict(event)
-        # Omit page/form contents. URLs and key names remain diagnostic metadata.
-        for name in ("text", "message", "value"):
-            record.pop(name, None)
-        return record
-    record: dict[str, object] = {"type": str(event.type)}
-    for item in fields(event) if is_dataclass(event) else ():
-        value = getattr(event, item.name)
-        if item.name in _METADATA and (
-            value is None or isinstance(value, str | int | float | bool | Enum)
-        ):
-            record[item.name] = value
-    call = getattr(event, "call", None)
-    if call is not None:
-        record.update(tool=call.name, call_id=call.id)
-    result = getattr(event, "result", None)
-    if result is not None and hasattr(result, "is_error"):
-        record["is_error"] = result.is_error
-        record["tool_status"] = result.status
-        record["break_chain"] = result.break_chain
-    return record
-
-
 class TerminalEvents(Plugin):
     def __init__(self, output: TextIO | None = None) -> None:
         super().__init__()
@@ -120,3 +95,28 @@ class TerminalEvents(Plugin):
     @hook(ModelAttemptFinishedEvent)
     def _attempt_finished(self, event: ModelAttemptFinishedEvent) -> None:
         self._write(event)
+
+
+def _event_record(event: _TerminalEvent) -> dict[str, object]:
+    if isinstance(event, BrowserEvent | InputEvent):
+        record = asdict(event)
+        # Omit page/form contents. URLs and key names remain diagnostic metadata.
+        for name in ("text", "message", "value"):
+            record.pop(name, None)
+        return record
+    record: dict[str, object] = {"type": str(event.type)}
+    for item in fields(event) if is_dataclass(event) else ():
+        value = getattr(event, item.name)
+        if item.name in _METADATA and (
+            value is None or isinstance(value, str | int | float | bool | Enum)
+        ):
+            record[item.name] = value
+    call = getattr(event, "call", None)
+    if call is not None:
+        record.update(tool=call.name, call_id=call.id)
+    result = getattr(event, "result", None)
+    if result is not None and hasattr(result, "is_error"):
+        record["is_error"] = result.is_error
+        record["tool_status"] = result.status
+        record["break_chain"] = result.break_chain
+    return record

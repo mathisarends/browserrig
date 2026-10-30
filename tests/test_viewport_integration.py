@@ -20,37 +20,6 @@ pytestmark = pytest.mark.integration
 _LINE = re.compile(r'^\s*\*?\[(?P<ref>[^\]]+)\] \S+ "(?P<name>[^"]*)"')
 
 
-def _state(request):
-    text = next(
-        message.text
-        for message in reversed(request.messages)
-        if message.text.startswith("# ") and "\nurl: " in message.text
-    )
-    elements = []
-    in_viewport = False
-    for line in text.splitlines():
-        if not line.startswith(" "):
-            in_viewport = line == "in viewport:"
-        match = _LINE.match(line)
-        if match:
-            elements.append({**match.groupdict(), "in_viewport": in_viewport})
-    return elements
-
-
-def _element(request, name):
-    elements = _state(request)
-    entry = next((item for item in elements if item["name"] == name), None)
-    assert entry is not None, [item["name"] for item in elements]
-    return entry
-
-
-def _assert_tools_succeeded(result):
-    receipts = [event.result for event in result.events if isinstance(event, ToolCallFinishedEvent)]
-    assert receipts and all(not item.is_error for item in receipts), [
-        item.text for item in receipts
-    ]
-
-
 async def test_all_rendered_controls_are_listed_with_explicit_viewport_flags(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
@@ -341,3 +310,34 @@ async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target
         tab = holder["actions"].browser.active_tab
         assert await evaluate(tab, "scrollY") == 0
         assert await evaluate(tab, "document.body.dataset.clicked") is None
+
+
+def _state(request):
+    text = next(
+        message.text
+        for message in reversed(request.messages)
+        if message.text.startswith("# ") and "\nurl: " in message.text
+    )
+    elements = []
+    in_viewport = False
+    for line in text.splitlines():
+        if not line.startswith(" "):
+            in_viewport = line == "in viewport:"
+        match = _LINE.match(line)
+        if match:
+            elements.append({**match.groupdict(), "in_viewport": in_viewport})
+    return elements
+
+
+def _element(request, name):
+    elements = _state(request)
+    entry = next((item for item in elements if item["name"] == name), None)
+    assert entry is not None, [item["name"] for item in elements]
+    return entry
+
+
+def _assert_tools_succeeded(result):
+    receipts = [event.result for event in result.events if isinstance(event, ToolCallFinishedEvent)]
+    assert receipts and all(not item.is_error for item in receipts), [
+        item.text for item in receipts
+    ]

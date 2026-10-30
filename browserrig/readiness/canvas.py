@@ -18,26 +18,6 @@ from .config import ReadinessOptions
 from .strategy import ReadinessStrategy
 
 
-async def _locate_canvas(tab: Tab, mode: CanvasMode) -> CanvasProbe:
-    return await (await tab.main_frame()).run(
-        CANVAS, CanvasArgs(selector=mode.selector, loading_selector=mode.loading_selector)
-    )
-
-
-async def _probe_canvas(tab: Tab, mode: CanvasMode) -> tuple[Geometry | None, str]:
-    state = await _locate_canvas(tab, mode)
-    if not state.ready or state.geometry is None:
-        return None, state.reason
-    geometry = state.geometry
-    encoded = await screenshot(tab, geometry)
-    content = await asyncio.to_thread(_has_canvas_content, encoded, mode.min_color_fraction)
-    return (
-        (geometry, "")
-        if content
-        else (None, "canvas pixels are blank or a central loading graphic")
-    )
-
-
 class CanvasReadiness(ReadinessStrategy):
     """Ready once a visible canvas shows content within stable bounds.
 
@@ -58,10 +38,6 @@ class CanvasReadiness(ReadinessStrategy):
         self.geometry = geometry_cache.get(self._key)
         self.budget = options.timeout if self.geometry is not None else options.canvas_timeout
         self._last_geometry: Geometry | None = None
-
-    @property
-    def _key(self) -> tuple[str, str]:
-        return self._tab.id, self._tab.document_id
 
     async def check(self) -> bool:
         self.delay = max(self._options.poll_interval, 0.5)
@@ -84,6 +60,30 @@ class CanvasReadiness(ReadinessStrategy):
 
     def timeout_status(self) -> ReadinessStatus:
         return ReadinessStatus.FAILED
+
+    @property
+    def _key(self) -> tuple[str, str]:
+        return self._tab.id, self._tab.document_id
+
+
+async def _locate_canvas(tab: Tab, mode: CanvasMode) -> CanvasProbe:
+    return await (await tab.main_frame()).run(
+        CANVAS, CanvasArgs(selector=mode.selector, loading_selector=mode.loading_selector)
+    )
+
+
+async def _probe_canvas(tab: Tab, mode: CanvasMode) -> tuple[Geometry | None, str]:
+    state = await _locate_canvas(tab, mode)
+    if not state.ready or state.geometry is None:
+        return None, state.reason
+    geometry = state.geometry
+    encoded = await screenshot(tab, geometry)
+    content = await asyncio.to_thread(_has_canvas_content, encoded, mode.min_color_fraction)
+    return (
+        (geometry, "")
+        if content
+        else (None, "canvas pixels are blank or a central loading graphic")
+    )
 
 
 def _has_canvas_content(encoded: str, min_fraction: float) -> bool:

@@ -28,6 +28,10 @@ from browserrig.readiness.plugin import Readiness
 from .execution import Actions, Effect
 
 
+def has_files(browser: Inject[Browser]) -> bool:
+    return browser.files is not None
+
+
 class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
     _browser: Inject[Browser]
     _readiness: Inject[Readiness]
@@ -47,37 +51,6 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         ),
     )
 
-    def _has_files(self) -> bool:
-        return self._browser.files is not None
-
-    def _files(self) -> FileSystem:
-        files = self._browser.files
-        if files is None:
-            raise ToolError("A shared local file system must be configured for this browser")
-        return files
-
-    @hook(PreStep)
-    async def _before_step(self, event: PreStep, next_: Next[StepDecision]) -> StepDecision:
-        files = self._browser.files
-        downloads = await self._browser.downloads()
-        state = FileSystemState(
-            directory=files.directory if files is not None else None,
-            download_directory=files.download_directory if files is not None else None,
-            downloads=downloads[-20:],
-            total_downloads=len(downloads),
-        )
-        view = FileSystemView(file_system=state)
-        event.session.observe(
-            Observation(
-                source="files",
-                full=yaml.safe_dump(
-                    view.model_dump(mode="json"), allow_unicode=True, sort_keys=False
-                ),
-                summary=f"File system: {state.total_downloads} browser downloads.",
-            )
-        )
-        return await next_()
-
     @tool(
         kind=ActionKind.LIST_DOWNLOADS,
         chainable=True,
@@ -90,7 +63,7 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
     @tool(
         kind=ActionKind.LIST_FILES,
         chainable=True,
-        enabled=_has_files,
+        enabled=has_files,
         readonly=True,
         description="List a workspace directory. Follow next_offset for more entries.",
     )
@@ -105,7 +78,7 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
     @tool(
         kind=ActionKind.READ_FILE,
         chainable=True,
-        enabled=_has_files,
+        enabled=has_files,
         readonly=True,
         description=(
             "Read workspace/download content without a browser preview: text, PDF (page 1 by "
@@ -145,7 +118,7 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
     @tool(
         kind=ActionKind.WRITE_FILE,
         chainable=True,
-        enabled=_has_files,
+        enabled=has_files,
         description="Save UTF-8 text in the workspace. Existing files require overwrite=true.",
     )
     async def write_file(self, path: str, content: str, overwrite: bool = False) -> FileEntry:
@@ -154,7 +127,7 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
 
     @tool(
         kind=ActionKind.OPEN_FILE,
-        enabled=_has_files,
+        enabled=has_files,
         description="Open a workspace/download file in a new active browser tab, including PDFs.",
     )
     async def open_file(self, path: str) -> ToolResult:
@@ -166,7 +139,7 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
 
     @tool(
         kind=ActionKind.OPEN_DOWNLOADED_FILE,
-        enabled=_has_files,
+        enabled=has_files,
         description="Open a completed download in a new active tab using its list_downloads ID.",
     )
     async def open_downloaded_file(self, download_id: str) -> ToolResult:
@@ -183,6 +156,34 @@ class FileTools(Plugin, needs=(Actions, Browser, Readiness)):
         if not await asyncio.to_thread(resolved.is_file):
             raise ToolError("Downloaded file is no longer available")
         return await self._open(resolved, ActionKind.OPEN_DOWNLOADED_FILE)
+
+    def _files(self) -> FileSystem:
+        files = self._browser.files
+        if files is None:
+            raise ToolError("A shared local file system must be configured for this browser")
+        return files
+
+    @hook(PreStep)
+    async def _before_step(self, event: PreStep, next_: Next[StepDecision]) -> StepDecision:
+        files = self._browser.files
+        downloads = await self._browser.downloads()
+        state = FileSystemState(
+            directory=files.directory if files is not None else None,
+            download_directory=files.download_directory if files is not None else None,
+            downloads=downloads[-20:],
+            total_downloads=len(downloads),
+        )
+        view = FileSystemView(file_system=state)
+        event.session.observe(
+            Observation(
+                source="files",
+                full=yaml.safe_dump(
+                    view.model_dump(mode="json"), allow_unicode=True, sort_keys=False
+                ),
+                summary=f"File system: {state.total_downloads} browser downloads.",
+            )
+        )
+        return await next_()
 
     async def _open(self, path: Path, kind: ActionKind) -> ToolResult:
         async def open_file(_tab: Tab) -> Effect:

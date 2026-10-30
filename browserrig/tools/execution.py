@@ -70,18 +70,6 @@ _NAVIGATION_KINDS = {
 }
 
 
-def _stop_on_failure(result: ToolResult, tool: ToolInfo | None) -> ToolResult:
-    metadata = tool.metadata.get(BrowserToolMetadata) if tool else None
-    # Calls denied, disabled or skipped before execution retain native approval semantics.
-    if (
-        metadata is not None
-        and result.is_error
-        and result.status not in {ToolStatus.DENIED, ToolStatus.UNAVAILABLE, ToolStatus.SKIPPED}
-    ):
-        return replace(result, break_chain=True)
-    return result
-
-
 @dataclass(frozen=True, slots=True)
 class Effect:
     text: str
@@ -110,19 +98,6 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
             "skipped calls were not executed. Inspect the next observation before continuing."
         ),
     )
-
-    @hook(ExecuteTool)
-    async def _execute_browser_result(
-        self, event: ExecuteTool, next_: Next[ToolResult]
-    ) -> ToolResult:
-        # Set the signal before the execution receipt is persisted, including on errors.
-        return _stop_on_failure(await next_(), event.tool)
-
-    @hook(ReviewToolResult)
-    async def _review_browser_result(
-        self, event: ReviewToolResult, next_: Next[ToolResult]
-    ) -> ToolResult:
-        return _stop_on_failure(await next_(), event.tool)
 
     async def run(
         self,
@@ -194,6 +169,52 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
                 hint = "; the action may have run. Observe before retrying." if dispatched else ""
                 raise ToolError(reason + hint) from error
 
+    async def page_change(self, tab: Tab) -> str:
+        """A comparison probe must never replace the refs or image the model acted on."""
+        before = self.observe.snapshot
+        if before is None or before.mode != ObservationKind.DOM:
+            return "A fresh observation is required after this input."
+        if tab.closed or self.browser.active_tab.id != tab.id:
+            return "The active tab changed."
+        try:
+            after = await self.observe.probe(tab)
+        except Exception:  # pylint: disable=broad-exception-caught
+            # A diagnostic failure after successful input must not turn that input into
+            # a failed action or encourage repeating a submission.
+            return "The page could not be checked after input."
+        if after.readiness != ReadinessStatus.READY or after.limitations:
+            return "The page could not be checked completely after input."
+        return decision_change(before, after)
+
+    async def element_point(self, *, tab: Tab, ref: str, scroll: bool = True) -> ElementPoint:
+        """Reveal a ref with wheel input, then return a hit-tested point and highlight it.
+
+        Use `scroll=False` to re-check the target after hover or other input moved it.
+        """
+        handle = await self.observe.element(tab, ref)
+        scrolled = False
+        if scroll:
+            scrolled = await prepare_element(tab, handle)
+            # Wheel input may have moved ancestor documents; refresh their transforms.
+            handle = await self.observe.element(tab, ref)
+        point = await handle.locate()
+        if point.bounds is not None:
+            await tab.input.highlight(ref, point.bounds)
+        return point.model_copy(update={"scrolled": scrolled})
+
+    @hook(ExecuteTool)
+    async def _execute_browser_result(
+        self, event: ExecuteTool, next_: Next[ToolResult]
+    ) -> ToolResult:
+        # Set the signal before the execution receipt is persisted, including on errors.
+        return _stop_on_failure(await next_(), event.tool)
+
+    @hook(ReviewToolResult)
+    async def _review_browser_result(
+        self, event: ReviewToolResult, next_: Next[ToolResult]
+    ) -> ToolResult:
+        return _stop_on_failure(await next_(), event.tool)
+
     async def _prepare(self, tab: Tab, kind: ActionKind) -> PageState:
         """Return the pre-action baseline once the page accepts input."""
         if kind in _TAB_KINDS:
@@ -218,23 +239,6 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
             fingerprint=before.fingerprint,
             scroll_y=before.scroll_y,
         )
-
-    async def page_change(self, tab: Tab) -> str:
-        """A comparison probe must never replace the refs or image the model acted on."""
-        before = self.observe.snapshot
-        if before is None or before.mode != ObservationKind.DOM:
-            return "A fresh observation is required after this input."
-        if tab.closed or self.browser.active_tab.id != tab.id:
-            return "The active tab changed."
-        try:
-            after = await self.observe.probe(tab)
-        except Exception:  # pylint: disable=broad-exception-caught
-            # A diagnostic failure after successful input must not turn that input into
-            # a failed action or encourage repeating a submission.
-            return "The page could not be checked after input."
-        if after.readiness != ReadinessStatus.READY or after.limitations:
-            return "The page could not be checked completely after input."
-        return decision_change(before, after)
 
     async def _settle(self, tab: Tab, kind: ActionKind) -> str:
         phase = ReadinessPhase.NAVIGATION if kind in _NAVIGATION_KINDS else ReadinessPhase.ACTION
@@ -263,21 +267,17 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
             )
         )
 
-    async def element_point(self, *, tab: Tab, ref: str, scroll: bool = True) -> ElementPoint:
-        """Reveal a ref with wheel input, then return a hit-tested point and highlight it.
 
-        Use `scroll=False` to re-check the target after hover or other input moved it.
-        """
-        handle = await self.observe.element(tab, ref)
-        scrolled = False
-        if scroll:
-            scrolled = await prepare_element(tab, handle)
-            # Wheel input may have moved ancestor documents; refresh their transforms.
-            handle = await self.observe.element(tab, ref)
-        point = await handle.locate()
-        if point.bounds is not None:
-            await tab.input.highlight(ref, point.bounds)
-        return point.model_copy(update={"scrolled": scrolled})
+def _stop_on_failure(result: ToolResult, tool: ToolInfo | None) -> ToolResult:
+    metadata = tool.metadata.get(BrowserToolMetadata) if tool else None
+    # Calls denied, disabled or skipped before execution retain native approval semantics.
+    if (
+        metadata is not None
+        and result.is_error
+        and result.status not in {ToolStatus.DENIED, ToolStatus.UNAVAILABLE, ToolStatus.SKIPPED}
+    ):
+        return replace(result, break_chain=True)
+    return result
 
 
 def _observes(snapshot: Snapshot, tab: Tab) -> bool:

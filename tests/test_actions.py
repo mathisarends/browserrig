@@ -15,18 +15,6 @@ from browserrig.kinds import ActionKind
 from browserrig.tools.execution import Actions
 
 
-def _actions():
-    events = []
-    tab = Tab("tab", SimpleNamespace())
-    actions = SimpleNamespace(
-        browser=SimpleNamespace(action_lock=asyncio.Lock(), active_tab=tab),
-        _events=SimpleNamespace(emit=AsyncMock(side_effect=events.append)),
-        _prepare=AsyncMock(return_value=SimpleNamespace()),
-    )
-    actions._fail = lambda *args: Actions._fail(actions, *args)
-    return actions, events
-
-
 @pytest.mark.parametrize(
     "error", [BrowserError("wrong input"), ToolError("denied"), ValueError("bad")]
 )
@@ -88,3 +76,15 @@ async def test_global_keyboard_input_rejects_a_document_changed_between_calls():
     )
     with pytest.raises(BrowserError, match="observe before input"):
         await Actions._prepare(actions, tab, ActionKind.PRESS)
+
+
+def _actions():
+    events = []
+    tab = Tab("tab", SimpleNamespace())
+    actions = SimpleNamespace(
+        browser=SimpleNamespace(action_lock=asyncio.Lock(), active_tab=tab),
+        _events=SimpleNamespace(emit=AsyncMock(side_effect=events.append)),
+        _prepare=AsyncMock(return_value=SimpleNamespace()),
+    )
+    actions._fail = lambda *args: Actions._fail(actions, *args)
+    return actions, events

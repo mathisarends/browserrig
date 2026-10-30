@@ -51,6 +51,17 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
     async def setup(self, ctx: Context) -> None:
         ctx.effect(self._close_all)
 
+    def intervals(self, *, now: float | None = None) -> tuple[ActivityFinishedEvent, ...]:
+        return project_intervals(
+            (
+                event
+                for event in self._log.events
+                if isinstance(event, ActivityStartedEvent | ActivityFinishedEvent)
+                and event.epoch_id == self._state.epoch
+            ),
+            now=now,
+        )
+
     async def _start(self, key: ActivityKey, *, cause_id: str) -> None:
         """A new interval in the same slot supersedes only that slot's previous interval."""
         await self._finish(key, ActivityOutcome.SUPERSEDED)
@@ -196,14 +207,3 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         for key in tuple(self._state.open):
             if key.kind != ActivityKind.PAUSED:
                 await self._finish(key, turn_outcome(event.reason))
-
-    def intervals(self, *, now: float | None = None) -> tuple[ActivityFinishedEvent, ...]:
-        return project_intervals(
-            (
-                event
-                for event in self._log.events
-                if isinstance(event, ActivityStartedEvent | ActivityFinishedEvent)
-                and event.epoch_id == self._state.epoch
-            ),
-            now=now,
-        )

@@ -82,16 +82,6 @@ class FrameTransform:
         )
 
 
-def _enclosing(bounds: Bounds, transform: Callable[[float, float], tuple[float, float]]) -> Bounds:
-    points = [
-        transform(x, y)
-        for x in (bounds.x, bounds.x + bounds.width)
-        for y in (bounds.y, bounds.y + bounds.height)
-    ]
-    xs, ys = zip(*points, strict=True)
-    return Bounds(x=min(xs), y=min(ys), width=max(xs) - min(xs), height=max(ys) - min(ys))
-
-
 class Point(Options):
     x: float = Field(ge=0)
     y: float = Field(ge=0)
@@ -134,3 +124,13 @@ class Region(Options):
         return Geometry(
             x=visible.x, y=visible.y, width=visible.width, height=visible.height, scale=scale
         )
+
+
+def _enclosing(bounds: Bounds, transform: Callable[[float, float], tuple[float, float]]) -> Bounds:
+    points = [
+        transform(x, y)
+        for x in (bounds.x, bounds.x + bounds.width)
+        for y in (bounds.y, bounds.y + bounds.height)
+    ]
+    xs, ys = zip(*points, strict=True)
+    return Bounds(x=min(xs), y=min(ys), width=max(xs) - min(xs), height=max(ys) - min(ys))

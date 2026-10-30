@@ -10,16 +10,6 @@ from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 
 
-def _tab(result):
-    runtime = SimpleNamespace(
-        evaluate=AsyncMock(return_value=result),
-        release_object_group=AsyncMock(),
-    )
-    tab = Tab("tab", SimpleNamespace(runtime=runtime))
-    tab.invalidate_frames = Mock()
-    return tab, runtime
-
-
 @pytest.mark.parametrize(
     "value, expected",
     [
@@ -93,3 +83,13 @@ async def test_unserializable_result_is_reported_without_reexecuting_the_code():
         await tab.evaluate("expression")
     runtime.evaluate.assert_awaited_once()
     runtime.release_object_group.assert_awaited_once()
+
+
+def _tab(result):
+    runtime = SimpleNamespace(
+        evaluate=AsyncMock(return_value=result),
+        release_object_group=AsyncMock(),
+    )
+    tab = Tab("tab", SimpleNamespace(runtime=runtime))
+    tab.invalidate_frames = Mock()
+    return tab, runtime

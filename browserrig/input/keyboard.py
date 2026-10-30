@@ -52,50 +52,6 @@ _SHIFTED = dict(zip('!@#$%^&*()_+{}|:"<>?~', "1234567890-=[]\\;',./`", strict=Tr
 _SHIFTED_BY_BASE = {base: shifted for shifted, base in _SHIFTED.items()}
 
 
-class _KeyArguments(TypedDict):
-    key: str
-    code: str
-    windows_virtual_key_code: int
-
-
-@dataclass(frozen=True, slots=True)
-class _Stroke:
-    key: str
-    modifiers: tuple[str, ...] = ()
-
-    @property
-    def flags(self) -> int:
-        return sum(_MODIFIERS[name] for name in self.modifiers)
-
-    def arguments(self) -> _KeyArguments:
-        base = _SHIFTED.get(self.key, self.key)
-        virtual, code = _SPECIAL_KEYS.get(self.key, _PUNCTUATION.get(base, (0, "")))
-        if len(base) == 1 and base.isascii() and base.isalnum():
-            virtual = ord(base.upper())
-            code = f"Key{base.upper()}" if base.isalpha() else f"Digit{base}"
-        return {"key": self.key, "code": code, "windows_virtual_key_code": virtual}
-
-
-def _key_stroke(value: str, modifiers: tuple[str, ...]) -> _Stroke:
-    if len(value) != 1 and value not in _SPECIAL_KEYS:
-        raise BrowserError("Provide one character or a named key such as Escape, Enter or Tab")
-    stroke = _character(value) if len(value) == 1 else _Stroke(value)
-    modifiers = tuple(dict.fromkeys((*modifiers, *stroke.modifiers)))
-    key = stroke.key
-    if "Shift" in modifiers and len(key) == 1:
-        shifted = _SHIFTED_BY_BASE.get(key, key.upper())
-        if len(shifted) == 1:
-            key = shifted
-    return _Stroke(key, modifiers)
-
-
-def _character(value: str) -> _Stroke:
-    if value in {"\n", "\r"}:
-        return _Stroke("Enter")
-    shifted = value in _SHIFTED or value.isascii() and value.isupper()
-    return _Stroke(value, ("Shift",) if shifted else ())
-
-
 class Keyboard:
     def __init__(self, cdp: CdpSession, *, emit: Callable[[InputEvent], Awaitable[None]]) -> None:
         self._cdp = cdp
@@ -184,3 +140,47 @@ class Keyboard:
                 duration=duration,
             )
         )
+
+
+class _KeyArguments(TypedDict):
+    key: str
+    code: str
+    windows_virtual_key_code: int
+
+
+@dataclass(frozen=True, slots=True)
+class _Stroke:
+    key: str
+    modifiers: tuple[str, ...] = ()
+
+    @property
+    def flags(self) -> int:
+        return sum(_MODIFIERS[name] for name in self.modifiers)
+
+    def arguments(self) -> _KeyArguments:
+        base = _SHIFTED.get(self.key, self.key)
+        virtual, code = _SPECIAL_KEYS.get(self.key, _PUNCTUATION.get(base, (0, "")))
+        if len(base) == 1 and base.isascii() and base.isalnum():
+            virtual = ord(base.upper())
+            code = f"Key{base.upper()}" if base.isalpha() else f"Digit{base}"
+        return {"key": self.key, "code": code, "windows_virtual_key_code": virtual}
+
+
+def _key_stroke(value: str, modifiers: tuple[str, ...]) -> _Stroke:
+    if len(value) != 1 and value not in _SPECIAL_KEYS:
+        raise BrowserError("Provide one character or a named key such as Escape, Enter or Tab")
+    stroke = _character(value) if len(value) == 1 else _Stroke(value)
+    modifiers = tuple(dict.fromkeys((*modifiers, *stroke.modifiers)))
+    key = stroke.key
+    if "Shift" in modifiers and len(key) == 1:
+        shifted = _SHIFTED_BY_BASE.get(key, key.upper())
+        if len(shifted) == 1:
+            key = shifted
+    return _Stroke(key, modifiers)
+
+
+def _character(value: str) -> _Stroke:
+    if value in {"\n", "\r"}:
+        return _Stroke("Enter")
+    shifted = value in _SHIFTED or value.isascii() and value.isupper()
+    return _Stroke(value, ("Shift",) if shifted else ())

@@ -23,6 +23,71 @@ from .models import Element, ElementFingerprint, PageFingerprint, Snapshot
 _MAX_REGION_SIDE = 2000
 
 
+async def capture(
+    tab: Tab,
+    mode: ObservationMode,
+    report: ReadinessReport,
+    *,
+    tabs: tuple[TabInfo, ...] = (),
+    previous: Snapshot | None = None,
+    region: Region | None = None,
+    zoom: float = 1,
+) -> Snapshot:
+    """Observe `tab`. With `previous` from the same document, unseen elements get `new`.
+
+    `region` crops a DOM-mode screenshot to a viewport area, magnified by `zoom`.
+    """
+    snapshot_id = uuid4().hex
+    if tab.dialog:
+        return Snapshot(
+            id=snapshot_id,
+            tab_id=tab.id,
+            document_id=tab.document_id,
+            url=tab.url,
+            title=tab.title,
+            mode=mode.kind,
+            readiness=ReadinessStatus.BLOCKED,
+            width=0,
+            height=0,
+            scroll_y=0,
+            fingerprint="dialog",
+            tabs=tabs,
+            text=f"Open {tab.dialog[0]} dialog: {tab.dialog[1]}",
+        )
+    await tab.sync_document()
+    document_id = tab.document_id
+    content = await _capture_strategy(mode, region, zoom).collect(tab, report)
+    await tab.sync_document()
+    if tab.document_id != document_id:
+        raise BrowserError("Document changed during capture; observe again before acting")
+    page = content.page
+    elements = _mark_new(page.elements, previous, tab.id, document_id)
+    return Snapshot(
+        id=snapshot_id,
+        tab_id=tab.id,
+        document_id=document_id,
+        url=page.url,
+        title=page.title,
+        width=page.width,
+        height=page.height,
+        scroll_y=page.scroll_y,
+        page_height=page.page_height,
+        mode=mode.kind,
+        readiness=report.status,
+        fingerprint=_fingerprint(page, document_id, content.image_digest),
+        tabs=tabs,
+        text=page.text,
+        elements=elements,
+        headings=page.headings,
+        alerts=page.alerts,
+        modal=page.modal,
+        canvases=page.canvases,
+        limitations=page.limitations,
+        image=content.image,
+        geometry=content.geometry,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _Content:
     page: Extraction
@@ -111,71 +176,6 @@ def _capture_strategy(
             return _CanvasCapture(mode)
         case _:
             assert_never(mode)
-
-
-async def capture(
-    tab: Tab,
-    mode: ObservationMode,
-    report: ReadinessReport,
-    *,
-    tabs: tuple[TabInfo, ...] = (),
-    previous: Snapshot | None = None,
-    region: Region | None = None,
-    zoom: float = 1,
-) -> Snapshot:
-    """Observe `tab`. With `previous` from the same document, unseen elements get `new`.
-
-    `region` crops a DOM-mode screenshot to a viewport area, magnified by `zoom`.
-    """
-    snapshot_id = uuid4().hex
-    if tab.dialog:
-        return Snapshot(
-            id=snapshot_id,
-            tab_id=tab.id,
-            document_id=tab.document_id,
-            url=tab.url,
-            title=tab.title,
-            mode=mode.kind,
-            readiness=ReadinessStatus.BLOCKED,
-            width=0,
-            height=0,
-            scroll_y=0,
-            fingerprint="dialog",
-            tabs=tabs,
-            text=f"Open {tab.dialog[0]} dialog: {tab.dialog[1]}",
-        )
-    await tab.sync_document()
-    document_id = tab.document_id
-    content = await _capture_strategy(mode, region, zoom).collect(tab, report)
-    await tab.sync_document()
-    if tab.document_id != document_id:
-        raise BrowserError("Document changed during capture; observe again before acting")
-    page = content.page
-    elements = _mark_new(page.elements, previous, tab.id, document_id)
-    return Snapshot(
-        id=snapshot_id,
-        tab_id=tab.id,
-        document_id=document_id,
-        url=page.url,
-        title=page.title,
-        width=page.width,
-        height=page.height,
-        scroll_y=page.scroll_y,
-        page_height=page.page_height,
-        mode=mode.kind,
-        readiness=report.status,
-        fingerprint=_fingerprint(page, document_id, content.image_digest),
-        tabs=tabs,
-        text=page.text,
-        elements=elements,
-        headings=page.headings,
-        alerts=page.alerts,
-        modal=page.modal,
-        canvases=page.canvases,
-        limitations=page.limitations,
-        image=content.image,
-        geometry=content.geometry,
-    )
 
 
 def _mark_new(

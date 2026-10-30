@@ -12,6 +12,43 @@ from tests.observations import latest
 pytestmark = pytest.mark.integration
 
 
+@pytest.mark.parametrize("coordinates", [False, True])
+async def test_double_click_dispatches_native_detail_and_dblclick(site, coordinates):
+    def arguments(state):
+        if coordinates:
+            return {"x": 70, "y": 40, "count": 2}
+        ref = next(e["ref"] for e in state["elements"] if e["name"] == "Double")
+        return {"ref": ref, "count": 2}
+
+    state = await _perform(site, "click_at" if coordinates else "click", arguments)
+    assert state["doubles"] == 1
+    assert state["details"] == [1, 2]
+
+
+@pytest.mark.parametrize("mode", [DragMode.POINTER, DragMode.HTML5])
+@pytest.mark.parametrize("coordinates", [False, True])
+async def test_drag_pointer_and_html5_transfer(site, mode, coordinates):
+    def arguments(state):
+        if coordinates:
+            y = 140 if mode is DragMode.HTML5 else 290
+            return {
+                "start": {"x": 70, "y": y},
+                "end": {"x": 350, "y": y},
+                "mode": mode,
+                "duration": 0.1,
+            }
+        prefix = "Native" if mode is DragMode.HTML5 else "Pointer"
+        refs = {e["name"]: e["ref"] for e in state["elements"]}
+        return {
+            "source_ref": refs[f"{prefix} source"],
+            "target_ref": refs[f"{prefix} target"],
+            "duration": 0.1,
+        }
+
+    state = await _perform(site, "drag_at" if coordinates else "drag", arguments)
+    assert state["native"] == "payload" if mode is DragMode.HTML5 else state["pointer"] is True
+
+
 async def _perform(site, name, arguments):
     holder = {}
     count = 0
@@ -53,40 +90,3 @@ async def _perform(site, name, arguments):
             return_by_value=True,
         )
         return state.result.value
-
-
-@pytest.mark.parametrize("coordinates", [False, True])
-async def test_double_click_dispatches_native_detail_and_dblclick(site, coordinates):
-    def arguments(state):
-        if coordinates:
-            return {"x": 70, "y": 40, "count": 2}
-        ref = next(e["ref"] for e in state["elements"] if e["name"] == "Double")
-        return {"ref": ref, "count": 2}
-
-    state = await _perform(site, "click_at" if coordinates else "click", arguments)
-    assert state["doubles"] == 1
-    assert state["details"] == [1, 2]
-
-
-@pytest.mark.parametrize("mode", [DragMode.POINTER, DragMode.HTML5])
-@pytest.mark.parametrize("coordinates", [False, True])
-async def test_drag_pointer_and_html5_transfer(site, mode, coordinates):
-    def arguments(state):
-        if coordinates:
-            y = 140 if mode is DragMode.HTML5 else 290
-            return {
-                "start": {"x": 70, "y": y},
-                "end": {"x": 350, "y": y},
-                "mode": mode,
-                "duration": 0.1,
-            }
-        prefix = "Native" if mode is DragMode.HTML5 else "Pointer"
-        refs = {e["name"]: e["ref"] for e in state["elements"]}
-        return {
-            "source_ref": refs[f"{prefix} source"],
-            "target_ref": refs[f"{prefix} target"],
-            "duration": 0.1,
-        }
-
-    state = await _perform(site, "drag_at" if coordinates else "drag", arguments)
-    assert state["native"] == "payload" if mode is DragMode.HTML5 else state["pointer"] is True

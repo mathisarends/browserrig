@@ -17,14 +17,6 @@ from browserrig.files.models import DownloadState
 from browserrig.tools.files import _file_call
 
 
-@pytest.fixture(name="files")
-def _files(tmp_path):
-    workspace = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
-    assert not workspace.directory.exists()
-    workspace.initialize()
-    return workspace
-
-
 def test_workspace_text_round_trip_pagination_and_explicit_overwrite(files):
     content = "Grüße aus dem Weltall 🌍\n" * 10
     saved = files.write_file("notes/research.md", content)
@@ -164,19 +156,6 @@ def test_explicit_download_directory_is_accessible_without_opening_other_paths(t
         files.resolve(tmp_path / "other")
 
 
-async def _started_download(tmp_path):
-    files = FileSystem(FileSystemOptions(directory=tmp_path))
-    files.initialize()
-    emit = AsyncMock()
-    downloads = Downloads(files, None, emit)
-    await downloads.handle(
-        DownloadWillBeginEvent(
-            frame_id="frame", guid="id", url="https://example.org", suggested_filename="note.txt"
-        )
-    )
-    return files, downloads, emit
-
-
 _COMPLETED = DownloadProgressEvent(guid="id", total_bytes=8, received_bytes=8, state="completed")
 
 
@@ -216,3 +195,24 @@ async def test_io_errors_become_model_visible_tool_errors():
 
     with pytest.raises(ToolError, match="Download the file first"):
         await _file_call(fail)
+
+
+@pytest.fixture(name="files")
+def _files(tmp_path):
+    workspace = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
+    assert not workspace.directory.exists()
+    workspace.initialize()
+    return workspace
+
+
+async def _started_download(tmp_path):
+    files = FileSystem(FileSystemOptions(directory=tmp_path))
+    files.initialize()
+    emit = AsyncMock()
+    downloads = Downloads(files, None, emit)
+    await downloads.handle(
+        DownloadWillBeginEvent(
+            frame_id="frame", guid="id", url="https://example.org", suggested_filename="note.txt"
+        )
+    )
+    return files, downloads, emit

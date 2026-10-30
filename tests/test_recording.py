@@ -18,46 +18,6 @@ from browserrig.events import RecordingFailedEvent, RecordingSegmentLostEvent, T
 from tests.fakes import FakeChrome
 
 
-def _tab(name, *, size=100):
-    data = b"\x1aE\xdf\xa3" + b"x" * size
-    stream = f"stream-{name}"
-    return SimpleNamespace(
-        id=name,
-        document_id="doc",
-        closed=False,
-        screen=SimpleNamespace(
-            start=AsyncMock(return_value=stream),
-            stop=AsyncMock(return_value=stream),
-            read=AsyncMock(return_value=(data, True)),
-            close=AsyncMock(),
-        ),
-    )
-
-
-@pytest.fixture(name="recording")
-async def _recording(tmp_path):
-    holder = {}
-
-    class Chrome(FakeChrome):
-        events = (TabClosedEvent,)
-
-    class Access(Plugin, needs=(Recording,)):
-        async def setup(self, recorder: Inject[Recording]):
-            holder["recording"] = recorder
-
-    agent = Agent(
-        model=ScriptedModel(["unused"]),
-        plugins=[
-            Chrome(holder),
-            Readiness(),
-            Recording(RecordingOptions(directory=tmp_path, required=True, max_bytes=1024)),
-            Access(),
-        ],
-    )
-    async with agent.session() as session:
-        yield holder["recording"], session
-
-
 async def test_closed_tab_loses_segment_without_touching_dead_session_and_can_restart(recording):
     recorder, session = recording
     closed = _tab("closed")
@@ -137,3 +97,43 @@ async def test_screen_recorder_decodes_base64_and_text_chunks():
     assert await screen.read("stream") == (payload, False)
     assert await screen.read("stream") == (b"tail", True)
     read.assert_awaited_with(handle="stream", size=64 * 1024)
+
+
+def _tab(name, *, size=100):
+    data = b"\x1aE\xdf\xa3" + b"x" * size
+    stream = f"stream-{name}"
+    return SimpleNamespace(
+        id=name,
+        document_id="doc",
+        closed=False,
+        screen=SimpleNamespace(
+            start=AsyncMock(return_value=stream),
+            stop=AsyncMock(return_value=stream),
+            read=AsyncMock(return_value=(data, True)),
+            close=AsyncMock(),
+        ),
+    )
+
+
+@pytest.fixture(name="recording")
+async def _recording(tmp_path):
+    holder = {}
+
+    class Chrome(FakeChrome):
+        events = (TabClosedEvent,)
+
+    class Access(Plugin, needs=(Recording,)):
+        async def setup(self, recorder: Inject[Recording]):
+            holder["recording"] = recorder
+
+    agent = Agent(
+        model=ScriptedModel(["unused"]),
+        plugins=[
+            Chrome(holder),
+            Readiness(),
+            Recording(RecordingOptions(directory=tmp_path, required=True, max_bytes=1024)),
+            Access(),
+        ],
+    )
+    async with agent.session() as session:
+        yield holder["recording"], session

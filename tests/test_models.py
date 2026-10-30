@@ -19,30 +19,6 @@ from browserrig.observation.models import (
 from browserrig.observation.render import image_caption, render
 
 
-def _snapshot(*elements: Element, **fields) -> Snapshot:
-    return Snapshot(
-        id="observation",
-        tab_id="tab",
-        document_id="document",
-        url="https://example.org/shop",
-        title="Shop",
-        mode="dom",
-        readiness="ready",
-        width=1280,
-        height=800,
-        scroll_y=0,
-        page_height=4000,
-        fingerprint="fingerprint",
-        elements=elements,
-        **fields,
-    )
-
-
-def _element(ref: str, order: int, **fields) -> Element:
-    defaults = {"frame_id": "internal-frame", "backend_id": 1, "role": "button", "tag": "button"}
-    return Element(ref=ref, order=order, name=fields.pop("name", ref), **(defaults | fields))
-
-
 def test_render_lists_visible_elements_by_section_and_group_without_routing_data():
     snapshot = _snapshot(
         _element(
@@ -201,3 +177,27 @@ def test_configuration_discriminators_are_enums_and_credentials_are_hidden():
     assert "secret" not in repr(connected)
     with pytest.raises(ValidationError):
         LaunchBrowser(arguments=("--user-data-dir=unexpected",))
+
+
+def _snapshot(*elements: Element, **fields) -> Snapshot:
+    return Snapshot(
+        id="observation",
+        tab_id="tab",
+        document_id="document",
+        url="https://example.org/shop",
+        title="Shop",
+        mode="dom",
+        readiness="ready",
+        width=1280,
+        height=800,
+        scroll_y=0,
+        page_height=4000,
+        fingerprint="fingerprint",
+        elements=elements,
+        **fields,
+    )
+
+
+def _element(ref: str, order: int, **fields) -> Element:
+    defaults = {"frame_id": "internal-frame", "backend_id": 1, "role": "button", "tag": "button"}
+    return Element(ref=ref, order=order, name=fields.pop("name", ref), **(defaults | fields))

@@ -674,6 +674,11 @@ leave hints queued. `NudgeIncludedEvent.request_id` matches the submitted reques
 Development tools require Python >=3.12, uv, and Node.js >=24.
 Python sources live in `browserrig/`.
 
+Keep public entry points before private helpers in modules, and public methods before
+private methods in classes. Imports and prerequisite type or constant declarations come
+first; preserve definition-time dependencies used by defaults, decorators and registries.
+Apply this order to production code, tests and examples.
+
 ```powershell
 uv sync --locked --extra openai
 npm.cmd ci
