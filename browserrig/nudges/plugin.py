@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -28,6 +29,20 @@ from browserrig.events import (
 
 _CLICK_KINDS = {ActionKind.CLICK, ActionKind.CLICK_AT, ActionKind.DOUBLE_CLICK}
 _SOURCE = "browser.nudges"
+# Wording shared by captcha widgets and bot-check interstitials across vendors.
+_CHALLENGE = re.compile(
+    r"captcha|(?:verify|prove) (?:that )?you(?:'re| are) (?:a )?human|prove your humanity"
+    r"|(?:i'm|i am|are you) (?:not )?a robot|unusual traffic|blocked by network security"
+    r"|checking your browser",
+    re.IGNORECASE,
+)
+# Challenge pages are small; a page with many controls that mentions captchas is about them.
+_CHALLENGE_MAX_CONTROLS = 40
+_CHALLENGE_HINT = (
+    "This page looks like a captcha or bot check. Do not try to solve or bypass it; "
+    "reach the information another way, such as another site or source, "
+    "or report that access was blocked so the user can complete the check."
+)
 
 if TYPE_CHECKING:
     from browserrig.observation.models import Snapshot
@@ -38,6 +53,8 @@ class _State:
     queued: dict[str, NudgeQueuedEvent] = field(default_factory=dict)
     tabs: dict[str, _TabState] = field(default_factory=dict)
     effect_at: float = 0
+    # Documents already flagged as bot checks; each is flagged once.
+    challenges: set[str] = field(default_factory=set)
     # Whether the last recorded hint observation listed any hints.
     shown: bool = False
 
@@ -105,6 +122,15 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
 
     async def observation(self, snapshot: Snapshot) -> Observation | None:
         """Hints for the next step; None while there are none and none were shown last."""
+        if snapshot.document_id not in self._state.challenges and _challenge(snapshot):
+            self._state.challenges.add(snapshot.document_id)
+            await self.queue(
+                _CHALLENGE_HINT,
+                key=f"challenge:{snapshot.tab_id}",
+                cause_id=snapshot.id,
+                target_id=snapshot.tab_id,
+                document_id=snapshot.document_id,
+            )
         observation = await self.project(snapshot)
         shown, self._state.shown = self._state.shown, bool(observation.refs)
         # One empty list after shown hints marks them as handled; later empty lists add nothing.
@@ -239,6 +265,18 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
                 NudgeIncludedEvent(nudge_ids=included, request_id=event.request_id)
             )
             self._remove(included)
+
+
+def _challenge(snapshot: Snapshot) -> bool:
+    if len(snapshot.elements) + len(snapshot.offscreen) > _CHALLENGE_MAX_CONTROLS:
+        return False
+    parts = (
+        snapshot.title,
+        snapshot.text[:2000],
+        *(heading.text for heading in snapshot.headings),
+        *(element.name for element in snapshot.elements),
+    )
+    return any(_CHALLENGE.search(part) for part in parts)
 
 
 @dataclass

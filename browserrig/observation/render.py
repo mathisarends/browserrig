@@ -5,8 +5,9 @@ landmark section and form/menu group in document order, so structure costs a hea
 line instead of nesting on every element.
 """
 
+import re
 from collections import Counter
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from browserrig.core.kinds import ReadinessStatus
 
@@ -20,6 +21,8 @@ _MAX_NAME = 100
 _MAX_HREF = 80
 _MAX_OPTIONS = 10
 _MAX_CANVASES = 10
+# Footnote markers such as [1], [a] or [note 3].
+_FOOTNOTE = re.compile(r"\[\w[\w ]{0,7}\]")
 
 
 def render(snapshot: Snapshot) -> str:
@@ -190,7 +193,7 @@ def _element(element: Element, url: str) -> str:
         if len(element.options) > _MAX_OPTIONS:
             shown.append(f"…+{len(element.options) - _MAX_OPTIONS}")
         parts.append(f"options=[{', '.join(shown)}]")
-    link = _link(element.href, url)
+    link = _link(element.href, url, element.name)
     if link:
         parts.append(f"-> {link}")
     elif not element.name and element.bounds is not None and element.value is None:
@@ -224,7 +227,7 @@ def _tristate(value: object, on: str, off: str, mixed: str) -> str:
     return off if value is False else ""
 
 
-def _link(href: str, url: str) -> str:
+def _link(href: str, url: str, name: str = "") -> str:
     """Same-page links as fragments, same-origin links as paths; script links are omitted."""
     href = unwrap_redirect(href)
     parts = urlsplit(href)
@@ -232,7 +235,15 @@ def _link(href: str, url: str) -> str:
         return ""
     page = url.split("#", 1)[0]
     if href.startswith(page + "#"):
-        return _cut(href[len(page) :], _MAX_HREF) if len(href) > len(page) + 1 else ""
+        fragment = href[len(page) + 1 :]
+        # Table-of-contents entries and footnote markers say nothing more with their target.
+        if (
+            not fragment
+            or unquote(fragment).replace("_", " ").casefold() == name.casefold()
+            or _FOOTNOTE.fullmatch(name)
+        ):
+            return ""
+        return _cut("#" + fragment, _MAX_HREF)
     origin = _origin(url)
     if origin and href.startswith(origin + "/"):
         href = href[len(origin) :]

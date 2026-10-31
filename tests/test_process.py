@@ -1,6 +1,7 @@
 # Internal state is inspected to verify lifecycle and cleanup.
 # pylint: disable=protected-access
 
+import asyncio
 import errno
 from unittest.mock import Mock
 
@@ -51,3 +52,22 @@ def test_startup_retries_locked_and_incomplete_port_file():
     assert _active_endpoint(path) is None
     assert _active_endpoint(path) is None
     assert _active_endpoint(path) == "ws://127.0.0.1:9222/devtools/browser/test"
+
+
+async def test_profile_cleanup_gives_up_on_persistent_lock_without_failing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    process = ChromeProcess(LaunchBrowser())
+    profile = Mock()
+    profile.name = "missing-profile-dir"
+    profile.cleanup.side_effect = PermissionError("held by a Chrome helper")
+    process._profile = profile
+    clock = iter(range(0, 1000, 5))
+    monkeypatch.setattr("asyncio.sleep", _no_sleep)
+    monkeypatch.setattr(asyncio.get_running_loop(), "time", lambda: next(clock))
+    await process.aclose()
+    assert process._profile is None
+
+
+async def _no_sleep(_: float) -> None:
+    return None

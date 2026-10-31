@@ -62,7 +62,6 @@ class ActionKind(StrEnum):
     WRITE_FILE = "write_file"
     OPEN_FILE = "open_file"
     OPEN_DOWNLOADED_FILE = "open_downloaded_file"
-    OBSERVE = "observe"
     SCREENSHOT = "screenshot"
     EXTRACT_CONTENT = "extract_content"
     # Kept readable in existing persisted action receipts.

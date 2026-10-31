@@ -184,7 +184,9 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         if field is not None:
             marked = await field.run(SECRET_FIELD, SecretFieldArgs(mask=True))
             if marked.origin != origins[0]:
-                raise SecretError("The field's page changed; observe before retrying")
+                raise SecretError(
+                    "The field's page changed; retry with refs from the next observation"
+                )
             guard = _field_guard(browser, tab.id, field, origins)
         else:
             start = await main.run(SECRET_FOCUS, SecretFocusArgs(start=True))

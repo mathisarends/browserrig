@@ -4,11 +4,19 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from cdpify.domains.page import FrameStartedLoadingEvent, FrameStoppedLoadingEvent
+from cdpify.domains.input import MouseButton
+from cdpify.domains.page import (
+    FrameStartedLoadingEvent,
+    FrameStoppedLoadingEvent,
+    JavascriptDialogClosedEvent,
+    JavascriptDialogOpeningEvent,
+)
 
 from browserrig.browser import favicon
 from browserrig.browser.favicon import load_favicon
 from browserrig.browser.tab import Tab
+from browserrig.core.geometry import Point
+from browserrig.core.kinds import MouseEventKind
 from browserrig.events import TabUpdatedEvent
 from browserrig.scripts.models import TabStrip
 from browserrig.tools.navigation import site_url, typed_address
@@ -134,3 +142,44 @@ async def test_a_discarded_tab_stops_resolving_its_icon(monkeypatch):
     tab.discard()
     with pytest.raises(asyncio.CancelledError):
         await task
+
+
+async def test_input_that_opens_a_dialog_returns_without_waiting_for_its_reply():
+    held = asyncio.get_running_loop().create_future()
+
+    async def dispatch_mouse_event(**_):
+        await held
+
+    cdp = SimpleNamespace(
+        input=SimpleNamespace(dispatch_mouse_event=dispatch_mouse_event),
+        page=SimpleNamespace(get_frame_tree=AsyncMock(side_effect=AssertionError("blocked"))),
+    )
+    tab = Tab("tab", cdp)
+    click = asyncio.create_task(
+        tab.dispatch_mouse(
+            MouseEventKind.RELEASED,
+            Point(x=1, y=2),
+            button=MouseButton.LEFT,
+            buttons=0,
+            click_count=1,
+        )
+    )
+    await asyncio.sleep(0)
+    assert not click.done()
+    await tab.handle(_dialog())
+    await asyncio.wait_for(click, 1)
+    # The page answers nothing while the dialog is open, so the document is kept as is.
+    await tab.sync_document()
+    held.set_exception(RuntimeError("reply after the dialog closed"))
+    await tab.handle(JavascriptDialogClosedEvent(frame_id="tab", result=True, user_input=""))
+    assert tab.dialog is None
+
+
+def _dialog() -> JavascriptDialogOpeningEvent:
+    return JavascriptDialogOpeningEvent(
+        url="about:blank",
+        frame_id="tab",
+        message="Hi",
+        type="alert",
+        has_browser_handler=False,
+    )

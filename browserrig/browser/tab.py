@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Coroutine, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal
@@ -111,7 +111,9 @@ class Frame:
             return await self.parent.run_on_node(self.owner_id, script, args)
         except BrowserError as error:
             if str(error) == "STALE_ELEMENT":
-                raise BrowserError("Element frame no longer exists; observe again") from error
+                raise BrowserError(
+                    "Element frame no longer exists; use refs from the next observation"
+                ) from error
             raise
 
     async def check_point(self, x: float, y: float) -> None:
@@ -186,6 +188,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         self.url = "about:blank"
         self.title = ""
         self.dialog: tuple[str, str] | None = None
+        self._dialog_opened = asyncio.Event()
         self.closed = False
         # Tab-strip state for live viewers; see `TabUpdatedEvent`.
         self.loading = False
@@ -282,19 +285,53 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         buttons: int,
         click_count: int,
     ) -> None:
-        await self.cdp.input.dispatch_mouse_event(
-            type=kind.value,
-            x=point.x,
-            y=point.y,
-            button=button,
-            buttons=buttons,
-            click_count=click_count,
+        await self._input(
+            self.cdp.input.dispatch_mouse_event(
+                type=kind.value,
+                x=point.x,
+                y=point.y,
+                button=button,
+                buttons=buttons,
+                click_count=click_count,
+            )
         )
 
     async def dispatch_wheel(self, point: Point, *, delta_x: float, delta_y: float) -> None:
-        await self.cdp.input.dispatch_mouse_event(
-            type=MouseEventKind.WHEEL.value, x=point.x, y=point.y, delta_x=delta_x, delta_y=delta_y
+        await self._input(
+            self.cdp.input.dispatch_mouse_event(
+                type=MouseEventKind.WHEEL.value,
+                x=point.x,
+                y=point.y,
+                delta_x=delta_x,
+                delta_y=delta_y,
+            )
         )
+
+    async def _input(self, command: Coroutine[Any, Any, None]) -> None:
+        """Send input, returning early when it opens a JavaScript dialog.
+
+        Chrome answers an input event only after its handlers finish, and an alert, confirm
+        or prompt holds them until the dialog closes. The input has landed by then, so the
+        reply is left to arrive later.
+        """
+        if self.dialog is not None:
+            await command
+            return
+        # Started eagerly, input that needs no reply lands within the caller's step.
+        sent = asyncio.Task(command, loop=asyncio.get_running_loop(), eager_start=True)
+        if not sent.done():
+            opened = asyncio.ensure_future(self._dialog_opened.wait())
+            try:
+                await asyncio.wait((sent, opened), return_when=asyncio.FIRST_COMPLETED)
+            except asyncio.CancelledError:
+                sent.cancel()
+                raise
+            finally:
+                opened.cancel()
+        if not sent.done():
+            sent.add_done_callback(_discard_result)
+            return
+        sent.result()
 
     async def dispatch_key(
         self,
@@ -306,13 +343,15 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         windows_virtual_key_code: int,
         text: str | None = None,
     ) -> None:
-        await self.cdp.input.dispatch_key_event(
-            type=kind,
-            modifiers=modifiers,
-            key=key,
-            code=code,
-            windows_virtual_key_code=windows_virtual_key_code,
-            text=text,
+        await self._input(
+            self.cdp.input.dispatch_key_event(
+                type=kind,
+                modifiers=modifiers,
+                key=key,
+                code=code,
+                windows_virtual_key_code=windows_virtual_key_code,
+                text=text,
+            )
         )
 
     async def cancel_drag(self) -> None:
@@ -360,9 +399,11 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
                 self.refresh_strip()
             case JavascriptDialogOpeningEvent(type=kind, message=message):
                 self.dialog = (str(kind), message)
+                self._dialog_opened.set()
                 await self.emit(DialogOpenedEvent(kind=str(kind), message=message[:1000]))
             case JavascriptDialogClosedEvent(result=accepted):
                 self.dialog = None
+                self._dialog_opened.clear()
                 await self.emit(DialogHandledEvent(accepted=accepted))
 
     async def main_frame(self) -> Frame:
@@ -373,6 +414,9 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         return await _frame_tree(self.cdp)
 
     async def sync_document(self) -> None:
+        if self.dialog is not None:
+            # The page answers nothing while a dialog blocks it, and cannot navigate either.
+            return
         tree = await self.frame_tree()
         if self.document_id != tree.frame.loader_id:
             self.worlds.invalidate(frame_id=tree.frame.id)
@@ -454,6 +498,12 @@ def validated_url(url: str) -> str:
     if url == "about:blank" or (parsed.scheme in {"http", "https"} and parsed.hostname):
         return url
     raise BrowserError("Navigation requires an HTTP(S) URL or about:blank")
+
+
+def _discard_result(task: asyncio.Future[None]) -> None:
+    # The reply of input that opened a dialog only reports when the dialog closed.
+    if not task.cancelled():
+        task.exception()
 
 
 async def _frame_tree(cdp: CdpSession) -> FrameTree:

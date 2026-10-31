@@ -83,7 +83,7 @@ async def capture(
     )
     await tab.sync_document()
     if tab.document_id != document_id:
-        raise BrowserError("Document changed during capture; observe again before acting")
+        raise BrowserError("Document changed during capture; act on the next observation")
     page, image = content.page, content.image
     if redaction is not None:
         page, image = await _redact(page, image, content, redaction)

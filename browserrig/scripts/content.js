@@ -29,27 +29,39 @@ function browserrigContent({maxChars, mainOnly, origin}) {
     'nav',
     'p',
     'section',
+    'summary',
   ]);
+  const tableRoles = new Set(['table', 'grid', 'treegrid']);
+  const ariaTableSelector = 'table, [role="table"], [role="grid"], [role="treegrid"]';
+  const cellRoles = new Set(['cell', 'gridcell', 'columnheader', 'rowheader']);
   let visited = 0;
   let textLength = 0;
   let truncated = false;
+  // Set when the node or depth limit, not the character budget, ended the walk.
+  let limited = false;
   let frames = 0;
   const literals = [];
   const page = location.href.split('#')[0];
   let lastHref = '';
+  // Inside closed <details>: loaded but collapsed text is still read.
+  let collapsed = 0;
+  let skipChrome = false;
 
   function escape(text) {
     return text.replace(/([\\`*_[\]<>#|])/g, '\\$1');
   }
 
   function text(value, pre) {
+    // Count what is written: collapsed whitespace does not use up the budget.
+    const clean = value.replace(/\0/g, '');
+    const normalized = pre ? clean : clean.replace(/\s+/g, ' ');
     const remaining = Math.max(0, maxChars - textLength);
-    if (value.length > remaining) {
+    if (normalized.length > remaining) {
       truncated = true;
     }
-    const part = value.slice(0, remaining).replace(/\0/g, '');
+    const part = normalized.slice(0, remaining);
     textLength += part.length;
-    return pre ? part : escape(part.replace(/\s+/g, ' '));
+    return pre ? part : escape(part);
   }
 
   function content(node, depth, pre = false) {
@@ -65,7 +77,46 @@ function browserrigContent({maxChars, mainOnly, origin}) {
   }
 
   function hidden(node) {
-    return node.hidden || node.getAttribute('aria-hidden') === 'true' || !canTraverse(node);
+    return (
+      (node.hidden && node.getAttribute('hidden') !== 'until-found') ||
+      node.getAttribute('aria-hidden') === 'true' ||
+      !canTraverse(node)
+    );
+  }
+
+  function clipped(node) {
+    // Collapsed menus and panels: a zero-size box that clips its overflow shows nothing.
+    const style = getComputedStyle(node);
+    if (style.display === 'contents') {
+      return false;
+    }
+    const clipY = /hidden|clip/.test(style.overflowY);
+    const clipX = /hidden|clip/.test(style.overflowX);
+    if (!clipX && !clipY) {
+      return false;
+    }
+    const rect = node.getBoundingClientRect();
+    return (clipY && rect.height === 0) || (clipX && rect.width === 0);
+  }
+
+  const chromeSelector =
+    'header, footer, nav, [role="banner"], [role="contentinfo"], [role="navigation"]';
+
+  function isChrome(node) {
+    // Site-wide header, navigation and footer; an article's own header or footer is content.
+    if (!node.matches(chromeSelector)) {
+      return false;
+    }
+    if (node.matches('header, footer')) {
+      const scope = node.parentElement?.closest(
+        'article, aside, main, section, [role="article"], [role="main"], [role="region"]',
+      );
+      if (scope) {
+        return false;
+      }
+    }
+    // A header that carries the page title is the hero, not chrome.
+    return !(node.matches('header, [role="banner"]') && node.querySelector('h1'));
   }
 
   function destination(value) {
@@ -83,6 +134,16 @@ function browserrigContent({maxChars, mainOnly, origin}) {
     } catch {
       return '';
     }
+  }
+
+  function footnote(node) {
+    // Markers like [12] that only jump to the page's own reference list.
+    const links = Array.from(node.querySelectorAll('a[href]'));
+    return (
+      links.length > 0 &&
+      node.textContent.trim().length <= 12 &&
+      links.every((link) => link.getAttribute('href').includes('#') && !destination(link.href))
+    );
   }
 
   function fenced(value) {
@@ -117,15 +178,44 @@ function browserrigContent({maxChars, mainOnly, origin}) {
   }
 
   function table(node, depth) {
-    const rows = Array.from(node.rows)
-      .filter((row) => !hidden(row))
-      .map((row) => tableRow(row, depth + 1))
+    // Spanned cells are repeated into every row and column they cover, so each row
+    // reads on its own; a cell spanning the whole row is written once.
+    if (node.localName === 'table' && layoutTable(node)) {
+      return layout(node, depth);
+    }
+    const grid = [];
+    let y = 0;
+    const tableRows = rowsOf(node);
+    for (const row of tableRows) {
+      if (visited >= 50000 || textLength >= maxChars) {
+        truncated = true;
+        break;
+      }
+      if (hidden(row)) {
+        continue;
+      }
+      grid[y] = grid[y] || [];
+      let x = 0;
+      for (const cell of cellsOf(row)) {
+        x = place(grid, y, x, cell, {value: tableCell(cell, depth + 1)});
+      }
+      y++;
+    }
+    const width = Math.max(0, ...grid.map((row) => row.length));
+    const rows = grid
+      .map((row) => {
+        const entries = Array.from({length: width}, (_, index) => row[index]);
+        if (width > 1 && entries.every((entry) => entry === entries[0])) {
+          return [entries[0]?.value || ''];
+        }
+        return entries.map((entry) => entry?.value || '');
+      })
       .filter((row) => row.some(Boolean));
     if (!rows.length) {
       return '';
     }
-    const width = Math.max(...rows.map((row) => row.length));
-    if (!node.rows[0]?.querySelector('th')) {
+    const header = tableRows[0] ? cellsOf(tableRows[0]) : [];
+    if (!header.some((cell) => cell.localName === 'th' || role(cell) === 'columnheader')) {
       rows.unshift(Array(width).fill(''));
     }
     const lines = rows.map((row) => {
@@ -137,12 +227,100 @@ function browserrigContent({maxChars, mainOnly, origin}) {
     return '\n\n' + caption + lines.join('\n') + '\n\n';
   }
 
-  function tableRow(row, depth) {
-    return Array.from(row.cells).map((cell) =>
-      render(cell, depth + 1)
-        .trim()
-        .replace(/\n+/g, '<br>'),
+  function place(grid, y, start, cell, entry) {
+    // The cell takes the first free column and every slot its spans cover.
+    let x = start;
+    while (grid[y][x]) {
+      x++;
+    }
+    const columns = span(cell, cell.colSpan, 'aria-colspan');
+    const rows = span(cell, cell.rowSpan, 'aria-rowspan');
+    for (let dy = 0; dy < rows; dy++) {
+      grid[y + dy] = grid[y + dy] || [];
+      for (let dx = 0; dx < columns; dx++) {
+        grid[y + dy][x + dx] = entry;
+      }
+    }
+    return x + columns;
+  }
+
+  function layoutTable(node) {
+    // Mozilla Readability's test for tables that only position page parts.
+    if (['presentation', 'none'].includes(role(node))) {
+      return true;
+    }
+    if (node.getAttribute('summary') || node.caption?.textContent.trim()) {
+      return false;
+    }
+    if (node.querySelector('col, colgroup, tfoot, thead, th')) {
+      return false;
+    }
+    if (node.querySelector('table')) {
+      return true;
+    }
+    const rows = node.rows.length;
+    const columns = Math.max(
+      0,
+      ...Array.from(node.rows, (row) =>
+        Array.from(row.cells).reduce((sum, cell) => sum + span(cell, cell.colSpan), 0),
+      ),
     );
+    return rows < 10 && columns <= 4 && rows * columns <= 10;
+  }
+
+  function layout(node, depth) {
+    // Each row reads as a paragraph: its cells on one line, or as blocks when they hold blocks.
+    const blocks = [];
+    for (const row of node.rows) {
+      if (visited >= 50000 || textLength >= maxChars) {
+        truncated = true;
+        break;
+      }
+      if (hidden(row)) {
+        continue;
+      }
+      const cells = Array.from(row.cells, (cell) => render(cell, depth + 1).trim()).filter(Boolean);
+      if (cells.length) {
+        blocks.push(cells.join(cells.some((cell) => cell.includes('\n')) ? '\n\n' : ' '));
+      }
+    }
+    return '\n\n' + blocks.join('\n\n') + '\n\n';
+  }
+
+  function span(cell, native, attribute) {
+    const value = Number(native ?? cell.getAttribute(attribute)) || 1;
+    return Math.min(Math.max(value, 1), 100);
+  }
+
+  function role(node) {
+    return (node.getAttribute('role') || '').trim().toLowerCase();
+  }
+
+  function owner(node, selector) {
+    return node.parentElement?.closest(selector);
+  }
+
+  function rowsOf(node) {
+    if (node.localName === 'table') {
+      return Array.from(node.rows);
+    }
+    // Grid layouts marked up with ARIA table roles read like tables.
+    return Array.from(node.querySelectorAll('[role="row"]')).filter(
+      (row) => owner(row, ariaTableSelector) === node,
+    );
+  }
+
+  function cellsOf(row) {
+    if (row.localName === 'tr') {
+      return Array.from(row.cells);
+    }
+    return Array.from(row.querySelectorAll('[role]')).filter(
+      (cell) => cellRoles.has(role(cell)) && owner(cell, '[role="row"], tr') === row,
+    );
+  }
+
+  function tableCell(cell, depth) {
+    return render(cell, depth).trim().replace(/\n+/g, '<br>');
   }
 
   function oneLine(value) {
@@ -193,15 +371,25 @@ function browserrigContent({maxChars, mainOnly, origin}) {
   function render(node, depth, pre = false) {
     if (++visited > 50000 || depth > 128) {
       truncated = true;
+      limited = true;
       return '';
     }
     if (node.nodeType === Node.TEXT_NODE) {
-      return isRendered(parentFor(node), true) ? text(node.textContent, pre) : '';
+      return collapsed || isRendered(parentFor(node), true) ? text(node.textContent, pre) : '';
     }
     if (node.nodeType !== Node.ELEMENT_NODE) {
       return '';
     }
     if (skipped.has(node.localName) || hidden(node)) {
+      return '';
+    }
+    if (skipChrome && isChrome(node)) {
+      return '';
+    }
+    if (collapsed) {
+      return element(node, depth, pre);
+    }
+    if (clipped(node)) {
       return '';
     }
     return isRendered(node, true) ? element(node, depth, pre) : content(node, depth, pre);
@@ -216,13 +404,16 @@ function browserrigContent({maxChars, mainOnly, origin}) {
     if (tag === 'ul' || tag === 'ol') {
       return list(node, depth);
     }
-    if (tag === 'table') {
+    if (tag === 'table' || (tableRoles.has(role(node)) && rowsOf(node).length)) {
       return table(node, depth);
     }
     if (tag === 'pre') {
       const value = content(node, depth, true).replace(/\n$/, '');
       const fence = fenced(value);
       return '\n\n' + literal(`${fence}\n${value}\n${fence}`) + '\n\n';
+    }
+    if (tag === 'sup' && footnote(node)) {
+      return '';
     }
     if (tag === 'code' && !pre) {
       const value = content(node, depth, true).replace(/\s+/g, ' ');
@@ -247,8 +438,16 @@ function browserrigContent({maxChars, mainOnly, origin}) {
       return text(node.getAttribute('alt') || '', pre);
     }
     if (tag === 'details' && !node.open) {
+      // FAQ answers and disclosures are loaded content; read them without opening.
       const summary = Array.from(node.children).find((child) => child.localName === 'summary');
-      return summary ? render(summary, depth + 1, pre) : '';
+      const head = summary ? oneLine(render(summary, depth + 1, pre)) : '';
+      collapsed++;
+      const body = Array.from(childrenFor(node, closedRoots))
+        .filter((child) => child !== summary)
+        .map((child) => render(child, depth + 1, pre))
+        .join('');
+      collapsed--;
+      return '\n\n' + (head ? head + '\n\n' : '') + body.trim() + '\n\n';
     }
     const value = content(node, depth, pre);
     return pre ? value : format(node, value);
@@ -269,7 +468,18 @@ function browserrigContent({maxChars, mainOnly, origin}) {
       }
     }
     const total = ((document.body || document.documentElement).innerText || '').trim().length;
-    return best && bestLength >= Math.max(200, total * 0.2) ? best : null;
+    if (best && bestLength >= Math.max(200, total * 0.2)) {
+      return best;
+    }
+    // Without a usable main landmark, leave out site chrome if enough text remains.
+    let chromeLength = 0;
+    for (const node of document.querySelectorAll(chromeSelector)) {
+      if (isChrome(node) && !node.parentElement?.closest(chromeSelector) && !hidden(node)) {
+        chromeLength += (node.innerText || '').trim().length;
+      }
+    }
+    skipChrome = chromeLength > 0 && total - chromeLength >= Math.max(200, total * 0.2);
+    return null;
   }
 
   const main = mainRegion();
@@ -284,7 +494,9 @@ function browserrigContent({maxChars, mainOnly, origin}) {
     title: document.title,
     markdown: truncateMarkdown(markdown, maxChars),
     truncated: truncated || markdown.length > maxChars,
+    limited: limited || visited >= 50000,
     frames,
     main: main !== null,
+    chrome: skipChrome,
   };
 }

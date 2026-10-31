@@ -1,11 +1,12 @@
 import asyncio
 import base64
 from dataclasses import dataclass, replace
+from types import SimpleNamespace
 from typing import Literal
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent, Inject, Plugin, PolicyDecision, SessionLog, SessionState, hook
+from harnessed import Agent, Inject, Plugin, PolicyDecision, SessionLog, SessionState, hook, tool
 from harnessed.events import (
     DurableEvent,
     ModelRequestedEvent,
@@ -39,6 +40,7 @@ from browserrig.events import ObservationCapturedEvent, ReadinessStartedEvent
 from browserrig.files.models import Download
 from browserrig.nudges import Nudges
 from browserrig.observation.capture import CaptureContent
+from browserrig.observation.delta import INTRO
 from browserrig.observation.extraction import Extraction
 from browserrig.observation.models import Element, Snapshot
 from browserrig.tools import FileTools, UploadTools
@@ -127,10 +129,19 @@ def _agent(
                 skip_unchanged=skip_unchanged,
             ),
             Approvals(default=PolicyDecision.ALLOW),
+            _Step(),
             *after,
         ],
     )
     return agent, model, capture, holder
+
+
+class _Step(Plugin):
+    """A tool without browser effects, so tests can advance steps."""
+
+    @tool(description="Do nothing.")
+    async def step(self) -> str:
+        return "Done nothing."
 
 
 def _browser_ready(holder):
@@ -162,16 +173,14 @@ async def test_image_fifo_and_one_capture_per_boundary_with_custom_strategies(tr
         ids = [image_id(message) for message in _images(model.requests[-1])]
         assert len(ids) == len(set(ids)) == 2
         assert ids[0] == image_id(_images(model.requests[-2])[-1])
-        note = model.requests[-1].messages[-1]
-        assert note.id == "browser-latest-image"
-        assert note.text == f"Latest captured screenshot: {ids[1]}"
+        assert _note(model.requests[-1]) == f"Latest captured screenshot: {ids[1]}"
         assert any("Custom view:" in str(message.content) for message in model.requests[0].messages)
         replies = [m for m in model.requests[-1].messages if isinstance(m, ToolMessage)]
         assert all(isinstance(reply.content, str) for reply in replies)
 
 
 async def test_text_only_observations_and_probes_keep_last_shown_crop_and_no_duplicate_images():
-    agent, model, capture, holder = _agent([call("screenshot"), call("observe"), "Done"])
+    agent, model, capture, holder = _agent([call("screenshot"), call("step"), "Done"])
     async with agent.session() as session:
         browser = _browser_ready(holder)
         await session.run("Inspect", max_steps=3)
@@ -228,7 +237,7 @@ def test_image_history_trims_to_half_by_default_and_rejects_inverted_bounds():
 
 async def test_images_stay_where_captured_and_keep_the_prompt_prefix_until_a_batch_trim():
     agent, model, _capture, holder = _agent(
-        [call("observe")] * 5 + ["Done"],
+        [call("step")] * 5 + ["Done"],
         ScreenshotTrigger.EACH_STEP,
         TrimInBatches(max_images=4, min_images=2),
     )
@@ -242,7 +251,7 @@ async def test_images_stay_where_captured_and_keep_the_prompt_prefix_until_a_bat
             if has_image(message):
                 assert "Custom view:" in message.text
                 assert "Screenshot " in message.text
-        assert messages[-1].id == "browser-latest-image"
+        assert _note(SimpleNamespace(messages=messages)).startswith("Latest captured screenshot")
     assert [len(_images(request)) for request in model.requests] == [1, 2, 3, 4, 2, 3]
 
     def prefix(messages):
@@ -256,23 +265,34 @@ async def test_images_stay_where_captured_and_keep_the_prompt_prefix_until_a_bat
 
     # Steps 2-4 only append; earlier images keep their place and caption.
     assert all(shared(requests[i], requests[i + 1]) for i in (1, 2))
+    # Notes are part of the history too, so whole requests stay prefixes of later ones.
+    assert all(
+        [(m.id, m.content) for m in requests[i + 1][: len(requests[i])]]
+        == [(m.id, m.content) for m in requests[i]]
+        for i in (0, 1, 2)
+    )
     # Step 5 trims from 4 to 2 images once, then appending resumes.
     assert not shared(requests[3], requests[4])
     assert shared(requests[4], requests[5])
 
 
-def _observes(count):
+def _steps(count):
     # Distinct calls, so every step gets its own tool call id.
-    return [call("observe") for _ in range(count)]
+    return [call("step") for _ in range(count)]
+
+
+def _note(request):
+    notes = [m.text for m in request.messages if m.id.endswith(":browser-image")]
+    return notes[-1] if notes else None
 
 
 def _notes(model):
-    return [request.messages[-1].text for request in model.requests]
+    return [_note(request) for request in model.requests]
 
 
 async def test_unchanged_screens_are_not_added_again():
     agent, model, _capture, holder = _agent(
-        [*_observes(3), "Done"],
+        [*_steps(3), "Done"],
         ScreenshotTrigger.EACH_STEP,
         TrimInBatches(max_images=4, min_images=4),
         frames=[("a", 2), ("a", 2), ("b", 2), ("b", 2)],
@@ -292,7 +312,7 @@ async def test_unchanged_screens_are_not_added_again():
 
 async def test_same_pixels_with_other_geometry_or_disabled_skipping_are_added():
     agent, model, _capture, holder = _agent(
-        [*_observes(2), "Done"],
+        [*_steps(2), "Done"],
         ScreenshotTrigger.EACH_STEP,
         TrimInBatches(max_images=4, min_images=4),
         frames=[("a", 2), ("a", 3), ("a", 3)],
@@ -304,7 +324,7 @@ async def test_same_pixels_with_other_geometry_or_disabled_skipping_are_added():
     assert [len(_images(request)) for request in model.requests] == [1, 2, 3]
 
     agent, model, _capture, holder = _agent(
-        [*_observes(1), "Done"],
+        [*_steps(1), "Done"],
         ScreenshotTrigger.EACH_STEP,
         TrimInBatches(max_images=4, min_images=4),
         frames=[("a", 2), ("a", 3)],
@@ -326,7 +346,7 @@ async def test_until_compaction_keeps_images_until_their_steps_are_summarized():
         trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
     )
     agent, model, _capture, holder = _agent(
-        [*_observes(5), "Done"], ScreenshotTrigger.EACH_STEP, UntilCompaction(), extra=(compaction,)
+        [*_steps(5), "Done"], ScreenshotTrigger.EACH_STEP, UntilCompaction(), extra=(compaction,)
     )
     async with agent.session() as session:
         _browser_ready(holder)
@@ -341,7 +361,7 @@ async def test_until_compaction_keeps_images_until_their_steps_are_summarized():
 
 async def test_multimodal_observations_use_session_assets_and_survive_saved_state():
     agent, model, _capture, holder = _agent(
-        [call("observe"), "Done"],
+        [call("step"), "Done"],
         ScreenshotTrigger.EACH_STEP,
         UntilCompaction(),
         frames=[("same screenshot", 2), ("same screenshot", 2)],
@@ -351,7 +371,9 @@ async def test_multimodal_observations_use_session_assets_and_survive_saved_stat
         _browser_ready(holder)
         result = await session.run("Inspect", max_steps=2)
         observations = [
-            event for event in result.events if isinstance(event, ObservationRecordedEvent)
+            event
+            for event in result.events
+            if isinstance(event, ObservationRecordedEvent) and event.observation.source == "browser"
         ]
         assets = [
             part.asset
@@ -367,6 +389,7 @@ async def test_multimodal_observations_use_session_assets_and_survive_saved_stat
             for e in result.events
             if isinstance(e, ObservationsIncludedEvent) and e.request_id == request.request_id
         ]
+        included = [item for item in included if item.source == "browser"]
         assert len(included) == 2
         for receipt, observation in zip(included, observations, strict=True):
             assert receipt.refs == observation.observation.refs
@@ -410,7 +433,9 @@ async def test_coordinate_geometry_uses_final_receipts_after_request_image_remov
         _browser_ready(holder)
         await session.run("Inspect")
         assert not _images(model.requests[0])
-        assert session.log.last(ObservationsIncludedEvent).observations == ()
+        # The screenshot was stripped after PrepareRequest; only its note remains.
+        included = session.log.last(ObservationsIncludedEvent).observations
+        assert [item.source for item in included] == ["browser-image"]
         observe = session.ctx[Observe]
         assert observe.snapshot.geometry is not None
         assert _image_point(observe.coordinate_source(), Point(x=20, y=30)) == Point(x=20, y=30)
@@ -422,7 +447,7 @@ async def test_compaction_removes_last_screenshot_on_a_text_only_step():
         trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
     )
     agent, model, _capture, holder = _agent(
-        [call("screenshot"), *_observes(2), "Done"],
+        [call("screenshot"), *_steps(2), "Done"],
         retention=UntilCompaction(),
         extra=(compaction,),
     )
@@ -435,14 +460,15 @@ async def test_compaction_removes_last_screenshot_on_a_text_only_step():
 
 async def test_latest_observation_only_is_an_explicit_policy_with_native_image_lifecycle():
     agent, model, _capture, holder = _agent(
-        [call("screenshot"), call("observe"), "Done"], extra=(LatestObservationOnly(),)
+        [call("screenshot"), call("step"), "Done"], extra=(LatestObservationOnly(),)
     )
     async with agent.session() as session:
         _browser_ready(holder)
         await session.run("Inspect", max_steps=3)
         assert [len(_images(request)) for request in model.requests] == [0, 1, 0]
         included = session.log.last(ObservationsIncludedEvent).observations
-        assert len(included) == 1 and included[0].source == "browser"
+        # The screenshot's note left the context with the screenshot.
+        assert [item.source for item in included] == ["browser"]
         assert session.ctx[Observe].coordinate_source().geometry is None
 
 
@@ -461,7 +487,7 @@ def _visible(request, source):
 
 async def test_file_state_is_resent_only_after_a_change():
     download = Download(id="d1", filename="report.pdf", url="https://example.org/report.pdf")
-    agent, model, _capture, holder = _agent([*_observes(3), "Done"], after=(Actions(), FileTools()))
+    agent, model, _capture, holder = _agent([*_steps(3), "Done"], after=(Actions(), FileTools()))
     async with agent.session() as session:
         browser = _browser_ready(holder)
         browser.downloads = AsyncMock(side_effect=[(), (), (download,), (download,)])
@@ -476,7 +502,7 @@ async def test_file_state_is_resent_when_compaction_removed_the_last_copy():
         trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
     )
     agent, model, _capture, holder = _agent(
-        [*_observes(4), "Done"], extra=(compaction,), after=(Actions(), FileTools())
+        [*_steps(4), "Done"], extra=(compaction,), after=(Actions(), FileTools())
     )
     async with agent.session() as session:
         _browser_ready(holder)
@@ -488,7 +514,7 @@ async def test_file_state_is_resent_when_compaction_removed_the_last_copy():
 
 
 async def test_hint_observations_are_skipped_while_there_is_nothing_to_report():
-    agent, model, _capture, holder = _agent([*_observes(3), "Done"], after=(Nudges(),))
+    agent, model, _capture, holder = _agent([*_steps(3), "Done"], after=(Nudges(),))
     async with agent.session() as session:
         _browser_ready(holder)
         nudges = session.ctx[Nudges]
@@ -667,7 +693,7 @@ def test_recipe_can_omit_local_file_tools():
 
 async def test_unchanged_page_is_not_repeated_while_the_model_still_sees_it():
     renderer = PageRenderer()
-    agent, model, _capture, holder = _agent([*_observes(4), "Done"], renderer=renderer)
+    agent, model, _capture, holder = _agent([*_steps(4), "Done"], renderer=renderer)
     async with agent.session() as session:
         _browser_ready(holder)
         first = await session.run("Inspect", max_steps=2)
@@ -678,13 +704,51 @@ async def test_unchanged_page_is_not_repeated_while_the_model_still_sees_it():
         assert [len(_visible(request, "browser")) for request in model.requests] == [1, 1, 2, 2, 2]
 
 
+async def test_returning_to_a_page_lists_only_its_changes():
+    renderer = PageRenderer()
+    first = "\n".join(["# Page A", "", *(f'  [{i}] link "Story {i}"' for i in range(20))])
+    agent, _model, _capture, holder = _agent([*_steps(3), "Done"], renderer=renderer)
+    async with agent.session() as session:
+        tab = _browser_ready(holder).active_tab
+        renderer.text, document = first, tab.document_id
+        results = [await session.run("Inspect", max_steps=1)]
+        renderer.text, tab.document_id = '# Page B\n\n  [1] link "Reply"', "detail"
+        results.append(await session.run("Open", max_steps=1))
+        # Back on the first document, as bfcache restores it after going back.
+        renderer.text, tab.document_id = first.replace('"Story 3"', '"Story 3" focused'), document
+        results.append(await session.run("Back", max_steps=1))
+    recorded = [event.observation.content for event in _recorded(results, "browser")]
+    assert recorded[:2] == [first, '# Page B\n\n  [1] link "Reply"']
+    assert recorded[2] == "\n".join(
+        ["# Page A", "", INTRO, '- [3] link "Story 3"', '+ [3] link "Story 3" focused']
+    )
+
+
+@pytest.mark.parametrize(
+    "renderer,visible",
+    [
+        # Every capture renders differently, as when the page changed since the last step.
+        (None, 2),
+        (PageRenderer(), 1),
+    ],
+)
+async def test_each_step_shows_a_changed_page_once_and_an_unchanged_page_not_again(
+    renderer, visible
+):
+    agent, model, _capture, holder = _agent([*_steps(1), "Done"], renderer=renderer)
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect", max_steps=2)
+    assert len(_visible(model.requests[-1], "browser")) == visible
+
+
 async def test_page_is_resent_with_a_screenshot_and_after_compaction():
     fire = iter([False, False, False, True, *[False] * 10])
     compaction = Compaction(
         trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
     )
     agent, model, _capture, holder = _agent(
-        [call("screenshot"), *_observes(3), "Done"], extra=(compaction,), renderer=PageRenderer()
+        [call("screenshot"), *_steps(3), "Done"], extra=(compaction,), renderer=PageRenderer()
     )
     async with agent.session() as session:
         _browser_ready(holder)

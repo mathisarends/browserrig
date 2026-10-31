@@ -68,8 +68,8 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
             "> Quoted text",
             "` a < b `",
             "````\nline one\n\n\n  line two\n```\n````",
-            "Closed summary",
-            "Open details text",
+            "Closed summary\n\nClosed details secret",
+            "Open summary\n\nOpen details text",
             "Open shadow Slotted text",
             "## Closed shadow",
             "Closed root text",
@@ -85,7 +85,6 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
             "Hidden display",
             "Hidden aria",
             "Transparent",
-            "Closed details secret",
         ):
             assert excluded not in text
         button = next(element for element in snapshot.elements if element.name == "Continue")
@@ -106,9 +105,36 @@ async def test_markdown_limits_are_explicit_and_output_is_bounded(site):
         content = await extract_content(tab, max_chars=40)
         assert len(content.markdown) <= 40
         assert "# Heading" in content.markdown
-        assert any("truncated" in item for item in content.limitations)
+        assert any("offset=" in item for item in content.limitations)
         assert "Extraction limitations" in content.render()
         assert site in content.render()
+
+
+async def test_offset_reads_a_long_page_in_parts_without_losing_lines(site):
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        await evaluate(
+            tab,
+            "document.body.innerHTML = [...Array(60).keys()]"
+            ".map(i => `<p>Paragraph ${i} ${'y'.repeat(30)}</p>`).join('')",
+        )
+        offset, seen, parts = 0, set(), 0
+        while True:
+            content = await extract_content(tab, max_chars=500, offset=offset)
+            parts += 1
+            seen.update(re.findall(r"Paragraph \d+ y{30}", content.markdown))
+            following = [
+                int(match)
+                for item in content.limitations
+                for match in re.findall(r"offset=(\d+)", item)
+            ]
+            if not following:
+                break
+            assert following[0] > offset
+            offset = following[0]
+        assert parts > 3
+        assert seen == {f"Paragraph {index} {'y' * 30}" for index in range(60)}
+        assert f"(continued from offset {offset})" in content.render()
 
 
 @pytest.mark.parametrize("article_chars", [400, 20])
@@ -188,3 +214,112 @@ async def test_markdown_includes_available_frame_documents(site, cross_origin):
         assert f"Source: <{origin}/other>" in content.markdown
         assert "# Other page" in content.markdown
         assert not content.limitations
+
+
+async def test_spanned_table_cells_fill_every_row_and_column_they_cover(site):
+    markup = """<table><tr><th rowspan=2>Name</th>
+        <th colspan=2>Height<sup><a href='#n1'>[1]</a></sup></th></tr>
+        <tr><th>m</th><th>ft</th></tr>
+        <tr><td colspan=3>Asia</td></tr>
+        <tr><td>Tower</td><td rowspan=2>828</td><td>2717</td></tr>
+        <tr><td>Twin</td><td>2716</td></tr></table>"""
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
+        await wait_for_page(tab)
+        text = (await extract_content(tab)).markdown
+    assert text.splitlines() == [
+        "| Name | Height | Height |",
+        "| --- | --- | --- |",
+        "| Name | m | ft |",
+        "| Asia | | |",
+        "| Tower | 828 | 2717 |",
+        "| Twin | 828 | 2716 |",
+    ]
+
+
+async def test_grid_layouts_with_aria_table_roles_read_as_tables(site):
+    markup = """<div role=table><div role=rowgroup>
+        <div role=row><div role=cell>Feature</div><div role=columnheader>Free</div>
+        <div role=columnheader>Pro</div></div></div>
+        <div role=rowgroup><div role=row><div role=cell>Seats</div><div role=cell>2</div>
+        <div role=cell><span>Unlimited</span></div></div>
+        <div role=row><div role=cell aria-colspan=3>Security</div></div>
+        <div role=row><div role=rowheader>SSO</div><div role=cell>No</div>
+        <div role=cell>Yes</div></div></div></div>
+        <div role=grid><p>Grid without rows</p></div>"""
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
+        await wait_for_page(tab)
+        text = (await extract_content(tab)).markdown
+    assert text.splitlines() == [
+        "| Feature | Free | Pro |",
+        "| --- | --- | --- |",
+        "| Seats | 2 | Unlimited |",
+        "| Security | | |",
+        "| SSO | No | Yes |",
+        "",
+        "Grid without rows",
+    ]
+
+
+async def test_layout_tables_read_as_text_and_data_tables_stay_tables(site):
+    markup = """<table><tr><td>
+        <table><tr><td><a href='/item'>Story title</a> (example.org)</td></tr>
+        <tr><td>12 points by someone</td></tr></table>
+        </td></tr><tr><td><p>First comment</p><p>Second paragraph</p></td></tr></table>
+        <table><tr><td>Plan</td><td>Price</td></tr><tr><td>Free</td><td>$0</td></tr>
+        <tr><td>Pro</td><td>$10</td></tr><tr><td>Team</td><td>$20</td></tr>
+        <tr><td>Enterprise</td><td>Custom</td></tr><tr><td>Edu</td><td>$5</td></tr></table>
+        <table><tr><th>Name</th></tr><tr><td>Ada</td></tr></table>"""
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
+        await wait_for_page(tab)
+        text = (await extract_content(tab)).markdown
+    assert text.splitlines() == [
+        "[Story title](</item>) (example.org)",
+        "",
+        "12 points by someone",
+        "",
+        "First comment",
+        "",
+        "Second paragraph",
+        "",
+        "| | |",
+        "| --- | --- |",
+        "| Plan | Price |",
+        "| Free | $0 |",
+        "| Pro | $10 |",
+        "| Team | $20 |",
+        "| Enterprise | Custom |",
+        "| Edu | $5 |",
+        "",
+        "| Name |",
+        "| --- |",
+        "| Ada |",
+    ]
+
+
+async def test_collapsed_menus_and_site_chrome_are_left_out_without_main_landmark(site):
+    article = "word " * 80
+    markup = f"""<header><a href='/login'>Sign in</a>
+        <div style='height:0;overflow:clip'><a href='/menu'>Mega menu entry</a></div></header>
+        <nav><a href='/news'>News</a></nav>
+        <div><h1>Pricing</h1><p>{article}</p>
+        <div style='height:0;overflow:hidden'>Closed panel</div>
+        <article><header>Plan header</header><p>Plan text</p></article></div>
+        <footer>Imprint</footer>"""
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
+        await wait_for_page(tab)
+        content = await extract_content(tab)
+        full = await extract_content(tab, full_page=True)
+    assert "# Pricing" in content.markdown and "Plan header" in content.markdown
+    for chrome in ("Sign in", "News", "Imprint"):
+        assert chrome not in content.markdown and chrome in full.markdown
+    assert "Mega menu entry" not in full.markdown and "Closed panel" not in full.markdown
+    assert any("full_page=true" in item for item in content.limitations)
+    assert not any("full_page=true" in item for item in full.limitations)

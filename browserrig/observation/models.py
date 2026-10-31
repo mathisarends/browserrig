@@ -130,7 +130,7 @@ class Snapshot(Options):
                 return element
         if any(control.ref == ref for control in self.offscreen):
             raise StaleElement("Element is outside the viewport; scroll to it first")
-        raise StaleElement("Unknown element reference; observe again")
+        raise StaleElement("Unknown element reference; use refs from the next observation")
 
 
 @dataclass(frozen=True, slots=True)

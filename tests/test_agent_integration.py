@@ -23,7 +23,7 @@ from browserrig.events import (
     NudgeQueuedEvent,
     ObservationCapturedEvent,
 )
-from tests.observations import all_states, has_image, is_observation, latest, parse
+from tests.observations import all_states, has_image, latest
 
 pytestmark = pytest.mark.integration
 
@@ -44,7 +44,13 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(site
             monkeypatch.setattr(page_type, "capture_screenshot", counted)
 
     model = ScriptedModel(
-        [call("screenshot"), call("observe"), call("extract_content"), call("screenshot"), "Done"]
+        [
+            call("screenshot"),
+            call("wait", seconds=0),
+            call("extract_content"),
+            call("screenshot"),
+            "Done",
+        ]
     )
     agent = Agent(
         model=model,
@@ -57,9 +63,9 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(site
     result = await agent.run("Inspect the page on demand", max_steps=5)
     assert result.text == "Done"
     assert captures == 2
-    assert {"screenshot", "extract_content", "observe"} <= {
-        item.name for item in model.requests[0].tools
-    }
+    tools = {item.name for item in model.requests[0].tools}
+    # Every step ends with an observation, so there is no tool to request one.
+    assert {"screenshot", "extract_content", "wait"} <= tools and "observe" not in tools
     assert not any(
         isinstance(part, ImagePart)
         for message in model.requests[0].messages
@@ -79,8 +85,7 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(site
     assert len(replies) == 4
     assert all(not reply.is_error for reply in replies)
     assert all(isinstance(reply.content, str) for reply in replies)
-    assert isinstance(replies[1].content, str) and is_observation(replies[1].text)
-    assert "text" not in parse(replies[1].text)
+    assert replies[1].text == "Wait completed; the next observation shows the current state."
     assert isinstance(replies[2].content, str) and "# Test form" in replies[2].text
 
 

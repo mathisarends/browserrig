@@ -19,10 +19,14 @@ async def prepare_element(tab: Tab, handle: ElementHandle, mouse: Mouse) -> bool
         for _ in range(32):
             await tab.sync_document()
             if tab.document_id != handle.snapshot.document_id:
-                raise StaleElement("Document changed while scrolling; observe again")
+                raise StaleElement(
+                    "Document changed while scrolling; use refs from the next observation"
+                )
             frame = next((item for item in await tab.frames() if item.id == handle.frame.id), None)
             if frame is None:
-                raise StaleElement("Element frame no longer exists; observe again")
+                raise StaleElement(
+                    "Element frame no longer exists; use refs from the next observation"
+                )
             handle = replace(handle, frame=frame)
             planned = await _plan(handle)
             if planned is None:
@@ -38,7 +42,9 @@ async def prepare_element(tab: Tab, handle: ElementHandle, mouse: Mouse) -> bool
             await mouse.scroll(point=Point(x=x, y=y), delta_x=plan.delta_x, delta_y=plan.delta_y)
             scrolled = True
             await asyncio.sleep(0.05)
-    raise BrowserError("Element could not be brought into view using wheel input; observe again")
+    raise BrowserError(
+        "Element could not be brought into view using wheel input; try another way to reach it"
+    )
 
 
 async def _plan(handle: ElementHandle) -> tuple[Frame, ScrollPlan] | None:

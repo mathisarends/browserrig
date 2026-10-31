@@ -21,7 +21,7 @@ from browserrig.events import (
     PageState,
     TabClosedEvent,
 )
-from browserrig.observation.models import Snapshot
+from browserrig.observation.models import Element, Snapshot
 from tests.fakes import FakeChrome
 
 
@@ -289,3 +289,38 @@ def _snapshot():
         scroll_y=0,
         fingerprint="page",
     )
+
+
+@pytest.mark.parametrize(
+    "title,text,controls,expected",
+    [
+        ("Just a moment...", "Verify you are human by completing the action below.", 2, True),
+        ("Reddit - Prove your humanity", "", 3, True),
+        ("Suche", "Ungewöhnlicher Datenverkehr. Ich bin kein Roboter. reCAPTCHA", 4, True),
+        ("CAPTCHA - Wikipedia", "A CAPTCHA is a type of challenge-response test", 300, False),
+        ("Example", "An ordinary page", 2, False),
+    ],
+)
+async def test_bot_checks_get_one_hint_per_document(title, text, controls, expected):
+    elements = tuple(
+        Element(ref=str(index), frame_id="f", backend_id=index, role="link", name="x", tag="a")
+        for index in range(controls)
+    )
+    snapshot = _snapshot().model_copy(update={"title": title, "text": text, "elements": elements})
+
+    class Hints(Plugin, needs=(Nudges,)):
+        @hook(PreStep)
+        async def project(self, event: PreStep, next_: Next[StepDecision], nudges: Inject[Nudges]):
+            if (hints := await nudges.observation(snapshot)) is not None:
+                event.session.observe(hints)
+            return await next_()
+
+    holder = {}
+    model = ScriptedModel(["first", "second"])
+    agent = Agent(model=model, plugins=[FakeChrome(holder), Nudges(), Hints()])
+    async with agent.session() as session:
+        await session.run("Look")
+        await session.run("Look again")
+    hinted = ["captcha or bot check" in m.text for m in model.requests[-1].messages]
+    # Shown in the first step only; staying on the same document does not repeat it.
+    assert hinted.count(True) == int(expected)

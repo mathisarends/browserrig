@@ -218,5 +218,5 @@ async def test_main_snapshot_failure_asks_to_observe_again(site, monkeypatch):
             raise CDPCommandError("DOMSnapshot.captureSnapshot", -32000, "unavailable")
 
         monkeypatch.setattr(type(tab.cdp.dom_snapshot), "capture_snapshot", unavailable)
-        with pytest.raises(BrowserError, match="observe again"):
+        with pytest.raises(BrowserError, match="Page snapshot failed"):
             await capture(tab, DomMode(screenshots=False), report)

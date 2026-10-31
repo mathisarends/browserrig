@@ -78,7 +78,7 @@ class ChromeProcess:
         self._process = None
         if self._profile is not None:
             profile = self._profile
-            deadline = asyncio.get_running_loop().time() + 3
+            deadline = asyncio.get_running_loop().time() + 10
             while True:
                 try:
                     await asyncio.to_thread(profile.cleanup)
@@ -90,8 +90,11 @@ class ChromeProcess:
                     if not isinstance(error, PermissionError) and error.errno != errno.ENOTEMPTY:
                         raise
                     if asyncio.get_running_loop().time() >= deadline:
-                        raise
-                    await asyncio.sleep(0.05)
+                        # A leftover temp profile is not worth failing the session for.
+                        await asyncio.to_thread(shutil.rmtree, profile.name, ignore_errors=True)
+                        self._profile = None
+                        break
+                    await asyncio.sleep(0.1)
 
 
 def _chrome_executable(explicit: Path | None = None) -> str:

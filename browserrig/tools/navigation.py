@@ -106,7 +106,9 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
     @tool(
         kind=ActionKind.WAIT,
         readonly=True,
-        description="Wait briefly for an expected asynchronous page update, then observe again.",
+        description=(
+            "Wait briefly for an expected asynchronous page update; the next observation shows it."
+        ),
     )
     async def wait(
         self,
@@ -118,7 +120,7 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
                 WaitingEvent(duration=seconds, target_id=tab.id, document_id=tab.document_id)
             )
             await asyncio.sleep(seconds)
-        return "Wait completed; observe the current state."
+        return "Wait completed; the next observation shows the current state."
 
     async def _navigate(
         self, url: str, actions: Actions, kind: ActionKind, *, typed: str, new_tab: bool = False

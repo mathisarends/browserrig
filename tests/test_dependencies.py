@@ -72,7 +72,6 @@ async def test_each_browser_tool_has_a_unique_stable_kind(fake_chrome):
         "open_file": ActionKind.OPEN_FILE,
         "open_downloaded_file": ActionKind.OPEN_DOWNLOADED_FILE,
         "upload_files": ActionKind.UPLOAD,
-        "observe": ActionKind.OBSERVE,
         "screenshot": ActionKind.SCREENSHOT,
         "extract_content": ActionKind.EXTRACT_CONTENT,
     }

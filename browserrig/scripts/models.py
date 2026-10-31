@@ -68,6 +68,9 @@ class ContentExtraction(Options):
     frames: int = 0
     # Whether only the main landmark was read.
     main: bool = False
+    # Whether site header, navigation and footer were left out of a page without a main one.
+    chrome: bool = False
+    limited: bool = False
 
 
 class PageFacts(Options):

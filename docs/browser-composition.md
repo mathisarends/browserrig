@@ -59,8 +59,9 @@ observation after each input when selected explicitly.
 | `ImageContext(UntilCompaction())` | Never trim. Images leave history when compaction summarizes the steps they were captured in. Use it with a `Compaction` plugin, otherwise image history grows without limit. |
 | `ImageContext(..., skip_unchanged=False)` | Also add captures identical to the latest image. By default, a capture with the same pixels, crop, tab and document is not added again, and the last line of the request says the screen is unchanged. |
 
-Calling `screenshot` with `EACH_STEP` does not create a second image. `observe`
-refreshes text and refs without returning an image in the tool result. Internal
+Calling `screenshot` with `EACH_STEP` does not create a second image. There is no
+separate observe tool: every step ends with an observation, and `wait` covers
+pages that are still updating. Internal
 readiness and action-comparison probes never enter image history. Text-only steps
 retain included images across turns until compaction or an explicit observation
 policy removes their snapshots.

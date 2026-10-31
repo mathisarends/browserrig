@@ -125,7 +125,7 @@ async def test_input_rejects_a_document_changed_between_calls(kind):
             )
         )
     )
-    with pytest.raises(BrowserError, match="observe before input"):
+    with pytest.raises(BrowserError, match="act on the next observation"):
         await Actions._prepare(actions, tab, kind)
 
 

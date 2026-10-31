@@ -69,7 +69,9 @@ async def extract(
     for (session_id, _), result in zip(sessions.items(), snapshots, strict=True):
         if isinstance(result, BaseException):
             if session_id == main.cdp.session_id:
-                raise BrowserError("Page snapshot failed; observe again") from result
+                raise BrowserError(
+                    "Page snapshot failed; try again after the next observation"
+                ) from result
             continue
         wanted = {frame.id for frame in frames if frame.cdp.session_id == session_id}
         for document in result.documents:
@@ -118,7 +120,9 @@ class _Assembler:
         main = self._frames[0]
         document = self._documents.get(main.id)
         if document is None:
-            raise BrowserError("Page snapshot missed the main document; observe again")
+            raise BrowserError(
+                "Page snapshot missed the main document; try again after the next observation"
+            )
         for frame in self._frames:
             self._extract(frame, max(max_text, sparse_text))
         elements, headings, text = self._merge()

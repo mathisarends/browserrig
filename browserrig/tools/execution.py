@@ -120,7 +120,7 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
             "Combine actions only when no intermediate observation is needed, and put "
             "submission last. Inputs may continue while the page remains suitable. "
             "Navigation, tab changes, scrolling, "
-            "drags, coordinates, JavaScript, uploads, dialogs, observe and screenshot end the "
+            "drags, coordinates, JavaScript, uploads, dialogs, waiting and screenshot end the "
             "remaining chain. Use coordinate actions alone with a fresh screenshot. A navigation, "
             "new menu, suggestions, modal, alert or input failure interrupts remaining actions; "
             "skipped calls were not executed. Inspect the next observation before continuing."
@@ -249,7 +249,7 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
             and kind in _POINTER_KINDS | _CHAINABLE_KINDS
             and not _observes(before, tab)
         ):
-            raise BrowserError("The observed tab or document changed; observe before input")
+            raise BrowserError("The observed tab or document changed; act on the next observation")
         if before is None or before.tab_id != tab.id:
             before = await self.observe.capture(tab)
         report = await self.readiness.wait(tab, phase=ReadinessPhase.ACTION)

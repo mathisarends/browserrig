@@ -36,9 +36,14 @@ from .capture import CaptureStrategy, DomCapture
 from .capture import capture as capture_snapshot
 from .config import Screenshots, ScreenshotTrigger
 from .content import extract_content
+from .delta import delta, unmarked
 from .handle import ElementHandle
 from .models import CapturedImage, Snapshot
 from .renderer import DomRenderer, Renderer
+
+# Below the session's default 32,000-character tool output limit, which would cut the
+# middle out of a longer result instead of letting the agent page on with an offset.
+_MAX_CONTENT_CHARS = 30000
 
 
 @dataclass
@@ -53,6 +58,10 @@ class _State:
     sent_key: str | None = None
     sent_ref: str | None = None
     visible: bool = False
+    # The last complete observation of each page (tab, document) with its ref, which later
+    # ones of that page may list changes to while a request still includes it.
+    bases: dict[tuple[str, str], tuple[str, str]] = field(default_factory=dict)
+    included: frozenset[str] = frozenset()
 
 
 class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
@@ -178,25 +187,14 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         snapshot = self._state.snapshot
         await tab.sync_document()
         if snapshot is None or snapshot.tab_id != tab.id or snapshot.document_id != tab.document_id:
-            raise StaleElement("Observation belongs to another tab or document; observe again")
+            raise StaleElement(
+                "Observation belongs to another tab or document; use refs from the next observation"
+            )
         element = snapshot.element(ref)
         for frame in await tab.frames():
             if frame.id == element.frame_id:
                 return ElementHandle(frame, element, snapshot)
-        raise StaleElement("Element frame no longer exists; observe again")
-
-    @tool(
-        kind=ActionKind.OBSERVE,
-        readonly=True,
-        description=(
-            "Refresh page metadata and interactive elements. DOM mode omits page-text excerpts "
-            "and screenshots by default. Use extract_content to read content or screenshot "
-            "for an image."
-        ),
-    )
-    async def observe(self) -> ToolResult:
-        snapshot = await self.capture(screenshots=False)
-        return ToolResult(self._render(snapshot))
+        raise StaleElement("Element frame no longer exists; use refs from the next observation")
 
     @tool(
         kind=ActionKind.SCREENSHOT,
@@ -256,20 +254,24 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             "and code, including loaded content below the viewport. Does not scroll or navigate. "
             "Reads the page's main region when it has one; full_page=true adds header, "
             "navigation and footer. Same-site links are paths that navigate accepts. "
-            "max_chars limits the Markdown body; truncation and unavailable content are reported."
+            "max_chars limits the Markdown body; a longer page ends with the offset that reads "
+            "its next part. Unavailable content is reported."
         ),
     )
     async def extract_content(
         self,
-        max_chars: Annotated[int, Field(ge=1, le=200000)] = 50000,
+        max_chars: Annotated[int, Field(ge=1, le=_MAX_CONTENT_CHARS)] = 20000,
         full_page: bool = False,
+        offset: Annotated[int, Field(ge=0)] = 0,
     ) -> ToolResult:
         async with self._browser.action_lock:
             tab = self._browser.active_tab
             report = await self._readiness.wait(tab)
             if report.status == ReadinessStatus.BLOCKED:
                 raise ToolError(report.reason)
-            content = await extract_content(tab, max_chars=max_chars, full_page=full_page)
+            content = await extract_content(
+                tab, max_chars=max_chars, full_page=full_page, offset=offset
+            )
             return ToolResult(content.render())
 
     def project(self, snapshot: Snapshot) -> Observation:
@@ -317,7 +319,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         key = self._page_key(snapshot)
         # Text-only pages the model still sees are not repeated; images are always delivered.
         if snapshot.image is not None or not (state.visible and state.sent_key == key):
-            observations.append(self.project(snapshot))
+            observations.append(self._observation(snapshot))
             state.sent_key, state.sent_ref, state.visible = key, snapshot.id, False
         if nudges is not None and (hints := await nudges.observation(snapshot)) is not None:
             observations.append(hints)
@@ -331,12 +333,30 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             event.session.observe(secrets.redact(observation) if secrets else observation)
         return await next_()
 
+    def _observation(self, snapshot: Snapshot) -> Observation:
+        """The snapshot, or only its changes while the last complete one is still in context."""
+        state = self._state
+        text = self._render(snapshot)
+        plain = unmarked(text)
+        page = (snapshot.tab_id, snapshot.document_id)
+        base = state.bases.get(page)
+        # Returning to a page, as after going back, also lists only its changes.
+        if snapshot.image is None and base is not None and base[1] in state.included:
+            changes = delta(base[0], plain)
+            # Many changes read better as a complete observation, which becomes the new base.
+            if len(changes) <= len(text) // 2:
+                observation = Observation(source="browser", content=changes, refs=(snapshot.id,))
+                return self._secrets.redact(observation) if self._secrets else observation
+        state.bases[page] = (plain, snapshot.id)
+        return self.project(snapshot)
+
     @hook(ObservationsIncludedEvent)
     async def _included(self, event: ObservationsIncludedEvent) -> None:
         state = self._state
-        state.visible = any(
-            item.source == "browser" and state.sent_ref in item.refs for item in event.observations
-        )
+        refs = {ref for item in event.observations if item.source == "browser" for ref in item.refs}
+        state.visible = state.sent_ref in refs
+        state.included = frozenset(refs)
+        state.bases = {page: base for page, base in state.bases.items() if base[1] in refs}
 
     def _page_key(self, snapshot: Snapshot) -> str:
         # New-element marks depend on the previous capture, not on the page itself.

@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field, replace
 from typing import Protocol
 
-from harnessed import Inject, Plugin, PluginState, SystemSection, hook
+from harnessed import Inject, Observation, Plugin, PluginState, SystemSection, hook
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
-from harnessed.models import ImagePart, ImageReference, ModelRequest, TextPart, UserMessage
+from harnessed.models import ImagePart, ImageReference, ModelRequest, TextPart
 
 from browserrig.events import ObservationCapturedEvent
 
@@ -51,9 +51,14 @@ class UntilCompaction:
         return 0
 
 
+_NOTE_SOURCE = "browser-image"
+
+
 @dataclass
 class _State:
     images: list[CapturedImage] = field(default_factory=list)
+    # The last latest-screenshot note handed to the session.
+    note: str = ""
 
 
 class ImageContext(Plugin, needs=(Observe,)):
@@ -71,8 +76,8 @@ class ImageContext(Plugin, needs=(Observe,)):
         title="Browser image history",
         text=(
             "Screenshots belong to the browser observations they were captured with and are "
-            "labelled with capture time, tab and document. The last context line identifies "
-            "the latest captured screenshot. Coordinate tools use the latest screenshot "
+            "labelled with capture time, tab and document. A note names the latest captured "
+            "screenshot whenever that changes. Coordinate tools use the latest screenshot "
             "included in the request, including its crop and zoom, while it shows the current "
             "document. Without an included screenshot they use viewport CSS pixels."
         ),
@@ -130,16 +135,27 @@ class ImageContext(Plugin, needs=(Observe,)):
                     ),
                 )
             )
+        self._note(event)
         return decision
 
     @hook(PrepareRequest)
     async def _prepare(self, event: PrepareRequest, next_: Next[ModelRequest]) -> ModelRequest:
         request = await next_()
         retained = {image.id for image in self._state.images}
+        included = event.session.log.included_observations(request)
         dropped = {
             item.message_id
-            for item in event.session.log.included_observations(request)
+            for item in included
             if item.source == "browser" and not retained.intersection(item.refs)
+        }
+        shown = retained.intersection(
+            ref for item in included if item.source == "browser" for ref in item.refs
+        )
+        # A note about a screenshot leaves the context together with that screenshot.
+        stale = {
+            item.message_id
+            for item in included
+            if item.source == _NOTE_SOURCE and not shown.intersection(item.refs)
         }
         messages = tuple(
             replace(
@@ -153,9 +169,8 @@ class ImageContext(Plugin, needs=(Observe,)):
             if message.id in dropped and not isinstance(message.content, str)
             else message
             for message in request.messages
+            if message.id not in stale
         )
-        if self._state.images:
-            messages = (*messages, self._latest_note(self._state.images[-1]))
         return replace(request, messages=messages)
 
     @hook(ObservationsIncludedEvent)
@@ -165,7 +180,17 @@ class ImageContext(Plugin, needs=(Observe,)):
         self._state.images[:] = [image for image in self._state.images if image.id in refs]
         self._observe.image_delivered(self._state.images[-1] if self._state.images else None)
 
-    def _latest_note(self, latest: CapturedImage) -> UserMessage:
+    def _note(self, event: PreStep) -> None:
+        # Recorded once per change, so earlier requests stay a prefix of later ones.
+        images = self._state.images
+        text = self._latest_note(images[-1]) if images else ""
+        if text and text != self._state.note:
+            event.session.observe(
+                Observation(source=_NOTE_SOURCE, content=text, refs=(images[-1].id,))
+            )
+        self._state.note = text
+
+    def _latest_note(self, latest: CapturedImage) -> str:
         snapshot = self._observe.snapshot
         text = f"Latest captured screenshot: {latest.id}"
         if snapshot is None or (latest.tab_id, latest.document_id) != (
@@ -175,7 +200,7 @@ class ImageContext(Plugin, needs=(Observe,)):
             text += " (another document)"
         elif snapshot.image is not None and snapshot.id != latest.id:
             text += " (screen unchanged this step)"
-        return UserMessage(text, id="browser-latest-image")
+        return text
 
 
 def _positive(value: object) -> bool:

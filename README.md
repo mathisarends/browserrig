@@ -147,7 +147,7 @@ reads/writes, listings and content extraction can be chained. Browser tools run
 sequentially against explicitly addressed tabs.
 
 Navigation, search, history, reload, tab changes, file previews, scrolling, drags,
-coordinate actions, JavaScript, uploads, dialogs, waiting, `observe` and `screenshot`
+coordinate actions, JavaScript, uploads, dialogs, waiting and `screenshot`
 use `ToolChain.STOP_AFTER`. The tool executes first; unstarted calls after it receive
 `ToolStatus.SKIPPED`. The next model step can continue. Denied or disabled tools
 retain Harnessed's native approval semantics and do not themselves stop the chain.
@@ -416,7 +416,7 @@ Return plain objects and arrays
 for JSON results; `undefined`, `NaN`, infinities, and BigInts retain their JavaScript
 representation. JavaScript exceptions and execution timeouts become tool errors.
 `timeout` is in seconds, defaults to 10, and accepts up to 30. A timeout can leave
-asynchronous side effects pending; observe the page before retrying.
+asynchronous side effects pending; check the next observation before retrying.
 
 ```javascript
 const heading = document.querySelector('h1');

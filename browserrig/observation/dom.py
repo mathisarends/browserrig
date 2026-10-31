@@ -76,7 +76,9 @@ async def seed_dom(frame: Frame, snapshot: CaptureSnapshotResult) -> bool:
                 SeedArgs(clickable=tuple(index in clickable for index, _ in resolved)),
                 objects=tuple(object_id for _, object_id in resolved),
             )
-        return len(indexes) <= 256 and all(objects)
+        # Click listeners only refine hints; a missed closed root hides content.
+        missed = set(closed) - {index for index, _ in resolved}
+        return not missed
     finally:
         with suppress(CDPCommandError, TimeoutError):
             await frame.cdp.runtime.release_object_group(object_group=group)

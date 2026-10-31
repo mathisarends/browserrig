@@ -14,6 +14,7 @@ from .dom import seed_frame
 from .redirects import unwrap_redirect
 
 _LINK = re.compile(r"\]\(<([^<>\s]+)>\)")
+_MAX_OFFSET = 2_000_000
 
 
 class PageContent(Options):
@@ -21,9 +22,12 @@ class PageContent(Options):
     title: str
     markdown: str
     limitations: tuple[str, ...] = ()
+    offset: int = 0
 
     def render(self) -> str:
         text = f"# {_heading(self.title) or 'Page content'}\n\nSource: <{_source(self.url)}>"
+        if self.offset:
+            text += f"\n\n(continued from offset {self.offset})"
         if self.markdown:
             text += f"\n\n{self.markdown}"
         if self.limitations:
@@ -34,15 +38,18 @@ class PageContent(Options):
 
 
 async def extract_content(
-    tab: Tab, *, max_chars: int = 50000, full_page: bool = False
+    tab: Tab, *, max_chars: int = 50000, full_page: bool = False, offset: int = 0
 ) -> PageContent:
     """Read loaded document content without scrolling or replacing interactive element refs.
 
     Unless ``full_page`` is set, a page's main landmark replaces its surrounding header,
     navigation and footer. Links on the page's own origin are shortened to paths.
+    ``offset`` skips that many characters of the Markdown, so long pages are read in parts.
     """
     if not 1 <= max_chars <= 200000:
         raise ValueError("max_chars must be between 1 and 200000")
+    if not 0 <= offset <= _MAX_OFFSET:
+        raise ValueError(f"offset must be between 0 and {_MAX_OFFSET}")
     if tab.dialog:
         raise BrowserError("Handle the open dialog before extracting page content")
     await tab.sync_document()
@@ -58,29 +65,24 @@ async def extract_content(
     metadata: dict[str, CaptureSnapshotResult | None] = {}
     main: ContentExtraction | None = None
     parts: list[str] = []
-    remaining = max_chars
+    remaining = offset + max_chars
     embedded = 0
+    more = False
     for frame in frames:
         if remaining <= 0:
-            limitations.append("Page content was truncated by max_chars")
+            more = True
             break
         try:
             await seed_frame(frame, metadata, limitations)
             state = await frame.run(CONTENT, args(remaining))
             embedded += state.frames
             main = main or state
-            prefix = "\n\n" if parts else ""
-            if frame.parent is not None:
-                prefix += (
-                    f"## Frame: {_heading(state.title) or 'Embedded document'}\n\n"
-                    f"Source: <{_source(state.url)}>\n\n"
-                )
+            prefix = ("\n\n" if parts else "") + (_frame_heading(state) if frame.parent else "")
             available = max(0, remaining - len(prefix))
             body = state.markdown
-            if state.truncated or len(body) > available:
-                limitations.append(
-                    "Page content was truncated by max_chars or DOM traversal limits"
-                )
+            more = more or len(body) > available or (state.truncated and not state.limited)
+            if state.limited:
+                limitations.append("Page content was truncated by DOM traversal limits")
             if len(body) > available:
                 # Let the script close code fences using the actual body budget.
                 body = (await frame.run(CONTENT, args(available))).markdown if available else ""
@@ -96,18 +98,42 @@ async def extract_content(
     if tab.document_id != document_id:
         raise BrowserError("Document changed during extraction; extract the current page again")
     assert main is not None
-    if main.main:
+    if main.main or main.chrome:
         limitations.insert(
             0,
-            "Only the main region is included; header, navigation and footer were omitted "
-            "(full_page=true includes them)",
+            ("Only the main region is included; s" if main.main else "S")
+            + "ite header, navigation and footer were omitted (full_page=true includes them)",
         )
+    page = _page("".join(parts).strip(), offset, max_chars, more, limitations)
     return PageContent(
         url=main.url,
         title=main.title,
-        markdown="".join(parts).strip(),
+        markdown=page,
         limitations=tuple(dict.fromkeys(limitations)),
+        offset=offset,
     )
+
+
+def _frame_heading(state: ContentExtraction) -> str:
+    return (
+        f"## Frame: {_heading(state.title) or 'Embedded document'}\n\n"
+        f"Source: <{_source(state.url)}>\n\n"
+    )
+
+
+def _page(markdown: str, offset: int, max_chars: int, more: bool, limitations: list[str]) -> str:
+    """Cut one part of the Markdown and name the offset that reads the next part."""
+    if offset and offset >= len(markdown):
+        limitations.append(f"offset {offset} is past the end of the page content")
+    page = markdown[offset : offset + max_chars]
+    if more or len(markdown) > offset + len(page):
+        # The part ends mid-line; the next one starts with that whole line again.
+        line = page.rfind("\n", len(page) // 2) + 1
+        following = offset + (line or len(page))
+        limitations.append(
+            f"Page content continues; extract_content with offset={following} reads the next part"
+        )
+    return page.strip()
 
 
 def _heading(text: str) -> str:

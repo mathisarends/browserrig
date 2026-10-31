@@ -88,7 +88,7 @@ async def test_hover_reveals_menu_without_dispatching_click(site):
 
 @pytest.mark.parametrize(
     "first",
-    ["navigate", "move_mouse", "click_at", "scroll", "screenshot", "observe", "execute_javascript"],
+    ["navigate", "move_mouse", "click_at", "scroll", "screenshot", "wait", "execute_javascript"],
 )
 async def test_static_boundaries_skip_following_browser_calls(site, first):
     arguments = {
@@ -97,7 +97,7 @@ async def test_static_boundaries_skip_following_browser_calls(site, first):
         "move_mouse": {"x": 700, "y": 400},
         "scroll": {"delta_y": 10},
         "screenshot": {},
-        "observe": {},
+        "wait": {"seconds": 0},
         "execute_javascript": {"code": "document.title='Changed'"},
     }
     _, replies, _, _ = await _run(
@@ -266,10 +266,5 @@ async def _run(site, markup, plan):
         replies = [e.result for e in result.events if isinstance(e, ToolCallFinishedEvent)]
         assert result.text == "Done"
         # Probes must not publish extra snapshots or consume the next observation's new markers.
-        explicit = sum(
-            e.call.name == "observe" and e.result.status is ToolStatus.OK
-            for e in result.events
-            if isinstance(e, ToolCallFinishedEvent)
-        )
-        assert len(observations) == 2 + explicit
+        assert len(observations) == 2
         return values, replies, holder, result

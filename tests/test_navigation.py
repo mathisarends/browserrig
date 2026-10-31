@@ -51,7 +51,8 @@ async def test_wait_publishes_duration_and_tab_context_before_sleeping(monkeypat
     pause = AsyncMock(side_effect=sleep)
     monkeypatch.setattr("browserrig.tools.navigation.asyncio.sleep", pause)
     assert (
-        await NavigationTools.wait(tools, seconds=2) == "Wait completed; observe the current state."
+        await NavigationTools.wait(tools, seconds=2)
+        == "Wait completed; the next observation shows the current state."
     )
     pause.assert_awaited_once_with(2)
     assert not browser.action_lock.locked()

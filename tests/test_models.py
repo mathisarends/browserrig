@@ -80,6 +80,27 @@ def test_render_merges_link_headings_and_unwraps_search_redirects():
     ]
 
 
+def test_render_omits_in_page_targets_that_repeat_the_link_name():
+    page = "https://example.org/shop#"
+    links = [
+        ("Climbing history", "Climbing_history"),
+        ("[12]", "cite_note-Carter1985-12"),
+        ("Back to top", "top"),
+    ]
+    snapshot = _snapshot(
+        *(
+            _element(str(index), index, role="link", tag="a", name=name, href=page + fragment)
+            for index, (name, fragment) in enumerate(links)
+        )
+    )
+    lines = render(snapshot).splitlines()
+    assert lines[lines.index("in viewport:") + 1 :] == [
+        '  [0] link "Climbing history"',
+        '  [1] link "[12]"',
+        '  [2] link "Back to top" -> #top',
+    ]
+
+
 def test_render_lists_only_the_viewport_and_reports_modal():
     snapshot = _snapshot(_element("1", 0), modal=Modal(role="dialog", name="Cookies"))
     text = render(snapshot)
