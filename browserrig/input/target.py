@@ -3,8 +3,8 @@ from typing import Literal, Protocol
 
 from cdpify.domains.input import MouseButton
 
+from browserrig.core import Point
 from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import Point
 from browserrig.core.kinds import CursorStyle, MouseEventKind
 from browserrig.events import InputEvent
 

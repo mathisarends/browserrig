@@ -30,8 +30,7 @@ from browserrig.events import (
     HandoffStatus,
 )
 from browserrig.nudges import Nudges
-from browserrig.observation import Observe
-from browserrig.observation.models import Snapshot
+from browserrig.observation import Observe, Snapshot
 from browserrig.secrets import Secrets
 
 from .changes import page_changes, page_url

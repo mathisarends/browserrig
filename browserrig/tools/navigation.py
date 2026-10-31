@@ -11,7 +11,7 @@ from browserrig.core.errors import BrowserError
 from browserrig.core.kinds import ActionKind, BrowserBar, ReadinessPhase
 from browserrig.core.tools import browser_tool as tool
 from browserrig.events import NavigationStartedEvent, WaitingEvent
-from browserrig.readiness.plugin import Readiness
+from browserrig.readiness import Readiness
 
 from .execution import Actions, Effect
 

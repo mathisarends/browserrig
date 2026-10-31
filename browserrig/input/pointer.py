@@ -1,7 +1,7 @@
 import math
 from dataclasses import dataclass
 
-from browserrig.core.geometry import Point
+from browserrig.core import Point
 
 _FRAME_INTERVAL_SECONDS = 1 / 60
 

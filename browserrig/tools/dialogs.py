@@ -1,6 +1,6 @@
 from harnessed import Inject, Plugin, ToolError
 
-from browserrig.browser.base import Browser
+from browserrig.browser import Browser
 from browserrig.core.kinds import ActionKind
 from browserrig.core.tools import browser_tool as tool
 

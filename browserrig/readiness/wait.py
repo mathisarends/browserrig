@@ -7,8 +7,8 @@ from uuid import uuid4
 from cdpify.exceptions import CDPCommandError
 from harnessed.hooks import Next
 
+from browserrig.browser import Tab
 from browserrig.browser.base import BrowserEvents
-from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError, ReadinessError
 from browserrig.core.kinds import ReadinessPhase, ReadinessStage, ReadinessStatus
 from browserrig.events import (

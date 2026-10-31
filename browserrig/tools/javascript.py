@@ -3,7 +3,7 @@ from typing import Annotated
 from harnessed import Inject, Plugin, ToolResult
 from pydantic import Field
 
-from browserrig.browser.tab import Tab
+from browserrig.browser import Tab
 from browserrig.core.kinds import ActionKind
 from browserrig.core.tools import browser_tool as tool
 

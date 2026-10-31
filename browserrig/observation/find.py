@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from cdpify.exceptions import CDPCommandError
 
-from browserrig.browser.tab import Frame, Tab
+from browserrig.browser import Frame, Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Bounds
 from browserrig.events import FindMark

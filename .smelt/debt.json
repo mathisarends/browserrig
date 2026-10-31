@@ -104,36 +104,6 @@
       "message": "browserrig.activity.models.inference_only is public; among analyzed modules, only tests access it outside its defining module"
     },
     {
-      "fingerprint": "2c3dce104e9522ea1eed792cdad5e073",
-      "code": "SMT319",
-      "path": "browserrig/agent.py",
-      "message": "import these names from the existing browserrig.readiness package API"
-    },
-    {
-      "fingerprint": "627e40bd4efe8397c6485af6f61b019e",
-      "code": "SMT319",
-      "path": "browserrig/agent.py",
-      "message": "import these names from the existing browserrig.tools package API"
-    },
-    {
-      "fingerprint": "d302255c90baea60b4b1c80f68f16c0c",
-      "code": "SMT319",
-      "path": "browserrig/agent.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "1209c2c6968e22bba52d8ab9f61628b7",
-      "code": "SMT308",
-      "path": "browserrig/browser/base.py",
-      "message": "contract \"conventions\" expects an relative import of browserrig.browser.models"
-    },
-    {
-      "fingerprint": "825d2e6a548c9161fca585e1f5fadffd",
-      "code": "SMT308",
-      "path": "browserrig/browser/chrome.py",
-      "message": "contract \"conventions\" expects an relative import of browserrig.browser.models"
-    },
-    {
       "fingerprint": "84a32b0064b79e0688c6554c94cce710",
       "code": "SMT430",
       "path": "browserrig/browser/chrome.py",
@@ -380,58 +350,10 @@
       "message": "consider MouseEventKind.WHEEL directly; StrEnum members are already strings"
     },
     {
-      "fingerprint": "4f408b7dafbb7708358757a51b7fe6c6",
-      "code": "SMT319",
-      "path": "browserrig/browser/tab.py",
-      "message": "import these names from the existing browserrig.scripts package API"
-    },
-    {
       "fingerprint": "d070473cb452edeaa0017b57d248d2d3",
       "code": "SMT430",
       "path": "browserrig/browser/tab.py",
       "message": "Tab.loading is public; among analyzed modules, only tests read it outside its defining class"
-    },
-    {
-      "fingerprint": "205f9218e7345615399f17c240e4e106",
-      "code": "SMT319",
-      "path": "browserrig/composition.py",
-      "message": "import these names from the existing browserrig.tools package API"
-    },
-    {
-      "fingerprint": "49853762ba0e6871906e041186618e49",
-      "code": "SMT319",
-      "path": "browserrig/composition.py",
-      "message": "import these names from the existing browserrig.readiness package API"
-    },
-    {
-      "fingerprint": "806c38a4728a9bf379dbd27ff3c57da9",
-      "code": "SMT319",
-      "path": "browserrig/composition.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "9922f2ec92d66d347177b5eceaaedb9e",
-      "code": "SMT319",
-      "path": "browserrig/composition.py",
-      "message": "import these names from the existing browserrig.readiness package API"
-    },
-    {
-      "fingerprint": "c979a11d14f6bd3cde7124beb33924da",
-      "code": "SMT319",
-      "path": "browserrig/composition.py",
-      "message": "import these names from the existing browserrig.readiness package API"
-    },
-    {
-      "fingerprint": "dba6dc6753b0e7474efa9be3fd21e05a",
-      "code": "SMT319",
-      "path": "browserrig/composition.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "459e463574eb78ef2c19930165239ec5",
-      "code": "SMT308",
-      "path": "browserrig/events.py",
-      "message": "contract \"conventions\" expects an relative import of browserrig.core.kinds"
     },
     {
       "fingerprint": "c41b2ecd817a3fd8ac60d365b0a76e2c",
@@ -470,64 +392,10 @@
       "message": "FileReader._format is an internal static helper; prefer a private module function"
     },
     {
-      "fingerprint": "a5ca7b35d69d3218ac90da861b544997",
-      "code": "SMT319",
-      "path": "browserrig/handoff/changes.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "4aa4720a07d5ae43a07b750b9e3d77cb",
-      "code": "SMT319",
-      "path": "browserrig/handoff/plugin.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "7886a8c240bd0be7d38f021953cd0e23",
-      "code": "SMT319",
-      "path": "browserrig/input/mouse.py",
-      "message": "import these names from the existing browserrig.core package API"
-    },
-    {
       "fingerprint": "144d5c5544fcc748c775880aba917c58",
       "code": "SMT316",
       "path": "browserrig/input/pointer.py",
       "message": "ease is public, but has no observed use outside its module"
-    },
-    {
-      "fingerprint": "90666a152200564a1ae91925fb995d54",
-      "code": "SMT319",
-      "path": "browserrig/input/pointer.py",
-      "message": "import these names from the existing browserrig.core package API"
-    },
-    {
-      "fingerprint": "c0becd07a78daeb7579dbda9ec49ea5d",
-      "code": "SMT319",
-      "path": "browserrig/input/target.py",
-      "message": "import these names from the existing browserrig.core package API"
-    },
-    {
-      "fingerprint": "1be462e2093369967a64641a40056f0c",
-      "code": "SMT104",
-      "path": "browserrig/nudges/plugin.py",
-      "message": "import cycle between modules in browserrig: nudges -> observation -> nudges (type checking only)"
-    },
-    {
-      "fingerprint": "5cc450ed557617930192e88cf4b8788f",
-      "code": "SMT104",
-      "path": "browserrig/nudges/plugin.py",
-      "message": "import cycle between modules in browserrig: nudges -> observation -> nudges (type checking only)"
-    },
-    {
-      "fingerprint": "e0363c7215375f8b4a675c0ba7536ab0",
-      "code": "SMT104",
-      "path": "browserrig/nudges/plugin.py",
-      "message": "import cycle between modules in browserrig: nudges -> observation -> nudges (type checking only)"
-    },
-    {
-      "fingerprint": "e56fe34349c4b5123d28c06acdd914de",
-      "code": "SMT104",
-      "path": "browserrig/nudges/plugin.py",
-      "message": "import cycle between modules in browserrig: nudges -> observation -> nudges (type checking only)"
     },
     {
       "fingerprint": "556dd716907d4f73fd59109e899d8631",
@@ -536,64 +404,10 @@
       "message": "assignment writes 2 instance attributes; use separate statements"
     },
     {
-      "fingerprint": "8822a5161196a175bad89c325d5a2535",
-      "code": "SMT319",
-      "path": "browserrig/nudges/plugin.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "56be6f74c5a020a9899ded195fa2de90",
-      "code": "SMT319",
-      "path": "browserrig/observation/capture.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "8294f8d5500928765e9d6942287deaa2",
-      "code": "SMT319",
-      "path": "browserrig/observation/capture.py",
-      "message": "import these names from the existing browserrig.readiness package API"
-    },
-    {
-      "fingerprint": "80b3e66683b4cc25b821b33d7b804088",
-      "code": "SMT319",
-      "path": "browserrig/observation/content.py",
-      "message": "import these names from the existing browserrig.scripts package API"
-    },
-    {
-      "fingerprint": "cbb819d31d3c61d6c0131c448297c187",
-      "code": "SMT319",
-      "path": "browserrig/observation/content.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
       "fingerprint": "7d3a9038a86670597ce029f962a30651",
       "code": "SMT316",
       "path": "browserrig/observation/dom.py",
       "message": "seed_dom is public, but has no observed use outside its module"
-    },
-    {
-      "fingerprint": "3b045a2ae41c1cda1e45d950d2f564c9",
-      "code": "SMT319",
-      "path": "browserrig/observation/dom.py",
-      "message": "import these names from the existing browserrig.scripts package API"
-    },
-    {
-      "fingerprint": "cb4fc3f950dca863f90dbe50758f8cc1",
-      "code": "SMT319",
-      "path": "browserrig/observation/dom.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "14d33a3a49daedc40e5d12c888e0ea68",
-      "code": "SMT308",
-      "path": "browserrig/observation/extraction/__init__.py",
-      "message": "contract \"conventions\" expects an absolute import of browserrig.observation.models"
-    },
-    {
-      "fingerprint": "56f0970b43a08d9e2ea33a78f14dd10d",
-      "code": "SMT308",
-      "path": "browserrig/observation/extraction/accessibility.py",
-      "message": "contract \"conventions\" expects an absolute import of browserrig.observation.models"
     },
     {
       "fingerprint": "3898d378c54d77a71a9f922e37670dc0",
@@ -608,48 +422,6 @@
       "message": "assignment writes 2 instance attributes; use separate statements"
     },
     {
-      "fingerprint": "484baa8d2880dd1ddabf96a6f739d523",
-      "code": "SMT308",
-      "path": "browserrig/observation/extraction/elements.py",
-      "message": "contract \"conventions\" expects an absolute import of browserrig.observation.models"
-    },
-    {
-      "fingerprint": "d3b53372c5d46775ba706fb74c95a273",
-      "code": "SMT308",
-      "path": "browserrig/observation/extraction/semantics.py",
-      "message": "contract \"conventions\" expects an absolute import of browserrig.observation.models"
-    },
-    {
-      "fingerprint": "fbde3339c63abbaf9540ae854be9caa1",
-      "code": "SMT319",
-      "path": "browserrig/observation/find.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "0fd8ef6ffb3cf0976faa5116ba5b03c5",
-      "code": "SMT319",
-      "path": "browserrig/observation/handle.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "22f7a49170bd18255b4f3a78bb71ed3c",
-      "code": "SMT319",
-      "path": "browserrig/observation/handle.py",
-      "message": "import these names from the existing browserrig.scripts package API"
-    },
-    {
-      "fingerprint": "daabbb37f6cd833c8e4fa516e58f118b",
-      "code": "SMT319",
-      "path": "browserrig/observation/plugin.py",
-      "message": "import these names from the existing browserrig.readiness package API"
-    },
-    {
-      "fingerprint": "f7fba203f2471de10c49d3eee1afe7c9",
-      "code": "SMT319",
-      "path": "browserrig/observation/plugin.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
       "fingerprint": "fddab0d7f7a3bed56690e9d6d78fee23",
       "code": "SMT429",
       "path": "browserrig/observation/render.py",
@@ -660,48 +432,6 @@
       "code": "SMT316",
       "path": "browserrig/readiness/dom.py",
       "message": "probe_dom is public, but has no observed use outside its module"
-    },
-    {
-      "fingerprint": "05a8d6d77a2b80bb82fa8c4b5c34e5e3",
-      "code": "SMT319",
-      "path": "browserrig/readiness/dom.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "89c9b655c94397917238786a1206d5fc",
-      "code": "SMT319",
-      "path": "browserrig/readiness/dom.py",
-      "message": "import these names from the existing browserrig.scripts package API"
-    },
-    {
-      "fingerprint": "7ea53fe01a64dba4247c0f4c26014ae4",
-      "code": "SMT319",
-      "path": "browserrig/readiness/downloads.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "8fadc247468de27db3ddfb44287b3d24",
-      "code": "SMT319",
-      "path": "browserrig/readiness/plugin.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "3c72397a47bbdf9db4a209ca551ecba2",
-      "code": "SMT319",
-      "path": "browserrig/readiness/policies.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "34ea2c9bc02d09c1b22b6596a03884a7",
-      "code": "SMT319",
-      "path": "browserrig/readiness/strategy.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "501b6d6c77478aaee0c7e5c0c689f89f",
-      "code": "SMT319",
-      "path": "browserrig/readiness/wait.py",
-      "message": "import these names from the existing browserrig.browser package API"
     },
     {
       "fingerprint": "17725c5626418ef0b32357ff79020cb0",
@@ -722,72 +452,6 @@
       "message": "assignment writes 4 instance attributes; use separate statements"
     },
     {
-      "fingerprint": "125a6c543fcc57d4088d82eb2ef8bb53",
-      "code": "SMT319",
-      "path": "browserrig/secrets/plugin.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "49fc4941065707643d40518f6ecc89bd",
-      "code": "SMT319",
-      "path": "browserrig/secrets/plugin.py",
-      "message": "import these names from the existing browserrig.scripts package API"
-    },
-    {
-      "fingerprint": "4f6a41b73baf0f6bcccc1e131ab6d46a",
-      "code": "SMT319",
-      "path": "browserrig/secrets/plugin.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "b4bb69566d5204e3f574ea052536fbc8",
-      "code": "SMT319",
-      "path": "browserrig/secrets/plugin.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "e40d9c05c59a8ea8a77a87b67a3194b1",
-      "code": "SMT319",
-      "path": "browserrig/secrets/plugin.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "39ede10d4f294cb8f2ff49b466c4fc56",
-      "code": "SMT319",
-      "path": "browserrig/tools/dialogs.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "0b88b15a2405b16bf889d085a5b84bdb",
-      "code": "SMT319",
-      "path": "browserrig/tools/dom.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "8aacb4686a1986dd46a61d7c04f44673",
-      "code": "SMT319",
-      "path": "browserrig/tools/execution.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "8ef088725861a3b14b4a639ac9e92ca4",
-      "code": "SMT319",
-      "path": "browserrig/tools/execution.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "b006a8974afa2b868d12f14bad813536",
-      "code": "SMT319",
-      "path": "browserrig/tools/execution.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "c3b642ed8304906e1ad1b76c175c97d3",
-      "code": "SMT319",
-      "path": "browserrig/tools/execution.py",
-      "message": "import these names from the existing browserrig.readiness package API"
-    },
-    {
       "fingerprint": "26fafe06e0817bab7c1a4aa370542f26",
       "code": "SMT316",
       "path": "browserrig/tools/files.py",
@@ -800,84 +464,6 @@
       "message": "has_upload_files is public, but has no observed use outside its module"
     },
     {
-      "fingerprint": "98f7e7295d4a0bdeef8ab8fe1adfacb5",
-      "code": "SMT319",
-      "path": "browserrig/tools/files.py",
-      "message": "import these names from the existing browserrig.readiness package API"
-    },
-    {
-      "fingerprint": "f3dd6806bb7f73e46fc24866dff04f11",
-      "code": "SMT319",
-      "path": "browserrig/tools/files.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "587433e6371733d7c53434ae2228f30e",
-      "code": "SMT319",
-      "path": "browserrig/tools/find.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "5ebdb653a0eea731c64bee1fa65683c0",
-      "code": "SMT319",
-      "path": "browserrig/tools/find.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "48b050b2a0985dabee4bc41723f62f7e",
-      "code": "SMT319",
-      "path": "browserrig/tools/forms.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "db258720043cbcdebba3cc96e9251766",
-      "code": "SMT319",
-      "path": "browserrig/tools/javascript.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "30628e1e98482af8fbd9781a1ced9048",
-      "code": "SMT319",
-      "path": "browserrig/tools/keyboard.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "d12067de9f2aaafdff53baab95f307fd",
-      "code": "SMT319",
-      "path": "browserrig/tools/keyboard.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "05d839340ebf35fb67fb6ef8abd2d626",
-      "code": "SMT319",
-      "path": "browserrig/tools/mouse.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "18f08b5cafcc430137be99715c845c74",
-      "code": "SMT319",
-      "path": "browserrig/tools/mouse.py",
-      "message": "import these names from the existing browserrig.core package API"
-    },
-    {
-      "fingerprint": "6f4352459e5f0e28c62288c10f09770a",
-      "code": "SMT319",
-      "path": "browserrig/tools/mouse.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "8f91132493f80ddb6a4f711fd978ad65",
-      "code": "SMT319",
-      "path": "browserrig/tools/mouse.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "ee57f3132b487e487f1c3d766f161663",
-      "code": "SMT319",
-      "path": "browserrig/tools/navigation.py",
-      "message": "import these names from the existing browserrig.readiness package API"
-    },
-    {
       "fingerprint": "1c825b58dfa05e28bc92b15481aeb5b2",
       "code": "SMT429",
       "path": "browserrig/tools/navigation.py",
@@ -888,48 +474,6 @@
       "code": "SMT429",
       "path": "browserrig/tools/navigation.py",
       "message": "browserrig.tools.navigation.typed_address is public; among analyzed modules, only tests access it outside its defining module"
-    },
-    {
-      "fingerprint": "3261bf78c81d5298f99a3a45a3fb96cd",
-      "code": "SMT319",
-      "path": "browserrig/tools/scrolling.py",
-      "message": "import these names from the existing browserrig.scripts package API"
-    },
-    {
-      "fingerprint": "ca38e18f415c7449cb8ce7fc33fe3d8a",
-      "code": "SMT319",
-      "path": "browserrig/tools/scrolling.py",
-      "message": "import these names from the existing browserrig.core package API"
-    },
-    {
-      "fingerprint": "daefea2caa14791f8be0fd9b0ef77513",
-      "code": "SMT319",
-      "path": "browserrig/tools/scrolling.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "e02ed7d47aefc853b76cad4119c2e9f0",
-      "code": "SMT319",
-      "path": "browserrig/tools/scrolling.py",
-      "message": "import these names from the existing browserrig.observation package API"
-    },
-    {
-      "fingerprint": "60a3bba0c0314f733af57354e7dc5633",
-      "code": "SMT319",
-      "path": "browserrig/tools/tabs.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "9adeac1e32c485b7aab03b08c28d8d90",
-      "code": "SMT319",
-      "path": "browserrig/tools/tabs.py",
-      "message": "import these names from the existing browserrig.browser package API"
-    },
-    {
-      "fingerprint": "ee694b3a18f742a01139ee7eeb9a1568",
-      "code": "SMT319",
-      "path": "browserrig/tools/tabs.py",
-      "message": "import these names from the existing browserrig.readiness package API"
     },
     {
       "fingerprint": "8cd9eb8f6969e8e0dd7949bb2444c771",

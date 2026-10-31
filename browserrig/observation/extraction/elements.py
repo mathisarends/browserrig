@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
 from browserrig.core.geometry import Bounds, FrameTransform
+from browserrig.observation.models import Canvas, Element, Heading, Modal, Offscreen
 
-from ..models import Canvas, Element, Heading, Modal, Offscreen
 from . import semantics
 from .document import Document, Rect, clean
 from .styles import Style

@@ -5,7 +5,8 @@ without the cost of fetching Chrome's full accessibility tree. Chrome's own name
 replace these for the controls an observation lists; see `accessibility`.
 """
 
-from ..models import Option, Tristate
+from browserrig.observation.models import Option, Tristate
+
 from .document import Document, clean
 
 INTERACTIVE_ROLES = frozenset(

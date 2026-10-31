@@ -21,8 +21,8 @@ from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
 from pydantic import Field
 
+from browserrig.browser import Tab
 from browserrig.browser.base import Browser, BrowserEvents
-from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.kinds import (
     ActionKind,
@@ -52,7 +52,7 @@ from browserrig.files import (
 )
 from browserrig.files.models import Download, DownloadState
 from browserrig.observation.plugin import Observe, has_dom_refs
-from browserrig.readiness.plugin import Readiness
+from browserrig.readiness import Readiness
 
 from .execution import Actions, Effect
 

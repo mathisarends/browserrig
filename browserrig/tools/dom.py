@@ -1,6 +1,6 @@
 from harnessed import Inject
 
-from browserrig.observation.plugin import Observe
+from browserrig.observation import Observe
 
 from .forms import FormTools
 from .keyboard import DomKeyboardTools

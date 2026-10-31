@@ -11,7 +11,8 @@ from collections.abc import Iterable
 
 from cdpify import CdpSession
 
-from ..models import Element
+from browserrig.observation.models import Element
+
 from .document import clean
 
 _TIMEOUT = 2

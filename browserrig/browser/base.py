@@ -4,12 +4,12 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
-from browserrig.browser.models import TabInfo
 from browserrig.events import BrowserEvent, LiveEvent
 from browserrig.files import FileSystem
 from browserrig.files.models import Download
 from browserrig.input import Input, Keyboard, Mouse
 
+from .models import TabInfo
 from .tab import Tab
 
 type EventSink = Callable[[BrowserEvent | LiveEvent], Awaitable[None]]

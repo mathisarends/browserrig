@@ -3,11 +3,10 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from browserrig.browser.tab import Frame
+from browserrig.browser import Frame
 from browserrig.core.geometry import Bounds, ElementPoint
 from browserrig.core.kinds import ElementOperation
-from browserrig.scripts import ELEMENT, Script
-from browserrig.scripts.models import ElementArgs
+from browserrig.scripts import ELEMENT, ElementArgs, Script
 
 from .models import Element, Snapshot
 

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from time import monotonic
 from typing import Protocol
 
-from browserrig.browser.tab import Tab
+from browserrig.browser import Tab
 from browserrig.core.kinds import ReadinessPhase, ReadinessStage
 
 from .config import ReadinessOptions

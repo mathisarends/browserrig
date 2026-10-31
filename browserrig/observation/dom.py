@@ -4,9 +4,8 @@ from contextlib import suppress
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from cdpify.exceptions import CDPCommandError
 
-from browserrig.browser.tab import Frame
-from browserrig.scripts import RESET, SEED
-from browserrig.scripts.models import SeedArgs
+from browserrig.browser import Frame
+from browserrig.scripts import RESET, SEED, SeedArgs
 
 
 async def seed_frame(

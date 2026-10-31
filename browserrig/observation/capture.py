@@ -8,14 +8,14 @@ from uuid import uuid4
 from cdpify.exceptions import CDPCommandError
 from pydantic import Field
 
+from browserrig.browser import Tab
 from browserrig.browser.images import screenshot
 from browserrig.browser.models import TabInfo
-from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Bounds, Geometry, Point, Region
 from browserrig.core.kinds import ReadinessStatus
 from browserrig.core.options import Options
-from browserrig.readiness.models import ReadinessReport
+from browserrig.readiness import ReadinessReport
 
 from .extraction import Extraction, extract
 from .marks import annotate, blackout

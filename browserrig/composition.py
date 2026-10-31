@@ -8,13 +8,11 @@ from .browser.config import BrowserOptions
 from .files import FileSystemOptions
 from .handoff import HumanHandoff
 from .nudges import Nudges
-from .observation.images import ImageContext
-from .observation.plugin import Observe
-from .readiness.config import ReadinessOptions
-from .readiness.downloads import DownloadReadiness
-from .readiness.plugin import Readiness
+from .observation import ImageContext, Observe
+from .readiness import DownloadReadiness, Readiness, ReadinessOptions
 from .secrets import Secret, Secrets
 from .tools import (
+    Actions,
     DialogTools,
     DomTools,
     FileTools,
@@ -26,7 +24,6 @@ from .tools import (
     TabTools,
     UploadTools,
 )
-from .tools.execution import Actions
 
 
 def browser_plugins(

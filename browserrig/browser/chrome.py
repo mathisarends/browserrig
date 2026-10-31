@@ -28,7 +28,6 @@ from cdpify.domains.target import (
     TargetInfoChangedEvent,
 )
 
-from browserrig.browser.models import TabInfo
 from browserrig.core.errors import BrowserClosed, BrowserError
 from browserrig.core.kinds import TabGesture
 from browserrig.events import (
@@ -46,6 +45,7 @@ from .base import BrowserEvents, EventSink, _discard
 from .config import BrowserOptions, ConnectBrowser, LaunchBrowser, Viewport
 from .downloads import Downloads
 from .frames import discover_frames
+from .models import TabInfo
 from .process import ChromeProcess
 from .tab import Frame, Tab, validated_url
 from .worlds import Worlds

@@ -16,9 +16,9 @@ from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser.tab import Frame
 from browserrig.core.errors import BrowserError
+from browserrig.observation.models import Canvas, Element, Heading, Modal, Offscreen
 from browserrig.scripts import FOCUSED
 
-from ..models import Canvas, Element, Heading, Modal, Offscreen
 from .accessibility import chrome_names, preferred
 from .document import Document
 from .elements import FrameExtraction, extract_frame

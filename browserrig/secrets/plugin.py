@@ -32,17 +32,20 @@ from browserrig.core.errors import SecretError
 from browserrig.core.kinds import ActionKind
 from browserrig.core.tools import BrowserToolMetadata
 from browserrig.events import SECRET_EVENTS, BrowserEvent, LiveEvent, SecretEnteredEvent
-from browserrig.scripts import SECRET_FIELD, SECRET_FOCUS
-from browserrig.scripts.models import SecretFieldArgs, SecretFocusArgs
+from browserrig.scripts import (
+    SECRET_FIELD,
+    SECRET_FOCUS,
+    SecretFieldArgs,
+    SecretFocusArgs,
+)
 
 from .models import NAME, PLACEHOLDER, Secret, resolve
 from .redaction import Redactor
 
 if TYPE_CHECKING:
-    from browserrig.browser.tab import Frame
+    from browserrig.browser import Frame
     from browserrig.input import Keyboard
-    from browserrig.observation.handle import ElementHandle
-    from browserrig.observation.models import Snapshot
+    from browserrig.observation import ElementHandle, Snapshot
 
 # Only these tools resolve placeholders, and only in their `text` argument.
 _TYPING_TOOLS = frozenset({"type_text", "send_keys"})
@@ -109,7 +112,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
 
     async def setup(self, ctx: Context) -> None:
         # Imported here: observation imports this package to redact snapshots.
-        from browserrig.observation.plugin import (  # pylint: disable=import-outside-toplevel,cyclic-import
+        from browserrig.observation import (  # pylint: disable=import-outside-toplevel,cyclic-import
             Observe,
         )
 

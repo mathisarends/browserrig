@@ -4,11 +4,10 @@ from urllib.parse import urljoin, urlsplit
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from cdpify.exceptions import CDPCommandError
 
-from browserrig.browser.tab import Tab
+from browserrig.browser import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.options import Options
-from browserrig.scripts import CONTENT
-from browserrig.scripts.models import ContentArgs, ContentExtraction
+from browserrig.scripts import CONTENT, ContentArgs, ContentExtraction
 
 from .dom import seed_frame
 from .redirects import unwrap_redirect

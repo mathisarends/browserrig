@@ -45,7 +45,10 @@ _CHALLENGE_HINT = (
 )
 
 if TYPE_CHECKING:
-    from browserrig.observation.models import Snapshot
+    # Type-only edge: Observe injects Nudges at runtime.
+    from browserrig.observation import (  # smelt: ignore[SMT104] -- type-only edge
+        Snapshot,
+    )
 
 
 @dataclass

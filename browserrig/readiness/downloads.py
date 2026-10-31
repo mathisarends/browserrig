@@ -1,7 +1,7 @@
 from harnessed import Inject, Plugin, hook
 from harnessed.hooks import Next
 
-from browserrig.browser.base import Browser
+from browserrig.browser import Browser
 from browserrig.files.models import DownloadState
 
 from .hooks import CheckReadiness, ReadinessCheck

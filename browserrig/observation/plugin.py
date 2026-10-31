@@ -18,8 +18,8 @@ from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
 from pydantic import Field
 
+from browserrig.browser import Tab
 from browserrig.browser.base import Browser, BrowserEvents
-from browserrig.browser.tab import Tab
 from browserrig.core.errors import StaleElement
 from browserrig.core.geometry import Region
 from browserrig.core.kinds import ActionKind, ReadinessPhase, ReadinessStatus
@@ -28,7 +28,7 @@ from browserrig.events import (
     ObservationCapturedEvent,
 )
 from browserrig.nudges import Nudges
-from browserrig.readiness.plugin import Readiness
+from browserrig.readiness import Readiness
 from browserrig.secrets import Secrets
 
 from .capture import CaptureStrategy, DomCapture

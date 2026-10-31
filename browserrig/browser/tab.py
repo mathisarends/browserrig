@@ -38,8 +38,15 @@ from browserrig.events import (
     TabUpdatedEvent,
 )
 from browserrig.input.target import KeyEventType
-from browserrig.scripts import CURSOR, OWNER_HITS, TAB_STRIP, Script, failure
-from browserrig.scripts.models import CursorArgs, OwnerHitsArgs
+from browserrig.scripts import (
+    CURSOR,
+    OWNER_HITS,
+    TAB_STRIP,
+    CursorArgs,
+    OwnerHitsArgs,
+    Script,
+    failure,
+)
 
 from .favicon import load_favicon
 from .worlds import Worlds

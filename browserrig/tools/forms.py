@@ -1,6 +1,6 @@
 from harnessed import Inject, Plugin, ToolResult
 
-from browserrig.browser.tab import Tab
+from browserrig.browser import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.kinds import ActionKind
 from browserrig.core.tools import browser_tool as tool

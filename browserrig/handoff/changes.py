@@ -1,6 +1,6 @@
 from urllib.parse import urlsplit, urlunsplit
 
-from browserrig.observation.models import Snapshot
+from browserrig.observation import Snapshot
 
 
 def page_url(url: str) -> str:

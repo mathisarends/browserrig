@@ -1,7 +1,6 @@
 from harnessed import Inject, Plugin, ToolError, ToolResult
 
-from browserrig.browser.base import Browser
-from browserrig.browser.tab import Tab
+from browserrig.browser import Browser, Tab
 from browserrig.core.kinds import ActionKind
 from browserrig.core.tools import browser_tool as tool
 from browserrig.observation.plugin import Observe, has_dom_refs

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from browserrig.browser.tab import Tab
+from browserrig.browser import Tab
 from browserrig.core.kinds import ReadinessStatus
 
 from .config import ReadinessOptions

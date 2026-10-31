@@ -1,13 +1,18 @@
 import asyncio
 from dataclasses import replace
 
-from browserrig.browser.tab import Frame, Tab
+from browserrig.browser import Frame, Tab
+from browserrig.core import Point
 from browserrig.core.errors import BrowserError, StaleElement
-from browserrig.core.geometry import Point
 from browserrig.input import Mouse
-from browserrig.observation.handle import ElementHandle
-from browserrig.scripts import SCROLL, SCROLL_OWNER
-from browserrig.scripts.models import OwnerScrollArgs, ScrollArgs, ScrollPlan
+from browserrig.observation import ElementHandle
+from browserrig.scripts import (
+    SCROLL,
+    SCROLL_OWNER,
+    OwnerScrollArgs,
+    ScrollArgs,
+    ScrollPlan,
+)
 
 
 async def prepare_element(tab: Tab, handle: ElementHandle, mouse: Mouse) -> bool:

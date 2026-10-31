@@ -3,13 +3,12 @@ from typing import Annotated, Literal
 from harnessed import Inject, Plugin, SystemSection, ToolResult
 from pydantic import Field
 
-from browserrig.browser.base import Browser
-from browserrig.browser.tab import Tab
+from browserrig.browser import Browser, Tab
+from browserrig.core import Point
 from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import Point
 from browserrig.core.kinds import ActionKind
 from browserrig.core.tools import browser_tool as tool
-from browserrig.observation.models import CapturedImage, Snapshot
+from browserrig.observation import CapturedImage, Snapshot
 from browserrig.observation.plugin import Observe, has_dom_refs
 
 from .execution import Actions, Effect
