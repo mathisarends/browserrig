@@ -2,30 +2,6 @@
   "version": 1,
   "violations": [
     {
-      "fingerprint": "8cd9eb8f6969e8e0dd7949bb2444c771",
-      "code": "SMT420",
-      "path": "tests/test_actions.py",
-      "message": "test accesses private production name browserrig.tools.execution.Actions._fail"
-    },
-    {
-      "fingerprint": "e8a100a99244603a299f7db7293df9e7",
-      "code": "SMT420",
-      "path": "tests/test_actions.py",
-      "message": "test accesses private production name browserrig.tools.execution.Actions._prepare"
-    },
-    {
-      "fingerprint": "e8a100a99244603a299f7db7293df9e7",
-      "code": "SMT420",
-      "path": "tests/test_actions.py",
-      "message": "test accesses private production name browserrig.tools.execution.Actions._prepare"
-    },
-    {
-      "fingerprint": "e8a100a99244603a299f7db7293df9e7",
-      "code": "SMT420",
-      "path": "tests/test_actions.py",
-      "message": "test accesses private production name browserrig.tools.execution.Actions._prepare"
-    },
-    {
       "fingerprint": "57c4c77eee7729fb96b74d1b3216eecb",
       "code": "SMT420",
       "path": "tests/test_browser_composition.py",
@@ -54,30 +30,6 @@
       "code": "SMT420",
       "path": "tests/test_browser_composition.py",
       "message": "test accesses private production name browserrig.Observe._page_key"
-    },
-    {
-      "fingerprint": "7a91b78410591ccbc686380ffc853ed9",
-      "code": "SMT420",
-      "path": "tests/test_chains.py",
-      "message": "test accesses private production name browserrig.tools.Actions._execute_browser_result"
-    },
-    {
-      "fingerprint": "c52134bf8f075782a4ed21a470fd9a7c",
-      "code": "SMT420",
-      "path": "tests/test_chains.py",
-      "message": "test accesses private production name browserrig.tools.Actions._review_browser_result"
-    },
-    {
-      "fingerprint": "216e4ba512548b86ab366a9cace157a4",
-      "code": "SMT420",
-      "path": "tests/test_files.py",
-      "message": "test accesses private production name browserrig.tools.files._file_call"
-    },
-    {
-      "fingerprint": "fe323a48a3de16eb13b162e82e56898d",
-      "code": "SMT420",
-      "path": "tests/test_files.py",
-      "message": "test accesses private production name browserrig.tools.files.FileTools._open"
     },
     {
       "fingerprint": "59372a60c788db8cf6c982d0507c69de",

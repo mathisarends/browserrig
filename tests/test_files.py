@@ -1,6 +1,7 @@
 # CDP handlers are exercised directly for missing and repeated completion events.
 # pylint: disable=protected-access
 
+from contextlib import asynccontextmanager
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -35,10 +36,11 @@ from browserrig.events import (
     FileWrittenEvent,
 )
 from browserrig.files.models import DownloadState
-from browserrig.input import Input
 from browserrig.input import controller as controller_module
-from browserrig.kinds import FileSource, FileTransferDirection
-from browserrig.tools.files import FileTools, _file_call
+from browserrig.kinds import FileSource, FileTransferDirection, ReadinessPhase
+from browserrig.tools.execution import Actions
+from browserrig.tools.files import FileTools
+from tests.fakes import mounted
 
 
 def test_workspace_text_round_trip_pagination_and_explicit_overwrite(files):
@@ -287,15 +289,15 @@ async def test_download_progress_without_a_known_size_reports_no_total(tmp_path)
 
 async def test_file_tools_report_listing_reads_and_writes(files):
     saved = files.write_file("a.txt", "hello")
-    tools = _file_tools(files)
     listing = files.list_files()
-    await FileTools.list_files(tools)
-    await FileTools.read_file(tools, "a.txt")
-    with pytest.raises(ToolError):
-        await FileTools.read_file(tools, "missing.txt")
-    await FileTools.write_file(tools, "b.txt", "new")
-    await FileTools.write_file(tools, "b.txt", "again", overwrite=True)
-    listed, started, finished, missing, failed, created, replaced = _emitted(tools)
+    async with _file_tools(files) as (services, tools):
+        await tools.list_files()
+        await tools.read_file("a.txt")
+        with pytest.raises(ToolError):
+            await tools.read_file("missing.txt")
+        await tools.write_file("b.txt", "new")
+        await tools.write_file("b.txt", "again", overwrite=True)
+    listed, started, finished, missing, failed, created, replaced = services.events
     assert isinstance(listed, FilesListedEvent)
     assert listed.entries == len(listing.entries)
     assert isinstance(started, FileReadStartedEvent) and started.path == "a.txt"
@@ -319,29 +321,25 @@ async def test_open_file_moves_the_file_out_of_the_current_tab_before_reporting_
     sleep = AsyncMock()
     monkeypatch.setattr(controller_module.asyncio, "sleep", sleep)
     saved = files.write_file("report.txt", "report")
-    tools = _file_tools(files)
     opened = SimpleNamespace(id="new", document_id="new-document")
-    current = Tab("current", SimpleNamespace(), emit=tools._events.emit)
-
-    async def run(*, operation, settle, **_):
-        assert not settle
-        return (await operation(current)).text
-
-    tools._browser = SimpleNamespace(
-        open_tab=AsyncMock(return_value=opened), input=Input(lambda: current)
+    async with _file_tools(files) as (services, tools):
+        browser = services.browser
+        browser.active_tab = Tab("current", SimpleNamespace(), emit=services.record)
+        browser.open_tab = AsyncMock(return_value=opened)
+        await tools.open_file("report.txt")
+    transfer, report = (
+        _first(services.events, kind) for kind in (FileTransferEvent, FileOpenedEvent)
     )
-    tools._readiness = SimpleNamespace(wait=AsyncMock())
-    tools._actions = SimpleNamespace(run=run)
-    tools._open = lambda *args: FileTools._open(tools, *args)
-    await FileTools.open_file(tools, "report.txt")
-    transfer, report = _emitted(tools)
-    assert isinstance(transfer, FileTransferEvent) and transfer.target_id == "current"
+    assert transfer.target_id == "current"
     assert transfer.direction == FileTransferDirection.OPEN
     assert transfer.paths == (saved.path,)
     sleep.assert_awaited_once_with(transfer.duration)
-    assert isinstance(report, FileOpenedEvent) and report.source == FileSource.WORKSPACE
+    assert report.source == FileSource.WORKSPACE
     assert (report.target_id, report.document_id) == ("new", "new-document")
     assert report.path == saved.path
+    assert services.events.index(transfer) < services.events.index(report)
+    # Only the new tab is awaited; the current page is not settled afterwards.
+    assert services.readiness.phases == [ReadinessPhase.NAVIGATION]
 
 
 def test_remote_browser_requires_explicit_shared_filesystem(tmp_path):
@@ -352,12 +350,10 @@ def test_remote_browser_requires_explicit_shared_filesystem(tmp_path):
     assert ChromeBrowser(LaunchBrowser()).files is not None
 
 
-async def test_io_errors_become_model_visible_tool_errors():
-    def fail():
-        raise FileNotFoundError("Download the file first")
-
-    with pytest.raises(ToolError, match="Download the file first"):
-        await _file_call(fail)
+async def test_io_errors_become_model_visible_tool_errors(files):
+    async with _file_tools(files) as (_services, tools):
+        with pytest.raises(ToolError, match="missing"):
+            await tools.list_files("missing")
 
 
 @pytest.fixture(name="files")
@@ -374,14 +370,19 @@ def _progress(received, state, total=8):
     )
 
 
-def _file_tools(files):
-    return SimpleNamespace(
-        _files=lambda: files, _events=SimpleNamespace(emit=AsyncMock())
-    )
+class _FileTools(FileTools, provides=True):
+    """Expose the mounted plugin, so tests can call its tools directly."""
 
 
-def _emitted(tools):
-    return [call.args[0] for call in tools._events.emit.await_args_list]
+@asynccontextmanager
+async def _file_tools(files):
+    async with mounted(Actions(), _FileTools()) as (services, ctx):
+        services.browser.files = files
+        yield services, ctx[_FileTools]
+
+
+def _first(events, kind):
+    return next(event for event in events if isinstance(event, kind))
 
 
 async def _started_download(tmp_path):

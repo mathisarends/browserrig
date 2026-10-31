@@ -1,10 +1,16 @@
 import asyncio
+from contextlib import asynccontextmanager
+from types import SimpleNamespace
 
-from harnessed import Context, Inject, Plugin, SessionLog
+from harnessed import Agent, Context, Inject, Plugin, SessionLog
+from harnessed.testing import ScriptedModel
 
 from browserrig import Browser
 from browserrig.browser.base import BrowserEvents
+from browserrig.core.kinds import ReadinessStatus
 from browserrig.input import Input
+from browserrig.observation import Observe
+from browserrig.readiness import Readiness, ReadinessReport
 from browserrig.scripts.models import DOMProbe
 
 
@@ -65,3 +71,68 @@ class FakeChrome(Plugin, needs=(SessionLog,)):
         self.holder["browser"] = browser
         ctx.provide(Browser, browser)
         ctx.provide(BrowserEvents, browser.events)
+
+
+class FakeReadiness:
+    """Report every page as ready and record the phases waited for."""
+
+    def __init__(self):
+        self.phases = []
+
+    async def wait(self, tab, *, phase, dispatch=None):
+        self.phases.append(phase)
+        if dispatch is not None:
+            await dispatch()
+        return ReadinessReport(
+            id="ready",
+            target_id=tab.id,
+            document_id=tab.document_id,
+            phase=phase,
+            status=ReadinessStatus.READY,
+            duration=0,
+        )
+
+
+class FakeObserve:
+    """Hold the last observation and capture the tab as it is."""
+
+    def __init__(self):
+        self.snapshot = None
+
+    async def capture(self, tab):
+        return SimpleNamespace(
+            tab_id=tab.id,
+            url=tab.url,
+            document_id=tab.document_id,
+            fingerprint="",
+            scroll_y=0,
+        )
+
+
+class FakeServices(Plugin):
+    """Provide fake browser services, so real tool plugins run without Chrome."""
+
+    def __init__(self):
+        super().__init__()
+        self.events = []
+        self.browser = FakeBrowser(SimpleNamespace(emit=self.record))
+        self.readiness = FakeReadiness()
+        self.observe = FakeObserve()
+
+    async def record(self, event):
+        self.events.append(event)
+
+    async def setup(self, ctx: Context):
+        ctx.provide(Browser, self.browser)
+        ctx.provide(BrowserEvents, self.browser.events)
+        ctx.provide(Readiness, self.readiness)
+        ctx.provide(Observe, self.observe)
+
+
+@asynccontextmanager
+async def mounted(*plugins):
+    """Start a session with `plugins` on fake services; yield the services and context."""
+    services = FakeServices()
+    agent = Agent(model=ScriptedModel(["Done"]), plugins=[services, *plugins])
+    async with agent.session() as session:
+        yield services, session.ctx

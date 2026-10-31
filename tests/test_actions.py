@@ -1,8 +1,6 @@
-# Internal transaction state is inspected to verify failure receipts.
-# pylint: disable=protected-access
-
-import asyncio
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
+from typing import NamedTuple
 from unittest.mock import AsyncMock
 
 import pytest
@@ -14,46 +12,47 @@ from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import ElementPoint
 from browserrig.events import (
     ActionFailedEvent,
+    ActionFinishedEvent,
     CursorMovedEvent,
     FilesUploadedEvent,
     FileTransferEvent,
+    PageState,
 )
-from browserrig.input import Input
 from browserrig.input import controller as controller_module
 from browserrig.input import mouse as mouse_module
-from browserrig.kinds import ActionKind, FileTransferDirection
-from browserrig.tools.execution import Actions
+from browserrig.kinds import ActionKind, FileTransferDirection, ReadinessPhase
+from browserrig.tools.execution import Actions, Effect
 from browserrig.tools.files import UploadTools
+from tests.fakes import FakeServices, mounted
 
 
 @pytest.mark.parametrize(
     "error", [BrowserError("wrong input"), ToolError("denied"), ValueError("bad")]
 )
 async def test_action_keeps_error_details_and_uncertain_dispatch(error):
-    actions, events = _actions()
-    with pytest.raises(ToolError, match=str(error)) as caught:
-        await Actions.run(
-            actions, kind=ActionKind.TYPE, operation=AsyncMock(side_effect=error)
-        )
+    async with mounted(Actions()) as (services, ctx):
+        with pytest.raises(ToolError, match=str(error)) as caught:
+            await ctx[Actions].run(
+                kind=ActionKind.TYPE, operation=AsyncMock(side_effect=error)
+            )
     assert "may have run" in str(caught.value)
-    receipt = next(event for event in events if isinstance(event, ActionFailedEvent))
+    receipt = _first(services.events, ActionFailedEvent)
     assert receipt.dispatched and str(error) in receipt.reason
 
 
 async def test_validation_rejects_before_dispatch():
-    actions, events = _actions()
     operation = AsyncMock()
-    with pytest.raises(ToolError, match="wrong input") as caught:
-        await Actions.run(
-            actions,
-            kind=ActionKind.UPLOAD,
-            check=AsyncMock(side_effect=BrowserError("wrong input")),
-            operation=operation,
-        )
+    async with mounted(Actions()) as (services, ctx):
+        with pytest.raises(ToolError, match="wrong input") as caught:
+            await ctx[Actions].run(
+                kind=ActionKind.UPLOAD,
+                check=AsyncMock(side_effect=BrowserError("wrong input")),
+                operation=operation,
+            )
     assert "may have run" not in str(caught.value)
     operation.assert_not_awaited()
-    assert len(events) == 1
-    assert isinstance(events[0], ActionFailedEvent) and not events[0].dispatched
+    assert len(services.events) == 1
+    assert not _first(services.events, ActionFailedEvent).dispatched
 
 
 @pytest.mark.parametrize(
@@ -69,15 +68,13 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(
     secret.write_text("private")
     invalid = {"outside": str(secret), "missing": "missing.txt", "directory": "."}
     paths = [saved.path, invalid.get(selection, saved.path)]
-    tools, actions, handle, events = _uploads(
-        None if selection == "no_workspace" else files
-    )
-    with pytest.raises(ToolError):
-        await UploadTools.upload_files(tools, "input", paths, actions=actions)
-    actions.element_point.assert_not_awaited()
-    handle.upload_files.assert_not_awaited()
-    assert len(events) == 1
-    assert isinstance(events[0], ActionFailedEvent) and not events[0].dispatched
+    async with _uploads(None if selection == "no_workspace" else files) as upload:
+        with pytest.raises(ToolError):
+            await upload.tools.upload_files("input", paths, actions=upload.actions)
+    upload.actions.element_point.assert_not_awaited()
+    upload.handle.upload_files.assert_not_awaited()
+    assert len(upload.services.events) == 1
+    assert not _first(upload.services.events, ActionFailedEvent).dispatched
 
 
 async def test_upload_sends_only_resolved_workspace_paths_to_chrome(
@@ -88,15 +85,16 @@ async def test_upload_sends_only_resolved_workspace_paths_to_chrome(
     files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
     files.initialize()
     saved = files.write_file("report.txt", "report")
-    tools, actions, handle, events = _uploads(files)
-    result = await UploadTools.upload_files(
-        tools, "input", ["report.txt"], actions=actions
-    )
+    async with _uploads(files) as upload:
+        result = await upload.tools.upload_files(
+            "input", ["report.txt"], actions=upload.actions
+        )
     assert result.text == "Files assigned to input."
-    handle.upload_files.assert_awaited_once_with([saved.path])
-    actions.element_point.assert_awaited_once()
+    upload.handle.upload_files.assert_awaited_once_with([saved.path])
+    upload.actions.element_point.assert_awaited_once()
+    events = upload.services.events
     moved, transfer, uploaded = (
-        next(event for event in events if isinstance(event, kind))
+        _first(events, kind)
         for kind in (CursorMovedEvent, FileTransferEvent, FilesUploadedEvent)
     )
     assert moved.to_position == (40, 30)
@@ -119,79 +117,64 @@ async def test_upload_sends_only_resolved_workspace_paths_to_chrome(
     ],
 )
 async def test_tab_management_does_not_wait_on_current_page_dialog(kind):
-    tab = SimpleNamespace(
-        url="about:blank", document_id="doc", dialog=("alert", "hello")
-    )
-    before = await Actions._prepare(SimpleNamespace(), tab, kind)
-    assert before.url == tab.url and before.document_id == tab.document_id
+    async with mounted(Actions()) as (services, ctx):
+        tab = services.browser.active_tab
+        tab.dialog = ("alert", "hello")
+        await ctx[Actions].run(
+            kind=kind, operation=AsyncMock(return_value=Effect("Done.")), settle=False
+        )
+    finished = _first(services.events, ActionFinishedEvent)
+    assert finished.before == PageState(url=tab.url, document_id=tab.document_id)
+    assert not services.readiness.phases
 
 
 @pytest.mark.parametrize("kind", [ActionKind.PRESS, ActionKind.MOVE_MOUSE])
 async def test_input_rejects_a_document_changed_between_calls(kind):
-    tab = SimpleNamespace(
-        id="tab",
-        document_id="new-doc",
-        sync_document=AsyncMock(),
-    )
-    actions = SimpleNamespace(
-        readiness=SimpleNamespace(
-            wait=AsyncMock(
-                return_value=SimpleNamespace(status="ready", timed_out=False)
-            )
-        ),
-        observe=SimpleNamespace(
-            snapshot=SimpleNamespace(
-                tab_id="tab",
-                document_id="old-doc",
-            )
-        ),
-    )
-    with pytest.raises(BrowserError, match="act on the next observation"):
-        await Actions._prepare(actions, tab, kind)
+    operation = AsyncMock()
+    async with mounted(Actions()) as (services, ctx):
+        tab = services.browser.active_tab
+        services.observe.snapshot = SimpleNamespace(tab_id=tab.id, document_id="old")
+        with pytest.raises(ToolError, match="act on the next observation"):
+            await ctx[Actions].run(kind=kind, operation=operation)
+    operation.assert_not_awaited()
+    assert not _first(services.events, ActionFailedEvent).dispatched
 
 
 async def test_navigation_does_not_wait_for_the_current_dom_to_stop_changing():
-    tab = SimpleNamespace(
-        id="tab", url="https://example.org", document_id="doc", dialog=None
-    )
-    actions = SimpleNamespace(readiness=SimpleNamespace(wait=AsyncMock()))
-    before = await Actions._prepare(actions, tab, ActionKind.NAVIGATE)
-    assert before.url == tab.url
-    actions.readiness.wait.assert_not_awaited()
+    async with mounted(Actions()) as (services, ctx):
+        await ctx[Actions].run(
+            kind=ActionKind.NAVIGATE,
+            operation=AsyncMock(return_value=Effect("Navigated.")),
+        )
+    # The only wait is the one that dispatches the navigation.
+    assert services.readiness.phases == [ReadinessPhase.NAVIGATION]
 
 
-def _actions():
-    events = []
-
-    async def emit(event):
-        events.append(event)
-
-    cdp = SimpleNamespace(input=SimpleNamespace(dispatch_mouse_event=AsyncMock()))
-    tab = Tab("tab", cdp, emit=emit)
-    actions = SimpleNamespace(
-        browser=SimpleNamespace(
-            action_lock=asyncio.Lock(), active_tab=tab, input=Input(lambda: tab)
-        ),
-        _events=SimpleNamespace(emit=AsyncMock(side_effect=events.append)),
-        _prepare=AsyncMock(return_value=SimpleNamespace()),
-    )
-    actions._fail = lambda *args: Actions._fail(actions, *args)
-    return actions, events
+def _first(events, kind):
+    return next(event for event in events if isinstance(event, kind))
 
 
-def _uploads(files):
-    actions, events = _actions()
-    actions.run = lambda **kwargs: Actions.run(actions, **kwargs)
-    actions.element_point = AsyncMock(return_value=ElementPoint(x=40, y=30))
-    actions._settle = AsyncMock(return_value="")
-    handle = SimpleNamespace(
-        element=SimpleNamespace(input_type="file"), upload_files=AsyncMock()
-    )
-    tools = SimpleNamespace(
-        _browser=SimpleNamespace(
-            files=files, mouse=actions.browser.input.mouse, input=actions.browser.input
-        ),
-        _events=SimpleNamespace(emit=AsyncMock(side_effect=events.append)),
-        _observe=SimpleNamespace(element=AsyncMock(return_value=handle)),
-    )
-    return tools, actions, handle, events
+class _UploadTools(UploadTools, provides=True):
+    """Expose the mounted plugin, so tests can call its tool directly."""
+
+
+class _Upload(NamedTuple):
+    services: FakeServices
+    actions: Actions
+    tools: UploadTools
+    handle: SimpleNamespace
+
+
+@asynccontextmanager
+async def _uploads(files):
+    async with mounted(Actions(), _UploadTools()) as (services, ctx):
+        cdp = SimpleNamespace(input=SimpleNamespace(dispatch_mouse_event=AsyncMock()))
+        services.browser.active_tab = Tab("tab", cdp, emit=services.record)
+        services.browser.files = files
+        handle = SimpleNamespace(
+            element=SimpleNamespace(input_type="file"), upload_files=AsyncMock()
+        )
+        services.observe.element = AsyncMock(return_value=handle)
+        actions = ctx[Actions]
+        actions.element_point = AsyncMock(return_value=ElementPoint(x=40, y=30))
+        yield _Upload(services, actions, ctx[_UploadTools], handle)

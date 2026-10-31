@@ -26,6 +26,7 @@ from browserrig.observation.changes import decision_change
 from browserrig.observation.models import Element, Offscreen, Snapshot
 from browserrig.tools import Actions, BrowserToolMetadata, browser_tool
 from browserrig.tools.execution import DomActionChains, Effect
+from tests.fakes import FakeServices
 
 
 def _element(**values):
@@ -93,10 +94,6 @@ def test_unavailable_new_controls_do_not_interrupt(changes):
 
 
 class _Tools(Plugin):
-    # Exercise Browserrig's result review inside the native executor without starting Chrome.
-    _review_browser_result = Actions._review_browser_result  # pylint: disable=protected-access
-    _execute_browser_result = Actions._execute_browser_result  # pylint: disable=protected-access
-
     def __init__(self, executed):
         super().__init__()
         self.executed = executed
@@ -119,6 +116,11 @@ class _Tools(Plugin):
     async def suggest(self) -> ToolResult:
         self.executed.append("suggest")
         return ToolResult("Suggestions appeared", break_chain=True)
+
+
+def _browser():
+    # Browserrig's result review runs inside the native executor without starting Chrome.
+    return FakeServices(), Actions()
 
 
 @pytest.mark.parametrize(
@@ -144,7 +146,12 @@ async def test_native_chain_skips_trailing_calls_after_boundary_or_failure(
         ]
     )
     agent = Agent(
-        model=model, plugins=[_Tools(executed), Approvals(default=PolicyDecision.ALLOW)]
+        model=model,
+        plugins=[
+            *_browser(),
+            _Tools(executed),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
     )
     result = await agent.run("Fill the form")
     replies = [e.result for e in result.events if isinstance(e, ToolCallFinishedEvent)]
@@ -166,6 +173,7 @@ async def test_denied_boundary_does_not_discard_unrelated_followup():
     agent = Agent(
         model=model,
         plugins=[
+            *_browser(),
             _Tools(executed),
             Approvals(default=PolicyDecision.ALLOW, deny=["change"]),
         ],
@@ -190,6 +198,7 @@ async def test_browser_metadata_is_captured_for_review_without_reaching_the_mode
     await Agent(
         model=model,
         plugins=[
+            *_browser(),
             _Tools(executed),
             Inspect(),
             Approvals(default=PolicyDecision.ALLOW),
