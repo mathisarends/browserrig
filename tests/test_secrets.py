@@ -18,6 +18,7 @@ from browserrig.core.geometry import Bounds
 from browserrig.core.kinds import ActionKind
 from browserrig.events import ActionFailedEvent, KeyPressedEvent, SecretEnteredEvent
 from browserrig.input import Input
+from browserrig.input import keyboard as keyboard_module
 from browserrig.observation.capture import CaptureContent, _redact
 from browserrig.observation.extraction import Extraction
 from browserrig.observation.marks import blackout
@@ -242,7 +243,7 @@ async def test_capture_redacts_page_text_and_blacks_out_fields_showing_a_secret(
 
 
 async def test_sensitive_typing_hides_keys_and_stops_when_the_guard_fails(monkeypatch):
-    monkeypatch.setattr("browserrig.input.keyboard.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr(keyboard_module.asyncio, "sleep", AsyncMock())
     events, chars = [], []
 
     async def dispatch_key(kind, **arguments):
@@ -338,7 +339,7 @@ async def test_placeholders_are_rejected_outside_typing_tools():
 
 
 async def test_javascript_is_blocked_once_a_secret_was_entered(monkeypatch):
-    monkeypatch.setattr("browserrig.input.keyboard.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr(keyboard_module.asyncio, "sleep", AsyncMock())
     entered = False
 
     class Enter(Plugin, needs=(Secrets,)):

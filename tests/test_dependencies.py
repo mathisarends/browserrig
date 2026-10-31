@@ -36,6 +36,7 @@ from browserrig import (
     ScreenshotTrigger,
     browser_plugins,
 )
+from browserrig.browser import plugin as plugin_module
 from browserrig.browser.base import BrowserEvents
 from browserrig.core.kinds import ActionKind
 from browserrig.tools import BrowserToolMetadata, DialogTools, KeyboardTools
@@ -407,5 +408,5 @@ def _fake_chrome(monkeypatch):
         finally:
             resource.closed = True
 
-    monkeypatch.setattr("browserrig.browser.plugin.ChromeBrowser", open_browser)
+    monkeypatch.setattr(plugin_module, "ChromeBrowser", open_browser)
     return resources

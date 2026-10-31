@@ -7,6 +7,7 @@ import pytest
 from browserrig.browser.base import BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.events import WaitingEvent
+from browserrig.tools import navigation as navigation_module
 from browserrig.tools.navigation import NavigationTools
 
 
@@ -53,7 +54,7 @@ async def test_wait_publishes_duration_and_tab_context_before_sleeping(monkeypat
         assert events[0].target_id == "tab-1" and events[0].document_id == "doc-1"
 
     pause = AsyncMock(side_effect=sleep)
-    monkeypatch.setattr("browserrig.tools.navigation.asyncio.sleep", pause)
+    monkeypatch.setattr(navigation_module.asyncio, "sleep", pause)
     assert (
         await NavigationTools.wait(tools, seconds=2)
         == "Wait completed; the next observation shows the current state."

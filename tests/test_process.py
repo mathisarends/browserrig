@@ -69,8 +69,10 @@ async def test_profile_cleanup_gives_up_on_persistent_lock_without_failing(
     profile.cleanup.side_effect = PermissionError("held by a Chrome helper")
     process._profile = profile
     clock = iter(range(0, 1000, 5))
-    monkeypatch.setattr("asyncio.sleep", _no_sleep)
-    monkeypatch.setattr(asyncio.get_running_loop(), "time", lambda: next(clock))
+    monkeypatch.setattr(asyncio, "sleep", _no_sleep)
+    monkeypatch.setattr(  # smelt: ignore[SMT426] -- sleep is patched; no wait uses this clock
+        asyncio.get_running_loop(), "time", lambda: next(clock)
+    )
     await process.aclose()
     assert process._profile is None
 

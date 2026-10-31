@@ -15,6 +15,7 @@ from cdpify.domains.page import (
 )
 
 from browserrig.browser import favicon
+from browserrig.browser import tab as tab_module
 from browserrig.browser.favicon import load_favicon
 from browserrig.browser.tab import Tab
 from browserrig.core.geometry import Point
@@ -148,7 +149,7 @@ async def test_tab_publishes_loading_then_the_settled_icon_once(monkeypatch):
     frame = SimpleNamespace(id="tab", run=AsyncMock(return_value=strip))
     monkeypatch.setattr(tab, "main_frame", AsyncMock(return_value=frame))
     load = AsyncMock(return_value="data:image/png;base64,AA==")
-    monkeypatch.setattr("browserrig.browser.tab.load_favicon", load)
+    monkeypatch.setattr(tab_module, "load_favicon", load)
 
     await tab.handle(FrameStartedLoadingEvent(frame_id="tab"))
     await tab.handle(FrameStartedLoadingEvent(frame_id="tab"))

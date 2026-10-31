@@ -29,6 +29,9 @@ from browserrig.events import (
     TabPressedEvent,
 )
 from browserrig.input import Input
+from browserrig.input import controller as controller_module
+from browserrig.input import keyboard as keyboard_module
+from browserrig.input import mouse as mouse_module
 from browserrig.input.pointer import movement
 from browserrig.input.wheel import wheel_duration, wheel_progress
 from browserrig.kinds import BrowserBar, CursorStyle, FileTransferDirection, TabGesture
@@ -38,7 +41,7 @@ from browserrig.tools.keyboard import KeyboardTools
 async def test_mouse_and_keyboard_share_action_correlation_without_sharing_cursor_state(
     monkeypatch,
 ):
-    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
     devices, _tab, events, _ = _rig()
     with devices.action("shared-action"):
         await devices.mouse.click(Point(x=120, y=80))
@@ -55,7 +58,7 @@ async def test_mouse_and_keyboard_share_action_correlation_without_sharing_curso
 async def test_click_dispatches_selected_button_and_click_count(
     monkeypatch, button, mask, count
 ):
-    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
     devices, _tab, events, commands = _rig()
     await devices.mouse.click(Point(x=120, y=80), button=button, count=count)
     clicks = [command for command in commands if command["type"] != "mouseMoved"]
@@ -72,7 +75,7 @@ async def test_click_dispatches_selected_button_and_click_count(
 
 
 async def test_cancelled_right_click_releases_the_right_button(monkeypatch):
-    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
 
     async def cancel(arguments):
         if arguments["type"] == "mousePressed":
@@ -89,7 +92,7 @@ async def test_exact_typing_emits_ordered_correlated_keys_without_persistable_te
     monkeypatch,
 ):
     sleep = AsyncMock()
-    monkeypatch.setattr("browserrig.input.keyboard.asyncio.sleep", sleep)
+    monkeypatch.setattr(keyboard_module.asyncio, "sleep", sleep)
     devices, tab, events, commands = _rig()
     tab.document_id = "document-1"
     with devices.action("action-1"):
@@ -116,7 +119,7 @@ async def test_bar_typing_shows_each_key_without_page_input_and_follows_each_key
     monkeypatch,
 ):
     sleep = AsyncMock()
-    monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", sleep)
+    monkeypatch.setattr(controller_module.asyncio, "sleep", sleep)
     devices, tab, events, commands = _rig()
     seen = []
 
@@ -143,7 +146,7 @@ async def test_bar_typing_shows_each_key_without_page_input_and_follows_each_key
 
 async def test_long_addresses_type_faster_and_submit_with_enter(monkeypatch):
     sleep = AsyncMock()
-    monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", sleep)
+    monkeypatch.setattr(controller_module.asyncio, "sleep", sleep)
     devices, tab, events, _ = _rig()
     address = "example.org/" + "x" * 68
     await devices.type_in_bar(tab, BrowserBar.ADDRESS, address, submit=True)
@@ -236,7 +239,7 @@ async def test_send_keys_rejects_ambiguous_arguments_before_dispatch(arguments):
 
 
 async def test_send_keys_distinguishes_literal_text_from_named_keys(monkeypatch):
-    monkeypatch.setattr("browserrig.input.keyboard.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr(keyboard_module.asyncio, "sleep", AsyncMock())
     devices, tab, events, commands = _rig()
 
     async def run(*, kind, operation):
@@ -272,7 +275,7 @@ async def test_cancelled_cursor_reports_actual_position():
 
 
 async def test_cursor_style_is_reported_only_when_it_changes(monkeypatch):
-    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
     devices, tab, events, _ = _rig()
     styles = iter([CursorStyle.POINTER, CursorStyle.POINTER, None, CursorStyle.TEXT])
     probe = AsyncMock(side_effect=lambda point: next(styles))
@@ -303,7 +306,7 @@ def test_cursor_style_parse_keeps_the_keyword_fallback(value, style):
 
 async def test_file_transfer_is_correlated_and_holds_for_its_animation(monkeypatch):
     sleep = AsyncMock()
-    monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", sleep)
+    monkeypatch.setattr(controller_module.asyncio, "sleep", sleep)
     devices, _tab, events, _ = _rig()
     with devices.action("upload-1"):
         await devices.transfer(
@@ -409,10 +412,8 @@ def _tab(target_id="tab-1", *, dispatch=None, events=None, viewport=(1000, 600))
 
 async def test_first_tab_seeds_the_pointer_without_a_tab_press(monkeypatch):
     sleep = AsyncMock()
-    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", sleep)
-    monkeypatch.setattr(
-        "browserrig.input.mouse.random.uniform", Mock(side_effect=[450, 330])
-    )
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", sleep)
+    monkeypatch.setattr(mouse_module.random, "uniform", Mock(side_effect=[450, 330]))
     tab, events, commands = _tab()
     focus: dict[str, Tab | None] = {"tab": None}
     devices = Input(lambda: focus["tab"])
@@ -430,10 +431,8 @@ async def test_first_tab_seeds_the_pointer_without_a_tab_press(monkeypatch):
 
 async def test_tab_switch_presses_the_tab_then_enters_the_new_page(monkeypatch):
     sleep = AsyncMock()
-    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", sleep)
-    monkeypatch.setattr(
-        "browserrig.input.mouse.random.uniform", Mock(side_effect=[500, 300])
-    )
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", sleep)
+    monkeypatch.setattr(mouse_module.random, "uniform", Mock(side_effect=[500, 300]))
     events = []
     first, _, first_commands = _tab("first", events=events)
     second, _, second_commands = _tab("second", events=events)
@@ -469,9 +468,9 @@ async def test_tab_switch_presses_the_tab_then_enters_the_new_page(monkeypatch):
 
 
 async def test_returning_to_a_tab_lands_where_its_pointer_rested(monkeypatch):
-    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
     sample = Mock()
-    monkeypatch.setattr("browserrig.input.mouse.random.uniform", sample)
+    monkeypatch.setattr(mouse_module.random, "uniform", sample)
     events = []
     first, _, first_commands = _tab("first", events=events)
     second, _, _ = _tab("second", events=events)
@@ -493,7 +492,7 @@ async def test_returning_to_a_tab_lands_where_its_pointer_rested(monkeypatch):
 
 
 async def test_a_gesture_stays_on_the_tab_where_it_started(monkeypatch):
-    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
     second, _, second_commands = _tab("second")
     focus = {}
 
@@ -533,7 +532,7 @@ def test_wheel_timing_follows_chrome_smooth_scroll():
 
 
 async def test_scroll_spreads_wheel_input_over_frames_along_the_curve(monkeypatch):
-    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
     devices, _tab, events, commands = _rig()
     await devices.mouse.scroll(delta_y=600, delta_x=-60)
     wheels = [c for c in commands if c["type"] == "mouseWheel"]

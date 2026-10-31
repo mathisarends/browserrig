@@ -12,6 +12,7 @@ from cdpify.domains.browser import DownloadWillBeginEvent
 from cdpify.domains.page import JavascriptDialogOpeningEvent
 
 from browserrig import ChromeBrowser, ConnectBrowser
+from browserrig.browser import chrome as chrome_module
 from browserrig.browser.tab import Tab
 from browserrig.events import (
     DialogOpenedEvent,
@@ -125,7 +126,7 @@ async def test_frame_cache_is_action_scoped_and_invalidated_by_layout_and_docume
     tab = await browser._attach("tab")
     browser.client.target.get_targets.return_value = SimpleNamespace(target_infos=[])
     discover = AsyncMock(return_value=((), ()))
-    monkeypatch.setattr("browserrig.browser.chrome.discover_frames", discover)
+    monkeypatch.setattr(chrome_module, "discover_frames", discover)
     with browser.input.action("action"):
         await tab.frames()
         await tab.frames()

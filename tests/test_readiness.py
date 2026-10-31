@@ -25,6 +25,7 @@ from browserrig.core.kinds import ReadinessPhase
 from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent, ReadyEvent
 from browserrig.files.models import Download
 from browserrig.observation import capture
+from browserrig.readiness import wait as wait_module
 from tests.fakes import FakeBrowser, FakeChrome, FakeTab
 
 
@@ -109,7 +110,7 @@ async def test_readiness_events_keep_start_document_when_navigation_finishes(
         return True
 
     checked = []
-    monkeypatch.setattr("browserrig.readiness.wait._check", check)
+    monkeypatch.setattr(wait_module, "_check", check)
     report = await wait_for_page(tab, events=browser.events)
     start = next(event for event in events if isinstance(event, ReadinessStartedEvent))
     end = next(event for event in events if isinstance(event, ReadyEvent))
@@ -151,7 +152,7 @@ async def test_redirect_chain_restarts_probes_without_extending_the_deadline(
         tab.document_id += "x"
         return True
 
-    monkeypatch.setattr("browserrig.readiness.wait._check", redirect)
+    monkeypatch.setattr(wait_module, "_check", redirect)
     async with asyncio.timeout(0.5):
         report = await wait_for_page(tab, options=_fast_options())
     assert report.timed_out and report.status == "degraded"

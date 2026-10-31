@@ -26,18 +26,6 @@
       "message": "test accesses private production name browserrig.tools.execution.Actions._prepare"
     },
     {
-      "fingerprint": "77179b176978466e12c1ace8ffd27116",
-      "code": "SMT422",
-      "path": "tests/test_actions.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "b22b6e88a1c8a323c87a8f01d571062f",
-      "code": "SMT422",
-      "path": "tests/test_actions.py",
-      "message": "patch uses a literal string target"
-    },
-    {
       "fingerprint": "4fb673a3c0340baa07e5a24e78b4013d",
       "code": "SMT425",
       "path": "tests/test_architecture.py",
@@ -110,22 +98,10 @@
       "message": "test accesses private production name browserrig.tools.Actions._review_browser_result"
     },
     {
-      "fingerprint": "479ff2bfffd9f55f5181cf0f1b43ca25",
-      "code": "SMT422",
-      "path": "tests/test_chrome.py",
-      "message": "patch uses a literal string target"
-    },
-    {
       "fingerprint": "33b57c7312bd1e50d84c0670101e74ba",
       "code": "SMT426",
       "path": "tests/test_composition.py",
       "message": "test_facade_import_and_scripted_model_do_not_require_provider_sdks has no recognized deadline for subprocess.run"
-    },
-    {
-      "fingerprint": "669758a9b3586cece6825e4a17f9223b",
-      "code": "SMT422",
-      "path": "tests/test_dependencies.py",
-      "message": "patch uses a literal string target"
     },
     {
       "fingerprint": "216e4ba512548b86ab366a9cace157a4",
@@ -138,18 +114,6 @@
       "code": "SMT420",
       "path": "tests/test_files.py",
       "message": "test accesses private production name browserrig.tools.files.FileTools._open"
-    },
-    {
-      "fingerprint": "74c1fe0c610b32ffcf1e2a2b3e6fe75b",
-      "code": "SMT422",
-      "path": "tests/test_files.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "8c675e40aff01b44fd911b7471b2b7e7",
-      "code": "SMT422",
-      "path": "tests/test_files.py",
-      "message": "patch uses a literal string target"
     },
     {
       "fingerprint": "910405d743aa6447a75aaf191ed28b25",
@@ -168,108 +132,6 @@
       "code": "SMT426",
       "path": "tests/test_gestures_integration.py",
       "message": "test_cancelled_native_drag_does_not_drop_and_allows_next_gesture has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "3590658855f8f5f632e87916eedccf25",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "3590658855f8f5f632e87916eedccf25",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "3590658855f8f5f632e87916eedccf25",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "3a8b8d314c0c67dbcee302fe4e2eda2e",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "3a8b8d314c0c67dbcee302fe4e2eda2e",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "c24bab563d0f5233f5db2855aec7fcb5",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "c3671179193d19d0294bed07a3bec9ef",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "c3671179193d19d0294bed07a3bec9ef",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "cd6afcc1d16ad267d5523a84e9ea8364",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "e2947a48467ddc3cf6ee56a2108b865b",
-      "code": "SMT422",
-      "path": "tests/test_input.py",
-      "message": "patch uses a literal string target"
     },
     {
       "fingerprint": "1b68849773e7f8de02ffd46999cfbe91",
@@ -326,12 +188,6 @@
       "message": "test_turn_start_publishes_initial_cursor_before_any_model_or_input_action has no recognized deadline for asyncio.Event.wait"
     },
     {
-      "fingerprint": "3725dfa754504377082362056ab39945",
-      "code": "SMT422",
-      "path": "tests/test_navigation.py",
-      "message": "patch uses a literal string target"
-    },
-    {
       "fingerprint": "59372a60c788db8cf6c982d0507c69de",
       "code": "SMT420",
       "path": "tests/test_process.py",
@@ -360,30 +216,6 @@
       "code": "SMT420",
       "path": "tests/test_process.py",
       "message": "test accesses private production name browserrig.browser.process._active_endpoint"
-    },
-    {
-      "fingerprint": "95695cae9e3b28ae2b7d7819ddcd678c",
-      "code": "SMT422",
-      "path": "tests/test_process.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "1b0e25429e321e15af4ce29cb5c4a7d5",
-      "code": "SMT426",
-      "path": "tests/test_process.py",
-      "message": "test_profile_cleanup_gives_up_on_persistent_lock_without_failing replaces the asyncio scheduler/deadline clock"
-    },
-    {
-      "fingerprint": "b051e7f481417745e88c852225d9e0c5",
-      "code": "SMT422",
-      "path": "tests/test_readiness.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "c7342eadcafaa1b183a7d9231a85b709",
-      "code": "SMT422",
-      "path": "tests/test_readiness.py",
-      "message": "patch uses a literal string target"
     },
     {
       "fingerprint": "0c727ccfcf9283ea9edb807695631865",
@@ -428,18 +260,6 @@
       "message": "test accesses private production name browserrig.observation.capture._redact"
     },
     {
-      "fingerprint": "051f60d269983f4774a5eace49a0be50",
-      "code": "SMT422",
-      "path": "tests/test_secrets.py",
-      "message": "patch uses a literal string target"
-    },
-    {
-      "fingerprint": "051f60d269983f4774a5eace49a0be50",
-      "code": "SMT422",
-      "path": "tests/test_secrets.py",
-      "message": "patch uses a literal string target"
-    },
-    {
       "fingerprint": "4778f806842fe755f1da42cf078eaa06",
       "code": "SMT420",
       "path": "tests/test_tab_state.py",
@@ -468,12 +288,6 @@
       "code": "SMT420",
       "path": "tests/test_tab_state.py",
       "message": "test accesses private production name browserrig.browser.tab.Tab._strip_task"
-    },
-    {
-      "fingerprint": "2c635fbd131c9ddbdc144327bb6c0b40",
-      "code": "SMT422",
-      "path": "tests/test_tab_state.py",
-      "message": "patch uses a literal string target"
     },
     {
       "fingerprint": "75907c29aa46b950c81127587443b9e2",

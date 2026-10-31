@@ -19,6 +19,8 @@ from browserrig.events import (
     FileTransferEvent,
 )
 from browserrig.input import Input
+from browserrig.input import controller as controller_module
+from browserrig.input import mouse as mouse_module
 from browserrig.kinds import ActionKind, FileTransferDirection
 from browserrig.tools.execution import Actions
 from browserrig.tools.files import UploadTools
@@ -81,8 +83,8 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(
 async def test_upload_sends_only_resolved_workspace_paths_to_chrome(
     tmp_path, monkeypatch
 ):
-    monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
-    monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", AsyncMock())
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
+    monkeypatch.setattr(controller_module.asyncio, "sleep", AsyncMock())
     files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
     files.initialize()
     saved = files.write_file("report.txt", "report")

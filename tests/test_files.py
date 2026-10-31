@@ -18,6 +18,7 @@ from browserrig import (
     FileSystemOptions,
     LaunchBrowser,
 )
+from browserrig.browser import downloads as downloads_module
 from browserrig.browser.downloads import Downloads
 from browserrig.browser.tab import Tab
 from browserrig.events import (
@@ -35,6 +36,7 @@ from browserrig.events import (
 )
 from browserrig.files.models import DownloadState
 from browserrig.input import Input
+from browserrig.input import controller as controller_module
 from browserrig.kinds import FileSource, FileTransferDirection
 from browserrig.tools.files import FileTools, _file_call
 
@@ -257,7 +259,7 @@ async def test_download_progress_is_throttled_and_cancel_is_not_a_failure(
     tmp_path, monkeypatch
 ):
     clock = iter([10.0, 10.05, 10.3])
-    monkeypatch.setattr("browserrig.browser.downloads.monotonic", lambda: next(clock))
+    monkeypatch.setattr(downloads_module, "monotonic", lambda: next(clock))
     _, downloads, emit = await _started_download(tmp_path)
     for received in (2, 4, 6):
         await downloads.handle(_progress(received, "inProgress"))
@@ -315,7 +317,7 @@ async def test_open_file_moves_the_file_out_of_the_current_tab_before_reporting_
     files, monkeypatch
 ):
     sleep = AsyncMock()
-    monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", sleep)
+    monkeypatch.setattr(controller_module.asyncio, "sleep", sleep)
     saved = files.write_file("report.txt", "report")
     tools = _file_tools(files)
     opened = SimpleNamespace(id="new", document_id="new-document")
