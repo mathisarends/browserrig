@@ -11,9 +11,11 @@ from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
 from cdpify.domains.page import (
     FrameNavigatedEvent,
     FrameStartedLoadingEvent,
+    FrameStartedNavigatingEvent,
     FrameStoppedLoadingEvent,
     JavascriptDialogClosedEvent,
     JavascriptDialogOpeningEvent,
+    LifecycleEventEvent,
     NavigatedWithinDocumentEvent,
 )
 from cdpify.domains.runtime import (
@@ -55,6 +57,8 @@ _EVENTS = (
     FrameNavigatedEvent,
     NavigatedWithinDocumentEvent,
     FrameStartedLoadingEvent,
+    FrameStartedNavigatingEvent,
+    LifecycleEventEvent,
     FrameStoppedLoadingEvent,
     JavascriptDialogOpeningEvent,
     JavascriptDialogClosedEvent,
@@ -498,7 +502,11 @@ class ChromeBrowser:
 
 async def _enable_session(cdp: CdpSession, viewport: Viewport | None = None) -> None:
     """Enable the domains browserrig listens to, plus optional viewport emulation."""
-    steps = [cdp.page.enable(), cdp.runtime.enable()]
+    steps = [
+        cdp.page.enable(),
+        cdp.page.set_lifecycle_events_enabled(enabled=True),
+        cdp.runtime.enable(),
+    ]
     if viewport:
         steps.append(
             cdp.emulation.set_device_metrics_override(

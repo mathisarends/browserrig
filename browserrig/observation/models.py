@@ -101,6 +101,7 @@ class Snapshot(Options):
     url: str
     title: str
     readiness: ReadinessStatus
+    readiness_reason: str = ""
     width: float
     height: float
     scroll_y: float

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import ClassVar, Protocol
 from uuid import uuid4
 
+from cdpify.exceptions import CDPCommandError
 from pydantic import Field
 
 from browserrig.browser.images import screenshot
@@ -66,15 +67,42 @@ async def capture(
             text=f"Open {tab.dialog[0]} dialog: {tab.dialog[1]}",
             cursor=cursor,
         )
-    await tab.sync_document()
-    document_id = tab.document_id
-    content = await strategy.collect(
-        tab, report, screenshots=screenshots, region=region, zoom=zoom, cursor=cursor
-    )
-    await tab.sync_document()
-    if tab.document_id != document_id:
-        raise BrowserError(
-            "Document changed during capture; act on the next observation"
+    try:
+        # A pending renderer must not hold the next model iteration indefinitely
+        # after the readiness budget has already expired.
+        async with asyncio.timeout(1 if report.timed_out else None):
+            await tab.sync_document()
+            document_id = tab.document_id
+            content = await strategy.collect(
+                tab,
+                report,
+                screenshots=screenshots,
+                region=region,
+                zoom=zoom,
+                cursor=cursor,
+            )
+            await tab.sync_document()
+            if tab.document_id != document_id:
+                raise BrowserError(
+                    "Document changed during capture; act on the next observation"
+                )
+    except (BrowserError, CDPCommandError, TimeoutError):
+        if not report.timed_out:
+            raise
+        return Snapshot(
+            id=snapshot_id,
+            tab_id=tab.id,
+            document_id=tab.document_id,
+            url=tab.url,
+            title=tab.title,
+            readiness=report.status,
+            readiness_reason=report.reason,
+            width=0,
+            height=0,
+            scroll_y=0,
+            fingerprint=f"readiness:{report.id}",
+            tabs=tabs,
+            text="The page is still loading. Observe again before using page controls.",
         )
     page, image = content.page, content.image
     if redaction is not None:
@@ -91,6 +119,7 @@ async def capture(
         scroll_y=page.scroll_y,
         page_height=page.page_height,
         readiness=report.status,
+        readiness_reason=report.reason,
         fingerprint=_fingerprint(page, document_id),
         tabs=tabs,
         text=page.text,

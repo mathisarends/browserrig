@@ -11,3 +11,4 @@ class ReadinessReport(Options):
     status: ReadinessStatus
     duration: float
     reason: str = ""
+    timed_out: bool = False

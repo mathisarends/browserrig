@@ -75,6 +75,8 @@ def _header(snapshot: Snapshot) -> list[str]:
     lines.append(_cursor(snapshot))
     if snapshot.readiness != ReadinessStatus.READY:
         lines.append(f"readiness: {snapshot.readiness}")
+        if snapshot.readiness_reason:
+            lines.append(snapshot.readiness_reason)
     if snapshot.image and snapshot.geometry:
         lines.append(f"image: {_region(snapshot)}")
     if snapshot.modal is not None:

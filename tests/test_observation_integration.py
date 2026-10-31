@@ -39,6 +39,7 @@ pytestmark = pytest.mark.integration
 async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         await evaluate(
             tab,
             """document.body.innerHTML = `
@@ -103,6 +104,7 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
 async def test_element_names_come_from_chrome_accessibility_tree(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         await evaluate(
             tab,
             """document.body.innerHTML = `
@@ -291,6 +293,7 @@ async def test_challenge_overlay_reads_its_text_but_not_the_page_beneath(site):
 async def test_partially_covered_element_uses_exposed_hit_point(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         markup = """<button style='position:absolute;left:20px;top:20px;width:200px;height:80px'>
             Partial</button><div style='position:absolute;left:80px;top:20px;width:140px;
             height:80px;
@@ -324,6 +327,7 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
         LaunchBrowser(url=site, viewport=Viewport(scale=2))
     ) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(_CANVASES)}")
         await evaluate(
             tab, "document.querySelector('#board').addEventListener('click', () => {})"

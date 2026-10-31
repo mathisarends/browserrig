@@ -7,9 +7,11 @@ import pytest
 from cdpify.domains.input import MouseButton
 from cdpify.domains.page import (
     FrameStartedLoadingEvent,
+    FrameStartedNavigatingEvent,
     FrameStoppedLoadingEvent,
     JavascriptDialogClosedEvent,
     JavascriptDialogOpeningEvent,
+    LifecycleEventEvent,
 )
 
 from browserrig.browser import favicon
@@ -100,6 +102,42 @@ async def test_error_status_skips_the_body_and_still_closes_the_stream():
     assert await load_favicon(cdp, "frame", "https://example.org/favicon.ico") == ""
     cdp.io.read.assert_not_awaited()
     cdp.io.close.assert_awaited_once_with(handle="stream")
+
+
+async def test_navigation_pending_ends_at_its_dom_content_loaded_before_all_resources():
+    tab = Tab("tab", SimpleNamespace())
+    tab.document_id = "old"
+    await tab.handle(
+        FrameStartedNavigatingEvent(
+            frame_id="tab",
+            loader_id="new",
+            url="https://example.org/new",
+            navigation_type="differentDocument",
+        )
+    )
+    await tab.handle(FrameStartedLoadingEvent(frame_id="tab"))
+    assert tab.navigation_pending and tab.loading
+    # An old document or child frame cannot complete this main-frame navigation.
+    for frame, loader in [("tab", "old"), ("child", "new")]:
+        await tab.handle(
+            LifecycleEventEvent(
+                frame_id=frame,
+                loader_id=loader,
+                name="DOMContentLoaded",
+                timestamp=1,
+            )
+        )
+        assert tab.navigation_pending
+    tab.document_id = "new"
+    await tab.handle(
+        LifecycleEventEvent(
+            frame_id="tab",
+            loader_id="new",
+            name="DOMContentLoaded",
+            timestamp=2,
+        )
+    )
+    assert not tab.navigation_pending and tab.loading
 
 
 async def test_tab_publishes_loading_then_the_settled_icon_once(monkeypatch):

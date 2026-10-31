@@ -11,6 +11,7 @@ from .nudges import Nudges
 from .observation.images import ImageContext
 from .observation.plugin import Observe
 from .readiness.config import ReadinessOptions
+from .readiness.downloads import DownloadReadiness
 from .readiness.plugin import Readiness
 from .secrets import Secret, Secrets
 from .tools import (
@@ -45,6 +46,7 @@ def browser_plugins(
         Activity(),
         Chrome(options, file_system=file_system),
         readiness if isinstance(readiness, Readiness) else Readiness(options=readiness),
+        DownloadReadiness(),
         Nudges(),
     ]
     if secrets is not None:

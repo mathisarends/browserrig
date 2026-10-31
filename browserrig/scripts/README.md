@@ -15,9 +15,11 @@ The isolated world's `globalThis.__browserrig` namespace holds:
   reset and reseeded for each extraction.
 - `elements`: snapshot token and DOM node references; overwritten by the next
   snapshot. Content extraction does not replace these references.
-- `stability`: one MutationObserver per document and its last mutation time.
-  Its guard prevents duplicate observers. Document/context destruction disposes
-  of the world and observer together.
+- `stability`: persistent mutation observers and scroll listeners for the document,
+  accessible frame documents and shadow roots, plus the last activity time. Each
+  probe discovers newly attached roots and checks finite animations and visible
+  busy content. Detached roots are disconnected; document/context destruction
+  disposes of the remaining observers. Cross-origin frames are probed through CDP.
 - `findIndex`: the page text of the last find, with its session and the
   `stability` time it was read at; typing reuses it while the document is
   unchanged. Closing the find bar clears it.

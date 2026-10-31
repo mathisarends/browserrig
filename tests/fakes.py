@@ -13,7 +13,9 @@ class FakeTab:
         self.id = "tab-1"
         self.document_id = "doc-1"
         self.url = "https://example.org/"
+        self.title = "Example"
         self.dialog = None
+        self.navigation_pending = False
         self.quiet_ms = 1000
         self.probes = 0
 

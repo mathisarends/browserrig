@@ -132,15 +132,30 @@ async def test_input_rejects_a_document_changed_between_calls(kind):
         sync_document=AsyncMock(),
     )
     actions = SimpleNamespace(
+        readiness=SimpleNamespace(
+            wait=AsyncMock(
+                return_value=SimpleNamespace(status="ready", timed_out=False)
+            )
+        ),
         observe=SimpleNamespace(
             snapshot=SimpleNamespace(
                 tab_id="tab",
                 document_id="old-doc",
             )
-        )
+        ),
     )
     with pytest.raises(BrowserError, match="act on the next observation"):
         await Actions._prepare(actions, tab, kind)
+
+
+async def test_navigation_does_not_wait_for_the_current_dom_to_stop_changing():
+    tab = SimpleNamespace(
+        id="tab", url="https://example.org", document_id="doc", dialog=None
+    )
+    actions = SimpleNamespace(readiness=SimpleNamespace(wait=AsyncMock()))
+    before = await Actions._prepare(actions, tab, ActionKind.NAVIGATE)
+    assert before.url == tab.url
+    actions.readiness.wait.assert_not_awaited()
 
 
 def _actions():

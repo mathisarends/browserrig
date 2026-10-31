@@ -14,10 +14,12 @@ from cdpify.domains.input import MouseButton
 from cdpify.domains.page import (
     FrameNavigatedEvent,
     FrameStartedLoadingEvent,
+    FrameStartedNavigatingEvent,
     FrameStoppedLoadingEvent,
     FrameTree,
     JavascriptDialogClosedEvent,
     JavascriptDialogOpeningEvent,
+    LifecycleEventEvent,
     NavigatedWithinDocumentEvent,
 )
 from cdpify.domains.runtime import CallArgument, RemoteObject
@@ -208,6 +210,9 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         self.closed = False
         # Tab-strip state for live viewers; see `TabUpdatedEvent`.
         self.loading = False
+        self.navigation_pending = False
+        self._navigation_loader = ""
+        self._navigation_document = ""
         self.favicon = ""
         self._main_frame_id = target_id
         self._icon_url = ""
@@ -416,20 +421,42 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
                 self.changed.set()
                 await self.emit(NavigationCommittedEvent(url=self.url))
                 await self.publish_state()
-            case NavigatedWithinDocumentEvent(url=url):
+            case NavigatedWithinDocumentEvent(url=url, frame_id=frame_id) if (
+                frame_id == self._main_frame_id
+            ):
+                self.navigation_pending = False
                 self.url = url
                 self.changed.set()
                 await self.emit(NavigationCommittedEvent(url=self.url))
                 await self.publish_state()
+            case FrameStartedNavigatingEvent(frame_id=frame_id, loader_id=loader) if (
+                frame_id == self._main_frame_id
+            ):
+                self.navigation_pending = True
+                self._navigation_loader = loader
+                self._navigation_document = self.document_id
             case FrameStartedLoadingEvent(frame_id=frame_id) if (
                 frame_id == self._main_frame_id
             ):
                 self.loading = True
+                if not self.navigation_pending:
+                    self._navigation_loader = ""
+                    self._navigation_document = self.document_id
+                self.navigation_pending = True
                 await self.publish_state()
+            case LifecycleEventEvent(
+                frame_id=frame_id, loader_id=loader, name="DOMContentLoaded"
+            ) if frame_id == self._main_frame_id:
+                if loader == self._navigation_loader or (
+                    loader == self.document_id
+                    and self.document_id != self._navigation_document
+                ):
+                    self.navigation_pending = False
             case FrameStoppedLoadingEvent(frame_id=frame_id) if (
                 frame_id == self._main_frame_id
             ):
                 self.loading = False
+                self.navigation_pending = False
                 await self.publish_state()
                 self.refresh_strip()
             case JavascriptDialogOpeningEvent(type=kind, message=message):

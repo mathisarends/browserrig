@@ -2,7 +2,7 @@
 
 Harnessed `Agent` is the composition root. Browserrig plugins own session state,
 tools and hooks; ordinary Python strategies implement capture, rendering,
-readiness and action-chain decisions. Browserrig targets Harnessed 0.7.0.
+readiness and action-chain decisions. Browserrig targets Harnessed 0.8.0.
 
 ## A browser agent with screenshots
 
@@ -141,6 +141,8 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 | `Renderer` | `instructions(screenshots)`, `refs()` and `render(snapshot)`. Pure presentation, no browser input or waits. |
 | `ReadinessPolicy` | `create(context) -> ReadinessStrategy`, returning a fresh probe. Context supplies tab, stage, phase and options. |
 | `ReadinessStrategy` | `budget`, `delay`, `reason`; `async check() -> bool`; `timeout_status()`. The shared runner owns deadlines, dialogs, cancellation and events. |
+| `SelectReadiness` | Native Harnessed `Bail[ReadinessPolicy]`: the first non-`None` policy overrides the configured initial/ongoing policy for this document. |
+| `CheckReadiness` | Native Harnessed `Waterfall[ReadinessCheck]`: call `await next_()` and compose application conditions around the selected policy. The shared deadline includes the middleware. |
 | `ActionChainPolicy` (`browserrig.tools`) | `async check(observe, tab) -> str`: empty allows continuing; otherwise explain why a fresh observation is required. Failed comparison ends the chain without turning successful input into failed input. |
 
 ## Initial readiness and ongoing readiness
@@ -162,8 +164,89 @@ The independent event fields are:
 
 Concurrent waits share work only for the same document, stage and phase. A waiter
 cancelling does not cancel other waiters; plugin teardown/abort does cancel owned
-tasks. If the document changes while probing, the plugin selects readiness again
-for the new document. A policy factory must create a new mutable probe each time.
+tasks. If the document changes while probing, the runner selects initial readiness
+again for the new document within the original deadline. The standalone
+`wait_for_page` API also restarts its probe on document changes. A policy factory
+must create a new mutable probe each time.
+
+For navigation dispatch, `Readiness.wait(..., dispatch=async_callback)` executes
+the callback once inside the deadline. Dispatches are never deduplicated with
+other commands or read-only waiters; cancelling their caller cancels their owned
+wait. An exhausted report must be observed before a new dispatch is accepted.
+A timeout cannot undo a navigation already sent to Chrome, so inspect the next
+observation before retrying.
+
+The default `ReadinessOptions` use a 7.5-second budget, a 300 ms quiet period,
+750 ms minimum observation for initialization/navigation and 500 ms after input.
+Polling normally runs every 100 ms. Quiet time before input does not count toward
+the post-action quiet period. Adjust `action_min_ms` for applications with longer
+delayed responses; no finite grace period can predict arbitrarily late timers.
+
+The DOM policy checks main-frame navigation through `DOMContentLoaded`, DOM
+mutations, scrolling, finite visible animations, visible `aria-busy` content and
+accessible shadow/frame documents. Cross-origin frames use CDP sessions. Infinite
+animations do not hold readiness indefinitely. Root/frame discovery is bounded;
+incomplete inspection degrades rather than claiming readiness. DOM readiness does
+not wait for every image, font or background network request.
+
+`browser_plugins()` also mounts `DownloadReadiness()`. This separate plugin uses
+`CheckReadiness`, so active downloads share the page's budget. Include it explicitly
+in manual compositions when desired.
+
+Default timeouts produce a `DEGRADED` report with `timed_out=True` and a reason.
+Navigation tools include command dispatch in that deadline, so a slow response
+before navigation commits cannot add a separate unbounded wait.
+Successive action/comparison waits share the remaining budget until observation;
+redirects never restart the clock. After a post-action timeout, the remaining
+input chain stops and the following observation consumes the existing report
+without another full wait.
+It attempts a live capture for at most one additional second, falling back to a
+loading observation with no stale refs or image if the renderer cannot answer.
+The next model iteration can inspect the partial page and choose to wait. A later
+readiness attempt gets a fresh budget. Set `allow_degraded_dom=False`, or return
+`FAILED` from a custom strategy, for strict callers that require an exception.
+
+A usable but continuously changing page can still accept deliberate input using
+its delivered controls. A pending main-frame navigation or JavaScript dialog
+blocks input; degradation alone does not permanently lock the agent out.
+
+### Native readiness hooks
+
+Application-specific conditions belong in plugins. For example, this plugin
+selects a supplied policy for its application's URLs and adds an authoritative
+busy signal around the default probe:
+
+```python
+from harnessed import Plugin, hook
+from harnessed.hooks import Next
+from browserrig import CheckReadiness, ReadinessCheck, SelectReadiness
+
+class ApplicationReadiness(Plugin):
+    def __init__(self, application, policy):
+        super().__init__()
+        self.application = application
+        self.policy = policy
+
+    @hook(SelectReadiness)
+    def select(self, event: SelectReadiness):
+        if self.application.matches(event.context.tab.url):
+            return self.policy
+        return None
+
+    @hook(CheckReadiness)
+    async def check(self, event: CheckReadiness, next_: Next[ReadinessCheck]):
+        result = await next_()
+        if result.ready and await self.application.is_busy(event.context.tab.id):
+            return ReadinessCheck(False, "Application content is still loading")
+        return result
+```
+
+`ReadinessContext.remaining` exposes the shared deadline to extensions. Hook
+registration and removal follow the plugin mount. `Bail` and `Waterfall` requests
+are in-process extension points; existing durable `ReadinessStartedEvent`,
+`ReadyEvent`, `ReadinessDegradedEvent`, failure and cancellation events remain the
+audit/stream receipts. Terminal receipts include `timed_out`; polling does not
+flood the durable log with probe events.
 
 ## Native stream events
 

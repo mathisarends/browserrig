@@ -187,6 +187,7 @@ def _browser():
     cdp = SimpleNamespace(
         page=SimpleNamespace(
             enable=AsyncMock(),
+            set_lifecycle_events_enabled=AsyncMock(),
             get_frame_tree=AsyncMock(
                 return_value=SimpleNamespace(
                     frame_tree=SimpleNamespace(

@@ -1,12 +1,15 @@
 import asyncio
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, replace
 from time import monotonic
 from uuid import uuid4
 
 from cdpify.exceptions import CDPCommandError
+from harnessed.hooks import Next
 
 from browserrig.browser.base import BrowserEvents
 from browserrig.browser.tab import Tab
-from browserrig.core.errors import ReadinessError
+from browserrig.core.errors import BrowserError, ReadinessError
 from browserrig.core.kinds import ReadinessPhase, ReadinessStage, ReadinessStatus
 from browserrig.events import (
     BrowserEvent,
@@ -18,10 +21,15 @@ from browserrig.events import (
 )
 
 from .config import ReadinessOptions
-from .dom import DomReadiness
+from .hooks import ReadinessCheck
 from .models import ReadinessReport
-from .policies import ReadinessContext, ReadinessPolicy
+from .policies import DomReady, ReadinessContext, ReadinessPolicy
 from .strategy import ReadinessStrategy
+
+type PolicySelector = Callable[[ReadinessContext], Awaitable[ReadinessPolicy]]
+type ReadinessMiddleware = Callable[
+    [ReadinessContext, Next[ReadinessCheck]], Awaitable[ReadinessCheck]
+]
 
 
 async def wait_for_page(
@@ -32,10 +40,12 @@ async def wait_for_page(
     phase: ReadinessPhase = ReadinessPhase.INITIAL,
     policy: ReadinessPolicy | None = None,
     stage: ReadinessStage | None = None,
+    select: PolicySelector | None = None,
+    check: ReadinessMiddleware | None = None,
+    dispatch: Callable[[], Awaitable[None]] | None = None,
 ) -> ReadinessReport:
     emit = events.emit if events is not None else _discard
     options = options or ReadinessOptions()
-    await tab.sync_document()
     started_document = tab.document_id
     started = monotonic()
     rid = uuid4().hex
@@ -53,16 +63,24 @@ async def wait_for_page(
             stage=stage,
         )
     )
-    status = ReadinessStatus.READY
+    runner = _Runner(tab, options, phase, stage, policy, select, check)
+    timed_out = False
     try:
-        strategy = (
-            policy.create(ReadinessContext(tab, phase, stage, options))
-            if policy
-            else DomReadiness(tab, options, phase)
-        )
-        status = await _poll(
-            tab, strategy, started_document, reselect=policy is not None
-        )
+        timeout = asyncio.timeout(options.timeout)
+        try:
+            async with timeout:
+                # Deliver an already-exhausted budget before sending another command.
+                if options.timeout <= 0:
+                    await asyncio.sleep(0)
+                if dispatch is not None:
+                    await dispatch()
+                status = await runner.run(timeout, started_document)
+        except TimeoutError:
+            if not timeout.expired():
+                raise
+            timed_out = True
+            status = runner.timeout_status()
+            runner.reason = "Readiness budget exhausted: " + runner.reason
     except asyncio.CancelledError:
         await emit(
             ReadinessCancelledEvent(
@@ -88,6 +106,8 @@ async def wait_for_page(
                 reason=type(error).__name__,
             )
         )
+        if isinstance(error, BrowserError):
+            raise
         raise ReadinessError(
             f"Readiness probe failed ({type(error).__name__})"
         ) from error
@@ -96,10 +116,11 @@ async def wait_for_page(
         target_id=tab.id,
         document_id=tab.document_id,
         phase=phase,
-        stage=stage,
+        stage=runner.stage,
         status=status,
         duration=monotonic() - started,
-        reason=strategy.reason if status != ReadinessStatus.READY else "",
+        reason=runner.reason if status != ReadinessStatus.READY else "",
+        timed_out=timed_out,
     )
     match status:
         case ReadinessStatus.READY:
@@ -117,34 +138,84 @@ async def wait_for_page(
             stage=stage,
             duration=report.duration,
             reason=report.reason,
+            timed_out=report.timed_out,
         )
     )
     if status == ReadinessStatus.FAILED:
-        raise ReadinessError(f"DOM readiness timed out: {strategy.reason}")
+        raise ReadinessError(f"Page readiness timed out: {report.reason}")
     return report
 
 
-async def _poll(
-    tab: Tab, strategy: ReadinessStrategy, document_id: str, *, reselect: bool
-) -> ReadinessStatus:
-    try:
-        async with asyncio.timeout(strategy.budget):
-            while True:
-                if tab.dialog:
-                    strategy.reason = "A JavaScript dialog must be handled first"
-                    return ReadinessStatus.BLOCKED
-                ready = await _check(strategy)
-                await tab.sync_document()
-                if reselect and tab.document_id != document_id:
-                    strategy.reason = (
-                        "document changed during readiness; select policy again"
-                    )
-                    return ReadinessStatus.DEGRADED
-                if ready:
-                    return ReadinessStatus.READY
-                await asyncio.sleep(strategy.delay)
-    except TimeoutError:
-        return strategy.timeout_status()
+@dataclass
+class _Runner:
+    tab: Tab
+    options: ReadinessOptions
+    phase: ReadinessPhase
+    stage: ReadinessStage
+    policy: ReadinessPolicy | None
+    select: PolicySelector | None
+    middleware: ReadinessMiddleware | None
+    strategy: ReadinessStrategy | None = None
+    reason: str = "The document could not be inspected yet"
+
+    async def run(self, timeout: asyncio.Timeout, document: str) -> ReadinessStatus:
+        context: ReadinessContext | None = None
+        while True:
+            if self.tab.dialog:
+                self.reason = "A JavaScript dialog must be handled first"
+                return ReadinessStatus.BLOCKED
+            await self.tab.sync_document()
+            if self.strategy is None or document != self.tab.document_id:
+                if document != self.tab.document_id:
+                    self.stage = ReadinessStage.INITIAL
+                document = self.tab.document_id
+                deadline = timeout.when()
+                assert deadline is not None
+                context = ReadinessContext(
+                    self.tab, self.phase, self.stage, self.options, deadline
+                )
+                policy = self.policy if self.policy is not None else DomReady()
+                if self.select:
+                    policy = await self.select(context)
+                self.strategy = policy.create(context)
+                # A custom probe may shorten the budget. No redirect can extend it.
+                deadline = min(context.deadline, monotonic() + self.strategy.budget)
+                timeout.reschedule(deadline)
+                context = replace(context, deadline=deadline)
+            assert self.strategy is not None
+            assert context is not None
+            if self.tab.navigation_pending:
+                self.reason = "A navigation is still in progress"
+                await asyncio.sleep(self.strategy.delay)
+                continue
+            result = (
+                await self.middleware(context, self._probe)
+                if self.middleware
+                else await self._probe()
+            )
+            self.reason = result.reason or self.strategy.reason
+            await self.tab.sync_document()
+            if self.tab.document_id != document:
+                continue
+            if self.tab.navigation_pending:
+                self.reason = "A navigation is still in progress"
+            elif result.ready:
+                return ReadinessStatus.READY
+            await asyncio.sleep(self.strategy.delay)
+
+    def timeout_status(self) -> ReadinessStatus:
+        if self.strategy is not None:
+            return self.strategy.timeout_status()
+        return (
+            ReadinessStatus.DEGRADED
+            if self.options.allow_degraded_dom
+            else ReadinessStatus.FAILED
+        )
+
+    async def _probe(self) -> ReadinessCheck:
+        assert self.strategy is not None
+        ready = await _check(self.strategy)
+        return ReadinessCheck(ready=ready, reason=self.strategy.reason)
 
 
 async def _discard(_event: BrowserEvent) -> None:

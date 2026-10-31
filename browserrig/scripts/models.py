@@ -75,6 +75,10 @@ class DOMProbe(Options):
     quiet_ms: float
     width: float
     height: float
+    unobserved_frames: int = 0
+    animations: int = 0
+    busy: bool = False
+    limited: bool = False
 
 
 class ContentExtraction(Options):

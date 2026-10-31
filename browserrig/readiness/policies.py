@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from time import monotonic
 from typing import Protocol
 
 from browserrig.browser.tab import Tab
@@ -15,6 +16,12 @@ class ReadinessContext:
     phase: ReadinessPhase
     stage: ReadinessStage
     options: ReadinessOptions
+    deadline: float = float("inf")
+
+    @property
+    def remaining(self) -> float:
+        """Time left in the shared wait, including redirects and extension hooks."""
+        return max(0, self.deadline - monotonic())
 
 
 class ReadinessPolicy(Protocol):

@@ -154,8 +154,13 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
         async def navigate_new(_tab: Tab) -> Effect:
             # An empty tab first, so viewers see the address typed into a fresh tab.
             opened = await self._browser.open_tab()
-            await navigate(opened)
-            await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
+
+            async def dispatch() -> None:
+                await navigate(opened)
+
+            await self._readiness.wait(
+                opened, phase=ReadinessPhase.NAVIGATION, dispatch=dispatch
+            )
             return Effect(f"Opened tab {opened.id} and navigated.")
 
         if new_tab:

@@ -156,11 +156,16 @@ class Actions(
                     )
                 )
                 dispatched = True
-                with self.browser.input.action(action_id):
-                    effect = await operation(tab)
-                note = (
-                    await self._settle(tab, kind) if settle and not tab.closed else ""
-                )
+                if settle and kind in _NAVIGATION_KINDS:
+                    effect, note = await self._navigate(tab, action_id, operation)
+                else:
+                    with self.browser.input.action(action_id):
+                        effect = await operation(tab)
+                    note = (
+                        await self._settle(tab, kind)
+                        if settle and not tab.closed
+                        else ""
+                    )
                 await self._events.emit(
                     ActionFinishedEvent(
                         action_id=action_id,
@@ -251,10 +256,16 @@ class Actions(
 
     async def _prepare(self, tab: Tab, kind: ActionKind) -> PageState:
         """Return the pre-action baseline once the page accepts input."""
-        if kind in _TAB_KINDS:
-            # Tab management must work even when the current page has a blocking dialog.
+        if kind in _NAVIGATION_KINDS and tab.dialog:
+            raise BrowserError("A JavaScript dialog must be handled first")
+        if kind in _TAB_KINDS | _NAVIGATION_KINDS:
+            # Page management must work even when the current DOM never settles.
             return PageState(url=tab.url, document_id=tab.document_id)
-        await tab.sync_document()
+        report = await self.readiness.wait(tab, phase=ReadinessPhase.ACTION)
+        if report.status == ReadinessStatus.BLOCKED or (
+            report.timed_out and tab.navigation_pending
+        ):
+            raise BrowserError(report.reason + "; inspect the next observation")
         before = self.observe.snapshot
         if (
             before is not None
@@ -266,9 +277,6 @@ class Actions(
             )
         if before is None or before.tab_id != tab.id:
             before = await self.observe.capture(tab)
-        report = await self.readiness.wait(tab, phase=ReadinessPhase.ACTION)
-        if report.status == ReadinessStatus.BLOCKED:
-            raise BrowserError(report.reason)
         return PageState(
             url=before.url,
             document_id=before.document_id,
@@ -292,6 +300,33 @@ class Actions(
         if report.status != ReadinessStatus.READY:
             return f" Action executed; readiness is {report.status}: {report.reason}."
         return ""
+
+    async def _navigate(
+        self,
+        tab: Tab,
+        action_id: str,
+        operation: Callable[[Tab], Awaitable[Effect]],
+    ) -> tuple[Effect, str]:
+        effects: list[Effect] = []
+
+        async def dispatch() -> None:
+            with self.browser.input.action(action_id):
+                effects.append(await operation(tab))
+
+        report = await self.readiness.wait(
+            tab, phase=ReadinessPhase.NAVIGATION, dispatch=dispatch
+        )
+        effect = (
+            effects[0]
+            if effects
+            else Effect("Navigation requested; completion is not confirmed.")
+        )
+        note = (
+            ""
+            if report.status == ReadinessStatus.READY
+            else f" Readiness is {report.status}: {report.reason}."
+        )
+        return effect, note
 
     async def _fail(
         self, tab: Tab, action_id: str, kind: ActionKind, dispatched: bool, reason: str

@@ -592,6 +592,7 @@ class ReadinessEndedEvent(BrowserEvent):
     stage: ReadinessStage = field(default=ReadinessStage.ONGOING, kw_only=True)
     duration: float
     reason: str = ""
+    timed_out: bool = False
 
 
 @dataclass(frozen=True, slots=True)
