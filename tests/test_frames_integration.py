@@ -12,7 +12,7 @@ from browserrig import (
     Actions,
     Browser,
     ChromeBrowser,
-    DomMode,
+    DomCapture,
     LaunchBrowser,
     browser_plugins,
     wait_for_page,
@@ -32,7 +32,7 @@ async def test_frame_extraction_and_old_reference_is_rejected(site):
     async with ChromeBrowser(LaunchBrowser(url=site + "/frames")) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
-        snapshot = await capture(tab, DomMode(), report)
+        snapshot = await capture(tab, DomCapture(), report)
         inside = next(element for element in snapshot.elements if element.name == "Inside")
         assert inside.frame_id != (await tab.main_frame()).id
         frame = next(frame for frame in await tab.frames() if frame.id == inside.frame_id)
@@ -142,7 +142,7 @@ async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_d
     async with ChromeBrowser(LaunchBrowser(url=site + "/frame-host")) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
-        before = await capture(tab, DomMode(screenshots=False), report)
+        before = await capture(tab, DomCapture(), report)
         assert all(e.tag != "iframe" for e in before.elements)
         entry = next(e for e in before.elements if e.name == "Frame button")
         frame = next(frame for frame in await tab.frames() if frame.id == entry.frame_id)
@@ -155,7 +155,7 @@ async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_d
         )
         with pytest.raises(BrowserError, match="ELEMENT_BLOCKED"):
             await frame.check_point(x, y)
-        covered = await capture(tab, DomMode(screenshots=False), report)
+        covered = await capture(tab, DomCapture(), report)
         assert covered.elements and all(element.covered for element in covered.elements)
         await evaluate(
             tab,
@@ -166,7 +166,7 @@ async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_d
             tab, "document.querySelector('iframe').style.cssText='display:block;top:2000px'"
         )
         assert len(await tab.frames()) == 2
-        offscreen = await capture(tab, DomMode(), report)
+        offscreen = await capture(tab, DomCapture(), report)
         assert not offscreen.elements and offscreen.offscreen
 
 
@@ -179,7 +179,7 @@ async def test_unrendered_sibling_does_not_discard_usable_frame(site):
             '\'<iframe style="display:none" src="/frame-leaf"></iframe>\')',
         )
         report = await wait_for_page(tab)
-        state = await capture(tab, DomMode(screenshots=False), report)
+        state = await capture(tab, DomCapture(), report)
         assert sum(e.name == "Frame button" for e in state.elements) == 1
         assert not state.limitations
 
@@ -204,7 +204,7 @@ async def test_detaching_sibling_retains_root_and_other_frame(site, monkeypatch)
             return await original(domain, frame_id=frame_id)
 
         monkeypatch.setattr(type(tab.cdp.dom), "get_frame_owner", detach_during_inspection)
-        state = await capture(tab, DomMode(screenshots=False), report)
+        state = await capture(tab, DomCapture(), report)
         assert {"Root button", "Frame button"} <= {e.name for e in state.elements}
         assert any(removed_id in limitation for limitation in state.limitations)
 
@@ -219,4 +219,4 @@ async def test_main_snapshot_failure_asks_to_observe_again(site, monkeypatch):
 
         monkeypatch.setattr(type(tab.cdp.dom_snapshot), "capture_snapshot", unavailable)
         with pytest.raises(BrowserError, match="Page snapshot failed"):
-            await capture(tab, DomMode(screenshots=False), report)
+            await capture(tab, DomCapture(), report)

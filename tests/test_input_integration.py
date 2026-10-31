@@ -14,7 +14,6 @@ from browserrig import (
     Actions,
     Browser,
     BrowserAgent,
-    DomMode,
     LaunchBrowser,
     TerminalEvents,
 )
@@ -37,7 +36,6 @@ async def test_typing_shortcuts_stream_and_storage(site, coordinates):
     agent = BrowserAgent(
         model=_typing_model(holder, coordinates),
         browser=LaunchBrowser(url=site),
-        mode=DomMode(),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[TerminalEvents(output), Access()],
     )
@@ -156,7 +154,6 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
     agent = BrowserAgent(
         model=ScriptedModel(requests),
         browser=LaunchBrowser(url=site),
-        mode=DomMode(),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[Panels()],
     )

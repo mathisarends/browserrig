@@ -22,12 +22,11 @@ from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import BrowserAgent, LaunchBrowser, DomMode, TerminalEvents
+from browserrig import BrowserAgent, LaunchBrowser, TerminalEvents
 
 agent = BrowserAgent(
     model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
     browser=LaunchBrowser(url="https://en.wikipedia.org/wiki/Voyager_program"),
-    mode=DomMode(),
     approvals=Approvals(default=PolicyDecision.ALLOW),
     plugins=[TerminalEvents()],
 )
@@ -61,7 +60,7 @@ screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` and
 `ImageContext(TrimInBatches(max_images=6, min_images=3))` or
 `ImageContext(UntilCompaction())`. Capture, rendering, image retention and
 tool capabilities can be selected independently. `ScreenshotTrigger.ON_REQUEST`
-captures only after a screenshot tool call. Existing mode options remain recipe adapters.
+captures only after a screenshot tool call. Configure extraction through `DomCapture(...)`.
 Shared plugin services use class-level `Inject[T]` and `provides=True`; explicit
 `needs=(...)` declarations control waiting, teardown, and restart when a provider changes.
 Injection binds values without inferring dependencies. Optional services resolve
@@ -72,7 +71,7 @@ Tool decorators declare model-facing descriptions independently of developer doc
 
 Browserrig uses Harnessed's native scheduler for action chains. Deterministic
 form filling can combine `type_text`, `select_option`, `set_date`, and a final
-`click` in one model response. `send_keys` can also continue in DOM mode. File
+`click` in one model response. `send_keys` can also continue the chain. File
 reads/writes, listings and content extraction can be chained. Browser tools run
 sequentially against explicitly addressed tabs.
 
@@ -161,7 +160,7 @@ attributes in `SystemPrompt(sections=..., exclude=...)` to reorder or replace
 individual sections. `PluginSections()` places the remaining declarations.
 For manual compositions, configure `Observe` independently of `Readiness` and add
 `ImageContext()` to deliver captured images. Configure DOM observation settings
-through `Observe(DomMode(...))`; readiness is configured separately.
+through `Observe(capture=DomCapture(...))`; readiness is configured separately.
 Use `await session.prompt.render()` to inspect the exact session system text.
 
 Plugins mounted through `session.use()` require an explicit choice when they declare

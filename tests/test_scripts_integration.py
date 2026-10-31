@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from browserrig import ChromeBrowser, DomMode, LaunchBrowser, wait_for_page
+from browserrig import ChromeBrowser, DomCapture, LaunchBrowser, wait_for_page
 from browserrig.core.geometry import Point
 from browserrig.kinds import CursorStyle
 from browserrig.observation import capture
@@ -24,7 +24,7 @@ async def test_visible_descendant_of_hidden_parent_is_extracted_and_inert_conten
         )
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        snapshot = await capture(tab, DomMode(), report)
+        snapshot = await capture(tab, DomCapture(), report)
         assert [element.name for element in snapshot.elements] == ["Visible child"]
         content = await extract_content(tab)
         assert "Visible child" in content.markdown and "Contents text" in content.markdown

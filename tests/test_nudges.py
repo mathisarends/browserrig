@@ -68,7 +68,6 @@ async def test_scroll_nudge_requires_exact_same_url_document_and_unrequested_scr
                 url=after_url,
                 fingerprint="after",
                 scroll_y=640,
-                mode="dom",
                 readiness="ready",
             )
         )
@@ -105,7 +104,6 @@ async def test_pending_actions_are_separate_per_tab_and_closed_tabs_are_forgotte
                     url="https://example.org/",
                     fingerprint="changed",
                     scroll_y=500,
-                    mode="dom",
                     readiness="ready",
                 )
             )
@@ -282,7 +280,6 @@ def _snapshot():
         document_id="doc-1",
         url="https://example.org/",
         title="Example",
-        mode="dom",
         readiness="ready",
         width=1280,
         height=800,

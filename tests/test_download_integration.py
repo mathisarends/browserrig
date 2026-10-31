@@ -13,10 +13,12 @@ from browserrig import (
     Browser,
     BrowserAgent,
     ChromeBrowser,
-    DomMode,
     FileSystemOptions,
     LaunchBrowser,
+    Observe,
     ReadinessOptions,
+    Screenshots,
+    ScreenshotTrigger,
     wait_for_page,
 )
 from browserrig.browser import DownloadState
@@ -315,7 +317,7 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
     result = await BrowserAgent(
         model=CallbackModel(respond),
         browser=LaunchBrowser(url=site + "/canvas"),
-        mode=DomMode(screenshots=True),
+        observe=Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
         readiness=ReadinessOptions(timeout=3),
         file_system=FileSystemOptions(directory=tmp_path),
         approvals=Approvals(default=PolicyDecision.ALLOW),

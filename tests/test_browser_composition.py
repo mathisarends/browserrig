@@ -35,7 +35,7 @@ from browserrig import (
 )
 from browserrig.core.errors import ReadinessError, StaleElement
 from browserrig.core.geometry import Geometry, Point
-from browserrig.core.kinds import ObservationKind, ReadinessPhase, ReadinessStage, ReadinessStatus
+from browserrig.core.kinds import ReadinessPhase, ReadinessStage, ReadinessStatus
 from browserrig.events import ObservationCapturedEvent, ReadinessStartedEvent
 from browserrig.files.models import Download
 from browserrig.nudges import Nudges
@@ -51,7 +51,6 @@ from tests.observations import has_image, image_id
 
 
 class CountingCapture:
-    kind = ObservationKind.DOM
     provides_dom_refs = False
 
     def __init__(self, frames=None):
@@ -768,7 +767,6 @@ def test_page_comparison_ignores_new_element_marks():
         document_id="doc-1",
         url="https://example.org/",
         title="Example",
-        mode="dom",
         readiness="ready",
         width=1280,
         height=800,

@@ -13,7 +13,6 @@ from browserrig.core.kinds import (
     CursorStyle,
     FileSource,
     FileTransferDirection,
-    ObservationKind,
     ReadinessPhase,
     ReadinessStage,
     ReadinessStatus,
@@ -531,7 +530,6 @@ class ActionFailedEvent(BrowserEvent):
 @dataclass(frozen=True, slots=True)
 class ReadinessStartedEvent(BrowserEvent):
     readiness_id: str
-    mode: ObservationKind
     phase: ReadinessPhase
     stage: ReadinessStage = field(default=ReadinessStage.ONGOING, kw_only=True)
     type: Literal[EventKind.READINESS_STARTED] = field(
@@ -542,7 +540,6 @@ class ReadinessStartedEvent(BrowserEvent):
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ReadinessEndedEvent(BrowserEvent):
     readiness_id: str
-    mode: ObservationKind
     phase: ReadinessPhase
     stage: ReadinessStage = field(default=ReadinessStage.ONGOING, kw_only=True)
     duration: float
@@ -583,7 +580,6 @@ class ObservationCapturedEvent(BrowserEvent):
     url: str
     fingerprint: str
     scroll_y: float
-    mode: ObservationKind
     readiness: ReadinessStatus
     type: Literal[EventKind.OBSERVATION_CAPTURED] = field(
         default=EventKind.OBSERVATION_CAPTURED, kw_only=True

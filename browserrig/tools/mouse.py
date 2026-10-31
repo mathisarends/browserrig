@@ -132,7 +132,7 @@ class DomPointerTools(Plugin, needs=(Actions, Browser, Observe)):
     _browser: Inject[Browser]
     _observe: Inject[Observe]
 
-    # DOM mode deliberately also supports pointing at unreferenced screenshot regions.
+    # Coordinate input also supports pointing at unreferenced screenshot regions.
     @tool(
         kind=ActionKind.CLICK,
         chainable=True,

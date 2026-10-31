@@ -15,8 +15,11 @@ from browserrig import (
     Browser,
     BrowserAgent,
     ChromeBrowser,
-    DomMode,
+    DomCapture,
     LaunchBrowser,
+    Observe,
+    Screenshots,
+    ScreenshotTrigger,
     Viewport,
     wait_for_page,
 )
@@ -63,7 +66,7 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
         """,
         )
         report = await wait_for_page(tab)
-        state = await capture(tab, DomMode(max_text_chars=12000), report)
+        state = await capture(tab, DomCapture(max_text_chars=12000), report)
         names = [element.name for element in state.elements]
         for expected in ("Wrapped", "Check", "Listener only", "Switch", "Editor", "Closed shadow"):
             assert names.count(expected) == 1
@@ -104,7 +107,7 @@ async def test_element_names_come_from_chrome_accessibility_tree(site):
         """,
         )
         report = await wait_for_page(tab)
-        state = await capture(tab, DomMode(), report)
+        state = await capture(tab, DomCapture(), report)
     names = {element.name for element in state.elements}
     assert {"Close", "Search the web", "7,99 € per piece", "Home", "Small", "Prime"} <= names
     assert "Duplicate" not in names
@@ -119,10 +122,7 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
         before = await evaluate(tab, "document.documentElement.outerHTML")
         await browser.mouse.move_to(Point(x=700, y=200))
         state = await capture(
-            tab,
-            DomMode(screenshots=True, marks=marks),
-            report,
-            cursor=browser.mouse.position,
+            tab, DomCapture(marks=marks), report, cursor=browser.mouse.position, screenshots=True
         )
         assert await evaluate(tab, "document.documentElement.outerHTML") == before
         assert state.image is not None
@@ -134,7 +134,9 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
         rendered = render(state)
         assert all(f"[{element.ref}]" in rendered for element in state.elements)
         assert "never-echo-this" not in rendered
-        fresh = await capture(tab, DomMode(screenshots=True, marks=marks), report, previous=state)
+        fresh = await capture(
+            tab, DomCapture(marks=marks), report, previous=state, screenshots=True
+        )
         assert fresh.fingerprint == state.fingerprint
         assert [element.ref for element in fresh.elements] == refs
         assert not any(element.new for element in fresh.elements)
@@ -175,7 +177,7 @@ async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site)
     agent = BrowserAgent(
         model=CallbackModel(respond),
         browser=LaunchBrowser(url=site + "/canvas", viewport=Viewport(scale=2)),
-        mode=DomMode(screenshots=True),
+        observe=Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
         approvals=Approvals(default=PolicyDecision.ALLOW),
     )
     result = await agent.run("Move, click, and inspect the cursor after each action", max_steps=3)
@@ -189,15 +191,15 @@ async def test_limits_are_reported_and_checkbox_state_changes_fingerprint(site):
         await evaluate(
             tab, "document.body.innerHTML = '<label>Toggle<input type=checkbox></label>'"
         )
-        before = await capture(tab, DomMode(screenshots=False), report)
+        before = await capture(tab, DomCapture(), report)
         await evaluate(tab, "document.querySelector('input').checked = true")
-        after = await capture(tab, DomMode(screenshots=False), report)
+        after = await capture(tab, DomCapture(), report)
         assert before.fingerprint != after.fingerprint
         await evaluate(
             tab, "document.body.innerHTML = '<button>First</button><button>Second</button>'"
         )
         limited = await capture(
-            tab, DomMode(max_elements=1, max_text_chars=2, sparse_text_chars=0), report
+            tab, DomCapture(max_elements=1, max_text_chars=2, sparse_text_chars=0), report
         )
         assert len(limited.elements) == 1 and len(limited.text) <= 2
         assert any("truncated" in limitation for limitation in limited.limitations)
@@ -213,14 +215,14 @@ async def test_visible_text_is_shown_only_when_the_viewport_holds_few_controls(s
             <p>Your request was blocked.</p><a href='/help'>Help</a>
             <p style='position:absolute;top:3000px'>Below the fold</p>`""",
         )
-        sparse = await capture(tab, DomMode(), report)
+        sparse = await capture(tab, DomCapture(), report)
         assert "Your request was blocked." in sparse.text and "Below the fold" not in sparse.text
         assert "page text:" in render(sparse)
         await evaluate(
             tab,
             "document.body.insertAdjacentHTML('beforeend', '<button>Go</button>'.repeat(5))",
         )
-        busy = await capture(tab, DomMode(), report, previous=sparse)
+        busy = await capture(tab, DomCapture(), report, previous=sparse)
         assert busy.text == "" and busy.fingerprint != sparse.fingerprint
 
 
@@ -234,7 +236,7 @@ async def test_challenge_overlay_reads_its_text_but_not_the_page_beneath(site):
             <p>Select every square with a duck</p>{tiles}
             <button>\ue900</button><button>Submit</button></div>"""
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
-        state = await capture(tab, DomMode(), report)
+        state = await capture(tab, DomCapture(), report)
         assert "Select every square with a duck" in state.text
         assert "Hidden results" not in state.text
         glyph = next(e for e in state.elements if e.in_viewport and e.tag == "button")
@@ -250,7 +252,7 @@ async def test_partially_covered_element_uses_exposed_hit_point(site):
             background:white'></div>"""
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        state = await capture(tab, DomMode(screenshots=False), report)
+        state = await capture(tab, DomCapture(), report)
         element = next(e for e in state.elements if e.name == "Partial")
         point = await (await tab.main_frame()).run_on_node(
             element.backend_id,
@@ -281,11 +283,12 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
         await browser.mouse.move_to(Point(x=150, y=180))
         state = await capture(
             tab,
-            DomMode(screenshots=True),
+            DomCapture(),
             report,
             region=Region(x=100, y=150, width=400, height=200),
             zoom=2,
             cursor=browser.mouse.position,
+            screenshots=True,
         )
         assert [canvas.bounds for canvas in state.canvases] == [
             Bounds(x=100, y=150, width=400, height=200)
@@ -302,7 +305,11 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
         assert "image: viewport region x=100 y=150 400x200 at 2x zoom" in rendered
 
         outside = await capture(
-            tab, DomMode(screenshots=True), report, region=Region(x=5000, y=0, width=10, height=10)
+            tab,
+            DomCapture(),
+            report,
+            region=Region(x=5000, y=0, width=10, height=10),
+            screenshots=True,
         )
         assert outside.geometry is None
         assert any("outside the viewport" in note for note in outside.limitations)
@@ -343,7 +350,6 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
     agent = BrowserAgent(
         model=CallbackModel(respond),
         browser=LaunchBrowser(url=site),
-        mode=DomMode(),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[Access()],
     )

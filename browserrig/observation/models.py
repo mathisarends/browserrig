@@ -10,7 +10,7 @@ from pydantic import Field
 from browserrig.browser.models import TabInfo
 from browserrig.core.errors import StaleElement
 from browserrig.core.geometry import Bounds, Geometry, Point
-from browserrig.core.kinds import ObservationKind, ReadinessStatus
+from browserrig.core.kinds import ReadinessStatus
 from browserrig.core.options import Options
 
 type Tristate = bool | Literal["mixed"] | None
@@ -100,7 +100,6 @@ class Snapshot(Options):
     document_id: str
     url: str
     title: str
-    mode: ObservationKind
     readiness: ReadinessStatus
     width: float
     height: float

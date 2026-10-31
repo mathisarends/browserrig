@@ -1,5 +1,3 @@
-from browserrig.core.modes import DomMode
-
 from .capture import CaptureContent, CaptureStrategy, DomCapture, capture
 from .config import Screenshots, ScreenshotTrigger
 from .handle import ElementHandle
@@ -24,7 +22,6 @@ __all__ = [
     "Renderer",
     "capture",
     "Observe",
-    "DomMode",
     "Element",
     "ElementHandle",
     "Snapshot",

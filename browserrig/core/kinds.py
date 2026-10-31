@@ -158,10 +158,6 @@ class FileSource(StrEnum):
     DOWNLOAD = "download"
 
 
-class ObservationKind(StrEnum):
-    DOM = "dom"
-
-
 class ReadinessStatus(StrEnum):
     READY = "ready"
     DEGRADED = "degraded"

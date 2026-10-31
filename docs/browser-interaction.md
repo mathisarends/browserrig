@@ -39,7 +39,7 @@ must already expose a CDP endpoint and stays running after disconnecting.
 
 ## Element references and screenshot marks
 
-DOM mode reads every frame document with one `DOMSnapshot.captureSnapshot` call per
+`DomCapture` reads every frame document with one `DOMSnapshot.captureSnapshot` call per
 CDP session and derives roles, names, states, visibility and landmark sections from
 that data in Python, without walking the DOM in the page. Normal observations omit
 page-text excerpts and do not capture new screenshots. Use `extract_content()`
@@ -47,8 +47,9 @@ to read the page. The agent can call `screenshot()` to request the current view 
 image in its next iteration. `ImageContext` keeps the latest screenshot by default,
 including during subsequent text-only steps until compaction removes its snapshot.
 `observe()` refreshes page state. Use
-`DomMode(screenshots=True)` to enable images on every step.
-`DomMode(max_text_chars=N)` enables a page-text excerpt; its
+`Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` to enable images
+on every step. Pass it as `observe=` to `BrowserAgent` or `browser_plugins()`.
+`Observe(capture=DomCapture(max_text_chars=N))` enables a page-text excerpt; its
 default is `0`. When the viewport holds fewer than five named controls, as on error, challenge
 and confirmation pages, observations add up to `sparse_text_chars` (default `1500`)
 characters of visible text anyway. Every observation states where the mouse rests.
@@ -79,7 +80,7 @@ Only the elements and headings inside the viewport are listed and described; the
 header's scroll position says how much of the page lies above and below, and the
 agent scrolls to see more. A leading
 `*` marks elements that were not in the previous observation of the same document. There is no default element-count limit;
-`DomMode(max_elements=N)` keeps the elements nearest to the viewport and reports
+`DomCapture(max_elements=N)` keeps the elements nearest to the viewport and reports
 the truncation. Hidden, inert and fully clipped controls are omitted. Controls behind
 a positioned overlay are reported as covered and are not listed individually.
 
@@ -92,7 +93,7 @@ Requested DOM screenshots draw a labeled, colored dashed border around every ele
 in the viewport; each label is the element's ref. Links use blue borders, buttons
 green, text inputs purple, and selection controls pink or orange. Screenshots use
 viewport CSS pixels even on HiDPI displays. Annotations are drawn on the image
-without changing the page. Use `DomMode(marks=False)` for plain screenshots.
+without changing the page. Use `Observe(capture=DomCapture(marks=False))` for plain screenshots.
 
 Extraction follows the composed DOM, including slots, open and closed shadow roots,
 and CDP click-listener metadata. It checks viewport visibility, clipping and

@@ -8,12 +8,13 @@ from harnessed.testing import CallbackModel, ScriptedModel, call
 from browserrig import (
     Browser,
     Chrome,
-    DomMode,
     ImageContext,
     LaunchBrowser,
     Observe,
     Readiness,
     ReadinessOptions,
+    Screenshots,
+    ScreenshotTrigger,
     browser_plugins,
 )
 from browserrig.events import (
@@ -157,7 +158,7 @@ async def test_dom_screenshots_are_native_images(site):
             Chrome(),
             Start(),
             Readiness(),
-            Observe(DomMode(screenshots=True)),
+            Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
             ImageContext(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
@@ -166,7 +167,7 @@ async def test_dom_screenshots_are_native_images(site):
     assert result.text == "Canvas ready"
     assert any(has_image(msg) for msg in model.requests[0].messages)
     observations = [e for e in result.events if isinstance(e, ObservationCapturedEvent)]
-    assert observations[0].mode == "dom"
+    assert observations
 
 
 async def test_no_progress_hint_is_derived_from_events(site):
@@ -192,9 +193,7 @@ async def test_no_progress_hint_is_derived_from_events(site):
     agent = Agent(
         model=CallbackModel(respond),
         plugins=[
-            *browser_plugins(
-                mode=DomMode(), readiness=ReadinessOptions(quiet_ms=50, navigation_min_ms=100)
-            ),
+            *browser_plugins(readiness=ReadinessOptions(quiet_ms=50, navigation_min_ms=100)),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

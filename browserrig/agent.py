@@ -8,8 +8,6 @@ from harnessed.kernel import PluginLike
 from harnessed.models import Model
 from harnessed.plugins import Approvals, Compaction, ContextState
 
-from browserrig.core.modes import DomMode
-
 from .browser.config import BrowserOptions
 from .composition import browser_plugins
 from .files import FileSystemOptions
@@ -55,7 +53,6 @@ class BrowserAgent(Agent):
         *,
         model: Model | str | None = None,
         browser: BrowserOptions | None = None,
-        mode: DomMode | None = None,
         readiness: ReadinessOptions | Readiness | None = None,
         file_system: FileSystemOptions | None = None,
         observe: Observe | None = None,
@@ -74,7 +71,6 @@ class BrowserAgent(Agent):
         composed: list[PluginLike] = list(
             browser_plugins(
                 browser,
-                mode=mode,
                 readiness=readiness,
                 file_system=file_system,
                 observe=observe,

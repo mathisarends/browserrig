@@ -130,7 +130,7 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 
 | Contract | Implementation |
 | --- | --- |
-| `CaptureStrategy` | Declare `kind` (a presentation category) and `provides_dom_refs`; implement `collect(tab, report, *, screenshots, region=None, zoom=1) -> CaptureContent`. Honor `screenshots=False`. The runner handles dialogs, document coherence, fingerprints and snapshots. |
+| `CaptureStrategy` | Declare `provides_dom_refs`; implement `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent`. Honor `screenshots=False`. The runner handles dialogs, document coherence, fingerprints and snapshots. |
 | `Renderer` | `instructions(screenshots)`, `refs()` and `render(snapshot)`. Pure presentation, no browser input or waits. |
 | `ReadinessPolicy` | `create(context) -> ReadinessStrategy`, returning a fresh probe. Context supplies tab, stage, phase and options. |
 | `ReadinessStrategy` | `budget`, `delay`, `reason`; `async check() -> bool`; `timeout_status()`. The shared runner owns deadlines, dialogs, cancellation and events. |
@@ -193,11 +193,11 @@ custom-event support does not imply every persisted SDK event appears in a turn 
 
 ## Existing applications
 
-`BrowserAgent` and `browser_plugins()` remain convenience recipes. `mode=DomMode(...)`
-configures DOM observations and their screenshot defaults. New composition uses
-`observe=Observe(...)`, `readiness=Readiness(...)`,
+`BrowserAgent` and `browser_plugins()` remain convenience recipes. Configure
+observations with `observe=Observe(capture=DomCapture(...), screenshots=Screenshots(...))`.
+Composition also accepts `readiness=Readiness(...)`,
 `image_context=ImageContext(...)`, `actions=Actions(...)` and `local_files=False`
-when local file tools should be omitted. Choose `mode` or `observe`, not both.
+when local file tools should be omitted.
 
 The default recipe mounts `DomTools`; custom captures without refs omit DOM and
 upload tools. Transient availability (for example a missing workspace) still uses

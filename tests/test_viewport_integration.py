@@ -8,7 +8,14 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
-from browserrig import Actions, BrowserAgent, ChromeBrowser, DomMode, LaunchBrowser, wait_for_page
+from browserrig import (
+    Actions,
+    BrowserAgent,
+    ChromeBrowser,
+    DomCapture,
+    LaunchBrowser,
+    wait_for_page,
+)
 from browserrig.core.errors import StaleElement
 from browserrig.events import ActionFinishedEvent
 from browserrig.observation.capture import capture
@@ -33,7 +40,7 @@ async def test_only_viewport_controls_are_described_and_the_rest_are_known(site)
         """,
         )
         report = await wait_for_page(tab)
-        state = await capture(tab, DomMode(), report)
+        state = await capture(tab, DomCapture(), report)
         assert 0 < len(state.elements) < 300
         assert all(element.in_viewport for element in state.elements)
         assert len(state.elements) + len(state.offscreen) == 300
@@ -44,9 +51,9 @@ async def test_only_viewport_controls_are_described_and_the_rest_are_known(site)
         with pytest.raises(StaleElement, match="outside the viewport"):
             state.element(state.offscreen[-1].ref)
         assert await evaluate(tab, "scrollY") == 0
-        visual = await capture(tab, DomMode(screenshots=True), report)
+        visual = await capture(tab, DomCapture(), report, screenshots=True)
         assert visual.image is not None
-        limited = await capture(tab, DomMode(max_elements=10), report)
+        limited = await capture(tab, DomCapture(max_elements=10), report)
         assert len(limited.elements) == 10
         assert any("truncated" in item for item in limited.limitations)
 

@@ -37,7 +37,7 @@ from browserrig.events import (
     ReadinessStartedEvent,
     ReadyEvent,
 )
-from browserrig.kinds import ObservationKind, ReadinessPhase
+from browserrig.kinds import ReadinessPhase
 
 
 async def test_readiness_ids_cannot_close_model_pause_or_tool_intervals(activity_session):
@@ -328,7 +328,6 @@ def _request(request_id="request"):
 def _readiness_started(readiness_id):
     return ReadinessStartedEvent(
         readiness_id=readiness_id,
-        mode=ObservationKind.DOM,
         phase=ReadinessPhase.ACTION,
     )
 
@@ -336,7 +335,6 @@ def _readiness_started(readiness_id):
 def _readiness_ended(kind, readiness_id, reason=""):
     return kind(
         readiness_id=readiness_id,
-        mode=ObservationKind.DOM,
         phase=ReadinessPhase.ACTION,
         duration=0.1,
         reason=reason,

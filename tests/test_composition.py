@@ -10,11 +10,13 @@ from harnessed.testing import ScriptedModel
 from browserrig import (
     BrowserAgent,
     Chrome,
-    DomMode,
     FileSystemOptions,
     LaunchBrowser,
+    Observe,
     Readiness,
     ReadinessOptions,
+    Screenshots,
+    ScreenshotTrigger,
     WindowRatio,
 )
 from browserrig.tools import DomTools, FileTools, JavaScriptTools, PointerTools, UploadTools
@@ -32,7 +34,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     agent = BrowserAgent(
         model=ScriptedModel(["ok"]),
         browser=options,
-        mode=DomMode(screenshots=True),
+        observe=Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
         readiness=readiness,
         file_system=file_system,
         compaction=None,

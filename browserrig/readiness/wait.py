@@ -7,7 +7,7 @@ from cdpify.exceptions import CDPCommandError
 from browserrig.browser.base import BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import ReadinessError
-from browserrig.core.kinds import ObservationKind, ReadinessPhase, ReadinessStage, ReadinessStatus
+from browserrig.core.kinds import ReadinessPhase, ReadinessStage, ReadinessStatus
 from browserrig.events import (
     BrowserEvent,
     ReadinessCancelledEvent,
@@ -47,7 +47,6 @@ async def wait_for_page(
             readiness_id=rid,
             target_id=tab.id,
             document_id=started_document,
-            mode=ObservationKind.DOM,
             phase=phase,
             stage=stage,
         )
@@ -66,7 +65,6 @@ async def wait_for_page(
                 readiness_id=rid,
                 target_id=tab.id,
                 document_id=started_document,
-                mode=ObservationKind.DOM,
                 phase=phase,
                 stage=stage,
                 duration=monotonic() - started,
@@ -80,7 +78,6 @@ async def wait_for_page(
                 readiness_id=rid,
                 target_id=tab.id,
                 document_id=started_document,
-                mode=ObservationKind.DOM,
                 phase=phase,
                 stage=stage,
                 duration=monotonic() - started,
@@ -92,7 +89,6 @@ async def wait_for_page(
         id=rid,
         target_id=tab.id,
         document_id=tab.document_id,
-        mode=ObservationKind.DOM,
         phase=phase,
         stage=stage,
         status=status,
@@ -111,7 +107,6 @@ async def wait_for_page(
             readiness_id=rid,
             target_id=tab.id,
             document_id=started_document,
-            mode=ObservationKind.DOM,
             phase=phase,
             stage=stage,
             duration=report.duration,

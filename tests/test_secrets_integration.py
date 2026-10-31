@@ -9,8 +9,10 @@ from harnessed.testing import CallbackModel
 
 from browserrig import (
     Browser,
-    DomMode,
     LaunchBrowser,
+    Observe,
+    Screenshots,
+    ScreenshotTrigger,
     Secret,
     Secrets,
     browser_plugins,
@@ -68,7 +70,13 @@ def _agent(site, model, domains, holder, *, path="/", screenshots=False, live=No
     plugins = [
         *browser_plugins(
             LaunchBrowser(url=site + path, arguments=("--site-per-process",)),
-            mode=DomMode(screenshots=screenshots),
+            observe=Observe(
+                screenshots=Screenshots(
+                    trigger=ScreenshotTrigger.EACH_STEP
+                    if screenshots
+                    else ScreenshotTrigger.ON_REQUEST
+                )
+            ),
             secrets=secrets,
         ),
         _Hold(holder),

@@ -2,8 +2,6 @@ from collections.abc import Mapping
 
 from harnessed import Plugin
 
-from browserrig.core.modes import DomMode
-
 from .activity import Activity
 from .browser import Chrome
 from .browser.config import BrowserOptions
@@ -32,7 +30,6 @@ from .tools.execution import Actions
 def browser_plugins(
     options: BrowserOptions | None = None,
     *,
-    mode: DomMode | None = None,
     readiness: ReadinessOptions | Readiness | None = None,
     file_system: FileSystemOptions | None = None,
     observe: Observe | None = None,
@@ -41,10 +38,7 @@ def browser_plugins(
     local_files: bool = True,
     secrets: Secrets | Mapping[str, Secret] | None = None,
 ) -> list[Plugin]:
-    if mode is not None and observe is not None:
-        raise ValueError("Choose mode or observe, not both")
-    selected = mode or DomMode()
-    observation = observe or Observe(selected)
+    observation = observe or Observe()
     plugins: list[Plugin] = [
         Activity(),
         Chrome(options, file_system=file_system),

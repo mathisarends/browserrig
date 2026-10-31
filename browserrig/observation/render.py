@@ -42,7 +42,7 @@ def render(snapshot: Snapshot) -> str:
 
 def image_caption(snapshot: Snapshot) -> str:
     """Text placed before an observation image, naming the area it shows."""
-    caption = f"Current {snapshot.mode} observation {snapshot.id}"
+    caption = f"Current observation {snapshot.id}"
     if snapshot.geometry:
         caption += f"; {_region(snapshot)}"
     return caption

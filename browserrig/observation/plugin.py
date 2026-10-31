@@ -23,7 +23,6 @@ from browserrig.browser.tab import Tab
 from browserrig.core.errors import StaleElement
 from browserrig.core.geometry import Region
 from browserrig.core.kinds import ActionKind, ReadinessPhase, ReadinessStatus
-from browserrig.core.modes import DomMode
 from browserrig.core.tools import browser_tool as tool
 from browserrig.events import (
     ObservationCapturedEvent,
@@ -75,22 +74,13 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
 
     def __init__(
         self,
-        mode: DomMode | None = None,
         *,
         capture: CaptureStrategy | None = None,
         renderer: Renderer | None = None,
         screenshots: Screenshots | None = None,
     ) -> None:
         super().__init__()
-        if mode is not None and capture is not None:
-            raise ValueError("Choose mode or capture, not both")
-        self.mode = mode or DomMode()
-        self.capture_strategy = capture or DomCapture(
-            max_elements=self.mode.max_elements,
-            max_text_chars=self.mode.max_text_chars,
-            sparse_text_chars=self.mode.sparse_text_chars,
-            marks=self.mode.marks,
-        )
+        self.capture_strategy = capture or DomCapture()
         if renderer is None:
             if isinstance(self.capture_strategy, DomCapture):
                 renderer = DomRenderer(
@@ -101,11 +91,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             else:
                 renderer = DomRenderer()
         self.renderer = renderer
-        self.screenshots = screenshots or Screenshots(
-            trigger=ScreenshotTrigger.EACH_STEP
-            if mode is not None and mode.screenshots
-            else ScreenshotTrigger.ON_REQUEST
-        )
+        self.screenshots = screenshots or Screenshots()
 
     @system_section(title="Browser observations")
     def page_state(self) -> str:
@@ -177,7 +163,6 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                     url=snapshot.url,
                     fingerprint=snapshot.fingerprint,
                     scroll_y=snapshot.scroll_y,
-                    mode=snapshot.mode,
                     readiness=snapshot.readiness,
                 )
             )
@@ -202,7 +187,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         description=(
             "Request a screenshot of the active tab for visual inspection in your next iteration. "
             "The next observation includes an image and matching page state. "
-            "In DOM mode, region limits the image to a viewport area in CSS pixels, such as a "
+            "Region limits the image to a viewport area in CSS pixels, such as a "
             "listed canvas, and zoom magnifies it to read small details; "
             "move_mouse, click_at and drag_at then take pixels of that image. "
             "This does not enable automatic screenshots for later iterations."
@@ -226,9 +211,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             raise ToolError("zoom needs a region; pass the viewport area to magnify")
         if region is not None:
             if not self.capture_strategy.provides_dom_refs:
-                raise ToolError(
-                    "Region screenshots need DOM mode; canvas observations already show the canvas"
-                )
+                raise ToolError("Region screenshots require a capture strategy with DOM references")
             snapshot = self._state.snapshot
             if (
                 snapshot is not None

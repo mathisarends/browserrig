@@ -386,7 +386,6 @@ async def test_project_lists_names_for_allowed_origins_only():
             document_id="d",
             url=url,
             title="",
-            mode="dom",
             readiness="ready",
             width=1,
             height=1,

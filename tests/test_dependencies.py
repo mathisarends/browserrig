@@ -27,11 +27,13 @@ from browserrig import (
     Browser,
     BrowserAgent,
     Chrome,
-    DomMode,
+    DomCapture,
     FileSystem,
     FileSystemOptions,
     Observe,
     Readiness,
+    Screenshots,
+    ScreenshotTrigger,
     browser_plugins,
 )
 from browserrig.browser.base import BrowserEvents
@@ -188,13 +190,16 @@ async def test_facade_warning_policy_keeps_deferred_plugin_until_service_is_adde
 
 
 @pytest.mark.parametrize(
-    "mode",
-    [DomMode(), DomMode(screenshots=True, max_text_chars=1000, marks=False)],
+    "capture,trigger",
+    [
+        (DomCapture(), ScreenshotTrigger.ON_REQUEST),
+        (DomCapture(max_text_chars=1000, marks=False), ScreenshotTrigger.EACH_STEP),
+    ],
 )
-async def test_facade_renders_configured_prompt_and_mode_specific_sections(fake_chrome, mode):
+async def test_facade_renders_configured_observation_prompt(fake_chrome, capture, trigger):
     agent = BrowserAgent(
         model=ScriptedModel(["unused"]),
-        mode=mode,
+        observe=Observe(capture=capture, screenshots=Screenshots(trigger=trigger)),
         system_prompt=SystemPrompt(format=PromptFormat.MARKDOWN, sections=("Custom role.",)),
     )
     async with agent.session() as session:
@@ -204,9 +209,11 @@ async def test_facade_renders_configured_prompt_and_mode_specific_sections(fake_
         assert "## Browser content and action results" in rendered
         assert "## Workspace and downloads" in rendered
         assert "## DOM element references" in rendered
-        assert ("labeled with its ref" in rendered) == mode.marks
-        assert ("bounded page-text excerpt" in rendered) == bool(mode.max_text_chars)
-        assert ("Every observation includes a screenshot" in rendered) == mode.screenshots
+        assert ("labeled with its ref" in rendered) == capture.marks
+        assert ("bounded page-text excerpt" in rendered) == bool(capture.max_text_chars)
+        assert ("Every observation includes a screenshot" in rendered) == (
+            trigger == ScreenshotTrigger.EACH_STEP
+        )
     assert fake_chrome[0].closed
 
 

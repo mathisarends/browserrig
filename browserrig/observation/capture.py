@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Protocol
+from typing import ClassVar, Protocol
 from uuid import uuid4
+
+from pydantic import Field
 
 from browserrig.browser.images import screenshot
 from browserrig.browser.models import TabInfo
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Bounds, Geometry, Point, Region
-from browserrig.core.kinds import ObservationKind, ReadinessStatus
-from browserrig.core.modes import DomMode
+from browserrig.core.kinds import ReadinessStatus
+from browserrig.core.options import Options
 from browserrig.readiness.models import ReadinessReport
 
 from .extraction import Extraction, extract
@@ -30,34 +32,23 @@ class Redaction(Protocol):
 
 async def capture(
     tab: Tab,
-    mode: DomMode | CaptureStrategy,
+    strategy: CaptureStrategy,
     report: ReadinessReport,
     *,
     tabs: tuple[TabInfo, ...] = (),
     previous: Snapshot | None = None,
     region: Region | None = None,
     zoom: float = 1,
-    screenshots: bool | None = None,
+    screenshots: bool = False,
     cursor: Point | None = None,
     redaction: Redaction | None = None,
 ) -> Snapshot:
     """Observe `tab`. With `previous` from the same document, unseen elements get `new`.
 
-    `region` crops a DOM-mode screenshot to a viewport area, magnified by `zoom`.
+    `region` crops a screenshot to a viewport area, magnified by `zoom`.
     `cursor` is where the browser's mouse rests in `tab`; screenshots mark it.
     `redaction` hides secrets in all text and blacks out elements showing one.
     """
-    if isinstance(mode, DomMode):
-        strategy = DomCapture(
-            max_elements=mode.max_elements,
-            max_text_chars=mode.max_text_chars,
-            sparse_text_chars=mode.sparse_text_chars,
-            marks=mode.marks,
-        )
-        screenshots = mode.screenshots if screenshots is None else screenshots
-    else:
-        strategy = mode
-        screenshots = False if screenshots is None else screenshots
     snapshot_id = uuid4().hex
     if tab.dialog:
         return Snapshot(
@@ -66,7 +57,6 @@ async def capture(
             document_id=tab.document_id,
             url=tab.url,
             title=tab.title,
-            mode=strategy.kind,
             readiness=ReadinessStatus.BLOCKED,
             width=0,
             height=0,
@@ -98,7 +88,6 @@ async def capture(
         height=page.height,
         scroll_y=page.scroll_y,
         page_height=page.page_height,
-        mode=strategy.kind,
         readiness=report.status,
         fingerprint=_fingerprint(page, document_id),
         tabs=tabs,
@@ -134,8 +123,8 @@ class CaptureStrategy(Protocol):
     `provides_dom_refs` promises that collected refs support Observe.element().
     """
 
-    kind: ObservationKind
-    provides_dom_refs: bool
+    @property
+    def provides_dom_refs(self) -> bool: ...
 
     async def collect(  # pylint: disable=unused-argument
         self,
@@ -149,36 +138,13 @@ class CaptureStrategy(Protocol):
     ) -> CaptureContent: ...
 
 
-class DomCapture:
-    kind = ObservationKind.DOM
-    provides_dom_refs = True
-
-    def __init__(
-        self,
-        *,
-        max_elements: int | None = None,
-        max_text_chars: int = 0,
-        sparse_text_chars: int = DomMode().sparse_text_chars,
-        marks: bool = True,
-    ) -> None:
-        self._mode = DomMode(
-            max_elements=max_elements,
-            max_text_chars=max_text_chars,
-            sparse_text_chars=sparse_text_chars,
-            marks=marks,
-        )
-
-    @property
-    def max_text_chars(self) -> int:
-        return self._mode.max_text_chars
-
-    @property
-    def sparse_text_chars(self) -> int:
-        return self._mode.sparse_text_chars
-
-    @property
-    def marks(self) -> bool:
-        return self._mode.marks
+class DomCapture(Options):
+    provides_dom_refs: ClassVar[bool] = True
+    max_elements: int | None = Field(default=None, ge=1, le=50000)
+    max_text_chars: int = Field(default=0, ge=0, le=100000)
+    # Show visible text on pages with fewer than five named controls.
+    sparse_text_chars: int = Field(default=1500, ge=0, le=100000)
+    marks: bool = True
 
     async def collect(  # pylint: disable=unused-argument
         self,
@@ -193,16 +159,16 @@ class DomCapture:
         frames = await tab.frames()
         page = await extract(
             frames,
-            max_elements=self._mode.max_elements,
-            max_text=self._mode.max_text_chars,
-            sparse_text=self._mode.sparse_text_chars,
+            max_elements=self.max_elements,
+            max_text=self.max_text_chars,
+            sparse_text=self.sparse_text_chars,
         )
         page.limitations = tuple(dict.fromkeys((*tab.frame_limitations, *page.limitations)))
         if not screenshots:
             return CaptureContent(page=page)
         viewport = frames[0].visible
         assert viewport is not None
-        marked = page.elements if self._mode.marks else ()
+        marked = page.elements if self.marks else ()
         geometry = None
         if region is not None:
             geometry = region.capture(viewport, zoom, _MAX_REGION_SIDE)

@@ -7,6 +7,7 @@ from browserrig.core.errors import StaleElement
 from browserrig.core.geometry import Bounds, Geometry, Point, Region
 from browserrig.events import ActivityFinishedEvent
 from browserrig.kinds import ActivityKind, ActivityOutcome
+from browserrig.observation import DomCapture, Observe
 from browserrig.observation.models import (
     Canvas,
     Element,
@@ -139,7 +140,7 @@ def test_region_image_is_described_in_render_and_caption():
         "viewport region x=100 y=150 400x200 at 2x zoom; "
         "move_mouse, click_at and drag_at take pixels of this image until the next observation"
     )
-    assert image_caption(_snapshot(image="png")) == "Current dom observation observation"
+    assert image_caption(_snapshot(image="png")) == "Current observation observation"
 
 
 def test_region_clips_to_viewport_and_caps_zoom():
@@ -224,6 +225,29 @@ def test_configuration_discriminators_are_enums_and_credentials_are_hidden():
         LaunchBrowser(arguments=("--user-data-dir=unexpected",))
 
 
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {"max_elements": 0},
+        {"max_elements": 50001},
+        {"max_text_chars": -1},
+        {"max_text_chars": 100001},
+        {"sparse_text_chars": -1},
+        {"sparse_text_chars": 100001},
+    ],
+)
+def test_capture_rejects_invalid_limits(settings):
+    with pytest.raises(ValidationError):
+        DomCapture(**settings)
+
+
+def test_default_observation_explains_sparse_text_without_enabling_screenshots():
+    observe = Observe()
+    instructions = observe.renderer.instructions(observe.screenshots)
+    assert "When the viewport holds few controls" in instructions
+    assert "Screenshots are included only when requested" in instructions
+
+
 def _snapshot(*elements: Element, **fields) -> Snapshot:
     return Snapshot(
         id="observation",
@@ -231,7 +255,6 @@ def _snapshot(*elements: Element, **fields) -> Snapshot:
         document_id="document",
         url="https://example.org/shop",
         title="Shop",
-        mode="dom",
         readiness="ready",
         width=1280,
         height=800,

@@ -232,7 +232,6 @@ def _snapshot(**values):
         "document_id": "doc",
         "url": "https://example.org/",
         "title": "Form",
-        "mode": "dom",
         "readiness": "ready",
         "width": 800,
         "height": 600,

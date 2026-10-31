@@ -4,7 +4,7 @@ import argparse
 import asyncio
 
 from browserrig import ChromeBrowser, LaunchBrowser, wait_for_page
-from browserrig.observation import DomMode, capture, render
+from browserrig.observation import DomCapture, capture, render
 
 
 async def main() -> None:
@@ -15,7 +15,7 @@ async def main() -> None:
     async with ChromeBrowser(LaunchBrowser(url=args.url, headless=not args.headed)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
-        snapshot = await capture(tab, DomMode(), report)
+        snapshot = await capture(tab, DomCapture(), report)
         print(render(snapshot))
 
 
