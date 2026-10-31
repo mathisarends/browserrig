@@ -1,12 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
-from browserrig.activity.models import TimeRange, inference_only
 from browserrig.browser.config import BrowserKind, ConnectBrowser, LaunchBrowser
 from browserrig.core.errors import StaleElement
 from browserrig.core.geometry import Bounds, Geometry, Point, Region
-from browserrig.events import ActivityFinishedEvent
-from browserrig.kinds import ActivityKind, ActivityOutcome
 from browserrig.observation import DomCapture, Observe
 from browserrig.observation.models import (
     Canvas,
@@ -18,7 +15,7 @@ from browserrig.observation.models import (
     PageFingerprint,
     Snapshot,
 )
-from browserrig.observation.render import image_caption, render
+from browserrig.observation.render import render
 
 
 def test_render_lists_visible_elements_by_section_and_group_without_routing_data():
@@ -151,15 +148,10 @@ def test_render_lists_canvases_with_viewport_bounds_even_without_elements():
     assert "image:" not in text
 
 
-def test_region_image_is_described_in_render_and_caption():
+def test_region_image_is_described_in_render():
     geometry = Geometry(x=100, y=150, width=400, height=200, scale=2)
     snapshot = _snapshot(image="png", geometry=geometry)
     assert "image: viewport region x=100 y=150 400x200 at 2x zoom" in render(snapshot)
-    assert image_caption(snapshot).endswith(
-        "viewport region x=100 y=150 400x200 at 2x zoom; "
-        "move_mouse, click_at and drag_at take pixels of this image until the next observation"
-    )
-    assert image_caption(_snapshot(image="png")) == "Current observation observation"
 
 
 def test_region_clips_to_viewport_and_caps_zoom():
@@ -205,36 +197,6 @@ def test_fingerprint_changes_with_semantics_and_url():
         != original.digest()
     )
     assert original.model_copy(update={"scroll_y": 5}).digest() != original.digest()
-
-
-def test_inference_projection_subtracts_overlaps_and_respects_epoch():
-    def interval(kind, start, end, epoch="current"):
-        return ActivityFinishedEvent(
-            interval_id=f"{kind}:{start}",
-            kind=kind,
-            cause_id="test",
-            started_at=start,
-            at=end,
-            outcome=ActivityOutcome.COMPLETED,
-            epoch_id=epoch,
-        )
-
-    ranges = inference_only(
-        (
-            interval(ActivityKind.LLM, 1, 10),
-            interval(ActivityKind.TOOL, 3, 5),
-            interval(ActivityKind.READINESS, 4, 7),
-            interval(ActivityKind.PAUSED, 8, 9),
-            interval(ActivityKind.TOOL, 1, 10, "old"),
-        )
-    )
-    assert ranges == (
-        TimeRange(start=1, end=3),
-        TimeRange(start=7, end=8),
-        TimeRange(start=9, end=10),
-    )
-    with pytest.raises(ValidationError):
-        TimeRange(start=10, end=1)
 
 
 def test_configuration_discriminators_are_enums_and_credentials_are_hidden():

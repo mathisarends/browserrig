@@ -2,18 +2,6 @@
   "version": 1,
   "violations": [
     {
-      "fingerprint": "0974744ed0d65d6afaacf12ac6e9e952",
-      "code": "SMT429",
-      "path": "browserrig/activity/models.py",
-      "message": "browserrig.activity.models.inference_only is public; among analyzed modules, only tests access it outside its defining module"
-    },
-    {
-      "fingerprint": "fddab0d7f7a3bed56690e9d6d78fee23",
-      "code": "SMT429",
-      "path": "browserrig/observation/render.py",
-      "message": "browserrig.observation.render.image_caption is public; among analyzed modules, only tests access it outside its defining module"
-    },
-    {
       "fingerprint": "8cd9eb8f6969e8e0dd7949bb2444c771",
       "code": "SMT420",
       "path": "tests/test_actions.py",

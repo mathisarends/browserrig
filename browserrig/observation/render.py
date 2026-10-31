@@ -44,14 +44,6 @@ def render(snapshot: Snapshot) -> str:
     return "\n".join(lines)
 
 
-def image_caption(snapshot: Snapshot) -> str:
-    """Text placed before an observation image, naming the area it shows."""
-    caption = f"Current observation {snapshot.id}"
-    if snapshot.geometry:
-        caption += f"; {_region(snapshot)}"
-    return caption
-
-
 def _header(snapshot: Snapshot) -> list[str]:
     lines = [f"# {snapshot.title or '(untitled)'}", f"url: {snapshot.url}"]
     if len(snapshot.tabs) > 1:
