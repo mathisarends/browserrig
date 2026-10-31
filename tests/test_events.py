@@ -14,6 +14,7 @@ def test_enum_tags_and_registry_roundtrip():
         + events.READINESS_EVENTS
         + events.NUDGE_EVENTS
         + events.SECRET_EVENTS
+        + events.HANDOFF_EVENTS
         + events.ACTIVITY_EVENTS
         + events.FILE_EVENTS
         + events.UPLOAD_EVENTS
@@ -46,6 +47,7 @@ def test_action_page_state_roundtrips_as_a_typed_nested_value():
     + events.READINESS_EVENTS
     + events.NUDGE_EVENTS
     + events.SECRET_EVENTS
+    + events.HANDOFF_EVENTS
     + events.ACTIVITY_EVENTS
     + events.INPUT_EVENTS
     + events.FILE_EVENTS

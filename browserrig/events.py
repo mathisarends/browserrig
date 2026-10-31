@@ -61,6 +61,8 @@ class EventKind(StrEnum):
     SECRET_ENTERED = "browser.secret.entered"
     ACTIVITY_STARTED = "browser.activity.started"
     ACTIVITY_FINISHED = "browser.activity.finished"
+    HANDOFF_REQUESTED = "browser.handoff.requested"
+    HANDOFF_FINISHED = "browser.handoff.finished"
     CURSOR_MOVED = "browser.cursor.moved"
     CURSOR_STATE = "browser.cursor.state"
     CURSOR_STYLE = "browser.cursor.style"
@@ -618,6 +620,34 @@ class SecretEnteredEvent(BrowserEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class HandoffRequestedEvent(BrowserEvent):
+    handoff_id: str
+    reason: str
+    expected_state: str = ""
+    source: Literal["tool", "pause"] = "tool"
+    call_id: str = ""
+    type: Literal[EventKind.HANDOFF_REQUESTED] = field(
+        default=EventKind.HANDOFF_REQUESTED, kw_only=True
+    )
+
+
+type HandoffStatus = Literal["done", "declined", "timeout", "cancelled", "failed", "resumed"]
+
+
+@dataclass(frozen=True, slots=True)
+class HandoffFinishedEvent(BrowserEvent):
+    handoff_id: str
+    status: HandoffStatus
+    note: str = ""
+    changes: tuple[str, ...] = ()
+    source: Literal["tool", "pause"] = "tool"
+    call_id: str = ""
+    type: Literal[EventKind.HANDOFF_FINISHED] = field(
+        default=EventKind.HANDOFF_FINISHED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class ActivityStartedEvent(BrowserEvent):
     interval_id: str
     kind: ActivityKind
@@ -685,6 +715,7 @@ READINESS_EVENTS = (
 )
 NUDGE_EVENTS = (NudgeQueuedEvent, NudgeIncludedEvent, NudgeExpiredEvent)
 SECRET_EVENTS = (SecretEnteredEvent,)
+HANDOFF_EVENTS = (HandoffRequestedEvent, HandoffFinishedEvent)
 ACTIVITY_EVENTS = (ActivityStartedEvent, ActivityFinishedEvent)
 INPUT_EVENTS = (
     CursorMovedEvent,

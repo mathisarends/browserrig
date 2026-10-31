@@ -24,6 +24,8 @@ from browserrig.events import (
     ACTIVITY_EVENTS,
     ActivityFinishedEvent,
     ActivityStartedEvent,
+    HandoffFinishedEvent,
+    HandoffRequestedEvent,
     ReadinessCancelledEvent,
     ReadinessDegradedEvent,
     ReadinessEndedEvent,
@@ -160,6 +162,30 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
             outcome,
             reason=reason,
         )
+
+    @hook(HandoffRequestedEvent)
+    async def _on_handoff(self, event: HandoffRequestedEvent) -> None:
+        if event.call_id:
+            await self._finish(ActivityKey(ActivityKind.TOOL, event.call_id))
+            await self._start(
+                ActivityKey(ActivityKind.HANDOFF, event.handoff_id), cause_id=event.handoff_id
+            )
+
+    @hook(HandoffFinishedEvent)
+    async def _on_handoff_finished(self, event: HandoffFinishedEvent) -> None:
+        if event.call_id:
+            outcome = {
+                "done": ActivityOutcome.COMPLETED,
+                "declined": ActivityOutcome.REJECTED,
+                "timeout": ActivityOutcome.TIMEOUT,
+                "cancelled": ActivityOutcome.CANCELLED,
+                "failed": ActivityOutcome.FAILED,
+                "resumed": ActivityOutcome.COMPLETED,
+            }[event.status]
+            await self._finish(
+                ActivityKey(ActivityKind.HANDOFF, event.handoff_id), outcome, reason=event.status
+            )
+            await self._start(ActivityKey(ActivityKind.TOOL, event.call_id), cause_id=event.call_id)
 
     @hook(ReadinessStartedEvent)
     async def _on_readiness(self, event: ReadinessStartedEvent) -> None:

@@ -7,6 +7,7 @@ from .agent import BrowserAgent, WindowRatio
 from .browser import Browser, Chrome, ChromeBrowser, ConnectBrowser, LaunchBrowser, Viewport
 from .composition import browser_plugins
 from .files import FileSystem, FileSystemOptions
+from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanResponse
 from .kinds import MouseEventKind
 from .nudges import Nudges
 from .observation import (
@@ -48,6 +49,10 @@ from .tools import (
 )
 
 __all__ = [
+    "HandoffCallback",
+    "HandoffReceipt",
+    "HumanHandoff",
+    "HumanResponse",
     "CaptureContent",
     "CaptureStrategy",
     "DomCapture",

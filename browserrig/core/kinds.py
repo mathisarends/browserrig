@@ -8,6 +8,7 @@ class ActivityKind(StrEnum):
     READINESS = "readiness"
     COMPACTION = "compaction"
     PAUSED = "paused"
+    HANDOFF = "handoff"
 
 
 class ActivityOutcome(StrEnum):

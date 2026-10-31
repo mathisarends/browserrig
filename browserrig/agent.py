@@ -11,6 +11,7 @@ from harnessed.plugins import Approvals, Compaction, ContextState
 from .browser.config import BrowserOptions
 from .composition import browser_plugins
 from .files import FileSystemOptions
+from .handoff import HumanHandoff
 from .observation import Observe
 from .observation.images import ImageContext
 from .readiness import Readiness
@@ -60,6 +61,7 @@ class BrowserAgent(Agent):
         actions: Actions | None = None,
         local_files: bool = True,
         secrets: Secrets | Mapping[str, Secret] | None = None,
+        handoff: HumanHandoff | None = None,
         compaction: Compaction | None = DEFAULT_COMPACTION,
         approvals: Approvals | None = None,
         system_prompt: str | SystemPrompt | None = (
@@ -78,6 +80,7 @@ class BrowserAgent(Agent):
                 actions=actions,
                 local_files=local_files,
                 secrets=secrets,
+                handoff=handoff,
             )
         )
         if compaction is not None:

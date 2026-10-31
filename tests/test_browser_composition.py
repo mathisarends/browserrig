@@ -22,6 +22,8 @@ from harnessed.testing import ScriptedModel, call
 
 from browserrig import (
     DomRenderer,
+    HumanHandoff,
+    HumanResponse,
     ImageContext,
     Observe,
     Readiness,
@@ -141,6 +143,25 @@ class _Step(Plugin):
     @tool(description="Do nothing.")
     async def step(self) -> str:
         return "Done nothing."
+
+
+async def test_handoff_refreshes_a_previously_delivered_screenshot_before_coordinate_input():
+    async def ask(_request):
+        return HumanResponse()
+
+    agent, model, capture, holder = _agent(
+        [call("screenshot"), call("request_human", reason="Log in"), "Done"],
+        extra=(HumanHandoff(ask=ask),),
+    )
+    async with agent.session() as session:
+        _browser_ready(holder)
+        await session.run("Inspect")
+        source = session.ctx[Observe].coordinate_source()
+    images = _images(model.requests[-1])
+    assert sum(capture.captures) == 2
+    assert len(images) == 2
+    assert source.id == image_id(images[-1])
+    assert image_id(images[-1]) != image_id(images[0])
 
 
 def _browser_ready(holder):

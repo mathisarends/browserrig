@@ -49,6 +49,13 @@ setup. Empty pages can still have that capability. `Actions()` uses
 `DomActionChains()` for captures with refs; `ObserveAfterInput()` requires a fresh
 observation after each input when selected explicitly.
 
+## Human handoff
+
+For optional human login and takeover, add `HumanHandoff(ask=...)` to the plugin
+list or pass it as `handoff=` to `BrowserAgent` / `browser_plugins()`.
+See [human handoff](human-handoff.md) for host callbacks, typed receipts and
+pause/resume context. It is absent from the default recipe.
+
 ## Screenshot settings
 
 | Setting | Meaning |

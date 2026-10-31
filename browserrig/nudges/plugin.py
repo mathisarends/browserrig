@@ -57,6 +57,7 @@ class _State:
     challenges: set[str] = field(default_factory=set)
     # Whether the last recorded hint observation listed any hints.
     shown: bool = False
+    human_control: int = 0
 
 
 class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
@@ -79,6 +80,8 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         target_id: str = "",
         document_id: str = "",
     ) -> None:
+        if self._state.human_control:
+            return
         if previous := self._state.queued.get(key):
             if previous.text == text:
                 return
@@ -98,6 +101,18 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
             removed = self._state.queued.pop(oldest)
             await self._events.emit(NudgeExpiredEvent(nudge_id=removed.nudge_id))
         await self._events.emit(event)
+
+    async def begin_human_control(self) -> None:
+        """Discard pending action checks and withhold hints while a human owns the browser."""
+        self._state.human_control += 1
+        self._state.tabs.clear()
+        queued, self._state.queued = self._state.queued, {}
+        for event in queued.values():
+            await self._events.emit(NudgeExpiredEvent(nudge_id=event.nudge_id))
+
+    def end_human_control(self) -> None:
+        self._state.human_control = max(0, self._state.human_control - 1)
+        self._state.tabs.clear()
 
     async def project(self, snapshot: Snapshot) -> Observation:
         selected, size = [], 0

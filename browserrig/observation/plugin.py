@@ -113,6 +113,15 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
     def snapshot(self) -> Snapshot | None:
         return self._state.snapshot
 
+    def invalidate(self) -> None:
+        """Require a complete, fresh observation after external browser control."""
+        state = self._state
+        state.screenshot_requested |= state.delivered_image is not None
+        state.snapshot, state.delivered_image = None, None
+        state.sent_key, state.sent_ref, state.visible = None, None, False
+        state.bases.clear()
+        state.included = frozenset()
+
     async def probe(self, tab: Tab) -> Snapshot:
         """Compare current controls without publishing or replacing the delivered observation."""
         async with self._state.lock:

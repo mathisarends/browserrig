@@ -1,19 +1,22 @@
 import asyncio
+import json
+from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Context, Inject, Plugin, PolicyDecision, tool
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Browser, BrowserAgent, LaunchBrowser
-from browserrig.events import ActivityFinishedEvent
+from browserrig import Browser, BrowserAgent, HumanHandoff, HumanResponse, LaunchBrowser
+from browserrig.events import ActivityFinishedEvent, HandoffFinishedEvent
 from tests.javascript import evaluate
 from tests.observations import latest
 
 pytestmark = pytest.mark.integration
 
 
-async def test_pause_steer_resume_observes_external_page_change(site):
+@pytest.mark.parametrize("handoff_enabled", [False, True])
+async def test_pause_steer_resume_observes_external_page_change(site, handoff_enabled):
     started, release = asyncio.Event(), asyncio.Event()
     holder = {}
 
@@ -32,6 +35,9 @@ async def test_pause_steer_resume_observes_external_page_change(site):
         model=model,
         browser=LaunchBrowser(url=site),
         approvals=Approvals(default=PolicyDecision.ALLOW),
+        handoff=HumanHandoff(ask=AsyncMock(return_value=HumanResponse()))
+        if handoff_enabled
+        else None,
         plugins=[Gate()],
     )
     async with agent.session() as session:
@@ -43,14 +49,59 @@ async def test_pause_steer_resume_observes_external_page_change(site):
             release.set()
             await pause
             assert len(model.requests) == 1
-            await session.steer("Look for the changed title")
+            if not handoff_enabled:
+                await session.steer("Look for the changed title")
             await evaluate(holder["browser"].active_tab, "document.title='Changed during pause'")
             await session.resume()
             result = await handle.result()
         assert result.text == "Resumed"
         state = latest(model.requests[-1].messages)
         assert state["page"]["title"] == "Changed during pause"
-        assert any("Look for the changed title" in msg.text for msg in model.requests[-1].messages)
+        if handoff_enabled:
+            history = json.loads(session.context.values["browser.handoffs"])
+            assert history[-1]["status"] == "resumed"
+            assert any("Changed during pause" in change for change in history[-1]["changes"])
+        else:
+            assert any(
+                "Look for the changed title" in msg.text for msg in model.requests[-1].messages
+            )
         assert any(
             isinstance(e, ActivityFinishedEvent) and e.kind == "paused" for e in result.events
         )
+
+
+async def test_handoff_observes_human_navigation_and_a_short_lived_popup(site):
+    holder = {}
+
+    class BrowserHandle(Plugin, needs=(Browser,)):
+        async def setup(self, _ctx: Context, browser: Inject[Browser]):
+            holder["browser"] = browser
+
+    async def ask(_request):
+        browser = holder["browser"]
+        tab = browser.active_tab
+        popup = await browser.open_tab(f"{site}/other")
+        await browser.close_tab(popup.id)
+        await browser.activate_tab(tab.id)
+        await tab.navigate(f"{site}/other")
+        return HumanResponse()
+
+    model = ScriptedModel(
+        [call("request_human", reason="Log in", expected_state="Other page visible"), "Continued"]
+    )
+    agent = BrowserAgent(
+        model=model,
+        browser=LaunchBrowser(url=site),
+        handoff=HumanHandoff(ask=ask),
+        plugins=[BrowserHandle()],
+    )
+    async with agent.session() as session:
+        result = await session.run("Continue after login")
+        history = json.loads(session.context.values["browser.handoffs"])
+    assert result.text == "Continued"
+    assert latest(model.requests[-1].messages)["page"]["title"] == "Other"
+    receipt = history[-1]
+    assert receipt["status"] == "done" and receipt["human_note"] == ""
+    assert any("tab.opened" in change for change in receipt["changes"])
+    assert any("tab.closed" in change for change in receipt["changes"])
+    assert any(isinstance(event, HandoffFinishedEvent) for event in result.events)

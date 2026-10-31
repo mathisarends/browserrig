@@ -6,6 +6,7 @@ from .activity import Activity
 from .browser import Chrome
 from .browser.config import BrowserOptions
 from .files import FileSystemOptions
+from .handoff import HumanHandoff
 from .nudges import Nudges
 from .observation.images import ImageContext
 from .observation.plugin import Observe
@@ -37,6 +38,7 @@ def browser_plugins(
     actions: Actions | None = None,
     local_files: bool = True,
     secrets: Secrets | Mapping[str, Secret] | None = None,
+    handoff: HumanHandoff | None = None,
 ) -> list[Plugin]:
     observation = observe or Observe()
     plugins: list[Plugin] = [
@@ -66,4 +68,6 @@ def browser_plugins(
         plugins.append(FileTools())
         if observation.capture_strategy.provides_dom_refs:
             plugins.append(UploadTools())
+    if handoff is not None:
+        plugins.append(handoff)
     return plugins
