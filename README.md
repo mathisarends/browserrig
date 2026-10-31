@@ -449,6 +449,22 @@ Lazy content must already be
 loaded; images contribute their alt text, and canvas pixels are not converted to
 text. Use `screenshot()` when visual inspection is needed.
 
+## Finding text on the page
+
+`find_in_page(query, alternatives=(), match=1, max_results=10)` works like the
+browser's find bar. It searches the rendered text of every frame, ignores case,
+accents and whitespace differences, and keeps each match within one text block.
+Up to four `alternatives` (synonyms, other spellings or languages) are searched in
+the same call; their matches share one numbering in page order, and where two
+overlap the earlier, then longer, one counts. The reply gives the number of matches
+per wording and lists up to `max_results` matches from `match` onward with their
+surrounding text and nearest heading.
+
+Match number `match` is scrolled into view; a closed `<details>` or a
+`hidden="until-found"` section around it is opened first. Nothing is drawn on the
+page: viewers get the matches' viewport rectangles in `FindResultsEvent` and draw
+the find highlights themselves. Hidden text and form field values are not searched.
+
 ## Double-clicks and dragging
 
 DOM interactions prepare the target's viewport automatically with native, eased
@@ -569,6 +585,9 @@ registers these frozen event types alongside its durable browser events:
 | `PointerPressedEvent`, `PointerReleasedEvent` | Position, mouse button and native click count |
 | `KeyPressedEvent` | Key, modifiers, duration |
 | `KeyboardVisibilityEvent` | Keyboard presentation opened or closed |
+| `BarTypedEvent` | Browser bar (`address` or `find`), key, bar text after the key, duration |
+| `FindBarEvent` | Find bar opened or closed |
+| `FindResultsEvent` | Find bar text, match count, current match (0 for none), viewport rects of visible matches |
 | `ScrolledEvent` | Wheel origin, dispatched deltas, duration |
 | `HighlightElementEvent` | DOM reference and viewport bounds |
 | `WaitingEvent` | Requested wait duration |
@@ -604,7 +623,17 @@ only when rendered through `<img>`. A loading tab keeps its previous icon.
 `navigate(url, new_tab=True)` opens the URL in a new tab; `open_tab` without a URL
 starts on DuckDuckGo. The durable `NavigationStartedEvent` carries `typed`, the text
 a person would enter in the address bar: the URL without `https://` (and without a
-bare trailing `/`), or the query for `search`.
+bare trailing `/`), or the query for `search`. Before it, `BarTypedEvent`s show
+the text being typed into the address bar key by key, ending with `Enter`; nothing
+is typed into the page.
+
+`find_in_page` plays a person's Ctrl+F: a `KeyPressedEvent` for `f` with
+`Control`, `FindBarEvent(visible=True)`, one `BarTypedEvent` per key with a
+`FindResultsEvent` after each, then the final results with the current match in
+view, and finally `Escape` and `FindBarEvent(visible=False)`. `FindResultsEvent.marks`
+holds the visible matches numbered from 1 in page order, and `active` names the
+current one, so viewers can draw the familiar yellow and orange highlights over the
+screencast.
 
 Navigation, tab changes, downloads, and model/tool/readiness/pause intervals keep
 their existing typed events. Consumers can use those together with input events

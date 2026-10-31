@@ -4,6 +4,7 @@ from .dialogs import DialogTools
 from .dom import DomTools
 from .execution import ActionChainPolicy, Actions, DomActionChains, ObserveAfterInput
 from .files import FileTools, UploadTools
+from .find import FindTools
 from .forms import FormTools
 from .javascript import JavaScriptTools
 from .keyboard import KeyboardTools
@@ -22,6 +23,7 @@ __all__ = [
     "Actions",
     "DialogTools",
     "FileTools",
+    "FindTools",
     "FormTools",
     "JavaScriptTools",
     "KeyboardTools",

@@ -18,6 +18,9 @@ The isolated world's `globalThis.__browserrig` namespace holds:
 - `stability`: one MutationObserver per document and its last mutation time.
   Its guard prevents duplicate observers. Document/context destruction disposes
   of the world and observer together.
+- `findIndex`: the page text of the last find, with its session and the
+  `stability` time it was read at; typing reuses it while the document is
+  unchanged. Closing the find bar clears it.
 - `secretFields`: fields that received a secret; their text is masked with
   `-webkit-text-security`.
 - `secretTarget`: the field focused when secret typing started; typing aborts

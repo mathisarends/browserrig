@@ -18,6 +18,7 @@ from .tools import (
     DialogTools,
     DomTools,
     FileTools,
+    FindTools,
     JavaScriptTools,
     KeyboardTools,
     NavigationTools,
@@ -63,6 +64,7 @@ def browser_plugins(
         PointerTools(),
         TabTools(),
         DialogTools(),
+        FindTools(),
     ]
     if observation.capture_strategy.provides_dom_refs:
         plugins.append(DomTools())

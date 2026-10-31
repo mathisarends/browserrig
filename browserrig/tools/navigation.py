@@ -8,7 +8,7 @@ from pydantic import Field
 from browserrig.browser.base import Browser, BrowserEvents
 from browserrig.browser.tab import Tab, validated_url
 from browserrig.core.errors import BrowserError
-from browserrig.core.kinds import ActionKind, ReadinessPhase
+from browserrig.core.kinds import ActionKind, BrowserBar, ReadinessPhase
 from browserrig.core.tools import browser_tool as tool
 from browserrig.events import NavigationStartedEvent, WaitingEvent
 from browserrig.readiness.plugin import Readiness
@@ -128,6 +128,8 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
         validated_url(url)
 
         async def navigate(tab: Tab) -> Effect:
+            # Viewers see the address typed into the bar before the page starts loading.
+            await self._browser.input.type_in_bar(tab, BrowserBar.ADDRESS, typed, submit=True)
             await self._events.emit(NavigationStartedEvent(target_id=tab.id, url=url, typed=typed))
             await tab.navigate(url)
             return Effect("Navigation executed.")

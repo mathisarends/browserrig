@@ -64,6 +64,7 @@ class ActionKind(StrEnum):
     OPEN_DOWNLOADED_FILE = "open_downloaded_file"
     SCREENSHOT = "screenshot"
     EXTRACT_CONTENT = "extract_content"
+    FIND_IN_PAGE = "find_in_page"
     # Kept readable in existing persisted action receipts.
     TAB = "tab"
 
@@ -135,6 +136,13 @@ class CursorStyle(StrEnum):
 class FileTransferDirection(StrEnum):
     OPEN = "open"
     UPLOAD = "upload"
+
+
+class BrowserBar(StrEnum):
+    """Text fields of the browser itself, outside the page."""
+
+    ADDRESS = "address"
+    FIND = "find"
 
 
 class TabGesture(StrEnum):

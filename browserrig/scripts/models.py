@@ -32,6 +32,23 @@ class ContentArgs(ScriptArgs):
     origin: str = ""
 
 
+class FindArgs(ScriptArgs):
+    # Alternative wordings searched together; their matches share one page-order numbering.
+    queries: tuple[str, ...] = ()
+    # One find-bar session; typing reruns the search and reuses the page text within it.
+    session: str = ""
+    # The match, counted in this frame, shown as current; -1 for none.
+    active: int = -1
+    # The window of matches described with context.
+    start: int = 0
+    count: int = 0
+    # Open collapsed sections around the current match and scroll it into view.
+    reveal: bool = False
+    clip: Bounds | None = None
+    # Remove the find markers.
+    close: bool = False
+
+
 class OwnerHitsArgs(ScriptArgs):
     points: tuple[tuple[float, float], ...]
 
@@ -71,6 +88,30 @@ class ContentExtraction(Options):
     # Whether site header, navigation and footer were left out of a page without a main one.
     chrome: bool = False
     limited: bool = False
+
+
+class FoundText(Options):
+    before: str
+    text: str
+    after: str
+    heading: str = ""
+    # Inside a closed section; it opens when this match becomes current.
+    collapsed: bool = False
+
+
+class FoundMark(Options):
+    index: int
+    # Frame-local viewport rectangles as (x, y, width, height).
+    rects: tuple[tuple[float, float, float, float], ...]
+
+
+class FindResult(Options):
+    total: int
+    # Matches per query, in the order of `queries`.
+    counts: tuple[int, ...] = ()
+    items: tuple[FoundText, ...] = ()
+    marks: tuple[FoundMark, ...] = ()
+    scrolled: bool = False
 
 
 class PageFacts(Options):

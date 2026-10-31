@@ -11,7 +11,7 @@ from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEve
 
 from .target import Focus, InputTarget, focused
 
-_TYPING_INTERVAL_SECONDS = 0.05
+TYPING_INTERVAL_SECONDS = 0.05
 # Key events of sensitive text show this instead of the character and its modifiers.
 _HIDDEN_KEY = "•"
 
@@ -72,16 +72,7 @@ class Keyboard:
         hold_alt: bool = False,
         hold_meta: bool = False,
     ) -> None:
-        modifiers = tuple(
-            name
-            for enabled, name in (
-                (hold_control, "Control"),
-                (hold_shift, "Shift"),
-                (hold_alt, "Alt"),
-                (hold_meta, "Meta"),
-            )
-            if enabled
-        )
+        modifiers = _held(control=hold_control, shift=hold_shift, alt=hold_alt, meta=hold_meta)
         stroke = _key_stroke(key, modifiers)
         target = focused(self._focus)
         try:
@@ -89,6 +80,22 @@ class Keyboard:
             await self._stroke(target, stroke)
         finally:
             await self._emit(target, KeyboardVisibilityEvent(visible=False))
+
+    async def show_key(
+        self,
+        target: InputTarget,
+        key: str,
+        *,
+        hold_control: bool = False,
+        hold_shift: bool = False,
+        hold_alt: bool = False,
+        hold_meta: bool = False,
+    ) -> None:
+        """Show a key handled by the browser itself, such as Ctrl+F; nothing reaches the page."""
+        stroke = _key_stroke(
+            key, _held(control=hold_control, shift=hold_shift, alt=hold_alt, meta=hold_meta)
+        )
+        await self._emit(target, KeyPressedEvent(key=stroke.key, modifiers=stroke.modifiers))
 
     async def type_text(
         self,
@@ -112,10 +119,10 @@ class Keyboard:
                 await self._stroke(
                     target,
                     _character(value),
-                    duration=_TYPING_INTERVAL_SECONDS,
+                    duration=TYPING_INTERVAL_SECONDS,
                     sensitive=sensitive,
                 )
-                await asyncio.sleep(_TYPING_INTERVAL_SECONDS)
+                await asyncio.sleep(TYPING_INTERVAL_SECONDS)
         finally:
             await self._emit(target, KeyboardVisibilityEvent(visible=False))
 
@@ -194,6 +201,12 @@ class _Stroke:
             virtual = ord(base.upper())
             code = f"Key{base.upper()}" if base.isalpha() else f"Digit{base}"
         return {"key": self.key, "code": code, "windows_virtual_key_code": virtual}
+
+
+def _held(*, control: bool, shift: bool, alt: bool, meta: bool) -> tuple[str, ...]:
+    """The modifier names held for a key, in the order they are pressed."""
+    pressed = (("Control", control), ("Shift", shift), ("Alt", alt), ("Meta", meta))
+    return tuple(name for name, held in pressed if held)
 
 
 def _key_stroke(value: str, modifiers: tuple[str, ...]) -> _Stroke:

@@ -18,6 +18,8 @@ from .models import (
     CursorArgs,
     DOMProbe,
     ElementArgs,
+    FindArgs,
+    FindResult,
     OwnerHitsArgs,
     OwnerScrollArgs,
     PageFacts,
@@ -85,6 +87,7 @@ SCROLL_OWNER: Script[OwnerScrollArgs, ScrollPlan | None] = Script.load(
 CONTENT: Script[ContentArgs, ContentExtraction] = Script.load(
     "content", ContentArgs, ContentExtraction, uses=("composed", "visibility", "markdown")
 )
+FIND: Script[FindArgs, FindResult] = Script.load("find", FindArgs, FindResult, uses=("composed",))
 STABILITY: Script[ScriptArgs, DOMProbe] = Script.load("stability", ScriptArgs, DOMProbe)
 SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))
 RESET: Script[ScriptArgs, None] = Script.load("reset", ScriptArgs, type(None))

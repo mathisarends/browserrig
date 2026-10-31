@@ -1,17 +1,27 @@
 import asyncio
+from collections.abc import Awaitable, Callable
 from contextlib import contextmanager
 from dataclasses import replace
+from time import monotonic
 
 from browserrig.core.geometry import Bounds, Point
-from browserrig.core.kinds import FileTransferDirection
-from browserrig.events import FileTransferEvent, HighlightElementEvent, InputEvent
+from browserrig.core.kinds import BrowserBar, FileTransferDirection
+from browserrig.events import (
+    BarTypedEvent,
+    FileTransferEvent,
+    HighlightElementEvent,
+    InputEvent,
+    KeyboardVisibilityEvent,
+)
 
-from .keyboard import Keyboard
+from .keyboard import TYPING_INTERVAL_SECONDS, Keyboard
 from .mouse import Mouse
 from .target import Focus, InputTarget, focused
 
 # Long enough for a viewer to follow a file into its destination, short enough to stay brisk.
 _TRANSFER_SECONDS = 0.45
+# Bar text is typed at page typing speed, but a long URL speeds up to stay within this.
+_BAR_TYPING_SECONDS = 0.8
 
 
 class Input:
@@ -65,6 +75,42 @@ class Input:
             ),
         )
         await asyncio.sleep(_TRANSFER_SECONDS)
+
+    async def type_in_bar(
+        self,
+        target: InputTarget,
+        browser_bar: BrowserBar,
+        text: str,
+        *,
+        submit: bool = False,
+        after_key: Callable[[str], Awaitable[None]] | None = None,
+    ) -> None:
+        """Show `text` typed key by key into the browser's own `browser_bar` of `target`'s tab.
+
+        Nothing reaches the page. `after_key` runs with the text typed so far, within the
+        key's interval, as a browser updates find results while typing.
+        """
+        interval = min(TYPING_INTERVAL_SECONDS, _BAR_TYPING_SECONDS / max(1, len(text)))
+        keys = [(key, text[: index + 1]) for index, key in enumerate(text)]
+        if submit:
+            keys.append(("Enter", text))
+        try:
+            await self._emit(target, KeyboardVisibilityEvent(visible=True))
+            for key, typed in keys:
+                started = monotonic()
+                await self._emit(
+                    target,
+                    BarTypedEvent(browser_bar=browser_bar, key=key, text=typed, duration=interval),
+                )
+                if after_key is not None and key != "Enter":
+                    await after_key(typed)
+                await asyncio.sleep(max(0, interval - (monotonic() - started)))
+        finally:
+            await self._emit(target, KeyboardVisibilityEvent(visible=False))
+
+    async def announce(self, target: InputTarget, event: InputEvent) -> None:
+        """Send a presentation event for `target`'s tab, attributed to the current action."""
+        await self._emit(target, event)
 
     async def _emit(self, target: InputTarget, event: InputEvent) -> None:
         await target.emit(replace(event, action_id=self._action_id))

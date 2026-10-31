@@ -15,6 +15,7 @@ from browserrig.core.errors import BrowserError
 from browserrig.core.geometry import Point
 from browserrig.events import (
     INPUT_EVENTS,
+    BarTypedEvent,
     CursorEnteredEvent,
     CursorMovedEvent,
     CursorStateEvent,
@@ -30,7 +31,7 @@ from browserrig.events import (
 from browserrig.input import Input
 from browserrig.input.pointer import movement
 from browserrig.input.wheel import wheel_duration, wheel_progress
-from browserrig.kinds import CursorStyle, FileTransferDirection, TabGesture
+from browserrig.kinds import BrowserBar, CursorStyle, FileTransferDirection, TabGesture
 from browserrig.tools.keyboard import KeyboardTools
 
 
@@ -98,6 +99,58 @@ async def test_exact_typing_emits_ordered_correlated_keys_without_persistable_te
     assert all(call.args == (0.05,) for call in sleep.await_args_list)
     assert isinstance(events[0], KeyboardVisibilityEvent) and events[0].visible
     assert isinstance(events[-1], KeyboardVisibilityEvent) and not events[-1].visible
+
+
+async def test_bar_typing_shows_each_key_without_page_input_and_follows_each_key(monkeypatch):
+    sleep = AsyncMock()
+    monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", sleep)
+    devices, tab, events, commands = _rig()
+    seen = []
+
+    async def after_key(text):
+        seen.append(text)
+
+    with devices.action("action-1"):
+        await devices.type_in_bar(tab, BrowserBar.FIND, "ab c", after_key=after_key)
+    assert not commands
+    typed = [event for event in events if isinstance(event, BarTypedEvent)]
+    assert [(event.key, event.text) for event in typed] == [
+        ("a", "a"),
+        ("b", "ab"),
+        (" ", "ab "),
+        ("c", "ab c"),
+    ]
+    assert seen == ["a", "ab", "ab ", "ab c"]
+    assert all(event.browser_bar == BrowserBar.FIND for event in typed)
+    assert all(event.action_id == "action-1" for event in events)
+    assert all(event.duration == 0.05 for event in typed)
+    assert isinstance(events[0], KeyboardVisibilityEvent) and events[0].visible
+    assert isinstance(events[-1], KeyboardVisibilityEvent) and not events[-1].visible
+
+
+async def test_long_addresses_type_faster_and_submit_with_enter(monkeypatch):
+    sleep = AsyncMock()
+    monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", sleep)
+    devices, tab, events, _ = _rig()
+    address = "example.org/" + "x" * 68
+    await devices.type_in_bar(tab, BrowserBar.ADDRESS, address, submit=True)
+    typed = [event for event in events if isinstance(event, BarTypedEvent)]
+    assert len(typed) == len(address) + 1
+    assert (typed[-1].key, typed[-1].text) == ("Enter", address)
+    # The whole address stays within the bar's time budget, Enter included.
+    assert all(event.duration == pytest.approx(0.8 / len(address)) for event in typed)
+    assert sum(call.args[0] for call in sleep.await_args_list) <= 0.8 + typed[0].duration
+
+
+async def test_browser_shortcuts_are_shown_with_held_modifiers_without_reaching_the_page():
+    devices, tab, events, commands = _rig()
+    await devices.keyboard.show_key(tab, "f", hold_control=True)
+    await devices.keyboard.show_key(tab, "Escape")
+    assert not commands
+    assert [(event.key, event.modifiers) for event in events] == [
+        ("f", ("Control",)),
+        ("Escape", ()),
+    ]
 
 
 async def test_key_cancellation_releases_main_and_modifiers_and_hides_keyboard():
