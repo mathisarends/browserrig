@@ -13,7 +13,10 @@ class Chrome(Plugin, needs=(SessionLog,)):
     events = BROWSER_EVENTS + INPUT_EVENTS
 
     def __init__(
-        self, options: BrowserOptions | None = None, *, file_system: FileSystemOptions | None = None
+        self,
+        options: BrowserOptions | None = None,
+        *,
+        file_system: FileSystemOptions | None = None,
     ) -> None:
         super().__init__()
         self.options = options or LaunchBrowser()

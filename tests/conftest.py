@@ -89,7 +89,9 @@ async def site(pdf_document, xlsx_document) -> AsyncIterator[str]:
             <script>setInterval(()=>{document.querySelector('#t').textContent=Date.now()},20)</script>""",
     }
 
-    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         try:
             raw = await reader.readuntil(b"\r\n\r\n")
             path = raw.split(b" ")[1].decode().split("?")[0]

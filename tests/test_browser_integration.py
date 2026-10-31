@@ -4,14 +4,21 @@ import pytest
 
 from browserrig import ChromeBrowser, ConnectBrowser
 from browserrig.core.geometry import Point
-from browserrig.events import CursorEnteredEvent, CursorStateEvent, TabOpenedEvent, TabPressedEvent
+from browserrig.events import (
+    CursorEnteredEvent,
+    CursorStateEvent,
+    TabOpenedEvent,
+    TabPressedEvent,
+)
 from browserrig.kinds import TabGesture
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
 
 
-async def test_tabs_seed_centered_cursor_and_activation_republishes_existing_position(site):
+async def test_tabs_seed_centered_cursor_and_activation_republishes_existing_position(
+    site,
+):
     events = []
 
     async def emit(event):
@@ -22,8 +29,12 @@ async def test_tabs_seed_centered_cursor_and_activation_republishes_existing_pos
         viewport = (await first.cdp.page.get_layout_metrics()).css_layout_viewport
         initial = [event for event in events if isinstance(event, CursorStateEvent)]
         assert len(initial) == 1 and initial[0].target_id == first.id
-        assert 0.4 * viewport.client_width <= initial[0].x <= 0.6 * viewport.client_width
-        assert 0.4 * viewport.client_height <= initial[0].y <= 0.6 * viewport.client_height
+        assert (
+            0.4 * viewport.client_width <= initial[0].x <= 0.6 * viewport.client_width
+        )
+        assert (
+            0.4 * viewport.client_height <= initial[0].y <= 0.6 * viewport.client_height
+        )
         await browser.mouse.move_to(Point(x=100, y=120))
         second = await browser.open_tab(site)
         assert (
@@ -31,7 +42,8 @@ async def test_tabs_seed_centered_cursor_and_activation_republishes_existing_pos
                 [
                     event
                     for event in events
-                    if isinstance(event, TabOpenedEvent) and event.target_id == second.id
+                    if isinstance(event, TabOpenedEvent)
+                    and event.target_id == second.id
                 ]
             )
             == 1
@@ -44,9 +56,13 @@ async def test_tabs_seed_centered_cursor_and_activation_republishes_existing_pos
         pressed = [event for event in events if isinstance(event, TabPressedEvent)][-1]
         assert pressed.gesture is TabGesture.ACTIVATE and pressed.tab_id == first.id
         assert pressed.target_id == second.id
-        entered = [event for event in events if isinstance(event, CursorEnteredEvent)][-1]
+        entered = [event for event in events if isinstance(event, CursorEnteredEvent)][
+            -1
+        ]
         assert entered.target_id == first.id and entered.to_position == (100, 120)
-        last = next(event for event in reversed(events) if isinstance(event, CursorStateEvent))
+        last = next(
+            event for event in reversed(events) if isinstance(event, CursorStateEvent)
+        )
         assert last.target_id == first.id and (last.x, last.y) == (100, 120)
 
 

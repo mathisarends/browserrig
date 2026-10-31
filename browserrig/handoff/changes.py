@@ -6,12 +6,16 @@ from browserrig.observation.models import Snapshot
 def page_url(url: str) -> str:
     """Keep routing context without persisting credentials, OAuth queries or fragments."""
     parts = urlsplit(url)
-    return urlunsplit((parts.scheme, parts.netloc.rsplit("@", 1)[-1], parts.path, "", ""))
+    return urlunsplit(
+        (parts.scheme, parts.netloc.rsplit("@", 1)[-1], parts.path, "", "")
+    )
 
 
 def page_changes(before: Snapshot | None, after: Snapshot | None) -> tuple[str, ...]:
     if after is None:
-        return ("The page could not be captured after human control; inspect it again.",)
+        return (
+            "The page could not be captured after human control; inspect it again.",
+        )
     if before is None:
         return (
             f"No baseline was available. Current page: {page_url(after.url)} "
@@ -38,5 +42,7 @@ def page_changes(before: Snapshot | None, after: Snapshot | None) -> tuple[str, 
         for element in after.elements
     )
     if password_visible:
-        changes.append("A password field is still visible; login success is unverified.")
+        changes.append(
+            "A password field is still visible; login success is unverified."
+        )
     return tuple(changes) or ("No observable page change was detected.",)

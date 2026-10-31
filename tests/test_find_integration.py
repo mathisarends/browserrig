@@ -30,7 +30,9 @@ _GUIDE = """<h1>Guide</h1>
     <h2>Late</h2><p>A final WIDGET note.</p>"""
 
 
-async def test_find_matches_rendered_text_opens_collapsed_sections_and_marks_the_viewport(site):
+async def test_find_matches_rendered_text_opens_collapsed_sections_and_marks_the_viewport(
+    site,
+):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(_GUIDE)}")
@@ -49,14 +51,21 @@ async def test_find_matches_rendered_text_opens_collapsed_sections_and_marks_the
             "Usage",
             "Late",
         ]
-        assert [match.found.collapsed for match in found.matches] == [False, False, True, False]
+        assert [match.found.collapsed for match in found.matches] == [
+            False,
+            False,
+            True,
+            False,
+        ]
         assert "Install the" in found.matches[0].found.before
         assert [mark.index for mark in found.marks] == [1, 2]
         assert not found.scrolled and await evaluate(tab, "scrollY") == 0
         # Matches are marked for viewers only; the page itself is left unpainted.
         assert await evaluate(tab, "CSS.highlights.size") == 0
 
-        collapsed = await find_text(tab, ("widget",), session="s", active=2, reveal=True)
+        collapsed = await find_text(
+            tab, ("widget",), session="s", active=2, reveal=True
+        )
         assert await evaluate(tab, "document.querySelector('details').open")
         assert 3 in [mark.index for mark in collapsed.marks]
 
@@ -75,7 +84,9 @@ async def test_find_matches_rendered_text_opens_collapsed_sections_and_marks_the
 async def test_find_numbers_matches_across_frames_in_page_order(site):
     async with ChromeBrowser(LaunchBrowser(url=site + "/frames")) as browser:
         tab = browser.active_tab
-        await evaluate(tab, "document.body.insertAdjacentHTML('afterbegin', '<p>Inside out</p>')")
+        await evaluate(
+            tab, "document.body.insertAdjacentHTML('afterbegin', '<p>Inside out</p>')"
+        )
         found = await find_text(tab, ("inside",), session="s", count=5)
         assert found.total == 2 and not found.limitations
         assert [match.number for match in found.matches] == [1, 2]
@@ -92,10 +103,15 @@ async def test_find_tool_types_into_the_find_bar_and_reports_matches(site):
     model = ScriptedModel(
         [
             call("navigate", url=site + "/other"),
-            call("execute_javascript", code=f"document.body.innerHTML = {json.dumps(_GUIDE)}"),
+            call(
+                "execute_javascript",
+                code=f"document.body.innerHTML = {json.dumps(_GUIDE)}",
+            ),
             call("find_in_page", query="widget", match=4, max_results=2),
             call("find_in_page", query="nowhere to be found"),
-            call("find_in_page", query="widget", alternatives=["final widget", "gizmo"]),
+            call(
+                "find_in_page", query="widget", alternatives=["final widget", "gizmo"]
+            ),
             "Done",
         ]
     )
@@ -120,8 +136,12 @@ async def test_find_tool_types_into_the_find_bar_and_reports_matches(site):
         result = await session.run("Find the widget", max_steps=6)
     await consumer
     assert result.text == "Done"
-    replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)]
-    assert not any(reply.is_error for reply in replies), [reply.text for reply in replies]
+    replies = [
+        msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)
+    ]
+    assert not any(reply.is_error for reply in replies), [
+        reply.text for reply in replies
+    ]
     found, missing, either = replies[2].text, replies[3].text, replies[4].text
     assert found.startswith('4 matches for "widget"; match 4 is scrolled into view.')
     # Context stays within the match's paragraph.
@@ -138,22 +158,30 @@ async def test_find_tool_types_into_the_find_bar_and_reports_matches(site):
     # Live events stream to viewers and stay out of the saved conversation.
     assert not any(isinstance(event, BarTypedEvent) for event in result.events)
     events = streamed
-    address = [e for e in events if isinstance(e, BarTypedEvent) and e.browser_bar == "address"]
+    address = [
+        e for e in events if isinstance(e, BarTypedEvent) and e.browser_bar == "address"
+    ]
     assert address[-1].key == "Enter" and address[-1].text == address[-2].text
-    started = next(i for i, e in enumerate(events) if isinstance(e, NavigationStartedEvent))
+    started = next(
+        i for i, e in enumerate(events) if isinstance(e, NavigationStartedEvent)
+    )
     assert events.index(address[-1]) < started
 
     shown = [
         event
         for event in events
-        if isinstance(event, (KeyPressedEvent, FindBarEvent, BarTypedEvent, FindResultsEvent))
+        if isinstance(
+            event, (KeyPressedEvent, FindBarEvent, BarTypedEvent, FindResultsEvent)
+        )
         and getattr(event, "browser_bar", BrowserBar.FIND) == BrowserBar.FIND
     ]
     keys = [(e.key, e.modifiers) for e in shown if isinstance(e, KeyPressedEvent)]
     assert keys == [("f", ("Control",)), ("Escape", ())] * 3
     typed = [e.text for e in shown if isinstance(e, BarTypedEvent)][:6]
     assert typed == ["w", "wi", "wid", "widg", "widge", "widget"]
-    results = [e for e in shown if isinstance(e, FindResultsEvent) and e.query == "widget"]
+    results = [
+        e for e in shown if isinstance(e, FindResultsEvent) and e.query == "widget"
+    ]
     # One update for the last key, then the final one with match 4 scrolled into view.
     assert [(e.total, e.active) for e in results][:2] == [(4, 1), (4, 4)]
     assert 4 in [mark.index for mark in results[1].marks]

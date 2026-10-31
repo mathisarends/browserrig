@@ -8,15 +8,21 @@ from browserrig.scripts import PAGE_FACTS
 
 
 async def main() -> None:
-    parser = argparse.ArgumentParser(description="Connect to an already running CDP browser")
+    parser = argparse.ArgumentParser(
+        description="Connect to an already running CDP browser"
+    )
     parser.add_argument("--endpoint", required=True)
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument(
         "--target-id", help="Attach to an existing tab instead of an isolated context"
     )
-    selection.add_argument("--url", default="about:blank", help="URL in the new isolated context")
+    selection.add_argument(
+        "--url", default="about:blank", help="URL in the new isolated context"
+    )
     args = parser.parse_args()
-    options = ConnectBrowser(endpoint=args.endpoint, target_id=args.target_id, url=args.url)
+    options = ConnectBrowser(
+        endpoint=args.endpoint, target_id=args.target_id, url=args.url
+    )
     async with ChromeBrowser(options) as browser:
         tab = browser.active_tab
         await wait_for_page(tab)

@@ -26,7 +26,10 @@ async def chrome_names(
     try:
         async with asyncio.timeout(_TIMEOUT):
             names = await asyncio.gather(
-                *(_name(sessions[element.frame_id], element.backend_id) for element in queried),
+                *(
+                    _name(sessions[element.frame_id], element.backend_id)
+                    for element in queried
+                ),
                 return_exceptions=True,
             )
     except TimeoutError:
@@ -40,7 +43,10 @@ async def chrome_names(
 
 def preferred(own: str, chrome: str) -> str:
     """Chrome's name, unless it only differs from ours in case, spacing or icon glyphs."""
-    if not chrome or _NON_WORD.sub("", chrome).casefold() == _NON_WORD.sub("", own).casefold():
+    if (
+        not chrome
+        or _NON_WORD.sub("", chrome).casefold() == _NON_WORD.sub("", own).casefold()
+    ):
         return own
     return chrome
 

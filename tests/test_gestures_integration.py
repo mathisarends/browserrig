@@ -36,7 +36,9 @@ async def test_double_click_dispatches_native_detail_and_dblclick(site, coordina
 
 
 @pytest.mark.parametrize("coordinates", [False, True])
-async def test_right_click_dispatches_native_contextmenu_without_a_left_click(site, coordinates):
+async def test_right_click_dispatches_native_contextmenu_without_a_left_click(
+    site, coordinates
+):
     def arguments(state):
         if coordinates:
             return {"x": 70, "y": 40, "button": "right"}
@@ -88,21 +90,33 @@ async def test_drag_uses_browser_behavior_for_draggable_ancestor(site, prevented
                 });
             })()""".replace("PREVENTED", str(prevented).lower()),
         )
-        assert await evaluate(tab, "document.elementFromPoint(70, 140).draggable") is False
-        await browser.mouse.drag(start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1)
+        assert (
+            await evaluate(tab, "document.elementFromPoint(70, 140).draggable") is False
+        )
+        await browser.mouse.drag(
+            start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1
+        )
         assert await evaluate(tab, "window.dragStarts") == 1
-        assert await evaluate(tab, "window.nativeDrop") == ("" if prevented else "payload")
+        assert await evaluate(tab, "window.nativeDrop") == (
+            "" if prevented else "payload"
+        )
 
 
 async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site):
     reached_target = asyncio.Event()
 
     async def emit(event):
-        if isinstance(event, CursorStateEvent) and event.buttons == 1 and event.x == 350:
+        if (
+            isinstance(event, CursorStateEvent)
+            and event.buttons == 1
+            and event.x == 350
+        ):
             reached_target.set()
             await asyncio.Event().wait()
 
-    async with ChromeBrowser(LaunchBrowser(url=site + "/gestures"), emit=emit) as browser:
+    async with ChromeBrowser(
+        LaunchBrowser(url=site + "/gestures"), emit=emit
+    ) as browser:
         tab = browser.active_tab
         await evaluate(
             tab,
@@ -112,7 +126,9 @@ async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site)
             });""",
         )
         task = asyncio.create_task(
-            browser.mouse.drag(start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1)
+            browser.mouse.drag(
+                start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1
+            )
         )
         try:
             await asyncio.wait_for(reached_target.wait(), timeout=5)
@@ -156,7 +172,9 @@ async def _perform(site, name, arguments):
         result = await session.run("Perform one gesture")
         assert result.text == "Gesture completed"
         receipts = [
-            event for event in result.events if isinstance(event, ToolExecutionFinishedEvent)
+            event
+            for event in result.events
+            if isinstance(event, ToolExecutionFinishedEvent)
         ]
         assert receipts and all(not event.result.is_error for event in receipts)
         # The test fixture stores counters in its main world. Production extraction

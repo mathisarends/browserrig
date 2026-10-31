@@ -40,24 +40,32 @@ from browserrig.events import (
 from browserrig.kinds import ReadinessPhase
 
 
-async def test_readiness_ids_cannot_close_model_pause_or_tool_intervals(activity_session):
+async def test_readiness_ids_cannot_close_model_pause_or_tool_intervals(
+    activity_session,
+):
     session, activity = activity_session
     await session.emit(_request())
     await session.emit(_readiness_started("llm"))
     assert len(activity.intervals()) == 2
     assert all(item.outcome is ActivityOutcome.RUNNING for item in activity.intervals())
-    await session.emit(AssistantMessageEvent(AssistantMessage("ok"), request_id="request"))
+    await session.emit(
+        AssistantMessageEvent(AssistantMessage("ok"), request_id="request")
+    )
     await session.emit(AgentControlChangedEvent(state=ControlState.PAUSED))
     await session.emit(_readiness_started("paused"))
     await session.emit(ToolExecutionStartedEvent(call_id="shared"))
     await session.emit(_readiness_started("tool:shared"))
-    await session.emit(ToolExecutionFinishedEvent(call_id="shared", result=ToolResult("ok")))
+    await session.emit(
+        ToolExecutionFinishedEvent(call_id="shared", result=ToolResult("ok"))
+    )
 
     intervals = activity.intervals()
     closed = [item for item in intervals if item.outcome is ActivityOutcome.COMPLETED]
     assert {item.kind for item in closed} == {ActivityKind.LLM, ActivityKind.TOOL}
     running = [item for item in intervals if item.outcome is ActivityOutcome.RUNNING]
-    assert {item.cause_id for item in running if item.kind is ActivityKind.READINESS} == {
+    assert {
+        item.cause_id for item in running if item.kind is ActivityKind.READINESS
+    } == {
         "llm",
         "paused",
         "tool:shared",
@@ -66,22 +74,32 @@ async def test_readiness_ids_cannot_close_model_pause_or_tool_intervals(activity
     assert not any(item.outcome is ActivityOutcome.SUPERSEDED for item in intervals)
 
 
-async def test_replacing_an_interval_supersedes_only_the_same_correlated_activity(activity_session):
+async def test_replacing_an_interval_supersedes_only_the_same_correlated_activity(
+    activity_session,
+):
     session, activity = activity_session
     await session.emit(_readiness_started("first"))
     await session.emit(_readiness_started("second"))
     original = {item.cause_id: item.interval_id for item in activity.intervals()}
     await session.emit(_readiness_started("first"))
     replaced = next(
-        item for item in activity.intervals() if item.outcome is ActivityOutcome.SUPERSEDED
+        item
+        for item in activity.intervals()
+        if item.outcome is ActivityOutcome.SUPERSEDED
     )
     assert replaced.interval_id == original["first"]
-    live = [item for item in activity.intervals() if item.outcome is ActivityOutcome.RUNNING]
+    live = [
+        item for item in activity.intervals() if item.outcome is ActivityOutcome.RUNNING
+    ]
     assert len(live) == 2
     assert (
-        next(item for item in live if item.cause_id == "second").interval_id == original["second"]
+        next(item for item in live if item.cause_id == "second").interval_id
+        == original["second"]
     )
-    assert next(item for item in live if item.cause_id == "first").interval_id != original["first"]
+    assert (
+        next(item for item in live if item.cause_id == "first").interval_id
+        != original["first"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -115,8 +133,14 @@ async def test_readiness_outcome_comes_from_event_type_and_preserves_reason(
         (ToolResult.error("failure details"), ActivityOutcome.FAILED),
         (ToolResult.denied("denied details"), ActivityOutcome.FAILED),
         (ToolResult.unavailable("unavailable details"), ActivityOutcome.FAILED),
-        (ToolResult("cancelled details", status=ToolStatus.CANCELLED), ActivityOutcome.CANCELLED),
-        (ToolResult("timeout details", status=ToolStatus.TIMEOUT), ActivityOutcome.TIMEOUT),
+        (
+            ToolResult("cancelled details", status=ToolStatus.CANCELLED),
+            ActivityOutcome.CANCELLED,
+        ),
+        (
+            ToolResult("timeout details", status=ToolStatus.TIMEOUT),
+            ActivityOutcome.TIMEOUT,
+        ),
         (ToolResult("nonzero exit details", exit_code=1), ActivityOutcome.FAILED),
     ],
 )
@@ -137,7 +161,9 @@ async def test_tool_receipt_closes_only_its_activity_and_retains_failure_status(
 
 
 @pytest.mark.parametrize("reason", list(StepOutcome))
-async def test_each_step_outcome_closes_model_wait_with_a_typed_outcome(activity_session, reason):
+async def test_each_step_outcome_closes_model_wait_with_a_typed_outcome(
+    activity_session, reason
+):
     session, activity = activity_session
     await session.emit(TurnStartedEvent(turn_id="turn"))
     await session.emit(StepStartedEvent(turn_id="turn", step=1))
@@ -150,7 +176,9 @@ async def test_each_step_outcome_closes_model_wait_with_a_typed_outcome(activity
 
 
 @pytest.mark.parametrize("reason", list(TurnOutcome))
-async def test_turn_end_closes_correlated_activities_but_keeps_pause_open(activity_session, reason):
+async def test_turn_end_closes_correlated_activities_but_keeps_pause_open(
+    activity_session, reason
+):
     session, activity = activity_session
     await session.emit(TurnStartedEvent(turn_id="turn"))
     await session.emit(ToolExecutionStartedEvent(call_id="pending"))
@@ -165,7 +193,9 @@ async def test_turn_end_closes_correlated_activities_but_keeps_pause_open(activi
     pause = next(item for item in intervals if item.kind is ActivityKind.PAUSED)
     assert pause.outcome is ActivityOutcome.RUNNING
     await session.emit(AgentControlChangedEvent(state=ControlState.ACTIVE))
-    assert all(item.outcome is not ActivityOutcome.RUNNING for item in activity.intervals())
+    assert all(
+        item.outcome is not ActivityOutcome.RUNNING for item in activity.intervals()
+    )
 
 
 async def test_assistant_interruption_and_teardown_emit_one_finish_per_interval():
@@ -174,7 +204,9 @@ async def test_assistant_interruption_and_teardown_emit_one_finish_per_interval(
         await session.emit(_request())
         await session.emit(
             AssistantMessageEvent(
-                message=AssistantMessage("partial"), request_id="request", interrupted=True
+                message=AssistantMessage("partial"),
+                request_id="request",
+                interrupted=True,
             )
         )
         await session.emit(_readiness_started("pending"))
@@ -195,11 +227,15 @@ async def test_assistant_interruption_and_teardown_emit_one_finish_per_interval(
         (ModelRequestOutcome.CONTEXT_EXCEEDED, ActivityOutcome.CONTEXT_LIMIT),
     ],
 )
-async def test_model_failure_closes_only_the_matching_request(activity_session, outcome, expected):
+async def test_model_failure_closes_only_the_matching_request(
+    activity_session, outcome, expected
+):
     session, activity = activity_session
     await session.emit(_request("first"))
     await session.emit(_request("retry"))
-    failure = ModelRequestFailedEvent("first", outcome, reason="private provider details")
+    failure = ModelRequestFailedEvent(
+        "first", outcome, reason="private provider details"
+    )
     await session.emit(failure)
     await session.emit(failure)
     intervals = {item.cause_id: item for item in activity.intervals()}
@@ -207,14 +243,22 @@ async def test_model_failure_closes_only_the_matching_request(activity_session, 
     assert intervals["first"].outcome is expected
     assert intervals["first"].reason == outcome.value
     assert intervals["retry"].outcome is ActivityOutcome.RUNNING
-    await session.emit(AssistantMessageEvent(AssistantMessage("ok"), request_id="retry"))
-    assert all(item.outcome is not ActivityOutcome.RUNNING for item in activity.intervals())
+    await session.emit(
+        AssistantMessageEvent(AssistantMessage("ok"), request_id="retry")
+    )
+    assert all(
+        item.outcome is not ActivityOutcome.RUNNING for item in activity.intervals()
+    )
 
 
-async def test_late_assistant_reply_cannot_close_another_model_request(activity_session):
+async def test_late_assistant_reply_cannot_close_another_model_request(
+    activity_session,
+):
     session, activity = activity_session
     await session.emit(_request("current"))
-    await session.emit(AssistantMessageEvent(AssistantMessage("old reply"), request_id="previous"))
+    await session.emit(
+        AssistantMessageEvent(AssistantMessage("old reply"), request_id="previous")
+    )
     (interval,) = activity.intervals()
     assert interval.cause_id == "current"
     assert interval.outcome is ActivityOutcome.RUNNING
@@ -272,7 +316,9 @@ def test_existing_known_outcomes_load_without_the_new_reason_field():
         (ActivityKind.READINESS, ""),
     ],
 )
-def test_activity_keys_reject_invalid_singleton_or_correlated_combinations(kind, correlation_id):
+def test_activity_keys_reject_invalid_singleton_or_correlated_combinations(
+    kind, correlation_id
+):
     with pytest.raises(ValueError):
         ActivityKey(kind, correlation_id)
 
@@ -321,7 +367,9 @@ async def _activity_session():
 
 def _request(request_id="request"):
     return ModelRequestedEvent(
-        request=ModelRequest(messages=()), model=ModelInfo(name="test"), request_id=request_id
+        request=ModelRequest(messages=()),
+        model=ModelInfo(name="test"),
+        request_id=request_id,
     )
 
 

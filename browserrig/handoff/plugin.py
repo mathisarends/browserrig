@@ -55,7 +55,9 @@ class _State:
 
 
 class HumanHandoff(
-    Plugin, provides=True, needs=(Browser, BrowserEvents, Observe, DynamicContext, ToolRegistry)
+    Plugin,
+    provides=True,
+    needs=(Browser, BrowserEvents, Observe, DynamicContext, ToolRegistry),
 ):
     """Opt-in human control with measured receipts and durable, bounded context.
 
@@ -140,7 +142,11 @@ class HumanHandoff(
             return None
 
     async def _begin(
-        self, request: HandoffRequestedEvent, nudges: Nudges | None, *, probe: bool = True
+        self,
+        request: HandoffRequestedEvent,
+        nudges: Nudges | None,
+        *,
+        probe: bool = True,
     ) -> None:
         # A running pause is acknowledged before async event observers finish. Publish
         # its baseline synchronously so an immediate resume cannot overtake this hook.
@@ -189,7 +195,9 @@ class HumanHandoff(
                         note="The host callback failed; completion is unknown.",
                         secrets=secrets,
                     )
-                return await self._finish(response.status, note=response.note, secrets=secrets)
+                return await self._finish(
+                    response.status, note=response.note, secrets=secrets
+                )
             except asyncio.CancelledError:
                 if self._state.current is not None:
                     await self._finish("cancelled", secrets=secrets, capture=False)
@@ -250,7 +258,9 @@ class HumanHandoff(
         except ValidationError:
             history = []
         history = [*history, receipt][-self.history_limit :]
-        await self._context.set("browser.handoffs", _HISTORY.dump_json(history).decode())
+        await self._context.set(
+            "browser.handoffs", _HISTORY.dump_json(history).decode()
+        )
         self._observe.invalidate()
         self._release()
         return receipt.model_dump_json()
@@ -281,7 +291,10 @@ class HumanHandoff(
 
     @hook(PreStep, priority=-50)
     async def _resume(
-        self, _event: PreStep, next_: Next[StepDecision], secrets: Inject[Secrets | None]
+        self,
+        _event: PreStep,
+        next_: Next[StepDecision],
+        secrets: Inject[Secrets | None],
     ) -> StepDecision:
         if self._state.resume_pending:
             await self._finish("resumed", secrets=secrets)

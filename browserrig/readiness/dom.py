@@ -14,7 +14,9 @@ async def probe_dom(tab: Tab) -> DOMProbe:
 
 
 class DomReadiness(ReadinessStrategy):
-    def __init__(self, tab: Tab, options: ReadinessOptions, phase: ReadinessPhase) -> None:
+    def __init__(
+        self, tab: Tab, options: ReadinessOptions, phase: ReadinessPhase
+    ) -> None:
         super().__init__(tab, options)
         self.budget = options.timeout
         self._usable = False

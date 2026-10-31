@@ -148,9 +148,7 @@ the new `read_bytes`/`grep` backend contract needs no migration here.
 
 The file reader uses a shared `FileExtension` enum and a registry of readers with
 a common call signature and declared selection capabilities. New formats can be
-registered without extending a central parser dispatch chain. See
-[the validation report](../file-reader-validation.md) for real-document coverage and
-the command to repeat the public corpus check.
+registered without extending a central parser dispatch chain.
 
 `LaunchBrowser(download_directory="ABSOLUTE_PATH_ON_BROWSER_HOST")` overrides the
 download location. Downloads first use `.pending/` and then move into a folder

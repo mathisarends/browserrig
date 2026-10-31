@@ -4,7 +4,14 @@ from browserrig.core.geometry import Point
 
 from .activity import Activity
 from .agent import BrowserAgent, WindowRatio
-from .browser import Browser, Chrome, ChromeBrowser, ConnectBrowser, LaunchBrowser, Viewport
+from .browser import (
+    Browser,
+    Chrome,
+    ChromeBrowser,
+    ConnectBrowser,
+    LaunchBrowser,
+    Viewport,
+)
 from .composition import browser_plugins
 from .files import FileSystem, FileSystemOptions
 from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanResponse

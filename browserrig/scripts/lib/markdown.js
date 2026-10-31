@@ -25,6 +25,8 @@ function updateFence(open, match, offset, length) {
     return {marker: match[1], start: offset, end: offset + length};
   }
   const closes =
-    match[1][0] === open.marker[0] && match[1].length >= open.marker.length && !match[2].trim();
+    match[1][0] === open.marker[0] &&
+    match[1].length >= open.marker.length &&
+    !match[2].trim();
   return closes ? null : open;
 }

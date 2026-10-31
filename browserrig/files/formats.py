@@ -23,8 +23,12 @@ FORMATS = {
     (Ext.XLSX, Ext.XLSM, Ext.XLTX, Ext.XLTM): FileFormat(
         _selected(spreadsheets.read_xlsx), sheets=True, cell_ranges=True
     ),
-    (Ext.XLS,): FileFormat(_selected(spreadsheets.read_xls), sheets=True, cell_ranges=True),
-    (Ext.ODS,): FileFormat(_selected(spreadsheets.read_ods), sheets=True, cell_ranges=True),
+    (Ext.XLS,): FileFormat(
+        _selected(spreadsheets.read_xls), sheets=True, cell_ranges=True
+    ),
+    (Ext.ODS,): FileFormat(
+        _selected(spreadsheets.read_ods), sheets=True, cell_ranges=True
+    ),
     (Ext.CSV, Ext.TSV): FileFormat(
         _selected(spreadsheets.read_delimited), sheets=True, cell_ranges=True
     ),
@@ -41,7 +45,9 @@ FORMATS = {
     (Ext.TIFF, Ext.TIF): FileFormat(
         _ocr(imaging.read_image), pages=True, signatures=(b"II*\0", b"MM\0*")
     ),
-    (Ext.GIF,): FileFormat(_ocr(imaging.read_image), pages=True, signatures=(b"GIF87a", b"GIF89a")),
+    (Ext.GIF,): FileFormat(
+        _ocr(imaging.read_image), pages=True, signatures=(b"GIF87a", b"GIF89a")
+    ),
     (Ext.BMP,): FileFormat(_ocr(imaging.read_image), pages=True),
     (Ext.WEBP, Ext.ICO): FileFormat(_ocr(imaging.read_image), pages=True),
     (Ext.PPTX,): FileFormat(_selected(documents.read_pptx), pages=True),

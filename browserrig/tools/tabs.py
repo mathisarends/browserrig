@@ -39,10 +39,13 @@ class TabTools(Plugin, needs=(Actions, Browser, Readiness)):
             await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
             return Effect(f"Opened tab {opened.id}.")
 
-        return await actions.run(kind=ActionKind.OPEN_TAB, operation=open_tab, settle=False)
+        return await actions.run(
+            kind=ActionKind.OPEN_TAB, operation=open_tab, settle=False
+        )
 
     @tool(
-        kind=ActionKind.SWITCH_TAB, description="Activate one listed tab by its stable target ID."
+        kind=ActionKind.SWITCH_TAB,
+        description="Activate one listed tab by its stable target ID.",
     )
     async def switch_tab(
         self,
@@ -55,7 +58,9 @@ class TabTools(Plugin, needs=(Actions, Browser, Readiness)):
             await self._readiness.wait(selected)
             return Effect(f"Activated tab {selected.id}.")
 
-        return await actions.run(kind=ActionKind.SWITCH_TAB, operation=switch, settle=False)
+        return await actions.run(
+            kind=ActionKind.SWITCH_TAB, operation=switch, settle=False
+        )
 
     @tool(
         kind=ActionKind.CLOSE_TAB,
@@ -71,4 +76,6 @@ class TabTools(Plugin, needs=(Actions, Browser, Readiness)):
             selected = await self._browser.close_tab(target_id)
             return Effect(f"Tab closed. Active tab: {selected.id}.")
 
-        return await actions.run(kind=ActionKind.CLOSE_TAB, operation=close, settle=False)
+        return await actions.run(
+            kind=ActionKind.CLOSE_TAB, operation=close, settle=False
+        )

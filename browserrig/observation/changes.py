@@ -19,7 +19,9 @@ def decision_change(before: Snapshot, after: Snapshot) -> str:
         _identity(control): None for control in before.offscreen
     }
     known.update(
-        (_identity(el), el) for el in before.elements if not el.covered and not el.disabled
+        (_identity(el), el)
+        for el in before.elements
+        if not el.covered and not el.disabled
     )
     for element in after.elements:
         if not element.in_viewport or element.covered or element.disabled:
@@ -28,7 +30,11 @@ def decision_change(before: Snapshot, after: Snapshot) -> str:
         if identity not in known:
             return "New interactive elements became available."
         previous = known[identity]
-        if element.expanded is True and previous is not None and previous.expanded is not True:
+        if (
+            element.expanded is True
+            and previous is not None
+            and previous.expanded is not True
+        ):
             return "A control expanded."
     return ""
 

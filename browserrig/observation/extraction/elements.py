@@ -14,7 +14,18 @@ from .styles import Style
 from .visibility import Occlusion, hidden, visible_area
 
 _SKIPPED_TAGS = frozenset(
-    {"html", "body", "head", "script", "style", "noscript", "template", "iframe", "frame", "label"}
+    {
+        "html",
+        "body",
+        "head",
+        "script",
+        "style",
+        "noscript",
+        "template",
+        "iframe",
+        "frame",
+        "label",
+    }
 )
 _NATIVE_TAGS = frozenset({"a", "button", "input", "select", "textarea", "summary"})
 _HINT_ATTRIBUTES = (
@@ -99,7 +110,9 @@ class FrameExtraction:
     alerts: list[str] = field(default_factory=list)
     modal: tuple[int, Modal] | None = None
     text: str = ""
-    _context: Callable[[int], Context] = field(default=lambda _index: ("", ""), repr=False)
+    _context: Callable[[int], Context] = field(
+        default=lambda _index: ("", ""), repr=False
+    )
     _covered: Callable[[int], bool] = field(default=lambda _index: False, repr=False)
 
     def section(self, index: int) -> str:
@@ -142,7 +155,9 @@ class _FrameExtractor:
         self._frame_id = frame_id
         self._transform = transform
         self._visible = (
-            visible if visible is not None and visible.width and visible.height else None
+            visible
+            if visible is not None and visible.width and visible.height
+            else None
         )
         self._viewport = self._document_viewport()
         self._prefix = ref_prefix
@@ -155,7 +170,9 @@ class _FrameExtractor:
         self._modal: int | None = None
 
     def run(self, text_limit: int) -> FrameExtraction:
-        result = FrameExtraction(self._document, _context=self._context, _covered=self._covered)
+        result = FrameExtraction(
+            self._document, _context=self._context, _covered=self._covered
+        )
         modal = self._find_modal()
         if modal is not None:
             self._modal = modal[1]
@@ -220,7 +237,9 @@ class _FrameExtractor:
     def _candidate(self, index: int, tag: str) -> bool | None:
         """True for semantic controls, False for generic clickable boxes, None otherwise."""
         document = self._document
-        listed_option = tag == "option" and document.tag(document.parent(index)) in _OPTION_PARENTS
+        listed_option = (
+            tag == "option" and document.tag(document.parent(index)) in _OPTION_PARENTS
+        )
         if listed_option or self._decorative(index):
             return None
         if tag in _NATIVE_TAGS:
@@ -251,7 +270,11 @@ class _FrameExtractor:
     def _native(self, index: int, tag: str) -> bool | None:
         attributes = self._document.attributes(index)
         if tag == "a" and "href" not in attributes:
-            return False if index in self._document.clickable or index in self._marked else None
+            return (
+                False
+                if index in self._document.clickable or index in self._marked
+                else None
+            )
         if tag == "input" and attributes.get("type", "").lower() == "hidden":
             return None
         return True
@@ -323,7 +346,9 @@ class _FrameExtractor:
         for index in ordered:
             if not candidates[index]:
                 position = bisect_right(semantic, index)
-                if position < len(semantic) and semantic[position] < document.end(index):
+                if position < len(semantic) and semantic[position] < document.end(
+                    index
+                ):
                     continue
             unwrapped.append(index)
         kept: list[int] = []
@@ -347,7 +372,9 @@ class _FrameExtractor:
         kind = semantics.input_type(document, source)
         rect, area, covered = placement
         section, group = self._context(index)
-        href = attributes.get("href", "") if document.tag(index) in ("a", "area") else ""
+        href = (
+            attributes.get("href", "") if document.tag(index) in ("a", "area") else ""
+        )
         return Element.model_construct(
             ref=f"{self._prefix}{document.backend_ids[index]}",
             frame_id=self._frame_id,
@@ -361,10 +388,13 @@ class _FrameExtractor:
             input_type=kind,
             value=semantics.value(document, source, role, kind),
             placeholder=clean(
-                attributes.get("placeholder") or attributes.get("aria-placeholder", ""), 80
+                attributes.get("placeholder") or attributes.get("aria-placeholder", ""),
+                80,
             ),
             href=_absolute(document.url, href),
-            options=semantics.options(document, source) if document.tag(source) == "select" else (),
+            options=semantics.options(document, source)
+            if document.tag(source) == "select"
+            else (),
             section=section,
             group=group,
             in_viewport=area is not None and not covered,
@@ -418,7 +448,10 @@ class _FrameExtractor:
                         frame_id=self._frame_id,
                         bounds=bounds,
                         name=semantics.labelled_by(document, index)
-                        or clean(attributes.get("aria-label") or attributes.get("title", ""), 80),
+                        or clean(
+                            attributes.get("aria-label") or attributes.get("title", ""),
+                            80,
+                        ),
                         ref=f"{self._prefix}{document.backend_ids[index]}"
                         if index in listed
                         else "",
@@ -450,9 +483,9 @@ class _FrameExtractor:
                 if text:
                     alerts.append(text)
                 continue
-            text = clean(document.attributes(index).get("aria-label", "")) or document.text(
-                index, 120
-            )
+            text = clean(
+                document.attributes(index).get("aria-label", "")
+            ) or document.text(index, 120)
             area = visible_area(document, index, rect, self._viewport)
             if text and area is not None and not self._occluded(index, area):
                 headings.append(
@@ -596,7 +629,12 @@ class _FrameExtractor:
             return None
         local = self._transform.bounds_to_local(self._visible)
         x, y = self._document.scroll
-        return (local.x + x, local.y + y, local.x + local.width + x, local.y + local.height + y)
+        return (
+            local.x + x,
+            local.y + y,
+            local.x + local.width + x,
+            local.y + local.height + y,
+        )
 
     def _bounds(self, rect: Rect, area: Rect | None) -> Bounds:
         x, y = self._document.scroll

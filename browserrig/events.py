@@ -111,7 +111,9 @@ class CursorMovedEvent(InputEvent):
     control_point_2: tuple[float, float]
     duration: float
     easing: Literal["easeInOutCubic"] = "easeInOutCubic"
-    type: Literal[EventKind.CURSOR_MOVED] = field(default=EventKind.CURSOR_MOVED, kw_only=True)
+    type: Literal[EventKind.CURSOR_MOVED] = field(
+        default=EventKind.CURSOR_MOVED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,7 +121,9 @@ class CursorStateEvent(InputEvent):
     x: float
     y: float
     buttons: int = 0
-    type: Literal[EventKind.CURSOR_STATE] = field(default=EventKind.CURSOR_STATE, kw_only=True)
+    type: Literal[EventKind.CURSOR_STATE] = field(
+        default=EventKind.CURSOR_STATE, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,7 +131,9 @@ class CursorStyleEvent(InputEvent):
     """The CSS cursor under the pointer changed, for example to a hand over a link."""
 
     style: CursorStyle
-    type: Literal[EventKind.CURSOR_STYLE] = field(default=EventKind.CURSOR_STYLE, kw_only=True)
+    type: Literal[EventKind.CURSOR_STYLE] = field(
+        default=EventKind.CURSOR_STYLE, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,7 +163,9 @@ class KeyPressedEvent(InputEvent):
     key: str
     modifiers: tuple[str, ...] = ()
     duration: float = 0
-    type: Literal[EventKind.KEY_PRESSED] = field(default=EventKind.KEY_PRESSED, kw_only=True)
+    type: Literal[EventKind.KEY_PRESSED] = field(
+        default=EventKind.KEY_PRESSED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,7 +216,9 @@ class BarTypedEvent(InputEvent):
     key: str
     text: str
     duration: float
-    type: Literal[EventKind.BAR_TYPED] = field(default=EventKind.BAR_TYPED, kw_only=True)
+    type: Literal[EventKind.BAR_TYPED] = field(
+        default=EventKind.BAR_TYPED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -241,7 +251,9 @@ class FindResultsEvent(InputEvent):
     total: int
     active: int
     marks: tuple[FindMark, ...] = ()
-    type: Literal[EventKind.FIND_RESULTS] = field(default=EventKind.FIND_RESULTS, kw_only=True)
+    type: Literal[EventKind.FIND_RESULTS] = field(
+        default=EventKind.FIND_RESULTS, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -253,7 +265,9 @@ class FileTransferEvent(InputEvent):
     duration: float
     x: float | None = None
     y: float | None = None
-    type: Literal[EventKind.FILE_TRANSFER] = field(default=EventKind.FILE_TRANSFER, kw_only=True)
+    type: Literal[EventKind.FILE_TRANSFER] = field(
+        default=EventKind.FILE_TRANSFER, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,7 +283,9 @@ class TabPressedEvent(InputEvent):
     tab_id: str
     from_position: tuple[float, float]
     duration: float
-    type: Literal[EventKind.TAB_PRESSED] = field(default=EventKind.TAB_PRESSED, kw_only=True)
+    type: Literal[EventKind.TAB_PRESSED] = field(
+        default=EventKind.TAB_PRESSED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -283,7 +299,9 @@ class CursorEnteredEvent(InputEvent):
     to_position: tuple[float, float]
     duration: float
     easing: Literal["easeInOutCubic"] = "easeInOutCubic"
-    type: Literal[EventKind.CURSOR_ENTERED] = field(default=EventKind.CURSOR_ENTERED, kw_only=True)
+    type: Literal[EventKind.CURSOR_ENTERED] = field(
+        default=EventKind.CURSOR_ENTERED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -310,35 +328,47 @@ class TabUpdatedEvent(LiveEvent):
     title: str
     loading: bool
     favicon: str = ""
-    type: Literal[EventKind.TAB_UPDATED] = field(default=EventKind.TAB_UPDATED, kw_only=True)
+    type: Literal[EventKind.TAB_UPDATED] = field(
+        default=EventKind.TAB_UPDATED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class ConnectedEvent(BrowserEvent):
     owned_process: bool
-    type: Literal[EventKind.CONNECTED] = field(default=EventKind.CONNECTED, kw_only=True)
+    type: Literal[EventKind.CONNECTED] = field(
+        default=EventKind.CONNECTED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class DisconnectedEvent(BrowserEvent):
-    type: Literal[EventKind.DISCONNECTED] = field(default=EventKind.DISCONNECTED, kw_only=True)
+    type: Literal[EventKind.DISCONNECTED] = field(
+        default=EventKind.DISCONNECTED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class TabOpenedEvent(BrowserEvent):
     url: str
     opener_id: str = ""
-    type: Literal[EventKind.TAB_OPENED] = field(default=EventKind.TAB_OPENED, kw_only=True)
+    type: Literal[EventKind.TAB_OPENED] = field(
+        default=EventKind.TAB_OPENED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class TabActivatedEvent(BrowserEvent):
-    type: Literal[EventKind.TAB_ACTIVATED] = field(default=EventKind.TAB_ACTIVATED, kw_only=True)
+    type: Literal[EventKind.TAB_ACTIVATED] = field(
+        default=EventKind.TAB_ACTIVATED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class TabClosedEvent(BrowserEvent):
-    type: Literal[EventKind.TAB_CLOSED] = field(default=EventKind.TAB_CLOSED, kw_only=True)
+    type: Literal[EventKind.TAB_CLOSED] = field(
+        default=EventKind.TAB_CLOSED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -367,13 +397,17 @@ class NavigationCommittedEvent(BrowserEvent):
 class DialogOpenedEvent(BrowserEvent):
     kind: str
     message: str
-    type: Literal[EventKind.DIALOG_OPENED] = field(default=EventKind.DIALOG_OPENED, kw_only=True)
+    type: Literal[EventKind.DIALOG_OPENED] = field(
+        default=EventKind.DIALOG_OPENED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class DialogHandledEvent(BrowserEvent):
     accepted: bool
-    type: Literal[EventKind.DIALOG_HANDLED] = field(default=EventKind.DIALOG_HANDLED, kw_only=True)
+    type: Literal[EventKind.DIALOG_HANDLED] = field(
+        default=EventKind.DIALOG_HANDLED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -419,7 +453,9 @@ class FilesListedEvent(BrowserEvent):
     entries: int
     offset: int = 0
     next_offset: int | None = None
-    type: Literal[EventKind.FILES_LISTED] = field(default=EventKind.FILES_LISTED, kw_only=True)
+    type: Literal[EventKind.FILES_LISTED] = field(
+        default=EventKind.FILES_LISTED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -472,7 +508,9 @@ class FileWrittenEvent(BrowserEvent):
     path: str
     size: int
     created: bool
-    type: Literal[EventKind.FILE_WRITTEN] = field(default=EventKind.FILE_WRITTEN, kw_only=True)
+    type: Literal[EventKind.FILE_WRITTEN] = field(
+        default=EventKind.FILE_WRITTEN, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -482,21 +520,27 @@ class FileOpenedEvent(BrowserEvent):
     path: str
     source: FileSource
     download_id: str = ""
-    type: Literal[EventKind.FILE_OPENED] = field(default=EventKind.FILE_OPENED, kw_only=True)
+    type: Literal[EventKind.FILE_OPENED] = field(
+        default=EventKind.FILE_OPENED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class FilesUploadedEvent(BrowserEvent):
     paths: tuple[str, ...]
     ref: str
-    type: Literal[EventKind.FILES_UPLOADED] = field(default=EventKind.FILES_UPLOADED, kw_only=True)
+    type: Literal[EventKind.FILES_UPLOADED] = field(
+        default=EventKind.FILES_UPLOADED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class ActionStartedEvent(BrowserEvent):
     action_id: str
     kind: ActionKind
-    type: Literal[EventKind.ACTION_STARTED] = field(default=EventKind.ACTION_STARTED, kw_only=True)
+    type: Literal[EventKind.ACTION_STARTED] = field(
+        default=EventKind.ACTION_STARTED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -526,7 +570,9 @@ class ActionFailedEvent(BrowserEvent):
     kind: ActionKind
     dispatched: bool
     reason: str
-    type: Literal[EventKind.ACTION_FAILED] = field(default=EventKind.ACTION_FAILED, kw_only=True)
+    type: Literal[EventKind.ACTION_FAILED] = field(
+        default=EventKind.ACTION_FAILED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -594,20 +640,26 @@ class NudgeQueuedEvent(BrowserEvent):
     key: str
     text: str
     cause_id: str
-    type: Literal[EventKind.NUDGE_QUEUED] = field(default=EventKind.NUDGE_QUEUED, kw_only=True)
+    type: Literal[EventKind.NUDGE_QUEUED] = field(
+        default=EventKind.NUDGE_QUEUED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class NudgeIncludedEvent(BrowserEvent):
     nudge_ids: tuple[str, ...]
     request_id: str
-    type: Literal[EventKind.NUDGE_INCLUDED] = field(default=EventKind.NUDGE_INCLUDED, kw_only=True)
+    type: Literal[EventKind.NUDGE_INCLUDED] = field(
+        default=EventKind.NUDGE_INCLUDED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class NudgeExpiredEvent(BrowserEvent):
     nudge_id: str
-    type: Literal[EventKind.NUDGE_EXPIRED] = field(default=EventKind.NUDGE_EXPIRED, kw_only=True)
+    type: Literal[EventKind.NUDGE_EXPIRED] = field(
+        default=EventKind.NUDGE_EXPIRED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -616,7 +668,9 @@ class SecretEnteredEvent(BrowserEvent):
 
     names: tuple[str, ...]
     origin: str
-    type: Literal[EventKind.SECRET_ENTERED] = field(default=EventKind.SECRET_ENTERED, kw_only=True)
+    type: Literal[EventKind.SECRET_ENTERED] = field(
+        default=EventKind.SECRET_ENTERED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -631,7 +685,9 @@ class HandoffRequestedEvent(BrowserEvent):
     )
 
 
-type HandoffStatus = Literal["done", "declined", "timeout", "cancelled", "failed", "resumed"]
+type HandoffStatus = Literal[
+    "done", "declined", "timeout", "cancelled", "failed", "resumed"
+]
 
 
 @dataclass(frozen=True, slots=True)

@@ -87,11 +87,16 @@ class ChromeProcess:
                 except OSError as error:
                     # Chrome helpers can retain handles or repopulate profile
                     # directories briefly after the browser parent exits.
-                    if not isinstance(error, PermissionError) and error.errno != errno.ENOTEMPTY:
+                    if (
+                        not isinstance(error, PermissionError)
+                        and error.errno != errno.ENOTEMPTY
+                    ):
                         raise
                     if asyncio.get_running_loop().time() >= deadline:
                         # A leftover temp profile is not worth failing the session for.
-                        await asyncio.to_thread(shutil.rmtree, profile.name, ignore_errors=True)
+                        await asyncio.to_thread(
+                            shutil.rmtree, profile.name, ignore_errors=True
+                        )
                         self._profile = None
                         break
                     await asyncio.sleep(0.1)
@@ -129,6 +134,10 @@ def _active_endpoint(path: Path) -> str | None:
     except (FileNotFoundError, PermissionError):
         # Chrome can still hold the port file while publishing its endpoint on Windows.
         return None
-    if len(lines) >= 2 and lines[0].isdigit() and lines[1].startswith("/devtools/browser/"):
+    if (
+        len(lines) >= 2
+        and lines[0].isdigit()
+        and lines[1].startswith("/devtools/browser/")
+    ):
         return f"ws://127.0.0.1:{lines[0]}{lines[1]}"
     return None

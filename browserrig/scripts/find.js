@@ -98,7 +98,9 @@ function browserrigFind({queries, session, active, start, count, reveal, clip, c
 
   function visitDetails(details, depth) {
     // A closed <details> shows only its summary; the rest is found and opened on demand.
-    const summary = [...details.children].find((child) => child.localName === 'summary');
+    const summary = [...details.children].find(
+      (child) => child.localName === 'summary',
+    );
     for (const child of details.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
         addText(child, true);
@@ -163,12 +165,18 @@ function browserrigFind({queries, session, active, start, count, reveal, clip, c
   const mutation = state.stability?.last ?? -1;
   const cached = state.findIndex;
   const index =
-    cached && session && cached.session === session && mutation >= 0 && cached.mutation === mutation
+    cached &&
+    session &&
+    cached.session === session &&
+    mutation >= 0 &&
+    cached.mutation === mutation
       ? cached
       : build();
   state.findIndex = index;
   const {chars, nodes, offsets, hidden, headings, unitChar, haystack} = index;
-  const needles = queries.map((query) => [...query.replace(/\s+/g, ' ').trim()].map(fold).join(''));
+  const needles = queries.map((query) =>
+    [...query.replace(/\s+/g, ' ').trim()].map(fold).join(''),
+  );
 
   function rangeFor(first, last) {
     const range = document.createRange();
@@ -193,7 +201,9 @@ function browserrigFind({queries, session, active, start, count, reveal, clip, c
   }
 
   // All alternatives in page order; of overlapping ones the earlier, then longer, wins.
-  const hits = needles.flatMap(occurrences).sort((a, b) => a.at - b.at || b.end - a.end);
+  const hits = needles
+    .flatMap(occurrences)
+    .sort((a, b) => a.at - b.at || b.end - a.end);
   const counts = needles.map(() => 0);
   const matches = [];
   let reached = 0;
@@ -232,7 +242,9 @@ function browserrigFind({queries, session, active, start, count, reveal, clip, c
   }
 
   function collapsedMatch(match) {
-    return hidden[match.first] && Boolean(match.range) && folded(match.range.startContainer);
+    return (
+      hidden[match.first] && Boolean(match.range) && folded(match.range.startContainer)
+    );
   }
 
   function rectsOf(match) {
@@ -243,7 +255,9 @@ function browserrigFind({queries, session, active, start, count, reveal, clip, c
     }
     return [...range.getClientRects()]
       .filter((rect) => rect.width > 0 && rect.height > 0)
-      .map((rect) => [rect.x, rect.y, rect.width, rect.height].map((v) => Math.round(v * 10) / 10));
+      .map((rect) =>
+        [rect.x, rect.y, rect.width, rect.height].map((v) => Math.round(v * 10) / 10),
+      );
   }
 
   function inView([x, y, width, height]) {
@@ -295,7 +309,9 @@ function browserrigFind({queries, session, active, start, count, reveal, clip, c
       scrollBy({top: middle, behavior: 'instant'});
     }
     const after = range.getBoundingClientRect();
-    return Math.abs(after.top - before.top) > 0.5 || Math.abs(after.left - before.left) > 0.5;
+    return (
+      Math.abs(after.top - before.top) > 0.5 || Math.abs(after.left - before.left) > 0.5
+    );
   }
 
   const current = matches[active];

@@ -9,5 +9,7 @@ function browserrigFocused(_args) {
     }
     active = inner;
   }
-  return active && active !== document.body && active !== document.documentElement ? active : null;
+  return active && active !== document.body && active !== document.documentElement
+    ? active
+    : null;
 }

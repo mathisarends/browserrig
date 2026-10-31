@@ -14,7 +14,9 @@ in viewport:
 
 
 def test_changed_lines_keep_their_section_and_group_lines():
-    current = BASE.replace('[3] textbox "Email"', '[3] textbox "Email" value="a@b.c" focused')
+    current = BASE.replace(
+        '[3] textbox "Email"', '[3] textbox "Email" value="a@b.c" focused'
+    )
     assert delta(BASE, current).split("\n") == [
         *HEADER.split("\n"),
         "",
@@ -37,7 +39,10 @@ def test_element_after_a_group_is_not_placed_inside_it():
 
 def test_removed_section_and_unchanged_body():
     current = BASE.replace('  [HEADER]\n    [1] link "Home" -> /\n', "")
-    assert delta(BASE, current).split("\n")[-2:] == ["- [HEADER]", '-   [1] link "Home" -> /']
+    assert delta(BASE, current).split("\n")[-2:] == [
+        "- [HEADER]",
+        '-   [1] link "Home" -> /',
+    ]
     assert delta(BASE, BASE).endswith(INTRO + "\n  (no changes)")
 
 

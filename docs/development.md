@@ -30,7 +30,7 @@ uv build
 ```
 
 prek hooks use the uv and npm dependencies pinned in the lockfiles.
-The existing `.pre-commit-config.yaml` configures the checks; `--overwrite` replaces
+The existing `.pre-commit-config.yml` configures the checks; `--overwrite` replaces
 any previously installed pre-commit hook.
 On Linux and macOS, use `npm` instead of `npm.cmd` and `cp .env.example .env`
 instead of `Copy-Item`.

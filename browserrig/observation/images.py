@@ -31,7 +31,9 @@ class TrimInBatches:
 
     def __init__(self, max_images: int = 1, min_images: int | None = None) -> None:
         if min_images is None:
-            min_images = max(1, max_images // 2) if _positive(max_images) else max_images
+            min_images = (
+                max(1, max_images // 2) if _positive(max_images) else max_images
+            )
         if not _positive(max_images) or not _positive(min_images):
             raise ValueError("max_images and min_images must be positive integers")
         if min_images > max_images:
@@ -97,7 +99,11 @@ class ImageContext(Plugin, needs=(Observe,)):
     @hook(ObservationCapturedEvent)
     async def _captured(self, event: ObservationCapturedEvent) -> None:
         snapshot = self._observe.snapshot
-        if snapshot is None or snapshot.id != event.observation_id or snapshot.image is None:
+        if (
+            snapshot is None
+            or snapshot.id != event.observation_id
+            or snapshot.image is None
+        ):
             return
         images = self._state.images
         if any(image.id == snapshot.id for image in images):
@@ -111,7 +117,9 @@ class ImageContext(Plugin, needs=(Observe,)):
             del images[:overflow]
 
     @hook(PreStep)
-    async def _before_step(self, event: PreStep, next_: Next[StepDecision]) -> StepDecision:
+    async def _before_step(
+        self, event: PreStep, next_: Next[StepDecision]
+    ) -> StepDecision:
         # Wrap capture regardless of plugin order; session.observe replaces its pending source.
         decision = await next_()
         snapshot = self._observe.snapshot
@@ -139,7 +147,9 @@ class ImageContext(Plugin, needs=(Observe,)):
         return decision
 
     @hook(PrepareRequest)
-    async def _prepare(self, event: PrepareRequest, next_: Next[ModelRequest]) -> ModelRequest:
+    async def _prepare(
+        self, event: PrepareRequest, next_: Next[ModelRequest]
+    ) -> ModelRequest:
         request = await next_()
         retained = {image.id for image in self._state.images}
         included = event.session.log.included_observations(request)
@@ -176,9 +186,18 @@ class ImageContext(Plugin, needs=(Observe,)):
     @hook(ObservationsIncludedEvent)
     async def _included(self, event: ObservationsIncludedEvent) -> None:
         # Receipts reflect compaction and transformations after PrepareRequest as well.
-        refs = {ref for item in event.observations if item.source == "browser" for ref in item.refs}
-        self._state.images[:] = [image for image in self._state.images if image.id in refs]
-        self._observe.image_delivered(self._state.images[-1] if self._state.images else None)
+        refs = {
+            ref
+            for item in event.observations
+            if item.source == "browser"
+            for ref in item.refs
+        }
+        self._state.images[:] = [
+            image for image in self._state.images if image.id in refs
+        ]
+        self._observe.image_delivered(
+            self._state.images[-1] if self._state.images else None
+        )
 
     def _note(self, event: PreStep) -> None:
         # Recorded once per change, so earlier requests stay a prefix of later ones.

@@ -2,7 +2,16 @@ import io
 import json
 from dataclasses import dataclass
 
-from harnessed import Agent, Inject, Plugin, SessionLog, ToolCall, ToolResult, ToolStatus, hook
+from harnessed import (
+    Agent,
+    Inject,
+    Plugin,
+    SessionLog,
+    ToolCall,
+    ToolResult,
+    ToolStatus,
+    hook,
+)
 from harnessed.events import (
     CompactionFinishedEvent,
     CompactionStartedEvent,
@@ -26,7 +35,9 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
         @hook(ModelRequestedEvent)
         async def input(self, _event: ModelRequestedEvent, log: Inject[SessionLog]):
             await log.emit(KeyPressedEvent(key="x", action_id="action-1"))
-            await log.emit(WaitingEvent(duration=2, browser_id="browser-1", target_id="tab-1"))
+            await log.emit(
+                WaitingEvent(duration=2, browser_id="browser-1", target_id="tab-1")
+            )
 
     output = io.StringIO()
     model = ScriptedModel(["Final answer"])
@@ -58,7 +69,9 @@ def test_terminal_omits_arbitrary_page_and_form_value_fields():
         text: str
         type: str = "test.form"
 
-    record = _event_record(FormEvent(value="private form", message="page dialog", text="page text"))
+    record = _event_record(
+        FormEvent(value="private form", message="page dialog", text="page text")
+    )
     assert not {"text", "message", "value"} & record.keys()
 
 
@@ -85,14 +98,18 @@ async def test_terminal_reports_correlated_compaction_and_attempts_without_inven
     async with agent.session() as session:
         for event in events:
             await session.emit(event)
-        assert not any(isinstance(item, type(event)) for item in session.events for event in events)
+        assert not any(
+            isinstance(item, type(event)) for item in session.events for event in events
+        )
     records = [json.loads(line) for line in output.getvalue().splitlines()]
     activity = [r for r in records if r.get("compaction_id") or r.get("retry_group_id")]
     assert len(activity) == len(events)
     assert activity[0]["compaction_id"] == activity[-1]["compaction_id"] == "compact-1"
     assert activity[1]["attempt"] is None and activity[1]["retry_count"] is None
     assert activity[2]["retry_kind"] == "provider" and activity[2]["attempt"] == 1
-    assert activity[3]["outcome"] == "retrying" and activity[-1]["outcome"] == "discarded"
+    assert (
+        activity[3]["outcome"] == "retrying" and activity[-1]["outcome"] == "discarded"
+    )
 
 
 def test_terminal_distinguishes_skipped_calls_and_chain_breaks_without_result_contents():

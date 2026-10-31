@@ -49,13 +49,24 @@ class OriginPattern:
             parts = urlsplit(text)
             scheme = parts.scheme.lower()
             if scheme not in _DEFAULT_PORTS:
-                raise ValueError(f"Secret domain {pattern!r} needs an http or https origin")
-            if parts.path not in ("", "/") or parts.query or parts.fragment or "@" in text:
-                raise ValueError(f"Secret domain {pattern!r} must be an origin without a path")
+                raise ValueError(
+                    f"Secret domain {pattern!r} needs an http or https origin"
+                )
+            if (
+                parts.path not in ("", "/")
+                or parts.query
+                or parts.fragment
+                or "@" in text
+            ):
+                raise ValueError(
+                    f"Secret domain {pattern!r} must be an origin without a path"
+                )
             try:
                 port = parts.port or _DEFAULT_PORTS[scheme]
             except ValueError:
-                raise ValueError(f"Secret domain {pattern!r} has an invalid port") from None
+                raise ValueError(
+                    f"Secret domain {pattern!r} has an invalid port"
+                ) from None
             host = parts.hostname or ""
         else:
             if any(character in text for character in "/:?#@ \\"):
@@ -122,13 +133,17 @@ class Secret:
     origins: tuple[OriginPattern, ...] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        domains = (self.domains,) if isinstance(self.domains, str) else tuple(self.domains)
+        domains = (
+            (self.domains,) if isinstance(self.domains, str) else tuple(self.domains)
+        )
         if not domains:
             raise ValueError("A secret needs at least one domain")
         if not isinstance(self.value, str) and not callable(self.value):
             raise TypeError("A secret value must be text or a callable returning text")
         object.__setattr__(self, "domains", domains)
-        object.__setattr__(self, "origins", tuple(OriginPattern.parse(d) for d in domains))
+        object.__setattr__(
+            self, "origins", tuple(OriginPattern.parse(d) for d in domains)
+        )
 
     @property
     def rotating(self) -> bool:
@@ -187,11 +202,20 @@ class Totp:
         period: int = 30,
         digest: str = "sha1",
     ) -> None:
-        if not 6 <= digits <= 10 or period <= 0 or digest not in {"sha1", "sha256", "sha512"}:
+        if (
+            not 6 <= digits <= 10
+            or period <= 0
+            or digest not in {"sha1", "sha256", "sha512"}
+        ):
             raise ValueError("Invalid TOTP settings")
         if isinstance(seed, str):
             _key(seed)
-        self._seed, self._digits, self._period, self._digest = seed, digits, period, digest
+        self._seed, self._digits, self._period, self._digest = (
+            seed,
+            digits,
+            period,
+            digest,
+        )
 
     def __repr__(self) -> str:
         return f"Totp(digits={self._digits}, period={self._period})"
@@ -209,7 +233,11 @@ class Totp:
 
 
 def totp(
-    seed: str | Callable[[], str], *, digits: int = 6, period: int = 30, digest: str = "sha1"
+    seed: str | Callable[[], str],
+    *,
+    digits: int = 6,
+    period: int = 30,
+    digest: str = "sha1",
 ) -> Totp:
     """A one-time code generator for a base32 seed, e.g. `totp(env("GITHUB_TOTP_SEED"))`."""
     return Totp(seed, digits=digits, period=period, digest=digest)

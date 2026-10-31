@@ -51,7 +51,10 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
         assert not snapshot.limitations
         before = await evaluate(tab, "[document.documentElement.outerHTML, scrollY]")
         content = await extract_content(tab)
-        assert await evaluate(tab, "[document.documentElement.outerHTML, scrollY]") == before
+        assert (
+            await evaluate(tab, "[document.documentElement.outerHTML, scrollY]")
+            == before
+        )
         assert content.url == site + "/" and content.title == "Test form"
         assert not content.limitations
         text = content.markdown
@@ -87,7 +90,9 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
             "Transparent",
         ):
             assert excluded not in text
-        button = next(element for element in snapshot.elements if element.name == "Continue")
+        button = next(
+            element for element in snapshot.elements if element.name == "Continue"
+        )
         await (await tab.main_frame()).run_on_node(
             button.backend_id,
             ELEMENT,
@@ -100,7 +105,8 @@ async def test_markdown_limits_are_explicit_and_output_is_bounded(site):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(
-            tab, "document.body.innerHTML = '<h1>Heading</h1><p>'+'x'.repeat(500)+'</p>'"
+            tab,
+            "document.body.innerHTML = '<h1>Heading</h1><p>'+'x'.repeat(500)+'</p>'",
         )
         content = await extract_content(tab, max_chars=40)
         assert len(content.markdown) <= 40
@@ -138,7 +144,9 @@ async def test_offset_reads_a_long_page_in_parts_without_losing_lines(site):
 
 
 @pytest.mark.parametrize("article_chars", [400, 20])
-async def test_main_region_replaces_page_chrome_unless_it_holds_too_little(site, article_chars):
+async def test_main_region_replaces_page_chrome_unless_it_holds_too_little(
+    site, article_chars
+):
     markup = (
         "<header><a href='/login'>Sign in</a></header><nav><a href='/news'>News</a></nav>"
         f"<main><h1>Article</h1><p>{'word ' * (article_chars // 5)}</p></main>"
@@ -206,7 +214,8 @@ async def test_markdown_includes_available_frame_documents(site, cross_origin):
         tab = browser.active_tab
         origin = site.replace("127.0.0.1", "localhost") if cross_origin else site
         await evaluate(
-            tab, f"document.querySelector('iframe').src = {json.dumps(origin + '/other')}"
+            tab,
+            f"document.querySelector('iframe').src = {json.dumps(origin + '/other')}",
         )
         await wait_for_page(tab)
         content = await extract_content(tab)
@@ -320,6 +329,8 @@ async def test_collapsed_menus_and_site_chrome_are_left_out_without_main_landmar
     assert "# Pricing" in content.markdown and "Plan header" in content.markdown
     for chrome in ("Sign in", "News", "Imprint"):
         assert chrome not in content.markdown and chrome in full.markdown
-    assert "Mega menu entry" not in full.markdown and "Closed panel" not in full.markdown
+    assert (
+        "Mega menu entry" not in full.markdown and "Closed panel" not in full.markdown
+    )
     assert any("full_page=true" in item for item in content.limitations)
     assert not any("full_page=true" in item for item in full.limitations)

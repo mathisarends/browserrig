@@ -22,13 +22,21 @@ class CursorPath:
 
         def bounded(x: float, y: float) -> tuple[float, float]:
             return (
-                max(min(self.start.x, self.end.x), min(max(self.start.x, self.end.x), x)),
-                max(min(self.start.y, self.end.y), min(max(self.start.y, self.end.y), y)),
+                max(
+                    min(self.start.x, self.end.x), min(max(self.start.x, self.end.x), x)
+                ),
+                max(
+                    min(self.start.y, self.end.y), min(max(self.start.y, self.end.y), y)
+                ),
             )
 
         return (
-            bounded(self.start.x + dx * 0.3 - dy * 0.06, self.start.y + dy * 0.3 + dx * 0.06),
-            bounded(self.start.x + dx * 0.7 - dy * 0.04, self.start.y + dy * 0.7 + dx * 0.04),
+            bounded(
+                self.start.x + dx * 0.3 - dy * 0.06, self.start.y + dy * 0.3 + dx * 0.06
+            ),
+            bounded(
+                self.start.x + dx * 0.7 - dy * 0.04, self.start.y + dy * 0.7 + dx * 0.04
+            ),
         )
 
     @property

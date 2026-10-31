@@ -47,13 +47,18 @@ async def test_root_events_reach_downloads_and_session_events_reach_their_tab():
     await browser._handle(dialog, "unknown-session")
     await browser._handle(
         DownloadWillBeginEvent(
-            frame_id="frame", guid="id", url="https://example.org", suggested_filename="a.txt"
+            frame_id="frame",
+            guid="id",
+            url="https://example.org",
+            suggested_filename="a.txt",
         ),
         None,
     )
     assert tab.dialog == ("confirm", "Sure?")
     opened = [event for event in events if isinstance(event, DialogOpenedEvent)]
-    assert [(event.target_id, event.document_id) for event in opened] == [("tab", "doc")]
+    assert [(event.target_id, event.document_id) for event in opened] == [
+        ("tab", "doc")
+    ]
     assert [download.id for download in await browser.downloads()] == ["id"]
 
 
@@ -79,7 +84,9 @@ async def test_concurrent_attaches_publish_exactly_one_open_event():
 async def test_close_forgets_sessions_and_ignores_stale_target_listing(monkeypatch):
     browser, events = _browser()
     closed = await browser._attach("closing")
-    remaining = Tab("remaining", SimpleNamespace(page=SimpleNamespace(bring_to_front=AsyncMock())))
+    remaining = Tab(
+        "remaining", SimpleNamespace(page=SimpleNamespace(bring_to_front=AsyncMock()))
+    )
     browser._active = closed.id
     browser.client.target.get_targets.return_value = SimpleNamespace(
         target_infos=[
@@ -111,7 +118,9 @@ async def test_failed_startup_does_not_emit_disconnected():
     assert not any(isinstance(event, DisconnectedEvent) for event in events)
 
 
-async def test_frame_cache_is_action_scoped_and_invalidated_by_layout_and_document(monkeypatch):
+async def test_frame_cache_is_action_scoped_and_invalidated_by_layout_and_document(
+    monkeypatch,
+):
     browser, _ = _browser()
     tab = await browser._attach("tab")
     browser.client.target.get_targets.return_value = SimpleNamespace(target_infos=[])
@@ -135,7 +144,9 @@ async def test_frame_cache_is_action_scoped_and_invalidated_by_layout_and_docume
 async def test_main_frame_query_does_not_update_document_metadata():
     browser, _ = _browser()
     tab = await browser._attach("tab")
-    frame = SimpleNamespace(id="frame", loader_id="new-document", url="https://example.org")
+    frame = SimpleNamespace(
+        id="frame", loader_id="new-document", url="https://example.org"
+    )
     tab.cdp.page.get_frame_tree.return_value = SimpleNamespace(
         frame_tree=SimpleNamespace(frame=frame)
     )
@@ -179,7 +190,9 @@ def _browser():
             get_frame_tree=AsyncMock(
                 return_value=SimpleNamespace(
                     frame_tree=SimpleNamespace(
-                        frame=SimpleNamespace(id="frame", loader_id="doc", url="about:blank")
+                        frame=SimpleNamespace(
+                            id="frame", loader_id="doc", url="about:blank"
+                        )
                     )
                 )
             ),
@@ -190,7 +203,9 @@ def _browser():
         is_connected=True,
         session=Mock(return_value=cdp),
         target=SimpleNamespace(
-            attach_to_target=AsyncMock(return_value=SimpleNamespace(session_id="session")),
+            attach_to_target=AsyncMock(
+                return_value=SimpleNamespace(session_id="session")
+            ),
             detach_from_target=AsyncMock(),
             close_target=AsyncMock(),
             get_targets=AsyncMock(),

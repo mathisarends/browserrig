@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: uv sync --locked --extra openai --extra mcp --extra otel
-      - run: uv run --no-sync prek validate-config .pre-commit-config.yaml
+      - run: uv run --no-sync prek validate-config .pre-commit-config.yml
       - run: uv run --no-sync ruff check browserrig examples tests
       - run: uv run --no-sync ruff format --check browserrig examples tests
       - run: uv run --no-sync pylint browserrig examples tests

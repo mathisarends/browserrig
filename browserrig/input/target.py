@@ -19,7 +19,9 @@ class InputTarget(Protocol):
 
     async def dispatch_mouse(
         self,
-        kind: Literal[MouseEventKind.MOVED, MouseEventKind.PRESSED, MouseEventKind.RELEASED],
+        kind: Literal[
+            MouseEventKind.MOVED, MouseEventKind.PRESSED, MouseEventKind.RELEASED
+        ],
         point: Point,
         *,
         button: MouseButton,
@@ -27,7 +29,9 @@ class InputTarget(Protocol):
         click_count: int,
     ) -> None: ...
 
-    async def dispatch_wheel(self, point: Point, *, delta_x: float, delta_y: float) -> None: ...
+    async def dispatch_wheel(
+        self, point: Point, *, delta_x: float, delta_y: float
+    ) -> None: ...
 
     async def dispatch_key(
         self,

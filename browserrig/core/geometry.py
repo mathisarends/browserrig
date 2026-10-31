@@ -67,7 +67,10 @@ class FrameTransform:
     def child(self, quad: list[float], width: float, height: float) -> FrameTransform:
         """Compose an embedded frame's transform from its content quad in this space."""
         # Perspective needs a homography. Reject it instead of dispatching a wrong click.
-        if any(abs(quad[i] + quad[i + 4] - quad[i + 2] - quad[(i + 6) % 8]) > 0.5 for i in (0, 1)):
+        if any(
+            abs(quad[i] + quad[i + 4] - quad[i + 2] - quad[(i + 6) % 8]) > 0.5
+            for i in (0, 1)
+        ):
             raise ValueError("Perspective-transformed frames are not supported")
         origin = self.to_viewport(quad[0], quad[1])
         right = self.to_viewport(quad[2], quad[3])
@@ -113,24 +116,34 @@ class Region(Options):
     width: float = Field(gt=0)
     height: float = Field(gt=0)
 
-    def capture(self, viewport: Bounds, zoom: float, max_side: float) -> Geometry | None:
+    def capture(
+        self, viewport: Bounds, zoom: float, max_side: float
+    ) -> Geometry | None:
         """Clip to `viewport` and cap `zoom` so no image side exceeds `max_side` pixels."""
-        visible = Bounds(x=self.x, y=self.y, width=self.width, height=self.height).intersect(
-            Bounds(x=0, y=0, width=viewport.width, height=viewport.height)
-        )
+        visible = Bounds(
+            x=self.x, y=self.y, width=self.width, height=self.height
+        ).intersect(Bounds(x=0, y=0, width=viewport.width, height=viewport.height))
         if visible.width < 1 or visible.height < 1:
             return None
         scale = max(1.0, min(zoom, max_side / max(visible.width, visible.height)))
         return Geometry(
-            x=visible.x, y=visible.y, width=visible.width, height=visible.height, scale=scale
+            x=visible.x,
+            y=visible.y,
+            width=visible.width,
+            height=visible.height,
+            scale=scale,
         )
 
 
-def _enclosing(bounds: Bounds, transform: Callable[[float, float], tuple[float, float]]) -> Bounds:
+def _enclosing(
+    bounds: Bounds, transform: Callable[[float, float], tuple[float, float]]
+) -> Bounds:
     points = [
         transform(x, y)
         for x in (bounds.x, bounds.x + bounds.width)
         for y in (bounds.y, bounds.y + bounds.height)
     ]
     xs, ys = zip(*points, strict=True)
-    return Bounds(x=min(xs), y=min(ys), width=max(xs) - min(xs), height=max(ys) - min(ys))
+    return Bounds(
+        x=min(xs), y=min(ys), width=max(xs) - min(xs), height=max(ys) - min(ys)
+    )

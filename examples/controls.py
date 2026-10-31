@@ -12,7 +12,9 @@ from browserrig import BrowserAgent, LaunchBrowser
 
 
 async def main() -> None:
-    parser = argparse.ArgumentParser(description="Native Harnessed steering, pause and resume")
+    parser = argparse.ArgumentParser(
+        description="Native Harnessed steering, pause and resume"
+    )
     parser.add_argument("--url", default="https://example.com")
     parser.add_argument("--task", default="Inspect the page and describe it.")
     args = parser.parse_args()
@@ -27,7 +29,9 @@ async def main() -> None:
         handle = await session.submit(args.task)
         await session.pause()  # Wait for the current complete step, if already running.
         print("Paused:", session.status)
-        await session.steer("Pay particular attention to the navigation and contact information.")
+        await session.steer(
+            "Pay particular attention to the navigation and contact information."
+        )
         await session.context.set("constraints", "Do not submit forms.")
         await session.resume()
         print((await handle.result()).text)

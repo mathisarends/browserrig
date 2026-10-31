@@ -33,7 +33,9 @@ def test_action_page_state_roundtrips_as_a_typed_nested_value():
         action_id="action",
         kind="click",
         after_url="https://example.org/",
-        before=events.PageState(url="https://example.org/", document_id="document", scroll_y=100),
+        before=events.PageState(
+            url="https://example.org/", document_id="document", scroll_y=100
+        ),
     )
     restored = registry.decode(registry.encode(event))
     assert restored == event
@@ -58,4 +60,7 @@ def test_each_tag_has_one_literal_enum_and_matching_default(kind):
     values = get_args(get_type_hints(kind)["type"])
     assert len(values) == 1
     assert isinstance(values[0], events.EventKind)
-    assert next(field.default for field in fields(kind) if field.name == "type") is values[0]
+    assert (
+        next(field.default for field in fields(kind) if field.name == "type")
+        is values[0]
+    )

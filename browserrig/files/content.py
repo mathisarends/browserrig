@@ -29,7 +29,9 @@ class ParsedContent:
     def result(self, **fields) -> FileContent:
         return FileContent(
             format=self.format,
-            status="partial" if self.status == "complete" and self.limitations else self.status,
+            status="partial"
+            if self.status == "complete" and self.limitations
+            else self.status,
             limitations=tuple(dict.fromkeys(self.limitations)),
             page_number=self.page_number,
             page_count=self.page_count,
@@ -43,5 +45,9 @@ class ParsedContent:
 
 def cell_text(value: object) -> str:
     return (
-        str(value).replace("\\", "\\\\").replace("|", "\\|").replace("\r", "").replace("\n", "<br>")
+        str(value)
+        .replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("\r", "")
+        .replace("\n", "<br>")
     )

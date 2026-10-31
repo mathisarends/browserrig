@@ -73,10 +73,16 @@ class Script[A: BaseModel, R]:
 
 
 ELEMENT: Script[ElementArgs, Any] = Script.load(
-    "element", ElementArgs, Any, uses=("geometry", "composed", "visibility", "hit", "elements")
+    "element",
+    ElementArgs,
+    Any,
+    uses=("geometry", "composed", "visibility", "hit", "elements"),
 )
 SCROLL: Script[ScrollArgs, ScrollPlan | None] = Script.load(
-    "scroll", ScrollArgs, ScrollPlan | None, uses=("geometry", "composed", "elements", "scroll")
+    "scroll",
+    ScrollArgs,
+    ScrollPlan | None,
+    uses=("geometry", "composed", "elements", "scroll"),
 )
 SCROLL_OWNER: Script[OwnerScrollArgs, ScrollPlan | None] = Script.load(
     "owner_scroll",
@@ -85,21 +91,31 @@ SCROLL_OWNER: Script[OwnerScrollArgs, ScrollPlan | None] = Script.load(
     uses=("geometry", "composed", "elements", "scroll"),
 )
 CONTENT: Script[ContentArgs, ContentExtraction] = Script.load(
-    "content", ContentArgs, ContentExtraction, uses=("composed", "visibility", "markdown")
+    "content",
+    ContentArgs,
+    ContentExtraction,
+    uses=("composed", "visibility", "markdown"),
 )
-FIND: Script[FindArgs, FindResult] = Script.load("find", FindArgs, FindResult, uses=("composed",))
+FIND: Script[FindArgs, FindResult] = Script.load(
+    "find", FindArgs, FindResult, uses=("composed",)
+)
 STABILITY: Script[ScriptArgs, DOMProbe] = Script.load("stability", ScriptArgs, DOMProbe)
 SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))
 RESET: Script[ScriptArgs, None] = Script.load("reset", ScriptArgs, type(None))
 FOCUSED: Script[ScriptArgs, Any] = Script.load("focused", ScriptArgs, Any)
 CURSOR: Script[CursorArgs, str] = Script.load("cursor", CursorArgs, str)
 TAB_STRIP: Script[ScriptArgs, TabStrip] = Script.load("tab_strip", ScriptArgs, TabStrip)
-PAGE_FACTS: Script[ScriptArgs, PageFacts] = Script.load("page_facts", ScriptArgs, PageFacts)
+PAGE_FACTS: Script[ScriptArgs, PageFacts] = Script.load(
+    "page_facts", ScriptArgs, PageFacts
+)
 VIEWPORT: Script[ScriptArgs, tuple[float, float]] = Script.load(
     "viewport", ScriptArgs, tuple[float, float]
 )
 OWNER_SIZE: Script[ScriptArgs, tuple[float, float] | None] = Script.load(
-    "owner_size", ScriptArgs, tuple[float, float] | None, uses=("composed", "visibility")
+    "owner_size",
+    ScriptArgs,
+    tuple[float, float] | None,
+    uses=("composed", "visibility"),
 )
 OWNER_HITS: Script[OwnerHitsArgs, tuple[bool, ...]] = Script.load(
     "owner_hits",

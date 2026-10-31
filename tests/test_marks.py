@@ -46,15 +46,19 @@ def test_cursor_tip_matches_viewport_and_zoomed_crop_with_or_without_refs(
     with Image.open(BytesIO(base64.b64decode(encoded))) as image:
         assert image.size == (area.width * scale, area.height * scale)
         assert image.getpixel(pixel) == (30, 30, 30)
-        assert image.getpixel((pixel[0] + 2 * scale, pixel[1] + 8 * scale)) == (239, 68, 68)
+        assert image.getpixel((pixel[0] + 2 * scale, pixel[1] + 8 * scale)) == (
+            239,
+            68,
+            68,
+        )
 
 
 @pytest.mark.parametrize("cursor", [(99, 70), (120, 49), (180, 70), (120, 110)])
 def test_cursor_outside_crop_is_omitted(screenshot, cursor):
     area = Bounds(x=100, y=50, width=80, height=60)
-    assert annotate(screenshot, (), area, cursor=Point(x=cursor[0], y=cursor[1])) == annotate(
-        screenshot, (), area
-    )
+    assert annotate(
+        screenshot, (), area, cursor=Point(x=cursor[0], y=cursor[1])
+    ) == annotate(screenshot, (), area)
 
 
 @pytest.mark.parametrize("cursor", [(0, 0), (319, 199)])

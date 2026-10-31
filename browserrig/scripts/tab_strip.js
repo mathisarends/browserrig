@@ -2,7 +2,10 @@ function browserrigTabStrip() {
   // Pick the declared icon closest to tab-strip size; scalable icons fit any size.
   const target = 32;
   const score = (link) => {
-    if (link.type === 'image/svg+xml' || /\bany\b/i.test(link.getAttribute('sizes') ?? '')) {
+    if (
+      link.type === 'image/svg+xml' ||
+      /\bany\b/i.test(link.getAttribute('sizes') ?? '')
+    ) {
       return 0;
     }
     const sizes = (link.getAttribute('sizes') ?? '').match(/\d+/g);

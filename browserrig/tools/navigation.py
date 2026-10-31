@@ -43,7 +43,10 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
             url, actions, ActionKind.NAVIGATE, typed=typed_address(url), new_tab=new_tab
         )
 
-    @tool(kind=ActionKind.SEARCH, description="Search the web with DuckDuckGo in the active tab.")
+    @tool(
+        kind=ActionKind.SEARCH,
+        description="Search the web with DuckDuckGo in the active tab.",
+    )
     async def search(
         self,
         query: str,
@@ -57,7 +60,9 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
             typed=query,
         )
 
-    @tool(kind=ActionKind.GO_BACK, description="Go to the previous browser history entry.")
+    @tool(
+        kind=ActionKind.GO_BACK, description="Go to the previous browser history entry."
+    )
     async def go_back(self, *, actions: Inject[Actions]) -> ToolResult:
         async def back(tab: Tab) -> Effect:
             if not await tab.go_back():
@@ -117,20 +122,32 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
         async with self._browser.action_lock:
             tab = self._browser.active_tab
             await self._events.emit(
-                WaitingEvent(duration=seconds, target_id=tab.id, document_id=tab.document_id)
+                WaitingEvent(
+                    duration=seconds, target_id=tab.id, document_id=tab.document_id
+                )
             )
             await asyncio.sleep(seconds)
         return "Wait completed; the next observation shows the current state."
 
     async def _navigate(
-        self, url: str, actions: Actions, kind: ActionKind, *, typed: str, new_tab: bool = False
+        self,
+        url: str,
+        actions: Actions,
+        kind: ActionKind,
+        *,
+        typed: str,
+        new_tab: bool = False,
     ) -> ToolResult:
         validated_url(url)
 
         async def navigate(tab: Tab) -> Effect:
             # Viewers see the address typed into the bar before the page starts loading.
-            await self._browser.input.type_in_bar(tab, BrowserBar.ADDRESS, typed, submit=True)
-            await self._events.emit(NavigationStartedEvent(target_id=tab.id, url=url, typed=typed))
+            await self._browser.input.type_in_bar(
+                tab, BrowserBar.ADDRESS, typed, submit=True
+            )
+            await self._events.emit(
+                NavigationStartedEvent(target_id=tab.id, url=url, typed=typed)
+            )
             await tab.navigate(url)
             return Effect("Navigation executed.")
 

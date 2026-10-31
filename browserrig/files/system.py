@@ -43,12 +43,17 @@ class FileSystem:
             resolved = self.directory / resolved
         resolved = resolved.resolve()
         if not any(
-            resolved.is_relative_to(root) for root in (self.directory, self.download_directory)
+            resolved.is_relative_to(root)
+            for root in (self.directory, self.download_directory)
         ):
-            raise ValueError("Path is outside the agent workspace and download directory")
+            raise ValueError(
+                "Path is outside the agent workspace and download directory"
+            )
         return resolved
 
-    def list_files(self, path: str = ".", *, offset: int = 0, limit: int = 100) -> FileListing:
+    def list_files(
+        self, path: str = ".", *, offset: int = 0, limit: int = 100
+    ) -> FileListing:
         if offset < 0 or not 1 <= limit <= 200:
             raise ValueError("Use offset >= 0 and a limit between 1 and 200")
         directory = self.resolve(path)
@@ -97,7 +102,11 @@ class FileSystem:
         return self._reader.read(
             resolved,
             ReadRequest(
-                page_number=page_number, sheet=sheet, cell_range=cell_range, member=member, ocr=ocr
+                page_number=page_number,
+                sheet=sheet,
+                cell_range=cell_range,
+                member=member,
+                ocr=ocr,
             ),
             offset,
             max_chars,
@@ -113,7 +122,9 @@ class FileSystem:
                 raise FileNotFoundError(f"Upload requires an existing file: {path}")
         return [str(path) for path in resolved]
 
-    def write_file(self, path: str, content: str, *, overwrite: bool = False) -> FileEntry:
+    def write_file(
+        self, path: str, content: str, *, overwrite: bool = False
+    ) -> FileEntry:
         resolved = self.resolve(path)
         data = content.encode("utf-8")
         if len(data) > self._options.max_file_bytes:
@@ -121,9 +132,13 @@ class FileSystem:
         resolved.parent.mkdir(parents=True, exist_ok=True)
         with resolved.open("wb" if overwrite else "xb") as stream:
             stream.write(data)
-        return FileEntry(path=str(resolved), name=resolved.name, is_directory=False, size=len(data))
+        return FileEntry(
+            path=str(resolved), name=resolved.name, is_directory=False, size=len(data)
+        )
 
-    def complete_download(self, download_id: str, filename: str, path: str | None) -> str:
+    def complete_download(
+        self, download_id: str, filename: str, path: str | None
+    ) -> str:
         if not re.fullmatch(r"[a-zA-Z0-9-]+", download_id):
             raise ValueError("Invalid download ID")
         name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", filename).strip(" .") or "download"
@@ -145,5 +160,7 @@ class FileSystem:
             destination.parent.mkdir(parents=True, exist_ok=True)
             source.rename(destination)
         if not destination.is_file():
-            raise FileNotFoundError("Downloaded file is missing on disk; download it again")
+            raise FileNotFoundError(
+                "Downloaded file is missing on disk; download it again"
+            )
         return str(destination)

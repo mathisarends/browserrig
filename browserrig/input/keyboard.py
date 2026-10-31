@@ -58,7 +58,10 @@ class Keyboard:
     """The browser's one keyboard; each key or text goes to the tab focused when it starts."""
 
     def __init__(
-        self, focus: Focus, *, emit: Callable[[InputTarget, InputEvent], Awaitable[None]]
+        self,
+        focus: Focus,
+        *,
+        emit: Callable[[InputTarget, InputEvent], Awaitable[None]],
     ) -> None:
         self._focus = focus
         self._emit = emit
@@ -72,7 +75,9 @@ class Keyboard:
         hold_alt: bool = False,
         hold_meta: bool = False,
     ) -> None:
-        modifiers = _held(control=hold_control, shift=hold_shift, alt=hold_alt, meta=hold_meta)
+        modifiers = _held(
+            control=hold_control, shift=hold_shift, alt=hold_alt, meta=hold_meta
+        )
         stroke = _key_stroke(key, modifiers)
         target = focused(self._focus)
         try:
@@ -93,9 +98,12 @@ class Keyboard:
     ) -> None:
         """Show a key handled by the browser itself, such as Ctrl+F; nothing reaches the page."""
         stroke = _key_stroke(
-            key, _held(control=hold_control, shift=hold_shift, alt=hold_alt, meta=hold_meta)
+            key,
+            _held(control=hold_control, shift=hold_shift, alt=hold_alt, meta=hold_meta),
         )
-        await self._emit(target, KeyPressedEvent(key=stroke.key, modifiers=stroke.modifiers))
+        await self._emit(
+            target, KeyPressedEvent(key=stroke.key, modifiers=stroke.modifiers)
+        )
 
     async def type_text(
         self,
@@ -168,7 +176,9 @@ class Keyboard:
                 **arguments,
             )
             if text and stroke.key != "Enter":
-                await target.dispatch_key("char", modifiers=flags, text=text, **arguments)
+                await target.dispatch_key(
+                    "char", modifiers=flags, text=text, **arguments
+                )
         await self._emit(
             target,
             KeyPressedEvent(
@@ -211,7 +221,9 @@ def _held(*, control: bool, shift: bool, alt: bool, meta: bool) -> tuple[str, ..
 
 def _key_stroke(value: str, modifiers: tuple[str, ...]) -> _Stroke:
     if len(value) != 1 and value not in _SPECIAL_KEYS:
-        raise BrowserError("Provide one character or a named key such as Escape, Enter or Tab")
+        raise BrowserError(
+            "Provide one character or a named key such as Escape, Enter or Tab"
+        )
     stroke = _character(value) if len(value) == 1 else _Stroke(value)
     modifiers = tuple(dict.fromkeys((*modifiers, *stroke.modifiers)))
     key = stroke.key

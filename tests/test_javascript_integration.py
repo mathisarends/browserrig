@@ -16,7 +16,9 @@ from tests.javascript import evaluate
 pytestmark = pytest.mark.integration
 
 
-async def test_agent_javascript_shell_retains_main_world_state_awaits_and_reports_errors(site):
+async def test_agent_javascript_shell_retains_main_world_state_awaits_and_reports_errors(
+    site,
+):
     url = site
     model = ScriptedModel(
         [
@@ -46,19 +48,28 @@ async def test_agent_javascript_shell_retains_main_world_state_awaits_and_report
     async with agent.session() as session:
         result = await session.run("Run JavaScript", max_steps=5)
         assert result.text == "Done"
-        replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)]
+        replies = [
+            msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)
+        ]
         assert [reply.is_error for reply in replies] == [False, False, True, False]
         assert replies[0].text == "JavaScript result:\n40"
-        assert json.loads(replies[1].text.split("\n", 1)[1]) == {"value": 42, "marker": "main"}
+        assert json.loads(replies[1].text.split("\n", 1)[1]) == {
+            "value": 42,
+            "marker": "main",
+        }
         assert "Error: shell failure" in replies[2].text
         assert replies[3].text == "JavaScript result:\n1"
         tab = session.ctx[Browser].active_tab
         assert await evaluate(tab, "document.title") == "From JavaScript"
         assert await evaluate(tab, "typeof window.shellMarker") == "undefined"
-        finished = [event for event in result.events if isinstance(event, ActionFinishedEvent)]
+        finished = [
+            event for event in result.events if isinstance(event, ActionFinishedEvent)
+        ]
         assert len(finished) == 3
         assert all(event.kind == ActionKind.JAVASCRIPT for event in finished)
-        failed = [event for event in result.events if isinstance(event, ActionFailedEvent)]
+        failed = [
+            event for event in result.events if isinstance(event, ActionFailedEvent)
+        ]
         assert len(failed) == 1 and failed[0].dispatched
 
 
@@ -89,6 +100,8 @@ async def test_runtime_shell_values_and_execution_deadlines_in_chrome(site):
         with pytest.raises(BrowserError, match="JavaScript timed out"):
             await tab.evaluate("await new Promise(() => {})", timeout=0.1)
         assert await tab.evaluate("1 + 1") == "2"
-        with pytest.raises((BrowserError, CDPCommandError), match="terminated|timed out"):
+        with pytest.raises(
+            (BrowserError, CDPCommandError), match="terminated|timed out"
+        ):
             await tab.evaluate("while (true) {}", timeout=0.1)
         assert await tab.evaluate("2 + 2") == "4"

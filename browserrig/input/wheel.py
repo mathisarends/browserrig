@@ -13,7 +13,9 @@ _MAX_SECONDS = 1.5
 
 
 def wheel_duration(distance: float) -> float:
-    return min(_MAX_SECONDS, max(_MIN_SECONDS, math.sqrt(abs(distance)) * FRAME_SECONDS))
+    return min(
+        _MAX_SECONDS, max(_MIN_SECONDS, math.sqrt(abs(distance)) * FRAME_SECONDS)
+    )
 
 
 def wheel_progress(fraction: float) -> float:

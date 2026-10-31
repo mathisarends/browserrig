@@ -51,7 +51,9 @@ async def test_pause_steer_resume_observes_external_page_change(site, handoff_en
             assert len(model.requests) == 1
             if not handoff_enabled:
                 await session.steer("Look for the changed title")
-            await evaluate(holder["browser"].active_tab, "document.title='Changed during pause'")
+            await evaluate(
+                holder["browser"].active_tab, "document.title='Changed during pause'"
+            )
             await session.resume()
             result = await handle.result()
         assert result.text == "Resumed"
@@ -60,13 +62,17 @@ async def test_pause_steer_resume_observes_external_page_change(site, handoff_en
         if handoff_enabled:
             history = json.loads(session.context.values["browser.handoffs"])
             assert history[-1]["status"] == "resumed"
-            assert any("Changed during pause" in change for change in history[-1]["changes"])
+            assert any(
+                "Changed during pause" in change for change in history[-1]["changes"]
+            )
         else:
             assert any(
-                "Look for the changed title" in msg.text for msg in model.requests[-1].messages
+                "Look for the changed title" in msg.text
+                for msg in model.requests[-1].messages
             )
         assert any(
-            isinstance(e, ActivityFinishedEvent) and e.kind == "paused" for e in result.events
+            isinstance(e, ActivityFinishedEvent) and e.kind == "paused"
+            for e in result.events
         )
 
 
@@ -87,7 +93,10 @@ async def test_handoff_observes_human_navigation_and_a_short_lived_popup(site):
         return HumanResponse()
 
     model = ScriptedModel(
-        [call("request_human", reason="Log in", expected_state="Other page visible"), "Continued"]
+        [
+            call("request_human", reason="Log in", expected_state="Other page visible"),
+            "Continued",
+        ]
     )
     agent = BrowserAgent(
         model=model,

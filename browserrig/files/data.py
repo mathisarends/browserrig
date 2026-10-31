@@ -10,7 +10,9 @@ def read_sqlite(path: Path, request: ReadRequest) -> ParsedContent:
     details = ParsedContent((), "sqlite")
 
     def blocks():
-        connection = sqlite3.connect(path.resolve().as_uri() + "?mode=ro&immutable=1", uri=True)
+        connection = sqlite3.connect(
+            path.resolve().as_uri() + "?mode=ro&immutable=1", uri=True
+        )
         try:
             connection.execute("PRAGMA trusted_schema=OFF")
             names = tuple(
@@ -26,7 +28,9 @@ def read_sqlite(path: Path, request: ReadRequest) -> ParsedContent:
                 return
             selected = request.sheet or names[0]
             if selected not in names:
-                raise ValueError(f"Unknown table {selected!r}; available: {', '.join(names)}")
+                raise ValueError(
+                    f"Unknown table {selected!r}; available: {', '.join(names)}"
+                )
             details.sheet = selected
             quoted = '"' + selected.replace('"', '""') + '"'
             cursor = connection.execute(f"SELECT * FROM {quoted}")
@@ -59,7 +63,9 @@ def read_sqlite(path: Path, request: ReadRequest) -> ParsedContent:
 
 def read_media(path: Path) -> ParsedContent:
     media = mutagen.File(path)
-    blocks = [f"# Media file\n\nName: {path.name}\nSize: {path.stat().st_size} bytes\n\n"]
+    blocks = [
+        f"# Media file\n\nName: {path.name}\nSize: {path.stat().st_size} bytes\n\n"
+    ]
     if media is not None:
         for name in ("length", "bitrate", "sample_rate", "channels"):
             value = getattr(media.info, name, None)
@@ -68,6 +74,8 @@ def read_media(path: Path) -> ParsedContent:
     return ParsedContent(
         blocks,
         path.suffix.lstrip("."),
-        ["Metadata only; audio transcription and video understanding are not available"],
+        [
+            "Metadata only; audio transcription and video understanding are not available"
+        ],
         status="metadata_only",
     )

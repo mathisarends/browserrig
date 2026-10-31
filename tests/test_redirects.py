@@ -18,8 +18,14 @@ def _bing(target: str) -> str:
             _bing("https://docs.python.org/3/library/asyncio.html"),
             "https://docs.python.org/3/library/asyncio.html",
         ),
-        (_bing("/images/search?q=asyncio"), "https://www.bing.com/images/search?q=asyncio"),
-        ("https://www.google.de/url?q=https://example.org/a&sa=U", "https://example.org/a"),
+        (
+            _bing("/images/search?q=asyncio"),
+            "https://www.bing.com/images/search?q=asyncio",
+        ),
+        (
+            "https://www.google.de/url?q=https://example.org/a&sa=U",
+            "https://example.org/a",
+        ),
         (
             "https://duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.org%2Fb&rut=x",
             "https://example.org/b",
@@ -58,5 +64,7 @@ def test_other_links_and_unsafe_targets_stay_unchanged(href):
         ("Small", "", "Small"),
     ],
 )
-def test_chrome_names_win_unless_they_only_differ_in_presentation(own, chrome, expected):
+def test_chrome_names_win_unless_they_only_differ_in_presentation(
+    own, chrome, expected
+):
     assert preferred(own, chrome) == expected

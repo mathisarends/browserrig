@@ -50,7 +50,13 @@ class FormTools(Plugin, needs=(Actions, Observe)):
     ) -> ToolResult:
         async def check(tab: Tab) -> None:
             handle = await self._observe.element(tab, ref)
-            if handle.element.input_type not in {"date", "time", "datetime-local", "month", "week"}:
+            if handle.element.input_type not in {
+                "date",
+                "time",
+                "datetime-local",
+                "month",
+                "week",
+            }:
                 raise BrowserError("Element is not a native date/time input")
 
         async def set_date(tab: Tab) -> Effect:

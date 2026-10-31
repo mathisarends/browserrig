@@ -11,7 +11,13 @@ from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
 from harnessed import ToolError
 from pypdf import PdfReader, PdfWriter
 
-from browserrig import ChromeBrowser, ConnectBrowser, FileSystem, FileSystemOptions, LaunchBrowser
+from browserrig import (
+    ChromeBrowser,
+    ConnectBrowser,
+    FileSystem,
+    FileSystemOptions,
+    LaunchBrowser,
+)
 from browserrig.browser.downloads import Downloads
 from browserrig.browser.tab import Tab
 from browserrig.events import (
@@ -62,7 +68,11 @@ def test_directory_listing_is_bounded(files):
 
 @pytest.mark.parametrize("path", ["../private.txt", "notes/../../private.txt"])
 def test_workspace_rejects_traversal_for_read_write_and_list(files, path):
-    for operation in (files.read_file, files.list_files, lambda p: files.write_file(p, "secret")):
+    for operation in (
+        files.read_file,
+        files.list_files,
+        lambda p: files.write_file(p, "secret"),
+    ):
         with pytest.raises(ValueError, match="outside"):
             operation(path)
     with pytest.raises(ValueError, match="outside"):
@@ -137,7 +147,9 @@ def test_binary_missing_and_oversized_files_are_not_read_as_text(files):
         files.read_file("notes.txt", page_number=1)
 
 
-def test_downloads_keep_extensions_and_duplicate_names_without_overwriting(files, pdf_document):
+def test_downloads_keep_extensions_and_duplicate_names_without_overwriting(
+    files, pdf_document
+):
     paths = []
     for download_id in ("first", "second"):
         (files.pending_directory / download_id).write_bytes(pdf_document)
@@ -159,7 +171,9 @@ def test_download_names_are_safe_on_windows_and_preserve_suffix(files, filename)
     assert saved.read_bytes() == b"content"
 
 
-def test_explicit_download_directory_is_accessible_without_opening_other_paths(tmp_path):
+def test_explicit_download_directory_is_accessible_without_opening_other_paths(
+    tmp_path,
+):
     files = FileSystem(
         FileSystemOptions(directory=tmp_path / "workspace"),
         download_directory=str(tmp_path / "downloads"),
@@ -210,10 +224,14 @@ def test_uploads_reject_symlinks_to_outside_files(files, tmp_path):
         files.upload_paths([str(link)])
 
 
-_COMPLETED = DownloadProgressEvent(guid="id", total_bytes=8, received_bytes=8, state="completed")
+_COMPLETED = DownloadProgressEvent(
+    guid="id", total_bytes=8, received_bytes=8, state="completed"
+)
 
 
-async def test_download_completion_falls_back_to_guid_and_tolerates_repeated_events(tmp_path):
+async def test_download_completion_falls_back_to_guid_and_tolerates_repeated_events(
+    tmp_path,
+):
     files, downloads, emit = await _started_download(tmp_path)
     (files.pending_directory / "id").write_text("download")
     await downloads.handle(_COMPLETED)
@@ -235,7 +253,9 @@ async def test_missing_download_fails_without_raising(tmp_path):
     assert isinstance(emit.await_args.args[0], DownloadFailedEvent)
 
 
-async def test_download_progress_is_throttled_and_cancel_is_not_a_failure(tmp_path, monkeypatch):
+async def test_download_progress_is_throttled_and_cancel_is_not_a_failure(
+    tmp_path, monkeypatch
+):
     clock = iter([10.0, 10.05, 10.3])
     monkeypatch.setattr("browserrig.browser.downloads.monotonic", lambda: next(clock))
     _, downloads, emit = await _started_download(tmp_path)
@@ -243,8 +263,13 @@ async def test_download_progress_is_throttled_and_cancel_is_not_a_failure(tmp_pa
         await downloads.handle(_progress(received, "inProgress"))
     await downloads.handle(_progress(6, "canceled"))
     emitted = [call.args[0] for call in emit.await_args_list]
-    progress = [event for event in emitted if isinstance(event, DownloadProgressedEvent)]
-    assert [(event.received_bytes, event.total_bytes) for event in progress] == [(2, 8), (6, 8)]
+    progress = [
+        event for event in emitted if isinstance(event, DownloadProgressedEvent)
+    ]
+    assert [(event.received_bytes, event.total_bytes) for event in progress] == [
+        (2, 8),
+        (6, 8),
+    ]
     assert isinstance(emitted[-1], DownloadCanceledEvent)
     assert not any(isinstance(event, DownloadFailedEvent) for event in emitted)
     (download,) = downloads.all()
@@ -272,12 +297,17 @@ async def test_file_tools_report_listing_reads_and_writes(files):
     assert isinstance(listed, FilesListedEvent)
     assert listed.entries == len(listing.entries)
     assert isinstance(started, FileReadStartedEvent) and started.path == "a.txt"
-    assert isinstance(finished, FileReadFinishedEvent) and finished.read_id == started.read_id
+    assert (
+        isinstance(finished, FileReadFinishedEvent)
+        and finished.read_id == started.read_id
+    )
     assert finished.path == saved.path and finished.characters == 5
     assert isinstance(missing, FileReadStartedEvent)
     assert isinstance(failed, FileReadFailedEvent) and failed.read_id == missing.read_id
     assert missing.read_id != started.read_id
-    assert isinstance(created, FileWrittenEvent) and created.created and created.size == 3
+    assert (
+        isinstance(created, FileWrittenEvent) and created.created and created.size == 3
+    )
     assert isinstance(replaced, FileWrittenEvent) and not replaced.created
 
 
@@ -337,11 +367,15 @@ def _files(tmp_path):
 
 
 def _progress(received, state, total=8):
-    return DownloadProgressEvent(guid="id", total_bytes=total, received_bytes=received, state=state)
+    return DownloadProgressEvent(
+        guid="id", total_bytes=total, received_bytes=received, state=state
+    )
 
 
 def _file_tools(files):
-    return SimpleNamespace(_files=lambda: files, _events=SimpleNamespace(emit=AsyncMock()))
+    return SimpleNamespace(
+        _files=lambda: files, _events=SimpleNamespace(emit=AsyncMock())
+    )
 
 
 def _emitted(tools):
@@ -355,7 +389,10 @@ async def _started_download(tmp_path):
     downloads = Downloads(files, None, emit)
     await downloads.handle(
         DownloadWillBeginEvent(
-            frame_id="frame", guid="id", url="https://example.org", suggested_filename="note.txt"
+            frame_id="frame",
+            guid="id",
+            url="https://example.org",
+            suggested_filename="note.txt",
         )
     )
     return files, downloads, emit

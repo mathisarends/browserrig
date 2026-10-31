@@ -4,7 +4,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Agent, Plugin, PolicyDecision, SessionState, ToolStatus, tool
-from harnessed.events import CompactionAppliedEvent, EventRegistry, ToolCallFinishedEvent
+from harnessed.events import (
+    CompactionAppliedEvent,
+    EventRegistry,
+    ToolCallFinishedEvent,
+)
 from harnessed.models import ModelChunk, ToolMessage
 from harnessed.plugins import AgentLoop, Approvals, Compaction
 from harnessed.testing import ScriptedModel, call
@@ -117,7 +121,9 @@ def _prepare(holder):
 
 
 def _request():
-    return call("request_human", reason="Please log in", expected_state="Dashboard visible")
+    return call(
+        "request_human", reason="Please log in", expected_state="Dashboard visible"
+    )
 
 
 def _receipt(request):
@@ -132,9 +138,13 @@ async def test_handoff_reports_navigation_transient_popup_and_human_note():
     async def ask(request):
         assert request.reason == "Please log in"
         browser = holder["browser"]
-        await browser.events.emit(TabOpenedEvent(target_id="oauth", url="https://id.example/"))
+        await browser.events.emit(
+            TabOpenedEvent(target_id="oauth", url="https://id.example/")
+        )
         await browser.events.emit(TabClosedEvent(target_id="oauth"))
-        await session.ctx[Nudges].queue("stale no progress", key="no_progress", cause_id="old")
+        await session.ctx[Nudges].queue(
+            "stale no progress", key="no_progress", cause_id="old"
+        )
         browser.active_tab.url = "https://example.org/dashboard?token=sensitive#secret"
         browser.active_tab.document_id = "doc-2"
         browser.active_tab.title = "Dashboard"
@@ -167,21 +177,33 @@ async def test_handoff_reports_navigation_transient_popup_and_human_note():
 
 
 async def test_done_without_a_note_or_page_change_does_not_claim_login_success():
-    agent, model, holder = _agent([_request(), "Done"], AsyncMock(return_value=HumanResponse()))
+    agent, model, holder = _agent(
+        [_request(), "Done"], AsyncMock(return_value=HumanResponse())
+    )
     async with agent.session() as session:
         _prepare(holder)
         await session.run("Log in")
     receipt = _receipt(model.requests[-1])
     assert receipt["status"] == "done" and receipt["human_note"] == ""
-    assert any("password field is still visible" in change for change in receipt["changes"])
+    assert any(
+        "password field is still visible" in change for change in receipt["changes"]
+    )
     assert "not verified" in receipt["next"]
     # Even an unchanged page is delivered in full after control returns.
-    assert sum(message.text.startswith("# Login") for message in model.requests[-1].messages) == 2
+    assert (
+        sum(
+            message.text.startswith("# Login")
+            for message in model.requests[-1].messages
+        )
+        == 2
+    )
 
 
 async def test_failed_comparison_still_returns_a_typed_receipt_and_refreshes_the_page():
     async def ask(_request):
-        session.ctx[Observe].probe = AsyncMock(side_effect=RuntimeError("Capture unavailable"))
+        session.ctx[Observe].probe = AsyncMock(
+            side_effect=RuntimeError("Capture unavailable")
+        )
         holder["browser"].active_tab.title = "Changed by human"
         return HumanResponse()
 
@@ -198,7 +220,9 @@ async def test_failed_comparison_still_returns_a_typed_receipt_and_refreshes_the
     assert latest(model.requests[-1].messages)["page"]["title"] == "Changed by human"
 
 
-@pytest.mark.parametrize("outcome", ["declined", "timeout", "failed", "invalid_response"])
+@pytest.mark.parametrize(
+    "outcome", ["declined", "timeout", "failed", "invalid_response"]
+)
 async def test_unsuccessful_handoffs_release_browser_and_hint_state(outcome):
     async def ask(_request):
         if outcome == "timeout":
@@ -246,7 +270,11 @@ async def test_handoff_has_its_own_timeout_and_stops_trailing_tool_calls():
         _prepare(holder)
         result = await session.run("Log in")
     assert _receipt(model.requests[-1])["status"] == "done"
-    replies = [event.result for event in result.events if isinstance(event, ToolCallFinishedEvent)]
+    replies = [
+        event.result
+        for event in result.events
+        if isinstance(event, ToolCallFinishedEvent)
+    ]
     assert replies[0].break_chain and replies[1].status is ToolStatus.SKIPPED
 
 
@@ -269,7 +297,9 @@ async def test_pause_resume_explains_external_changes_without_steering(track_pau
         assert any(isinstance(event, HandoffFinishedEvent) for event in result.events)
     else:
         assert not history
-        assert not any(isinstance(event, HandoffFinishedEvent) for event in result.events)
+        assert not any(
+            isinstance(event, HandoffFinishedEvent) for event in result.events
+        )
 
 
 async def test_running_pause_cannot_lose_a_resume_while_a_probe_is_slow(monkeypatch):
@@ -319,7 +349,10 @@ async def test_handoff_context_survives_compaction_and_session_restore():
     callback = AsyncMock(return_value=HumanResponse(note="2FA completed"))
     fire = iter([False, False, False, True, *[False] * 10])
     compaction = Compaction(
-        trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
+        trigger=lambda _state: next(fire),
+        summarizer=_Summary(),
+        keep_turns=0,
+        keep_steps=1,
     )
     agent, model, holder = _agent(
         [_request(), call("step"), call("step"), call("step"), "Done", "Restored"],
@@ -332,7 +365,9 @@ async def test_handoff_context_survives_compaction_and_session_restore():
         saved = session.snapshot().to_json()
         history = session.context.values["browser.handoffs"]
     assert any(isinstance(event, CompactionAppliedEvent) for event in result.events)
-    assert "2FA completed" in "\n".join(message.text for message in model.requests[-1].messages)
+    assert "2FA completed" in "\n".join(
+        message.text for message in model.requests[-1].messages
+    )
     assert not any(
         isinstance(message, ToolMessage) and '"handoff_id"' in message.text
         for message in model.requests[-1].messages
@@ -388,7 +423,10 @@ async def test_abort_cancels_the_callback_and_releases_the_handoff():
         assert cancelled.is_set() and not browser.action_lock.locked()
         finished = session.log.last(HandoffFinishedEvent)
         assert finished.status == "cancelled"
-        assert json.loads(session.context.values["browser.handoffs"])[-1]["status"] == "cancelled"
+        assert (
+            json.loads(session.context.values["browser.handoffs"])[-1]["status"]
+            == "cancelled"
+        )
         await session.ctx[Nudges].queue("After abort", key="after", cause_id="after")
         assert session.log.last(NudgeQueuedEvent).text == "After abort"
 
@@ -401,7 +439,10 @@ async def test_handoff_is_opt_in_for_the_facade_and_explicit_composition():
     assert "Use request_human" not in await default.prompt.render()
     assert not any(isinstance(plugin, HumanHandoff) for plugin in browser_plugins())
     configured = BrowserAgent(model=ScriptedModel(["Done"]), handoff=handoff)
-    assert handoff in configured.plugins and "Use request_human" in await configured.prompt.render()
+    assert (
+        handoff in configured.plugins
+        and "Use request_human" in await configured.prompt.render()
+    )
     assert handoff in browser_plugins(handoff=handoff)
     composed = BrowserAgent(model=ScriptedModel(["Done"]), plugins=[handoff])
     assert handoff in composed.plugins
@@ -411,6 +452,8 @@ def test_handoff_events_roundtrip_with_typed_receipts():
     registry = EventRegistry(HANDOFF_EVENTS)
     for event in (
         HandoffRequestedEvent(handoff_id="id", reason="Log in"),
-        HandoffFinishedEvent(handoff_id="id", status="done", changes=("Document changed",)),
+        HandoffFinishedEvent(
+            handoff_id="id", status="done", changes=("Document changed",)
+        ),
     ):
         assert registry.decode(registry.encode(event)) == event

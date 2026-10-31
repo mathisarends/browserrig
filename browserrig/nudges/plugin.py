@@ -126,12 +126,17 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
                 self._state.queued.pop(key, None)
                 await self._events.emit(NudgeExpiredEvent(nudge_id=event.nudge_id))
                 continue
-            if size + len(event.text) <= self._max_chars and len(selected) < self._max_hints:
+            if (
+                size + len(event.text) <= self._max_chars
+                and len(selected) < self._max_hints
+            ):
                 selected.append({"id": event.nudge_id, "text": event.text})
                 size += len(event.text)
         return Observation(
             source=_SOURCE,
-            content=yaml.safe_dump({"nudges": selected}, sort_keys=False, allow_unicode=True),
+            content=yaml.safe_dump(
+                {"nudges": selected}, sort_keys=False, allow_unicode=True
+            ),
             refs=tuple(item["id"] for item in selected),
         )
 
@@ -153,7 +158,9 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
 
     def _remove(self, ids: tuple[str, ...]) -> None:
         self._state.queued = {
-            key: value for key, value in self._state.queued.items() if value.nudge_id not in ids
+            key: value
+            for key, value in self._state.queued.items()
+            if value.nudge_id not in ids
         }
 
     @hook(ActionStartedEvent)
@@ -273,7 +280,9 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
             for ref in observation.refs
         }
         included = tuple(
-            item.nudge_id for item in self._state.queued.values() if item.nudge_id in refs
+            item.nudge_id
+            for item in self._state.queued.values()
+            if item.nudge_id in refs
         )
         if included:
             await self._events.emit(

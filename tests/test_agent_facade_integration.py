@@ -57,7 +57,9 @@ async def test_facade_honors_explicit_tool_policy(site):
     )
     result = await agent.run("Try navigation")
     assert result.text == "Denied"
-    replies = [item for item in result.events if isinstance(item, ToolCallFinishedEvent)]
+    replies = [
+        item for item in result.events if isinstance(item, ToolCallFinishedEvent)
+    ]
     assert len(replies) == 1
     assert replies[0].result.is_error
     assert not any(isinstance(item, ActionStartedEvent) for item in result.events)

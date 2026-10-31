@@ -106,7 +106,9 @@ def project_intervals(
     return tuple(completed)
 
 
-def inference_only(intervals: tuple[ActivityFinishedEvent, ...]) -> tuple[TimeRange, ...]:
+def inference_only(
+    intervals: tuple[ActivityFinishedEvent, ...],
+) -> tuple[TimeRange, ...]:
     """Subtract overlapping tool/readiness/pause time from client-side model waits."""
     result: list[TimeRange] = []
     for interval in intervals:
@@ -126,7 +128,9 @@ def inference_only(intervals: tuple[ActivityFinishedEvent, ...]) -> tuple[TimeRa
         )
         for blocker in blockers:
             if blocker.started_at > cursor:
-                result.append(TimeRange(start=cursor, end=min(blocker.started_at, interval.at)))
+                result.append(
+                    TimeRange(start=cursor, end=min(blocker.started_at, interval.at))
+                )
             cursor = max(cursor, blocker.at)
             if cursor >= interval.at:
                 break

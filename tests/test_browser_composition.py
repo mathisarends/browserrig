@@ -6,7 +6,16 @@ from typing import Literal
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent, Inject, Plugin, PolicyDecision, SessionLog, SessionState, hook, tool
+from harnessed import (
+    Agent,
+    Inject,
+    Plugin,
+    PolicyDecision,
+    SessionLog,
+    SessionState,
+    hook,
+    tool,
+)
 from harnessed.events import (
     DurableEvent,
     ModelRequestedEvent,
@@ -67,9 +76,16 @@ class CountingCapture:
         image, scale = self._frame() if screenshots else (None, 2)
         return CaptureContent(
             page=Extraction(
-                url=tab.url, title="Example", width=800, height=600, scroll_y=0, page_height=600
+                url=tab.url,
+                title="Example",
+                width=800,
+                height=600,
+                scroll_y=0,
+                page_height=600,
             ),
-            image=base64.b64encode(image.encode()).decode() if image is not None else None,
+            image=base64.b64encode(image.encode()).decode()
+            if image is not None
+            else None,
             geometry=Geometry(x=100, y=50, width=200, height=100, scale=scale)
             if screenshots
             else None,
@@ -181,7 +197,9 @@ def _images(request):
         (ScreenshotTrigger.ON_REQUEST, [0, 1, 2, 2]),
     ],
 )
-async def test_image_fifo_and_one_capture_per_boundary_with_custom_strategies(trigger, counts):
+async def test_image_fifo_and_one_capture_per_boundary_with_custom_strategies(
+    trigger, counts
+):
     agent, model, capture, holder = _agent(
         [call("screenshot"), call("screenshot"), call("screenshot"), "Done"], trigger
     )
@@ -189,12 +207,17 @@ async def test_image_fifo_and_one_capture_per_boundary_with_custom_strategies(tr
         _browser_ready(holder)
         await session.run("Inspect", max_steps=4)
         assert [len(_images(request)) for request in model.requests] == counts
-        assert sum(capture.captures) == (4 if trigger == ScreenshotTrigger.EACH_STEP else 3)
+        assert sum(capture.captures) == (
+            4 if trigger == ScreenshotTrigger.EACH_STEP else 3
+        )
         ids = [image_id(message) for message in _images(model.requests[-1])]
         assert len(ids) == len(set(ids)) == 2
         assert ids[0] == image_id(_images(model.requests[-2])[-1])
         assert _note(model.requests[-1]) == f"Latest captured screenshot: {ids[1]}"
-        assert any("Custom view:" in str(message.content) for message in model.requests[0].messages)
+        assert any(
+            "Custom view:" in str(message.content)
+            for message in model.requests[0].messages
+        )
         replies = [m for m in model.requests[-1].messages if isinstance(m, ToolMessage)]
         assert all(isinstance(reply.content, str) for reply in replies)
 
@@ -207,7 +230,9 @@ async def test_text_only_observations_and_probes_keep_last_shown_crop_and_no_dup
         observe = session.ctx[Observe]
         assert observe.snapshot.image is None
         assert _images(model.requests[1])[0].id == _images(model.requests[2])[0].id
-        assert _image_point(observe.coordinate_source(), Point(x=20, y=30)) == Point(x=110, y=65)
+        assert _image_point(observe.coordinate_source(), Point(x=20, y=30)) == Point(
+            x=110, y=65
+        )
         assert sum(capture.captures) == 1
         before = observe.snapshot
         await observe.probe(browser.active_tab)
@@ -271,7 +296,9 @@ async def test_images_stay_where_captured_and_keep_the_prompt_prefix_until_a_bat
             if has_image(message):
                 assert "Custom view:" in message.text
                 assert "Screenshot " in message.text
-        assert _note(SimpleNamespace(messages=messages)).startswith("Latest captured screenshot")
+        assert _note(SimpleNamespace(messages=messages)).startswith(
+            "Latest captured screenshot"
+        )
     assert [len(_images(request)) for request in model.requests] == [1, 2, 3, 4, 2, 3]
 
     def prefix(messages):
@@ -363,15 +390,23 @@ class _Summary:
 async def test_until_compaction_keeps_images_until_their_steps_are_summarized():
     fire = iter([False, False, False, True, *[False] * 10])
     compaction = Compaction(
-        trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
+        trigger=lambda _state: next(fire),
+        summarizer=_Summary(),
+        keep_turns=0,
+        keep_steps=1,
     )
     agent, model, _capture, holder = _agent(
-        [*_steps(5), "Done"], ScreenshotTrigger.EACH_STEP, UntilCompaction(), extra=(compaction,)
+        [*_steps(5), "Done"],
+        ScreenshotTrigger.EACH_STEP,
+        UntilCompaction(),
+        extra=(compaction,),
     )
     async with agent.session() as session:
         _browser_ready(holder)
         await session.run("Inspect", max_steps=6)
-    images = [[message.id for message in _images(request)] for request in model.requests]
+    images = [
+        [message.id for message in _images(request)] for request in model.requests
+    ]
     # The request applying the summary drops images with their summarized steps.
     assert [len(ids) for ids in images[:4]] == [1, 2, 3, 2]
     # Steps 1 and 2 were summarized, so their images leave with them; later ones stay in place.
@@ -393,7 +428,8 @@ async def test_multimodal_observations_use_session_assets_and_survive_saved_stat
         observations = [
             event
             for event in result.events
-            if isinstance(event, ObservationRecordedEvent) and event.observation.source == "browser"
+            if isinstance(event, ObservationRecordedEvent)
+            and event.observation.source == "browser"
         ]
         assets = [
             part.asset
@@ -403,11 +439,14 @@ async def test_multimodal_observations_use_session_assets_and_survive_saved_stat
         ]
         assert len(assets) == 2 and assets[0] == assets[1]
         assert await session.assets.read(assets[0]) == b"same screenshot"
-        request = next(e for e in reversed(result.events) if isinstance(e, ModelRequestedEvent))
+        request = next(
+            e for e in reversed(result.events) if isinstance(e, ModelRequestedEvent)
+        )
         (included,) = [
             e.observations
             for e in result.events
-            if isinstance(e, ObservationsIncludedEvent) and e.request_id == request.request_id
+            if isinstance(e, ObservationsIncludedEvent)
+            and e.request_id == request.request_id
         ]
         included = [item for item in included if item.source == "browser"]
         assert len(included) == 2
@@ -415,7 +454,9 @@ async def test_multimodal_observations_use_session_assets_and_survive_saved_stat
             assert receipt.refs == observation.observation.refs
             assert receipt.turn_id == observation.turn_id
             assert receipt.step == observation.step
-            assert receipt.message_id in {message.id for message in request.request.messages}
+            assert receipt.message_id in {
+                message.id for message in request.request.messages
+            }
         assert len(_images(model.requests[-1])) == 2
         saved = session.snapshot().to_json()
     # Saved state carries the retained screenshot bytes, not just their references.
@@ -425,7 +466,9 @@ async def test_multimodal_observations_use_session_assets_and_survive_saved_stat
 
 class StripRequestImages(Plugin):
     @hook(ConfigureRequest)
-    async def strip(self, _event: ConfigureRequest, next_: Next[ModelRequest]) -> ModelRequest:
+    async def strip(
+        self, _event: ConfigureRequest, next_: Next[ModelRequest]
+    ) -> ModelRequest:
         request = await next_()
         return replace(
             request,
@@ -458,13 +501,18 @@ async def test_coordinate_geometry_uses_final_receipts_after_request_image_remov
         assert [item.source for item in included] == ["browser-image"]
         observe = session.ctx[Observe]
         assert observe.snapshot.geometry is not None
-        assert _image_point(observe.coordinate_source(), Point(x=20, y=30)) == Point(x=20, y=30)
+        assert _image_point(observe.coordinate_source(), Point(x=20, y=30)) == Point(
+            x=20, y=30
+        )
 
 
 async def test_compaction_removes_last_screenshot_on_a_text_only_step():
     fire = iter([False, False, False, True])
     compaction = Compaction(
-        trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
+        trigger=lambda _state: next(fire),
+        summarizer=_Summary(),
+        keep_turns=0,
+        keep_steps=1,
     )
     agent, model, _capture, holder = _agent(
         [call("screenshot"), *_steps(2), "Done"],
@@ -497,29 +545,44 @@ def _recorded(results, source):
         event
         for result in results
         for event in result.events
-        if isinstance(event, ObservationRecordedEvent) and event.observation.source == source
+        if isinstance(event, ObservationRecordedEvent)
+        and event.observation.source == source
     ]
 
 
 def _visible(request, source):
-    return [message for message in request.messages if message.id.endswith(f":{source}")]
+    return [
+        message for message in request.messages if message.id.endswith(f":{source}")
+    ]
 
 
 async def test_file_state_is_resent_only_after_a_change():
-    download = Download(id="d1", filename="report.pdf", url="https://example.org/report.pdf")
-    agent, model, _capture, holder = _agent([*_steps(3), "Done"], after=(Actions(), FileTools()))
+    download = Download(
+        id="d1", filename="report.pdf", url="https://example.org/report.pdf"
+    )
+    agent, model, _capture, holder = _agent(
+        [*_steps(3), "Done"], after=(Actions(), FileTools())
+    )
     async with agent.session() as session:
         browser = _browser_ready(holder)
         browser.downloads = AsyncMock(side_effect=[(), (), (download,), (download,)])
         result = await session.run("Inspect", max_steps=4)
         assert [event.step for event in _recorded([result], "files")] == [1, 3]
-        assert [len(_visible(request, "files")) for request in model.requests] == [1, 1, 2, 2]
+        assert [len(_visible(request, "files")) for request in model.requests] == [
+            1,
+            1,
+            2,
+            2,
+        ]
 
 
 async def test_file_state_is_resent_when_compaction_removed_the_last_copy():
     fire = iter([False, False, False, True, *[False] * 10])
     compaction = Compaction(
-        trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
+        trigger=lambda _state: next(fire),
+        summarizer=_Summary(),
+        keep_turns=0,
+        keep_steps=1,
     )
     agent, model, _capture, holder = _agent(
         [*_steps(4), "Done"], extra=(compaction,), after=(Actions(), FileTools())
@@ -541,7 +604,9 @@ async def test_hint_observations_are_skipped_while_there_is_nothing_to_report():
         first = await session.run("Inspect", max_steps=1)
         await nudges.queue("Inspect the page", key="hint", cause_id="action")
         second = await session.run("Continue", max_steps=3)
-        recorded = [event.observation for event in _recorded([first, second], "browser.nudges")]
+        recorded = [
+            event.observation for event in _recorded([first, second], "browser.nudges")
+        ]
         # Shown once, cleared once after delivery, then omitted.
         assert [bool(observation.refs) for observation in recorded] == [True, False]
         assert "Inspect the page" in str(recorded[0].content)
@@ -599,7 +664,12 @@ async def test_initial_per_document_and_ongoing_readiness_with_stream_stage():
         await readiness.wait(tab)
         tab.document_id, tab.url = "preview", "file:///preview.pdf"
         await readiness.wait(tab)
-        assert [doc for doc, _ in initial.checks] == ["doc-1", "doc-2", "doc-2", "preview"]
+        assert [doc for doc, _ in initial.checks] == [
+            "doc-1",
+            "doc-2",
+            "doc-2",
+            "preview",
+        ]
         assert len(ongoing.checks) == 1
         starts = [e for e in session.events if isinstance(e, ReadinessStartedEvent)]
         assert [(e.stage, e.phase) for e in starts[:3]] == [
@@ -628,7 +698,9 @@ async def test_failed_initial_retries_and_navigation_reselects_policy():
         assert len(app.checks) == 2
         app.ready, app.change_document = True, True
         report = await readiness.wait(tab)
-        assert report.document_id == "preview" and report.status == ReadinessStatus.READY
+        assert (
+            report.document_id == "preview" and report.status == ReadinessStatus.READY
+        )
         assert app.checks[-1] == ("preview", ReadinessStage.INITIAL)
 
 
@@ -684,7 +756,9 @@ class AppEvents(Plugin):
     events = (AppFact, AppProgress)
 
     @hook(PreStep)
-    async def emit(self, _event: PreStep, next_: Next[StepDecision], log: Inject[SessionLog]):
+    async def emit(
+        self, _event: PreStep, next_: Next[StepDecision], log: Inject[SessionLog]
+    ):
         await log.emit(AppFact())
         await log.emit(AppProgress())
         return await next_()
@@ -719,14 +793,24 @@ async def test_unchanged_page_is_not_repeated_while_the_model_still_sees_it():
         first = await session.run("Inspect", max_steps=2)
         renderer.text = "Page B"
         second = await session.run("Continue", max_steps=3)
-        recorded = [event.observation.content for event in _recorded([first, second], "browser")]
+        recorded = [
+            event.observation.content for event in _recorded([first, second], "browser")
+        ]
         assert recorded == ["Page A", "Page B"]
-        assert [len(_visible(request, "browser")) for request in model.requests] == [1, 1, 2, 2, 2]
+        assert [len(_visible(request, "browser")) for request in model.requests] == [
+            1,
+            1,
+            2,
+            2,
+            2,
+        ]
 
 
 async def test_returning_to_a_page_lists_only_its_changes():
     renderer = PageRenderer()
-    first = "\n".join(["# Page A", "", *(f'  [{i}] link "Story {i}"' for i in range(20))])
+    first = "\n".join(
+        ["# Page A", "", *(f'  [{i}] link "Story {i}"' for i in range(20))]
+    )
     agent, _model, _capture, holder = _agent([*_steps(3), "Done"], renderer=renderer)
     async with agent.session() as session:
         tab = _browser_ready(holder).active_tab
@@ -735,7 +819,10 @@ async def test_returning_to_a_page_lists_only_its_changes():
         renderer.text, tab.document_id = '# Page B\n\n  [1] link "Reply"', "detail"
         results.append(await session.run("Open", max_steps=1))
         # Back on the first document, as bfcache restores it after going back.
-        renderer.text, tab.document_id = first.replace('"Story 3"', '"Story 3" focused'), document
+        renderer.text, tab.document_id = (
+            first.replace('"Story 3"', '"Story 3" focused'),
+            document,
+        )
         results.append(await session.run("Back", max_steps=1))
     recorded = [event.observation.content for event in _recorded(results, "browser")]
     assert recorded[:2] == [first, '# Page B\n\n  [1] link "Reply"']
@@ -765,10 +852,15 @@ async def test_each_step_shows_a_changed_page_once_and_an_unchanged_page_not_aga
 async def test_page_is_resent_with_a_screenshot_and_after_compaction():
     fire = iter([False, False, False, True, *[False] * 10])
     compaction = Compaction(
-        trigger=lambda _state: next(fire), summarizer=_Summary(), keep_turns=0, keep_steps=1
+        trigger=lambda _state: next(fire),
+        summarizer=_Summary(),
+        keep_turns=0,
+        keep_steps=1,
     )
     agent, model, _capture, holder = _agent(
-        [call("screenshot"), *_steps(3), "Done"], extra=(compaction,), renderer=PageRenderer()
+        [call("screenshot"), *_steps(3), "Done"],
+        extra=(compaction,),
+        renderer=PageRenderer(),
     )
     async with agent.session() as session:
         _browser_ready(holder)
@@ -781,7 +873,9 @@ async def test_page_is_resent_with_a_screenshot_and_after_compaction():
 
 def test_page_comparison_ignores_new_element_marks():
     observe = Observe()
-    button = Element(ref="e1", frame_id="f", backend_id=1, role="button", name="Go", tag="button")
+    button = Element(
+        ref="e1", frame_id="f", backend_id=1, role="button", name="Go", tag="button"
+    )
     snapshot = Snapshot(
         id="obs-1",
         tab_id="tab-1",
@@ -795,7 +889,9 @@ def test_page_comparison_ignores_new_element_marks():
         fingerprint="page",
         elements=(button,),
     )
-    marked = snapshot.model_copy(update={"elements": (button.model_copy(update={"new": True}),)})
+    marked = snapshot.model_copy(
+        update={"elements": (button.model_copy(update={"new": True}),)}
+    )
     renamed = snapshot.model_copy(
         update={"elements": (button.model_copy(update={"name": "Stop"}),)}
     )

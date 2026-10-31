@@ -58,7 +58,9 @@ async def test_only_viewport_controls_are_described_and_the_rest_are_known(site)
         assert any("truncated" in item for item in limited.limitations)
 
 
-async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_controls_still(site):
+async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_controls_still(
+    site,
+):
     holder = {}
     positions = []
     markup = """<style>body{margin:0;min-height:6000px}
@@ -117,13 +119,19 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
         plugins=[Prepare()],
     )
     async with agent.session() as session:
-        result = await session.run("Interact with edge and pinned controls", max_steps=5)
+        result = await session.run(
+            "Interact with edge and pinned controls", max_steps=5
+        )
         assert result.text == "Done"
         _assert_tools_succeeded(result)
         tab = holder["actions"].browser.active_tab
-        assert await evaluate(tab, "document.querySelector('#field').value") == "Prepared"
+        assert (
+            await evaluate(tab, "document.querySelector('#field').value") == "Prepared"
+        )
         assert await evaluate(tab, "document.querySelector('#choice').value") == "Two"
-        assert await evaluate(tab, "document.querySelector('#date').value") == "2026-10-29"
+        assert (
+            await evaluate(tab, "document.querySelector('#date').value") == "2026-10-29"
+        )
         wheels = await evaluate(tab, "wheels")
         clicks = await evaluate(tab, "clicks")
         assert len(wheels) > 6 and all(event["trusted"] for event in wheels)
@@ -131,12 +139,16 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
         assert all(event["trusted"] for event in clicks)
         assert positions[1] > 100
         assert all(abs(position - positions[1]) < 1 for position in positions[2:])
-        receipts = [event for event in result.events if isinstance(event, ActionFinishedEvent)]
+        receipts = [
+            event for event in result.events if isinstance(event, ActionFinishedEvent)
+        ]
         assert len(receipts) == 4
         assert not receipts[-1].prepared_scroll
 
 
-@pytest.mark.parametrize("modal,horizontal_only", [(False, False), (True, False), (True, True)])
+@pytest.mark.parametrize(
+    "modal,horizontal_only", [(False, False), (True, False), (True, True)]
+)
 async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
     site, modal, horizontal_only
 ):
@@ -153,7 +165,8 @@ async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
         async def setup(self, actions: Inject[Actions]):
             holder["actions"] = actions
             await evaluate(
-                actions.browser.active_tab, f"document.body.innerHTML = {json.dumps(markup)}"
+                actions.browser.active_tab,
+                f"document.body.innerHTML = {json.dumps(markup)}",
             )
             if modal:
                 await evaluate(
@@ -207,9 +220,12 @@ async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
 
 
 @pytest.mark.parametrize(
-    "cross_origin,oversized", [(False, False), (True, False), (False, True), (True, True)]
+    "cross_origin,oversized",
+    [(False, False), (True, False), (False, True), (True, True)],
 )
-async def test_edge_frame_is_scrolled_into_view_before_interaction(site, cross_origin, oversized):
+async def test_edge_frame_is_scrolled_into_view_before_interaction(
+    site, cross_origin, oversized
+):
     holder = {}
 
     class Prepare(Plugin, needs=(Actions,)):
@@ -237,7 +253,8 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(site, cross_o
                 frames = await actions.browser.active_tab.frames()
                 child = next(frame for frame in frames if frame.parent is not None)
                 await evaluate(
-                    child, f"document.querySelector('button').style.top='{height - 120}px'"
+                    child,
+                    f"document.querySelector('button').style.top='{height - 120}px'",
                 )
 
     count = 0
@@ -264,7 +281,9 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(site, cross_o
         _assert_tools_succeeded(result)
         actions = holder["actions"]
         tab = actions.browser.active_tab
-        element = next(el for el in actions.observe.snapshot.elements if el.name == "Frame button")
+        element = next(
+            el for el in actions.observe.snapshot.elements if el.name == "Frame button"
+        )
         frame = (await actions.observe.element(tab, element.ref)).frame
         assert await evaluate(frame, "document.body.dataset.clicked") == "true"
         assert await evaluate(tab, "scrollY") > 0
@@ -306,7 +325,9 @@ async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target
     )
     async with agent.session() as session:
         result = await session.run("Attempt the blocked scroll", max_steps=2)
-        receipts = [event for event in result.events if isinstance(event, ToolCallFinishedEvent)]
+        receipts = [
+            event for event in result.events if isinstance(event, ToolCallFinishedEvent)
+        ]
         assert len(receipts) == 1 and receipts[0].result.is_error
         assert "wheel input" in receipts[0].result.text
         tab = holder["actions"].browser.active_tab
@@ -339,7 +360,11 @@ def _element(request, name):
 
 
 def _assert_tools_succeeded(result):
-    receipts = [event.result for event in result.events if isinstance(event, ToolCallFinishedEvent)]
+    receipts = [
+        event.result
+        for event in result.events
+        if isinstance(event, ToolCallFinishedEvent)
+    ]
     assert receipts and all(not item.is_error for item in receipts), [
         item.text for item in receipts
     ]

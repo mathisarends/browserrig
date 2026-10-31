@@ -73,7 +73,9 @@ async def capture(
     )
     await tab.sync_document()
     if tab.document_id != document_id:
-        raise BrowserError("Document changed during capture; act on the next observation")
+        raise BrowserError(
+            "Document changed during capture; act on the next observation"
+        )
     page, image = content.page, content.image
     if redaction is not None:
         page, image = await _redact(page, image, content, redaction)
@@ -163,7 +165,9 @@ class DomCapture(Options):
             max_text=self.max_text_chars,
             sparse_text=self.sparse_text_chars,
         )
-        page.limitations = tuple(dict.fromkeys((*tab.frame_limitations, *page.limitations)))
+        page.limitations = tuple(
+            dict.fromkeys((*tab.frame_limitations, *page.limitations))
+        )
         if not screenshots:
             return CaptureContent(page=page)
         viewport = frames[0].visible
@@ -178,9 +182,14 @@ class DomCapture(Options):
                     "Screenshot region is outside the viewport; showing the full viewport",
                 )
         if geometry is None:
-            area, scale = Bounds(x=0, y=0, width=viewport.width, height=viewport.height), 1.0
+            area, scale = (
+                Bounds(x=0, y=0, width=viewport.width, height=viewport.height),
+                1.0,
+            )
         else:
-            area = Bounds(x=geometry.x, y=geometry.y, width=geometry.width, height=geometry.height)
+            area = Bounds(
+                x=geometry.x, y=geometry.y, width=geometry.width, height=geometry.height
+            )
             scale = geometry.scale
         image = await asyncio.to_thread(
             annotate,
@@ -190,7 +199,9 @@ class DomCapture(Options):
             scale,
             cursor=cursor,
         )
-        return CaptureContent(page=page, image=image, geometry=geometry, area=area, scale=scale)
+        return CaptureContent(
+            page=page, image=image, geometry=geometry, area=area, scale=scale
+        )
 
 
 async def _redact(
@@ -212,15 +223,27 @@ async def _redact(
     if not hidden:
         return redacted, image
     if content.area is None:
-        redacted.limitations = (*redacted.limitations, "Screenshot withheld: it may show a secret")
+        redacted.limitations = (
+            *redacted.limitations,
+            "Screenshot withheld: it may show a secret",
+        )
         return redacted, None
-    return redacted, await asyncio.to_thread(blackout, image, hidden, content.area, content.scale)
+    return redacted, await asyncio.to_thread(
+        blackout, image, hidden, content.area, content.scale
+    )
 
 
 def _mark_new(
-    elements: tuple[Element, ...], previous: Snapshot | None, tab_id: str, document_id: str
+    elements: tuple[Element, ...],
+    previous: Snapshot | None,
+    tab_id: str,
+    document_id: str,
 ) -> tuple[Element, ...]:
-    if previous is None or previous.tab_id != tab_id or previous.document_id != document_id:
+    if (
+        previous is None
+        or previous.tab_id != tab_id
+        or previous.document_id != document_id
+    ):
         return elements
     seen = {control.ref for control in (*previous.elements, *previous.offscreen)}
     if not seen:

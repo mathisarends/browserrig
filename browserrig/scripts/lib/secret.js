@@ -38,8 +38,20 @@ function isTextField(element) {
   if (element.isContentEditable || element.localName === 'textarea') {
     return true;
   }
-  const buttons = ['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range'];
-  return element.localName === 'input' && ![...buttons, 'reset', 'submit'].includes(element.type);
+  const buttons = [
+    'button',
+    'checkbox',
+    'color',
+    'file',
+    'hidden',
+    'image',
+    'radio',
+    'range',
+  ];
+  return (
+    element.localName === 'input' &&
+    ![...buttons, 'reset', 'submit'].includes(element.type)
+  );
 }
 
 function focusStep(active) {

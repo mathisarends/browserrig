@@ -77,15 +77,23 @@ async def extract_content(
             state = await frame.run(CONTENT, args(remaining))
             embedded += state.frames
             main = main or state
-            prefix = ("\n\n" if parts else "") + (_frame_heading(state) if frame.parent else "")
+            prefix = ("\n\n" if parts else "") + (
+                _frame_heading(state) if frame.parent else ""
+            )
             available = max(0, remaining - len(prefix))
             body = state.markdown
-            more = more or len(body) > available or (state.truncated and not state.limited)
+            more = (
+                more or len(body) > available or (state.truncated and not state.limited)
+            )
             if state.limited:
                 limitations.append("Page content was truncated by DOM traversal limits")
             if len(body) > available:
                 # Let the script close code fences using the actual body budget.
-                body = (await frame.run(CONTENT, args(available))).markdown if available else ""
+                body = (
+                    (await frame.run(CONTENT, args(available))).markdown
+                    if available
+                    else ""
+                )
             parts.append(prefix[:remaining] + _unwrap_links(body, state.url, origin))
             remaining -= len(parts[-1])
         except (CDPCommandError, BrowserError, TimeoutError):
@@ -93,10 +101,14 @@ async def extract_content(
                 raise
             limitations.append(f"Frame {frame.id} changed or could not be inspected")
     if embedded > len(frames) - 1:
-        limitations.append("Some embedded frames are unavailable or could not be inspected")
+        limitations.append(
+            "Some embedded frames are unavailable or could not be inspected"
+        )
     await tab.sync_document()
     if tab.document_id != document_id:
-        raise BrowserError("Document changed during extraction; extract the current page again")
+        raise BrowserError(
+            "Document changed during extraction; extract the current page again"
+        )
     assert main is not None
     if main.main or main.chrome:
         limitations.insert(
@@ -121,7 +133,9 @@ def _frame_heading(state: ContentExtraction) -> str:
     )
 
 
-def _page(markdown: str, offset: int, max_chars: int, more: bool, limitations: list[str]) -> str:
+def _page(
+    markdown: str, offset: int, max_chars: int, more: bool, limitations: list[str]
+) -> str:
     """Cut one part of the Markdown and name the offset that reads the next part."""
     if offset and offset >= len(markdown):
         limitations.append(f"offset {offset} is past the end of the page content")
@@ -156,4 +170,9 @@ def _unwrap_links(markdown: str, base: str, origin: str) -> str:
 
 
 def _source(url: str) -> str:
-    return url.replace("<", "%3C").replace(">", "%3E").replace("\n", "%0A").replace("\r", "%0D")
+    return (
+        url.replace("<", "%3C")
+        .replace(">", "%3E")
+        .replace("\n", "%0A")
+        .replace("\r", "%0D")
+    )

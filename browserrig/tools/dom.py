@@ -12,4 +12,6 @@ class DomTools(DomPointerTools, DomKeyboardTools, FormTools):
 
     async def setup(self, observe: Inject[Observe]) -> None:
         if not observe.capture_strategy.provides_dom_refs:
-            raise ValueError("DomTools requires a capture strategy providing DOM references")
+            raise ValueError(
+                "DomTools requires a capture strategy providing DOM references"
+            )

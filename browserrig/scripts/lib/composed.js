@@ -3,7 +3,9 @@ function parentFor(node) {
 }
 
 function closedRootsForDocument() {
-  return new Map((globalThis.__browserrig?.dom?.roots || []).map((root) => [root.host, root]));
+  return new Map(
+    (globalThis.__browserrig?.dom?.roots || []).map((root) => [root.host, root]),
+  );
 }
 
 function childrenFor(node, closedRoots) {

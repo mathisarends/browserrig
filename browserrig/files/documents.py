@@ -22,7 +22,9 @@ from .content import ParsedContent, ReadRequest, cell_text
 
 def html_text(source: str | bytes) -> str:
     soup = BeautifulSoup(source, "html.parser")
-    for node in soup.select("script, style, template, noscript, input, textarea, select"):
+    for node in soup.select(
+        "script, style, template, noscript, input, textarea, select"
+    ):
         node.decompose()
     return markdownify(str(soup), heading_style="ATX")
 
@@ -48,7 +50,9 @@ def read_docx(path: Path) -> ParsedContent:
     return ParsedContent(
         blocks(),
         "docx",
-        ["Images, drawings, revision history, footnotes and comments are not extracted"],
+        [
+            "Images, drawings, revision history, footnotes and comments are not extracted"
+        ],
     )
 
 
@@ -56,7 +60,9 @@ def read_pptx(path: Path, request: ReadRequest) -> ParsedContent:
     presentation = Presentation(str(path))
     count = len(presentation.slides)
     if request.page_number is not None and not 1 <= request.page_number <= count:
-        raise ValueError(f"Presentation has {count} slides; choose an existing page_number")
+        raise ValueError(
+            f"Presentation has {count} slides; choose an existing page_number"
+        )
 
     def shapes_text(shapes) -> Iterator[str]:
         for shape in shapes:
@@ -124,11 +130,16 @@ def read_epub(path: Path) -> ParsedContent:
                 encrypted = {
                     posixpath.normpath(unquote(urlsplit(node.attrib["URI"]).path))
                     for node in encryption.iter()
-                    if node.tag.rsplit("}", 1)[-1] == "CipherReference" and "URI" in node.attrib
+                    if node.tag.rsplit("}", 1)[-1] == "CipherReference"
+                    and "URI" in node.attrib
                 }
             container = fromstring(archive.read("META-INF/container.xml"))
             rootfile = next(
-                (node for node in container.iter() if node.tag.rsplit("}", 1)[-1] == "rootfile"),
+                (
+                    node
+                    for node in container.iter()
+                    if node.tag.rsplit("}", 1)[-1] == "rootfile"
+                ),
                 None,
             )
             if rootfile is None:
@@ -141,7 +152,9 @@ def read_epub(path: Path) -> ParsedContent:
                 if node.tag.rsplit("}", 1)[-1] == "item"
             }
             references = [
-                node for node in package.iter() if node.tag.rsplit("}", 1)[-1] == "itemref"
+                node
+                for node in package.iter()
+                if node.tag.rsplit("}", 1)[-1] == "itemref"
             ]
             for index, reference in enumerate(references, 1):
                 href = manifest.get(reference.get("idref"))
@@ -149,14 +162,17 @@ def read_epub(path: Path) -> ParsedContent:
                     raise ValueError("EPUB chapter is missing from the manifest")
                 chapter = posixpath.normpath(
                     posixpath.join(
-                        posixpath.dirname(package_path), unquote(urlsplit(str(href)).path)
+                        posixpath.dirname(package_path),
+                        unquote(urlsplit(str(href)).path),
                     )
                 )
                 if chapter in encrypted:
                     raise ValueError(
                         "EPUB chapter is encrypted; DRM-protected content is unavailable"
                     )
-                yield f"# Chapter {index}\n\n" + html_text(archive.read(chapter)) + "\n\n"
+                yield (
+                    f"# Chapter {index}\n\n" + html_text(archive.read(chapter)) + "\n\n"
+                )
 
     return ParsedContent(blocks(), "epub", ["Embedded images are not extracted"])
 
@@ -165,7 +181,9 @@ def read_email(path: Path) -> ParsedContent:
     with path.open("rb") as stream:
         message = BytesParser(policy=policy.default).parse(stream)
     blocks = [
-        f"{name}: {message[name]}\n" for name in ("Subject", "From", "To", "Date") if message[name]
+        f"{name}: {message[name]}\n"
+        for name in ("Subject", "From", "To", "Date")
+        if message[name]
     ]
     blocks.append("\n")
     attachments = []
@@ -173,12 +191,16 @@ def read_email(path: Path) -> ParsedContent:
     if body is not None:
         content = body.get_content()
         blocks.append(
-            html_text(content) if body.get_content_type() == "text/html" else str(content)
+            html_text(content)
+            if body.get_content_type() == "text/html"
+            else str(content)
         )
     for part in message.iter_attachments():
         attachments.append(part.get_filename() or f"attachment-{len(attachments) + 1}")
     if attachments:
-        blocks.append("\n\n## Attachments\n\n" + "\n".join(f"- {name}" for name in attachments))
+        blocks.append(
+            "\n\n## Attachments\n\n" + "\n".join(f"- {name}" for name in attachments)
+        )
     limitations = (
         ["Attachments are listed separately; use member to read their contents"]
         if attachments
@@ -194,7 +216,9 @@ def read_mhtml(path: Path) -> ParsedContent:
     for part in message.walk():
         if part.get_content_type() == "text/html":
             blocks.append(html_text(part.get_content()) + "\n\n")
-    return ParsedContent(blocks, "mhtml", ["Non-HTML embedded resources are not extracted"])
+    return ParsedContent(
+        blocks, "mhtml", ["Non-HTML embedded resources are not extracted"]
+    )
 
 
 def _docx_table(table: Table) -> Iterator[str]:

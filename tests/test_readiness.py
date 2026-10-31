@@ -40,7 +40,10 @@ async def test_readiness_deduplicates_waiters_and_one_cancellation_does_not_canc
             await first
         report = await second
         assert report.status == "ready"
-        assert len([e for e in session.events if isinstance(e, ReadinessStartedEvent)]) == 1
+        assert (
+            len([e for e in session.events if isinstance(e, ReadinessStartedEvent)])
+            == 1
+        )
 
 
 async def test_endless_dom_mutation_is_explicitly_degraded():
@@ -61,7 +64,8 @@ async def test_endless_dom_mutation_is_explicitly_degraded():
 async def test_plugin_state_is_per_session():
     holder = {}
     agent = Agent(
-        model=ScriptedModel(["ok"]), plugins=[Access(holder), Readiness(), FakeChrome(holder)]
+        model=ScriptedModel(["ok"]),
+        plugins=[Access(holder), Readiness(), FakeChrome(holder)],
     )
     async with agent.session():
         first = holder["readiness"]
@@ -78,7 +82,9 @@ async def test_plugin_state_is_per_session():
         _ = first._events
 
 
-async def test_readiness_events_keep_start_document_when_navigation_finishes(monkeypatch):
+async def test_readiness_events_keep_start_document_when_navigation_finishes(
+    monkeypatch,
+):
     events = []
     browser = FakeBrowser(SimpleNamespace(emit=AsyncMock(side_effect=events.append)))
     tab = browser.active_tab

@@ -46,7 +46,9 @@ async def test_scroll_nudge_requires_exact_same_url_document_and_unrequested_scr
 
     agent = Agent(model=ScriptedModel(["ok"]), plugins=[Producer(holder), Nudges()])
     async with agent.session() as session:
-        await session.emit(ActionStartedEvent(action_id="click-1", kind="click", target_id="tab-1"))
+        await session.emit(
+            ActionStartedEvent(action_id="click-1", kind="click", target_id="tab-1")
+        )
         await session.emit(
             ActionFinishedEvent(
                 action_id="click-1",
@@ -54,7 +56,9 @@ async def test_scroll_nudge_requires_exact_same_url_document_and_unrequested_scr
                 target_id="tab-1",
                 document_id=document,
                 before=PageState(
-                    url="https://example.org/", document_id="doc-1", fingerprint="before"
+                    url="https://example.org/",
+                    document_id="doc-1",
+                    fingerprint="before",
                 ),
                 after_url=after_url,
                 prepared_scroll=prepared,
@@ -72,19 +76,27 @@ async def test_scroll_nudge_requires_exact_same_url_document_and_unrequested_scr
             )
         )
         actual = any(
-            isinstance(e, NudgeQueuedEvent) and e.key == "unexpected_scroll" for e in session.events
+            isinstance(e, NudgeQueuedEvent) and e.key == "unexpected_scroll"
+            for e in session.events
         )
         assert actual is expected
 
 
 async def test_pending_actions_are_separate_per_tab_and_closed_tabs_are_forgotten():
     class Producer(FakeChrome):
-        events = (ActionStartedEvent, ActionFinishedEvent, ObservationCapturedEvent, TabClosedEvent)
+        events = (
+            ActionStartedEvent,
+            ActionFinishedEvent,
+            ObservationCapturedEvent,
+            TabClosedEvent,
+        )
 
     agent = Agent(model=ScriptedModel(["unused"]), plugins=[Producer({}), Nudges()])
     async with agent.session() as session:
         for target in ("first", "second"):
-            await session.emit(ActionStartedEvent(action_id=target, kind="click", target_id=target))
+            await session.emit(
+                ActionStartedEvent(action_id=target, kind="click", target_id=target)
+            )
             await session.emit(
                 ActionFinishedEvent(
                     action_id=target,
@@ -123,7 +135,9 @@ async def test_pending_actions_are_separate_per_tab_and_closed_tabs_are_forgotte
         ("browser.nudges", False, False),
     ],
 )
-async def test_hint_acknowledgement_requires_matching_provenance(source, matching_ref, delivered):
+async def test_hint_acknowledgement_requires_matching_provenance(
+    source, matching_ref, delivered
+):
     holder = {}
     agent = Agent(
         model=ScriptedModel(["ok"]),
@@ -157,9 +171,13 @@ async def test_hint_acknowledgement_requires_matching_provenance(source, matchin
         )
         await session.emit(included)
         await session.emit(included)
-        receipts = [event for event in session.events if isinstance(event, NudgeIncludedEvent)]
+        receipts = [
+            event for event in session.events if isinstance(event, NudgeIncludedEvent)
+        ]
         assert len(receipts) == int(delivered)
-        assert (await nudges.project(_snapshot())).refs == (() if delivered else (nudge_id,))
+        assert (await nudges.project(_snapshot())).refs == (
+            () if delivered else (nudge_id,)
+        )
         if delivered:
             assert receipts[0].request_id == "request"
 
@@ -192,14 +210,18 @@ async def test_hint_provenance_is_recorded_and_unselected_hints_stay_queued():
         await nudges.queue("First hint", key="first", cause_id="first-action")
         await nudges.queue("Second hint", key="second", cause_id="second-action")
         result = await session.run("Inspect")
-        request = next(event for event in result.events if isinstance(event, ModelRequestedEvent))
+        request = next(
+            event for event in result.events if isinstance(event, ModelRequestedEvent)
+        )
         (provenance,) = [
             event.observations
             for event in result.events
             if isinstance(event, ObservationsIncludedEvent)
             and event.request_id == request.request_id
         ]
-        (receipt,) = [event for event in result.events if isinstance(event, NudgeIncludedEvent)]
+        (receipt,) = [
+            event for event in result.events if isinstance(event, NudgeIncludedEvent)
+        ]
         assert receipt.request_id == request.request_id
         assert provenance == (
             IncludedObservation(
@@ -216,12 +238,16 @@ async def test_hint_provenance_is_recorded_and_unselected_hints_stay_queued():
 
 
 @pytest.mark.parametrize("transform", ["keep", "drop", "redact"])
-async def test_hints_stay_queued_until_the_unchanged_observation_is_submitted(transform):
+async def test_hints_stay_queued_until_the_unchanged_observation_is_submitted(
+    transform,
+):
     holder = {}
 
     class Hints(Plugin, needs=(Nudges,)):
         @hook(PreStep)
-        async def project(self, event: PreStep, next_: Next[StepDecision], nudges: Inject[Nudges]):
+        async def project(
+            self, event: PreStep, next_: Next[StepDecision], nudges: Inject[Nudges]
+        ):
             event.session.observe(await nudges.project(_snapshot()))
             return await next_()
 
@@ -235,13 +261,16 @@ async def test_hints_stay_queued_until_the_unchanged_observation_is_submitted(tr
             }
             if transform == "drop":
                 return replace(
-                    request, messages=tuple(m for m in request.messages if m.id not in ids)
+                    request,
+                    messages=tuple(m for m in request.messages if m.id not in ids),
                 )
             if transform == "redact":
                 return replace(
                     request,
                     messages=tuple(
-                        replace(message, content="Redacted hint") if message.id in ids else message
+                        replace(message, content="Redacted hint")
+                        if message.id in ids
+                        else message
                         for message in request.messages
                     ),
                 )
@@ -256,10 +285,14 @@ async def test_hints_stay_queued_until_the_unchanged_observation_is_submitted(tr
         await nudges.queue("Inspect the page", key="hint", cause_id="action")
         (nudge_id,) = (await nudges.project(_snapshot())).refs
         result = await session.run("Inspect")
-        receipts = [event for event in result.events if isinstance(event, NudgeIncludedEvent)]
+        receipts = [
+            event for event in result.events if isinstance(event, NudgeIncludedEvent)
+        ]
         delivered = transform == "keep"
         assert len(receipts) == int(delivered)
-        assert (await nudges.project(_snapshot())).refs == (() if delivered else (nudge_id,))
+        assert (await nudges.project(_snapshot())).refs == (
+            () if delivered else (nudge_id,)
+        )
 
 
 class _Access(Plugin, needs=(Nudges,)):
@@ -291,23 +324,49 @@ def _snapshot():
 @pytest.mark.parametrize(
     "title,text,controls,expected",
     [
-        ("Just a moment...", "Verify you are human by completing the action below.", 2, True),
+        (
+            "Just a moment...",
+            "Verify you are human by completing the action below.",
+            2,
+            True,
+        ),
         ("Reddit - Prove your humanity", "", 3, True),
-        ("Suche", "Ungewöhnlicher Datenverkehr. Ich bin kein Roboter. reCAPTCHA", 4, True),
-        ("CAPTCHA - Wikipedia", "A CAPTCHA is a type of challenge-response test", 300, False),
+        (
+            "Suche",
+            "Ungewöhnlicher Datenverkehr. Ich bin kein Roboter. reCAPTCHA",
+            4,
+            True,
+        ),
+        (
+            "CAPTCHA - Wikipedia",
+            "A CAPTCHA is a type of challenge-response test",
+            300,
+            False,
+        ),
         ("Example", "An ordinary page", 2, False),
     ],
 )
 async def test_bot_checks_get_one_hint_per_document(title, text, controls, expected):
     elements = tuple(
-        Element(ref=str(index), frame_id="f", backend_id=index, role="link", name="x", tag="a")
+        Element(
+            ref=str(index),
+            frame_id="f",
+            backend_id=index,
+            role="link",
+            name="x",
+            tag="a",
+        )
         for index in range(controls)
     )
-    snapshot = _snapshot().model_copy(update={"title": title, "text": text, "elements": elements})
+    snapshot = _snapshot().model_copy(
+        update={"title": title, "text": text, "elements": elements}
+    )
 
     class Hints(Plugin, needs=(Nudges,)):
         @hook(PreStep)
-        async def project(self, event: PreStep, next_: Next[StepDecision], nudges: Inject[Nudges]):
+        async def project(
+            self, event: PreStep, next_: Next[StepDecision], nudges: Inject[Nudges]
+        ):
             if (hints := await nudges.observation(snapshot)) is not None:
                 event.session.observe(hints)
             return await next_()

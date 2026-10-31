@@ -38,10 +38,14 @@ def read_pdf(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedConten
         with path.open("rb") as stream:
             reader = PdfReader(stream)
             if reader.is_encrypted:
-                raise ValueError("PDF is encrypted; a password is required to extract its contents")
+                raise ValueError(
+                    "PDF is encrypted; a password is required to extract its contents"
+                )
             count = len(reader.pages)
             if not 1 <= number <= count:
-                raise ValueError(f"PDF has {count} pages; choose an existing page_number")
+                raise ValueError(
+                    f"PDF has {count} pages; choose an existing page_number"
+                )
             page = reader.pages[number - 1]
             text = page.extract_text() or ""
             resources = page.get("/Resources", DictionaryObject()).get_object()
@@ -49,7 +53,9 @@ def read_pdf(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedConten
     except PyPdfError as error:
         raise ValueError("Could not read PDF: invalid or damaged document") from error
     details = ParsedContent((), "pdf", page_number=number, page_count=count)
-    if request.ocr is True or (not text.strip() and enable_ocr and request.ocr is not False):
+    if request.ocr is True or (
+        not text.strip() and enable_ocr and request.ocr is not False
+    ):
         with _pdf_image(path, number) as image:
             text = image_text(image)
         details.limitations.append(
@@ -71,10 +77,13 @@ def read_image(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedCont
         format_ = (image.format or path.suffix.lstrip(".")).lower()
         count = getattr(image, "n_frames", 1)
         if not 1 <= number <= count:
-            raise ValueError(f"Image has {count} frames; choose an existing page_number")
+            raise ValueError(
+                f"Image has {count} frames; choose an existing page_number"
+            )
         image.seek(number - 1)
         metadata = (
-            f"# Image\n\nFormat: {image.format}\nDimensions: {image.width} × {image.height}\n\n"
+            f"# Image\n\nFormat: {image.format}\n"
+            f"Dimensions: {image.width} × {image.height}\n\n"
         )
         if request.ocr is False or (request.ocr is None and not enable_ocr):
             return ParsedContent(
@@ -89,7 +98,9 @@ def read_image(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedCont
     details = ParsedContent(
         (metadata, "## Recognized text\n\n", text),
         format_,
-        ["Local OCR extracts text, not a complete interpretation of pictures or diagrams"],
+        [
+            "Local OCR extracts text, not a complete interpretation of pictures or diagrams"
+        ],
         page_number=number,
         page_count=count,
     )

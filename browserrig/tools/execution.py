@@ -101,7 +101,9 @@ class DomActionChains:
         return decision_change(before, after)
 
 
-class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, Observe)):
+class Actions(
+    Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, Observe)
+):
     """Own the action transaction: serialization, readiness, dispatch and receipts."""
 
     events = ACTION_EVENTS
@@ -156,7 +158,9 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
                 dispatched = True
                 with self.browser.input.action(action_id):
                     effect = await operation(tab)
-                note = await self._settle(tab, kind) if settle and not tab.closed else ""
+                note = (
+                    await self._settle(tab, kind) if settle and not tab.closed else ""
+                )
                 await self._events.emit(
                     ActionFinishedEvent(
                         action_id=action_id,
@@ -177,7 +181,9 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
                     break_chain=effect.break_chain or bool(note) or bool(change),
                 )
                 return (
-                    result.with_note(change + " Observe before continuing.") if change else result
+                    result.with_note(change + " Observe before continuing.")
+                    if change
+                    else result
                 )
             except asyncio.CancelledError:
                 reason = (
@@ -194,7 +200,11 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
                     else f"{type(error).__name__}: {error}"
                 )
                 await self._fail(tab, action_id, kind, dispatched, reason)
-                hint = "; the action may have run. Observe before retrying." if dispatched else ""
+                hint = (
+                    "; the action may have run. Observe before retrying."
+                    if dispatched
+                    else ""
+                )
                 raise ToolError(reason + hint) from error
 
     async def page_change(self, tab: Tab, *, after_input: bool = True) -> str:
@@ -208,7 +218,9 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
             # Successful input remains successful even if comparison fails.
             return "The page could not be checked after input."
 
-    async def element_point(self, *, tab: Tab, ref: str, scroll: bool = True) -> ElementPoint:
+    async def element_point(
+        self, *, tab: Tab, ref: str, scroll: bool = True
+    ) -> ElementPoint:
         """Reveal a ref with wheel input, then return a hit-tested point and highlight it.
 
         Use `scroll=False` to re-check the target after hover or other input moved it.
@@ -249,7 +261,9 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
             and kind in _POINTER_KINDS | _CHAINABLE_KINDS
             and not _observes(before, tab)
         ):
-            raise BrowserError("The observed tab or document changed; act on the next observation")
+            raise BrowserError(
+                "The observed tab or document changed; act on the next observation"
+            )
         if before is None or before.tab_id != tab.id:
             before = await self.observe.capture(tab)
         report = await self.readiness.wait(tab, phase=ReadinessPhase.ACTION)
@@ -264,7 +278,9 @@ class Actions(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, O
 
     async def _settle(self, tab: Tab, kind: ActionKind) -> str:
         phase = (
-            ReadinessPhase.NAVIGATION if kind in _NAVIGATION_KINDS else ReadinessPhase.AFTER_ACTION
+            ReadinessPhase.NAVIGATION
+            if kind in _NAVIGATION_KINDS
+            else ReadinessPhase.AFTER_ACTION
         )
         try:
             report = await self.readiness.wait(tab, phase=phase)
@@ -298,7 +314,8 @@ def _stop_on_failure(result: ToolResult, tool: ToolInfo | None) -> ToolResult:
     if (
         metadata is not None
         and result.is_error
-        and result.status not in {ToolStatus.DENIED, ToolStatus.UNAVAILABLE, ToolStatus.SKIPPED}
+        and result.status
+        not in {ToolStatus.DENIED, ToolStatus.UNAVAILABLE, ToolStatus.SKIPPED}
     ):
         return replace(result, break_chain=True)
     return result

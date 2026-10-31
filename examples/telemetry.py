@@ -52,9 +52,14 @@ async def tracing_plugins(
 
     # Optional dependencies belong to application startup, never Browserrig imports.
     try:
-        from harnessed.integrations.opentelemetry import OpenTelemetryTracer, otlp_provider
+        from harnessed.integrations.opentelemetry import (
+            OpenTelemetryTracer,
+            otlp_provider,
+        )
     except ImportError as error:
-        raise RuntimeError("Tracing requires the otel extra: uv sync --extra otel") from error
+        raise RuntimeError(
+            "Tracing requires the otel extra: uv sync --extra otel"
+        ) from error
 
     # Standard OTLP variables stay in charge; without them, export to local Phoenix.
     configured = os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") or os.getenv(
@@ -65,7 +70,9 @@ async def tracing_plugins(
         service_name=os.getenv("OTEL_SERVICE_NAME", "browserrig"),
         endpoint=None if configured else "http://127.0.0.1:6006/v1/traces",
         resource_attributes={
-            "openinference.project.name": os.getenv("PHOENIX_PROJECT_NAME", "browserrig")
+            "openinference.project.name": os.getenv(
+                "PHOENIX_PROJECT_NAME", "browserrig"
+            )
         },
     ) as provider:
         yield [

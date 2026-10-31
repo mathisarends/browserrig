@@ -90,11 +90,15 @@ async def find_text(
         marks += _viewport_marks(frame, result.marks, first=total + 1)
         scrolled = scrolled or result.scrolled
         total += result.total
-        counts = [mine + theirs for mine, theirs in zip(counts, result.counts, strict=True)]
+        counts = [
+            mine + theirs for mine, theirs in zip(counts, result.counts, strict=True)
+        ]
     if scrolled:
         # Scrolling moved the frames: mark the matches where they are now.
         tab.layout_changed()
-        marks = list((await find_text(tab, queries, session=session, active=active)).marks)
+        marks = list(
+            (await find_text(tab, queries, session=session, active=active)).marks
+        )
     return PageMatches(
         total=total,
         counts=tuple(counts),
@@ -124,12 +128,19 @@ def _viewport_marks(frame: Frame, marks, *, first: int) -> list[FindMark]:
     for mark in marks:
         rects = []
         for x, y, width, height in mark.rects:
-            box = frame.transform.bounds_to_viewport(Bounds(x=x, y=y, width=width, height=height))
+            box = frame.transform.bounds_to_viewport(
+                Bounds(x=x, y=y, width=width, height=height)
+            )
             if frame.visible is not None:
                 box = box.intersect(frame.visible)
             if box.width > 0 and box.height > 0:
                 rects.append(
-                    (round(box.x, 1), round(box.y, 1), round(box.width, 1), round(box.height, 1))
+                    (
+                        round(box.x, 1),
+                        round(box.y, 1),
+                        round(box.width, 1),
+                        round(box.height, 1),
+                    )
                 )
         if rects:
             found.append(FindMark(index=first + mark.index, rects=tuple(rects)))

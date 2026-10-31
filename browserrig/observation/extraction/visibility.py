@@ -5,7 +5,9 @@ import re
 from .document import Document, Rect, intersect, is_empty
 from .styles import Style
 
-_CLIP_RECT = re.compile(r"rect\(([-\d.]+)px,?\s*([-\d.]+)px,?\s*([-\d.]+)px,?\s*([-\d.]+)px\)")
+_CLIP_RECT = re.compile(
+    r"rect\(([-\d.]+)px,?\s*([-\d.]+)px,?\s*([-\d.]+)px,?\s*([-\d.]+)px\)"
+)
 _INSET = re.compile(r"inset\(\s*(\d+(?:\.\d+)?)%")
 _TRANSPARENT = frozenset({"", "transparent", "rgba(0, 0, 0, 0)"})
 _OPAQUE_TAGS = frozenset({"img", "video", "canvas", "iframe", "embed", "object"})
@@ -35,12 +37,15 @@ def hidden(document: Document, index: int, rect: Rect | None) -> bool:
     return clip_area is not None and is_empty(intersect(rect, clip_area))
 
 
-def visible_area(document: Document, index: int, rect: Rect, viewport: Rect | None) -> Rect | None:
+def visible_area(
+    document: Document, index: int, rect: Rect, viewport: Rect | None
+) -> Rect | None:
     """The part of `rect` inside the viewport and every scroll container, if any."""
     if viewport is None:
         return None
     area = intersect(
-        intersect(intersect(rect, document.clip(index)), document.scroll_clip(index)), viewport
+        intersect(intersect(rect, document.clip(index)), document.scroll_clip(index)),
+        viewport,
     )
     return None if is_empty(area) else area
 
@@ -62,7 +67,10 @@ class Occlusion:
             if rect is None or hidden(document, index, rect):
                 continue
             area = visible_area(document, index, rect, viewport)
-            if area is not None and (area[2] - area[0]) * (area[3] - area[1]) >= _MIN_OCCLUDER_AREA:
+            if (
+                area is not None
+                and (area[2] - area[0]) * (area[3] - area[1]) >= _MIN_OCCLUDER_AREA
+            ):
                 self._boxes.append((document.paint_order(index), index, area))
         self._boxes.sort(reverse=True)
 
@@ -87,9 +95,9 @@ class Occlusion:
 
 def _paints(document: Document, index: int) -> bool:
     """Opaque boxes that are positioned or inside a fixed box; static flow does not overlap."""
-    if document.style(index, Style.POSITION) not in _OVERLAY_POSITIONS and not document.pinned(
-        index
-    ):
+    if document.style(
+        index, Style.POSITION
+    ) not in _OVERLAY_POSITIONS and not document.pinned(index):
         return False
     if document.style(index, Style.POINTER_EVENTS) == "none":
         return False

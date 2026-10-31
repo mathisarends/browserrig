@@ -23,7 +23,9 @@ _PROGRESS_INTERVAL_SECONDS = 0.2
 class Downloads:
     """Track browser downloads and move completed files into the workspace."""
 
-    def __init__(self, files: FileSystem | None, directory: str | None, emit: EventSink) -> None:
+    def __init__(
+        self, files: FileSystem | None, directory: str | None, emit: EventSink
+    ) -> None:
         self._files = files
         self._directory = directory
         self._emit = emit
@@ -31,7 +33,9 @@ class Downloads:
         self._progress_at: dict[str, float] = {}
 
     async def enable(self, client: CdpClient, context_id: str | None) -> None:
-        directory = str(self._files.pending_directory) if self._files else self._directory
+        directory = (
+            str(self._files.pending_directory) if self._files else self._directory
+        )
         if directory is not None:
             await client.browser.set_download_behavior(
                 behavior="allowAndName",
@@ -43,7 +47,9 @@ class Downloads:
     def all(self) -> tuple[Download, ...]:
         return tuple(self._items.values())
 
-    async def handle(self, event: DownloadWillBeginEvent | DownloadProgressEvent) -> None:
+    async def handle(
+        self, event: DownloadWillBeginEvent | DownloadProgressEvent
+    ) -> None:
         match event:
             case DownloadWillBeginEvent():
                 self._items[event.guid] = Download(
@@ -51,7 +57,9 @@ class Downloads:
                 )
                 await self._emit(
                     DownloadStartedEvent(
-                        download_id=event.guid, filename=event.suggested_filename, url=event.url
+                        download_id=event.guid,
+                        filename=event.suggested_filename,
+                        url=event.url,
                     )
                 )
             case DownloadProgressEvent() if event.guid in self._items:
@@ -102,12 +110,17 @@ class Downloads:
             case DownloadState.CANCELED:
                 await self._emit(DownloadCanceledEvent(download_id=guid))
 
-    async def _report_progress(self, download: Download, received: int, total: int | None) -> None:
+    async def _report_progress(
+        self, download: Download, received: int, total: int | None
+    ) -> None:
         self._items[download.id] = download.model_copy(
             update={"received_bytes": received, "total_bytes": total}
         )
         now = monotonic()
-        if now - self._progress_at.get(download.id, float("-inf")) < _PROGRESS_INTERVAL_SECONDS:
+        if (
+            now - self._progress_at.get(download.id, float("-inf"))
+            < _PROGRESS_INTERVAL_SECONDS
+        ):
             return
         self._progress_at[download.id] = now
         await self._emit(

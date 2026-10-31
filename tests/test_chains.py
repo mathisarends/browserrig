@@ -43,7 +43,9 @@ def _element(**values):
 
 
 def test_probe_changes_ignore_values_cosmetic_text_ref_renaming_and_prepared_scroll():
-    before = _snapshot(offscreen=(Offscreen(ref="first-ref", frame_id="frame", backend_id=10),))
+    before = _snapshot(
+        offscreen=(Offscreen(ref="first-ref", frame_id="frame", backend_id=10),)
+    )
     after = _snapshot(
         id="after",
         title="Cosmetic title",
@@ -85,7 +87,9 @@ def test_new_decisions_interrupt(changes):
     ],
 )
 def test_unavailable_new_controls_do_not_interrupt(changes):
-    assert not decision_change(_snapshot(elements=()), _snapshot(elements=(_element(**changes),)))
+    assert not decision_change(
+        _snapshot(elements=()), _snapshot(elements=(_element(**changes),))
+    )
 
 
 class _Tools(Plugin):
@@ -109,7 +113,9 @@ class _Tools(Plugin):
         self.executed.append("change")
         return "Changed"
 
-    @browser_tool(description="Reveal suggestions.", kind=ActionKind.SELECT, chainable=True)
+    @browser_tool(
+        description="Reveal suggestions.", kind=ActionKind.SELECT, chainable=True
+    )
     async def suggest(self) -> ToolResult:
         self.executed.append("suggest")
         return ToolResult("Suggestions appeared", break_chain=True)
@@ -123,28 +129,40 @@ class _Tools(Plugin):
         (call(_Tools.fill, value="error"), ["first", "error"]),
     ],
 )
-async def test_native_chain_skips_trailing_calls_after_boundary_or_failure(boundary, expected):
+async def test_native_chain_skips_trailing_calls_after_boundary_or_failure(
+    boundary, expected
+):
     executed = []
     model = ScriptedModel(
         [
-            _batch(call(_Tools.fill, value="first"), boundary, call(_Tools.fill, value="last")),
+            _batch(
+                call(_Tools.fill, value="first"),
+                boundary,
+                call(_Tools.fill, value="last"),
+            ),
             "Done",
         ]
     )
-    agent = Agent(model=model, plugins=[_Tools(executed), Approvals(default=PolicyDecision.ALLOW)])
+    agent = Agent(
+        model=model, plugins=[_Tools(executed), Approvals(default=PolicyDecision.ALLOW)]
+    )
     result = await agent.run("Fill the form")
     replies = [e.result for e in result.events if isinstance(e, ToolCallFinishedEvent)]
     assert executed == expected
     assert replies[1].break_chain
     assert replies[2].status is ToolStatus.SKIPPED
-    receipts = [e.result for e in result.events if isinstance(e, ToolExecutionFinishedEvent)]
+    receipts = [
+        e.result for e in result.events if isinstance(e, ToolExecutionFinishedEvent)
+    ]
     assert len(receipts) == 2 and receipts[1].break_chain
     assert result.completed and result.text == "Done"
 
 
 async def test_denied_boundary_does_not_discard_unrelated_followup():
     executed = []
-    model = ScriptedModel([_batch(call(_Tools.change), call(_Tools.fill, value="allowed")), "Done"])
+    model = ScriptedModel(
+        [_batch(call(_Tools.change), call(_Tools.fill, value="allowed")), "Done"]
+    )
     agent = Agent(
         model=model,
         plugins=[
@@ -178,7 +196,9 @@ async def test_browser_metadata_is_captured_for_review_without_reaching_the_mode
         ],
     ).run("Fill")
     info = registrations[0]
-    assert info.metadata.get(BrowserToolMetadata) == BrowserToolMetadata(ActionKind.TYPE, True)
+    assert info.metadata.get(BrowserToolMetadata) == BrowserToolMetadata(
+        ActionKind.TYPE, True
+    )
     assert info.chain is ToolChain.CONTINUE and not info.parallel
     assert "BrowserToolMetadata" not in str(model.requests[0].tools)
 

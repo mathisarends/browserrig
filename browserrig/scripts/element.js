@@ -5,7 +5,9 @@ function browserrigElement({operation, value, clip = null}) {
     if (el.localName !== 'select') {
       throw new Error('NOT_A_SELECT');
     }
-    const found = Array.from(el.options).find((o) => o.value === value || o.text === value);
+    const found = Array.from(el.options).find(
+      (o) => o.value === value || o.text === value,
+    );
     if (!found || found.disabled) {
       throw new Error('OPTION_NOT_FOUND');
     }
@@ -19,7 +21,9 @@ function browserrigElement({operation, value, clip = null}) {
       throw new Error('NOT_EDITABLE');
     }
     const prototype =
-      el.localName === 'textarea' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      el.localName === 'textarea'
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype;
     Object.getOwnPropertyDescriptor(prototype, 'value').set.call(el, value);
     el.dispatchEvent(new Event('input', {bubbles: true}));
     el.dispatchEvent(new Event('change', {bubbles: true}));
@@ -29,7 +33,10 @@ function browserrigElement({operation, value, clip = null}) {
     return {value: el.type === 'password' ? null : el.value};
   }
   function focus() {
-    if (!(el.matches('input:not([readonly]),textarea:not([readonly])') || el.isContentEditable)) {
+    if (!(
+      el.matches('input:not([readonly]),textarea:not([readonly])') ||
+      el.isContentEditable
+    )) {
       throw new Error('NOT_EDITABLE');
     }
     el.focus({preventScroll: true});

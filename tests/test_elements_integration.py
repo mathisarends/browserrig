@@ -32,7 +32,9 @@ async def test_select_notifies_bubbling_listeners_and_rejects_disabled_options(s
             "}",
         )
         snapshot = await capture(tab, DomCapture(), report)
-        select = next(element for element in snapshot.elements if element.tag == "select")
+        select = next(
+            element for element in snapshot.elements if element.tag == "select"
+        )
         result = await frame.run_on_node(
             select.backend_id,
             ELEMENT,
@@ -75,7 +77,9 @@ async def test_focus_selects_text_in_native_and_contenteditable_controls(site, m
             ElementArgs(operation=ElementOperation.FOCUS, value=True),
             user_gesture=True,
         )
-        assert await evaluate(frame, "document.activeElement === document.body.firstElementChild")
+        assert await evaluate(
+            frame, "document.activeElement === document.body.firstElementChild"
+        )
         selected = await evaluate(
             frame,
             "document.activeElement.localName === 'textarea'"
@@ -86,13 +90,17 @@ async def test_focus_selects_text_in_native_and_contenteditable_controls(site, m
         assert selected == "Hello"
 
 
-async def test_native_value_setter_preserves_password_redaction_and_value_validation(site):
+async def test_native_value_setter_preserves_password_redaction_and_value_validation(
+    site,
+):
     async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         snapshot = await capture(tab, DomCapture(), report)
         frame = await tab.main_frame()
-        secret = next(element for element in snapshot.elements if element.input_type == "password")
+        secret = next(
+            element for element in snapshot.elements if element.input_type == "password"
+        )
         assert secret.value is None
         assert await frame.run_on_node(
             secret.backend_id,
@@ -103,8 +111,13 @@ async def test_native_value_setter_preserves_password_redaction_and_value_valida
             ),
             user_gesture=True,
         ) == {"value": None}
-        assert await evaluate(frame, "document.querySelector('#secret').value") == "new-secret"
-        date = next(element for element in snapshot.elements if element.input_type == "date")
+        assert (
+            await evaluate(frame, "document.querySelector('#secret').value")
+            == "new-secret"
+        )
+        date = next(
+            element for element in snapshot.elements if element.input_type == "date"
+        )
         with pytest.raises(BrowserError, match="INVALID_VALUE"):
             await frame.run_on_node(
                 date.backend_id,

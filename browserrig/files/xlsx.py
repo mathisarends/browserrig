@@ -14,12 +14,15 @@ from defusedxml.sax import parse
 def value_source(path: Path) -> Generator[IO[bytes], None, None]:
     # The spill is local and temporary; the original workbook is never rewritten.
     with SpooledTemporaryFile(max_size=8 * 1024 * 1024, mode="w+b") as buffer:
-        with ZipFile(path) as source, ZipFile(buffer, "w", compression=ZIP_DEFLATED) as output:
+        with (
+            ZipFile(path) as source,
+            ZipFile(buffer, "w", compression=ZIP_DEFLATED) as output,
+        ):
             for entry in source.infolist():
                 with source.open(entry) as input_, output.open(entry, "w") as target:
-                    if entry.filename.startswith("xl/worksheets/") and entry.filename.endswith(
-                        ".xml"
-                    ):
+                    if entry.filename.startswith(
+                        "xl/worksheets/"
+                    ) and entry.filename.endswith(".xml"):
                         parse(input_, _WorksheetValues(target))
                     else:
                         copyfileobj(input_, target, length=65536)

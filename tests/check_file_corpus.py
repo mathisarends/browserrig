@@ -55,7 +55,9 @@ def _source(directory: Path, entry: dict, download: bool) -> Path:
 
 
 def _inspect(path: Path, workspace: Path, entry: dict) -> dict:
-    files = FileSystem(FileSystemOptions(directory=workspace), download_directory=str(path.parent))
+    files = FileSystem(
+        FileSystemOptions(directory=workspace), download_directory=str(path.parent)
+    )
     first = files.read_file(str(path), max_chars=200000)
     selections = [{}]
     if first.sheets:
@@ -66,7 +68,9 @@ def _inspect(path: Path, workspace: Path, entry: dict) -> dict:
     for selection in selections:
         offset = 0
         while True:
-            result = files.read_file(str(path), offset=offset, max_chars=200000, **selection)
+            result = files.read_file(
+                str(path), offset=offset, max_chars=200000, **selection
+            )
             chunks.append(result.text)
             limitations.update(result.limitations)
             if result.next_offset is None:
@@ -78,7 +82,10 @@ def _inspect(path: Path, workspace: Path, entry: dict) -> dict:
     missing = [marker for marker in entry.get("contains", []) if marker not in text]
     if missing:
         raise ValueError(f"Expected content missing: {missing}")
-    if first.status != entry["expected_status"] or len(selections) != entry["expected_views"]:
+    if (
+        first.status != entry["expected_status"]
+        or len(selections) != entry["expected_views"]
+    ):
         raise ValueError("Reader status or number of document views changed")
     return {
         "format": first.format,
@@ -97,7 +104,11 @@ def _worker(path: Path, workspace: Path, entry: dict) -> dict:
             return {"name": path.name, "passed": True, "expected_error": str(error)}
         return {"name": path.name, "passed": False, "error": str(error)}
     if entry.get("expected_error"):
-        return {"name": path.name, "passed": False, "error": "Expected corrupt-file error"}
+        return {
+            "name": path.name,
+            "passed": False,
+            "error": "Expected corrupt-file error",
+        }
     return {"name": path.name, "passed": True, **result}
 
 

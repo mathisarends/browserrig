@@ -24,7 +24,12 @@ from browserrig.observation.render import image_caption, render
 def test_render_lists_visible_elements_by_section_and_group_without_routing_data():
     snapshot = _snapshot(
         _element(
-            "1", 0, role="link", tag="a", href="https://example.org/cart?x=1", section="HEADER"
+            "1",
+            0,
+            role="link",
+            tag="a",
+            href="https://example.org/cart?x=1",
+            section="HEADER",
         ),
         _element(
             "2",
@@ -40,7 +45,13 @@ def test_render_lists_visible_elements_by_section_and_group_without_routing_data
         ),
         _element("3", 3, role="checkbox", tag="input", checked=False, section="MAIN"),
         headings=(
-            Heading(level=2, text="Login", frame_id="internal-frame", order=1, section="MAIN"),
+            Heading(
+                level=2,
+                text="Login",
+                frame_id="internal-frame",
+                order=1,
+                section="MAIN",
+            ),
         ),
     )
     lines = render(snapshot).splitlines()
@@ -67,7 +78,9 @@ def test_render_merges_link_headings_and_unwraps_search_redirects():
             name="Result",
             href="https://www.google.com/url?q=https://docs.example.org/a&sa=U",
         ),
-        _element("2", 3, role="link", tag="a", name="More", href="https://example.org/more"),
+        _element(
+            "2", 3, role="link", tag="a", name="More", href="https://example.org/more"
+        ),
         headings=(
             Heading(level=2, text="Result", frame_id="internal-frame", order=0),
             Heading(level=3, text="Section", frame_id="internal-frame", order=2),
@@ -90,7 +103,9 @@ def test_render_omits_in_page_targets_that_repeat_the_link_name():
     ]
     snapshot = _snapshot(
         *(
-            _element(str(index), index, role="link", tag="a", name=name, href=page + fragment)
+            _element(
+                str(index), index, role="link", tag="a", name=name, href=page + fragment
+            )
             for index, (name, fragment) in enumerate(links)
         )
     )
@@ -117,7 +132,11 @@ def test_render_lists_only_the_viewport_and_reports_modal():
 def test_render_lists_canvases_with_viewport_bounds_even_without_elements():
     snapshot = _snapshot(
         canvases=(
-            Canvas(frame_id="f", bounds=Bounds(x=100, y=150, width=400, height=200), name="Map"),
+            Canvas(
+                frame_id="f",
+                bounds=Bounds(x=100, y=150, width=400, height=200),
+                name="Map",
+            ),
             Canvas(
                 frame_id="f",
                 bounds=Bounds(x=0, y=600, width=300, height=200),
@@ -175,7 +194,9 @@ def test_fingerprint_changes_with_semantics_and_url():
         document_id="doc",
         text=("hello",),
         scroll_y=0,
-        elements=(ElementFingerprint(role="button", name="Go", value=None, disabled=False),),
+        elements=(
+            ElementFingerprint(role="button", name="Go", value=None, disabled=False),
+        ),
     )
     restored = PageFingerprint.model_validate_json(original.model_dump_json())
     assert restored.digest() == original.digest()
@@ -267,5 +288,12 @@ def _snapshot(*elements: Element, **fields) -> Snapshot:
 
 
 def _element(ref: str, order: int, **fields) -> Element:
-    defaults = {"frame_id": "internal-frame", "backend_id": 1, "role": "button", "tag": "button"}
-    return Element(ref=ref, order=order, name=fields.pop("name", ref), **(defaults | fields))
+    defaults = {
+        "frame_id": "internal-frame",
+        "backend_id": 1,
+        "role": "button",
+        "tag": "button",
+    }
+    return Element(
+        ref=ref, order=order, name=fields.pop("name", ref), **(defaults | fields)
+    )

@@ -52,7 +52,9 @@ async def test_mouse_and_keyboard_share_action_correlation_without_sharing_curso
 
 @pytest.mark.parametrize("button,mask", [("left", 1), ("right", 2)])
 @pytest.mark.parametrize("count", [1, 2])
-async def test_click_dispatches_selected_button_and_click_count(monkeypatch, button, mask, count):
+async def test_click_dispatches_selected_button_and_click_count(
+    monkeypatch, button, mask, count
+):
     monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
     devices, _tab, events, commands = _rig()
     await devices.mouse.click(Point(x=120, y=80), button=button, count=count)
@@ -63,7 +65,9 @@ async def test_click_dispatches_selected_button_and_click_count(monkeypatch, but
         for item in [("mousePressed", mask, index), ("mouseReleased", 0, index)]
     ]
     assert all(command["button"] == button for command in clicks)
-    receipts = [e for e in events if isinstance(e, (PointerPressedEvent, PointerReleasedEvent))]
+    receipts = [
+        e for e in events if isinstance(e, (PointerPressedEvent, PointerReleasedEvent))
+    ]
     assert len(receipts) == count * 2 and all(e.button == button for e in receipts)
 
 
@@ -81,18 +85,25 @@ async def test_cancelled_right_click_releases_the_right_button(monkeypatch):
     assert commands[-1]["button"] == "right" and commands[-1]["buttons"] == 0
 
 
-async def test_exact_typing_emits_ordered_correlated_keys_without_persistable_text(monkeypatch):
+async def test_exact_typing_emits_ordered_correlated_keys_without_persistable_text(
+    monkeypatch,
+):
     sleep = AsyncMock()
     monkeypatch.setattr("browserrig.input.keyboard.asyncio.sleep", sleep)
     devices, tab, events, commands = _rig()
     tab.document_id = "document-1"
     with devices.action("action-1"):
         await devices.keyboard.type_text("A+ä🙂\t")
-    assert [command["text"] for command in commands if command["type"] == "char"] == list("A+ä🙂\t")
+    assert [
+        command["text"] for command in commands if command["type"] == "char"
+    ] == list("A+ä🙂\t")
     keys = [event for event in events if isinstance(event, KeyPressedEvent)]
     assert [event.key for event in keys] == list("A+ä🙂\t")
     assert all(event.duration == 0.05 for event in keys)
-    assert all(event.target_id == "tab-1" and event.document_id == "document-1" for event in events)
+    assert all(
+        event.target_id == "tab-1" and event.document_id == "document-1"
+        for event in events
+    )
     assert all(event.action_id == "action-1" for event in events)
     assert devices._action_id == ""
     assert sleep.await_count == len(keys)
@@ -101,7 +112,9 @@ async def test_exact_typing_emits_ordered_correlated_keys_without_persistable_te
     assert isinstance(events[-1], KeyboardVisibilityEvent) and not events[-1].visible
 
 
-async def test_bar_typing_shows_each_key_without_page_input_and_follows_each_key(monkeypatch):
+async def test_bar_typing_shows_each_key_without_page_input_and_follows_each_key(
+    monkeypatch,
+):
     sleep = AsyncMock()
     monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", sleep)
     devices, tab, events, commands = _rig()
@@ -139,7 +152,9 @@ async def test_long_addresses_type_faster_and_submit_with_enter(monkeypatch):
     assert (typed[-1].key, typed[-1].text) == ("Enter", address)
     # The whole address stays within the bar's time budget, Enter included.
     assert all(event.duration == pytest.approx(0.8 / len(address)) for event in typed)
-    assert sum(call.args[0] for call in sleep.await_args_list) <= 0.8 + typed[0].duration
+    assert (
+        sum(call.args[0] for call in sleep.await_args_list) <= 0.8 + typed[0].duration
+    )
 
 
 async def test_browser_shortcuts_are_shown_with_held_modifiers_without_reaching_the_page():
@@ -162,7 +177,9 @@ async def test_key_cancellation_releases_main_and_modifiers_and_hides_keyboard()
             await asyncio.Event().wait()
 
     devices, _tab, events, commands = _rig(dispatch=dispatch)
-    task = asyncio.create_task(devices.keyboard.press_key("a", hold_control=True, hold_shift=True))
+    task = asyncio.create_task(
+        devices.keyboard.press_key("a", hold_control=True, hold_shift=True)
+    )
     await entered.wait()
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
@@ -182,9 +199,9 @@ async def test_shortcut_dispatches_modifiers_without_inserting_text():
         ("keyUp", "a"),
         ("keyUp", "Control"),
     ]
-    assert next(event for event in events if isinstance(event, KeyPressedEvent)).modifiers == (
-        "Control",
-    )
+    assert next(
+        event for event in events if isinstance(event, KeyPressedEvent)
+    ).modifiers == ("Control",)
 
 
 @pytest.mark.parametrize(
@@ -208,7 +225,8 @@ async def test_modifier_flags_reach_cdp_and_key_events(modifier, name, flag, key
 
 
 @pytest.mark.parametrize(
-    "arguments", [{}, {"text": "hello", "key": "Enter"}, {"text": "hello", "hold_control": True}]
+    "arguments",
+    [{}, {"text": "hello", "key": "Enter"}, {"text": "hello", "hold_control": True}],
 )
 async def test_send_keys_rejects_ambiguous_arguments_before_dispatch(arguments):
     actions = SimpleNamespace(run=AsyncMock())
@@ -228,12 +246,16 @@ async def test_send_keys_distinguishes_literal_text_from_named_keys(monkeypatch)
     actions = SimpleNamespace(run=run)
     tools = SimpleNamespace(_browser=SimpleNamespace(keyboard=devices.keyboard))
     await KeyboardTools.send_keys(tools, text="Escape", actions=actions)
-    assert [command["text"] for command in commands if command["type"] == "char"] == list("Escape")
+    assert [
+        command["text"] for command in commands if command["type"] == "char"
+    ] == list("Escape")
     commands.clear()
     events.clear()
     await KeyboardTools.send_keys(tools, key="Escape", actions=actions)
     assert [command["type"] for command in commands] == ["rawKeyDown", "keyUp"]
-    assert [event.key for event in events if isinstance(event, KeyPressedEvent)] == ["Escape"]
+    assert [event.key for event in events if isinstance(event, KeyPressedEvent)] == [
+        "Escape"
+    ]
 
 
 async def test_cancelled_cursor_reports_actual_position():
@@ -284,7 +306,9 @@ async def test_file_transfer_is_correlated_and_holds_for_its_animation(monkeypat
     monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", sleep)
     devices, _tab, events, _ = _rig()
     with devices.action("upload-1"):
-        await devices.transfer(FileTransferDirection.UPLOAD, ("a.pdf", "b.png"), Point(x=12, y=34))
+        await devices.transfer(
+            FileTransferDirection.UPLOAD, ("a.pdf", "b.png"), Point(x=12, y=34)
+        )
     assert len(events) == 1
     event = events[0]
     assert isinstance(event, FileTransferEvent)
@@ -293,7 +317,9 @@ async def test_file_transfer_is_correlated_and_holds_for_its_animation(monkeypat
     sleep.assert_awaited_once_with(event.duration)
 
 
-@pytest.mark.parametrize("end", [Point(x=0, y=400), Point(x=400, y=0), Point(x=1, y=400)])
+@pytest.mark.parametrize(
+    "end", [Point(x=0, y=400), Point(x=400, y=0), Point(x=1, y=400)]
+)
 def test_cursor_paths_stay_in_viewport_at_edges(end):
     path = movement(Point(x=0, y=0), end)
     assert path.point(1) == end
@@ -330,7 +356,9 @@ async def test_failed_native_drag_cancellation_still_releases_mouse_button():
     devices, tab, _, commands = _rig(dispatch=dispatch)
     tab.cdp.input.cancel_dragging.side_effect = RuntimeError("cancel failed")
     with pytest.raises(RuntimeError, match="cancel failed"):
-        await devices.mouse.drag(start=Point(x=10, y=10), end=Point(x=200, y=200), duration=0.1)
+        await devices.mouse.drag(
+            start=Point(x=10, y=10), end=Point(x=200, y=200), duration=0.1
+        )
     assert commands[-1]["type"] == "mouseReleased"
     assert commands[-1]["buttons"] == 0
 
@@ -369,7 +397,9 @@ def _tab(target_id="tab-1", *, dispatch=None, events=None, viewport=(1000, 600))
         page=SimpleNamespace(
             get_layout_metrics=AsyncMock(
                 return_value=SimpleNamespace(
-                    css_layout_viewport=SimpleNamespace(client_width=width, client_height=height)
+                    css_layout_viewport=SimpleNamespace(
+                        client_width=width, client_height=height
+                    )
                 )
             )
         ),
@@ -380,7 +410,9 @@ def _tab(target_id="tab-1", *, dispatch=None, events=None, viewport=(1000, 600))
 async def test_first_tab_seeds_the_pointer_without_a_tab_press(monkeypatch):
     sleep = AsyncMock()
     monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", sleep)
-    monkeypatch.setattr("browserrig.input.mouse.random.uniform", Mock(side_effect=[450, 330]))
+    monkeypatch.setattr(
+        "browserrig.input.mouse.random.uniform", Mock(side_effect=[450, 330])
+    )
     tab, events, commands = _tab()
     focus: dict[str, Tab | None] = {"tab": None}
     devices = Input(lambda: focus["tab"])
@@ -399,7 +431,9 @@ async def test_first_tab_seeds_the_pointer_without_a_tab_press(monkeypatch):
 async def test_tab_switch_presses_the_tab_then_enters_the_new_page(monkeypatch):
     sleep = AsyncMock()
     monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", sleep)
-    monkeypatch.setattr("browserrig.input.mouse.random.uniform", Mock(side_effect=[500, 300]))
+    monkeypatch.setattr(
+        "browserrig.input.mouse.random.uniform", Mock(side_effect=[500, 300])
+    )
     events = []
     first, _, first_commands = _tab("first", events=events)
     second, _, second_commands = _tab("second", events=events)
@@ -429,7 +463,9 @@ async def test_tab_switch_presses_the_tab_then_enters_the_new_page(monkeypatch):
     ]
     # Hover in the new page is real: the renderer gets the landing position too.
     assert not first_commands
-    assert [(c["type"], c["x"], c["y"]) for c in second_commands] == [("mouseMoved", 500, 300)]
+    assert [(c["type"], c["x"], c["y"]) for c in second_commands] == [
+        ("mouseMoved", 500, 300)
+    ]
 
 
 async def test_returning_to_a_tab_lands_where_its_pointer_rested(monkeypatch):
@@ -468,7 +504,9 @@ async def test_a_gesture_stays_on_the_tab_where_it_started(monkeypatch):
     first, _, first_commands = _tab("first", dispatch=dispatch)
     focus["tab"] = first
     devices = Input(lambda: focus["tab"])
-    await devices.mouse.drag(start=Point(x=10, y=10), end=Point(x=200, y=200), duration=0.1)
+    await devices.mouse.drag(
+        start=Point(x=10, y=10), end=Point(x=200, y=200), duration=0.1
+    )
     assert first_commands[-1]["type"] == "mouseReleased"
     assert not second_commands
     assert devices.mouse.position_in(first.id) == Point(x=200, y=200)

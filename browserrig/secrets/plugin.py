@@ -18,7 +18,13 @@ from harnessed import (
     ToolResult,
     hook,
 )
-from harnessed.hooks import ExecuteTool, Next, PrepareRequest, Priority, ReviewToolResult
+from harnessed.hooks import (
+    ExecuteTool,
+    Next,
+    PrepareRequest,
+    Priority,
+    ReviewToolResult,
+)
 from harnessed.models import TextPart
 
 from browserrig.browser.base import Browser, BrowserEvents
@@ -77,7 +83,9 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         super().__init__()
         for name, secret in secrets.items():
             if not isinstance(name, str) or not NAME.fullmatch(name):
-                raise ValueError(f"Secret name {name!r} may only use letters, digits, _ . and -")
+                raise ValueError(
+                    f"Secret name {name!r} may only use letters, digits, _ . and -"
+                )
             if not isinstance(secret, Secret):
                 raise TypeError(f"Secret {name} must be a Secret")
         self._secrets = dict(secrets)
@@ -107,7 +115,9 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
 
         if Observe in ctx:
             # Observe binds Secrets when mounted; mounted earlier, it would never redact.
-            raise ValueError("Mount Secrets before Observe, e.g. via browser_plugins(secrets=...)")
+            raise ValueError(
+                "Mount Secrets before Observe, e.g. via browser_plugins(secrets=...)"
+            )
         for name, secret in self._secrets.items():
             if not secret.rotating:
                 self._learn(name, await resolve(name, secret.value))
@@ -122,7 +132,9 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
 
     def available(self, url: str) -> tuple[str, ...]:
         origin = _origin(url)
-        return tuple(name for name, secret in self._secrets.items() if secret.allows(origin))
+        return tuple(
+            name for name, secret in self._secrets.items() if secret.allows(origin)
+        )
 
     def project(self, snapshot: Snapshot) -> Observation | None:
         """List the secrets usable on the observed page; values are never part of it."""
@@ -156,7 +168,9 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
             return None
         for name in names:
             if name not in self._secrets:
-                raise SecretError(f"Unknown secret {name}; use a name listed for this page")
+                raise SecretError(
+                    f"Unknown secret {name}; use a name listed for this page"
+                )
         tab = browser.active_tab
         if field is not None:
             origins = await _field_origins(field)
@@ -171,7 +185,9 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
                 raise SecretError("Focus a text field before typing a secret")
             origins = focus.origins
         for name in names:
-            denied = next((o for o in origins if not self._secrets[name].allows(o)), None)
+            denied = next(
+                (o for o in origins if not self._secrets[name].allows(o)), None
+            )
             if denied is not None:
                 shown = denied if denied != "null" else "an opaque origin"
                 raise SecretError(f"Secret {name} is not allowed on {shown}")
@@ -191,7 +207,9 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         else:
             start = await main.run(SECRET_FOCUS, SecretFocusArgs(start=True))
             if not start.same or start.origins != origins:
-                raise SecretError("Focus changed while preparing the secret; observe first")
+                raise SecretError(
+                    "Focus changed while preparing the secret; observe first"
+                )
             guard = _focus_guard(browser, tab.id, main, origins)
         return SecretEntry(names, origins[0], tab.id, tab.document_id, parts, guard)
 
@@ -222,11 +240,15 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
             ) from None
 
     @hook(ExecuteTool, priority=Priority.GUARD)
-    async def _guard_tool(self, event: ExecuteTool, next_: Next[ToolResult]) -> ToolResult:
+    async def _guard_tool(
+        self, event: ExecuteTool, next_: Next[ToolResult]
+    ) -> ToolResult:
         call = event.call
         allowed = ("text",) if call.name in _TYPING_TOOLS else ()
         if any(
-            _has_placeholder(value) for key, value in call.arguments.items() if key not in allowed
+            _has_placeholder(value)
+            for key, value in call.arguments.items()
+            if key not in allowed
         ):
             return ToolResult.error(
                 "Secret placeholders work only in the text of type_text or send_keys."
@@ -238,7 +260,9 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         return self._redact_result(await next_())
 
     @hook(ReviewToolResult, priority=Priority.GUARD)
-    async def _review_tool(self, _event: ReviewToolResult, next_: Next[ToolResult]) -> ToolResult:
+    async def _review_tool(
+        self, _event: ReviewToolResult, next_: Next[ToolResult]
+    ) -> ToolResult:
         return self._redact_result(await next_())
 
     @hook(PrepareRequest, priority=Priority.GUARD)
@@ -246,12 +270,16 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         request = await next_()
         if not self._redactor:
             return request
-        messages = tuple(_redact_message(self._redactor, message) for message in request.messages)
+        messages = tuple(
+            _redact_message(self._redactor, message) for message in request.messages
+        )
         if all(new is old for new, old in zip(messages, request.messages, strict=True)):
             return request
         return replace(request, messages=messages)
 
-    def _filter_event(self, event: BrowserEvent | LiveEvent) -> BrowserEvent | LiveEvent:
+    def _filter_event(
+        self, event: BrowserEvent | LiveEvent
+    ) -> BrowserEvent | LiveEvent:
         return self._redactor.scrub(event)
 
     def _redact_result(self, result: ToolResult) -> ToolResult:
@@ -279,7 +307,9 @@ async def _field_origins(field: ElementHandle) -> tuple[str, ...]:
     origins = [(await field.run(SECRET_FIELD, SecretFieldArgs())).origin]
     frame: Frame | None = field.frame
     while frame is not None and frame.parent is not None:
-        origins.append((await frame.run_on_owner(SECRET_FIELD, SecretFieldArgs())).origin)
+        origins.append(
+            (await frame.run_on_owner(SECRET_FIELD, SecretFieldArgs())).origin
+        )
         frame = frame.parent
     return tuple(origins)
 
@@ -289,7 +319,9 @@ def _field_guard(
 ) -> Callable[[], Awaitable[None]]:
     async def guard() -> None:
         if browser.active_tab.id != tab_id:
-            raise SecretError("The active tab changed while typing a secret; typing stopped")
+            raise SecretError(
+                "The active tab changed while typing a secret; typing stopped"
+            )
         state = await field.run(SECRET_FIELD, SecretFieldArgs())
         if not state.focused or state.origin != origins[0]:
             raise _left_field()
@@ -309,7 +341,9 @@ def _focus_guard(
 ) -> Callable[[], Awaitable[None]]:
     async def guard() -> None:
         if browser.active_tab.id != tab_id:
-            raise SecretError("The active tab changed while typing a secret; typing stopped")
+            raise SecretError(
+                "The active tab changed while typing a secret; typing stopped"
+            )
         state = await main.run(SECRET_FOCUS, SecretFocusArgs())
         if state.cross_origin or not state.same or state.origins != origins:
             raise _left_field()
@@ -318,7 +352,9 @@ def _focus_guard(
 
 
 def _left_field() -> SecretError:
-    return SecretError("Focus left the field while typing a secret; typing stopped. Observe first")
+    return SecretError(
+        "Focus left the field while typing a secret; typing stopped. Observe first"
+    )
 
 
 def _origin(url: str) -> str:
@@ -332,7 +368,10 @@ def _has_placeholder(value: object) -> bool:
     if isinstance(value, str):
         return PLACEHOLDER.search(value) is not None
     if isinstance(value, Mapping):
-        return any(_has_placeholder(key) or _has_placeholder(item) for key, item in value.items())
+        return any(
+            _has_placeholder(key) or _has_placeholder(item)
+            for key, item in value.items()
+        )
     if isinstance(value, (list, tuple)):
         return any(_has_placeholder(item) for item in value)
     return False

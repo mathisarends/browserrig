@@ -70,5 +70,7 @@ class ElementHandle:
         clip: Bounds | None = None,
     ) -> Any:
         return await self.run(
-            ELEMENT, ElementArgs(operation=operation, value=value, clip=clip), user_gesture=True
+            ELEMENT,
+            ElementArgs(operation=operation, value=value, clip=clip),
+            user_gesture=True,
         )

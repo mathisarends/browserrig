@@ -23,13 +23,17 @@ async def main():
 
 asyncio.run(main())
 """
-    subprocess.run([sys.executable, "-c", script], check=True, capture_output=True, text=True)
+    subprocess.run(
+        [sys.executable, "-c", script], check=True, capture_output=True, text=True
+    )
 
 
 @pytest.fixture(name="collector")
 async def otlp_collector(monkeypatch):
     pytest.importorskip("opentelemetry.sdk.trace")
-    trace_service = pytest.importorskip("opentelemetry.proto.collector.trace.v1.trace_service_pb2")
+    trace_service = pytest.importorskip(
+        "opentelemetry.proto.collector.trace.v1.trace_service_pb2"
+    )
 
     requests = []
 
@@ -43,8 +47,12 @@ async def otlp_collector(monkeypatch):
                 if line.lower().startswith("content-length:")
             )
             body = await reader.readexactly(length)
-            requests.append((lines[0], trace_service.ExportTraceServiceRequest.FromString(body)))
-            writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            requests.append(
+                (lines[0], trace_service.ExportTraceServiceRequest.FromString(body))
+            )
+            writer.write(
+                b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            )
             await writer.drain()
         finally:
             writer.close()
@@ -52,7 +60,9 @@ async def otlp_collector(monkeypatch):
 
     server = await asyncio.start_server(receive, "127.0.0.1", 0)
     port = server.sockets[0].getsockname()[1]
-    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", f"http://127.0.0.1:{port}/v1/traces")
+    monkeypatch.setenv(
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", f"http://127.0.0.1:{port}/v1/traces"
+    )
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION", "none")
     monkeypatch.setenv("OTEL_SERVICE_NAME", "browserrig-test")
     monkeypatch.setenv("PHOENIX_PROJECT_NAME", "browserrig-test")
@@ -71,12 +81,19 @@ class Echo(Plugin):
 
 
 def _attributes(attributes):
-    return {item.key: getattr(item.value, item.value.WhichOneof("value")) for item in attributes}
+    return {
+        item.key: getattr(item.value, item.value.WhichOneof("value"))
+        for item in attributes
+    }
 
 
 @pytest.mark.parametrize("capture_content", [False, True])
-async def test_otlp_export_contains_correlated_model_and_tool_spans(collector, capture_content):
-    async with tracing_plugins(enabled=True, capture_content=capture_content) as plugins:
+async def test_otlp_export_contains_correlated_model_and_tool_spans(
+    collector, capture_content
+):
+    async with tracing_plugins(
+        enabled=True, capture_content=capture_content
+    ) as plugins:
         agent = Agent(
             model=ScriptedModel([call("echo", value="TOOL INPUT"), "MODEL OUTPUT"]),
             plugins=[*plugins, Echo(), Approvals(default=PolicyDecision.ALLOW)],
@@ -86,10 +103,15 @@ async def test_otlp_export_contains_correlated_model_and_tool_spans(collector, c
             assert result.text == "MODEL OUTPUT"
             session_id = session.id
 
-    assert collector and all(path == "POST /v1/traces HTTP/1.1" for path, _ in collector)
-    resources = [resource for _, request in collector for resource in request.resource_spans]
+    assert collector and all(
+        path == "POST /v1/traces HTTP/1.1" for path, _ in collector
+    )
+    resources = [
+        resource for _, request in collector for resource in request.resource_spans
+    ]
     assert all(
-        _attributes(r.resource.attributes)["service.name"] == "browserrig-test" for r in resources
+        _attributes(r.resource.attributes)["service.name"] == "browserrig-test"
+        for r in resources
     )
     spans = [span for r in resources for scope in r.scope_spans for span in scope.spans]
     turn = next(span for span in spans if span.name == "harnessed.turn")
@@ -99,10 +121,14 @@ async def test_otlp_export_contains_correlated_model_and_tool_spans(collector, c
     assert len(steps) == len(models) == 2
     assert all(span.trace_id == turn.trace_id for span in spans)
     assert all(span.parent_span_id == turn.span_id for span in steps)
-    assert all(span.parent_span_id in {step.span_id for step in steps} for span in models)
+    assert all(
+        span.parent_span_id in {step.span_id for step in steps} for span in models
+    )
     assert tool_span.parent_span_id in {step.span_id for step in steps}
     assert _attributes(tool_span.attributes)["tool.name"] == "echo"
-    assert all(_attributes(span.attributes)["session.id"] == session_id for span in spans)
+    assert all(
+        _attributes(span.attributes)["session.id"] == session_id for span in spans
+    )
     contents = str([_attributes(span.attributes) for span in spans])
     for content in ("MODEL INPUT", "MODEL OUTPUT", "TOOL INPUT"):
         assert (content in contents) is capture_content
@@ -113,8 +139,12 @@ async def test_otlp_export_contains_correlated_model_and_tool_spans(collector, c
 
 async def test_content_is_bounded_and_batches_flush_when_host_fails(collector):
     with pytest.raises(RuntimeError, match="host failed"):
-        async with tracing_plugins(capture_content=True, max_content_length=20) as plugins:
-            result = await Agent(model=ScriptedModel(["x" * 100]), plugins=plugins).run("y" * 100)
+        async with tracing_plugins(
+            capture_content=True, max_content_length=20
+        ) as plugins:
+            result = await Agent(model=ScriptedModel(["x" * 100]), plugins=plugins).run(
+                "y" * 100
+            )
             assert result.text == "x" * 100
             raise RuntimeError("host failed")
     spans = [
@@ -124,7 +154,9 @@ async def test_content_is_bounded_and_batches_flush_when_host_fails(collector):
         for scope in resource.scope_spans
         for span in scope.spans
     ]
-    model = _attributes(next(span for span in spans if span.name == "harnessed.model").attributes)
+    model = _attributes(
+        next(span for span in spans if span.name == "harnessed.model").attributes
+    )
     for direction in ("input", "output"):
         assert len(model[f"{direction}.value"]) == 20
         assert model[f"harnessed.{direction}.truncated"] is True

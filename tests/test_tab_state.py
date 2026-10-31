@@ -46,7 +46,11 @@ def test_typed_address_drops_only_what_a_person_would_not_type(url, typed):
             "https://de.wikipedia.org/wiki/Voyager_2",
             "https://de.wikipedia.org/wiki/Voyager_1",
         ),
-        ("/search?q=a#top", "http://localhost:8000/x/y", "http://localhost:8000/search?q=a#top"),
+        (
+            "/search?q=a#top",
+            "http://localhost:8000/x/y",
+            "http://localhost:8000/search?q=a#top",
+        ),
         ("https://example.org/", "https://de.wikipedia.org/", "https://example.org/"),
         ("//example.org/", "https://de.wikipedia.org/", "//example.org/"),
         ("/wiki/Voyager_1", "about:blank", "/wiki/Voyager_1"),
@@ -87,7 +91,9 @@ async def test_error_status_skips_the_body_and_still_closes_the_stream():
     resource = SimpleNamespace(success=True, stream="stream", http_status_code=404.0)
     cdp = SimpleNamespace(
         network=SimpleNamespace(
-            load_network_resource=AsyncMock(return_value=SimpleNamespace(resource=resource))
+            load_network_resource=AsyncMock(
+                return_value=SimpleNamespace(resource=resource)
+            )
         ),
         io=SimpleNamespace(read=AsyncMock(), close=AsyncMock()),
     )
@@ -152,7 +158,9 @@ async def test_input_that_opens_a_dialog_returns_without_waiting_for_its_reply()
 
     cdp = SimpleNamespace(
         input=SimpleNamespace(dispatch_mouse_event=dispatch_mouse_event),
-        page=SimpleNamespace(get_frame_tree=AsyncMock(side_effect=AssertionError("blocked"))),
+        page=SimpleNamespace(
+            get_frame_tree=AsyncMock(side_effect=AssertionError("blocked"))
+        ),
     )
     tab = Tab("tab", cdp)
     click = asyncio.create_task(
@@ -171,7 +179,9 @@ async def test_input_that_opens_a_dialog_returns_without_waiting_for_its_reply()
     # The page answers nothing while the dialog is open, so the document is kept as is.
     await tab.sync_document()
     held.set_exception(RuntimeError("reply after the dialog closed"))
-    await tab.handle(JavascriptDialogClosedEvent(frame_id="tab", result=True, user_input=""))
+    await tab.handle(
+        JavascriptDialogClosedEvent(frame_id="tab", result=True, user_input="")
+    )
     assert tab.dialog is None
 
 

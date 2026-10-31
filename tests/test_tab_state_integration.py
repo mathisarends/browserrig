@@ -18,7 +18,10 @@ _PNG = base64.b64decode(
 )
 _INLINE = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>"
 _RESOURCES = {
-    "/": (b"text/html", b"<!doctype html><title>Icons</title><link rel=icon href=/icon.png>"),
+    "/": (
+        b"text/html",
+        b"<!doctype html><title>Icons</title><link rel=icon href=/icon.png>",
+    ),
     "/inline": (
         b"text/html",
         f'<!doctype html><title>Inline</title><link rel=icon href="{_INLINE}">'.encode(),
@@ -29,14 +32,18 @@ _RESOURCES = {
 
 @pytest.fixture(name="icon_site")
 async def icon_site_fixture() -> AsyncIterator[str]:
-    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         try:
             path = (await reader.readline()).split()[1].decode()
             while (await reader.readline()).strip():
                 pass
             found = _RESOURCES.get(path)
             status, (media_type, body) = (
-                (b"200 OK", found) if found else (b"404 Not Found", (b"text/html", b"missing"))
+                (b"200 OK", found)
+                if found
+                else (b"404 Not Found", (b"text/html", b"missing"))
             )
             writer.write(
                 b"HTTP/1.1 "
@@ -69,7 +76,10 @@ async def test_tab_updates_carry_loading_title_and_icons(icon_site):
 
     async with ChromeBrowser(LaunchBrowser(), emit=collect) as browser:
         tab = browser.active_tab
-        for path, prefix in (("/", "data:image/png;base64,"), ("/inline", "data:image/svg+xml")):
+        for path, prefix in (
+            ("/", "data:image/png;base64,"),
+            ("/inline", "data:image/svg+xml"),
+        ):
             await tab.navigate(icon_site + path)
             async with asyncio.timeout(10):
                 while not (
@@ -97,12 +107,16 @@ async def test_navigate_can_open_the_url_in_a_new_tab(icon_site):
     result = await agent.run("Open the page in a new tab", max_steps=3)
     assert result.text == "Done"
     opened = [event for event in result.events if isinstance(event, TabOpenedEvent)]
-    started = [event for event in result.events if isinstance(event, NavigationStartedEvent)]
+    started = [
+        event for event in result.events if isinstance(event, NavigationStartedEvent)
+    ]
     assert len(opened) == 1
     assert [(event.target_id, event.typed) for event in started] == [
         (opened[0].target_id, icon_site.removeprefix("http://"))
     ]
-    replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)]
+    replies = [
+        msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)
+    ]
     assert not any(reply.is_error for reply in replies)
     assert f"{icon_site}/inline" in str(replies[-1].content)
     assert f"{icon_site}/" in str(replies[-1].content)

@@ -44,7 +44,9 @@ def test_xlsx_preserves_coordinates_formulas_formats_and_hidden_content(files):
     assert "Merged cells: A4:B4" in result.text
     assert "Hidden row: 2" in result.text and "Internal: hidden" in result.text
     assert path.read_bytes() == before
-    assert result.status == "partial" and any("recalculated" in item for item in result.limitations)
+    assert result.status == "partial" and any(
+        "recalculated" in item for item in result.limitations
+    )
     with pytest.raises(ValueError, match="Unknown sheet"):
         files.read_file(str(path), sheet="Missing")
     with pytest.raises(ValueError, match="A1 range"):
@@ -66,7 +68,9 @@ def test_format_detection_does_not_depend_on_download_extension(files, pdf_docum
 
 
 @pytest.mark.parametrize("dimension", [None, "A1:A1"])
-def test_xlsx_tolerates_bad_dimensions_and_irrelevant_invalid_formatting(files, dimension):
+def test_xlsx_tolerates_bad_dimensions_and_irrelevant_invalid_formatting(
+    files, dimension
+):
     source = BytesIO()
     book = Workbook()
     book.active["B3"] = "Actual data"
@@ -139,7 +143,9 @@ def test_legacy_biff_xls_values_are_read_without_a_conversion_backend(files):
     )
     (files.directory / "legacy.xls").write_bytes(content)
     result = files.read_file("legacy.xls")
-    assert "42.0" in result.text and "Voyager" in result.text and result.sheet == "Sheet 1"
+    assert (
+        "42.0" in result.text and "Voyager" in result.text and result.sheet == "Sheet 1"
+    )
 
 
 def test_nested_word_tables_are_not_silently_omitted(files):
@@ -159,7 +165,9 @@ def test_sparse_sheet_reports_view_and_allows_targeted_read(files):
     book.active["ZZ10000"] = "Far away"
     book.save(files.directory / "sparse.xlsx")
     preview = files.read_file("sparse.xlsx")
-    assert preview.status == "partial" and any("ZZ10000" in item for item in preview.limitations)
+    assert preview.status == "partial" and any(
+        "ZZ10000" in item for item in preview.limitations
+    )
     selected = files.read_file("sparse.xlsx", cell_range="ZZ10000:ZZ10000")
     assert "Far away" in selected.text
 
@@ -178,14 +186,20 @@ def test_derived_text_is_complete_cached_and_invalidated_after_source_changes(fi
     stamp = artifact.stat().st_mtime_ns
     rest = files.read_file(str(path), offset=first.next_offset, max_chars=200000)
     assert first.text + rest.text == artifact.read_text(encoding="utf-8")
-    assert rest.extracted_path == first.extracted_path and artifact.stat().st_mtime_ns == stamp
     assert (
-        files.read_file(first.extracted_path).text == artifact.read_text(encoding="utf-8")[:20000]
+        rest.extracted_path == first.extracted_path
+        and artifact.stat().st_mtime_ns == stamp
+    )
+    assert (
+        files.read_file(first.extracted_path).text
+        == artifact.read_text(encoding="utf-8")[:20000]
     )
     document.add_paragraph("ADDED_LATER")
     document.save(path)
     changed = files.read_file(str(path), max_chars=200000)
-    assert "ADDED_LATER" in changed.text and changed.extracted_path != first.extracted_path
+    assert (
+        "ADDED_LATER" in changed.text and changed.extracted_path != first.extracted_path
+    )
 
 
 def test_presentation_reads_tables_notes_and_selected_slide(files):
@@ -208,7 +222,9 @@ def test_open_document_text_and_spreadsheet(files):
     document.text.addElement(P(text="OpenDocument research"))
     document.save(str(files.directory / "notes.odt"))
     assert "OpenDocument research" in files.read_file("notes.odt").text
-    (files.directory / "renamed.bin").write_bytes((files.directory / "notes.odt").read_bytes())
+    (files.directory / "renamed.bin").write_bytes(
+        (files.directory / "notes.odt").read_bytes()
+    )
     assert files.read_file("renamed.bin").format == "odt"
     workbook = OpenDocumentSpreadsheet()
     table = Table(name="Data")
@@ -227,7 +243,11 @@ def test_csv_handles_quoted_delimiters_newlines_and_ranges(files):
     path = files.directory / "data.csv"
     path.write_text('Name;Value\n"A;B";"first\nsecond"\nTail;42\n', encoding="utf-8")
     result = files.read_file("data.csv", cell_range="A2:B2")
-    assert "A;B" in result.text and "first<br>second" in result.text and "Tail" not in result.text
+    assert (
+        "A;B" in result.text
+        and "first<br>second" in result.text
+        and "Tail" not in result.text
+    )
 
 
 def test_utf16_text_pagination_is_character_based_and_large_text_is_streamed(files):
@@ -244,7 +264,9 @@ def test_utf16_text_pagination_is_character_based_and_large_text_is_streamed(fil
 
 
 def test_html_and_rtf_are_read_without_running_scripts(files):
-    files.write_file("page.html", "<h1>Title</h1><p>Visible</p><script>secret()</script>")
+    files.write_file(
+        "page.html", "<h1>Title</h1><p>Visible</p><script>secret()</script>"
+    )
     html = files.read_file("page.html")
     assert "# Title" in html.text and "secret" not in html.text
     files.write_file("notes.rtf", r"{\rtf1\ansi Hello \b world\b0\par Next line}")
@@ -287,11 +309,18 @@ def test_email_body_and_attachment_use_the_same_read_path(files):
     message["From"] = "source@example.test"
     message.set_content("Message body")
     message.add_attachment(
-        b"# Attached research\nPayload", maintype="text", subtype="markdown", filename="notes.md"
+        b"# Attached research\nPayload",
+        maintype="text",
+        subtype="markdown",
+        filename="notes.md",
     )
     (files.directory / "mail.eml").write_bytes(message.as_bytes())
     result = files.read_file("mail.eml")
-    assert "Message body" in result.text and "notes.md" in result.text and result.entry_count == 1
+    assert (
+        "Message body" in result.text
+        and "notes.md" in result.text
+        and result.entry_count == 1
+    )
     attachment = files.read_file("mail.eml", member="#1")
     assert attachment.text == "# Attached research\nPayload"
     assert attachment.path.endswith("mail.eml") and attachment.member == "#1"
@@ -307,12 +336,16 @@ def test_nested_archives_and_compressed_text_are_accessible(files):
     assert "folder/inner.zip" in listing.text and listing.entry_count == 1
     nested = files.read_file("outer.zip", member="folder/inner.zip!/notes.md")
     assert nested.text == "# Nested payload"
-    limited = FileSystem(FileSystemOptions(directory=files.directory, max_archive_depth=1))
+    limited = FileSystem(
+        FileSystemOptions(directory=files.directory, max_archive_depth=1)
+    )
     with pytest.raises(ValueError, match="max_archive_depth"):
         limited.read_file("outer.zip", member="folder/inner.zip!/notes.md")
     with gzip.open(files.directory / "note.txt.gz", "wb") as stream:
         stream.write(b"Compressed payload")
-    assert files.read_file("note.txt.gz", member="note.txt").text == "Compressed payload"
+    assert (
+        files.read_file("note.txt.gz", member="note.txt").text == "Compressed payload"
+    )
 
 
 def test_archive_members_cannot_escape_follow_links_or_expand_without_bound(files):
@@ -328,7 +361,9 @@ def test_archive_members_cannot_escape_follow_links_or_expand_without_bound(file
         files.read_file("unsafe.zip", member="../escape.md")
     with pytest.raises(ValueError, match="regular"):
         files.read_file("unsafe.zip", member="link.md")
-    bounded = FileSystem(FileSystemOptions(directory=files.directory, max_expanded_bytes=100))
+    bounded = FileSystem(
+        FileSystemOptions(directory=files.directory, max_expanded_bytes=100)
+    )
     with pytest.raises(ValueError, match="max_expanded_bytes"):
         bounded.read_file("unsafe.zip", member="large.txt")
     assert not (files.directory.parent / "escape.md").exists()
@@ -355,7 +390,12 @@ def test_sqlite_is_read_only_and_retains_null_and_binary_values(files):
 def test_local_ocr_reads_real_image_and_scanned_pdf(files, suffix):
     image = Image.new("RGB", (900, 180), "white")
     draw = ImageDraw.Draw(image)
-    draw.text((30, 45), "MISSION REPORT 2026", fill="black", font=ImageFont.load_default(size=52))
+    draw.text(
+        (30, 45),
+        "MISSION REPORT 2026",
+        fill="black",
+        font=ImageFont.load_default(size=52),
+    )
     path = files.directory / f"scan.{suffix}"
     image.save(path)
     result = files.read_file(str(path))
@@ -368,7 +408,10 @@ def test_unsupported_binary_has_explicit_status_and_no_screenshot_instruction(fi
     (files.directory / "unknown.bin").write_bytes(b"\0\xff\x01binary")
     result = files.read_file("unknown.bin")
     assert result.status == "unsupported" and result.size == 9
-    assert result.limitations and "screenshot" not in json.dumps(result.model_dump()).lower()
+    assert (
+        result.limitations
+        and "screenshot" not in json.dumps(result.model_dump()).lower()
+    )
     preview = files.read_file("unknown.bin", max_chars=4)
     assert len(preview.text) == 4 and preview.next_offset == 4
 
@@ -379,7 +422,9 @@ def test_tar_index_and_selected_entry_enforce_expansion_budget(files):
         entry = tarfile.TarInfo("large.txt")
         entry.size = 10000
         archive.addfile(entry, BytesIO(b"x" * entry.size))
-    bounded = FileSystem(FileSystemOptions(directory=files.directory, max_expanded_bytes=100))
+    bounded = FileSystem(
+        FileSystemOptions(directory=files.directory, max_expanded_bytes=100)
+    )
     with pytest.raises(ValueError, match="max_expanded_bytes"):
         bounded.read_file("large.tar.gz")
     with pytest.raises(ValueError, match="max_expanded_bytes"):
@@ -404,7 +449,9 @@ def test_archive_pagination_reuses_entry_and_rejects_bad_crc(files):
         files.read_file("broken.zip", member="notes.txt")
 
 
-def test_derived_cache_cannot_follow_a_directory_symlink_outside_workspace(files, tmp_path):
+def test_derived_cache_cannot_follow_a_directory_symlink_outside_workspace(
+    files, tmp_path
+):
     outside = tmp_path / "outside"
     outside.mkdir()
     try:

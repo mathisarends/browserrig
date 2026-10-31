@@ -49,7 +49,11 @@ class Extraction:
 
 
 async def extract(
-    frames: tuple[Frame, ...], *, max_elements: int | None, max_text: int, sparse_text: int = 0
+    frames: tuple[Frame, ...],
+    *,
+    max_elements: int | None,
+    max_text: int,
+    sparse_text: int = 0,
 ) -> Extraction:
     """Extract all frames; `frames[0]` must be the main frame.
 
@@ -59,9 +63,12 @@ async def extract(
     main = frames[0]
     sessions = _sessions(frames)
     snapshots, focused = await asyncio.gather(
-        asyncio.gather(*(_snapshot(cdp) for cdp in sessions.values()), return_exceptions=True),
         asyncio.gather(
-            *(_focused(frame) for frame in _session_roots(frames)), return_exceptions=True
+            *(_snapshot(cdp) for cdp in sessions.values()), return_exceptions=True
+        ),
+        asyncio.gather(
+            *(_focused(frame) for frame in _session_roots(frames)),
+            return_exceptions=True,
         ),
     )
     limitations: list[str] = []
@@ -86,10 +93,14 @@ async def extract(
     extraction = _Assembler(frames, documents, focus, limitations).run(
         max_elements, max_text, sparse_text
     )
-    names = await chrome_names({frame.id: frame.cdp for frame in frames}, extraction.elements)
+    names = await chrome_names(
+        {frame.id: frame.cdp for frame in frames}, extraction.elements
+    )
     if names:
         extraction.elements = tuple(
-            element.model_copy(update={"name": preferred(element.name, names[element.ref])})
+            element.model_copy(
+                update={"name": preferred(element.name, names[element.ref])}
+            )
             if element.ref in names
             else element
             for element in extraction.elements
@@ -116,7 +127,9 @@ class _Assembler:
         self._keys: dict[str, tuple[int, ...]] = {}
         self._covered: set[str] = set()
 
-    def run(self, max_elements: int | None, max_text: int, sparse_text: int) -> Extraction:
+    def run(
+        self, max_elements: int | None, max_text: int, sparse_text: int
+    ) -> Extraction:
         main = self._frames[0]
         document = self._documents.get(main.id)
         if document is None:
@@ -146,11 +159,17 @@ class _Assembler:
             page_height=document.content_height,
             elements=tuple(elements),
             offscreen=tuple(
-                control for result in self._results.values() for control in result.offscreen
+                control
+                for result in self._results.values()
+                for control in result.offscreen
             ),
             headings=tuple(headings),
             alerts=tuple(
-                dict.fromkeys(alert for result in self._results.values() for alert in result.alerts)
+                dict.fromkeys(
+                    alert
+                    for result in self._results.values()
+                    for alert in result.alerts
+                )
             ),
             modal=self._modal(),
             canvases=self._canvases(),
@@ -163,7 +182,9 @@ class _Assembler:
             return self._results[frame.id]
         document = self._documents.get(frame.id)
         if document is None:
-            self._limitations.append(f"Frame {frame.id} changed or could not be inspected")
+            self._limitations.append(
+                f"Frame {frame.id} changed or could not be inspected"
+            )
             return None
         key: tuple[int, ...] = ()
         section = ""
@@ -177,7 +198,9 @@ class _Assembler:
                 owner if owner is not None else len(parent.document),
             )
             section = parent.section(owner) if owner is not None else ""
-            if frame.parent.id in self._covered or (owner is not None and parent.covered(owner)):
+            if frame.parent.id in self._covered or (
+                owner is not None and parent.covered(owner)
+            ):
                 self._covered.add(frame.id)
         result = extract_frame(
             document,
@@ -191,7 +214,10 @@ class _Assembler:
         )
         if frame.id in self._covered:
             result.elements = [
-                (index, element.model_copy(update={"covered": True, "in_viewport": False}))
+                (
+                    index,
+                    element.model_copy(update={"covered": True, "in_viewport": False}),
+                )
                 for index, element in result.elements
             ]
         self._results[frame.id] = result
@@ -214,8 +240,12 @@ class _Assembler:
             if result is None:
                 continue
             key = self._keys[frame.id]
-            ordered.extend(((*key, index), element) for index, element in result.elements)
-            ordered.extend(((*key, index), heading) for index, heading in result.headings)
+            ordered.extend(
+                ((*key, index), element) for index, element in result.elements
+            )
+            ordered.extend(
+                ((*key, index), heading) for index, heading in result.headings
+            )
             if result.text:
                 texts.append(result.text)
         ordered.sort(key=lambda item: item[0])
@@ -228,7 +258,9 @@ class _Assembler:
                 headings.append(item.model_copy(update={"order": order}))
         return elements, headings, "\n".join(texts)
 
-    def _limit(self, elements: list[Element], max_elements: int | None) -> list[Element]:
+    def _limit(
+        self, elements: list[Element], max_elements: int | None
+    ) -> list[Element]:
         if max_elements is None or len(elements) <= max_elements:
             return elements
         viewport = self._frames[0].visible
@@ -239,7 +271,9 @@ class _Assembler:
                 return 0 if element.in_viewport else float("inf")
             return abs(element.bounds.y + element.bounds.height / 2 - middle)
 
-        kept = {id(element) for element in sorted(elements, key=distance)[:max_elements]}
+        kept = {
+            id(element) for element in sorted(elements, key=distance)[:max_elements]
+        }
         self._limitations.append(
             f"Element list truncated to {max_elements} of {len(elements)}, nearest to the "
             "viewport first"
@@ -261,7 +295,11 @@ class _Assembler:
         main = self._results.get(self._frames[0].id)
         if main is not None and main.modal is not None:
             return main.modal[1]
-        candidates = [result.modal for result in self._results.values() if result.modal is not None]
+        candidates = [
+            result.modal
+            for result in self._results.values()
+            if result.modal is not None
+        ]
         return max(candidates, key=lambda item: item[0])[1] if candidates else None
 
 

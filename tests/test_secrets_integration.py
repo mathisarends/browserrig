@@ -45,7 +45,9 @@ def _model(steps):
 
 
 def _ref(state, name):
-    return next(element["ref"] for element in state["elements"] if element["name"] == name)
+    return next(
+        element["ref"] for element in state["elements"] if element["name"] == name
+    )
 
 
 def _replies(model):
@@ -53,7 +55,9 @@ def _replies(model):
 
 
 async def _email(holder):
-    return await evaluate(holder["browser"].active_tab, "document.querySelector('#email').value")
+    return await evaluate(
+        holder["browser"].active_tab, "document.querySelector('#email').value"
+    )
 
 
 class _Hold(Plugin, needs=(Browser,)):
@@ -115,7 +119,9 @@ async def test_typed_secret_reaches_the_page_but_never_the_model(site):
         assert PASSWORD not in repr(request.messages)
     assert "{{secret:pw}}" in repr(model.requests[-1].messages)
     assert PASSWORD not in repr(result.events)
-    entered = [event for event in result.events if isinstance(event, SecretEnteredEvent)]
+    entered = [
+        event for event in result.events if isinstance(event, SecretEnteredEvent)
+    ]
     assert [(event.names, event.origin) for event in entered] == [(("pw",), site)]
     assert not any(reply.is_error for reply in _replies(model))
 
@@ -158,7 +164,9 @@ async def test_send_keys_types_into_the_focused_field_and_blocks_javascript(site
     assert value == f"me {PASSWORD}"
     replies = _replies(model)
     assert not replies[1].is_error
-    assert replies[2].is_error and "JavaScript execution is unavailable" in replies[2].text
+    assert (
+        replies[2].is_error and "JavaScript execution is unavailable" in replies[2].text
+    )
     finished = [e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)]
     assert PASSWORD not in repr(finished)
 
@@ -193,7 +201,8 @@ async def test_secret_is_refused_inside_a_cross_origin_frame_of_an_allowed_page(
     model = _model(
         [
             lambda state, _: ToolCall(
-                "type_text", {"ref": _ref(state, "Frame input"), "text": "{{secret:pw}}"}
+                "type_text",
+                {"ref": _ref(state, "Frame input"), "text": "{{secret:pw}}"},
             ),
             lambda state, _: ToolCall("click", {"ref": _ref(state, "Frame input")}),
             lambda state, _: ToolCall("send_keys", {"text": "{{secret:pw}}"}),

@@ -129,7 +129,8 @@ function browserrigContent({maxChars, mainOnly, origin}) {
       if (url.href.split('#')[0] === page) {
         return '';
       }
-      const href = url.origin === origin ? url.pathname + url.search + url.hash : url.href;
+      const href =
+        url.origin === origin ? url.pathname + url.search + url.hash : url.href;
       return href.replace(/[<>\s()]/g, (char) => encodeURIComponent(char));
     } catch {
       return '';
@@ -142,7 +143,9 @@ function browserrigContent({maxChars, mainOnly, origin}) {
     return (
       links.length > 0 &&
       node.textContent.trim().length <= 12 &&
-      links.every((link) => link.getAttribute('href').includes('#') && !destination(link.href))
+      links.every(
+        (link) => link.getAttribute('href').includes('#') && !destination(link.href),
+      )
     );
   }
 
@@ -215,7 +218,9 @@ function browserrigContent({maxChars, mainOnly, origin}) {
       return '';
     }
     const header = tableRows[0] ? cellsOf(tableRows[0]) : [];
-    if (!header.some((cell) => cell.localName === 'th' || role(cell) === 'columnheader')) {
+    if (
+      !header.some((cell) => cell.localName === 'th' || role(cell) === 'columnheader')
+    ) {
       rows.unshift(Array(width).fill(''));
     }
     const lines = rows.map((row) => {
@@ -279,9 +284,13 @@ function browserrigContent({maxChars, mainOnly, origin}) {
       if (hidden(row)) {
         continue;
       }
-      const cells = Array.from(row.cells, (cell) => render(cell, depth + 1).trim()).filter(Boolean);
+      const cells = Array.from(row.cells, (cell) =>
+        render(cell, depth + 1).trim(),
+      ).filter(Boolean);
       if (cells.length) {
-        blocks.push(cells.join(cells.some((cell) => cell.includes('\n')) ? '\n\n' : ' '));
+        blocks.push(
+          cells.join(cells.some((cell) => cell.includes('\n')) ? '\n\n' : ' '),
+        );
       }
     }
     return '\n\n' + blocks.join('\n\n') + '\n\n';
@@ -339,10 +348,14 @@ function browserrigContent({maxChars, mainOnly, origin}) {
     const tag = node.localName;
     if (/^h[1-6]$/.test(tag)) {
       const title = oneLine(value);
-      return title ? '\n\n' + '#'.repeat(Number(tag[1])) + ' ' + title + '\n\n' : '\n\n';
+      return title
+        ? '\n\n' + '#'.repeat(Number(tag[1])) + ' ' + title + '\n\n'
+        : '\n\n';
     }
     if (tag === 'a') {
-      const href = node.hasAttribute('href') ? destination(node.getAttribute('href')) : '';
+      const href = node.hasAttribute('href')
+        ? destination(node.getAttribute('href'))
+        : '';
       if (!href || !value.trim()) {
         return value;
       }
@@ -375,7 +388,9 @@ function browserrigContent({maxChars, mainOnly, origin}) {
       return '';
     }
     if (node.nodeType === Node.TEXT_NODE) {
-      return collapsed || isRendered(parentFor(node), true) ? text(node.textContent, pre) : '';
+      return collapsed || isRendered(parentFor(node), true)
+        ? text(node.textContent, pre)
+        : '';
     }
     if (node.nodeType !== Node.ELEMENT_NODE) {
       return '';
@@ -392,7 +407,9 @@ function browserrigContent({maxChars, mainOnly, origin}) {
     if (clipped(node)) {
       return '';
     }
-    return isRendered(node, true) ? element(node, depth, pre) : content(node, depth, pre);
+    return isRendered(node, true)
+      ? element(node, depth, pre)
+      : content(node, depth, pre);
   }
 
   function element(node, depth, pre) {
@@ -439,7 +456,9 @@ function browserrigContent({maxChars, mainOnly, origin}) {
     }
     if (tag === 'details' && !node.open) {
       // FAQ answers and disclosures are loaded content; read them without opening.
-      const summary = Array.from(node.children).find((child) => child.localName === 'summary');
+      const summary = Array.from(node.children).find(
+        (child) => child.localName === 'summary',
+      );
       const head = summary ? oneLine(render(summary, depth + 1, pre)) : '';
       collapsed++;
       const body = Array.from(childrenFor(node, closedRoots))
@@ -467,14 +486,19 @@ function browserrigContent({maxChars, mainOnly, origin}) {
         bestLength = length;
       }
     }
-    const total = ((document.body || document.documentElement).innerText || '').trim().length;
+    const total = ((document.body || document.documentElement).innerText || '').trim()
+      .length;
     if (best && bestLength >= Math.max(200, total * 0.2)) {
       return best;
     }
     // Without a usable main landmark, leave out site chrome if enough text remains.
     let chromeLength = 0;
     for (const node of document.querySelectorAll(chromeSelector)) {
-      if (isChrome(node) && !node.parentElement?.closest(chromeSelector) && !hidden(node)) {
+      if (
+        isChrome(node) &&
+        !node.parentElement?.closest(chromeSelector) &&
+        !hidden(node)
+      ) {
         chromeLength += (node.innerText || '').trim().length;
       }
     }

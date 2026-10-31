@@ -51,7 +51,8 @@ def annotate(
     with Image.open(BytesIO(base64.b64decode(image))) as source:
         # Keep image pixels an exact multiple of viewport CSS pixels, including on HiDPI.
         canvas = source.convert("RGB").resize(
-            (round(area.width * scale), round(area.height * scale)), Image.Resampling.LANCZOS
+            (round(area.width * scale), round(area.height * scale)),
+            Image.Resampling.LANCZOS,
         )
     draw = ImageDraw.Draw(canvas)
     font = ImageFont.load_default(size=14)
@@ -93,7 +94,9 @@ def annotate(
     return base64.b64encode(output.getvalue()).decode("ascii")
 
 
-def blackout(image: str, regions: tuple[Bounds, ...], area: Bounds, scale: float = 1) -> str:
+def blackout(
+    image: str, regions: tuple[Bounds, ...], area: Bounds, scale: float = 1
+) -> str:
     """Paint viewport `regions` solid black in an image of `area`, e.g. fields with secrets."""
     with Image.open(BytesIO(base64.b64decode(image))) as source:
         canvas = source.convert("RGB")
@@ -103,7 +106,10 @@ def blackout(image: str, regions: tuple[Bounds, ...], area: Bounds, scale: float
         if shown.width <= 0 or shown.height <= 0:
             continue
         # Round outward so no anti-aliased edge of a glyph survives.
-        left, top = math.floor((shown.x - area.x) * scale), math.floor((shown.y - area.y) * scale)
+        left, top = (
+            math.floor((shown.x - area.x) * scale),
+            math.floor((shown.y - area.y) * scale),
+        )
         right = math.ceil((shown.x + shown.width - area.x) * scale)
         bottom = math.ceil((shown.y + shown.height - area.y) * scale)
         draw.rectangle((left - 2, top - 2, right + 2, bottom + 2), fill="#000000")
@@ -112,7 +118,9 @@ def blackout(image: str, regions: tuple[Bounds, ...], area: Bounds, scale: float
     return base64.b64encode(output.getvalue()).decode("ascii")
 
 
-def _cursor(draw: ImageDraw.ImageDraw, cursor: Point, area: Bounds, scale: float) -> None:
+def _cursor(
+    draw: ImageDraw.ImageDraw, cursor: Point, area: Bounds, scale: float
+) -> None:
     # The arrow's tip is the exact input coordinate, including in zoomed crops.
     x, y = (cursor.x - area.x) * scale, (cursor.y - area.y) * scale
     size = 1.3 * scale
@@ -120,15 +128,30 @@ def _cursor(draw: ImageDraw.ImageDraw, cursor: Point, area: Bounds, scale: float
         (x + dx * size, y + dy * size)
         for dx, dy in ((0, 0), (0, 20), (5, 16), (9, 25), (13, 23), (9, 14), (16, 14))
     ]
-    draw.line(points + points[:1], fill=_Color.WHITE, width=max(1, round(4 * size)), joint="curve")
-    draw.polygon(points, fill=_Color.CURSOR, outline=_Color.DARK, width=max(1, round(size)))
+    draw.line(
+        points + points[:1],
+        fill=_Color.WHITE,
+        width=max(1, round(4 * size)),
+        joint="curve",
+    )
+    draw.polygon(
+        points, fill=_Color.CURSOR, outline=_Color.DARK, width=max(1, round(size))
+    )
 
 
 def _border(draw: ImageDraw.ImageDraw, bounds: Bounds, color: _Color) -> None:
     x, y, width, height = bounds.x, bounds.y, bounds.width, bounds.height
     for offset in range(0, round(width), 10):
         for edge in (y, y + height):
-            draw.line((x + offset, edge, x + min(offset + 4, width), edge), fill=color, width=2)
+            draw.line(
+                (x + offset, edge, x + min(offset + 4, width), edge),
+                fill=color,
+                width=2,
+            )
     for offset in range(0, round(height), 10):
         for edge in (x, x + width):
-            draw.line((edge, y + offset, edge, y + min(offset + 4, height)), fill=color, width=2)
+            draw.line(
+                (edge, y + offset, edge, y + min(offset + 4, height)),
+                fill=color,
+                width=2,
+            )

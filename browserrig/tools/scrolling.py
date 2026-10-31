@@ -22,7 +22,10 @@ async def prepare_element(tab: Tab, handle: ElementHandle, mouse: Mouse) -> bool
                 raise StaleElement(
                     "Document changed while scrolling; use refs from the next observation"
                 )
-            frame = next((item for item in await tab.frames() if item.id == handle.frame.id), None)
+            frame = next(
+                (item for item in await tab.frames() if item.id == handle.frame.id),
+                None,
+            )
             if frame is None:
                 raise StaleElement(
                     "Element frame no longer exists; use refs from the next observation"
@@ -39,7 +42,9 @@ async def prepare_element(tab: Tab, handle: ElementHandle, mouse: Mouse) -> bool
             previous = signature
             x, y = owner.transform.to_viewport(plan.x, plan.y)
             await owner.check_point(x, y)
-            await mouse.scroll(point=Point(x=x, y=y), delta_x=plan.delta_x, delta_y=plan.delta_y)
+            await mouse.scroll(
+                point=Point(x=x, y=y), delta_x=plan.delta_x, delta_y=plan.delta_y
+            )
             scrolled = True
             await asyncio.sleep(0.05)
     raise BrowserError(

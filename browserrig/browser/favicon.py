@@ -65,7 +65,9 @@ async def _fetch(cdp: CdpSession, frame_id: str, url: str) -> bytes | None:
     result = await cdp.network.load_network_resource(
         frame_id=frame_id,
         url=url,
-        options=LoadNetworkResourceOptions(disable_cache=False, include_credentials=False),
+        options=LoadNetworkResourceOptions(
+            disable_cache=False, include_credentials=False
+        ),
     )
     resource = result.resource
     if not resource.success or resource.stream is None:
@@ -110,6 +112,8 @@ def _media_type(data: bytes) -> str | None:
     if b"<html" in head:
         return None
     body = _SVG_PREAMBLE.sub(b"", head)
-    if body.startswith(b"<svg") or (body.startswith(b"<!doctype svg") and b"<svg" in body):
+    if body.startswith(b"<svg") or (
+        body.startswith(b"<!doctype svg") and b"<svg" in body
+    ):
         return "image/svg+xml"
     return None

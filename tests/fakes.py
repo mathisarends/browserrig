@@ -28,7 +28,9 @@ class FakeTab:
             raise AssertionError(f"Unexpected fake script: {script.name}")
         self.probes += 1
         await asyncio.sleep(0)
-        return DOMProbe(loaded=True, body=True, quiet_ms=self.quiet_ms, width=1280, height=800)
+        return DOMProbe(
+            loaded=True, body=True, quiet_ms=self.quiet_ms, width=1280, height=800
+        )
 
 
 class FakeBrowser:

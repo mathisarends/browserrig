@@ -43,7 +43,9 @@ _PAUSE = ActivityKey(ActivityKind.PAUSED)
 class _State:
     open: dict[ActivityKey, ActivityStartedEvent] = field(default_factory=dict)
     # The session log only holds the open turn, so intervals keep their own record.
-    records: list[ActivityStartedEvent | ActivityFinishedEvent] = field(default_factory=list)
+    records: list[ActivityStartedEvent | ActivityFinishedEvent] = field(
+        default_factory=list
+    )
     epoch: str = field(default_factory=lambda: uuid4().hex)
 
 
@@ -55,14 +57,19 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
     async def setup(self, ctx: Context) -> None:
         ctx.effect(self._close_all)
 
-    def intervals(self, *, now: float | None = None) -> tuple[ActivityFinishedEvent, ...]:
+    def intervals(
+        self, *, now: float | None = None
+    ) -> tuple[ActivityFinishedEvent, ...]:
         return project_intervals(self._state.records, now=now)
 
     async def _start(self, key: ActivityKey, *, cause_id: str) -> None:
         """A new interval in the same slot supersedes only that slot's previous interval."""
         await self._finish(key, ActivityOutcome.SUPERSEDED)
         event = ActivityStartedEvent(
-            interval_id=uuid4().hex, kind=key.kind, cause_id=cause_id, epoch_id=self._state.epoch
+            interval_id=uuid4().hex,
+            kind=key.kind,
+            cause_id=cause_id,
+            epoch_id=self._state.epoch,
         )
         self._state.open[key] = event
         self._state.records.append(event)
@@ -104,7 +111,9 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
     async def _on_assistant(self, event: AssistantMessageEvent) -> None:
         await self._finish(
             ActivityKey(ActivityKind.LLM, event.request_id),
-            ActivityOutcome.INTERRUPTED if event.interrupted else ActivityOutcome.COMPLETED,
+            ActivityOutcome.INTERRUPTED
+            if event.interrupted
+            else ActivityOutcome.COMPLETED,
         )
 
     @hook(ModelRequestFailedEvent)
@@ -119,13 +128,16 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
             case _:
                 assert_never(event.outcome)
         await self._finish(
-            ActivityKey(ActivityKind.LLM, event.request_id), outcome, reason=event.outcome.value
+            ActivityKey(ActivityKind.LLM, event.request_id),
+            outcome,
+            reason=event.outcome.value,
         )
 
     @hook(CompactionStartedEvent)
     async def _on_compaction(self, event: CompactionStartedEvent) -> None:
         await self._start(
-            ActivityKey(ActivityKind.COMPACTION, event.compaction_id), cause_id=event.compaction_id
+            ActivityKey(ActivityKind.COMPACTION, event.compaction_id),
+            cause_id=event.compaction_id,
         )
 
     @hook(CompactionFinishedEvent)
@@ -144,7 +156,9 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
 
     @hook(ToolExecutionStartedEvent)
     async def _on_tool(self, event: ToolExecutionStartedEvent) -> None:
-        await self._start(ActivityKey(ActivityKind.TOOL, event.call_id), cause_id=event.call_id)
+        await self._start(
+            ActivityKey(ActivityKind.TOOL, event.call_id), cause_id=event.call_id
+        )
 
     @hook(ToolExecutionFinishedEvent)
     async def _on_tool_finished(self, event: ToolExecutionFinishedEvent) -> None:
@@ -156,7 +170,11 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         elif event.result.status is ToolStatus.TIMEOUT:
             outcome = ActivityOutcome.TIMEOUT
         else:
-            outcome = ActivityOutcome.FAILED if event.result.is_error else ActivityOutcome.COMPLETED
+            outcome = (
+                ActivityOutcome.FAILED
+                if event.result.is_error
+                else ActivityOutcome.COMPLETED
+            )
         await self._finish(
             ActivityKey(ActivityKind.TOOL, event.call_id),
             outcome,
@@ -168,7 +186,8 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         if event.call_id:
             await self._finish(ActivityKey(ActivityKind.TOOL, event.call_id))
             await self._start(
-                ActivityKey(ActivityKind.HANDOFF, event.handoff_id), cause_id=event.handoff_id
+                ActivityKey(ActivityKind.HANDOFF, event.handoff_id),
+                cause_id=event.handoff_id,
             )
 
     @hook(HandoffFinishedEvent)
@@ -183,14 +202,19 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
                 "resumed": ActivityOutcome.COMPLETED,
             }[event.status]
             await self._finish(
-                ActivityKey(ActivityKind.HANDOFF, event.handoff_id), outcome, reason=event.status
+                ActivityKey(ActivityKind.HANDOFF, event.handoff_id),
+                outcome,
+                reason=event.status,
             )
-            await self._start(ActivityKey(ActivityKind.TOOL, event.call_id), cause_id=event.call_id)
+            await self._start(
+                ActivityKey(ActivityKind.TOOL, event.call_id), cause_id=event.call_id
+            )
 
     @hook(ReadinessStartedEvent)
     async def _on_readiness(self, event: ReadinessStartedEvent) -> None:
         await self._start(
-            ActivityKey(ActivityKind.READINESS, event.readiness_id), cause_id=event.readiness_id
+            ActivityKey(ActivityKind.READINESS, event.readiness_id),
+            cause_id=event.readiness_id,
         )
 
     @hook(ReadinessEndedEvent)
@@ -207,7 +231,9 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
             case _:
                 raise TypeError(f"Unsupported readiness event: {type(event).__name__}")
         await self._finish(
-            ActivityKey(ActivityKind.READINESS, event.readiness_id), outcome, reason=event.reason
+            ActivityKey(ActivityKind.READINESS, event.readiness_id),
+            outcome,
+            reason=event.reason,
         )
 
     @hook(AgentControlChangedEvent)

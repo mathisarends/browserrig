@@ -15,9 +15,12 @@ from browserrig.observation.plugin import Observe, has_dom_refs
 from .execution import Actions, Effect
 
 type _ClickCount = Annotated[
-    Literal[1, 2], Field(description="2 = native double click (open, edit, select word)")
+    Literal[1, 2],
+    Field(description="2 = native double click (open, edit, select word)"),
 ]
-type _ClickButton = Annotated[Literal["left", "right"], Field(description="Mouse button to press.")]
+type _ClickButton = Annotated[
+    Literal["left", "right"], Field(description="Mouse button to press.")
+]
 
 
 class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
@@ -79,7 +82,9 @@ class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
             await self._browser.mouse.click(point, count=count, button=button)
             return Effect(_click_message(count, button), break_chain=button == "right")
 
-        return await actions.run(kind=ActionKind.CLICK_AT, operation=click, expects_change=True)
+        return await actions.run(
+            kind=ActionKind.CLICK_AT, operation=click, expects_change=True
+        )
 
     @tool(
         kind=ActionKind.SCROLL,
@@ -125,7 +130,9 @@ class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
             )
             return Effect("Drag dispatched; inspect the destination.")
 
-        return await actions.run(kind=ActionKind.DRAG_AT, operation=drag, expects_change=True)
+        return await actions.run(
+            kind=ActionKind.DRAG_AT, operation=drag, expects_change=True
+        )
 
 
 class DomPointerTools(Plugin, needs=(Actions, Browser, Observe)):
@@ -170,7 +177,9 @@ class DomPointerTools(Plugin, needs=(Actions, Browser, Observe)):
                 break_chain=button == "right",
             )
 
-        return await actions.run(kind=ActionKind.CLICK, operation=click, expects_change=True)
+        return await actions.run(
+            kind=ActionKind.CLICK, operation=click, expects_change=True
+        )
 
     @tool(
         kind=ActionKind.DRAG,
@@ -199,7 +208,9 @@ class DomPointerTools(Plugin, needs=(Actions, Browser, Observe)):
                 prepared_scroll=prepared.scrolled or target.scrolled,
             )
 
-        return await actions.run(kind=ActionKind.DRAG, operation=drag, expects_change=True)
+        return await actions.run(
+            kind=ActionKind.DRAG, operation=drag, expects_change=True
+        )
 
 
 class MouseTools(PointerTools, DomPointerTools):

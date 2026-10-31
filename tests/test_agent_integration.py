@@ -29,7 +29,9 @@ from tests.observations import all_states, has_image, latest
 pytestmark = pytest.mark.integration
 
 
-async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(site, monkeypatch):
+async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
+    site, monkeypatch
+):
     captures = 0
 
     class CountScreenshots(Plugin, needs=(Browser,)):
@@ -82,11 +84,16 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(site
             continue
         assert any(isinstance(part, ImagePart) for part in images[0].content)
         assert latest(request.messages)["elements"]
-    replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)]
+    replies = [
+        msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)
+    ]
     assert len(replies) == 4
     assert all(not reply.is_error for reply in replies)
     assert all(isinstance(reply.content, str) for reply in replies)
-    assert replies[1].text == "Wait completed; the next observation shows the current state."
+    assert (
+        replies[1].text
+        == "Wait completed; the next observation shows the current state."
+    )
     assert isinstance(replies[2].content, str) and "# Test form" in replies[2].text
 
 
@@ -101,12 +108,18 @@ async def test_model_tools_yaml_and_activity(site):
             state = latest(request.messages)
             assert state is not None
             if count == 1:
-                email = next((el for el in state["elements"] if el.get("name") == "Email"), None)
+                email = next(
+                    (el for el in state["elements"] if el.get("name") == "Email"), None
+                )
                 assert email is not None
-                result = ToolCall("type_text", {"ref": email["ref"], "text": "person@example.org"})
+                result = ToolCall(
+                    "type_text", {"ref": email["ref"], "text": "person@example.org"}
+                )
                 assert "never-echo-this" not in str(state)
             elif count == 2:
-                button = next((el for el in state["elements"] if el.get("name") == "Submit"), None)
+                button = next(
+                    (el for el in state["elements"] if el.get("name") == "Submit"), None
+                )
                 assert button is not None
                 result = ToolCall("click", {"ref": button["ref"]})
             else:
@@ -119,29 +132,49 @@ async def test_model_tools_yaml_and_activity(site):
 
     model = CallbackModel(respond)
     agent = Agent(
-        model=model, plugins=[*browser_plugins(), Approvals(default=PolicyDecision.ALLOW)]
+        model=model,
+        plugins=[*browser_plugins(), Approvals(default=PolicyDecision.ALLOW)],
     )
     result = await agent.run("Fill the form and submit", max_steps=5)
     assert result.text == "Completed"
-    assert len([event for event in result.events if isinstance(event, ActionFinishedEvent)]) == 3
-    intervals = [event for event in result.events if isinstance(event, ActivityFinishedEvent)]
+    assert (
+        len(
+            [event for event in result.events if isinstance(event, ActionFinishedEvent)]
+        )
+        == 3
+    )
+    intervals = [
+        event for event in result.events if isinstance(event, ActivityFinishedEvent)
+    ]
     assert len([event for event in intervals if event.kind == "llm"]) == 4
     assert all(event.at >= event.started_at for event in intervals)
-    requests = [event for event in result.events if isinstance(event, ModelRequestedEvent)]
-    provenance = [event for event in result.events if isinstance(event, ObservationsIncludedEvent)]
+    requests = [
+        event for event in result.events if isinstance(event, ModelRequestedEvent)
+    ]
+    provenance = [
+        event for event in result.events if isinstance(event, ObservationsIncludedEvent)
+    ]
     assert len(requests) == len(provenance) == 4
-    assert [item.request_id for item in requests] == [item.request_id for item in provenance]
+    assert [item.request_id for item in requests] == [
+        item.request_id for item in provenance
+    ]
     assert {event.cause_id for event in intervals if event.kind == "llm"} == {
         item.request_id for item in requests
     }
     snapshots = {
-        item.observation_id for item in result.events if isinstance(item, ObservationCapturedEvent)
+        item.observation_id
+        for item in result.events
+        if isinstance(item, ObservationCapturedEvent)
     }
     for step, included in enumerate(provenance, 1):
-        observations = [item for item in included.observations if item.source == "browser"]
+        observations = [
+            item for item in included.observations if item.source == "browser"
+        ]
         assert len(observations) == step
         assert [item.step for item in observations] == list(range(1, step + 1))
-        assert all(len(item.refs) == 1 and item.refs[0] in snapshots for item in observations)
+        assert all(
+            len(item.refs) == 1 and item.refs[0] in snapshots for item in observations
+        )
 
 
 async def test_dom_screenshots_are_native_images(site):
@@ -180,11 +213,15 @@ async def test_no_progress_hint_is_derived_from_events(site):
         elif count == 1:
             state = latest(request.messages)
             assert state is not None
-            element = next((el for el in state["elements"] if el.get("name") == "Nothing"), None)
+            element = next(
+                (el for el in state["elements"] if el.get("name") == "Nothing"), None
+            )
             assert element is not None
             result = ToolCall("click", {"ref": element["ref"]})
         else:
-            assert any("no observable page change" in msg.text for msg in request.messages)
+            assert any(
+                "no observable page change" in msg.text for msg in request.messages
+            )
             yield ModelChunk(text="No change detected")
             return
         count += 1
@@ -193,14 +230,21 @@ async def test_no_progress_hint_is_derived_from_events(site):
     agent = Agent(
         model=CallbackModel(respond),
         plugins=[
-            *browser_plugins(readiness=ReadinessOptions(quiet_ms=50, navigation_min_ms=100)),
+            *browser_plugins(
+                readiness=ReadinessOptions(quiet_ms=50, navigation_min_ms=100)
+            ),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     result = await agent.run("Click Nothing")
-    assert any(isinstance(e, NudgeQueuedEvent) and e.key == "no_progress" for e in result.events)
+    assert any(
+        isinstance(e, NudgeQueuedEvent) and e.key == "no_progress"
+        for e in result.events
+    )
     hint = next(
-        e for e in result.events if isinstance(e, NudgeQueuedEvent) and e.key == "no_progress"
+        e
+        for e in result.events
+        if isinstance(e, NudgeQueuedEvent) and e.key == "no_progress"
     )
     receipt = next(
         e
@@ -210,7 +254,8 @@ async def test_no_progress_hint_is_derived_from_events(site):
     included = next(
         e
         for e in result.events
-        if isinstance(e, ObservationsIncludedEvent) and e.request_id == receipt.request_id
+        if isinstance(e, ObservationsIncludedEvent)
+        and e.request_id == receipt.request_id
     )
     assert any(
         hint.nudge_id in item.refs and item.source == "browser.nudges"

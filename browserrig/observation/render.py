@@ -14,8 +14,12 @@ from browserrig.core.kinds import ReadinessStatus
 from .models import Canvas, Element, Heading, Snapshot
 from .redirects import unwrap_redirect
 
-_CHECKABLE = frozenset({"checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio"})
-_PLAIN_TYPES = frozenset({"", "text", "checkbox", "radio", "submit", "button", "search"})
+_CHECKABLE = frozenset(
+    {"checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio"}
+)
+_PLAIN_TYPES = frozenset(
+    {"", "text", "checkbox", "radio", "submit", "button", "search"}
+)
 _FLAGS = ("required", "readonly", "invalid", "focused", "draggable")
 _MAX_NAME = 100
 _MAX_HREF = 80
@@ -53,7 +57,8 @@ def _header(snapshot: Snapshot) -> list[str]:
     if len(snapshot.tabs) > 1:
         lines.append("tabs (* = this tab):")
         lines.extend(
-            _tab(tab.id, tab.title or tab.url, tab.id == snapshot.tab_id) for tab in snapshot.tabs
+            _tab(tab.id, tab.title or tab.url, tab.id == snapshot.tab_id)
+            for tab in snapshot.tabs
         )
     else:
         lines.append(f"tab: {snapshot.tab_id}")
@@ -74,9 +79,13 @@ def _header(snapshot: Snapshot) -> list[str]:
         lines.append(f"image: {_region(snapshot)}")
     if snapshot.modal is not None:
         name = f' "{_cut(snapshot.modal.name, 80)}"' if snapshot.modal.name else ""
-        lines.append(f"modal: {snapshot.modal.role}{name} is open; interact with it first")
+        lines.append(
+            f"modal: {snapshot.modal.role}{name} is open; interact with it first"
+        )
     if snapshot.alerts:
-        lines.append("alerts: " + " | ".join(_cut(alert, 200) for alert in snapshot.alerts))
+        lines.append(
+            "alerts: " + " | ".join(_cut(alert, 200) for alert in snapshot.alerts)
+        )
     return lines
 
 
@@ -114,7 +123,10 @@ def _region(snapshot: Snapshot) -> str:
 
 
 def _canvases(canvases: tuple[Canvas, ...]) -> list[str]:
-    lines = ["", "canvases in viewport (viewport CSS pixels; no refs inside, use coordinates):"]
+    lines = [
+        "",
+        "canvases in viewport (viewport CSS pixels; no refs inside, use coordinates):",
+    ]
     for canvas in canvases[:_MAX_CANVASES]:
         bounds = canvas.bounds
         parts = ["  canvas"]
@@ -154,7 +166,9 @@ def _blocks(items: list[Element | Heading], url: str) -> list[str]:
         if isinstance(item, Heading):
             # A heading that is just a link, as on search result pages, is the link's line.
             if not _titles(item, ordered[position + 1 : position + 2]):
-                lines.append(f"{indent}{'#' * min(item.level, 6)} {_cut(item.text, 100)}")
+                lines.append(
+                    f"{indent}{'#' * min(item.level, 6)} {_cut(item.text, 100)}"
+                )
         else:
             heading = _titles(ordered[position - 1] if position else None, [item])
             prefix = f"{'#' * min(heading.level, 6)} " if heading else ""
@@ -169,7 +183,11 @@ def _titles(
     if not isinstance(heading, Heading) or not following:
         return None
     element = following[0]
-    return heading if isinstance(element, Element) and element.name == heading.text else None
+    return (
+        heading
+        if isinstance(element, Element) and element.name == heading.text
+        else None
+    )
 
 
 def _element(element: Element, url: str) -> str:
@@ -182,7 +200,11 @@ def _element(element: Element, url: str) -> str:
     parts.extend(_states(element))
     if element.value is not None and element.value != element.name:
         parts.append(f"value={_quote(element.value, 100)}")
-    if element.placeholder and element.placeholder != element.name and not element.value:
+    if (
+        element.placeholder
+        and element.placeholder != element.name
+        and not element.value
+    ):
         parts.append(f"placeholder={_quote(element.placeholder, 60)}")
     if element.options:
         shown = [
@@ -199,7 +221,9 @@ def _element(element: Element, url: str) -> str:
     elif not element.name and element.bounds is not None and element.value is None:
         # Without a name, size and place are what tell icons, tiles and wrappers apart.
         bounds = element.bounds
-        parts.append(f"x={bounds.x:.0f} y={bounds.y:.0f} {bounds.width:.0f}x{bounds.height:.0f}")
+        parts.append(
+            f"x={bounds.x:.0f} y={bounds.y:.0f} {bounds.width:.0f}x{bounds.height:.0f}"
+        )
     return " ".join(parts)
 
 
@@ -252,7 +276,9 @@ def _link(href: str, url: str, name: str = "") -> str:
 
 def _origin(url: str) -> str:
     parts = urlsplit(url)
-    return f"{parts.scheme}://{parts.netloc}" if parts.scheme in ("http", "https") else ""
+    return (
+        f"{parts.scheme}://{parts.netloc}" if parts.scheme in ("http", "https") else ""
+    )
 
 
 def _summary(elements: list[Element]) -> str:

@@ -26,7 +26,9 @@ from browserrig.core.errors import BrowserError
         (RemoteObject(type="symbol", description="Symbol(test)"), "Symbol(test)"),
     ],
 )
-async def test_runtime_evaluation_returns_javascript_values_and_releases_handles(value, expected):
+async def test_runtime_evaluation_returns_javascript_values_and_releases_handles(
+    value, expected
+):
     tab, runtime = _tab(EvaluateResult(result=value))
     assert await tab.evaluate("expression", timeout=2) == expected
     arguments = runtime.evaluate.await_args.kwargs
@@ -35,12 +37,16 @@ async def test_runtime_evaluation_returns_javascript_values_and_releases_handles
     assert arguments["repl_mode"] and arguments["user_gesture"]
     assert arguments["timeout"] == 2000
     assert "context_id" not in arguments
-    runtime.release_object_group.assert_awaited_once_with(object_group=arguments["object_group"])
+    runtime.release_object_group.assert_awaited_once_with(
+        object_group=arguments["object_group"]
+    )
     tab.layout_changed.assert_called_once()
 
 
 async def test_javascript_exception_is_reported_without_retrying():
-    exception = RemoteObject(type="object", subtype="error", description="Error: shell failed")
+    exception = RemoteObject(
+        type="object", subtype="error", description="Error: shell failed"
+    )
     tab, runtime = _tab(
         EvaluateResult(
             result=exception,

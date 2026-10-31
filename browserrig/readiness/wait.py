@@ -40,7 +40,9 @@ async def wait_for_page(
     started = monotonic()
     rid = uuid4().hex
     stage = stage or (
-        ReadinessStage.INITIAL if phase == ReadinessPhase.INITIAL else ReadinessStage.ONGOING
+        ReadinessStage.INITIAL
+        if phase == ReadinessPhase.INITIAL
+        else ReadinessStage.ONGOING
     )
     await emit(
         ReadinessStartedEvent(
@@ -58,7 +60,9 @@ async def wait_for_page(
             if policy
             else DomReadiness(tab, options, phase)
         )
-        status = await _poll(tab, strategy, started_document, reselect=policy is not None)
+        status = await _poll(
+            tab, strategy, started_document, reselect=policy is not None
+        )
     except asyncio.CancelledError:
         await emit(
             ReadinessCancelledEvent(
@@ -84,7 +88,9 @@ async def wait_for_page(
                 reason=type(error).__name__,
             )
         )
-        raise ReadinessError(f"Readiness probe failed ({type(error).__name__})") from error
+        raise ReadinessError(
+            f"Readiness probe failed ({type(error).__name__})"
+        ) from error
     report = ReadinessReport(
         id=rid,
         target_id=tab.id,
@@ -130,7 +136,9 @@ async def _poll(
                 ready = await _check(strategy)
                 await tab.sync_document()
                 if reselect and tab.document_id != document_id:
-                    strategy.reason = "document changed during readiness; select policy again"
+                    strategy.reason = (
+                        "document changed during readiness; select policy again"
+                    )
                     return ReadinessStatus.DEGRADED
                 if ready:
                     return ReadinessStatus.READY
@@ -147,7 +155,9 @@ async def _check(strategy: ReadinessStrategy) -> bool:
     try:
         return await strategy.check()
     except CDPCommandError as error:
-        if not any(text in error.message.lower() for text in ("context", "frame", "navigat")):
+        if not any(
+            text in error.message.lower() for text in ("context", "frame", "navigat")
+        ):
             raise
         strategy.reason = "document changed during readiness"
         return False

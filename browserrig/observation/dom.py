@@ -10,7 +10,9 @@ from browserrig.scripts.models import SeedArgs
 
 
 async def seed_frame(
-    frame: Frame, metadata: dict[str, CaptureSnapshotResult | None], limitations: list[str]
+    frame: Frame,
+    metadata: dict[str, CaptureSnapshotResult | None],
+    limitations: list[str],
 ) -> None:
     await frame.run(RESET)
     try:
@@ -23,15 +25,24 @@ async def seed_frame(
                 )
         snapshot = metadata[session_id]
         if snapshot is None or not await seed_dom(frame, snapshot):
-            limitations.append(f"Supplementary DOM metadata incomplete for frame {frame.id}")
+            limitations.append(
+                f"Supplementary DOM metadata incomplete for frame {frame.id}"
+            )
     except (CDPCommandError, TimeoutError):
-        limitations.append(f"Supplementary DOM metadata unavailable for frame {frame.id}")
+        limitations.append(
+            f"Supplementary DOM metadata unavailable for frame {frame.id}"
+        )
 
 
 async def seed_dom(frame: Frame, snapshot: CaptureSnapshotResult) -> bool:
     """Supplement the composed DOM walk with closed roots and native click-listener metadata."""
     document = next(
-        (doc for doc in snapshot.documents if snapshot.strings[doc.frame_id] == frame.id), None
+        (
+            doc
+            for doc in snapshot.documents
+            if snapshot.strings[doc.frame_id] == frame.id
+        ),
+        None,
     )
     if document is None:
         return False
@@ -42,7 +53,8 @@ async def seed_dom(frame: Frame, snapshot: CaptureSnapshotResult) -> bool:
         [
             index
             for index, value in zip(roots.index, roots.value, strict=True)
-            if snapshot.strings[value] == "closed" and (nodes.node_type or [])[index] == 1
+            if snapshot.strings[value] == "closed"
+            and (nodes.node_type or [])[index] == 1
         ]
         if roots
         else []
@@ -57,7 +69,9 @@ async def seed_dom(frame: Frame, snapshot: CaptureSnapshotResult) -> bool:
         async with semaphore:
             try:
                 node = await frame.cdp.dom.resolve_node(
-                    backend_node_id=ids[index], execution_context_id=context, object_group=group
+                    backend_node_id=ids[index],
+                    execution_context_id=context,
+                    object_group=group,
                 )
                 return node.object.object_id
             except CDPCommandError:

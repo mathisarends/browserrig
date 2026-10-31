@@ -235,7 +235,9 @@ async def test_capture_redacts_page_text_and_blacks_out_fields_showing_a_secret(
         assert result.getpixel((20, 15)) == (0, 0, 0)
         assert result.getpixel((80, 40)) == (255, 255, 255)
     # Without a known image area the screenshot is withheld instead of shown.
-    _, withheld = await _redact(page, image, CaptureContent(page=page, image=image), redaction)
+    _, withheld = await _redact(
+        page, image, CaptureContent(page=page, image=image), redaction
+    )
     assert withheld is None
 
 
@@ -281,7 +283,9 @@ def _agent(secrets, *, model, plugins=()):
         events = (ActionFailedEvent,)
 
     allow = Approvals(default=PolicyDecision.ALLOW)
-    agent = Agent(model=model, plugins=[Chrome(holder), secrets, Capture(), allow, *plugins])
+    agent = Agent(
+        model=model, plugins=[Chrome(holder), secrets, Capture(), allow, *plugins]
+    )
     return agent, holder
 
 
@@ -323,7 +327,9 @@ async def test_model_requests_never_contain_secret_values():
 
 
 async def test_placeholders_are_rejected_outside_typing_tools():
-    model = ScriptedModel([call("navigate", url="https://example.org/?q={{secret:pw}}"), "done"])
+    model = ScriptedModel(
+        [call("navigate", url="https://example.org/?q={{secret:pw}}"), "done"]
+    )
     agent, _ = _agent(_secrets(), model=model, plugins=[Leaky()])
     await agent.run("go", max_steps=3)
     reply = repr(model.requests[-1].messages)
@@ -340,7 +346,12 @@ async def test_javascript_is_blocked_once_a_secret_was_entered(monkeypatch):
         async def enter(self, mounted: Inject[Secrets]) -> ToolResult:
             nonlocal entered
             entry = SecretEntry(
-                ("pw",), "https://example.org", "tab-1", "doc-1", ((PASSWORD, True),), AsyncMock()
+                ("pw",),
+                "https://example.org",
+                "tab-1",
+                "doc-1",
+                ((PASSWORD, True),),
+                AsyncMock(),
             )
             await mounted.enter(entry, SimpleNamespace(type_text=AsyncMock()))
             entered = True
@@ -361,7 +372,9 @@ async def test_javascript_is_blocked_once_a_secret_was_entered(monkeypatch):
     assert "ran 1" in replies and "ran 2" not in replies
     assert "JavaScript execution is unavailable" in replies
     events = [event for event in result.events if isinstance(event, SecretEnteredEvent)]
-    assert [(event.names, event.origin) for event in events] == [(("pw",), "https://example.org")]
+    assert [(event.names, event.origin) for event in events] == [
+        (("pw",), "https://example.org")
+    ]
 
 
 async def test_browser_events_are_redacted_before_they_are_logged():
@@ -369,10 +382,15 @@ async def test_browser_events_are_redacted_before_they_are_logged():
     async with agent.session() as session:
         await holder["browser"].events.emit(
             ActionFailedEvent(
-                action_id="a", kind=ActionKind.TYPE, dispatched=True, reason=f"bad {PASSWORD}"
+                action_id="a",
+                kind=ActionKind.TYPE,
+                dispatched=True,
+                reason=f"bad {PASSWORD}",
             )
         )
-        failed = [event for event in session.events if isinstance(event, ActionFailedEvent)]
+        failed = [
+            event for event in session.events if isinstance(event, ActionFailedEvent)
+        ]
     assert failed[0].reason == "bad {{secret:pw}}"
 
 

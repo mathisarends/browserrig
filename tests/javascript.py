@@ -19,4 +19,6 @@ _EVALUATE: Script[_EvalArgs, Any] = Script(
 
 async def evaluate(target: Tab | Frame, expression: str) -> Any:
     frame = target if isinstance(target, Frame) else await target.main_frame()
-    return await frame.run(_EVALUATE, _EvalArgs(expression=expression), user_gesture=True)
+    return await frame.run(
+        _EVALUATE, _EvalArgs(expression=expression), user_gesture=True
+    )

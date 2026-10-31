@@ -29,7 +29,9 @@ INTERACTIVE_ROLES = frozenset(
         "treeitem",
     }
 )
-CHECKABLE_ROLES = frozenset({"checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio"})
+CHECKABLE_ROLES = frozenset(
+    {"checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio"}
+)
 
 _INPUT_ROLES = {
     "button": "button",
@@ -68,7 +70,16 @@ _TAG_ROLES = {
 }
 _SCOPING = frozenset({"article", "aside", "main", "nav", "section"})
 _NAME_FROM_CONTENT_EXCLUDED = frozenset(
-    {"textbox", "searchbox", "combobox", "listbox", "slider", "spinbutton", "progressbar", "meter"}
+    {
+        "textbox",
+        "searchbox",
+        "combobox",
+        "listbox",
+        "slider",
+        "spinbutton",
+        "progressbar",
+        "meter",
+    }
 )
 _RANGE_ROLES = frozenset({"slider", "spinbutton", "progressbar", "meter", "scrollbar"})
 _NO_VALUE_TYPES = frozenset(
@@ -134,13 +145,19 @@ def value(document: Document, index: int, element_role: str, kind: str) -> str |
             return clean(text)
     tag = document.tag(index)
     if tag == "select":
-        chosen = [option.label for option in options(document, index) if option.selected]
+        chosen = [
+            option.label for option in options(document, index) if option.selected
+        ]
         return ", ".join(chosen) or None
     if tag in ("input", "textarea"):
         if kind in _NO_VALUE_TYPES:
             return None
         return clean(document.input_value(index) or "", 200) or None
-    if editable(document, index) or element_role in ("textbox", "searchbox", "combobox"):
+    if editable(document, index) or element_role in (
+        "textbox",
+        "searchbox",
+        "combobox",
+    ):
         return document.text(index, 200) or None
     return None
 
@@ -150,9 +167,9 @@ def options(document: Document, index: int) -> tuple[Option, ...]:
     for node in document.descendants(index, frozenset({"option"})):
         attributes = document.attributes(node)
         parent = document.parent(node)
-        group_disabled = document.tag(parent) == "optgroup" and "disabled" in document.attributes(
+        group_disabled = document.tag(
             parent
-        )
+        ) == "optgroup" and "disabled" in document.attributes(parent)
         result.append(
             Option(
                 label=clean(attributes.get("label", "")) or document.own_text(node, 80),
@@ -164,7 +181,10 @@ def options(document: Document, index: int) -> tuple[Option, ...]:
 
 
 def checked(document: Document, index: int, element_role: str) -> Tristate:
-    if document.tag(index) == "input" and input_type(document, index) in ("checkbox", "radio"):
+    if document.tag(index) == "input" and input_type(document, index) in (
+        "checkbox",
+        "radio",
+    ):
         return index in document.checked
     state = _tristate(document.attributes(index).get("aria-checked"))
     if state is None and element_role in CHECKABLE_ROLES:
@@ -227,7 +247,10 @@ def flag(document: Document, index: int, native: str, aria: str) -> bool:
 
 
 def invalid(document: Document, index: int) -> bool:
-    return document.attributes(index).get("aria-invalid", "false").lower() not in ("false", "")
+    return document.attributes(index).get("aria-invalid", "false").lower() not in (
+        "false",
+        "",
+    )
 
 
 def has_popup(document: Document, index: int) -> str:
@@ -268,18 +291,26 @@ def _implicit_role(document: Document, index: int) -> str:
     return "textbox" if editable(document, index) else _TAG_ROLES.get(tag, "")
 
 
-def _conditional_role(document: Document, index: int, tag: str, attributes: dict[str, str]) -> str:
+def _conditional_role(
+    document: Document, index: int, tag: str, attributes: dict[str, str]
+) -> str:
     """Roles that images, headers, footers and sections only get in some contexts."""
     if tag == "img":
         return "img" if attributes.get("alt") != "" else ""
     if tag == "section":
-        return "region" if "aria-label" in attributes or "aria-labelledby" in attributes else ""
+        return (
+            "region"
+            if "aria-label" in attributes or "aria-labelledby" in attributes
+            else ""
+        )
     if any(document.tag(parent) in _SCOPING for parent in document.ancestors(index)):
         return ""
     return "banner" if tag == "header" else "contentinfo"
 
 
-def _own_name(document: Document, index: int, element_role: str, attributes: dict[str, str]) -> str:
+def _own_name(
+    document: Document, index: int, element_role: str, attributes: dict[str, str]
+) -> str:
     tag = document.tag(index)
     if tag in ("input", "select", "textarea", "meter", "progress"):
         return _control_name(document, index, attributes)

@@ -166,7 +166,9 @@ class Mouse:
         await self._move(target, start)
         current = start
         try:
-            await self._dispatch(target, MouseEventKind.PRESSED, start, buttons=1, click_count=1)
+            await self._dispatch(
+                target, MouseEventKind.PRESSED, start, buttons=1, click_count=1
+            )
             # CDP's mouse input handles native drag-and-drop as well as pointer gestures.
             steps = max(3, math.ceil(duration * 30))
             for index in range(1, steps + 1):
@@ -185,7 +187,9 @@ class Mouse:
             await target.cancel_drag()
             raise
         finally:
-            await self._dispatch(target, MouseEventKind.RELEASED, current, buttons=0, click_count=1)
+            await self._dispatch(
+                target, MouseEventKind.RELEASED, current, buttons=0, click_count=1
+            )
 
     async def scroll(
         self, *, delta_y: float, delta_x: float = 0, point: Point | None = None
@@ -207,7 +211,9 @@ class Mouse:
         frame = 0
         while sent < 1:
             frame += 1
-            await asyncio.sleep(max(0.0, started + frame * FRAME_SECONDS - clock.time()))
+            await asyncio.sleep(
+                max(0.0, started + frame * FRAME_SECONDS - clock.time())
+            )
             # Follow the clock so slow dispatches do not stretch the scroll.
             elapsed = max(clock.time() - started, frame * FRAME_SECONDS)
             progress = wheel_progress(elapsed / duration) if elapsed < duration else 1.0
@@ -223,7 +229,11 @@ class Mouse:
         await self._emit(
             target,
             ScrolledEvent(
-                x=point.x, y=point.y, delta_x=delta_x, delta_y=delta_y, duration=duration
+                x=point.x,
+                y=point.y,
+                delta_x=delta_x,
+                delta_y=delta_y,
+                duration=duration,
             ),
         )
         # Scrolled content can put a different element under the resting pointer.
@@ -272,7 +282,9 @@ class Mouse:
     async def _dispatch(
         self,
         target: InputTarget,
-        kind: Literal[MouseEventKind.MOVED, MouseEventKind.PRESSED, MouseEventKind.RELEASED],
+        kind: Literal[
+            MouseEventKind.MOVED, MouseEventKind.PRESSED, MouseEventKind.RELEASED
+        ],
         point: Point,
         *,
         button: MouseButton = MouseButton.LEFT,
@@ -282,7 +294,9 @@ class Mouse:
         await target.dispatch_mouse(
             kind,
             point,
-            button=button if buttons or kind is MouseEventKind.RELEASED else MouseButton.NONE,
+            button=button
+            if buttons or kind is MouseEventKind.RELEASED
+            else MouseButton.NONE,
             buttons=buttons,
             click_count=click_count,
         )
@@ -292,11 +306,20 @@ class Mouse:
         target.layout_changed()
         if kind is MouseEventKind.MOVED:
             if buttons:
-                await self._emit(target, CursorStateEvent(x=point.x, y=point.y, buttons=buttons))
+                await self._emit(
+                    target, CursorStateEvent(x=point.x, y=point.y, buttons=buttons)
+                )
             return
-        event_type = PointerPressedEvent if kind is MouseEventKind.PRESSED else PointerReleasedEvent
+        event_type = (
+            PointerPressedEvent
+            if kind is MouseEventKind.PRESSED
+            else PointerReleasedEvent
+        )
         await self._emit(
-            target, event_type(x=point.x, y=point.y, click_count=click_count, button=button.value)
+            target,
+            event_type(
+                x=point.x, y=point.y, click_count=click_count, button=button.value
+            ),
         )
 
     def _rest(self, target: InputTarget) -> _Rest:

@@ -68,23 +68,36 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
         report = await wait_for_page(tab)
         state = await capture(tab, DomCapture(max_text_chars=12000), report)
         names = [element.name for element in state.elements]
-        for expected in ("Wrapped", "Check", "Listener only", "Switch", "Editor", "Closed shadow"):
+        for expected in (
+            "Wrapped",
+            "Check",
+            "Listener only",
+            "Switch",
+            "Editor",
+            "Closed shadow",
+        ):
             assert names.count(expected) == 1
         assert not {
             "Transparent ancestor",
             "Inert ancestor",
             "Clipped",
         } & set(names)
-        covered = next(element for element in state.elements if element.name == "Covered")
+        covered = next(
+            element for element in state.elements if element.name == "Covered"
+        )
         assert covered.covered and not covered.in_viewport
         assert "Offscreen" not in names and state.offscreen
-        assert next(element for element in state.elements if element.name == "Wrapped").in_viewport
+        assert next(
+            element for element in state.elements if element.name == "Wrapped"
+        ).in_viewport
         assert "Slotted label" in state.text and "Closed shadow" in state.text
         assert "Offscreen text" not in state.text
         assert not state.limitations
         checked = next(element for element in state.elements if element.name == "Check")
         assert checked.checked is True
-        assert next(e for e in state.elements if e.name == "Disabled by fieldset").disabled
+        assert next(
+            e for e in state.elements if e.name == "Disabled by fieldset"
+        ).disabled
 
 
 async def test_element_names_come_from_chrome_accessibility_tree(site):
@@ -109,20 +122,33 @@ async def test_element_names_come_from_chrome_accessibility_tree(site):
         report = await wait_for_page(tab)
         state = await capture(tab, DomCapture(), report)
     names = {element.name for element in state.elements}
-    assert {"Close", "Search the web", "7,99 € per piece", "Home", "Small", "Prime"} <= names
+    assert {
+        "Close",
+        "Search the web",
+        "7,99 € per piece",
+        "Home",
+        "Small",
+        "Prime",
+    } <= names
     assert "Duplicate" not in names
     assert re.search(r"\] div x=\d+ y=\d+ 50x40$", render(state), flags=re.M)
 
 
 @pytest.mark.parametrize("marks", [False, True])
 async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site, marks):
-    async with ChromeBrowser(LaunchBrowser(url=site, viewport=Viewport(scale=2))) as browser:
+    async with ChromeBrowser(
+        LaunchBrowser(url=site, viewport=Viewport(scale=2))
+    ) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         before = await evaluate(tab, "document.documentElement.outerHTML")
         await browser.mouse.move_to(Point(x=700, y=200))
         state = await capture(
-            tab, DomCapture(marks=marks), report, cursor=browser.mouse.position, screenshots=True
+            tab,
+            DomCapture(marks=marks),
+            report,
+            cursor=browser.mouse.position,
+            screenshots=True,
         )
         assert await evaluate(tab, "document.documentElement.outerHTML") == before
         assert state.image is not None
@@ -158,14 +184,24 @@ async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site)
         nonlocal step
         if step:
             latest_image = next(
-                (message for message in reversed(request.messages) if has_image(message)),
+                (
+                    message
+                    for message in reversed(request.messages)
+                    if has_image(message)
+                ),
                 None,
             )
             assert latest_image is not None
-            (image_part,) = [part for part in latest_image.content if isinstance(part, ImagePart)]
+            (image_part,) = [
+                part for part in latest_image.content if isinstance(part, ImagePart)
+            ]
             encoded = image_part.url.split(",", 1)[1]
             with Image.open(BytesIO(base64.b64decode(encoded))) as image:
-                assert image.getpixel((60, 80) if step == 1 else (180, 120)) == (30, 30, 30)
+                assert image.getpixel((60, 80) if step == 1 else (180, 120)) == (
+                    30,
+                    30,
+                    30,
+                )
         if step == 0:
             yield ModelChunk(tool_call=ToolCall("move_mouse", {"x": 60, "y": 80}))
         elif step == 1:
@@ -180,7 +216,9 @@ async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site)
         observe=Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
         approvals=Approvals(default=PolicyDecision.ALLOW),
     )
-    result = await agent.run("Move, click, and inspect the cursor after each action", max_steps=3)
+    result = await agent.run(
+        "Move, click, and inspect the cursor after each action", max_steps=3
+    )
     assert result.text == "Done" and step == 3
 
 
@@ -189,17 +227,21 @@ async def test_limits_are_reported_and_checkbox_state_changes_fingerprint(site):
         tab = browser.active_tab
         report = await wait_for_page(tab)
         await evaluate(
-            tab, "document.body.innerHTML = '<label>Toggle<input type=checkbox></label>'"
+            tab,
+            "document.body.innerHTML = '<label>Toggle<input type=checkbox></label>'",
         )
         before = await capture(tab, DomCapture(), report)
         await evaluate(tab, "document.querySelector('input').checked = true")
         after = await capture(tab, DomCapture(), report)
         assert before.fingerprint != after.fingerprint
         await evaluate(
-            tab, "document.body.innerHTML = '<button>First</button><button>Second</button>'"
+            tab,
+            "document.body.innerHTML = '<button>First</button><button>Second</button>'",
         )
         limited = await capture(
-            tab, DomCapture(max_elements=1, max_text_chars=2, sparse_text_chars=0), report
+            tab,
+            DomCapture(max_elements=1, max_text_chars=2, sparse_text_chars=0),
+            report,
         )
         assert len(limited.elements) == 1 and len(limited.text) <= 2
         assert any("truncated" in limitation for limitation in limited.limitations)
@@ -216,7 +258,10 @@ async def test_visible_text_is_shown_only_when_the_viewport_holds_few_controls(s
             <p style='position:absolute;top:3000px'>Below the fold</p>`""",
         )
         sparse = await capture(tab, DomCapture(), report)
-        assert "Your request was blocked." in sparse.text and "Below the fold" not in sparse.text
+        assert (
+            "Your request was blocked." in sparse.text
+            and "Below the fold" not in sparse.text
+        )
         assert "page text:" in render(sparse)
         await evaluate(
             tab,
@@ -275,10 +320,14 @@ _CANVASES = """<style>body{margin:0}</style>
 
 
 async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(site):
-    async with ChromeBrowser(LaunchBrowser(url=site, viewport=Viewport(scale=2))) as browser:
+    async with ChromeBrowser(
+        LaunchBrowser(url=site, viewport=Viewport(scale=2))
+    ) as browser:
         tab = browser.active_tab
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(_CANVASES)}")
-        await evaluate(tab, "document.querySelector('#board').addEventListener('click', () => {})")
+        await evaluate(
+            tab, "document.querySelector('#board').addEventListener('click', () => {})"
+        )
         report = await wait_for_page(tab)
         await browser.mouse.move_to(Point(x=150, y=180))
         state = await capture(
@@ -301,7 +350,9 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
             assert image.size == (800, 400)
             assert image.getpixel((100, 60)) == (30, 30, 30)
         rendered = render(state)
-        assert f"canvas (ref {board.ref}) x=100 y=150 400x200 center=300,250" in rendered
+        assert (
+            f"canvas (ref {board.ref}) x=100 y=150 400x200 center=300,250" in rendered
+        )
         assert "image: viewport region x=100 y=150 400x200 at 2x zoom" in rendered
 
         outside = await capture(
@@ -333,7 +384,9 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
         if step == 0:
             assert any("x=100 y=150 400x200 center=300,250" in text for text in texts)
             region = {"x": 100, "y": 150, "width": 400, "height": 200}
-            yield ModelChunk(tool_call=ToolCall("screenshot", {"region": region, "zoom": 2}))
+            yield ModelChunk(
+                tool_call=ToolCall("screenshot", {"region": region, "zoom": 2})
+            )
         elif step == 1:
             captions.extend(
                 line
@@ -365,7 +418,9 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
         )
         result = await session.run("Click the board", max_steps=5)
         assert result.text == "Done"
-        receipts = [e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)]
+        receipts = [
+            e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)
+        ]
         assert receipts and not any(receipt.result.is_error for receipt in receipts)
         offset = await evaluate(tab, "document.querySelector('#board').dataset.offset")
         assert offset == "50,30"

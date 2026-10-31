@@ -27,9 +27,13 @@ def read_xlsx(path: Path, request: ReadRequest) -> ParsedContent:
     def blocks() -> Iterator[str]:
         with ExitStack() as stack:
             source = stack.enter_context(value_source(path))
-            book = load_workbook(source, read_only=True, data_only=False, keep_links=False)
+            book = load_workbook(
+                source, read_only=True, data_only=False, keep_links=False
+            )
             stack.callback(book.close)
-            values = load_workbook(source, read_only=True, data_only=True, keep_links=False)
+            values = load_workbook(
+                source, read_only=True, data_only=True, keep_links=False
+            )
             stack.callback(values.close)
             details.sheets = tuple(book.sheetnames)
             selected = request.sheet or book.sheetnames[0]
@@ -60,11 +64,19 @@ def read_xlsx(path: Path, request: ReadRequest) -> ParsedContent:
                     yield f"Sheet {item.title}: {item.sheet_state}\n\n"
             yield from notes
             yield _table_header(left, right)
-            rows = sheet.iter_rows(min_row=top, max_row=bottom, min_col=left, max_col=right)
-            cached_rows = cached.iter_rows(min_row=top, max_row=bottom, min_col=left, max_col=right)
+            rows = sheet.iter_rows(
+                min_row=top, max_row=bottom, min_col=left, max_col=right
+            )
+            cached_rows = cached.iter_rows(
+                min_row=top, max_row=bottom, min_col=left, max_col=right
+            )
             has_formulas = False
-            for index, (row, cached_row) in enumerate(zip(rows, cached_rows, strict=True), top):
-                if request.cell_range is None and all(cell.value is None for cell in row):
+            for index, (row, cached_row) in enumerate(
+                zip(rows, cached_rows, strict=True), top
+            ):
+                if request.cell_range is None and all(
+                    cell.value is None for cell in row
+                ):
                     continue
                 cells = []
                 for cell, saved in zip(row, cached_row, strict=True):
@@ -73,10 +85,17 @@ def read_xlsx(path: Path, request: ReadRequest) -> ParsedContent:
                         has_formulas = True
                         value += (
                             " [stored result: "
-                            + (_value(saved.value) if saved.value is not None else "unavailable")
+                            + (
+                                _value(saved.value)
+                                if saved.value is not None
+                                else "unavailable"
+                            )
                             + "]"
                         )
-                    if cell.value is not None and cell.number_format not in ("General", "@"):
+                    if cell.value is not None and cell.number_format not in (
+                        "General",
+                        "@",
+                    ):
                         value += f" [format: {cell_text(cell.number_format)}]"
                     cells.append(value)
                 yield "| " + str(index) + " | " + " | ".join(cells) + " |\n"
@@ -84,8 +103,12 @@ def read_xlsx(path: Path, request: ReadRequest) -> ParsedContent:
                 details.limitations.append(
                     "Formulas were not recalculated; stored results can be missing or stale"
                 )
-            details.limitations.append("Embedded images, charts and comments are not extracted")
-            details.limitations.append("Conditional formatting is not applied to stored values")
+            details.limitations.append(
+                "Embedded images, charts and comments are not extracted"
+            )
+            details.limitations.append(
+                "Conditional formatting is not applied to stored values"
+            )
 
     details.blocks = blocks()
     return details
@@ -105,7 +128,9 @@ def read_xls(path: Path, request: ReadRequest) -> ParsedContent:
                 )
             sheet = book.sheet_by_name(selected)
             details.sheet = selected
-            left, top, right, bottom = _bounds(request.cell_range, sheet.nrows, sheet.ncols)
+            left, top, right, bottom = _bounds(
+                request.cell_range, sheet.nrows, sheet.ncols
+            )
             details.cell_range = (
                 f"{get_column_letter(left)}{top}:{get_column_letter(right)}{bottom}"
             )
@@ -120,7 +145,9 @@ def read_xls(path: Path, request: ReadRequest) -> ParsedContent:
             for index in range(top, min(bottom, sheet.nrows) + 1):
                 cells = []
                 for column in range(left - 1, right):
-                    cell = sheet.cell(index - 1, column) if column < sheet.ncols else None
+                    cell = (
+                        sheet.cell(index - 1, column) if column < sheet.ncols else None
+                    )
                     cells.append(_value(_xls_value(cell, book.datemode)))
                 yield "| " + str(index) + " | " + " | ".join(cells) + " |\n"
             details.limitations.append(
@@ -135,15 +162,23 @@ def read_xls(path: Path, request: ReadRequest) -> ParsedContent:
 
 def read_ods(path: Path, request: ReadRequest) -> ParsedContent:
     document = load_odf(str(path))
-    tables = [node for node in document.spreadsheet.childNodes if node.qname[1] == "table"]
+    tables = [
+        node for node in document.spreadsheet.childNodes if node.qname[1] == "table"
+    ]
     names = tuple(table.getAttribute("name") for table in tables)
     selected = request.sheet or names[0]
     if selected not in names:
         raise ValueError(f"Unknown sheet {selected!r}; available: {', '.join(names)}")
-    details = ParsedContent((), "ods", sheet=selected, sheets=names, cell_range=request.cell_range)
+    details = ParsedContent(
+        (), "ods", sheet=selected, sheets=names, cell_range=request.cell_range
+    )
 
     def blocks() -> Iterator[str]:
-        yield "# Workbook\n\nSheets: " + ", ".join(names) + f"\n\n## Sheet: {selected}\n\n"
+        yield (
+            "# Workbook\n\nSheets: "
+            + ", ".join(names)
+            + f"\n\n## Sheet: {selected}\n\n"
+        )
         bounds = _bounds(request.cell_range, 1048576, 16384)
         yield from _odf_values(tables[names.index(selected)], bounds)
 
@@ -170,12 +205,16 @@ def read_delimited(path: Path, request: ReadRequest) -> ParsedContent:
             )
     if request.sheet not in {None, "Data"}:
         raise ValueError("Delimited files have one sheet: Data")
-    details = ParsedContent((), path.suffix.lower().lstrip("."), sheet="Data", sheets=("Data",))
+    details = ParsedContent(
+        (), path.suffix.lower().lstrip("."), sheet="Data", sheets=("Data",)
+    )
 
     def blocks() -> Iterable[str]:
         with path.open(encoding=encoding, newline="") as source:
             rows = csv.reader(source, delimiter=delimiter)
-            bounds = _bounds(request.cell_range, 1048576, 1) if request.cell_range else None
+            bounds = (
+                _bounds(request.cell_range, 1048576, 1) if request.cell_range else None
+            )
             for index, row in enumerate(rows, 1):
                 if bounds and index > bounds[3]:
                     break
@@ -194,7 +233,9 @@ def read_delimited(path: Path, request: ReadRequest) -> ParsedContent:
     return details
 
 
-def _bounds(selection: str | None, rows: int, columns: int) -> tuple[int, int, int, int]:
+def _bounds(
+    selection: str | None, rows: int, columns: int
+) -> tuple[int, int, int, int]:
     if selection is None:
         return 1, 1, max(1, columns), max(1, rows)
     try:
@@ -206,7 +247,9 @@ def _bounds(selection: str | None, rows: int, columns: int) -> tuple[int, int, i
             raise ValueError
         return left, top, right, bottom
     except (ValueError, TypeError) as error:
-        raise ValueError("cell_range must be an A1 range, for example B2:F100") from error
+        raise ValueError(
+            "cell_range must be an A1 range, for example B2:F100"
+        ) from error
 
 
 def _value(value: object) -> str:
@@ -219,7 +262,13 @@ def _value(value: object) -> str:
 
 def _table_header(left: int, right: int) -> str:
     columns = ["Row", *(get_column_letter(index) for index in range(left, right + 1))]
-    return "| " + " | ".join(columns) + " |\n| " + " | ".join("---" for _ in columns) + " |\n"
+    return (
+        "| "
+        + " | ".join(columns)
+        + " |\n| "
+        + " | ".join("---" for _ in columns)
+        + " |\n"
+    )
 
 
 def _xlsx_layout(path: Path, name: str) -> tuple[list[str], int, int]:
@@ -231,7 +280,9 @@ def _xlsx_layout(path: Path, name: str) -> tuple[list[str], int, int]:
         with archive.open("xl/workbook.xml") as stream:
             book = parse(stream).getroot()
         relationship = next(
-            node.attrib["{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"]
+            node.attrib[
+                "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+            ]
             for node in book.iter()
             if node.tag.endswith("}sheet") and node.get("name") == name
         )
@@ -255,7 +306,9 @@ def _xlsx_layout(path: Path, name: str) -> tuple[list[str], int, int]:
                     elif tag == "c":
                         coordinate = node.get("r")
                         row, column = (
-                            coordinate_to_tuple(coordinate) if coordinate else (row, column + 1)
+                            coordinate_to_tuple(coordinate)
+                            if coordinate
+                            else (row, column + 1)
                         )
                         has_content = False
                     continue
@@ -303,7 +356,11 @@ def _odf_cell_text(cell) -> str:
     if not value:
         attributes = ("value", "datevalue", "timevalue", "booleanvalue", "stringvalue")
         value = next(
-            (str(stored) for name in attributes if (stored := cell.getAttribute(name)) is not None),
+            (
+                str(stored)
+                for name in attributes
+                if (stored := cell.getAttribute(name)) is not None
+            ),
             "",
         )
     formula = cell.getAttribute("formula")
@@ -329,7 +386,9 @@ def _odf_cells(row) -> list[str]:
     return cells
 
 
-def _odf_row_text(row, cells: list[str], number: int, left: int, right: int) -> Iterator[str]:
+def _odf_row_text(
+    row, cells: list[str], number: int, left: int, right: int
+) -> Iterator[str]:
     yield f"### Row {number}\n\n"
     if row.getAttribute("visibility") in {"collapse", "filter"}:
         yield "Hidden row (included).\n\n"

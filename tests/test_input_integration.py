@@ -48,18 +48,24 @@ async def test_typing_shortcuts_stream_and_storage(site, coordinates):
         await ready.wait()
         result = await session.run("Type exactly and use shortcuts", max_steps=10)
         assert result.text == "Done"
-        receipts = [e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)]
+        receipts = [
+            e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)
+        ]
         assert all(not receipt.result.is_error for receipt in receipts)
         tab = holder["browser"].active_tab
         assert await evaluate(tab, "document.querySelector('#email').value") == "+"
-        assert await evaluate(tab, "document.querySelector('#secret').value") == "Secret!"
+        assert (
+            await evaluate(tab, "document.querySelector('#secret').value") == "Secret!"
+        )
         assert not any(isinstance(event, InputEvent) for event in result.events)
         stored = session.snapshot().to_json()
     await consumer
     _assert_events(streamed, output.getvalue(), stored, coordinates)
 
 
-async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_action(site):
+async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_action(
+    site,
+):
     holder = {}
     output = io.StringIO()
 
@@ -92,18 +98,25 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
     assert len(states) == 2
     assert all((event.x, event.y) == (position.x, position.y) for event in states)
     assert all(
-        event.browser_id and event.target_id == tab.id and not event.action_id for event in states
+        event.browser_id and event.target_id == tab.id and not event.action_id
+        for event in states
     )
     assert not any(isinstance(event, CursorMovedEvent) for event in streamed)
     first_cursor = next(
-        index for index, event in enumerate(streamed) if isinstance(event, CursorStateEvent)
+        index
+        for index, event in enumerate(streamed)
+        if isinstance(event, CursorStateEvent)
     )
     first_model = next(
-        index for index, event in enumerate(streamed) if isinstance(event, ModelRequestedEvent)
+        index
+        for index, event in enumerate(streamed)
+        if isinstance(event, ModelRequestedEvent)
     )
     assert first_cursor < first_model
     records = [json.loads(line) for line in output.getvalue().splitlines()]
-    cursor = next(record for record in records if record["type"] == "browser.cursor.state")
+    cursor = next(
+        record for record in records if record["type"] == "browser.cursor.state"
+    )
     assert (cursor["x"], cursor["y"]) == (position.x, position.y)
 
 
@@ -138,7 +151,9 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
         if coordinates
         else [
             scripted_call(
-                "screenshot", region={"x": 20, "y": 80, "width": 500, "height": 240}, zoom=2
+                "screenshot",
+                region={"x": 20, "y": 80, "width": 500, "height": 240},
+                zoom=2,
             )
         ]
     )
@@ -158,9 +173,13 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
         plugins=[Panels()],
     )
     async with agent.session() as session:
-        result = await session.run("Hover and scroll each panel without clicking", max_steps=6)
+        result = await session.run(
+            "Hover and scroll each panel without clicking", max_steps=6
+        )
         assert result.text == "Done"
-        receipts = [e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)]
+        receipts = [
+            e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)
+        ]
         assert receipts and all(not receipt.result.is_error for receipt in receipts)
         state = await evaluate(
             holder["tab"],
@@ -194,7 +213,9 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
         actions = holder["actions"]
         tab = actions.browser.active_tab
         ref = next(
-            element.ref for element in actions.observe.snapshot.elements if element.name == "Email"
+            element.ref
+            for element in actions.observe.snapshot.elements
+            if element.name == "Email"
         )
         await evaluate(
             tab,
@@ -210,7 +231,9 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
         assert point.scrolled
         assert point.bounds.model_dump() == actual
     records = [json.loads(line) for line in output.getvalue().splitlines()]
-    highlight = next(record for record in records if record["type"] == "browser.element.highlight")
+    highlight = next(
+        record for record in records if record["type"] == "browser.element.highlight"
+    )
     assert {key: highlight[key] for key in actual} == actual
 
 
@@ -232,7 +255,9 @@ def _typing_model(holder, coordinates):
             lambda request: ToolCall(
                 "type_text", {"ref": _ref(request, "Email"), "text": "old value"}
             ),
-            lambda request: ToolCall("type_text", {"ref": _ref(request, "Email"), "text": text}),
+            lambda request: ToolCall(
+                "type_text", {"ref": _ref(request, "Email"), "text": text}
+            ),
             shortcut,
             ToolCall("send_keys", {"key": "+"}),
             lambda request: ToolCall(
@@ -257,7 +282,8 @@ def _typing_model(holder, coordinates):
         if step == 2:
             assert (
                 await evaluate(
-                    holder["browser"].active_tab, "document.querySelector('#email').value"
+                    holder["browser"].active_tab,
+                    "document.querySelector('#email').value",
                 )
                 == text
             )
@@ -286,10 +312,13 @@ def _assert_events(streamed, output, stored, coordinates):
     assert keys[-7].modifiers == ("Shift",)
     records = [json.loads(line) for line in output.splitlines()]
     assert any(record["type"] == "browser.cursor.moved" for record in records)
-    assert any(record["type"] == "browser.pointer.pressed" for record in records) == coordinates
-    assert [record["key"] for record in records if record["type"] == "browser.key.pressed"] == [
-        event.key for event in keys
-    ]
+    assert (
+        any(record["type"] == "browser.pointer.pressed" for record in records)
+        == coordinates
+    )
+    assert [
+        record["key"] for record in records if record["type"] == "browser.key.pressed"
+    ] == [event.key for event in keys]
     # Live input events stream to subscribers but stay out of the saved conversation.
     assert '"browser.key.pressed"' not in stored
     assert '"browser.cursor.moved"' not in stored
@@ -297,4 +326,6 @@ def _assert_events(streamed, output, stored, coordinates):
 
 def _ref(request, name):
     state = latest(request.messages)
-    return next(element["ref"] for element in state["elements"] if element["name"] == name)
+    return next(
+        element["ref"] for element in state["elements"] if element["name"] == name
+    )

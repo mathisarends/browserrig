@@ -20,11 +20,14 @@ def text_encoding(sample: bytes) -> str | None:
         return None
     if (
         sample
-        and sum(byte < 32 and byte not in (9, 10, 12, 13) for byte in sample) > len(sample) / 50
+        and sum(byte < 32 and byte not in (9, 10, 12, 13) for byte in sample)
+        > len(sample) / 50
     ):
         return None
     try:
-        codecs.getincrementaldecoder("utf-8")(errors="strict").decode(sample, final=False)
+        codecs.getincrementaldecoder("utf-8")(errors="strict").decode(
+            sample, final=False
+        )
         return "utf-8-sig"
     except UnicodeError:
         match = from_bytes(sample).best()

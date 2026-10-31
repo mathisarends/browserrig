@@ -68,14 +68,20 @@ class Frame:
     @property
     def local_visible(self) -> Bounds | None:
         """The visible area in this frame's own CSS pixels, for in-page scripts."""
-        return self.transform.bounds_to_local(self.visible) if self.visible is not None else None
+        return (
+            self.transform.bounds_to_local(self.visible)
+            if self.visible is not None
+            else None
+        )
 
     async def frame_tree(self) -> FrameTree:
         return await _frame_tree(self.cdp)
 
     async def upload_files(self, backend_node_id: int, paths: list[str]) -> None:
         try:
-            await self.cdp.dom.set_file_input_files(files=paths, backend_node_id=backend_node_id)
+            await self.cdp.dom.set_file_input_files(
+                files=paths, backend_node_id=backend_node_id
+            )
         except CDPCommandError as error:
             raise BrowserError("STALE_ELEMENT") from error
 
@@ -104,7 +110,9 @@ class Frame:
             ),
         )
 
-    async def run_on_owner[A: BaseModel, R](self, script: Script[A, R], args: A | None = None) -> R:
+    async def run_on_owner[A: BaseModel, R](
+        self, script: Script[A, R], args: A | None = None
+    ) -> R:
         """Run with this frame's embedding element as `this`, using the same error policy."""
         assert self.parent is not None and self.owner_id is not None
         try:
@@ -121,7 +129,9 @@ class Frame:
         if not (await self.visible_points(((x, y),)))[0]:
             raise BrowserError("ELEMENT_BLOCKED")
 
-    async def visible_points(self, points: tuple[tuple[float, float], ...]) -> tuple[bool, ...]:
+    async def visible_points(
+        self, points: tuple[tuple[float, float], ...]
+    ) -> tuple[bool, ...]:
         visible = [True] * len(points)
         current = self
         while current.parent is not None:
@@ -129,11 +139,15 @@ class Frame:
             hits = await current.run_on_owner(
                 OWNER_HITS,
                 OwnerHitsArgs(
-                    points=tuple(current.parent.transform.to_local(x, y) for x, y in points)
+                    points=tuple(
+                        current.parent.transform.to_local(x, y) for x, y in points
+                    )
                 ),
             )
             visible = [
-                before and hit and (visible_area is None or visible_area.contains(*point))
+                before
+                and hit
+                and (visible_area is None or visible_area.contains(*point))
                 for before, hit, point in zip(visible, hits, points, strict=True)
             ]
             current = current.parent
@@ -168,7 +182,9 @@ class Frame:
         )
 
 
-type FrameDiscovery = Callable[[Tab], Awaitable[tuple[tuple[Frame, ...], tuple[str, ...]]]]
+type FrameDiscovery = Callable[
+    [Tab], Awaitable[tuple[tuple[Frame, ...], tuple[str, ...]]]
+]
 
 
 class Tab:  # pylint: disable=too-many-public-methods  # document API plus InputTarget
@@ -209,7 +225,9 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
 
     async def emit(self, event: BrowserEvent | LiveEvent) -> None:
         if self._emit is not None:
-            await self._emit(replace(event, target_id=self.id, document_id=self.document_id))
+            await self._emit(
+                replace(event, target_id=self.id, document_id=self.document_id)
+            )
 
     async def publish_state(self) -> None:
         """Tell live viewers what the tab strip shows, once per distinct state."""
@@ -219,7 +237,10 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         self._shown = state
         await self.emit(
             TabUpdatedEvent(
-                url=self.url, title=self.title, loading=self.loading, favicon=self.favicon
+                url=self.url,
+                title=self.title,
+                loading=self.loading,
+                favicon=self.favicon,
             )
         )
 
@@ -251,7 +272,9 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
                         await self.publish_state()
                         self._icon_url = strip.icon
                         self.favicon = (
-                            await load_favicon(self.cdp, frame.id, strip.icon) if strip.icon else ""
+                            await load_favicon(self.cdp, frame.id, strip.icon)
+                            if strip.icon
+                            else ""
                         )
                 await self.publish_state()
         except Exception:  # pylint: disable=broad-exception-caught
@@ -278,7 +301,9 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
     # Native input lands here; the browser's mouse and keyboard aim at the focused tab.
     async def dispatch_mouse(
         self,
-        kind: Literal[MouseEventKind.MOVED, MouseEventKind.PRESSED, MouseEventKind.RELEASED],
+        kind: Literal[
+            MouseEventKind.MOVED, MouseEventKind.PRESSED, MouseEventKind.RELEASED
+        ],
         point: Point,
         *,
         button: MouseButton,
@@ -296,7 +321,9 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
             )
         )
 
-    async def dispatch_wheel(self, point: Point, *, delta_x: float, delta_y: float) -> None:
+    async def dispatch_wheel(
+        self, point: Point, *, delta_x: float, delta_y: float
+    ) -> None:
         await self._input(
             self.cdp.input.dispatch_mouse_event(
                 type=MouseEventKind.WHEEL.value,
@@ -372,7 +399,11 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         if key[1] and key == self._frames_key:
             return self._frames
         frames, self.frame_limitations = await self._discover_frames(self)
-        if key[1] and key == (self.document_id, self._current_action(), self._layout_revision):
+        if key[1] and key == (
+            self.document_id,
+            self._current_action(),
+            self._layout_revision,
+        ):
             self._frames_key, self._frames = key, frames
         return frames
 
@@ -390,17 +421,23 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
                 self.changed.set()
                 await self.emit(NavigationCommittedEvent(url=self.url))
                 await self.publish_state()
-            case FrameStartedLoadingEvent(frame_id=frame_id) if frame_id == self._main_frame_id:
+            case FrameStartedLoadingEvent(frame_id=frame_id) if (
+                frame_id == self._main_frame_id
+            ):
                 self.loading = True
                 await self.publish_state()
-            case FrameStoppedLoadingEvent(frame_id=frame_id) if frame_id == self._main_frame_id:
+            case FrameStoppedLoadingEvent(frame_id=frame_id) if (
+                frame_id == self._main_frame_id
+            ):
                 self.loading = False
                 await self.publish_state()
                 self.refresh_strip()
             case JavascriptDialogOpeningEvent(type=kind, message=message):
                 self.dialog = (str(kind), message)
                 self._dialog_opened.set()
-                await self.emit(DialogOpenedEvent(kind=str(kind), message=message[:1000]))
+                await self.emit(
+                    DialogOpenedEvent(kind=str(kind), message=message[:1000])
+                )
             case JavascriptDialogClosedEvent(result=accepted):
                 self.dialog = None
                 self._dialog_opened.clear()
@@ -408,7 +445,12 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
 
     async def main_frame(self) -> Frame:
         tree = await self.frame_tree()
-        return Frame(tree.frame.id, self.cdp, document_id=tree.frame.loader_id, worlds=self.worlds)
+        return Frame(
+            tree.frame.id,
+            self.cdp,
+            document_id=tree.frame.loader_id,
+            worlds=self.worlds,
+        )
 
     async def frame_tree(self) -> FrameTree:
         return await _frame_tree(self.cdp)
@@ -460,7 +502,9 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
                 raise BrowserError(f"JavaScript failed: {message}")
             return _javascript_value(result.result)
         except TimeoutError as error:
-            raise BrowserError(f"JavaScript timed out after {timeout:g} seconds") from error
+            raise BrowserError(
+                f"JavaScript timed out after {timeout:g} seconds"
+            ) from error
         except CDPCommandError as error:
             if error.message == "Object couldn't be returned by value":
                 raise BrowserError(
@@ -489,7 +533,9 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         index = history.current_index + offset
         if not 0 <= index < len(history.entries):
             return False
-        await self.cdp.page.navigate_to_history_entry(entry_id=history.entries[index].id)
+        await self.cdp.page.navigate_to_history_entry(
+            entry_id=history.entries[index].id
+        )
         return True
 
 
@@ -516,7 +562,11 @@ def _javascript_value(value: RemoteObject) -> str:
         return value.unserializable_value
     if value.type == "undefined":
         return "undefined"
-    if value.value is None and value.subtype != "null" and value.description is not None:
+    if (
+        value.value is None
+        and value.subtype != "null"
+        and value.description is not None
+    ):
         return value.description
     return json.dumps(value.value, ensure_ascii=False)
 
@@ -542,7 +592,12 @@ async def _call_on_node[A: BaseModel, R](
         raise BrowserError("STALE_ELEMENT")
     try:
         return await _call(
-            cdp, script, args, object_id=object_id, by_value=by_value, user_gesture=user_gesture
+            cdp,
+            script,
+            args,
+            object_id=object_id,
+            by_value=by_value,
+            user_gesture=user_gesture,
         )
     finally:
         with suppress(CDPCommandError):

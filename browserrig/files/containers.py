@@ -68,15 +68,22 @@ def container_index(path: Path, format_: str, limit: int) -> ParsedContent:
     return details
 
 
-def copy_entry(path: Path, format_: str, name: str, target: IO[bytes], limit: int) -> str:
+def copy_entry(
+    path: Path, format_: str, name: str, target: IO[bytes], limit: int
+) -> str:
     _safe_member(name)
     if format_ == "zip":
         with ZipFile(path) as archive:
             entries = [entry for entry in archive.infolist() if entry.filename == name]
             if len(entries) != 1:
-                raise ValueError("Container entry was not found or its name is ambiguous")
+                raise ValueError(
+                    "Container entry was not found or its name is ambiguous"
+                )
             entry = entries[0]
-            if entry.is_dir() or stat.S_IFMT(entry.external_attr >> 16) not in (0, stat.S_IFREG):
+            if entry.is_dir() or stat.S_IFMT(entry.external_attr >> 16) not in (
+                0,
+                stat.S_IFREG,
+            ):
                 raise ValueError("Only regular container files can be read")
             if entry.flag_bits & 1:
                 raise ValueError("Container entry is encrypted; a password is required")
@@ -86,7 +93,9 @@ def copy_entry(path: Path, format_: str, name: str, target: IO[bytes], limit: in
                 _copy(source, target, limit)
     elif format_ == "tar":
         with tarfile.open(path) as archive:
-            entries = [entry for entry in _tar_entries(archive, limit) if entry.name == name]
+            entries = [
+                entry for entry in _tar_entries(archive, limit) if entry.name == name
+            ]
             if len(entries) != 1 or not entries[0].isfile():
                 raise ValueError(
                     "Container entry was not found, is ambiguous, or is not a regular file"
@@ -105,7 +114,9 @@ def copy_entry(path: Path, format_: str, name: str, target: IO[bytes], limit: in
         with opener(path, "rb") as source:
             _copy(source, target, limit)
     else:
-        raise ValueError("member is only supported for containers and email attachments")
+        raise ValueError(
+            "member is only supported for containers and email attachments"
+        )
     return name
 
 
@@ -142,7 +153,9 @@ def _tar_entries(archive: tarfile.TarFile, limit: int) -> Iterator[tarfile.TarIn
         yield entry
 
 
-def _copy_message(path: Path, format_: str, name: str, target: IO[bytes], limit: int) -> str:
+def _copy_message(
+    path: Path, format_: str, name: str, target: IO[bytes], limit: int
+) -> str:
     if format_ == "mbox":
         if not name.startswith("#") or not name[1:].isdigit():
             raise ValueError("Select an mbox message using member='#1', '#2', etc.")
@@ -166,12 +179,18 @@ def _copy_message(path: Path, format_: str, name: str, target: IO[bytes], limit:
             if name in (part.get_filename() or f"attachment-{index}", f"#{index}")
         ]
         if len(matches) != 1:
-            raise ValueError("Attachment was not found or its name is ambiguous; use its #number")
+            raise ValueError(
+                "Attachment was not found or its name is ambiguous; use its #number"
+            )
         index, part = matches[0]
         data = part.get_payload(decode=True)
         if data is None and part.get_content_type() == "message/rfc822":
             payload = part.get_payload()
-            if isinstance(payload, list) and payload and isinstance(payload[0], Message):
+            if (
+                isinstance(payload, list)
+                and payload
+                and isinstance(payload[0], Message)
+            ):
                 data = payload[0].as_bytes()
         if not isinstance(data, bytes):
             raise ValueError("Attachment has no readable payload")

@@ -180,7 +180,11 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
     async def element(self, tab: Tab, ref: str) -> ElementHandle:
         snapshot = self._state.snapshot
         await tab.sync_document()
-        if snapshot is None or snapshot.tab_id != tab.id or snapshot.document_id != tab.document_id:
+        if (
+            snapshot is None
+            or snapshot.tab_id != tab.id
+            or snapshot.document_id != tab.document_id
+        ):
             raise StaleElement(
                 "Observation belongs to another tab or document; use refs from the next observation"
             )
@@ -188,7 +192,9 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         for frame in await tab.frames():
             if frame.id == element.frame_id:
                 return ElementHandle(frame, element, snapshot)
-        raise StaleElement("Element frame no longer exists; use refs from the next observation")
+        raise StaleElement(
+            "Element frame no longer exists; use refs from the next observation"
+        )
 
     @tool(
         kind=ActionKind.SCREENSHOT,
@@ -206,7 +212,9 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         self,
         region: Annotated[
             Region | None,
-            Field(description="Viewport area in CSS pixels; omit for the full viewport."),
+            Field(
+                description="Viewport area in CSS pixels; omit for the full viewport."
+            ),
         ] = None,
         zoom: Annotated[
             float, Field(ge=1, le=4, description="Magnification of the region image.")
@@ -220,7 +228,9 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             raise ToolError("zoom needs a region; pass the viewport area to magnify")
         if region is not None:
             if not self.capture_strategy.provides_dom_refs:
-                raise ToolError("Region screenshots require a capture strategy with DOM references")
+                raise ToolError(
+                    "Region screenshots require a capture strategy with DOM references"
+                )
             snapshot = self._state.snapshot
             if (
                 snapshot is not None
@@ -235,7 +245,9 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         self._state.screenshot_requested = True
         self._state.screenshot_region, self._state.screenshot_zoom = region, zoom
         target = "requested region" if region is not None else "current viewport"
-        return ToolResult(f"Screenshot requested. Your next observation will show the {target}.")
+        return ToolResult(
+            f"Screenshot requested. Your next observation will show the {target}."
+        )
 
     @tool(
         kind=ActionKind.EXTRACT_CONTENT,
@@ -283,7 +295,10 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             raise StaleElement("Observe before using coordinates")
         image = self._state.delivered_image
         if image is not None:
-            if (image.tab_id, image.document_id) != (snapshot.tab_id, snapshot.document_id):
+            if (image.tab_id, image.document_id) != (
+                snapshot.tab_id,
+                snapshot.document_id,
+            ):
                 raise StaleElement(
                     "The last shown image belongs to another document; screenshot again"
                 )
@@ -313,7 +328,10 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         if snapshot.image is not None or not (state.visible and state.sent_key == key):
             observations.append(self._observation(snapshot))
             state.sent_key, state.sent_ref, state.visible = key, snapshot.id, False
-        if nudges is not None and (hints := await nudges.observation(snapshot)) is not None:
+        if (
+            nudges is not None
+            and (hints := await nudges.observation(snapshot)) is not None
+        ):
             observations.append(hints)
         secrets = self._secrets
         if secrets is not None:
@@ -322,7 +340,9 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 observations.append(listed)
         for observation in observations:
             # Nudges quote page text too; nothing reaches the session unredacted.
-            event.session.observe(secrets.redact(observation) if secrets else observation)
+            event.session.observe(
+                secrets.redact(observation) if secrets else observation
+            )
         return await next_()
 
     def _observation(self, snapshot: Snapshot) -> Observation:
@@ -337,18 +357,29 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             changes = delta(base[0], plain)
             # Many changes read better as a complete observation, which becomes the new base.
             if len(changes) <= len(text) // 2:
-                observation = Observation(source="browser", content=changes, refs=(snapshot.id,))
-                return self._secrets.redact(observation) if self._secrets else observation
+                observation = Observation(
+                    source="browser", content=changes, refs=(snapshot.id,)
+                )
+                return (
+                    self._secrets.redact(observation) if self._secrets else observation
+                )
         state.bases[page] = (plain, snapshot.id)
         return self.project(snapshot)
 
     @hook(ObservationsIncludedEvent)
     async def _included(self, event: ObservationsIncludedEvent) -> None:
         state = self._state
-        refs = {ref for item in event.observations if item.source == "browser" for ref in item.refs}
+        refs = {
+            ref
+            for item in event.observations
+            if item.source == "browser"
+            for ref in item.refs
+        }
         state.visible = state.sent_ref in refs
         state.included = frozenset(refs)
-        state.bases = {page: base for page, base in state.bases.items() if base[1] in refs}
+        state.bases = {
+            page: base for page, base in state.bases.items() if base[1] in refs
+        }
 
     def _page_key(self, snapshot: Snapshot) -> str:
         # New-element marks depend on the previous capture, not on the page itself.

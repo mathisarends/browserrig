@@ -16,8 +16,15 @@ from cdpify.domains.page import (
     JavascriptDialogOpeningEvent,
     NavigatedWithinDocumentEvent,
 )
-from cdpify.domains.runtime import ExecutionContextDestroyedEvent, ExecutionContextsClearedEvent
-from cdpify.domains.target import TargetDestroyedEvent, TargetInfo, TargetInfoChangedEvent
+from cdpify.domains.runtime import (
+    ExecutionContextDestroyedEvent,
+    ExecutionContextsClearedEvent,
+)
+from cdpify.domains.target import (
+    TargetDestroyedEvent,
+    TargetInfo,
+    TargetInfoChangedEvent,
+)
 
 from browserrig.browser.models import TabInfo
 from browserrig.core.errors import BrowserClosed, BrowserError
@@ -81,7 +88,9 @@ class ChromeBrowser:
         self._active = ""
         self._context: str | None = None
         self._sessions: dict[str, str] = {}
-        self._downloads = Downloads(self.files, self._options.download_directory, self.events.emit)
+        self._downloads = Downloads(
+            self.files, self._options.download_directory, self.events.emit
+        )
         self._tasks: list[asyncio.Task[None]] = []
         self._failure: Exception | None = None
         self._connected = False
@@ -118,7 +127,9 @@ class ChromeBrowser:
                 if isinstance(options, ConnectBrowser) and options.target_id:
                     tab = await self._attach(options.target_id)
                     await self.mouse.switch_tab(
-                        TabGesture.ACTIVATE, tab.id, lambda: self._focus(tab, front=False)
+                        TabGesture.ACTIVATE,
+                        tab.id,
+                        lambda: self._focus(tab, front=False),
                     )
                 else:
                     await self.open_tab(options.url)
@@ -179,7 +190,11 @@ class ChromeBrowser:
         Strings may come from the model and are limited to HTTP(S) and about:blank.
         A `Path` opens as file:// without checks; resolve it through `files` first.
         """
-        url = target.absolute().as_uri() if isinstance(target, Path) else validated_url(target)
+        url = (
+            target.absolute().as_uri()
+            if isinstance(target, Path)
+            else validated_url(target)
+        )
         self._check()
         opened: list[Tab] = []
 
@@ -197,10 +212,14 @@ class ChromeBrowser:
         if tab.id == self._active:
             # Already in front: nothing to press, but late viewers still need the cursor.
             await tab.bring_to_front()
-            await self.events.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
+            await self.events.emit(
+                TabActivatedEvent(target_id=tab.id, document_id=tab.document_id)
+            )
             await self.mouse.publish_cursor()
             return tab
-        await self.mouse.switch_tab(TabGesture.ACTIVATE, tab.id, lambda: self._focus(tab))
+        await self.mouse.switch_tab(
+            TabGesture.ACTIVATE, tab.id, lambda: self._focus(tab)
+        )
         return tab
 
     async def close_tab(self, target_id: str) -> Tab:
@@ -226,7 +245,9 @@ class ChromeBrowser:
 
     async def aclose(self) -> None:
         if self._close_task is None:
-            self._close_task = asyncio.create_task(self._close(), name="browserrig:close")
+            self._close_task = asyncio.create_task(
+                self._close(), name="browserrig:close"
+            )
         await asyncio.shield(self._close_task)
 
     async def _resolve_endpoint(self) -> tuple[str, dict[str, str]]:
@@ -237,7 +258,9 @@ class ChromeBrowser:
             endpoint, headers = process.endpoint, {}
         else:
             endpoint = options.endpoint.get_secret_value()
-            headers = {key: value.get_secret_value() for key, value in options.headers.items()}
+            headers = {
+                key: value.get_secret_value() for key, value in options.headers.items()
+            }
         if endpoint.startswith(("http://", "https://")):
             async with httpx2.AsyncClient(
                 timeout=options.timeout, headers=headers, trust_env=False
@@ -246,7 +269,9 @@ class ChromeBrowser:
                 response.raise_for_status()
                 endpoint = response.json()["webSocketDebuggerUrl"]
         if "/devtools/page/" in endpoint:
-            raise BrowserError("Discovery returned a page endpoint; a browser endpoint is needed")
+            raise BrowserError(
+                "Discovery returned a page endpoint; a browser endpoint is needed"
+            )
         return endpoint, headers
 
     async def _create_context(self) -> None:
@@ -254,7 +279,9 @@ class ChromeBrowser:
         if isinstance(options, ConnectBrowser) and options.target_id is not None:
             return
         assert self._stack is not None
-        context = await self.client.target.create_browser_context(dispose_on_detach=True)
+        context = await self.client.target.create_browser_context(
+            dispose_on_detach=True
+        )
         self._context = context.browser_context_id
         self._stack.push_async_callback(
             self.client.target.dispose_browser_context, browser_context_id=self._context
@@ -275,22 +302,30 @@ class ChromeBrowser:
         return None if tab is None or tab.closed else tab
 
     async def _create(self, url: str) -> Tab:
-        result = await self.client.target.create_target(url=url, browser_context_id=self._context)
+        result = await self.client.target.create_target(
+            url=url, browser_context_id=self._context
+        )
         return await self._attach(result.target_id, opened=True)
 
     async def _focus(self, tab: Tab, *, front: bool = True) -> None:
         if front:
             await tab.bring_to_front()
         self._active = tab.id
-        await self.events.emit(TabActivatedEvent(target_id=tab.id, document_id=tab.document_id))
+        await self.events.emit(
+            TabActivatedEvent(target_id=tab.id, document_id=tab.document_id)
+        )
 
-    async def _attach(self, target_id: str, *, opened: bool = False, opener_id: str = "") -> Tab:
+    async def _attach(
+        self, target_id: str, *, opened: bool = False, opener_id: str = ""
+    ) -> Tab:
         async with self._attach_lock:
             if target_id in self._tabs:
                 return self._tabs[target_id]
             if target_id in self._closed_targets:
                 raise BrowserError("Target has already closed")
-            attached = await self.client.target.attach_to_target(target_id=target_id, flatten=True)
+            attached = await self.client.target.attach_to_target(
+                target_id=target_id, flatten=True
+            )
             cdp = self.client.session(attached.session_id)
             try:
                 await _enable_session(cdp, self._options.viewport)
@@ -309,7 +344,9 @@ class ChromeBrowser:
                 self._sessions[attached.session_id] = target_id
                 if opened:
                     await self.events.emit(
-                        TabOpenedEvent(target_id=tab.id, url=tab.url, opener_id=opener_id)
+                        TabOpenedEvent(
+                            target_id=tab.id, url=tab.url, opener_id=opener_id
+                        )
                     )
                 tab.refresh_strip()
                 if self._context is None:
@@ -342,7 +379,9 @@ class ChromeBrowser:
             tab.discard()
             await self.events.emit(TabClosedEvent(target_id=target_id))
 
-    async def _discover_frames(self, tab: Tab) -> tuple[tuple[Frame, ...], tuple[str, ...]]:
+    async def _discover_frames(
+        self, tab: Tab
+    ) -> tuple[tuple[Frame, ...], tuple[str, ...]]:
         """Resolve each frame to its own session, including cross-process targets."""
         self._check()
         targets = await self._targets()
@@ -359,7 +398,9 @@ class ChromeBrowser:
     async def _frame_session(self, frame_id: str) -> CdpSession:
         """Reuse owned OOPIF sessions; discard stale sessions when targets disappear."""
         async with self._attach_lock:
-            sid = next((sid for sid, tid in self._sessions.items() if tid == frame_id), None)
+            sid = next(
+                (sid for sid, tid in self._sessions.items() if tid == frame_id), None
+            )
             if sid is None:
                 attached = await self.client.target.attach_to_target(
                     target_id=frame_id, flatten=True
@@ -376,11 +417,14 @@ class ChromeBrowser:
             subscription = self.client.listen_all(event_type)
             self._tasks.append(
                 asyncio.create_task(
-                    self._consume(subscription), name=f"browserrig:{event_type.__name__}"
+                    self._consume(subscription),
+                    name=f"browserrig:{event_type.__name__}",
                 )
             )
 
-    async def _consume(self, subscription: EventSubscription[ReceivedEvent[Any]]) -> None:
+    async def _consume(
+        self, subscription: EventSubscription[ReceivedEvent[Any]]
+    ) -> None:
         try:
             async with subscription:
                 async for received in subscription:
@@ -388,7 +432,9 @@ class ChromeBrowser:
                         await self._handle(received.value, received.session_id)
                     except Exception:  # pylint: disable=broad-exception-caught
                         # A target can disappear while its event is being handled.
-                        logger.exception("Browser event %s failed", type(received.value).__name__)
+                        logger.exception(
+                            "Browser event %s failed", type(received.value).__name__
+                        )
         except Exception as error:  # pylint: disable=broad-exception-caught
             # Surface listener failures on the next browser operation.
             self._failure = error
@@ -422,8 +468,14 @@ class ChromeBrowser:
         if known := self._tabs.get(info.target_id):
             known.url, known.title = info.url, info.title
             await known.publish_state()
-        elif info.type == "page" and self._context and info.browser_context_id == self._context:
-            await self._attach(info.target_id, opened=True, opener_id=info.opener_id or "")
+        elif (
+            info.type == "page"
+            and self._context
+            and info.browser_context_id == self._context
+        ):
+            await self._attach(
+                info.target_id, opened=True, opener_id=info.opener_id or ""
+            )
 
     async def _stop_listeners(self) -> None:
         for task in self._tasks:

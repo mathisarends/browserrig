@@ -59,7 +59,9 @@ class Readiness(Plugin, provides=True, needs=(BrowserEvents,)):
         )
         key = (*document, phase, stage)
         if key not in self._state.pending:
-            task = asyncio.create_task(self._wait(tab, phase, stage), name="browserrig:readiness")
+            task = asyncio.create_task(
+                self._wait(tab, phase, stage), name="browserrig:readiness"
+            )
             self._state.pending[key] = task
 
             def finished(completed: asyncio.Task[ReadinessReport]) -> None:
@@ -111,6 +113,8 @@ class Readiness(Plugin, provides=True, needs=(BrowserEvents,)):
             return await self.wait(tab, phase=phase)
         if stage == ReadinessStage.INITIAL and report.status == ReadinessStatus.READY:
             # Keep only the live generation for this tab.
-            self._state.initialized = {key for key in self._state.initialized if key[0] != tab.id}
+            self._state.initialized = {
+                key for key in self._state.initialized if key[0] != tab.id
+            }
             self._state.initialized.add(document)
         return report

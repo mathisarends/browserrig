@@ -28,5 +28,9 @@ class DomReady:
     options: ReadinessOptions | None = None
 
     def create(self, context: ReadinessContext) -> ReadinessStrategy:
-        phase = ReadinessPhase.INITIAL if context.stage == ReadinessStage.INITIAL else context.phase
+        phase = (
+            ReadinessPhase.INITIAL
+            if context.stage == ReadinessStage.INITIAL
+            else context.phase
+        )
         return DomReadiness(context.tab, self.options or context.options, phase)

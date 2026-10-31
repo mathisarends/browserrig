@@ -21,9 +21,21 @@ _WHITESPACE = re.compile(r"\s+")
 _ICON_GLYPHS = re.compile("[\ue000-\uf8ff\U000f0000-\U0010fffd]")
 _UNBOUNDED = 1e9
 _NO_TEXT = frozenset(
-    {"script", "style", "noscript", "template", "head", "title", "select", "option", "textarea"}
+    {
+        "script",
+        "style",
+        "noscript",
+        "template",
+        "head",
+        "title",
+        "select",
+        "option",
+        "textarea",
+    }
 )
-_LABELABLE = frozenset({"input", "select", "textarea", "button", "meter", "output", "progress"})
+_LABELABLE = frozenset(
+    {"input", "select", "textarea", "button", "meter", "output", "progress"}
+)
 _FORM_CONTROLS = frozenset({"input", "select", "textarea"})
 _REPLACED = frozenset({"img", "svg", "input"})
 
@@ -53,7 +65,9 @@ class Document:  # pylint: disable=too-many-public-methods
         # Chrome encodes empty strings as index -1, which now lands on this sentinel.
         strings = [*strings, ""]
         self.frame_id = strings[document.frame_id]
-        self.url = strings[document.document_url] if document.document_url is not None else ""
+        self.url = (
+            strings[document.document_url] if document.document_url is not None else ""
+        )
         self.title = strings[document.title] if document.title is not None else ""
         self.scroll = (document.scroll_offset_x or 0.0, document.scroll_offset_y or 0.0)
         self.content_height = document.content_height or 0.0
@@ -120,10 +134,13 @@ class Document:  # pylint: disable=too-many-public-methods
     def attributes(self, index: int) -> dict[str, str]:
         cached = self._attributes.get(index)
         if cached is None:
-            raw = self._raw_attributes[index] if index < len(self._raw_attributes) else ()
+            raw = (
+                self._raw_attributes[index] if index < len(self._raw_attributes) else ()
+            )
             strings = self._strings
             cached = {
-                strings[raw[i]].lower(): strings[raw[i + 1]] for i in range(0, len(raw) - 1, 2)
+                strings[raw[i]].lower(): strings[raw[i + 1]]
+                for i in range(0, len(raw) - 1, 2)
             }
             self._attributes[index] = cached
         return cached
@@ -160,7 +177,11 @@ class Document:  # pylint: disable=too-many-public-methods
         target = self.attributes(label).get("for")
         if target is not None:
             control = self._ids.get(target)
-            return control if control is not None and self._tags[control] in _LABELABLE else None
+            return (
+                control
+                if control is not None and self._tags[control] in _LABELABLE
+                else None
+            )
         controls = self.descendants(label, _FORM_CONTROLS)
         return controls[0] if controls else None
 
@@ -207,7 +228,11 @@ class Document:  # pylint: disable=too-many-public-methods
 
     def paint_order(self, index: int) -> int:
         layout = self._layout.get(index)
-        return self._paint[layout] if layout is not None and layout < len(self._paint) else -1
+        return (
+            self._paint[layout]
+            if layout is not None and layout < len(self._paint)
+            else -1
+        )
 
     def hidden(self, index: int) -> bool:
         """Inherited invisibility: opacity 0, `inert`, or a hidden ancestor."""
@@ -315,7 +340,9 @@ class Document:  # pylint: disable=too-many-public-methods
 
     def _string_id(self, value: str) -> int | None:
         if self._string_ids is None:
-            self._string_ids = {string: index for index, string in enumerate(self._strings)}
+            self._string_ids = {
+                string: index for index, string in enumerate(self._strings)
+            }
         return self._string_ids.get(value)
 
     @cached_property
@@ -361,7 +388,12 @@ class Document:  # pylint: disable=too-many-public-methods
     def _inherit(self) -> None:
         count = len(self._types)
         parents, types, tags = self._parents, self._types, self._tags
-        layout, styles, strings, bounds = self._layout, self._styles, self._strings, self._bounds
+        layout, styles, strings, bounds = (
+            self._layout,
+            self._styles,
+            self._strings,
+            self._bounds,
+        )
         position_at, opacity_at = Style.POSITION.slot, Style.OPACITY.slot
         overflow_x_at, overflow_y_at = Style.OVERFLOW_X.slot, Style.OVERFLOW_Y.slot
         inert = self._string_id("inert")
@@ -392,14 +424,20 @@ class Document:  # pylint: disable=too-many-public-methods
                 is_hidden = is_hidden or strings[values[opacity_at]] == "0"
                 overflow_x = strings[values[overflow_x_at]]
                 overflow_y = strings[values[overflow_y_at]]
-                if (overflow_x != "visible" or overflow_y != "visible") and tags[index] not in (
+                if (overflow_x != "visible" or overflow_y != "visible") and tags[
+                    index
+                ] not in (
                     "html",
                     "body",
                 ):
                     x, y, width, height = bounds[box]
                     rect = (x, y, x + width, y + height)
-                    own_hard = intersect(_overflow(rect, overflow_x, overflow_y, True), hard)
-                    own_soft = intersect(_overflow(rect, overflow_x, overflow_y, False), soft)
+                    own_hard = intersect(
+                        _overflow(rect, overflow_x, overflow_y, True), hard
+                    )
+                    own_soft = intersect(
+                        _overflow(rect, overflow_x, overflow_y, False), soft
+                    )
             hidden[index], pinned[index] = is_hidden, is_pinned
             clip[index], scroll[index] = hard, soft
             inner_clip[index], inner_scroll[index] = own_hard, own_soft
@@ -421,7 +459,10 @@ def _overflow(rect: Rect, overflow_x: str, overflow_y: str, hard: bool) -> Rect:
 def _values(data: RareStringData | None, strings: list[str]) -> dict[int, str]:
     if data is None:
         return {}
-    return {index: strings[value] for index, value in zip(data.index, data.value, strict=True)}
+    return {
+        index: strings[value]
+        for index, value in zip(data.index, data.value, strict=True)
+    }
 
 
 def _flags(data: RareBooleanData | None) -> frozenset[int]:

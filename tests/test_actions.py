@@ -30,7 +30,9 @@ from browserrig.tools.files import UploadTools
 async def test_action_keeps_error_details_and_uncertain_dispatch(error):
     actions, events = _actions()
     with pytest.raises(ToolError, match=str(error)) as caught:
-        await Actions.run(actions, kind=ActionKind.TYPE, operation=AsyncMock(side_effect=error))
+        await Actions.run(
+            actions, kind=ActionKind.TYPE, operation=AsyncMock(side_effect=error)
+        )
     assert "may have run" in str(caught.value)
     receipt = next(event for event in events if isinstance(event, ActionFailedEvent))
     assert receipt.dispatched and str(error) in receipt.reason
@@ -52,8 +54,12 @@ async def test_validation_rejects_before_dispatch():
     assert isinstance(events[0], ActionFailedEvent) and not events[0].dispatched
 
 
-@pytest.mark.parametrize("selection", ["outside", "missing", "directory", "no_workspace"])
-async def test_upload_rejects_invalid_selection_before_any_browser_input(tmp_path, selection):
+@pytest.mark.parametrize(
+    "selection", ["outside", "missing", "directory", "no_workspace"]
+)
+async def test_upload_rejects_invalid_selection_before_any_browser_input(
+    tmp_path, selection
+):
     files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
     files.initialize()
     saved = files.write_file("report.txt", "report")
@@ -61,7 +67,9 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(tmp_pat
     secret.write_text("private")
     invalid = {"outside": str(secret), "missing": "missing.txt", "directory": "."}
     paths = [saved.path, invalid.get(selection, saved.path)]
-    tools, actions, handle, events = _uploads(None if selection == "no_workspace" else files)
+    tools, actions, handle, events = _uploads(
+        None if selection == "no_workspace" else files
+    )
     with pytest.raises(ToolError):
         await UploadTools.upload_files(tools, "input", paths, actions=actions)
     actions.element_point.assert_not_awaited()
@@ -70,14 +78,18 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(tmp_pat
     assert isinstance(events[0], ActionFailedEvent) and not events[0].dispatched
 
 
-async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path, monkeypatch):
+async def test_upload_sends_only_resolved_workspace_paths_to_chrome(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr("browserrig.input.mouse.asyncio.sleep", AsyncMock())
     monkeypatch.setattr("browserrig.input.controller.asyncio.sleep", AsyncMock())
     files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
     files.initialize()
     saved = files.write_file("report.txt", "report")
     tools, actions, handle, events = _uploads(files)
-    result = await UploadTools.upload_files(tools, "input", ["report.txt"], actions=actions)
+    result = await UploadTools.upload_files(
+        tools, "input", ["report.txt"], actions=actions
+    )
     assert result.text == "Files assigned to input."
     handle.upload_files.assert_awaited_once_with([saved.path])
     actions.element_point.assert_awaited_once()
@@ -105,7 +117,9 @@ async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path, mo
     ],
 )
 async def test_tab_management_does_not_wait_on_current_page_dialog(kind):
-    tab = SimpleNamespace(url="about:blank", document_id="doc", dialog=("alert", "hello"))
+    tab = SimpleNamespace(
+        url="about:blank", document_id="doc", dialog=("alert", "hello")
+    )
     before = await Actions._prepare(SimpleNamespace(), tab, kind)
     assert before.url == tab.url and before.document_id == tab.document_id
 
@@ -153,7 +167,9 @@ def _uploads(files):
     actions.run = lambda **kwargs: Actions.run(actions, **kwargs)
     actions.element_point = AsyncMock(return_value=ElementPoint(x=40, y=30))
     actions._settle = AsyncMock(return_value="")
-    handle = SimpleNamespace(element=SimpleNamespace(input_type="file"), upload_files=AsyncMock())
+    handle = SimpleNamespace(
+        element=SimpleNamespace(input_type="file"), upload_files=AsyncMock()
+    )
     tools = SimpleNamespace(
         _browser=SimpleNamespace(
             files=files, mouse=actions.browser.input.mouse, input=actions.browser.input

@@ -56,7 +56,11 @@ def parse(text: str) -> dict:
 
 def latest(messages) -> dict | None:
     return next(
-        (parse(message.text) for message in reversed(messages) if is_observation(message.text)),
+        (
+            parse(message.text)
+            for message in reversed(messages)
+            if is_observation(message.text)
+        ),
         None,
     )
 

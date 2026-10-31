@@ -2,7 +2,10 @@
 function planScroll(el, {clip = null, targetBounds = null}) {
   const root = document.scrollingElement;
   const closedRoots = closedRootsForDocument();
-  const viewport = intersect({x: 0, y: 0, width: innerWidth, height: innerHeight}, clip);
+  const viewport = intersect(
+    {x: 0, y: 0, width: innerWidth, height: innerHeight},
+    clip,
+  );
   const containers = [];
   let pinned = false;
 
@@ -20,7 +23,10 @@ function planScroll(el, {clip = null, targetBounds = null}) {
   function axes(node) {
     const style = getComputedStyle(node);
     if (node !== root) {
-      return {x: /auto|scroll/.test(style.overflowX), y: /auto|scroll/.test(style.overflowY)};
+      return {
+        x: /auto|scroll/.test(style.overflowX),
+        y: /auto|scroll/.test(style.overflowY),
+      };
     }
     const body = getComputedStyle(document.body || root);
     const x = style.overflowX === 'visible' ? body.overflowX : style.overflowX;
@@ -35,7 +41,8 @@ function planScroll(el, {clip = null, targetBounds = null}) {
       style.position === 'fixed' ||
       (style.position === 'sticky' &&
         ((style.top !== 'auto' && box.top <= parseFloat(style.top) + 1) ||
-          (style.bottom !== 'auto' && box.bottom >= innerHeight - parseFloat(style.bottom) - 1)))
+          (style.bottom !== 'auto' &&
+            box.bottom >= innerHeight - parseFloat(style.bottom) - 1)))
     );
   }
 
@@ -69,7 +76,9 @@ function planScroll(el, {clip = null, targetBounds = null}) {
     const label = target.labels?.[0]?.getBoundingClientRect();
     const nearbyLabel = label && Math.abs(box.y - label.y) <= area.height * 0.25;
     const top = nearbyLabel ? Math.min(box.y, label.y) : box.y;
-    const group = target.closest('fieldset,form,[role="group"]')?.getBoundingClientRect();
+    const group = target
+      .closest('fieldset,form,[role="group"]')
+      ?.getBoundingClientRect();
     if (
       group &&
       group.height <= area.height * 0.8 &&
@@ -84,7 +93,9 @@ function planScroll(el, {clip = null, targetBounds = null}) {
 
   function deltas(container, target, area, scaleX, scaleY) {
     const box =
-      target === el && targetBounds ? clampTarget(targetBounds) : target.getBoundingClientRect();
+      target === el && targetBounds
+        ? clampTarget(targetBounds)
+        : target.getBoundingClientRect();
     const allowed = axes(container);
     let dx = 0;
     let dy = 0;
@@ -96,11 +107,17 @@ function planScroll(el, {clip = null, targetBounds = null}) {
     }
     dx = Math.max(
       -container.scrollLeft,
-      Math.min(container.scrollWidth - container.clientWidth - container.scrollLeft, dx),
+      Math.min(
+        container.scrollWidth - container.clientWidth - container.scrollLeft,
+        dx,
+      ),
     );
     dy = Math.max(
       -container.scrollTop,
-      Math.min(container.scrollHeight - container.clientHeight - container.scrollTop, dy),
+      Math.min(
+        container.scrollHeight - container.clientHeight - container.scrollTop,
+        dy,
+      ),
     );
     const outsideX = box.x + box.width <= area.x || box.x >= area.x + area.width;
     const outsideY = box.y + box.height <= area.y || box.y >= area.y + area.height;
@@ -127,9 +144,13 @@ function planScroll(el, {clip = null, targetBounds = null}) {
     const allowed = axes(node);
     return (
       (allowed.x && dx < 0 && node.scrollLeft > 0) ||
-      (allowed.x && dx > 0 && node.scrollLeft < node.scrollWidth - node.clientWidth - 1) ||
+      (allowed.x &&
+        dx > 0 &&
+        node.scrollLeft < node.scrollWidth - node.clientWidth - 1) ||
       (allowed.y && dy < 0 && node.scrollTop > 0) ||
-      (allowed.y && dy > 0 && node.scrollTop < node.scrollHeight - node.clientHeight - 1)
+      (allowed.y &&
+        dy > 0 &&
+        node.scrollTop < node.scrollHeight - node.clientHeight - 1)
     );
   }
 

@@ -30,7 +30,9 @@ from tests.observations import all_states, has_image
 pytestmark = pytest.mark.integration
 
 
-async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selection(site, tmp_path):
+async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selection(
+    site, tmp_path
+):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     report = workspace / "report.txt"
@@ -42,16 +44,21 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
     async def respond(request):
         nonlocal stage
         page = all_states(request.messages)[-1]
-        replies = [message for message in request.messages if isinstance(message, ToolMessage)]
+        replies = [
+            message for message in request.messages if isinstance(message, ToolMessage)
+        ]
         if stage == 2:
             assert not replies[-1].is_error
             assert (
-                await evaluate(browser.active_tab, "document.querySelector('#upload').files.length")
+                await evaluate(
+                    browser.active_tab, "document.querySelector('#upload').files.length"
+                )
                 == 1
             )
             assert (
                 await evaluate(
-                    browser.active_tab, "document.querySelector('#upload').files[0].name"
+                    browser.active_tab,
+                    "document.querySelector('#upload').files[0].name",
                 )
                 == "report.txt"
             )
@@ -60,17 +67,23 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
         if stage == 1:
             assert replies[-1].is_error and "outside" in replies[-1].text
             assert (
-                await evaluate(browser.active_tab, "document.querySelector('#upload').files.length")
+                await evaluate(
+                    browser.active_tab, "document.querySelector('#upload').files.length"
+                )
                 == 0
             )
         refs = [
-            element["ref"] for element in page["elements"] if element["name"] == "Upload report"
+            element["ref"]
+            for element in page["elements"]
+            if element["name"] == "Upload report"
         ]
         assert len(refs) == 1
         ref = refs[0]
         paths = ["report.txt", str(secret)] if stage == 0 else ["report.txt"]
         stage += 1
-        yield ModelChunk(tool_call=ToolCall("upload_files", {"ref": ref, "paths": paths}))
+        yield ModelChunk(
+            tool_call=ToolCall("upload_files", {"ref": ref, "paths": paths})
+        )
 
     agent = BrowserAgent(
         model=CallbackModel(respond),
@@ -90,9 +103,12 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
     assert result.text == "Only the workspace file was uploaded"
 
 
-async def test_downloaded_workbook_is_read_as_context_without_browser_preview(site, tmp_path):
+async def test_downloaded_workbook_is_read_as_context_without_browser_preview(
+    site, tmp_path
+):
     async with ChromeBrowser(
-        LaunchBrowser(url=site), file_system=FileSystemOptions(directory=tmp_path / "workspace")
+        LaunchBrowser(url=site),
+        file_system=FileSystemOptions(directory=tmp_path / "workspace"),
     ) as browser:
         tab = browser.active_tab
         await wait_for_page(tab)
@@ -108,14 +124,19 @@ async def test_downloaded_workbook_is_read_as_context_without_browser_preview(si
             ):
                 await asyncio.sleep(0.02)
         document = await asyncio.to_thread(
-            browser.files.read_file, downloads[-1].path, sheet="Revenue", cell_range="A1:C2"
+            browser.files.read_file,
+            downloads[-1].path,
+            sheet="Revenue",
+            cell_range="A1:C2",
         )
         assert "Voyager" in document.text and "=B2*2" in document.text
         assert document.extracted_path and Path(document.extracted_path).is_file()
         assert len(await browser.tabs()) == 1 and browser.active_tab.id == tab.id
 
 
-async def test_agent_reads_selected_workbook_cells_as_context(site, tmp_path, xlsx_document):
+async def test_agent_reads_selected_workbook_cells_as_context(
+    site, tmp_path, xlsx_document
+):
     (tmp_path / "report.xlsx").write_bytes(xlsx_document)
     stage = 0
 
@@ -125,11 +146,14 @@ async def test_agent_reads_selected_workbook_cells_as_context(site, tmp_path, xl
             stage += 1
             yield ModelChunk(
                 tool_call=ToolCall(
-                    "read_file", {"path": "report.xlsx", "sheet": "Revenue", "cell_range": "A1:C2"}
+                    "read_file",
+                    {"path": "report.xlsx", "sheet": "Revenue", "cell_range": "A1:C2"},
                 )
             )
             return
-        replies = [message for message in request.messages if isinstance(message, ToolMessage)]
+        replies = [
+            message for message in request.messages if isinstance(message, ToolMessage)
+        ]
         assert not replies[-1].is_error and "Voyager" in replies[-1].text
         assert "=B2*2" in replies[-1].text
         assert not any(
@@ -178,9 +202,12 @@ async def test_scoped_download_has_enum_state_and_namespaced_events(site, tmp_pa
         assert any(isinstance(event, DownloadCompletedEvent) for event in received)
 
 
-async def test_default_downloads_can_be_read_and_viewed_as_pdf_in_a_new_tab(site, tmp_path):
+async def test_default_downloads_can_be_read_and_viewed_as_pdf_in_a_new_tab(
+    site, tmp_path
+):
     async with ChromeBrowser(
-        LaunchBrowser(url=site), file_system=FileSystemOptions(directory=tmp_path / "workspace")
+        LaunchBrowser(url=site),
+        file_system=FileSystemOptions(directory=tmp_path / "workspace"),
     ) as browser:
         original = browser.active_tab
         await wait_for_page(original)
@@ -208,7 +235,9 @@ async def test_default_downloads_can_be_read_and_viewed_as_pdf_in_a_new_tab(site
     assert Path(downloaded.path).is_file()
 
 
-async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(site, tmp_path):
+async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(
+    site, tmp_path
+):
     stage = 0
     original_tab = ""
     downloaded_path = ""
@@ -221,7 +250,9 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(si
             for message in request.messages
             if message.text.startswith("file_system:\n")
         ][-1]
-        replies = [message for message in request.messages if isinstance(message, ToolMessage)]
+        replies = [
+            message for message in request.messages if isinstance(message, ToolMessage)
+        ]
         assert all(not reply.is_error for reply in replies)
         if stage == 0:
             assert {
@@ -232,7 +263,11 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(si
                 "open_downloaded_file",
             } <= {item.name for item in request.tools}
             original_tab = page["page"]["tab"]
-            link = [element for element in page["elements"] if element["name"] == "Download PDF"][0]
+            link = [
+                element
+                for element in page["elements"]
+                if element["name"] == "Download PDF"
+            ][0]
             tool_call = ToolCall("click", {"ref": link["ref"]})
         elif stage == 1:
             downloads = files["downloads"]
@@ -240,7 +275,9 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(si
                 yield ModelChunk(tool_call=ToolCall("list_downloads", {}))
                 return
             downloaded_path = downloads[-1]["path"]
-            tool_call = ToolCall("read_file", {"path": downloaded_path, "page_number": 2})
+            tool_call = ToolCall(
+                "read_file", {"path": downloaded_path, "page_number": 2}
+            )
         elif stage == 2:
             assert "Second page: Voyager 2" in replies[-1].text
             tool_call = ToolCall(
@@ -261,7 +298,8 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(si
         elif stage == 5:
             assert page["page"]["tab"] == original_tab
             tool_call = ToolCall(
-                "write_file", {"path": "notes/summary.md", "content": "Voyager 2 research"}
+                "write_file",
+                {"path": "notes/summary.md", "content": "Voyager 2 research"},
             )
         elif stage == 6:
             tool_call = ToolCall("read_file", {"path": "notes/summary.md"})
@@ -279,7 +317,9 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(si
         file_system=FileSystemOptions(directory=tmp_path / "workspace"),
         approvals=Approvals(default=PolicyDecision.ALLOW),
     )
-    result = await agent.run("Download the PDF, inspect it and save notes", max_steps=30)
+    result = await agent.run(
+        "Download the PDF, inspect it and save notes", max_steps=30
+    )
     assert result.text == "PDF inspected and notes saved"
     assert (tmp_path / "workspace/notes/summary.md").read_text() == "Voyager 2 research"
 
@@ -294,7 +334,9 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
     async def respond(request):
         nonlocal stage, original_tab
         page = all_states(request.messages)[-1]["page"]
-        replies = [message for message in request.messages if isinstance(message, ToolMessage)]
+        replies = [
+            message for message in request.messages if isinstance(message, ToolMessage)
+        ]
         assert all(not reply.is_error for reply in replies)
         if stage == 0:
             original_tab = page["tab"]

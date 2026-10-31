@@ -1,7 +1,15 @@
 import json
 
 import pytest
-from harnessed import Context, Inject, Plugin, PolicyDecision, ToolCall, ToolStatus, hook
+from harnessed import (
+    Context,
+    Inject,
+    Plugin,
+    PolicyDecision,
+    ToolCall,
+    ToolStatus,
+    hook,
+)
 from harnessed.events import ToolCallFinishedEvent, ToolExecutionFinishedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
 from harnessed.models import ModelChunk
@@ -39,8 +47,14 @@ async def test_form_edits_and_submit_chain_without_cosmetic_interruptions(site):
             ("click", {"ref": refs["Submit"]}),
         ],
     )
-    assert values == {"email": "person@example.org", "password": "secret", "clicked": "yes"}
-    assert all(reply.status is ToolStatus.OK and not reply.break_chain for reply in replies)
+    assert values == {
+        "email": "person@example.org",
+        "password": "secret",
+        "clicked": "yes",
+    }
+    assert all(
+        reply.status is ToolStatus.OK and not reply.break_chain for reply in replies
+    )
 
 
 async def test_typing_reveals_existing_suggestions_and_skips_submit(site):
@@ -61,7 +75,9 @@ async def test_typing_reveals_existing_suggestions_and_skips_submit(site):
     assert replies[0].break_chain and replies[1].status is ToolStatus.SKIPPED
     assert "Text entered" in replies[0].text
     assert not any(e.name == "Suggested address" for e in holder["delivered"].elements)
-    assert any(e.new and e.name == "Suggested address" for e in holder["after"].elements)
+    assert any(
+        e.new and e.name == "Suggested address" for e in holder["after"].elements
+    )
 
 
 async def test_hover_reveals_menu_without_dispatching_click(site):
@@ -88,7 +104,15 @@ async def test_hover_reveals_menu_without_dispatching_click(site):
 
 @pytest.mark.parametrize(
     "first",
-    ["navigate", "move_mouse", "click_at", "scroll", "screenshot", "wait", "execute_javascript"],
+    [
+        "navigate",
+        "move_mouse",
+        "click_at",
+        "scroll",
+        "screenshot",
+        "wait",
+        "execute_javascript",
+    ],
 )
 async def test_static_boundaries_skip_following_browser_calls(site, first):
     arguments = {
@@ -128,7 +152,8 @@ async def test_click_navigation_dynamically_stops_a_chainable_tool(site):
 
 async def test_right_click_stops_following_input_even_without_a_page_change(site):
     markup = (
-        _FORM + "<script>document.addEventListener('contextmenu',e=>e.preventDefault())</script>"
+        _FORM
+        + "<script>document.addEventListener('contextmenu',e=>e.preventDefault())</script>"
     )
     values, replies, _, _ = await _run(
         site,
@@ -155,7 +180,9 @@ async def test_invalid_input_persists_chain_break_before_skipping_submit(site):
     assert values["clicked"] is None
     assert replies[0].status is ToolStatus.ERROR and replies[0].break_chain
     assert replies[1].status is ToolStatus.SKIPPED
-    receipt = next(e for e in result.events if isinstance(e, ToolExecutionFinishedEvent))
+    receipt = next(
+        e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)
+    )
     assert receipt.result.break_chain
 
 
@@ -175,9 +202,13 @@ async def test_tab_actions_keep_their_distinct_kinds_in_durable_receipts(site):
             yield ModelChunk(tool_call=ToolCall("open_tab", {"url": site + "/other"}))
         elif step == 2:
             holder["second"] = holder["browser"].active_tab.id
-            yield ModelChunk(tool_call=ToolCall("switch_tab", {"target_id": holder["first"]}))
+            yield ModelChunk(
+                tool_call=ToolCall("switch_tab", {"target_id": holder["first"]})
+            )
         elif step == 3:
-            yield ModelChunk(tool_call=ToolCall("close_tab", {"target_id": holder["second"]}))
+            yield ModelChunk(
+                tool_call=ToolCall("close_tab", {"target_id": holder["second"]})
+            )
         else:
             yield ModelChunk(text="Done")
 
@@ -201,8 +232,12 @@ async def test_reserved_final_summary_uses_effective_limit_and_remains_incomplet
 
     class Progress(Plugin):
         @hook(PreStep)
-        async def before(self, event: PreStep, next_: Next[StepDecision]) -> StepDecision:
-            progress.append((event.max_steps, event.remaining_steps, event.is_final_step))
+        async def before(
+            self, event: PreStep, next_: Next[StepDecision]
+        ) -> StepDecision:
+            progress.append(
+                (event.max_steps, event.remaining_steps, event.is_final_step)
+            )
             return await next_()
 
     model = ScriptedModel(["Partial browser findings"])
@@ -225,9 +260,13 @@ async def _run(site, markup, plan):
     holder, observations = {}, []
 
     class Page(Plugin, needs=(Browser, Observe)):
-        async def setup(self, _ctx: Context, browser: Inject[Browser], observe: Inject[Observe]):
+        async def setup(
+            self, _ctx: Context, browser: Inject[Browser], observe: Inject[Observe]
+        ):
             holder.update(browser=browser, observe=observe)
-            await evaluate(browser.active_tab, f"document.body.innerHTML={json.dumps(markup)}")
+            await evaluate(
+                browser.active_tab, f"document.body.innerHTML={json.dumps(markup)}"
+            )
 
         @hook(ObservationCapturedEvent)
         async def observed(self, event: ObservationCapturedEvent):
@@ -263,7 +302,9 @@ async def _run(site, markup, plan):
             "clicked:document.querySelector('#submit')?.dataset.clicked ?? null})",
         )
         holder["after"] = holder["observe"].snapshot
-        replies = [e.result for e in result.events if isinstance(e, ToolCallFinishedEvent)]
+        replies = [
+            e.result for e in result.events if isinstance(e, ToolCallFinishedEvent)
+        ]
         assert result.text == "Done"
         # Probes must not publish extra snapshots or consume the next observation's new markers.
         assert len(observations) == 2

@@ -33,7 +33,9 @@ async def test_agent_go_forward_reports_success_and_missing_or_replaced_history(
     )
     result = await agent.run("Navigate through history", max_steps=9)
     assert result.text == "Done"
-    replies = [msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)]
+    replies = [
+        msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)
+    ]
     assert [reply.is_error for reply in replies] == [
         True,
         False,
@@ -48,7 +50,9 @@ async def test_agent_go_forward_reports_success_and_missing_or_replaced_history(
     for index in (0, 4, 7):
         assert "Cannot go forward: no next history entry" in replies[index].text
         assert "may have run" not in replies[index].text
-    navigations = [event for event in result.events if isinstance(event, ActionFinishedEvent)]
+    navigations = [
+        event for event in result.events if isinstance(event, ActionFinishedEvent)
+    ]
     assert [event.after_url for event in navigations] == [
         site + "/other",
         site + "/",
@@ -56,5 +60,7 @@ async def test_agent_go_forward_reports_success_and_missing_or_replaced_history(
         site + "/",
         site + "/canvas",
     ]
-    failures = [event for event in result.events if isinstance(event, ActionFailedEvent)]
+    failures = [
+        event for event in result.events if isinstance(event, ActionFailedEvent)
+    ]
     assert len(failures) == 3 and all(not event.dispatched for event in failures)

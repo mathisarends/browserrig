@@ -30,7 +30,9 @@ async def test_profile_cleanup_retries_transient_errors_and_retains_ownership(
     assert profile.cleanup.call_count == 2
 
 
-async def test_profile_cleanup_propagates_unexpected_errors_and_retains_ownership() -> None:
+async def test_profile_cleanup_propagates_unexpected_errors_and_retains_ownership() -> (
+    None
+):
     process = ChromeProcess(LaunchBrowser())
     profile = Mock()
     error = OSError(errno.EIO, "disk failure")
@@ -48,7 +50,11 @@ async def test_profile_cleanup_propagates_unexpected_errors_and_retains_ownershi
 
 def test_startup_retries_locked_and_incomplete_port_file():
     path = Mock()
-    path.read_text.side_effect = [PermissionError(), "9222\n", "9222\n/devtools/browser/test\n"]
+    path.read_text.side_effect = [
+        PermissionError(),
+        "9222\n",
+        "9222\n/devtools/browser/test\n",
+    ]
     assert _active_endpoint(path) is None
     assert _active_endpoint(path) is None
     assert _active_endpoint(path) == "ws://127.0.0.1:9222/devtools/browser/test"

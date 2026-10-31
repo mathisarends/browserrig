@@ -43,7 +43,9 @@ async def discover_frames(
     target_map = {info.target_id: info for info in targets if info.type == "iframe"}
     seen = {root.frame.id}
 
-    async def visit(tree: FrameTree, parent: Frame, session_space: FrameTransform, depth: int):
+    async def visit(
+        tree: FrameTree, parent: Frame, session_space: FrameTransform, depth: int
+    ):
         children: dict[str, FrameTree | None] = {
             child.frame.id: child for child in tree.child_frames or ()
         }
@@ -71,22 +73,34 @@ async def discover_frames(
                         child = replace(child, document_id=child_tree.frame.loader_id)
                 result.append(child)
                 if child_tree is not None:
-                    child_space = child.transform if frame_id in target_map else session_space
+                    child_space = (
+                        child.transform if frame_id in target_map else session_space
+                    )
                     await visit(child_tree, child, child_space, depth + 1)
             except (CDPCommandError, BrowserError, TimeoutError, ValueError):
-                limitations.append(f"Frame {frame_id} changed or could not be inspected")
+                limitations.append(
+                    f"Frame {frame_id} changed or could not be inspected"
+                )
 
-    async def inspect(frame_id: str, parent: Frame, space: FrameTransform) -> Frame | None:
+    async def inspect(
+        frame_id: str, parent: Frame, space: FrameTransform
+    ) -> Frame | None:
         owner = await parent.cdp.dom.get_frame_owner(frame_id=frame_id)
         child = Frame(
-            frame_id, parent.cdp, parent=parent, owner_id=owner.backend_node_id, worlds=tab.worlds
+            frame_id,
+            parent.cdp,
+            parent=parent,
+            owner_id=owner.backend_node_id,
+            worlds=tab.worlds,
         )
         size = await child.run_on_owner(OWNER_SIZE)
         if not size or min(size) <= 0:
             return None
         box = await parent.cdp.dom.get_box_model(backend_node_id=owner.backend_node_id)
         transform = space.child(box.model.content, *size)
-        visible = transform.bounds_to_viewport(Bounds(x=0, y=0, width=size[0], height=size[1]))
+        visible = transform.bounds_to_viewport(
+            Bounds(x=0, y=0, width=size[0], height=size[1])
+        )
         visible = visible.intersect(parent.visible or viewport)
         # BoxModel quads are relative to the CDP session's root, not the parent frame.
         cdp = await session_for(frame_id) if frame_id in target_map else parent.cdp
@@ -96,5 +110,7 @@ async def discover_frames(
         async with asyncio.timeout(10):
             await visit(root, result[0], FrameTransform(), 0)
     except TimeoutError:
-        limitations.append("Frame discovery timed out; some frames could not be inspected")
+        limitations.append(
+            "Frame discovery timed out; some frames could not be inspected"
+        )
     return tuple(result), tuple(dict.fromkeys(limitations))

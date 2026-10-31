@@ -24,7 +24,12 @@ from pydantic import Field
 from browserrig.browser.base import Browser, BrowserEvents
 from browserrig.browser.tab import Tab
 from browserrig.core.errors import BrowserError
-from browserrig.core.kinds import ActionKind, FileSource, FileTransferDirection, ReadinessPhase
+from browserrig.core.kinds import (
+    ActionKind,
+    FileSource,
+    FileTransferDirection,
+    ReadinessPhase,
+)
 from browserrig.core.tools import browser_tool as tool
 from browserrig.events import (
     FILE_EVENTS,
@@ -116,7 +121,9 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
         limit: Annotated[int, Field(ge=1, le=200)] = 100,
     ) -> FileListing:
         files = self._files()
-        listing = await _file_call(lambda: files.list_files(path, offset=offset, limit=limit))
+        listing = await _file_call(
+            lambda: files.list_files(path, offset=offset, limit=limit)
+        )
         await self._events.emit(
             FilesListedEvent(
                 directory=listing.directory,
@@ -183,8 +190,14 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
             content = await read
         except (ToolError, asyncio.CancelledError) as error:
             # Viewers must never keep a reading indicator for a read that ended.
-            reason = "Read cancelled" if isinstance(error, asyncio.CancelledError) else str(error)
-            await self._events.emit(FileReadFailedEvent(read_id=read_id, path=path, reason=reason))
+            reason = (
+                "Read cancelled"
+                if isinstance(error, asyncio.CancelledError)
+                else str(error)
+            )
+            await self._events.emit(
+                FileReadFailedEvent(read_id=read_id, path=path, reason=reason)
+            )
             raise
         await self._events.emit(
             FileReadFinishedEvent(
@@ -209,7 +222,9 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
         enabled=has_files,
         description="Save UTF-8 text in the workspace. Existing files require overwrite=true.",
     )
-    async def write_file(self, path: str, content: str, overwrite: bool = False) -> FileEntry:
+    async def write_file(
+        self, path: str, content: str, overwrite: bool = False
+    ) -> FileEntry:
         files = self._files()
 
         def write() -> tuple[FileEntry, bool]:
@@ -218,7 +233,9 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
 
         entry, created = await _file_call(write)
         size = entry.size if entry.size is not None else len(content.encode("utf-8"))
-        await self._events.emit(FileWrittenEvent(path=entry.path, size=size, created=created))
+        await self._events.emit(
+            FileWrittenEvent(path=entry.path, size=size, created=created)
+        )
         return entry
 
     @tool(
@@ -242,11 +259,17 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
         downloads = await self._browser.downloads()
         download = next((item for item in downloads if item.id == download_id), None)
         if download is None:
-            raise ToolError("Unknown download ID; use list_downloads to find available downloads")
+            raise ToolError(
+                "Unknown download ID; use list_downloads to find available downloads"
+            )
         if download.state != DownloadState.COMPLETED:
-            raise ToolError(f"Download is {download.state}; only completed downloads can be opened")
+            raise ToolError(
+                f"Download is {download.state}; only completed downloads can be opened"
+            )
         if download.error or download.path is None:
-            raise ToolError(download.error or "Download has no accessible path; download it again")
+            raise ToolError(
+                download.error or "Download has no accessible path; download it again"
+            )
         download_path = download.path
         resolved = await _file_call(lambda: self._files().resolve(download_path))
         if not await asyncio.to_thread(resolved.is_file):
@@ -258,11 +281,15 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
     def _files(self) -> FileSystem:
         files = self._browser.files
         if files is None:
-            raise ToolError("A shared local file system must be configured for this browser")
+            raise ToolError(
+                "A shared local file system must be configured for this browser"
+            )
         return files
 
     @hook(PreStep)
-    async def _before_step(self, event: PreStep, next_: Next[StepDecision]) -> StepDecision:
+    async def _before_step(
+        self, event: PreStep, next_: Next[StepDecision]
+    ) -> StepDecision:
         files = self._browser.files
         downloads = await self._browser.downloads()
         state = FileSystemState(
@@ -280,7 +307,9 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
         delivery = self._delivery
         # Resend only changes, or when the model no longer sees the last copy (e.g. compaction).
         if not (delivery.visible and delivery.sent == ref):
-            event.session.observe(Observation(source=_SOURCE, content=content, refs=(ref,)))
+            event.session.observe(
+                Observation(source=_SOURCE, content=content, refs=(ref,))
+            )
             delivery.sent, delivery.visible = ref, False
         return await next_()
 
@@ -288,7 +317,8 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
     async def _included(self, event: ObservationsIncludedEvent) -> None:
         delivery = self._delivery
         delivery.visible = any(
-            item.source == _SOURCE and delivery.sent in item.refs for item in event.observations
+            item.source == _SOURCE and delivery.sent in item.refs
+            for item in event.observations
         )
 
     async def _open(
@@ -343,13 +373,17 @@ class UploadTools(Plugin, needs=(Actions, Browser, BrowserEvents, Observe)):
                 raise BrowserError("Target is not a file input")
             files = self._browser.files
             if files is None:
-                raise ToolError("Uploads require a shared local file system for this browser")
+                raise ToolError(
+                    "Uploads require a shared local file system for this browser"
+                )
             selected.extend(await _file_call(lambda: files.upload_paths(paths)))
 
         async def upload(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
             await self._browser.mouse.move_to(point)
-            await self._browser.input.transfer(FileTransferDirection.UPLOAD, tuple(selected), point)
+            await self._browser.input.transfer(
+                FileTransferDirection.UPLOAD, tuple(selected), point
+            )
             await (await self._observe.element(tab, ref)).upload_files(selected)
             await self._events.emit(
                 FilesUploadedEvent(

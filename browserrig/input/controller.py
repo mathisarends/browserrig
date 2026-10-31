@@ -53,7 +53,11 @@ class Input:
         await self._emit(
             focused(self._focus),
             HighlightElementEvent(
-                ref=ref, x=bounds.x, y=bounds.y, width=bounds.width, height=bounds.height
+                ref=ref,
+                x=bounds.x,
+                y=bounds.y,
+                width=bounds.width,
+                height=bounds.height,
             ),
         )
 
@@ -100,7 +104,9 @@ class Input:
                 started = monotonic()
                 await self._emit(
                     target,
-                    BarTypedEvent(browser_bar=browser_bar, key=key, text=typed, duration=interval),
+                    BarTypedEvent(
+                        browser_bar=browser_bar, key=key, text=typed, duration=interval
+                    ),
                 )
                 if after_key is not None and key != "Enter":
                     await after_key(typed)
