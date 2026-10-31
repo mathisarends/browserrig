@@ -49,7 +49,10 @@ async def capture(
     """
     if isinstance(mode, DomMode):
         strategy = DomCapture(
-            max_elements=mode.max_elements, max_text_chars=mode.max_text_chars, marks=mode.marks
+            max_elements=mode.max_elements,
+            max_text_chars=mode.max_text_chars,
+            sparse_text_chars=mode.sparse_text_chars,
+            marks=mode.marks,
         )
         screenshots = mode.screenshots if screenshots is None else screenshots
     else:
@@ -71,6 +74,7 @@ async def capture(
             fingerprint="dialog",
             tabs=tabs,
             text=f"Open {tab.dialog[0]} dialog: {tab.dialog[1]}",
+            cursor=cursor,
         )
     await tab.sync_document()
     document_id = tab.document_id
@@ -108,6 +112,7 @@ async def capture(
         limitations=page.limitations,
         image=image,
         geometry=content.geometry,
+        cursor=cursor,
     )
 
 
@@ -149,13 +154,27 @@ class DomCapture:
     provides_dom_refs = True
 
     def __init__(
-        self, *, max_elements: int | None = None, max_text_chars: int = 0, marks: bool = True
+        self,
+        *,
+        max_elements: int | None = None,
+        max_text_chars: int = 0,
+        sparse_text_chars: int = DomMode().sparse_text_chars,
+        marks: bool = True,
     ) -> None:
-        self._mode = DomMode(max_elements=max_elements, max_text_chars=max_text_chars, marks=marks)
+        self._mode = DomMode(
+            max_elements=max_elements,
+            max_text_chars=max_text_chars,
+            sparse_text_chars=sparse_text_chars,
+            marks=marks,
+        )
 
     @property
     def max_text_chars(self) -> int:
         return self._mode.max_text_chars
+
+    @property
+    def sparse_text_chars(self) -> int:
+        return self._mode.sparse_text_chars
 
     @property
     def marks(self) -> bool:
@@ -173,7 +192,10 @@ class DomCapture:
     ) -> CaptureContent:
         frames = await tab.frames()
         page = await extract(
-            frames, max_elements=self._mode.max_elements, max_text=self._mode.max_text_chars
+            frames,
+            max_elements=self._mode.max_elements,
+            max_text=self._mode.max_text_chars,
+            sparse_text=self._mode.sparse_text_chars,
         )
         page.limitations = tuple(dict.fromkeys((*tab.frame_limitations, *page.limitations)))
         if not screenshots:

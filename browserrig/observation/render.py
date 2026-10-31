@@ -64,6 +64,7 @@ def _header(snapshot: Snapshot) -> list[str]:
                 f" ({above:.1f} pages above, {below / snapshot.height:.1f} below)"
             )
         lines.append(viewport)
+    lines.append(_cursor(snapshot))
     if snapshot.readiness != ReadinessStatus.READY:
         lines.append(f"readiness: {snapshot.readiness}")
     if snapshot.image and snapshot.geometry:
@@ -88,6 +89,14 @@ def _body(snapshot: Snapshot) -> list[str]:
     if covered:
         lines.extend(("", f"covered by an overlay: {_summary(covered)}"))
     return lines
+
+
+def _cursor(snapshot: Snapshot) -> str:
+    """The pointer position matters for hover, scroll and coordinate tools without an image."""
+    cursor = snapshot.cursor
+    if cursor is None:
+        return "cursor: not in this tab yet"
+    return f"cursor: x={cursor.x:.0f} y={cursor.y:.0f} (viewport CSS pixels)"
 
 
 def _region(snapshot: Snapshot) -> str:
@@ -184,6 +193,10 @@ def _element(element: Element, url: str) -> str:
     link = _link(element.href, url)
     if link:
         parts.append(f"-> {link}")
+    elif not element.name and element.bounds is not None and element.value is None:
+        # Without a name, size and place are what tell icons, tiles and wrappers apart.
+        bounds = element.bounds
+        parts.append(f"x={bounds.x:.0f} y={bounds.y:.0f} {bounds.width:.0f}x{bounds.height:.0f}")
     return " ".join(parts)
 
 

@@ -220,10 +220,11 @@ class _FrameExtractor:
     def _candidate(self, index: int, tag: str) -> bool | None:
         """True for semantic controls, False for generic clickable boxes, None otherwise."""
         document = self._document
+        listed_option = tag == "option" and document.tag(document.parent(index)) in _OPTION_PARENTS
+        if listed_option or self._decorative(index):
+            return None
         if tag in _NATIVE_TAGS:
             return self._native(index, tag)
-        if tag == "option" and document.tag(document.parent(index)) in _OPTION_PARENTS:
-            return None
         if index in self._marked:
             if semantics.role(document, index) in semantics.INTERACTIVE_ROLES:
                 return True
@@ -232,6 +233,20 @@ class _FrameExtractor:
         if index in document.clickable or self._pointer(index):
             return False
         return None
+
+    def _decorative(self, index: int) -> bool:
+        """Hidden from assistive technology and taken out of the focus order on purpose.
+
+        Sites do this to duplicates such as an image link beside its title link or a styled
+        box over a native select; Chrome's accessibility tree omits them too.
+        """
+        document = self._document
+        if document.attributes(index).get("tabindex", "").strip() != "-1":
+            return False
+        return any(
+            document.attributes(node).get("aria-hidden", "").strip().lower() == "true"
+            for node in (index, *document.ancestors(index))
+        )
 
     def _native(self, index: int, tag: str) -> bool | None:
         attributes = self._document.attributes(index)
@@ -338,7 +353,8 @@ class _FrameExtractor:
             frame_id=self._frame_id,
             backend_id=document.backend_ids[index],
             role=role,
-            name=document.text(index)
+            # A label standing in for its control is named like the control.
+            name=semantics.name(document, control, role) or document.text(index)
             if control is not None
             else semantics.name(document, index, role),
             tag=document.tag(index),
@@ -563,7 +579,10 @@ class _FrameExtractor:
         parts: list[str] = []
         length = 0
         for node, value, rect in document.text_runs():
-            if visible_area(document, document.parent(node), rect, self._viewport) is None:
+            parent = document.parent(node)
+            area = visible_area(document, parent, rect, self._viewport)
+            # Text under an overlay is not what the page shows.
+            if area is None or self._occluded(parent, area):
                 continue
             parts.append(value)
             length += len(value) + 1

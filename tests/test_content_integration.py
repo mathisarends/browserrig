@@ -45,7 +45,7 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
         """,
         )
         report = await wait_for_page(tab)
-        snapshot = await capture(tab, DomMode(), report)
+        snapshot = await capture(tab, DomMode(sparse_text_chars=0), report)
         assert snapshot.image is None
         assert snapshot.text == ""
         assert not snapshot.limitations

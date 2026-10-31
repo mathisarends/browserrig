@@ -17,6 +17,8 @@ type Rect = tuple[float, float, float, float]
 
 _ELEMENT, _TEXT = 1, 3
 _WHITESPACE = re.compile(r"\s+")
+# Icon-font glyphs sit in the Unicode Private Use Areas and read as nothing.
+_ICON_GLYPHS = re.compile("[\ue000-\uf8ff\U000f0000-\U0010fffd]")
 _UNBOUNDED = 1e9
 _NO_TEXT = frozenset(
     {"script", "style", "noscript", "template", "head", "title", "select", "option", "textarea"}
@@ -27,7 +29,7 @@ _REPLACED = frozenset({"img", "svg", "input"})
 
 
 def clean(text: str, limit: int = 150) -> str:
-    return _WHITESPACE.sub(" ", text).strip()[:limit]
+    return _WHITESPACE.sub(" ", _ICON_GLYPHS.sub("", text)).strip()[:limit]
 
 
 def intersect(a: Rect, b: Rect | None) -> Rect:

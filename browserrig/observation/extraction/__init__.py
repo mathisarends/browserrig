@@ -27,6 +27,7 @@ from .styles import STYLES
 __all__ = ["Extraction", "extract"]
 
 _TIMEOUT = 5
+SPARSE_CONTROLS = 5
 
 
 @dataclass(slots=True)
@@ -48,9 +49,13 @@ class Extraction:
 
 
 async def extract(
-    frames: tuple[Frame, ...], *, max_elements: int | None, max_text: int
+    frames: tuple[Frame, ...], *, max_elements: int | None, max_text: int, sparse_text: int = 0
 ) -> Extraction:
-    """Extract all frames; `frames[0]` must be the main frame."""
+    """Extract all frames; `frames[0]` must be the main frame.
+
+    `sparse_text` raises the visible-text limit when the viewport shows fewer than
+    `SPARSE_CONTROLS` named controls, so pages that are mostly text still read as text.
+    """
     main = frames[0]
     sessions = _sessions(frames)
     snapshots, focused = await asyncio.gather(
@@ -76,7 +81,9 @@ async def extract(
         for frame, value in zip(_session_roots(frames), focused, strict=True)
         if isinstance(value, int)
     }
-    extraction = _Assembler(frames, documents, focus, limitations).run(max_elements, max_text)
+    extraction = _Assembler(frames, documents, focus, limitations).run(
+        max_elements, max_text, sparse_text
+    )
     names = await chrome_names({frame.id: frame.cdp for frame in frames}, extraction.elements)
     if names:
         extraction.elements = tuple(
@@ -107,14 +114,23 @@ class _Assembler:
         self._keys: dict[str, tuple[int, ...]] = {}
         self._covered: set[str] = set()
 
-    def run(self, max_elements: int | None, max_text: int) -> Extraction:
+    def run(self, max_elements: int | None, max_text: int, sparse_text: int) -> Extraction:
         main = self._frames[0]
         document = self._documents.get(main.id)
         if document is None:
             raise BrowserError("Page snapshot missed the main document; observe again")
         for frame in self._frames:
-            self._extract(frame, max_text)
-        elements, headings, text = self._merge(max_text)
+            self._extract(frame, max(max_text, sparse_text))
+        elements, headings, text = self._merge()
+        # Nameless tiles and icons say nothing, so they do not count as controls.
+        shown = sum(element.in_viewport and bool(element.name) for element in elements)
+        limit = max_text if shown >= SPARSE_CONTROLS else max(max_text, sparse_text)
+        if len(text) > limit:
+            if limit:
+                self._limitations.append(
+                    f"Page text truncated to {limit} characters; extract_content reads it all"
+                )
+            text = text[:limit]
         elements = self._limit(elements, max_elements)
         visible = main.visible
         return Extraction(
@@ -186,7 +202,7 @@ class _Assembler:
             self._prefixes[session_id] = f"f{len(self._prefixes) + 1}:"
         return self._prefixes[session_id]
 
-    def _merge(self, max_text: int) -> tuple[list[Element], list[Heading], str]:
+    def _merge(self) -> tuple[list[Element], list[Heading], str]:
         ordered: list[tuple[tuple[int, ...], Element | Heading]] = []
         texts: list[str] = []
         for frame in self._frames:
@@ -206,11 +222,7 @@ class _Assembler:
                 elements.append(item.model_copy(update={"order": order}))
             else:
                 headings.append(item.model_copy(update={"order": order}))
-        text = "\n".join(texts)
-        if len(text) > max_text:
-            text = text[:max_text]
-            self._limitations.append(f"Page text truncated to {max_text} characters")
-        return elements, headings, text
+        return elements, headings, "\n".join(texts)
 
     def _limit(self, elements: list[Element], max_elements: int | None) -> list[Element]:
         if max_elements is None or len(elements) <= max_elements:

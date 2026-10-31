@@ -79,12 +79,14 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         self.capture_strategy = capture or DomCapture(
             max_elements=self.mode.max_elements,
             max_text_chars=self.mode.max_text_chars,
+            sparse_text_chars=self.mode.sparse_text_chars,
             marks=self.mode.marks,
         )
         if renderer is None:
             if isinstance(self.capture_strategy, DomCapture):
                 renderer = DomRenderer(
                     max_text_chars=self.capture_strategy.max_text_chars,
+                    sparse_text_chars=self.capture_strategy.sparse_text_chars,
                     marks=self.capture_strategy.marks,
                 )
             else:

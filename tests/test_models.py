@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from browserrig.activity.models import TimeRange, inference_only
 from browserrig.browser.config import BrowserKind, ConnectBrowser, LaunchBrowser
 from browserrig.core.errors import StaleElement
-from browserrig.core.geometry import Bounds, Geometry, Region
+from browserrig.core.geometry import Bounds, Geometry, Point, Region
 from browserrig.events import ActivityFinishedEvent
 from browserrig.kinds import ActivityKind, ActivityOutcome
 from browserrig.observation.models import (
@@ -83,6 +83,10 @@ def test_render_merges_link_headings_and_unwraps_search_redirects():
 def test_render_lists_only_the_viewport_and_reports_modal():
     snapshot = _snapshot(_element("1", 0), modal=Modal(role="dialog", name="Cookies"))
     text = render(snapshot)
+    assert "cursor: not in this tab yet" in text
+    assert "cursor: x=640 y=13 (viewport CSS pixels)" in render(
+        snapshot.model_copy(update={"cursor": Point(x=640.2, y=12.6)})
+    )
     assert 'modal: dialog "Cookies" is open; interact with it first' in text
     assert "[1] button" in text and "[2]" not in text and "below viewport" not in text
     assert "scroll 0 of 4000px (0.0 pages above, 4.0 below)" in text

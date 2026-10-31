@@ -1,5 +1,6 @@
 import base64
 import json
+import re
 from io import BytesIO
 
 import pytest
@@ -94,12 +95,20 @@ async def test_element_names_come_from_chrome_accessibility_tree(site):
             <a href='/price'><span style='position:absolute;clip:rect(0 0 0 0)'>7,99 €</span>
                 <span aria-hidden=true>7<sup>99</sup></span> per piece</a>
             <a href='/home' style='text-transform:uppercase'>Home</a>
-            <label><input type=radio name=size>Small</label>`;
+            <label><input type=radio name=size>Small</label>
+            <label><input type=checkbox style='opacity:0;position:absolute'
+                aria-labelledby=prime><i></i></label><span id=prime>Prime</span>
+            <a href='/duplicate' aria-hidden=true tabindex=-1><img alt='Duplicate'
+                width=20 height=20></a>
+            <div tabindex=0 style='width:50px;height:40px'></div>`;
         """,
         )
         report = await wait_for_page(tab)
-        names = {element.name for element in (await capture(tab, DomMode(), report)).elements}
-    assert {"Close", "Search the web", "7,99 € per piece", "Home", "Small"} <= names
+        state = await capture(tab, DomMode(), report)
+    names = {element.name for element in state.elements}
+    assert {"Close", "Search the web", "7,99 € per piece", "Home", "Small", "Prime"} <= names
+    assert "Duplicate" not in names
+    assert re.search(r"\] div x=\d+ y=\d+ 50x40$", render(state), flags=re.M)
 
 
 @pytest.mark.parametrize("marks", [False, True])
@@ -187,9 +196,49 @@ async def test_limits_are_reported_and_checkbox_state_changes_fingerprint(site):
         await evaluate(
             tab, "document.body.innerHTML = '<button>First</button><button>Second</button>'"
         )
-        limited = await capture(tab, DomMode(max_elements=1, max_text_chars=2), report)
+        limited = await capture(
+            tab, DomMode(max_elements=1, max_text_chars=2, sparse_text_chars=0), report
+        )
         assert len(limited.elements) == 1 and len(limited.text) <= 2
         assert any("truncated" in limitation for limitation in limited.limitations)
+
+
+async def test_visible_text_is_shown_only_when_the_viewport_holds_few_controls(site):
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        report = await wait_for_page(tab)
+        await evaluate(
+            tab,
+            """document.body.innerHTML = `<h1>Access denied</h1>
+            <p>Your request was blocked.</p><a href='/help'>Help</a>
+            <p style='position:absolute;top:3000px'>Below the fold</p>`""",
+        )
+        sparse = await capture(tab, DomMode(), report)
+        assert "Your request was blocked." in sparse.text and "Below the fold" not in sparse.text
+        assert "page text:" in render(sparse)
+        await evaluate(
+            tab,
+            "document.body.insertAdjacentHTML('beforeend', '<button>Go</button>'.repeat(5))",
+        )
+        busy = await capture(tab, DomMode(), report, previous=sparse)
+        assert busy.text == "" and busy.fingerprint != sparse.fingerprint
+
+
+async def test_challenge_overlay_reads_its_text_but_not_the_page_beneath(site):
+    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+        tab = browser.active_tab
+        report = await wait_for_page(tab)
+        tiles = "<div tabindex=0 style='width:60px;height:60px'></div>" * 6
+        markup = f"""<p>Hidden results</p><a href='/a'>Result</a>
+            <div style='position:fixed;inset:0;background:white'>
+            <p>Select every square with a duck</p>{tiles}
+            <button>\ue900</button><button>Submit</button></div>"""
+        await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
+        state = await capture(tab, DomMode(), report)
+        assert "Select every square with a duck" in state.text
+        assert "Hidden results" not in state.text
+        glyph = next(e for e in state.elements if e.in_viewport and e.tag == "button")
+        assert glyph.name == ""
 
 
 async def test_partially_covered_element_uses_exposed_hit_point(site):

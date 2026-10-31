@@ -335,7 +335,9 @@ including during subsequent text-only steps until compaction removes its snapsho
 `observe()` refreshes page state. Use
 `DomMode(screenshots=True)` to enable images on every step.
 `DomMode(max_text_chars=N)` enables a page-text excerpt; its
-default is `0`.
+default is `0`. When the viewport holds fewer than five named controls, as on error, challenge
+and confirmation pages, observations add up to `sparse_text_chars` (default `1500`)
+characters of visible text anyway. Every observation states where the mouse rests.
 
 An observation looks like this:
 
@@ -344,6 +346,7 @@ An observation looks like this:
 url: https://shop.example/checkout
 tab: 3F2A9C...
 viewport: 1280x800, scroll 0 of 2400px (0.0 pages above, 2.0 below)
+cursor: x=640 y=412 (viewport CSS pixels)
 modal: dialog "Cookie settings" is open; interact with it first
 
 in viewport:

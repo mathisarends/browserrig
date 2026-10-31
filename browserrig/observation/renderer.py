@@ -15,6 +15,7 @@ class Renderer(Protocol):
 @dataclass(frozen=True)
 class DomRenderer:
     max_text_chars: int = 0
+    sparse_text_chars: int = 0
     marks: bool = True
 
     def instructions(self, screenshots: Screenshots) -> str:
@@ -34,11 +35,15 @@ class DomRenderer:
             "pixels, the same space as those bounds. Later text-only observations retain "
             "the newest shown image's coordinate space. "
         )
-        text += (
-            "Observations include a bounded page-text excerpt. "
-            if self.max_text_chars
-            else "Observations omit page-text excerpts; use extract_content to read the page. "
-        )
+        if self.max_text_chars:
+            text += "Observations include a bounded page-text excerpt. "
+        elif self.sparse_text_chars:
+            text += (
+                "When the viewport holds few controls, observations add its visible text; "
+                "otherwise use extract_content to read the page. "
+            )
+        else:
+            text += "Observations omit page-text excerpts; use extract_content to read the page. "
         text += (
             "Every observation includes a screenshot; its pixels equal viewport CSS pixels."
             if screenshots.trigger == ScreenshotTrigger.EACH_STEP

@@ -9,7 +9,7 @@ from pydantic import Field
 
 from browserrig.browser.models import TabInfo
 from browserrig.core.errors import StaleElement
-from browserrig.core.geometry import Bounds, Geometry
+from browserrig.core.geometry import Bounds, Geometry, Point
 from browserrig.core.kinds import ObservationKind, ReadinessStatus
 from browserrig.core.options import Options
 
@@ -120,6 +120,8 @@ class Snapshot(Options):
     image: str | None = Field(default=None, repr=False)
     # The viewport area the image shows; coordinate tools map image pixels through it.
     geometry: Geometry | None = None
+    # Where the mouse rests, in viewport CSS pixels; None before it entered this tab.
+    cursor: Point | None = None
     captured_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     def element(self, ref: str) -> Element:
