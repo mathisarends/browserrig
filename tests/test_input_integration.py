@@ -26,7 +26,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.parametrize("coordinates", [False, True])
-async def test_typing_shortcuts_stream_and_storage(site, tmp_path, coordinates):
+async def test_typing_shortcuts_stream_and_storage(site, coordinates):
     holder = {}
     output = io.StringIO()
 
@@ -34,12 +34,10 @@ async def test_typing_shortcuts_stream_and_storage(site, tmp_path, coordinates):
         async def setup(self, browser: Inject[Browser]):
             holder["browser"] = browser
 
-    directory = tmp_path / "sessions"
     agent = BrowserAgent(
         model=_typing_model(holder, coordinates),
         browser=LaunchBrowser(url=site),
         mode=DomMode(),
-        session_directory=directory,
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[TerminalEvents(output), Access()],
     )
@@ -52,14 +50,15 @@ async def test_typing_shortcuts_stream_and_storage(site, tmp_path, coordinates):
         await ready.wait()
         result = await session.run("Type exactly and use shortcuts", max_steps=10)
         assert result.text == "Done"
-        receipts = [e for e in session.events if isinstance(e, ToolExecutionFinishedEvent)]
+        receipts = [e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)]
         assert all(not receipt.result.is_error for receipt in receipts)
         tab = holder["browser"].active_tab
         assert await evaluate(tab, "document.querySelector('#email').value") == "+"
         assert await evaluate(tab, "document.querySelector('#secret').value") == "Secret!"
-        assert not any(isinstance(event, InputEvent) for event in session.events)
+        assert not any(isinstance(event, InputEvent) for event in result.events)
+        stored = session.snapshot().to_json()
     await consumer
-    _assert_events(streamed, output.getvalue(), directory, coordinates)
+    _assert_events(streamed, output.getvalue(), stored, coordinates)
 
 
 async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_action(site):
@@ -85,10 +84,11 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
         width, height = await evaluate(tab, "[innerWidth, innerHeight]")
         assert 0.35 * width <= position.x <= 0.65 * width
         assert 0.35 * height <= position.y <= 0.65 * height
-        await session.run("Inspect without moving")
-        await session.run("Continue without moving")
+        first = await session.run("Inspect without moving")
+        second = await session.run("Continue without moving")
         assert holder["browser"].mouse.position == position
-        assert not any(isinstance(event, InputEvent) for event in session.events)
+        events = (*first.events, *second.events)
+        assert not any(isinstance(event, InputEvent) for event in events)
     await consumer
     states = [event for event in streamed if isinstance(event, CursorStateEvent)]
     assert len(states) == 2
@@ -163,7 +163,7 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
     async with agent.session() as session:
         result = await session.run("Hover and scroll each panel without clicking", max_steps=6)
         assert result.text == "Done"
-        receipts = [e for e in session.events if isinstance(e, ToolExecutionFinishedEvent)]
+        receipts = [e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)]
         assert receipts and all(not receipt.result.is_error for receipt in receipts)
         state = await evaluate(
             holder["tab"],
@@ -280,7 +280,7 @@ async def _consume(session, streamed, ready):
         streamed.append(event)
 
 
-def _assert_events(streamed, output, directory, coordinates):
+def _assert_events(streamed, output, stored, coordinates):
     live = [event for event in streamed if isinstance(event, InputEvent)]
     assert live and all(event.browser_id and event.target_id for event in live)
     assert all(event.action_id or isinstance(event, CursorStateEvent) for event in live)
@@ -293,12 +293,9 @@ def _assert_events(streamed, output, directory, coordinates):
     assert [record["key"] for record in records if record["type"] == "browser.key.pressed"] == [
         event.key for event in keys
     ]
-    files = list(directory.rglob("*.jsonl"))
-    assert files
-    for path in files:
-        stored = path.read_text(encoding="utf-8")
-        assert '"browser.key.pressed"' not in stored
-        assert '"browser.cursor.moved"' not in stored
+    # Live input events stream to subscribers but stay out of the saved conversation.
+    assert '"browser.key.pressed"' not in stored
+    assert '"browser.cursor.moved"' not in stored
 
 
 def _ref(request, name):

@@ -81,9 +81,10 @@ async def test_otlp_export_contains_correlated_model_and_tool_spans(collector, c
             model=ScriptedModel([call("echo", value="TOOL INPUT"), "MODEL OUTPUT"]),
             plugins=[*plugins, Echo(), Approvals(default=PolicyDecision.ALLOW)],
         )
-        async with agent.session("telemetry-test") as session:
+        async with agent.session() as session:
             result = await session.run("MODEL INPUT")
             assert result.text == "MODEL OUTPUT"
+            session_id = session.id
 
     assert collector and all(path == "POST /v1/traces HTTP/1.1" for path, _ in collector)
     resources = [resource for _, request in collector for resource in request.resource_spans]
@@ -101,7 +102,7 @@ async def test_otlp_export_contains_correlated_model_and_tool_spans(collector, c
     assert all(span.parent_span_id in {step.span_id for step in steps} for span in models)
     assert tool_span.parent_span_id in {step.span_id for step in steps}
     assert _attributes(tool_span.attributes)["tool.name"] == "echo"
-    assert all(_attributes(span.attributes)["session.id"] == "telemetry-test" for span in spans)
+    assert all(_attributes(span.attributes)["session.id"] == session_id for span in spans)
     contents = str([_attributes(span.attributes) for span in spans])
     for content in ("MODEL INPUT", "MODEL OUTPUT", "TOOL INPUT"):
         assert (content in contents) is capture_content

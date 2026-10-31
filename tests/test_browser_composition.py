@@ -5,7 +5,7 @@ from typing import Literal
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent, Inject, Plugin, PolicyDecision, SessionLog, hook
+from harnessed import Agent, Inject, Plugin, PolicyDecision, SessionLog, SessionState, hook
 from harnessed.events import (
     DurableEvent,
     ModelRequestedEvent,
@@ -15,7 +15,7 @@ from harnessed.events import (
 )
 from harnessed.hooks import ConfigureRequest, Next, PreStep, StepDecision
 from harnessed.models import ImagePart, ImageReference, ModelRequest, ToolMessage
-from harnessed.plugins import Approvals, JsonlSessions, LatestObservationOnly
+from harnessed.plugins import Approvals, LatestObservationOnly
 from harnessed.plugins.compaction import Compaction
 from harnessed.testing import ScriptedModel, call
 
@@ -339,20 +339,19 @@ async def test_until_compaction_keeps_images_until_their_steps_are_summarized():
     assert images[5] == images[4] + [images[5][-1]]
 
 
-async def test_multimodal_observations_use_session_assets_and_replay_receipts(tmp_path):
+async def test_multimodal_observations_use_session_assets_and_survive_saved_state():
     agent, model, _capture, holder = _agent(
         [call("observe"), "Done"],
         ScreenshotTrigger.EACH_STEP,
         UntilCompaction(),
-        extra=(JsonlSessions(tmp_path),),
         frames=[("same screenshot", 2), ("same screenshot", 2)],
         skip_unchanged=False,
     )
-    async with agent.session("screenshots") as session:
+    async with agent.session() as session:
         _browser_ready(holder)
-        await session.run("Inspect", max_steps=2)
+        result = await session.run("Inspect", max_steps=2)
         observations = [
-            event for event in session.events if isinstance(event, ObservationRecordedEvent)
+            event for event in result.events if isinstance(event, ObservationRecordedEvent)
         ]
         assets = [
             part.asset
@@ -362,8 +361,12 @@ async def test_multimodal_observations_use_session_assets_and_replay_receipts(tm
         ]
         assert len(assets) == 2 and assets[0] == assets[1]
         assert await session.assets.read(assets[0]) == b"same screenshot"
-        request = session.log.last(ModelRequestedEvent)
-        included = session.log.included_observations(request.request)
+        request = next(e for e in reversed(result.events) if isinstance(e, ModelRequestedEvent))
+        (included,) = [
+            e.observations
+            for e in result.events
+            if isinstance(e, ObservationsIncludedEvent) and e.request_id == request.request_id
+        ]
         assert len(included) == 2
         for receipt, observation in zip(included, observations, strict=True):
             assert receipt.refs == observation.observation.refs
@@ -371,12 +374,10 @@ async def test_multimodal_observations_use_session_assets_and_replay_receipts(tm
             assert receipt.step == observation.step
             assert receipt.message_id in {message.id for message in request.request.messages}
         assert len(_images(model.requests[-1])) == 2
-    # The audit log contains asset references instead of repeated inline image data.
-    assert "data:image/png;base64," not in (tmp_path / "screenshots.jsonl").read_text()
-    async with agent.session("screenshots") as restored:
-        assert restored.log.included_observations(request.request) == included
-        replay = await restored.log.resolve_request(request.request)
-        assert _images(replay) == _images(model.requests[-1])
+        saved = session.snapshot().to_json()
+    # Saved state carries the retained screenshot bytes, not just their references.
+    async with agent.session(state=SessionState.from_json(saved)) as restored:
+        assert await restored.assets.read(assets[0]) == b"same screenshot"
 
 
 class StripRequestImages(Plugin):
@@ -445,10 +446,11 @@ async def test_latest_observation_only_is_an_explicit_policy_with_native_image_l
         assert session.ctx[Observe].coordinate_source().geometry is None
 
 
-def _recorded(session, source):
+def _recorded(results, source):
     return [
         event
-        for event in session.events
+        for result in results
+        for event in result.events
         if isinstance(event, ObservationRecordedEvent) and event.observation.source == source
     ]
 
@@ -463,8 +465,8 @@ async def test_file_state_is_resent_only_after_a_change():
     async with agent.session() as session:
         browser = _browser_ready(holder)
         browser.downloads = AsyncMock(side_effect=[(), (), (download,), (download,)])
-        await session.run("Inspect", max_steps=4)
-        assert [event.step for event in _recorded(session, "files")] == [1, 3]
+        result = await session.run("Inspect", max_steps=4)
+        assert [event.step for event in _recorded([result], "files")] == [1, 3]
         assert [len(_visible(request, "files")) for request in model.requests] == [1, 1, 2, 2]
 
 
@@ -478,11 +480,11 @@ async def test_file_state_is_resent_when_compaction_removed_the_last_copy():
     )
     async with agent.session() as session:
         _browser_ready(holder)
-        await session.run("Inspect", max_steps=5)
+        result = await session.run("Inspect", max_steps=5)
         visible = [len(_visible(request, "files")) for request in model.requests]
         # The compacted request lacks the old copy; the next step sends it again.
         assert visible[:3] == [1, 1, 1] and visible[3] == 0 and visible[4] == 1
-        assert [event.step for event in _recorded(session, "files")] == [1, 5]
+        assert [event.step for event in _recorded([result], "files")] == [1, 5]
 
 
 async def test_hint_observations_are_skipped_while_there_is_nothing_to_report():
@@ -490,10 +492,10 @@ async def test_hint_observations_are_skipped_while_there_is_nothing_to_report():
     async with agent.session() as session:
         _browser_ready(holder)
         nudges = session.ctx[Nudges]
-        await session.run("Inspect", max_steps=1)
+        first = await session.run("Inspect", max_steps=1)
         await nudges.queue("Inspect the page", key="hint", cause_id="action")
-        await session.run("Continue", max_steps=3)
-        recorded = [event.observation for event in _recorded(session, "browser.nudges")]
+        second = await session.run("Continue", max_steps=3)
+        recorded = [event.observation for event in _recorded([first, second], "browser.nudges")]
         # Shown once, cleared once after delivery, then omitted.
         assert [bool(observation.refs) for observation in recorded] == [True, False]
         assert "Inspect the page" in str(recorded[0].content)
@@ -654,8 +656,6 @@ async def test_native_stream_forwards_custom_events_and_browser_readiness_withou
         assert any(isinstance(e, ReadinessStartedEvent) for e in streamed)
         observations = [e for e in streamed if isinstance(e, ObservationCapturedEvent)]
         assert len(observations) == 1 and not hasattr(observations[0], "image")
-        assert any(isinstance(e, AppFact) for e in session.events)
-        assert not any(isinstance(e, AppProgress) for e in session.events)
 
 
 def test_recipe_can_omit_local_file_tools():
@@ -670,10 +670,10 @@ async def test_unchanged_page_is_not_repeated_while_the_model_still_sees_it():
     agent, model, _capture, holder = _agent([*_observes(4), "Done"], renderer=renderer)
     async with agent.session() as session:
         _browser_ready(holder)
-        await session.run("Inspect", max_steps=2)
+        first = await session.run("Inspect", max_steps=2)
         renderer.text = "Page B"
-        await session.run("Continue", max_steps=3)
-        recorded = [event.observation.content for event in _recorded(session, "browser")]
+        second = await session.run("Continue", max_steps=3)
+        recorded = [event.observation.content for event in _recorded([first, second], "browser")]
         assert recorded == ["Page A", "Page B"]
         assert [len(_visible(request, "browser")) for request in model.requests] == [1, 1, 2, 2, 2]
 
@@ -688,9 +688,9 @@ async def test_page_is_resent_with_a_screenshot_and_after_compaction():
     )
     async with agent.session() as session:
         _browser_ready(holder)
-        await session.run("Inspect", max_steps=5)
+        result = await session.run("Inspect", max_steps=5)
         # Step 2 carries the requested image; step 5 restores the page compaction removed.
-        assert [event.step for event in _recorded(session, "browser")] == [1, 2, 5]
+        assert [event.step for event in _recorded([result], "browser")] == [1, 2, 5]
         visible = [len(_visible(request, "browser")) for request in model.requests]
         assert visible[3] == 0 and visible[4] == 1
 

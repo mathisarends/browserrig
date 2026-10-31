@@ -63,12 +63,12 @@ async def test_plugin_state_is_per_session():
     agent = Agent(
         model=ScriptedModel(["ok"]), plugins=[Access(holder), Readiness(), FakeChrome(holder)]
     )
-    async with agent.session("first"):
+    async with agent.session():
         first = holder["readiness"]
         first_events = first._events
         assert first_events is holder["browser"].events
         first._state.initialized.add(("sentinel", "doc"))
-    async with agent.session("second"):
+    async with agent.session():
         second = holder["readiness"]
         assert second is not first
         assert second._events is holder["browser"].events

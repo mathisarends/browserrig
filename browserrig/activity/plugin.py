@@ -40,6 +40,8 @@ _PAUSE = ActivityKey(ActivityKind.PAUSED)
 @dataclass
 class _State:
     open: dict[ActivityKey, ActivityStartedEvent] = field(default_factory=dict)
+    # The session log only holds the open turn, so intervals keep their own record.
+    records: list[ActivityStartedEvent | ActivityFinishedEvent] = field(default_factory=list)
     epoch: str = field(default_factory=lambda: uuid4().hex)
 
 
@@ -52,15 +54,7 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         ctx.effect(self._close_all)
 
     def intervals(self, *, now: float | None = None) -> tuple[ActivityFinishedEvent, ...]:
-        return project_intervals(
-            (
-                event
-                for event in self._log.events
-                if isinstance(event, ActivityStartedEvent | ActivityFinishedEvent)
-                and event.epoch_id == self._state.epoch
-            ),
-            now=now,
-        )
+        return project_intervals(self._state.records, now=now)
 
     async def _start(self, key: ActivityKey, *, cause_id: str) -> None:
         """A new interval in the same slot supersedes only that slot's previous interval."""
@@ -69,6 +63,7 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
             interval_id=uuid4().hex, kind=key.kind, cause_id=cause_id, epoch_id=self._state.epoch
         )
         self._state.open[key] = event
+        self._state.records.append(event)
         await self._log.emit(event)
 
     async def _finish(
@@ -81,17 +76,17 @@ class Activity(Plugin, provides=True, needs=(SessionLog,)):
         event = self._state.open.pop(key, None)
         if event is None:
             return
-        await self._log.emit(
-            ActivityFinishedEvent(
-                interval_id=event.interval_id,
-                kind=event.kind,
-                cause_id=event.cause_id,
-                started_at=event.at,
-                outcome=outcome,
-                reason=reason,
-                epoch_id=event.epoch_id,
-            )
+        finished = ActivityFinishedEvent(
+            interval_id=event.interval_id,
+            kind=event.kind,
+            cause_id=event.cause_id,
+            started_at=event.at,
+            outcome=outcome,
+            reason=reason,
+            epoch_id=event.epoch_id,
         )
+        self._state.records.append(finished)
+        await self._log.emit(finished)
 
     async def _close_all(self) -> None:
         for key in tuple(self._state.open):

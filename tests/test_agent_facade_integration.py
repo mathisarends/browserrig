@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Context, Inject, Plugin, PolicyDecision
+from harnessed import Context, Inject, Plugin, PolicyDecision, SessionState
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
@@ -14,7 +14,7 @@ from browserrig.kinds import ActivityKind
 pytestmark = pytest.mark.integration
 
 
-async def test_facade_reopens_native_sessions_and_owns_a_fresh_browser_per_session(site, tmp_path):
+async def test_facade_restores_saved_state_and_owns_a_fresh_browser_per_session(site):
     browsers = []
 
     class Access(Plugin, needs=(Browser,)):
@@ -25,24 +25,24 @@ async def test_facade_reopens_native_sessions_and_owns_a_fresh_browser_per_sessi
     agent = BrowserAgent(
         model=model,
         browser=LaunchBrowser(url=site),
-        session_directory=tmp_path / "sessions",
         plugins=[Access()],
     )
-    async with agent.session("conversation") as session:
+    async with agent.session() as session:
         first = await session.run("Remember this page")
         assert first.text == "First answer"
+        saved = first.state.to_json()
     assert not browsers[0].client.is_connected
-    assert (tmp_path / "sessions" / "conversation.jsonl").is_file()
-    async with agent.session("conversation") as session:
+    async with agent.session(state=SessionState.from_json(saved)) as session:
         second = await session.run("Continue the conversation")
         assert second.text == "Restored answer"
         assert any("First answer" in msg.text for msg in model.requests[-1].messages)
-        epochs = {
-            item.epoch_id
-            for item in session.events
-            if isinstance(item, ActivityStartedEvent) and item.kind is ActivityKind.LLM
-        }
-        assert len(epochs) == 2
+    # Each session mounts its own Activity, so model intervals carry a new epoch.
+    epochs = {
+        item.epoch_id
+        for item in (*first.events, *second.events)
+        if isinstance(item, ActivityStartedEvent) and item.kind is ActivityKind.LLM
+    }
+    assert len(epochs) == 2
     assert len(browsers) == 2
     assert browsers[0].id != browsers[1].id
     assert not browsers[1].client.is_connected

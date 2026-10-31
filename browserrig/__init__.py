@@ -3,7 +3,7 @@ __version__ = "0.1.0"
 from browserrig.core.geometry import Point
 
 from .activity import Activity
-from .agent import BrowserAgent
+from .agent import BrowserAgent, WindowRatio
 from .browser import Browser, Chrome, ChromeBrowser, ConnectBrowser, LaunchBrowser, Viewport
 from .composition import browser_plugins
 from .files import FileSystem, FileSystemOptions
@@ -94,6 +94,7 @@ __all__ = [
     "env",
     "totp",
     "Viewport",
+    "WindowRatio",
     "TerminalEvents",
     "browser_plugins",
     "wait_for_page",

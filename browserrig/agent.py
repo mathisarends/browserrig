@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from pathlib import Path
+from dataclasses import dataclass
 
 from harnessed import Agent, PluginValidation, SystemPrompt
 from harnessed.kernel import PluginLike
 from harnessed.models import Model
-from harnessed.plugins import Approvals, JsonlSessions
+from harnessed.plugins import Approvals, Compaction, ContextState
 
 from browserrig.core.modes import DomMode
 
@@ -21,10 +21,32 @@ from .secrets import Secret, Secrets
 from .tools.execution import Actions
 
 
+@dataclass(frozen=True)
+class WindowRatio:
+    """Compact at a share of the context window, or at a token count when it is unknown.
+
+    Many providers report no window, so a plain ratio trigger would never fire for them.
+    """
+
+    at: float = 0.8
+    fallback_tokens: int = 100_000
+
+    def __call__(self, state: ContextState) -> bool:
+        if state.ratio is None:
+            return state.input_tokens + state.reserve_tokens >= self.fallback_tokens
+        return state.ratio >= self.at
+
+
+DEFAULT_COMPACTION = Compaction(trigger=WindowRatio())
+
+
 class BrowserAgent(Agent):
     """Explicit provider clients remain caller-owned.
 
-    Sessions stay in memory unless session_directory is supplied.
+    Conversations stay in memory; continue one by passing a saved `SessionState`
+    to `run` or `session`. Long runs summarize older steps once the request fills
+    80% of the model's context window, or 100k tokens when the model reports none;
+    pass `compaction=None` to keep everything, or a configured `Compaction`.
     Approvals use Harnessed's defaults unless configured.
     """
 
@@ -41,7 +63,7 @@ class BrowserAgent(Agent):
         actions: Actions | None = None,
         local_files: bool = True,
         secrets: Secrets | Mapping[str, Secret] | None = None,
-        session_directory: str | Path | None = None,
+        compaction: Compaction | None = DEFAULT_COMPACTION,
         approvals: Approvals | None = None,
         system_prompt: str | SystemPrompt | None = (
             "Complete the requested browser task using the observed page state."
@@ -62,8 +84,8 @@ class BrowserAgent(Agent):
                 secrets=secrets,
             )
         )
-        if session_directory is not None:
-            composed.append(JsonlSessions(session_directory))
+        if compaction is not None:
+            composed.append(compaction)
         if approvals is not None:
             composed.append(approvals)
         composed.extend(plugins)

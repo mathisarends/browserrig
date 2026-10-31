@@ -9,7 +9,6 @@ from harnessed.events import (
 )
 from harnessed.hooks import ConfigureRequest, Next, PreStep, StepDecision
 from harnessed.models import ModelInfo, ModelRequest, UserMessage
-from harnessed.plugins import JsonlSessions
 from harnessed.testing import ScriptedModel
 
 from browserrig import Nudges
@@ -167,7 +166,7 @@ async def test_hint_acknowledgement_requires_matching_provenance(source, matchin
             assert receipts[0].request_id == "request"
 
 
-async def test_hint_provenance_and_unselected_hints_survive_session_replay(tmp_path):
+async def test_hint_provenance_is_recorded_and_unselected_hints_stay_queued():
     holder = {}
 
     class Hints(Plugin, needs=(Nudges,)):
@@ -188,17 +187,21 @@ async def test_hint_provenance_and_unselected_hints_survive_session_replay(tmp_p
             Nudges(max_hints=1),
             _Access(holder),
             Hints(),
-            JsonlSessions(tmp_path),
         ],
     )
-    async with agent.session("hints") as session:
+    async with agent.session() as session:
         nudges = holder["nudges"]
         await nudges.queue("First hint", key="first", cause_id="first-action")
         await nudges.queue("Second hint", key="second", cause_id="second-action")
-        await session.run("Inspect")
-        request = next(event for event in session.events if isinstance(event, ModelRequestedEvent))
-        provenance = session.log.included_observations(request.request)
-        (receipt,) = [event for event in session.events if isinstance(event, NudgeIncludedEvent)]
+        result = await session.run("Inspect")
+        request = next(event for event in result.events if isinstance(event, ModelRequestedEvent))
+        (provenance,) = [
+            event.observations
+            for event in result.events
+            if isinstance(event, ObservationsIncludedEvent)
+            and event.request_id == request.request_id
+        ]
+        (receipt,) = [event for event in result.events if isinstance(event, NudgeIncludedEvent)]
         assert receipt.request_id == request.request_id
         assert provenance == (
             IncludedObservation(
@@ -209,10 +212,7 @@ async def test_hint_provenance_and_unselected_hints_survive_session_replay(tmp_p
                 message_id=provenance[0].message_id,
             ),
         )
-        assert "Second hint" in (await nudges.project(_snapshot())).content
-    async with agent.session("hints") as restored:
-        assert restored.log.included_observations(request.request) == provenance
-        remaining = await holder["nudges"].project(_snapshot())
+        remaining = await nudges.project(_snapshot())
         assert "Second hint" in remaining.content
         assert "First hint" not in remaining.content
 
@@ -257,8 +257,8 @@ async def test_hints_stay_queued_until_the_unchanged_observation_is_submitted(tr
         nudges = holder["nudges"]
         await nudges.queue("Inspect the page", key="hint", cause_id="action")
         (nudge_id,) = (await nudges.project(_snapshot())).refs
-        await session.run("Inspect")
-        receipts = [event for event in session.events if isinstance(event, NudgeIncludedEvent)]
+        result = await session.run("Inspect")
+        receipts = [event for event in result.events if isinstance(event, NudgeIncludedEvent)]
         delivered = transform == "keep"
         assert len(receipts) == int(delivered)
         assert (await nudges.project(_snapshot())).refs == (() if delivered else (nudge_id,))

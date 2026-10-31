@@ -156,7 +156,7 @@ async def _perform(site, name, arguments):
         result = await session.run("Perform one gesture")
         assert result.text == "Gesture completed"
         receipts = [
-            event for event in session.events if isinstance(event, ToolExecutionFinishedEvent)
+            event for event in result.events if isinstance(event, ToolExecutionFinishedEvent)
         ]
         assert receipts and all(not event.result.is_error for event in receipts)
         # The test fixture stores counters in its main world. Production extraction

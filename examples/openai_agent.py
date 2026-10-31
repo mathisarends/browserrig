@@ -8,7 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from harnessed import PolicyDecision
 from harnessed.models.pydantic_ai import PydanticAIModel
-from harnessed.plugins import Approvals, Compaction
+from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
@@ -61,10 +61,8 @@ async def main() -> None:
             mode=DomMode(),
             image_context=ImageContext(UntilCompaction()),
             file_system=FileSystemOptions(directory=args.workspace) if args.workspace else None,
-            session_directory=Path(".browserrig/sessions-v3"),
             approvals=Approvals(default=PolicyDecision.ALLOW),
             plugins=[
-                Compaction(trigger=lambda state: state.input_tokens >= 32000, keep_steps=4),
                 *telemetry,
                 *([] if args.quiet else [TerminalEvents()]),
             ],

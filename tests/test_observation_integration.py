@@ -359,7 +359,7 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
         )
         result = await session.run("Click the board", max_steps=5)
         assert result.text == "Done"
-        receipts = [e for e in session.events if isinstance(e, ToolExecutionFinishedEvent)]
+        receipts = [e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)]
         assert receipts and not any(receipt.result.is_error for receipt in receipts)
         offset = await evaluate(tab, "document.querySelector('#board').dataset.offset")
         assert offset == "50,30"

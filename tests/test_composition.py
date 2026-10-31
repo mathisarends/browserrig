@@ -2,7 +2,7 @@ import subprocess
 import sys
 
 from harnessed import Agent, Plugin, PolicyDecision, SystemSection
-from harnessed.plugins import Approvals, JsonlSessions, MemorySessions
+from harnessed.plugins import Approvals, Compaction, ContextState
 from harnessed.plugins.filesystem import FilesystemTools
 from harnessed.plugins.shell import ShellTools
 from harnessed.testing import ScriptedModel
@@ -15,6 +15,7 @@ from browserrig import (
     LaunchBrowser,
     Readiness,
     ReadinessOptions,
+    WindowRatio,
 )
 from browserrig.tools import DomTools, FileTools, JavaScriptTools, PointerTools, UploadTools
 
@@ -34,7 +35,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
         mode=DomMode(screenshots=True),
         readiness=readiness,
         file_system=file_system,
-        session_directory=tmp_path / "sessions",
+        compaction=None,
         approvals=approvals,
         system_prompt="Custom instructions.",
         plugins=iter([extension]),
@@ -47,9 +48,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     )
     assert extension in agent.plugins
     assert [item for item in agent.plugins if isinstance(item, Approvals)] == [approvals]
-    assert sum(isinstance(item, JsonlSessions) for item in agent.plugins) == 1
-    assert not any(isinstance(item, MemorySessions) for item in agent.plugins)
-    assert not (tmp_path / "sessions").exists()
+    assert not any(isinstance(item, Compaction) for item in agent.plugins)
     assert not file_system.directory.exists()
 
 
@@ -62,14 +61,26 @@ def test_facade_mounts_dom_and_coordinate_tool_capabilities():
     assert sum(isinstance(item, FileTools) for item in agent.plugins) == 1
 
 
-def test_facade_retains_native_memory_storage_and_approval_defaults():
+def test_facade_compacts_by_window_ratio_and_keeps_approval_defaults():
     agent = BrowserAgent(model=ScriptedModel(["ok"]))
     assert not any(isinstance(item, (ShellTools, FilesystemTools)) for item in agent.plugins)
-    assert sum(isinstance(item, MemorySessions) for item in agent.plugins) == 1
-    assert not any(isinstance(item, JsonlSessions) for item in agent.plugins)
+    (compaction,) = [item for item in agent.plugins if isinstance(item, Compaction)]
+    assert compaction.config.trigger == WindowRatio(0.8, fallback_tokens=100_000)
     assert next(item for item in agent.plugins if isinstance(item, Approvals)).default is (
         PolicyDecision.ASK
     )
+
+
+def test_window_ratio_uses_the_token_fallback_only_without_a_known_window():
+    trigger = WindowRatio(0.8, fallback_tokens=1000)
+
+    def state(tokens, window):
+        return ContextState(
+            input_tokens=tokens, reserve_tokens=0, context_window=window, turns_since_compaction=0
+        )
+
+    assert [trigger(state(900, None)), trigger(state(1000, None))] == [False, True]
+    assert [trigger(state(1500, 2000)), trigger(state(1600, 2000))] == [False, True]
 
 
 def test_facade_import_and_scripted_model_do_not_require_provider_sdks():

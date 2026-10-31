@@ -106,8 +106,8 @@ async def test_typed_secret_reaches_the_page_but_never_the_model(site):
     for request in model.requests:
         assert PASSWORD not in repr(request.messages)
     assert "{{secret:pw}}" in repr(model.requests[-1].messages)
-    assert PASSWORD not in repr(session.events)
-    entered = [event for event in session.events if isinstance(event, SecretEnteredEvent)]
+    assert PASSWORD not in repr(result.events)
+    entered = [event for event in result.events if isinstance(event, SecretEnteredEvent)]
     assert [(event.names, event.origin) for event in entered] == [(("pw",), site)]
     assert not any(reply.is_error for reply in _replies(model))
 
@@ -124,13 +124,13 @@ async def test_secret_is_refused_on_other_domains_without_touching_the_field(sit
     )
     agent = _agent(site, model, ("example.org",), holder)
     async with agent.session() as session:
-        await session.run("Log in", max_steps=3)
+        result = await session.run("Log in", max_steps=3)
         value = await _email(holder)
     assert value == ""
     replies = _replies(model)
     assert replies[0].is_error and "Secret pw is not allowed on" in replies[0].text
     assert "Secrets for" not in repr(model.requests[0].messages)
-    assert not any(isinstance(event, SecretEnteredEvent) for event in session.events)
+    assert not any(isinstance(event, SecretEnteredEvent) for event in result.events)
 
 
 async def test_send_keys_types_into_the_focused_field_and_blocks_javascript(site):
@@ -145,13 +145,13 @@ async def test_send_keys_types_into_the_focused_field_and_blocks_javascript(site
     )
     agent = _agent(site, model, (site,), holder)
     async with agent.session() as session:
-        await session.run("Log in", max_steps=5)
+        result = await session.run("Log in", max_steps=5)
         value = await _email(holder)
     assert value == f"me {PASSWORD}"
     replies = _replies(model)
     assert not replies[1].is_error
     assert replies[2].is_error and "JavaScript execution is unavailable" in replies[2].text
-    finished = [e for e in session.events if isinstance(e, ToolExecutionFinishedEvent)]
+    finished = [e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)]
     assert PASSWORD not in repr(finished)
 
 
