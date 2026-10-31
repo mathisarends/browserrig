@@ -13,6 +13,7 @@ from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
     BrowserAgent,
+    Done,
     FileSystemOptions,
     ImageContext,
     LaunchBrowser,
@@ -45,6 +46,11 @@ async def main() -> None:
     )
     parser.add_argument("--headed", action="store_true")
     parser.add_argument(
+        "--done",
+        action="store_true",
+        help="Require done before the final answer; allow standalone progress messages",
+    )
+    parser.add_argument(
         "--workspace", type=Path, help="Reuse a directory for agent files and downloads"
     )
     parser.add_argument(
@@ -72,6 +78,7 @@ async def main() -> None:
             approvals=Approvals(default=PolicyDecision.ALLOW),
             plugins=[
                 *telemetry,
+                *([Done()] if args.done else []),
                 *([] if args.quiet else [TerminalEvents()]),
             ],
         )

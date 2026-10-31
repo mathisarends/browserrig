@@ -2,12 +2,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Context, Inject, Plugin, PolicyDecision, SessionState
-from harnessed.events import ToolCallFinishedEvent
+from harnessed.events import TextDeltaEvent, ToolCallFinishedEvent, TurnFinishedEvent
 from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
+from pydantic import BaseModel
 
-from browserrig import Browser, BrowserAgent, LaunchBrowser
+from browserrig import Browser, BrowserAgent, Done, LaunchBrowser
 from browserrig.events import ActionStartedEvent, ActivityStartedEvent
 from browserrig.kinds import ActivityKind
 
@@ -79,3 +80,44 @@ async def test_facade_manages_wrapped_native_model_context_on_reuse(site, monkey
     first_contexts = enter.await_count
     assert (await agent.run("Inspect again")).text == "Native model adapted"
     assert enter.await_count == leave.await_count > first_contexts
+
+
+async def test_facade_streams_commentary_and_returns_a_typed_answer_after_done(site):
+    class PageAnswer(BaseModel):
+        title: str
+        url: str
+
+    model = ScriptedModel(
+        [
+            "I will open the other page.",
+            call("navigate", url=site + "/other"),
+            "The other page is open.",
+            call("done", success=True),
+            call("final_answer", title="Other", url=site + "/other"),
+        ]
+    )
+    agent = BrowserAgent(
+        model=model,
+        browser=LaunchBrowser(url=site),
+        approvals=Approvals(default=PolicyDecision.ALLOW),
+        plugins=[Done()],
+    )
+    async with agent.session() as session:
+        events = [
+            event
+            async for event in session.stream(
+                "Open the other page and report its title and URL.",
+                output=PageAnswer,
+                max_steps=5,
+            )
+        ]
+    assert [event.text for event in events if isinstance(event, TextDeltaEvent)] == [
+        "I will open the other page.",
+        "The other page is open.",
+    ]
+    assert isinstance(events[-1], TurnFinishedEvent)
+    result = events[-1].result
+    assert result.completed
+    assert result.output == PageAnswer(title="Other", url=site + "/other")
+    assert any(isinstance(event, ActionStartedEvent) for event in result.events)
+    assert [tool.name for tool in model.requests[-1].tools] == ["final_answer"]

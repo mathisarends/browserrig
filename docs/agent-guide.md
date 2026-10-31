@@ -108,6 +108,77 @@ an explicit kind and defaults to ending the chain. Metadata stays process-local;
 mutation receipts persist their stable action kind. `Actions.run()` returns the
 native `ToolResult`, exposing both `.text` and `.break_chain` to direct callers.
 
+## Explicit completion and output formats
+
+`Done` is an optional plugin. While it is mounted, standalone text messages are
+progress updates and the agent keeps working. The agent calls `done(success=True)`
+alone once it has checked the last action's result, or `done(success=False)` when
+the task could not be completed. This ends application-tool use; the next model
+response supplies the final answer. Plain runs keep the user's requested format,
+such as Markdown or CSV, through the final-answer instructions. These natural-language
+format requests are instructions to the model, not schema validation.
+
+```python
+from browserrig import BrowserAgent, Done
+
+agent = BrowserAgent(model=model, plugins=[Done()])
+result = await agent.run("Compare the two products. Return a Markdown table.")
+print(result.text)
+```
+
+Omit `Done()` to retain Harnessed's native behavior, where a text response without
+tool calls ends the turn. `browser_plugins()` does not include it by default.
+It also works with a plain Harnessed `Agent` or a runtime mount through
+`session.use(Done(), section_delivery=SectionDelivery.CONTEXT)`; closing the mount
+restores the native completion and output behavior.
+
+For a validated final format, pass the native `output=` contract when starting the
+task. The schema is shown to the agent during work, but progress text remains
+unconstrained. After `done`, Harnessed uses native structured output when supported
+by the model, or its reserved `final_answer` tool otherwise. Validation and correction
+retries remain native. Read the typed value from `result.output`; `result.text` may
+be empty when the model returns the structured answer through a tool.
+
+```python
+from pydantic import BaseModel, Field
+
+
+class ProductComparison(BaseModel):
+    cheaper_product: str
+    price_difference: float = Field(ge=0)
+    sources: list[str]
+
+
+result = await agent.run(
+    "Compare the two products, including shipping.", output=ProductComparison
+)
+if result.completed:
+    print(result.output.model_dump_json(indent=2))
+```
+
+Progress is available through the native event stream. The example below displays
+all generated text, including the final answer; structured answers are available
+on the terminal event's `result.output`.
+
+```python
+from harnessed.events import TextDeltaEvent, TurnFinishedEvent
+
+async with agent.session() as session:
+    async for event in session.stream("Compare the products. Return a Markdown table."):
+        if isinstance(event, TextDeltaEvent):
+            print(event.text, end="", flush=True)
+        elif isinstance(event, TurnFinishedEvent):
+            result = event.result
+```
+
+The work phase, the `done` call, the final response, and any correction attempts all
+count against the existing step and token budgets. A limit or host stop still ends
+the turn as incomplete; no extra model call bypasses those limits. A denied, failed,
+or mixed-batch `done` does not enter finalization. Application tools cannot execute
+after an accepted `done`, even if the model attempts to call one. The `success`
+argument is the agent's assessment, recorded with its tool call; `result.completed`
+continues to mean the turn ended normally, independently of task success.
+
 ## Step limits and optional final summaries
 
 Configure Harnessed's native loop through the existing plugin interface:

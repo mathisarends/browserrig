@@ -12,6 +12,7 @@ from .browser import (
     LaunchBrowser,
     Viewport,
 )
+from .completion import Done
 from .composition import browser_plugins
 from .files import FileSystem, FileSystemOptions
 from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanResponse
@@ -56,6 +57,7 @@ from .tools import (
 )
 
 __all__ = [
+    "Done",
     "HandoffCallback",
     "HandoffReceipt",
     "HumanHandoff",

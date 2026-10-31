@@ -25,7 +25,7 @@ Copy-Item .env.example .env
 uv run --env-file .env --extra openai python -m examples.openai_agent --headed
 ```
 
-The example explores the Voyager missions. Use `--url` and `--task` to change the starting page and mission, `OPENAI_MODEL` to select a model, and `--quiet` to suppress streamed events. The final answer goes to stdout. Tests use scripted models and need no API key.
+The example explores the Voyager missions. Use `--url` and `--task` to change the starting page and mission, `OPENAI_MODEL` to select a model, and `--quiet` to suppress streamed events. Add `--done` to allow standalone progress messages and require an explicit completion tool before the final answer. The final answer goes to stdout. Tests use scripted models and need no API key.
 
 ## Use from Python
 
@@ -42,6 +42,10 @@ async with ChromeBrowser(LaunchBrowser(url="https://example.com")) as browser:
 ```
 
 For an LLM-powered agent, see the [agent guide](docs/agent-guide.md#browseragent). For connecting to an existing browser and controlling pages directly, see [browser interaction](docs/browser-interaction.md).
+
+Mount `plugins=[Done()]` to opt into [explicit completion and structured final
+answers](docs/agent-guide.md#explicit-completion-and-output-formats). Without it,
+ordinary text responses retain Harnessed's default completion behavior.
 
 ## Documentation
 

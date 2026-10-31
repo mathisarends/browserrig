@@ -45,6 +45,16 @@ Integration tests require Chrome or Chromium. Set `BROWSERRIG_CHROME` or
 `LaunchBrowser(executable=...)` to select the executable. Media validation also
 uses ffprobe when available.
 
+## Harnessed compatibility
+
+The opt-in `Done` plugin uses native hooks for continuation and tool execution.
+Harnessed 0.8.0 has no output-policy hook, so `browserrig/completion.py` contains
+one reversible, per-session bridge around the step runner's output handler. This
+defers the declared output contract until finalization without changing the model
+or session APIs. When upgrading Harnessed, verify that bridge with
+`tests/test_completion.py`, including native/tool structured output, retries,
+limits, streaming, and runtime removal.
+
 ## Project status
 
 The core is implemented and tested against real Chrome, including transformed,
