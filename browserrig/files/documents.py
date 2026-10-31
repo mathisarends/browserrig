@@ -20,7 +20,7 @@ from striprtf.striprtf import rtf_to_text
 from .content import ParsedContent, ReadRequest, cell_text
 
 
-def html_text(source: str | bytes) -> str:
+def _html_text(source: str | bytes) -> str:
     soup = BeautifulSoup(source, "html.parser")
     for node in soup.select(
         "script, style, template, noscript, input, textarea, select"
@@ -30,7 +30,7 @@ def html_text(source: str | bytes) -> str:
 
 
 def read_html(path: Path) -> ParsedContent:
-    return ParsedContent((html_text(path.read_bytes()),), "html")
+    return ParsedContent((_html_text(path.read_bytes()),), "html")
 
 
 def read_docx(path: Path) -> ParsedContent:
@@ -104,7 +104,7 @@ def read_odf(path: Path) -> ParsedContent:
     with ZipFile(path) as archive:
         format_ = "odp" if archive.read("mimetype").endswith(b"presentation") else "odt"
     return ParsedContent(
-        (html_text(converter.xhtml()),),
+        (_html_text(converter.xhtml()),),
         format_,
         ["Embedded images and document-specific annotations are not extracted"],
     )
@@ -171,7 +171,9 @@ def read_epub(path: Path) -> ParsedContent:
                         "EPUB chapter is encrypted; DRM-protected content is unavailable"
                     )
                 yield (
-                    f"# Chapter {index}\n\n" + html_text(archive.read(chapter)) + "\n\n"
+                    f"# Chapter {index}\n\n"
+                    + _html_text(archive.read(chapter))
+                    + "\n\n"
                 )
 
     return ParsedContent(blocks(), "epub", ["Embedded images are not extracted"])
@@ -191,7 +193,7 @@ def read_email(path: Path) -> ParsedContent:
     if body is not None:
         content = body.get_content()
         blocks.append(
-            html_text(content)
+            _html_text(content)
             if body.get_content_type() == "text/html"
             else str(content)
         )
@@ -215,7 +217,7 @@ def read_mhtml(path: Path) -> ParsedContent:
     blocks = []
     for part in message.walk():
         if part.get_content_type() == "text/html":
-            blocks.append(html_text(part.get_content()) + "\n\n")
+            blocks.append(_html_text(part.get_content()) + "\n\n")
     return ParsedContent(
         blocks, "mhtml", ["Non-HTML embedded resources are not extracted"]
     )

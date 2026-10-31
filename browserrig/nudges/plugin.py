@@ -72,7 +72,8 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         super().__init__()
         if not 1 <= max_hints <= 20 or not 100 <= max_chars <= 10000:
             raise ValueError("Invalid nudge limits")
-        self._max_hints, self._max_chars = max_hints, max_chars
+        self._max_hints = max_hints
+        self._max_chars = max_chars
 
     async def queue(
         self,

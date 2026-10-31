@@ -9,7 +9,7 @@ from .config import ReadinessOptions
 from .strategy import ReadinessStrategy
 
 
-async def probe_dom(tab: Tab) -> DOMProbe:
+async def _probe_dom(tab: Tab) -> DOMProbe:
     main = await tab.main_frame()
     state = await main.run(STABILITY)
     if not state.unobserved_frames:
@@ -54,7 +54,7 @@ class DomReadiness(ReadinessStrategy):
         self._earliest = self._started + minimum / 1000
 
     async def check(self) -> bool:
-        state = await probe_dom(self._tab)
+        state = await _probe_dom(self._tab)
         now = monotonic()
         quiet = state.quiet_ms
         if self._after_action:

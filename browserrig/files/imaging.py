@@ -22,16 +22,6 @@ _OCR_LOCK = Lock()
 _PDF_LOCK = Lock()
 
 
-def image_text(image: Image.Image) -> str:
-    image = ImageOps.exif_transpose(image).convert("RGB")
-    image.thumbnail((4000, 4000))
-    buffer = BytesIO()
-    image.save(buffer, format="PNG")
-    with _OCR_LOCK:
-        result = _engine()(buffer.getvalue())
-    return "\n".join(getattr(result, "txts", None) or ())
-
-
 def read_pdf(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedContent:
     number = 1 if request.page_number is None else request.page_number
     try:
@@ -57,7 +47,7 @@ def read_pdf(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedConten
         not text.strip() and enable_ocr and request.ocr is not False
     ):
         with _pdf_image(path, number) as image:
-            text = image_text(image)
+            text = _image_text(image)
         details.limitations.append(
             "Text was recognized with local OCR and may contain recognition errors"
         )
@@ -94,7 +84,7 @@ def read_image(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedCont
                 page_number=number,
                 page_count=count,
             )
-        text = image_text(image)
+        text = _image_text(image)
     details = ParsedContent(
         (metadata, "## Recognized text\n\n", text),
         format_,
@@ -108,6 +98,16 @@ def read_image(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedCont
         details.status = "metadata_only"
         details.limitations.append("No readable text was recognized in this image")
     return details
+
+
+def _image_text(image: Image.Image) -> str:
+    image = ImageOps.exif_transpose(image).convert("RGB")
+    image.thumbnail((4000, 4000))
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    with _OCR_LOCK:
+        result = _engine()(buffer.getvalue())
+    return "\n".join(getattr(result, "txts", None) or ())
 
 
 @cache

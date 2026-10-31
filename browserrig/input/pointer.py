@@ -6,7 +6,7 @@ from browserrig.core import Point
 _FRAME_INTERVAL_SECONDS = 1 / 60
 
 
-def ease(progress: float) -> float:
+def _ease(progress: float) -> float:
     return 4 * progress**3 if progress < 0.5 else 1 - (-2 * progress + 2) ** 3 / 2
 
 
@@ -44,7 +44,7 @@ class CursorPath:
         return max(1, math.ceil(self.duration / _FRAME_INTERVAL_SECONDS))
 
     def point(self, progress: float) -> Point:
-        t = ease(progress)
+        t = _ease(progress)
         u = 1 - t
         cp1, cp2 = self.control_points
         return Point(

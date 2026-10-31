@@ -57,12 +57,12 @@ from browserrig.readiness import Readiness
 from .execution import Actions, Effect
 
 
-def has_files(browser: Inject[Browser]) -> bool:
+def _has_files(browser: Inject[Browser]) -> bool:
     return browser.files is not None
 
 
-def has_upload_files(browser: Inject[Browser], observe: Inject[Observe]) -> bool:
-    return has_files(browser) and has_dom_refs(observe)
+def _has_upload_files(browser: Inject[Browser], observe: Inject[Observe]) -> bool:
+    return _has_files(browser) and has_dom_refs(observe)
 
 
 _SOURCE = "files"
@@ -110,7 +110,7 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
     @tool(
         kind=ActionKind.LIST_FILES,
         chainable=True,
-        enabled=has_files,
+        enabled=_has_files,
         readonly=True,
         description="List a workspace directory. Follow next_offset for more entries.",
     )
@@ -137,7 +137,7 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
     @tool(
         kind=ActionKind.READ_FILE,
         chainable=True,
-        enabled=has_files,
+        enabled=_has_files,
         readonly=True,
         description=(
             "Read workspace/download content without a browser preview: text, PDF (page 1 by "
@@ -219,7 +219,7 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
     @tool(
         kind=ActionKind.WRITE_FILE,
         chainable=True,
-        enabled=has_files,
+        enabled=_has_files,
         description="Save UTF-8 text in the workspace. Existing files require overwrite=true.",
     )
     async def write_file(
@@ -240,7 +240,7 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
 
     @tool(
         kind=ActionKind.OPEN_FILE,
-        enabled=has_files,
+        enabled=_has_files,
         description="Open a workspace/download file in a new active browser tab, including PDFs.",
     )
     async def open_file(self, path: str) -> ToolResult:
@@ -252,7 +252,7 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
 
     @tool(
         kind=ActionKind.OPEN_DOWNLOADED_FILE,
-        enabled=has_files,
+        enabled=_has_files,
         description="Open a completed download in a new active tab using its list_downloads ID.",
     )
     async def open_downloaded_file(self, download_id: str) -> ToolResult:
@@ -352,7 +352,7 @@ class UploadTools(Plugin, needs=(Actions, Browser, BrowserEvents, Observe)):
 
     @tool(
         kind=ActionKind.UPLOAD,
-        enabled=has_upload_files,
+        enabled=_has_upload_files,
         description=(
             "Set a file input using existing workspace/download files. Paths are relative to "
             "the workspace or absolute paths returned by file tools."

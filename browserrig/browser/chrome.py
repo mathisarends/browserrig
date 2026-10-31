@@ -105,7 +105,7 @@ class ChromeBrowser:
         # One mouse and keyboard for the whole browser, aimed at the active tab.
         self.input = Input(self._focused)
         self._close_task: asyncio.Task[None] | None = None
-        self.client: CdpClient
+        self.client: CdpClient  # smelt: ignore[SMT430] -- raw CDP escape hatch
 
     async def __aenter__(self) -> Self:
         if self._stack is not None or self._close_task is not None:

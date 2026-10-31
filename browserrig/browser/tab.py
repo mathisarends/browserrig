@@ -216,7 +216,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         self._dialog_opened = asyncio.Event()
         self.closed = False
         # Tab-strip state for live viewers; see `TabUpdatedEvent`.
-        self.loading = False
+        self.loading = False  # smelt: ignore[SMT430] -- public Tab state like url/title
         self.navigation_pending = False
         self._navigation_loader = ""
         self._navigation_document = ""
@@ -272,27 +272,6 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
             self._strip_task.cancel()
             self._strip_task = None
 
-    async def _load_strip(self) -> None:
-        try:
-            async with asyncio.timeout(_STRIP_SECONDS):
-                if self.dialog is None:
-                    frame = await self.main_frame()
-                    strip = await frame.run(TAB_STRIP)
-                    # Chrome's target info often keeps the host as title; the document knows.
-                    self.title = strip.title or self.title
-                    if strip.icon != self._icon_url:
-                        await self.publish_state()
-                        self._icon_url = strip.icon
-                        self.favicon = (
-                            await load_favicon(self.cdp, frame.id, strip.icon)
-                            if strip.icon
-                            else ""
-                        )
-                await self.publish_state()
-        except Exception:  # pylint: disable=broad-exception-caught
-            # Navigation, dialogs and detached sessions only cost the strip state, never the tab.
-            return
-
     async def cursor_style(self, point: Point) -> CursorStyle | None:
         """Return the CSS cursor under a viewport point, or None when the page cannot say."""
         if self._emit is None or self.dialog is not None:
@@ -338,39 +317,13 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
     ) -> None:
         await self._input(
             self.cdp.input.dispatch_mouse_event(
-                type=MouseEventKind.WHEEL.value,
+                type=MouseEventKind.WHEEL.value,  # smelt: ignore[SMT318] -- cdpify wants a Literal
                 x=point.x,
                 y=point.y,
                 delta_x=delta_x,
                 delta_y=delta_y,
             )
         )
-
-    async def _input(self, command: Coroutine[Any, Any, None]) -> None:
-        """Send input, returning early when it opens a JavaScript dialog.
-
-        Chrome answers an input event only after its handlers finish, and an alert, confirm
-        or prompt holds them until the dialog closes. The input has landed by then, so the
-        reply is left to arrive later.
-        """
-        if self.dialog is not None:
-            await command
-            return
-        # Started eagerly, input that needs no reply lands within the caller's step.
-        sent = asyncio.Task(command, loop=asyncio.get_running_loop(), eager_start=True)
-        if not sent.done():
-            opened = asyncio.ensure_future(self._dialog_opened.wait())
-            try:
-                await asyncio.wait((sent, opened), return_when=asyncio.FIRST_COMPLETED)
-            except asyncio.CancelledError:
-                sent.cancel()
-                raise
-            finally:
-                opened.cancel()
-        if not sent.done():
-            sent.add_done_callback(_discard_result)
-            return
-        sent.result()
 
     async def dispatch_key(
         self,
@@ -416,14 +369,16 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
             self._current_action(),
             self._layout_revision,
         ):
-            self._frames_key, self._frames = key, frames
+            self._frames_key = key
+            self._frames = frames
         return frames
 
     async def handle(self, event: object) -> None:
         """Apply a page event that arrived on this tab's own CDP session."""
         match event:
             case FrameNavigatedEvent(frame=frame) if not frame.parent_id:
-                self.document_id, self.url = frame.loader_id, frame.url
+                self.document_id = frame.loader_id
+                self.url = frame.url
                 self._main_frame_id = frame.id
                 self.changed.set()
                 await self.emit(NavigationCommittedEvent(url=self.url))
@@ -497,7 +452,8 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         if self.document_id != tree.frame.loader_id:
             self.worlds.invalidate(frame_id=tree.frame.id)
             self.layout_changed()
-        self.document_id, self.url = tree.frame.loader_id, tree.frame.url
+        self.document_id = tree.frame.loader_id
+        self.url = tree.frame.url
         self._main_frame_id = tree.frame.id
 
     async def go_back(self) -> bool:
@@ -561,6 +517,53 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         result = await self.cdp.page.navigate(url=validated_url(url))
         if result.error_text:
             raise BrowserError(f"Navigation failed: {result.error_text}")
+
+    async def _load_strip(self) -> None:
+        try:
+            async with asyncio.timeout(_STRIP_SECONDS):
+                if self.dialog is None:
+                    frame = await self.main_frame()
+                    strip = await frame.run(TAB_STRIP)
+                    # Chrome's target info often keeps the host as title; the document knows.
+                    self.title = strip.title or self.title
+                    if strip.icon != self._icon_url:
+                        await self.publish_state()
+                        self._icon_url = strip.icon
+                        self.favicon = (
+                            await load_favicon(self.cdp, frame.id, strip.icon)
+                            if strip.icon
+                            else ""
+                        )
+                await self.publish_state()
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Navigation, dialogs and detached sessions only cost the strip state, never the tab.
+            return
+
+    async def _input(self, command: Coroutine[Any, Any, None]) -> None:
+        """Send input, returning early when it opens a JavaScript dialog.
+
+        Chrome answers an input event only after its handlers finish, and an alert, confirm
+        or prompt holds them until the dialog closes. The input has landed by then, so the
+        reply is left to arrive later.
+        """
+        if self.dialog is not None:
+            await command
+            return
+        # Started eagerly, input that needs no reply lands within the caller's step.
+        sent = asyncio.Task(command, loop=asyncio.get_running_loop(), eager_start=True)
+        if not sent.done():
+            opened = asyncio.ensure_future(self._dialog_opened.wait())
+            try:
+                await asyncio.wait((sent, opened), return_when=asyncio.FIRST_COMPLETED)
+            except asyncio.CancelledError:
+                sent.cancel()
+                raise
+            finally:
+                opened.cancel()
+        if not sent.done():
+            sent.add_done_callback(_discard_result)
+            return
+        sent.result()
 
     async def _history(self, offset: int) -> bool:
         history = await self.cdp.page.get_navigation_history()

@@ -1,7 +1,3 @@
-__version__ = "0.1.0"
-
-from browserrig.core.geometry import Point
-
 from .activity import Activity
 from .agent import BrowserAgent, WindowRatio
 from .browser import (
@@ -14,6 +10,7 @@ from .browser import (
 )
 from .completion import Done
 from .composition import browser_plugins
+from .core.geometry import Point
 from .files import FileSystem, FileSystemOptions
 from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanResponse
 from .kinds import MouseEventKind
@@ -59,6 +56,8 @@ from .tools import (
     PointerTools,
     TabTools,
 )
+
+__version__ = "0.1.0"
 
 __all__ = [
     "CheckReadiness",

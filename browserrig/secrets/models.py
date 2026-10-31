@@ -38,6 +38,12 @@ class OriginPattern:
     port: int | None = None
     subdomains: bool = False
 
+    def __str__(self) -> str:
+        host = f"*.{self.host}" if self.subdomains else self.host
+        default = self.port is None or self.port == _DEFAULT_PORTS[self.scheme]
+        port = "" if default else f":{self.port}"
+        return f"{self.scheme}://{host}{port}"
+
     @classmethod
     def parse(cls, pattern: str) -> OriginPattern:
         """`github.com` is that host over https on any port, `*.github.com` its subdomains.
@@ -101,12 +107,6 @@ class OriginPattern:
         if self.subdomains:
             return host.endswith("." + self.host)
         return host == self.host
-
-    def __str__(self) -> str:
-        host = f"*.{self.host}" if self.subdomains else self.host
-        default = self.port is None or self.port == _DEFAULT_PORTS[self.scheme]
-        port = "" if default else f":{self.port}"
-        return f"{self.scheme}://{host}{port}"
 
 
 def _normalize_host(host: str) -> str:
@@ -210,12 +210,10 @@ class Totp:
             raise ValueError("Invalid TOTP settings")
         if isinstance(seed, str):
             _key(seed)
-        self._seed, self._digits, self._period, self._digest = (
-            seed,
-            digits,
-            period,
-            digest,
-        )
+        self._seed = seed
+        self._digits = digits
+        self._period = period
+        self._digest = digest
 
     def __repr__(self) -> str:
         return f"Totp(digits={self._digits}, period={self._period})"

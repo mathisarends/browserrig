@@ -168,7 +168,9 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
         return await actions.run(kind=kind, operation=navigate)
 
 
-def site_url(url: str, current: str) -> str:
+def site_url(  # smelt: ignore[SMT429] -- pure, table-tested
+    url: str, current: str
+) -> str:
     """Resolve a site path such as ``/wiki/Page`` against the current HTTP(S) page."""
     site_path = url.startswith("/") and not url.startswith("//")
     if site_path and urlsplit(current).scheme in {"http", "https"}:
@@ -176,7 +178,7 @@ def site_url(url: str, current: str) -> str:
     return url
 
 
-def typed_address(url: str) -> str:
+def typed_address(url: str) -> str:  # smelt: ignore[SMT429] -- pure, table-tested
     """What a person types into the address bar for `url`: no scheme, no lone trailing slash."""
     parts = urlsplit(url)
     if parts.scheme not in {"http", "https"}:

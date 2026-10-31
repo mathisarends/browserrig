@@ -23,7 +23,7 @@ async def seed_frame(
                     computed_styles=[]
                 )
         snapshot = metadata[session_id]
-        if snapshot is None or not await seed_dom(frame, snapshot):
+        if snapshot is None or not await _seed_dom(frame, snapshot):
             limitations.append(
                 f"Supplementary DOM metadata incomplete for frame {frame.id}"
             )
@@ -33,7 +33,7 @@ async def seed_frame(
         )
 
 
-async def seed_dom(frame: Frame, snapshot: CaptureSnapshotResult) -> bool:
+async def _seed_dom(frame: Frame, snapshot: CaptureSnapshotResult) -> bool:
     """Supplement the composed DOM walk with closed roots and native click-listener metadata."""
     document = next(
         (

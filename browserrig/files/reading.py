@@ -68,10 +68,10 @@ class FileReader:
     ) -> FileContent:
         with path.open("rb") as stream:
             sample = stream.read(65536)
-        format_ = self._format(path, sample)
+        format_ = _format(path, sample)
         if request.member is not None:
             return self._read_member(path, format_, request, offset, max_chars, depth)
-        self._validate_selection(format_, request)
+        _validate_selection(format_, request)
         if format_ == "text":
             encoding = text_encoding(sample)
             if encoding is not None:
@@ -82,7 +82,7 @@ class FileReader:
                         or "text/plain",
                     }
                 )
-            return self._unsupported(
+            return _unsupported(
                 path,
                 format_,
                 "The file contains binary data or an unrecognized text encoding",
@@ -90,7 +90,7 @@ class FileReader:
                 max_chars,
             )
         if format_ in _UNSUPPORTED or format_ == "binary":
-            return self._unsupported(
+            return _unsupported(
                 path,
                 format_,
                 "No local content reader is available for this format",
@@ -126,80 +126,6 @@ class FileReader:
         if not path.resolve().is_relative_to(directory):
             raise ValueError("Content cache file is outside the cache directory")
         return path
-
-    @staticmethod
-    def _format(path: Path, sample: bytes) -> str:
-        # pylint: disable=too-many-return-statements,too-many-branches
-        suffix = path.suffix.lower().lstrip(".")
-        detected = signature_format(sample)
-        if detected is not None:
-            return detected
-        if is_zipfile(path):
-            with ZipFile(path) as archive:
-                names = set(archive.namelist())
-                if "xl/workbook.xml" in names:
-                    return (
-                        suffix
-                        if suffix in {Ext.XLSX, Ext.XLSM, Ext.XLTX, Ext.XLTM}
-                        else Ext.XLSX
-                    )
-                if "word/document.xml" in names:
-                    return Ext.DOCX
-                if "ppt/presentation.xml" in names:
-                    return Ext.PPTX
-                if "META-INF/container.xml" in names:
-                    return Ext.EPUB
-                if "mimetype" in names:
-                    with archive.open("mimetype") as stream:
-                        mime = stream.read(256)
-                    for name, type_ in (
-                        (b"spreadsheet", Ext.ODS),
-                        (b"presentation", Ext.ODP),
-                        (b"text", Ext.ODT),
-                    ):
-                        if b"opendocument" in mime and name in mime:
-                            return type_
-                return Ext.ZIP
-        if sample.startswith(b"\xd0\xcf\x11\xe0"):
-            return (
-                Ext.XLS
-                if suffix == Ext.XLS
-                else suffix
-                if suffix in _UNSUPPORTED
-                else "binary"
-            )
-        if suffix in {Ext.TAR, Ext.TGZ, Ext.TBZ2, Ext.TXZ, Ext.GZ, Ext.BZ2, Ext.XZ}:
-            if tarfile.is_tarfile(path):
-                return Ext.TAR
-            return suffix
-        if suffix in READERS or suffix in _UNSUPPORTED:
-            return suffix
-        if suffix in {
-            Ext.HTML,
-            Ext.HTM,
-            Ext.XHTML,
-            Ext.SVG,
-        } or sample.lstrip().lower().startswith((b"<!doctype html", b"<html")):
-            return Ext.HTML
-        if suffix in {Ext.MHT, Ext.MHTML}:
-            return Ext.MHTML
-        return "text" if text_encoding(sample) is not None else "binary"
-
-    @staticmethod
-    def _validate_selection(format_: str, request: ReadRequest) -> None:
-        spec = READERS.get(format_)
-        if request.page_number is not None and (spec is None or not spec.pages):
-            raise ValueError(
-                "page_number is only supported for PDF pages, presentation slides and image frames"
-            )
-        if request.sheet is not None and (spec is None or not spec.sheets):
-            raise ValueError(
-                "sheet is only supported for spreadsheets, delimited tables and SQLite databases"
-            )
-        if request.cell_range is not None and (spec is None or not spec.cell_ranges):
-            raise ValueError(
-                "cell_range is only supported for spreadsheets and delimited tables"
-            )
 
     def _key(self, path: Path, request: ReadRequest) -> str:
         stat = path.stat()
@@ -346,21 +272,93 @@ class FileReader:
             suffix = ""
         return self._cache_path(f"{key}.source{suffix}")
 
-    @staticmethod
-    def _unsupported(
-        path: Path, format_: str, reason: str, offset: int, max_chars: int
-    ) -> FileContent:
-        text = (
-            f"Name: {path.name}\nSize: {path.stat().st_size} bytes\nFormat: {format_}"
+
+def _format(path: Path, sample: bytes) -> str:
+    # pylint: disable=too-many-return-statements,too-many-branches
+    suffix = path.suffix.lower().lstrip(".")
+    detected = signature_format(sample)
+    if detected is not None:
+        return detected
+    if is_zipfile(path):
+        with ZipFile(path) as archive:
+            names = set(archive.namelist())
+            if "xl/workbook.xml" in names:
+                return (
+                    suffix
+                    if suffix in {Ext.XLSX, Ext.XLSM, Ext.XLTX, Ext.XLTM}
+                    else Ext.XLSX
+                )
+            if "word/document.xml" in names:
+                return Ext.DOCX
+            if "ppt/presentation.xml" in names:
+                return Ext.PPTX
+            if "META-INF/container.xml" in names:
+                return Ext.EPUB
+            if "mimetype" in names:
+                with archive.open("mimetype") as stream:
+                    mime = stream.read(256)
+                for name, type_ in (
+                    (b"spreadsheet", Ext.ODS),
+                    (b"presentation", Ext.ODP),
+                    (b"text", Ext.ODT),
+                ):
+                    if b"opendocument" in mime and name in mime:
+                        return type_
+            return Ext.ZIP
+    if sample.startswith(b"\xd0\xcf\x11\xe0"):
+        return (
+            Ext.XLS
+            if suffix == Ext.XLS
+            else suffix
+            if suffix in _UNSUPPORTED
+            else "binary"
         )
-        return FileContent(
-            path=str(path),
-            media_type=mimetypes.guess_type(path.name)[0] or "application/octet-stream",
-            text=text[offset : offset + max_chars],
-            offset=offset,
-            next_offset=offset + max_chars if len(text) > offset + max_chars else None,
-            size=path.stat().st_size,
-            format=format_,
-            status="unsupported",
-            limitations=(reason,),
+    if suffix in {Ext.TAR, Ext.TGZ, Ext.TBZ2, Ext.TXZ, Ext.GZ, Ext.BZ2, Ext.XZ}:
+        if tarfile.is_tarfile(path):
+            return Ext.TAR
+        return suffix
+    if suffix in READERS or suffix in _UNSUPPORTED:
+        return suffix
+    if suffix in {
+        Ext.HTML,
+        Ext.HTM,
+        Ext.XHTML,
+        Ext.SVG,
+    } or sample.lstrip().lower().startswith((b"<!doctype html", b"<html")):
+        return Ext.HTML
+    if suffix in {Ext.MHT, Ext.MHTML}:
+        return Ext.MHTML
+    return "text" if text_encoding(sample) is not None else "binary"
+
+
+def _validate_selection(format_: str, request: ReadRequest) -> None:
+    spec = READERS.get(format_)
+    if request.page_number is not None and (spec is None or not spec.pages):
+        raise ValueError(
+            "page_number is only supported for PDF pages, presentation slides and image frames"
         )
+    if request.sheet is not None and (spec is None or not spec.sheets):
+        raise ValueError(
+            "sheet is only supported for spreadsheets, delimited tables and SQLite databases"
+        )
+    if request.cell_range is not None and (spec is None or not spec.cell_ranges):
+        raise ValueError(
+            "cell_range is only supported for spreadsheets and delimited tables"
+        )
+
+
+def _unsupported(
+    path: Path, format_: str, reason: str, offset: int, max_chars: int
+) -> FileContent:
+    text = f"Name: {path.name}\nSize: {path.stat().st_size} bytes\nFormat: {format_}"
+    return FileContent(
+        path=str(path),
+        media_type=mimetypes.guess_type(path.name)[0] or "application/octet-stream",
+        text=text[offset : offset + max_chars],
+        offset=offset,
+        next_offset=offset + max_chars if len(text) > offset + max_chars else None,
+        size=path.stat().st_size,
+        format=format_,
+        status="unsupported",
+        limitations=(reason,),
+    )

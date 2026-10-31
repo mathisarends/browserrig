@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 
 from . import data, documents, imaging, spreadsheets
-from ._adapters import Reader
-from ._adapters import container as _container
-from ._adapters import document as _document
-from ._adapters import ocr as _ocr
-from ._adapters import selected as _selected
+from .adapters import Reader
+from .adapters import container as _container
+from .adapters import document as _document
+from .adapters import ocr as _ocr
+from .adapters import selected as _selected
 from .kinds import FileExtension as Ext
 
 

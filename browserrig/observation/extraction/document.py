@@ -441,8 +441,10 @@ class Document:  # pylint: disable=too-many-public-methods
             hidden[index], pinned[index] = is_hidden, is_pinned
             clip[index], scroll[index] = hard, soft
             inner_clip[index], inner_scroll[index] = own_hard, own_soft
-        self._hidden, self._pinned = hidden, pinned
-        self._clip, self._scroll_clip = clip, scroll
+        self._hidden = hidden
+        self._pinned = pinned
+        self._clip = clip
+        self._scroll_clip = scroll
 
 
 def _overflow(rect: Rect, overflow_x: str, overflow_y: str, hard: bool) -> Rect:
