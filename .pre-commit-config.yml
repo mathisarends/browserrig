@@ -26,6 +26,13 @@ repos:
         language: system
         files: '^((browserrig|examples|tests)/.*\.py|pyproject\.toml|uv\.lock)$'
         pass_filenames: false
+      - id: smelt
+        name: Smelt
+        entry: uv run --locked smelt check --fail-on warning
+        language: system
+        files: '^((browserrig|tests)/.*\.py|smelt\.yml|\.smelt/debt\.json|pyproject\.toml|uv\.lock)$'
+        pass_filenames: false
+        require_serial: true
       - id: eslint
         name: ESLint
         entry: node node_modules/eslint/bin/eslint.js . --max-warnings 0

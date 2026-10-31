@@ -47,6 +47,7 @@ dev = [
     "pytest-asyncio>=1,<2",
     "python-dotenv>=1,<2",
     "ruff>=0.14,<1",
+    "smelt-cli>=0.2.0,<0.3",
     "ty>=0.0.93,<0.1",
 ]
 
@@ -56,7 +57,7 @@ packages = ["browserrig"]
 [tool.hatch.build.targets.sdist]
 include = ["browserrig", "examples", "tests", "README.md",
            "pyproject.toml", "uv.lock", ".env.example", "compose.yml", "docs", ".github", ".gitattributes",
-           ".pre-commit-config.yml", "package.json", "package-lock.json", "eslint.config.mjs",
+           ".pre-commit-config.yml", "smelt.yml", ".smelt", "package.json", "package-lock.json", "eslint.config.mjs",
            ".prettierrc.json", ".prettierignore"]
 
 [tool.pytest.ini_options]

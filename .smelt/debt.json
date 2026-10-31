@@ -1,0 +1,1433 @@
+{
+  "version": 1,
+  "violations": [
+    {
+      "fingerprint": "7f117105538cac52f99d007288008672",
+      "code": "SMT308",
+      "path": "browserrig/__init__.py",
+      "message": "contract \"conventions\" expects an relative import of browserrig.core.geometry"
+    },
+    {
+      "fingerprint": "0d4df5d65a1c285c2d13851b9b1e6fdc",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "446f04d7dc66a8ef935772d71af80962",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "55906b145ac584dbc69481032731ebe8",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "6acfeca4d64e1dc6a465a81c4239ca25",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "718df2db7733ce11f1d6242e1d696fe3",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "812bf42d035ee65d3e052f4ecb8fe14c",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "962634fc0cfc09800382d39d678e2a75",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "a5646e6d66fd164f8c6639a0456f4ff3",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "b5d9c8635627a3416b765b72ad097249",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "c1cf25abd2874fb6b789bd610b5d06ee",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "cc1f520a6250e16c8f20fa013f334cac",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "ee042cd8a99c73b5b04830a8291a8b99",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "f60e51c0bbc86e73a6a2b856a326ecf0",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "f6924470adedd74485659608e91252df",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "f771ec7d59ab67db4f216e713017263a",
+      "code": "SMT313",
+      "path": "browserrig/__init__.py",
+      "message": "imports appear after later definition groups"
+    },
+    {
+      "fingerprint": "0974744ed0d65d6afaacf12ac6e9e952",
+      "code": "SMT429",
+      "path": "browserrig/activity/models.py",
+      "message": "browserrig.activity.models.inference_only is public; among analyzed modules, only tests access it outside its defining module"
+    },
+    {
+      "fingerprint": "2c3dce104e9522ea1eed792cdad5e073",
+      "code": "SMT319",
+      "path": "browserrig/agent.py",
+      "message": "import these names from the existing browserrig.readiness package API"
+    },
+    {
+      "fingerprint": "627e40bd4efe8397c6485af6f61b019e",
+      "code": "SMT319",
+      "path": "browserrig/agent.py",
+      "message": "import these names from the existing browserrig.tools package API"
+    },
+    {
+      "fingerprint": "d302255c90baea60b4b1c80f68f16c0c",
+      "code": "SMT319",
+      "path": "browserrig/agent.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "1209c2c6968e22bba52d8ab9f61628b7",
+      "code": "SMT308",
+      "path": "browserrig/browser/base.py",
+      "message": "contract \"conventions\" expects an relative import of browserrig.browser.models"
+    },
+    {
+      "fingerprint": "825d2e6a548c9161fca585e1f5fadffd",
+      "code": "SMT308",
+      "path": "browserrig/browser/chrome.py",
+      "message": "contract \"conventions\" expects an relative import of browserrig.browser.models"
+    },
+    {
+      "fingerprint": "84a32b0064b79e0688c6554c94cce710",
+      "code": "SMT430",
+      "path": "browserrig/browser/chrome.py",
+      "message": "ChromeBrowser.client is public; among analyzed modules, only tests read it outside its defining class"
+    },
+    {
+      "fingerprint": "0522bde9578ebf2b2b5d339d8a982ce5",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "0a131f8563617b821c8d7623d758fddd",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "177b6725b5abd42d5fa67f4bb33e89f9",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "1880ec8831ad4f6211240c35c361b732",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "21f054f5498d601e423cf9ba631def9e",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "22560b248f7e72b19109b0dceb2dec08",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "2e0fdcbda526f577dc5b24e27983bf2d",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "2f1a892e534ce1d3aa74688b129877a1",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "303c2f9c6eb1ea5379542586c4b24692",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "39e338dc4405eb2554fb884710861181",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "528570299a0dbfa433e5061cb51addac",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "53900ab4de832ddd422ab81af7eaeffc",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "597875d4b19a9f0507d838db91583232",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "6408bcd74f1518ac319bce81f50b9ba2",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "682a11e5078c3bbac8d8b379b9835294",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "7c254ab4844080457b787b42b648dcf9",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "80bd55fdce22b41bc580f57c7b250d3a",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "878e5d0975fae36f7d2eb7efdd730b88",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "8d0e17935dfe6cdb12b1a3e7895b3da5",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "8e1e0f8ea31bcde77c1103bdbcef486d",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "8fbdcabb4adfd1cfa0869b5611b2ccab",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "940d911f2aaa493dc2bffad6c9c85d97",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "a5aff2cb977886ed77d0126007ab2dde",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "a75401997f83dd436370b54a48ac8e66",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "ac3140f6037ef42967832aee9e94f204",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "afa0042811595e7394fa245978df5cde",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "c1f56003b77d62eef1eeca5b3445d484",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "c5510e14b6ffce0f6c4f1cdf12f2c347",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "c7a72638a4830dcbbe6a134fdb1dad80",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "d156e596e16653a17731722a1b4d6ca2",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "d645c9f7c1bcce3f6e3cc5eb45cf41bc",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "d653405b2714f0f1b19fcb6f52643c74",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "f2204f37caf6ca25dc9f545c1f88b26a",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "f5f041b13251f1234423239af59a754a",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "f7e921cb802bf112d247fd038907bb35",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "ff27b14eba83156921b1cde163a65c8a",
+      "code": "SMT313",
+      "path": "browserrig/browser/tab.py",
+      "message": "definitions in module.Tab#0 have 36 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "20473f8a2688b79a4b8a3c3b6d632f45",
+      "code": "SMT314",
+      "path": "browserrig/browser/tab.py",
+      "message": "assignment writes 2 instance attributes; use separate statements"
+    },
+    {
+      "fingerprint": "262137648ee7dfd84bd459743a431425",
+      "code": "SMT314",
+      "path": "browserrig/browser/tab.py",
+      "message": "assignment writes 2 instance attributes; use separate statements"
+    },
+    {
+      "fingerprint": "c0053e397f8d2ffa2143de77e0d287f2",
+      "code": "SMT314",
+      "path": "browserrig/browser/tab.py",
+      "message": "assignment writes 2 instance attributes; use separate statements"
+    },
+    {
+      "fingerprint": "d3f97dd95b950ec81ace6259bf64237a",
+      "code": "SMT318",
+      "path": "browserrig/browser/tab.py",
+      "message": "consider MouseEventKind.WHEEL directly; StrEnum members are already strings"
+    },
+    {
+      "fingerprint": "4f408b7dafbb7708358757a51b7fe6c6",
+      "code": "SMT319",
+      "path": "browserrig/browser/tab.py",
+      "message": "import these names from the existing browserrig.scripts package API"
+    },
+    {
+      "fingerprint": "d070473cb452edeaa0017b57d248d2d3",
+      "code": "SMT430",
+      "path": "browserrig/browser/tab.py",
+      "message": "Tab.loading is public; among analyzed modules, only tests read it outside its defining class"
+    },
+    {
+      "fingerprint": "205f9218e7345615399f17c240e4e106",
+      "code": "SMT319",
+      "path": "browserrig/composition.py",
+      "message": "import these names from the existing browserrig.tools package API"
+    },
+    {
+      "fingerprint": "49853762ba0e6871906e041186618e49",
+      "code": "SMT319",
+      "path": "browserrig/composition.py",
+      "message": "import these names from the existing browserrig.readiness package API"
+    },
+    {
+      "fingerprint": "806c38a4728a9bf379dbd27ff3c57da9",
+      "code": "SMT319",
+      "path": "browserrig/composition.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "9922f2ec92d66d347177b5eceaaedb9e",
+      "code": "SMT319",
+      "path": "browserrig/composition.py",
+      "message": "import these names from the existing browserrig.readiness package API"
+    },
+    {
+      "fingerprint": "c979a11d14f6bd3cde7124beb33924da",
+      "code": "SMT319",
+      "path": "browserrig/composition.py",
+      "message": "import these names from the existing browserrig.readiness package API"
+    },
+    {
+      "fingerprint": "dba6dc6753b0e7474efa9be3fd21e05a",
+      "code": "SMT319",
+      "path": "browserrig/composition.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "459e463574eb78ef2c19930165239ec5",
+      "code": "SMT308",
+      "path": "browserrig/events.py",
+      "message": "contract \"conventions\" expects an relative import of browserrig.core.kinds"
+    },
+    {
+      "fingerprint": "c41b2ecd817a3fd8ac60d365b0a76e2c",
+      "code": "SMT312",
+      "path": "browserrig/files/_adapters.py",
+      "message": "contract \"conventions\" forbids underscore-prefixed module name \"_adapters\" (browserrig.files._adapters)"
+    },
+    {
+      "fingerprint": "d2ff8e359e6a135a5279b1cd4a063e90",
+      "code": "SMT316",
+      "path": "browserrig/files/documents.py",
+      "message": "html_text is public, but has no observed use outside its module"
+    },
+    {
+      "fingerprint": "958127ba10535a82a119f88d3c816524",
+      "code": "SMT316",
+      "path": "browserrig/files/imaging.py",
+      "message": "image_text is public, but has no observed use outside its module"
+    },
+    {
+      "fingerprint": "9539704841557625d85e71767ee5cd4b",
+      "code": "SMT317",
+      "path": "browserrig/files/reading.py",
+      "message": "FileReader._unsupported is an internal static helper; prefer a private module function"
+    },
+    {
+      "fingerprint": "d92e627fa9ed59d4db9fdccb118ddcf6",
+      "code": "SMT317",
+      "path": "browserrig/files/reading.py",
+      "message": "FileReader._validate_selection is an internal static helper; prefer a private module function"
+    },
+    {
+      "fingerprint": "e997f9e6b6bdc8428803f27e94dc4e33",
+      "code": "SMT317",
+      "path": "browserrig/files/reading.py",
+      "message": "FileReader._format is an internal static helper; prefer a private module function"
+    },
+    {
+      "fingerprint": "a5ca7b35d69d3218ac90da861b544997",
+      "code": "SMT319",
+      "path": "browserrig/handoff/changes.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "4aa4720a07d5ae43a07b750b9e3d77cb",
+      "code": "SMT319",
+      "path": "browserrig/handoff/plugin.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "7886a8c240bd0be7d38f021953cd0e23",
+      "code": "SMT319",
+      "path": "browserrig/input/mouse.py",
+      "message": "import these names from the existing browserrig.core package API"
+    },
+    {
+      "fingerprint": "144d5c5544fcc748c775880aba917c58",
+      "code": "SMT316",
+      "path": "browserrig/input/pointer.py",
+      "message": "ease is public, but has no observed use outside its module"
+    },
+    {
+      "fingerprint": "90666a152200564a1ae91925fb995d54",
+      "code": "SMT319",
+      "path": "browserrig/input/pointer.py",
+      "message": "import these names from the existing browserrig.core package API"
+    },
+    {
+      "fingerprint": "c0becd07a78daeb7579dbda9ec49ea5d",
+      "code": "SMT319",
+      "path": "browserrig/input/target.py",
+      "message": "import these names from the existing browserrig.core package API"
+    },
+    {
+      "fingerprint": "1be462e2093369967a64641a40056f0c",
+      "code": "SMT104",
+      "path": "browserrig/nudges/plugin.py",
+      "message": "import cycle between modules in browserrig: nudges -> observation -> nudges (type checking only)"
+    },
+    {
+      "fingerprint": "5cc450ed557617930192e88cf4b8788f",
+      "code": "SMT104",
+      "path": "browserrig/nudges/plugin.py",
+      "message": "import cycle between modules in browserrig: nudges -> observation -> nudges (type checking only)"
+    },
+    {
+      "fingerprint": "e0363c7215375f8b4a675c0ba7536ab0",
+      "code": "SMT104",
+      "path": "browserrig/nudges/plugin.py",
+      "message": "import cycle between modules in browserrig: nudges -> observation -> nudges (type checking only)"
+    },
+    {
+      "fingerprint": "e56fe34349c4b5123d28c06acdd914de",
+      "code": "SMT104",
+      "path": "browserrig/nudges/plugin.py",
+      "message": "import cycle between modules in browserrig: nudges -> observation -> nudges (type checking only)"
+    },
+    {
+      "fingerprint": "556dd716907d4f73fd59109e899d8631",
+      "code": "SMT314",
+      "path": "browserrig/nudges/plugin.py",
+      "message": "assignment writes 2 instance attributes; use separate statements"
+    },
+    {
+      "fingerprint": "8822a5161196a175bad89c325d5a2535",
+      "code": "SMT319",
+      "path": "browserrig/nudges/plugin.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "56be6f74c5a020a9899ded195fa2de90",
+      "code": "SMT319",
+      "path": "browserrig/observation/capture.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "8294f8d5500928765e9d6942287deaa2",
+      "code": "SMT319",
+      "path": "browserrig/observation/capture.py",
+      "message": "import these names from the existing browserrig.readiness package API"
+    },
+    {
+      "fingerprint": "80b3e66683b4cc25b821b33d7b804088",
+      "code": "SMT319",
+      "path": "browserrig/observation/content.py",
+      "message": "import these names from the existing browserrig.scripts package API"
+    },
+    {
+      "fingerprint": "cbb819d31d3c61d6c0131c448297c187",
+      "code": "SMT319",
+      "path": "browserrig/observation/content.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "7d3a9038a86670597ce029f962a30651",
+      "code": "SMT316",
+      "path": "browserrig/observation/dom.py",
+      "message": "seed_dom is public, but has no observed use outside its module"
+    },
+    {
+      "fingerprint": "3b045a2ae41c1cda1e45d950d2f564c9",
+      "code": "SMT319",
+      "path": "browserrig/observation/dom.py",
+      "message": "import these names from the existing browserrig.scripts package API"
+    },
+    {
+      "fingerprint": "cb4fc3f950dca863f90dbe50758f8cc1",
+      "code": "SMT319",
+      "path": "browserrig/observation/dom.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "14d33a3a49daedc40e5d12c888e0ea68",
+      "code": "SMT308",
+      "path": "browserrig/observation/extraction/__init__.py",
+      "message": "contract \"conventions\" expects an absolute import of browserrig.observation.models"
+    },
+    {
+      "fingerprint": "56f0970b43a08d9e2ea33a78f14dd10d",
+      "code": "SMT308",
+      "path": "browserrig/observation/extraction/accessibility.py",
+      "message": "contract \"conventions\" expects an absolute import of browserrig.observation.models"
+    },
+    {
+      "fingerprint": "3898d378c54d77a71a9f922e37670dc0",
+      "code": "SMT314",
+      "path": "browserrig/observation/extraction/document.py",
+      "message": "assignment writes 2 instance attributes; use separate statements"
+    },
+    {
+      "fingerprint": "838fc40ebc06c7f34e79719473513b59",
+      "code": "SMT314",
+      "path": "browserrig/observation/extraction/document.py",
+      "message": "assignment writes 2 instance attributes; use separate statements"
+    },
+    {
+      "fingerprint": "484baa8d2880dd1ddabf96a6f739d523",
+      "code": "SMT308",
+      "path": "browserrig/observation/extraction/elements.py",
+      "message": "contract \"conventions\" expects an absolute import of browserrig.observation.models"
+    },
+    {
+      "fingerprint": "d3b53372c5d46775ba706fb74c95a273",
+      "code": "SMT308",
+      "path": "browserrig/observation/extraction/semantics.py",
+      "message": "contract \"conventions\" expects an absolute import of browserrig.observation.models"
+    },
+    {
+      "fingerprint": "fbde3339c63abbaf9540ae854be9caa1",
+      "code": "SMT319",
+      "path": "browserrig/observation/find.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "0fd8ef6ffb3cf0976faa5116ba5b03c5",
+      "code": "SMT319",
+      "path": "browserrig/observation/handle.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "22f7a49170bd18255b4f3a78bb71ed3c",
+      "code": "SMT319",
+      "path": "browserrig/observation/handle.py",
+      "message": "import these names from the existing browserrig.scripts package API"
+    },
+    {
+      "fingerprint": "daabbb37f6cd833c8e4fa516e58f118b",
+      "code": "SMT319",
+      "path": "browserrig/observation/plugin.py",
+      "message": "import these names from the existing browserrig.readiness package API"
+    },
+    {
+      "fingerprint": "f7fba203f2471de10c49d3eee1afe7c9",
+      "code": "SMT319",
+      "path": "browserrig/observation/plugin.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "fddab0d7f7a3bed56690e9d6d78fee23",
+      "code": "SMT429",
+      "path": "browserrig/observation/render.py",
+      "message": "browserrig.observation.render.image_caption is public; among analyzed modules, only tests access it outside its defining module"
+    },
+    {
+      "fingerprint": "2bf1ec62b0af7cf00f5a976143a6b425",
+      "code": "SMT316",
+      "path": "browserrig/readiness/dom.py",
+      "message": "probe_dom is public, but has no observed use outside its module"
+    },
+    {
+      "fingerprint": "05a8d6d77a2b80bb82fa8c4b5c34e5e3",
+      "code": "SMT319",
+      "path": "browserrig/readiness/dom.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "89c9b655c94397917238786a1206d5fc",
+      "code": "SMT319",
+      "path": "browserrig/readiness/dom.py",
+      "message": "import these names from the existing browserrig.scripts package API"
+    },
+    {
+      "fingerprint": "7ea53fe01a64dba4247c0f4c26014ae4",
+      "code": "SMT319",
+      "path": "browserrig/readiness/downloads.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "8fadc247468de27db3ddfb44287b3d24",
+      "code": "SMT319",
+      "path": "browserrig/readiness/plugin.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "3c72397a47bbdf9db4a209ca551ecba2",
+      "code": "SMT319",
+      "path": "browserrig/readiness/policies.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "34ea2c9bc02d09c1b22b6596a03884a7",
+      "code": "SMT319",
+      "path": "browserrig/readiness/strategy.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "501b6d6c77478aaee0c7e5c0c689f89f",
+      "code": "SMT319",
+      "path": "browserrig/readiness/wait.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "17725c5626418ef0b32357ff79020cb0",
+      "code": "SMT313",
+      "path": "browserrig/secrets/models.py",
+      "message": "definitions in module.OriginPattern#0 have 2 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "9c69a2a7409954e99df2a2f037087ce9",
+      "code": "SMT313",
+      "path": "browserrig/secrets/models.py",
+      "message": "definitions in module.OriginPattern#0 have 2 avoidable ordering inversion(s)"
+    },
+    {
+      "fingerprint": "19c96a62cfd619f4b87b35159a7a4ff7",
+      "code": "SMT314",
+      "path": "browserrig/secrets/models.py",
+      "message": "assignment writes 4 instance attributes; use separate statements"
+    },
+    {
+      "fingerprint": "125a6c543fcc57d4088d82eb2ef8bb53",
+      "code": "SMT319",
+      "path": "browserrig/secrets/plugin.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "49fc4941065707643d40518f6ecc89bd",
+      "code": "SMT319",
+      "path": "browserrig/secrets/plugin.py",
+      "message": "import these names from the existing browserrig.scripts package API"
+    },
+    {
+      "fingerprint": "4f6a41b73baf0f6bcccc1e131ab6d46a",
+      "code": "SMT319",
+      "path": "browserrig/secrets/plugin.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "b4bb69566d5204e3f574ea052536fbc8",
+      "code": "SMT319",
+      "path": "browserrig/secrets/plugin.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "e40d9c05c59a8ea8a77a87b67a3194b1",
+      "code": "SMT319",
+      "path": "browserrig/secrets/plugin.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "39ede10d4f294cb8f2ff49b466c4fc56",
+      "code": "SMT319",
+      "path": "browserrig/tools/dialogs.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "0b88b15a2405b16bf889d085a5b84bdb",
+      "code": "SMT319",
+      "path": "browserrig/tools/dom.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "8aacb4686a1986dd46a61d7c04f44673",
+      "code": "SMT319",
+      "path": "browserrig/tools/execution.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "8ef088725861a3b14b4a639ac9e92ca4",
+      "code": "SMT319",
+      "path": "browserrig/tools/execution.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "b006a8974afa2b868d12f14bad813536",
+      "code": "SMT319",
+      "path": "browserrig/tools/execution.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "c3b642ed8304906e1ad1b76c175c97d3",
+      "code": "SMT319",
+      "path": "browserrig/tools/execution.py",
+      "message": "import these names from the existing browserrig.readiness package API"
+    },
+    {
+      "fingerprint": "26fafe06e0817bab7c1a4aa370542f26",
+      "code": "SMT316",
+      "path": "browserrig/tools/files.py",
+      "message": "has_files is public, but has no observed use outside its module"
+    },
+    {
+      "fingerprint": "ef03e8ae394354808f1e1f5fa046c575",
+      "code": "SMT316",
+      "path": "browserrig/tools/files.py",
+      "message": "has_upload_files is public, but has no observed use outside its module"
+    },
+    {
+      "fingerprint": "98f7e7295d4a0bdeef8ab8fe1adfacb5",
+      "code": "SMT319",
+      "path": "browserrig/tools/files.py",
+      "message": "import these names from the existing browserrig.readiness package API"
+    },
+    {
+      "fingerprint": "f3dd6806bb7f73e46fc24866dff04f11",
+      "code": "SMT319",
+      "path": "browserrig/tools/files.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "587433e6371733d7c53434ae2228f30e",
+      "code": "SMT319",
+      "path": "browserrig/tools/find.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "5ebdb653a0eea731c64bee1fa65683c0",
+      "code": "SMT319",
+      "path": "browserrig/tools/find.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "48b050b2a0985dabee4bc41723f62f7e",
+      "code": "SMT319",
+      "path": "browserrig/tools/forms.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "db258720043cbcdebba3cc96e9251766",
+      "code": "SMT319",
+      "path": "browserrig/tools/javascript.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "30628e1e98482af8fbd9781a1ced9048",
+      "code": "SMT319",
+      "path": "browserrig/tools/keyboard.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "d12067de9f2aaafdff53baab95f307fd",
+      "code": "SMT319",
+      "path": "browserrig/tools/keyboard.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "05d839340ebf35fb67fb6ef8abd2d626",
+      "code": "SMT319",
+      "path": "browserrig/tools/mouse.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "18f08b5cafcc430137be99715c845c74",
+      "code": "SMT319",
+      "path": "browserrig/tools/mouse.py",
+      "message": "import these names from the existing browserrig.core package API"
+    },
+    {
+      "fingerprint": "6f4352459e5f0e28c62288c10f09770a",
+      "code": "SMT319",
+      "path": "browserrig/tools/mouse.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "8f91132493f80ddb6a4f711fd978ad65",
+      "code": "SMT319",
+      "path": "browserrig/tools/mouse.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "ee57f3132b487e487f1c3d766f161663",
+      "code": "SMT319",
+      "path": "browserrig/tools/navigation.py",
+      "message": "import these names from the existing browserrig.readiness package API"
+    },
+    {
+      "fingerprint": "1c825b58dfa05e28bc92b15481aeb5b2",
+      "code": "SMT429",
+      "path": "browserrig/tools/navigation.py",
+      "message": "browserrig.tools.navigation.site_url is public; among analyzed modules, only tests access it outside its defining module"
+    },
+    {
+      "fingerprint": "dc6feb6115600273565047cda6268244",
+      "code": "SMT429",
+      "path": "browserrig/tools/navigation.py",
+      "message": "browserrig.tools.navigation.typed_address is public; among analyzed modules, only tests access it outside its defining module"
+    },
+    {
+      "fingerprint": "3261bf78c81d5298f99a3a45a3fb96cd",
+      "code": "SMT319",
+      "path": "browserrig/tools/scrolling.py",
+      "message": "import these names from the existing browserrig.scripts package API"
+    },
+    {
+      "fingerprint": "ca38e18f415c7449cb8ce7fc33fe3d8a",
+      "code": "SMT319",
+      "path": "browserrig/tools/scrolling.py",
+      "message": "import these names from the existing browserrig.core package API"
+    },
+    {
+      "fingerprint": "daefea2caa14791f8be0fd9b0ef77513",
+      "code": "SMT319",
+      "path": "browserrig/tools/scrolling.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "e02ed7d47aefc853b76cad4119c2e9f0",
+      "code": "SMT319",
+      "path": "browserrig/tools/scrolling.py",
+      "message": "import these names from the existing browserrig.observation package API"
+    },
+    {
+      "fingerprint": "60a3bba0c0314f733af57354e7dc5633",
+      "code": "SMT319",
+      "path": "browserrig/tools/tabs.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "9adeac1e32c485b7aab03b08c28d8d90",
+      "code": "SMT319",
+      "path": "browserrig/tools/tabs.py",
+      "message": "import these names from the existing browserrig.browser package API"
+    },
+    {
+      "fingerprint": "ee694b3a18f742a01139ee7eeb9a1568",
+      "code": "SMT319",
+      "path": "browserrig/tools/tabs.py",
+      "message": "import these names from the existing browserrig.readiness package API"
+    },
+    {
+      "fingerprint": "8cd9eb8f6969e8e0dd7949bb2444c771",
+      "code": "SMT420",
+      "path": "tests/test_actions.py",
+      "message": "test accesses private production name browserrig.tools.execution.Actions._fail"
+    },
+    {
+      "fingerprint": "e8a100a99244603a299f7db7293df9e7",
+      "code": "SMT420",
+      "path": "tests/test_actions.py",
+      "message": "test accesses private production name browserrig.tools.execution.Actions._prepare"
+    },
+    {
+      "fingerprint": "e8a100a99244603a299f7db7293df9e7",
+      "code": "SMT420",
+      "path": "tests/test_actions.py",
+      "message": "test accesses private production name browserrig.tools.execution.Actions._prepare"
+    },
+    {
+      "fingerprint": "e8a100a99244603a299f7db7293df9e7",
+      "code": "SMT420",
+      "path": "tests/test_actions.py",
+      "message": "test accesses private production name browserrig.tools.execution.Actions._prepare"
+    },
+    {
+      "fingerprint": "77179b176978466e12c1ace8ffd27116",
+      "code": "SMT422",
+      "path": "tests/test_actions.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "b22b6e88a1c8a323c87a8f01d571062f",
+      "code": "SMT422",
+      "path": "tests/test_actions.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "4fb673a3c0340baa07e5a24e78b4013d",
+      "code": "SMT425",
+      "path": "tests/test_architecture.py",
+      "message": "test_service_packages_respect_dependency_boundaries only checks possibly empty data; its assertions can pass or be skipped without checking an item"
+    },
+    {
+      "fingerprint": "63d6d238644150241cd70ccdaff94463",
+      "code": "SMT425",
+      "path": "tests/test_architecture.py",
+      "message": "test_core_has_no_dependencies_on_browser_services only checks possibly empty data; its assertions can pass or be skipped without checking an item"
+    },
+    {
+      "fingerprint": "b7c329a0d3cb2e42926ba8ce795784b7",
+      "code": "SMT425",
+      "path": "tests/test_architecture.py",
+      "message": "test_tools_do_not_use_cdp only checks possibly empty data; its assertions can pass or be skipped without checking an item"
+    },
+    {
+      "fingerprint": "57c4c77eee7729fb96b74d1b3216eecb",
+      "code": "SMT420",
+      "path": "tests/test_browser_composition.py",
+      "message": "test accesses private production name browserrig.tools.mouse._image_point"
+    },
+    {
+      "fingerprint": "a1be727efcd1fb823790a19dde96d4f8",
+      "code": "SMT420",
+      "path": "tests/test_browser_composition.py",
+      "message": "test accesses private production name browserrig.Observe._page_key"
+    },
+    {
+      "fingerprint": "a1be727efcd1fb823790a19dde96d4f8",
+      "code": "SMT420",
+      "path": "tests/test_browser_composition.py",
+      "message": "test accesses private production name browserrig.Observe._page_key"
+    },
+    {
+      "fingerprint": "a1be727efcd1fb823790a19dde96d4f8",
+      "code": "SMT420",
+      "path": "tests/test_browser_composition.py",
+      "message": "test accesses private production name browserrig.Observe._page_key"
+    },
+    {
+      "fingerprint": "a1be727efcd1fb823790a19dde96d4f8",
+      "code": "SMT420",
+      "path": "tests/test_browser_composition.py",
+      "message": "test accesses private production name browserrig.Observe._page_key"
+    },
+    {
+      "fingerprint": "7066108feb2be7f423d3face43bfdc32",
+      "code": "SMT426",
+      "path": "tests/test_browser_composition.py",
+      "message": "test_invalidation_cancels_old_wait_and_starts_a_fresh_initial_probe has no recognized deadline for asyncio.Task"
+    },
+    {
+      "fingerprint": "ce7c97d1b3e7c7d70b51a1170d8a2816",
+      "code": "SMT426",
+      "path": "tests/test_browser_composition.py",
+      "message": "test_invalidation_cancels_old_wait_and_starts_a_fresh_initial_probe has no recognized deadline for asyncio.Event.wait"
+    },
+    {
+      "fingerprint": "7a91b78410591ccbc686380ffc853ed9",
+      "code": "SMT420",
+      "path": "tests/test_chains.py",
+      "message": "test accesses private production name browserrig.tools.Actions._execute_browser_result"
+    },
+    {
+      "fingerprint": "c52134bf8f075782a4ed21a470fd9a7c",
+      "code": "SMT420",
+      "path": "tests/test_chains.py",
+      "message": "test accesses private production name browserrig.tools.Actions._review_browser_result"
+    },
+    {
+      "fingerprint": "479ff2bfffd9f55f5181cf0f1b43ca25",
+      "code": "SMT422",
+      "path": "tests/test_chrome.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "33b57c7312bd1e50d84c0670101e74ba",
+      "code": "SMT426",
+      "path": "tests/test_composition.py",
+      "message": "test_facade_import_and_scripted_model_do_not_require_provider_sdks has no recognized deadline for subprocess.run"
+    },
+    {
+      "fingerprint": "669758a9b3586cece6825e4a17f9223b",
+      "code": "SMT422",
+      "path": "tests/test_dependencies.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "216e4ba512548b86ab366a9cace157a4",
+      "code": "SMT420",
+      "path": "tests/test_files.py",
+      "message": "test accesses private production name browserrig.tools.files._file_call"
+    },
+    {
+      "fingerprint": "fe323a48a3de16eb13b162e82e56898d",
+      "code": "SMT420",
+      "path": "tests/test_files.py",
+      "message": "test accesses private production name browserrig.tools.files.FileTools._open"
+    },
+    {
+      "fingerprint": "74c1fe0c610b32ffcf1e2a2b3e6fe75b",
+      "code": "SMT422",
+      "path": "tests/test_files.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "8c675e40aff01b44fd911b7471b2b7e7",
+      "code": "SMT422",
+      "path": "tests/test_files.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "910405d743aa6447a75aaf191ed28b25",
+      "code": "SMT426",
+      "path": "tests/test_find_integration.py",
+      "message": "test_find_tool_types_into_the_find_bar_and_reports_matches has no recognized deadline for asyncio.Event.wait"
+    },
+    {
+      "fingerprint": "e70ca360e306f268916562552d365439",
+      "code": "SMT426",
+      "path": "tests/test_find_integration.py",
+      "message": "test_find_tool_types_into_the_find_bar_and_reports_matches has no recognized deadline for asyncio.Task"
+    },
+    {
+      "fingerprint": "d2d97886806a7846b7cabaa87d9fae7b",
+      "code": "SMT426",
+      "path": "tests/test_gestures_integration.py",
+      "message": "test_cancelled_native_drag_does_not_drop_and_allows_next_gesture has no recognized deadline for asyncio.Task"
+    },
+    {
+      "fingerprint": "3590658855f8f5f632e87916eedccf25",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "3590658855f8f5f632e87916eedccf25",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "3590658855f8f5f632e87916eedccf25",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "3a8b8d314c0c67dbcee302fe4e2eda2e",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "3a8b8d314c0c67dbcee302fe4e2eda2e",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "6d3f33681553671da4c58dd6a8bf6420",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "c24bab563d0f5233f5db2855aec7fcb5",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "c3671179193d19d0294bed07a3bec9ef",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "c3671179193d19d0294bed07a3bec9ef",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "cd6afcc1d16ad267d5523a84e9ea8364",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "e2947a48467ddc3cf6ee56a2108b865b",
+      "code": "SMT422",
+      "path": "tests/test_input.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "1b68849773e7f8de02ffd46999cfbe91",
+      "code": "SMT426",
+      "path": "tests/test_input.py",
+      "message": "test_key_cancellation_releases_main_and_modifiers_and_hides_keyboard has no recognized deadline for asyncio.Event.wait"
+    },
+    {
+      "fingerprint": "1b68849773e7f8de02ffd46999cfbe91",
+      "code": "SMT426",
+      "path": "tests/test_input.py",
+      "message": "test_cancelled_drag_releases_mouse_button has no recognized deadline for asyncio.Event.wait"
+    },
+    {
+      "fingerprint": "88d209e82f4fb5f888ba6902a7a4e316",
+      "code": "SMT426",
+      "path": "tests/test_input.py",
+      "message": "test_key_cancellation_releases_main_and_modifiers_and_hides_keyboard has no recognized deadline for asyncio.Task"
+    },
+    {
+      "fingerprint": "88d209e82f4fb5f888ba6902a7a4e316",
+      "code": "SMT426",
+      "path": "tests/test_input.py",
+      "message": "test_cancelled_cursor_reports_actual_position has no recognized deadline for asyncio.Task"
+    },
+    {
+      "fingerprint": "88d209e82f4fb5f888ba6902a7a4e316",
+      "code": "SMT426",
+      "path": "tests/test_input.py",
+      "message": "test_cancelled_drag_releases_mouse_button has no recognized deadline for asyncio.Task"
+    },
+    {
+      "fingerprint": "2541df2fb9daf8df2507072e37e5bbb4",
+      "code": "SMT426",
+      "path": "tests/test_input_integration.py",
+      "message": "test_typing_shortcuts_stream_and_storage has no recognized deadline for asyncio.Task"
+    },
+    {
+      "fingerprint": "2541df2fb9daf8df2507072e37e5bbb4",
+      "code": "SMT426",
+      "path": "tests/test_input_integration.py",
+      "message": "test_turn_start_publishes_initial_cursor_before_any_model_or_input_action has no recognized deadline for asyncio.Task"
+    },
+    {
+      "fingerprint": "a8d3083a2cb9002516016d452a38ebc9",
+      "code": "SMT426",
+      "path": "tests/test_input_integration.py",
+      "message": "test_typing_shortcuts_stream_and_storage has no recognized deadline for asyncio.Event.wait"
+    },
+    {
+      "fingerprint": "a8d3083a2cb9002516016d452a38ebc9",
+      "code": "SMT426",
+      "path": "tests/test_input_integration.py",
+      "message": "test_turn_start_publishes_initial_cursor_before_any_model_or_input_action has no recognized deadline for asyncio.Event.wait"
+    },
+    {
+      "fingerprint": "3725dfa754504377082362056ab39945",
+      "code": "SMT422",
+      "path": "tests/test_navigation.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "59372a60c788db8cf6c982d0507c69de",
+      "code": "SMT420",
+      "path": "tests/test_process.py",
+      "message": "test accesses private production name browserrig.browser.process.ChromeProcess._profile"
+    },
+    {
+      "fingerprint": "59372a60c788db8cf6c982d0507c69de",
+      "code": "SMT420",
+      "path": "tests/test_process.py",
+      "message": "test accesses private production name browserrig.browser.process.ChromeProcess._profile"
+    },
+    {
+      "fingerprint": "59372a60c788db8cf6c982d0507c69de",
+      "code": "SMT420",
+      "path": "tests/test_process.py",
+      "message": "test accesses private production name browserrig.browser.process.ChromeProcess._profile"
+    },
+    {
+      "fingerprint": "59372a60c788db8cf6c982d0507c69de",
+      "code": "SMT420",
+      "path": "tests/test_process.py",
+      "message": "test accesses private production name browserrig.browser.process.ChromeProcess._profile"
+    },
+    {
+      "fingerprint": "dfa52a2d2d3e26242ede3e4d0b8cfa66",
+      "code": "SMT420",
+      "path": "tests/test_process.py",
+      "message": "test accesses private production name browserrig.browser.process._active_endpoint"
+    },
+    {
+      "fingerprint": "95695cae9e3b28ae2b7d7819ddcd678c",
+      "code": "SMT422",
+      "path": "tests/test_process.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "1b0e25429e321e15af4ce29cb5c4a7d5",
+      "code": "SMT426",
+      "path": "tests/test_process.py",
+      "message": "test_profile_cleanup_gives_up_on_persistent_lock_without_failing replaces the asyncio scheduler/deadline clock"
+    },
+    {
+      "fingerprint": "b051e7f481417745e88c852225d9e0c5",
+      "code": "SMT422",
+      "path": "tests/test_readiness.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "c7342eadcafaa1b183a7d9231a85b709",
+      "code": "SMT422",
+      "path": "tests/test_readiness.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "0c727ccfcf9283ea9edb807695631865",
+      "code": "SMT426",
+      "path": "tests/test_readiness.py",
+      "message": "test_cancelling_a_dispatch_cancels_its_owned_work has no recognized deadline for asyncio.Event.wait"
+    },
+    {
+      "fingerprint": "0d8282875d8f2fcf0d9bff80a185201e",
+      "code": "SMT426",
+      "path": "tests/test_readiness.py",
+      "message": "test_cancelling_a_dispatch_cancels_its_owned_work has no recognized deadline for asyncio.Task"
+    },
+    {
+      "fingerprint": "7799d805d1dfb7841bd6fe4f55b0f62e",
+      "code": "SMT426",
+      "path": "tests/test_readiness.py",
+      "message": "test_readiness_deduplicates_waiters_and_one_cancellation_does_not_cancel_other has no recognized deadline for asyncio.Task"
+    },
+    {
+      "fingerprint": "97f155fe57e3bfe3d39732e3fb24ad47",
+      "code": "SMT426",
+      "path": "tests/test_readiness.py",
+      "message": "test_readiness_deduplicates_waiters_and_one_cancellation_does_not_cancel_other has no recognized deadline for asyncio.Task"
+    },
+    {
+      "fingerprint": "e86674c751641eaa6264ea60630d40cb",
+      "code": "SMT426",
+      "path": "tests/test_readiness.py",
+      "message": "test_after_action_requires_fresh_observation_time_even_when_dom_was_quiet has no recognized deadline for asyncio.Task"
+    },
+    {
+      "fingerprint": "acb6c4929f4b9e3a6b774329f637372b",
+      "code": "SMT425",
+      "path": "tests/test_scripts.py",
+      "message": "test_scripts_are_single_matching_function_declarations only checks possibly empty data; its assertions can pass or be skipped without checking an item"
+    },
+    {
+      "fingerprint": "ed566f1f220074b0fd456472fa517c5c",
+      "code": "SMT420",
+      "path": "tests/test_secrets.py",
+      "message": "test accesses private production name browserrig.observation.capture._redact"
+    },
+    {
+      "fingerprint": "051f60d269983f4774a5eace49a0be50",
+      "code": "SMT422",
+      "path": "tests/test_secrets.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "051f60d269983f4774a5eace49a0be50",
+      "code": "SMT422",
+      "path": "tests/test_secrets.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "4778f806842fe755f1da42cf078eaa06",
+      "code": "SMT420",
+      "path": "tests/test_tab_state.py",
+      "message": "test accesses private production name browserrig.browser.favicon._media_type"
+    },
+    {
+      "fingerprint": "9daa497215f60c8f9e11e5c240d7be9a",
+      "code": "SMT420",
+      "path": "tests/test_tab_state.py",
+      "message": "test accesses private production name browserrig.browser.tab.Tab._strip_task"
+    },
+    {
+      "fingerprint": "9daa497215f60c8f9e11e5c240d7be9a",
+      "code": "SMT420",
+      "path": "tests/test_tab_state.py",
+      "message": "test accesses private production name browserrig.browser.tab.Tab._strip_task"
+    },
+    {
+      "fingerprint": "9daa497215f60c8f9e11e5c240d7be9a",
+      "code": "SMT420",
+      "path": "tests/test_tab_state.py",
+      "message": "test accesses private production name browserrig.browser.tab.Tab._strip_task"
+    },
+    {
+      "fingerprint": "9daa497215f60c8f9e11e5c240d7be9a",
+      "code": "SMT420",
+      "path": "tests/test_tab_state.py",
+      "message": "test accesses private production name browserrig.browser.tab.Tab._strip_task"
+    },
+    {
+      "fingerprint": "2c635fbd131c9ddbdc144327bb6c0b40",
+      "code": "SMT422",
+      "path": "tests/test_tab_state.py",
+      "message": "patch uses a literal string target"
+    },
+    {
+      "fingerprint": "75907c29aa46b950c81127587443b9e2",
+      "code": "SMT426",
+      "path": "tests/test_tab_state.py",
+      "message": "test_a_discarded_tab_stops_resolving_its_icon has no recognized deadline for asyncio.Event.wait"
+    },
+    {
+      "fingerprint": "fcbe0efcbfe052c88e272910e711c2d0",
+      "code": "SMT424",
+      "path": "tests/test_telemetry.py",
+      "message": "test_disabled_tracing_keeps_optional_dependencies_unloaded has no recognized outcome assertion"
+    },
+    {
+      "fingerprint": "f3cc031b4edcc5a6e1aa33f97d03a0c6",
+      "code": "SMT426",
+      "path": "tests/test_telemetry.py",
+      "message": "test_disabled_tracing_keeps_optional_dependencies_unloaded has no recognized deadline for subprocess.run"
+    },
+    {
+      "fingerprint": "a1c9880469f7f66d5e1e8b9a3399f5f4",
+      "code": "SMT420",
+      "path": "tests/test_terminal.py",
+      "message": "test accesses private production name browserrig.terminal._event_record"
+    }
+  ]
+}

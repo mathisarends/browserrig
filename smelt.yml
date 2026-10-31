@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=.smelt.schema.json
+# Static guardrails for browserrig. Rule details: `smelt explain <code>`.
+# Existing findings live in .smelt/debt.json; `smelt debt --prune` after fixing them.
+version: 1
+
+project:
+  source_roots: [.]
+  root_packages: [browserrig]
+  test_roots: [tests]
+
+debt: .smelt/debt.json
+
+structure:
+  contracts:
+    conventions:
+      match: browserrig
+      # Siblings via `from .x import y`, everything further away absolute.
+      imports: {style: relative, max_relative_level: 1}
+      future_annotations: when-needed
+      private_modules: forbid
+      type_dispatch: {style: match, min_branches: 3}
+      ordering:
+        constants_exempt: true
+        fix: safe-only
+
+tests:
+  layout: none  # tests are flat (tests/test_<topic>.py), not mirrored
+  max_patches_per_test: 3
+
+# error: deterministic patterns without false positives in this codebase.
+# warning: heuristics that need a look in context.
+rules:
+  # Source conventions
+  import-cycle: error
+  public-definitions-first: error
+  bundled-instance-assignment: error
+  redundant-str-enum-value: error
+  prefer-package-import: error
+  internal-public-member: error
+  internal-static-helper: error
+  unnecessary-future-annotations: warning
+  prefer-match-type-dispatch: warning
+  # Test smells
+  private-test-access: error
+  string-patch-target: error
+  test-only-public-function: error
+  # Attributes of exported classes (Tab, ChromeBrowser) may be read by library
+  # users, which smelt cannot see; review instead of failing.
+  test-only-public-attribute: warning
+  test-without-outcome-check: warning
+  test-only-checks-possibly-empty-data: warning
+  unbounded-test-wait: warning
+  async-mock-without-await-check: warning
+  independent-test-case-loop: hint
