@@ -46,7 +46,9 @@ def test_python_contains_no_inline_javascript_except_loader_glue():
 
 
 def test_scripts_are_single_matching_function_declarations():
-    for path in _SCRIPTS.glob("*.js"):
+    paths = sorted(_SCRIPTS.glob("*.js"))
+    assert paths
+    for path in paths:
         source = re.sub(
             r"^\s*/\*.*?\*/\s*", "", path.read_text(encoding="utf-8"), flags=re.S
         )

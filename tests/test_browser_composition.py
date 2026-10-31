@@ -733,11 +733,11 @@ async def test_invalidation_cancels_old_wait_and_starts_a_fresh_initial_probe():
         readiness = session.ctx[Readiness]
         tab = holder["browser"].active_tab
         old = asyncio.create_task(readiness.wait(tab))
-        await entered.wait()
+        await asyncio.wait_for(entered.wait(), 5)
         readiness.invalidate(tab)
         report = await readiness.wait(tab)
         with pytest.raises(asyncio.CancelledError):
-            await old
+            await asyncio.wait_for(old, 5)
         assert attempts == 2
         assert report.stage == ReadinessStage.INITIAL
 

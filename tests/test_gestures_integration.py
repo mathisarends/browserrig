@@ -135,7 +135,7 @@ async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site)
         finally:
             task.cancel()
             with pytest.raises(asyncio.CancelledError):
-                await task
+                await asyncio.wait_for(task, 30)
         assert await evaluate(tab, "window.nativeDrop") == ""
         assert await evaluate(tab, "window.dragEnds") == ["none"]
         await browser.mouse.click(Point(x=70, y=40))

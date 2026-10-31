@@ -121,6 +121,11 @@ def test_facade_import_and_scripted_model_do_not_require_provider_sdks():
         "assert 'mcp' not in sys.modules; "
         "assert not any(name.startswith('opentelemetry') for name in sys.modules)"
     )
-    subprocess.run(
-        [sys.executable, "-c", script], check=True, capture_output=True, text=True
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
     )
+    assert result.returncode == 0, result.stderr

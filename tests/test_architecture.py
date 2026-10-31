@@ -7,8 +7,11 @@ import pytest
 
 
 def test_core_has_no_dependencies_on_browser_services():
-    root = Path(__file__).resolve().parents[1] / "browserrig" / "core"
-    for path in root.glob("*.py"):
+    paths = sorted(
+        (Path(__file__).resolve().parents[1] / "browserrig" / "core").glob("*.py")
+    )
+    assert paths
+    for path in paths:
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.ImportFrom) and node.module:
                 assert not node.module.startswith(
@@ -20,8 +23,11 @@ def test_core_has_no_dependencies_on_browser_services():
 
 
 def test_tools_do_not_use_cdp():
-    root = Path(__file__).resolve().parents[1] / "browserrig" / "tools"
-    for path in root.glob("*.py"):
+    paths = sorted(
+        (Path(__file__).resolve().parents[1] / "browserrig" / "tools").glob("*.py")
+    )
+    assert paths
+    for path in paths:
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.ImportFrom):
                 assert not (node.module or "").startswith("cdpify"), path.name
@@ -42,8 +48,11 @@ def test_tools_do_not_use_cdp():
     ],
 )
 def test_service_packages_respect_dependency_boundaries(package, forbidden):
-    root = Path(__file__).resolve().parents[1] / "browserrig" / package
-    for path in root.rglob("*.py"):
+    paths = sorted(
+        (Path(__file__).resolve().parents[1] / "browserrig" / package).rglob("*.py")
+    )
+    assert paths
+    for path in paths:
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.ImportFrom):
                 assert not (node.module or "").startswith(forbidden), (

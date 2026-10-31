@@ -45,7 +45,7 @@ async def test_typing_shortcuts_stream_and_storage(site, coordinates):
         ready = asyncio.Event()
 
         consumer = asyncio.create_task(_consume(session, streamed, ready))
-        await ready.wait()
+        await asyncio.wait_for(ready.wait(), 30)
         result = await session.run("Type exactly and use shortcuts", max_steps=10)
         assert result.text == "Done"
         receipts = [
@@ -59,7 +59,7 @@ async def test_typing_shortcuts_stream_and_storage(site, coordinates):
         )
         assert not any(isinstance(event, InputEvent) for event in result.events)
         stored = session.snapshot().to_json()
-    await consumer
+    await asyncio.wait_for(consumer, 30)
     _assert_events(streamed, output.getvalue(), stored, coordinates)
 
 
@@ -82,7 +82,7 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
         streamed = []
         ready = asyncio.Event()
         consumer = asyncio.create_task(_consume(session, streamed, ready))
-        await ready.wait()
+        await asyncio.wait_for(ready.wait(), 30)
         tab = holder["browser"].active_tab
         position = holder["browser"].mouse.position
         width, height = await evaluate(tab, "[innerWidth, innerHeight]")
@@ -93,7 +93,7 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
         assert holder["browser"].mouse.position == position
         events = (*first.events, *second.events)
         assert not any(isinstance(event, InputEvent) for event in events)
-    await consumer
+    await asyncio.wait_for(consumer, 30)
     states = [event for event in streamed if isinstance(event, CursorStateEvent)]
     assert len(states) == 2
     assert all((event.x, event.y) == (position.x, position.y) for event in states)

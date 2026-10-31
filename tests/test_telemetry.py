@@ -23,9 +23,14 @@ async def main():
 
 asyncio.run(main())
 """
-    subprocess.run(
-        [sys.executable, "-c", script], check=True, capture_output=True, text=True
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
     )
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.fixture(name="collector")

@@ -132,9 +132,9 @@ async def test_find_tool_types_into_the_find_bar_and_reports_matches(site):
 
     async with agent.session() as session:
         consumer = asyncio.create_task(consume(session))
-        await ready.wait()
+        await asyncio.wait_for(ready.wait(), 30)
         result = await session.run("Find the widget", max_steps=6)
-    await consumer
+    await asyncio.wait_for(consumer, 30)
     assert result.text == "Done"
     replies = [
         msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)

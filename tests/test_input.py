@@ -183,10 +183,10 @@ async def test_key_cancellation_releases_main_and_modifiers_and_hides_keyboard()
     task = asyncio.create_task(
         devices.keyboard.press_key("a", hold_control=True, hold_shift=True)
     )
-    await entered.wait()
+    await asyncio.wait_for(entered.wait(), 5)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
-        await task
+        await asyncio.wait_for(task, 5)
     released = [command["key"] for command in commands if command["type"] == "keyUp"]
     assert released == ["A", "Shift", "Control"]
     assert not any(isinstance(event, KeyPressedEvent) for event in events)
@@ -267,7 +267,7 @@ async def test_cancelled_cursor_reports_actual_position():
     await asyncio.sleep(0)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
-        await task
+        await asyncio.wait_for(task, 5)
     assert isinstance(events[0], CursorMovedEvent)
     assert isinstance(events[-1], CursorStateEvent)
     assert (events[-1].x, events[-1].y) == (commands[-1]["x"], commands[-1]["y"])
@@ -342,10 +342,10 @@ async def test_cancelled_drag_releases_mouse_button():
     task = asyncio.create_task(
         devices.mouse.drag(start=Point(x=10, y=10), end=Point(x=200, y=200), duration=1)
     )
-    await entered.wait()
+    await asyncio.wait_for(entered.wait(), 5)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
-        await task
+        await asyncio.wait_for(task, 5)
     assert commands[-1]["type"] == "mouseReleased"
     assert commands[-1]["buttons"] == 0
     tab.cdp.input.cancel_dragging.assert_awaited_once_with()

@@ -183,7 +183,7 @@ async def test_a_discarded_tab_stops_resolving_its_icon(monkeypatch):
     monkeypatch.setattr(tab, "main_frame", main_frame)
     tab.refresh_strip()
     task = tab._strip_task  # pylint: disable=protected-access
-    await started.wait()
+    await asyncio.wait_for(started.wait(), 5)
     tab.discard()
     with pytest.raises(asyncio.CancelledError):
         await task

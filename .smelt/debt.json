@@ -26,24 +26,6 @@
       "message": "test accesses private production name browserrig.tools.execution.Actions._prepare"
     },
     {
-      "fingerprint": "4fb673a3c0340baa07e5a24e78b4013d",
-      "code": "SMT425",
-      "path": "tests/test_architecture.py",
-      "message": "test_service_packages_respect_dependency_boundaries only checks possibly empty data; its assertions can pass or be skipped without checking an item"
-    },
-    {
-      "fingerprint": "63d6d238644150241cd70ccdaff94463",
-      "code": "SMT425",
-      "path": "tests/test_architecture.py",
-      "message": "test_core_has_no_dependencies_on_browser_services only checks possibly empty data; its assertions can pass or be skipped without checking an item"
-    },
-    {
-      "fingerprint": "b7c329a0d3cb2e42926ba8ce795784b7",
-      "code": "SMT425",
-      "path": "tests/test_architecture.py",
-      "message": "test_tools_do_not_use_cdp only checks possibly empty data; its assertions can pass or be skipped without checking an item"
-    },
-    {
       "fingerprint": "57c4c77eee7729fb96b74d1b3216eecb",
       "code": "SMT420",
       "path": "tests/test_browser_composition.py",
@@ -74,18 +56,6 @@
       "message": "test accesses private production name browserrig.Observe._page_key"
     },
     {
-      "fingerprint": "7066108feb2be7f423d3face43bfdc32",
-      "code": "SMT426",
-      "path": "tests/test_browser_composition.py",
-      "message": "test_invalidation_cancels_old_wait_and_starts_a_fresh_initial_probe has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "ce7c97d1b3e7c7d70b51a1170d8a2816",
-      "code": "SMT426",
-      "path": "tests/test_browser_composition.py",
-      "message": "test_invalidation_cancels_old_wait_and_starts_a_fresh_initial_probe has no recognized deadline for asyncio.Event.wait"
-    },
-    {
       "fingerprint": "7a91b78410591ccbc686380ffc853ed9",
       "code": "SMT420",
       "path": "tests/test_chains.py",
@@ -98,12 +68,6 @@
       "message": "test accesses private production name browserrig.tools.Actions._review_browser_result"
     },
     {
-      "fingerprint": "33b57c7312bd1e50d84c0670101e74ba",
-      "code": "SMT426",
-      "path": "tests/test_composition.py",
-      "message": "test_facade_import_and_scripted_model_do_not_require_provider_sdks has no recognized deadline for subprocess.run"
-    },
-    {
       "fingerprint": "216e4ba512548b86ab366a9cace157a4",
       "code": "SMT420",
       "path": "tests/test_files.py",
@@ -114,78 +78,6 @@
       "code": "SMT420",
       "path": "tests/test_files.py",
       "message": "test accesses private production name browserrig.tools.files.FileTools._open"
-    },
-    {
-      "fingerprint": "910405d743aa6447a75aaf191ed28b25",
-      "code": "SMT426",
-      "path": "tests/test_find_integration.py",
-      "message": "test_find_tool_types_into_the_find_bar_and_reports_matches has no recognized deadline for asyncio.Event.wait"
-    },
-    {
-      "fingerprint": "e70ca360e306f268916562552d365439",
-      "code": "SMT426",
-      "path": "tests/test_find_integration.py",
-      "message": "test_find_tool_types_into_the_find_bar_and_reports_matches has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "d2d97886806a7846b7cabaa87d9fae7b",
-      "code": "SMT426",
-      "path": "tests/test_gestures_integration.py",
-      "message": "test_cancelled_native_drag_does_not_drop_and_allows_next_gesture has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "1b68849773e7f8de02ffd46999cfbe91",
-      "code": "SMT426",
-      "path": "tests/test_input.py",
-      "message": "test_key_cancellation_releases_main_and_modifiers_and_hides_keyboard has no recognized deadline for asyncio.Event.wait"
-    },
-    {
-      "fingerprint": "1b68849773e7f8de02ffd46999cfbe91",
-      "code": "SMT426",
-      "path": "tests/test_input.py",
-      "message": "test_cancelled_drag_releases_mouse_button has no recognized deadline for asyncio.Event.wait"
-    },
-    {
-      "fingerprint": "88d209e82f4fb5f888ba6902a7a4e316",
-      "code": "SMT426",
-      "path": "tests/test_input.py",
-      "message": "test_key_cancellation_releases_main_and_modifiers_and_hides_keyboard has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "88d209e82f4fb5f888ba6902a7a4e316",
-      "code": "SMT426",
-      "path": "tests/test_input.py",
-      "message": "test_cancelled_cursor_reports_actual_position has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "88d209e82f4fb5f888ba6902a7a4e316",
-      "code": "SMT426",
-      "path": "tests/test_input.py",
-      "message": "test_cancelled_drag_releases_mouse_button has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "2541df2fb9daf8df2507072e37e5bbb4",
-      "code": "SMT426",
-      "path": "tests/test_input_integration.py",
-      "message": "test_typing_shortcuts_stream_and_storage has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "2541df2fb9daf8df2507072e37e5bbb4",
-      "code": "SMT426",
-      "path": "tests/test_input_integration.py",
-      "message": "test_turn_start_publishes_initial_cursor_before_any_model_or_input_action has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "a8d3083a2cb9002516016d452a38ebc9",
-      "code": "SMT426",
-      "path": "tests/test_input_integration.py",
-      "message": "test_typing_shortcuts_stream_and_storage has no recognized deadline for asyncio.Event.wait"
-    },
-    {
-      "fingerprint": "a8d3083a2cb9002516016d452a38ebc9",
-      "code": "SMT426",
-      "path": "tests/test_input_integration.py",
-      "message": "test_turn_start_publishes_initial_cursor_before_any_model_or_input_action has no recognized deadline for asyncio.Event.wait"
     },
     {
       "fingerprint": "59372a60c788db8cf6c982d0507c69de",
@@ -216,42 +108,6 @@
       "code": "SMT420",
       "path": "tests/test_process.py",
       "message": "test accesses private production name browserrig.browser.process._active_endpoint"
-    },
-    {
-      "fingerprint": "0c727ccfcf9283ea9edb807695631865",
-      "code": "SMT426",
-      "path": "tests/test_readiness.py",
-      "message": "test_cancelling_a_dispatch_cancels_its_owned_work has no recognized deadline for asyncio.Event.wait"
-    },
-    {
-      "fingerprint": "0d8282875d8f2fcf0d9bff80a185201e",
-      "code": "SMT426",
-      "path": "tests/test_readiness.py",
-      "message": "test_cancelling_a_dispatch_cancels_its_owned_work has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "7799d805d1dfb7841bd6fe4f55b0f62e",
-      "code": "SMT426",
-      "path": "tests/test_readiness.py",
-      "message": "test_readiness_deduplicates_waiters_and_one_cancellation_does_not_cancel_other has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "97f155fe57e3bfe3d39732e3fb24ad47",
-      "code": "SMT426",
-      "path": "tests/test_readiness.py",
-      "message": "test_readiness_deduplicates_waiters_and_one_cancellation_does_not_cancel_other has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "e86674c751641eaa6264ea60630d40cb",
-      "code": "SMT426",
-      "path": "tests/test_readiness.py",
-      "message": "test_after_action_requires_fresh_observation_time_even_when_dom_was_quiet has no recognized deadline for asyncio.Task"
-    },
-    {
-      "fingerprint": "acb6c4929f4b9e3a6b774329f637372b",
-      "code": "SMT425",
-      "path": "tests/test_scripts.py",
-      "message": "test_scripts_are_single_matching_function_declarations only checks possibly empty data; its assertions can pass or be skipped without checking an item"
     },
     {
       "fingerprint": "ed566f1f220074b0fd456472fa517c5c",
@@ -288,24 +144,6 @@
       "code": "SMT420",
       "path": "tests/test_tab_state.py",
       "message": "test accesses private production name browserrig.browser.tab.Tab._strip_task"
-    },
-    {
-      "fingerprint": "75907c29aa46b950c81127587443b9e2",
-      "code": "SMT426",
-      "path": "tests/test_tab_state.py",
-      "message": "test_a_discarded_tab_stops_resolving_its_icon has no recognized deadline for asyncio.Event.wait"
-    },
-    {
-      "fingerprint": "fcbe0efcbfe052c88e272910e711c2d0",
-      "code": "SMT424",
-      "path": "tests/test_telemetry.py",
-      "message": "test_disabled_tracing_keeps_optional_dependencies_unloaded has no recognized outcome assertion"
-    },
-    {
-      "fingerprint": "f3cc031b4edcc5a6e1aa33f97d03a0c6",
-      "code": "SMT426",
-      "path": "tests/test_telemetry.py",
-      "message": "test_disabled_tracing_keeps_optional_dependencies_unloaded has no recognized deadline for subprocess.run"
     },
     {
       "fingerprint": "a1c9880469f7f66d5e1e8b9a3399f5f4",

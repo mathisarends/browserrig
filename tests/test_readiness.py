@@ -52,8 +52,8 @@ async def test_readiness_deduplicates_waiters_and_one_cancellation_does_not_canc
         await asyncio.sleep(0.005)
         first.cancel()
         with pytest.raises(asyncio.CancelledError):
-            await first
-        report = await second
+            await asyncio.wait_for(first, 5)
+        report = await asyncio.wait_for(second, 5)
         assert report.status == "ready"
         assert (
             len([e for e in session.events if isinstance(e, ReadinessStartedEvent)])
@@ -166,7 +166,7 @@ async def test_after_action_requires_fresh_observation_time_even_when_dom_was_qu
     )
     await asyncio.sleep(0.01)
     assert not task.done()
-    assert (await task).status == "ready"
+    assert (await asyncio.wait_for(task, 5)).status == "ready"
 
 
 async def test_pending_navigation_is_not_ready_using_the_old_document():
@@ -246,10 +246,10 @@ async def test_cancelling_a_dispatch_cancels_its_owned_work():
         task = asyncio.create_task(
             session.ctx[Readiness].wait(holder["browser"].active_tab, dispatch=dispatch)
         )
-        await entered.wait()
+        await asyncio.wait_for(entered.wait(), 5)
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
-            await task
+            await asyncio.wait_for(task, 5)
         assert cancelled.is_set()
 
 
