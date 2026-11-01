@@ -135,7 +135,7 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 | Contract | Implementation |
 | --- | --- |
 | `SessionSetup` | `async apply(cdp, *, frame) -> None`. Install ordered entries with `Launch(session_setup=(setup, ...))` or `Connect(session_setup=(setup, ...))`. Each new page or out-of-process frame session enables page, lifecycle and runtime first, then the browser applies viewport metrics to pages and runs each entry. `Viewport` only holds configuration data. |
-| `CaptureStrategy` | Implement `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent`. Collected refs must support `Observe.element()`. Honor `screenshots=False`. The runner handles dialogs, document coherence, fingerprints and snapshots. |
+| `CaptureStrategy` | Implement `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent`. Collected refs must support `Observe.element()`. Honor `screenshots=False`. Set `CaptureContent.fingerprint` to supply a comparison key; `None` keeps the DOM semantic fingerprint. The runner handles dialogs, document coherence and snapshots. |
 | `Renderer` | `instructions(screenshots)`, `refs()` and `render(snapshot)`. Pure presentation, no browser input or waits. |
 | `ReadinessPolicy` | `create(context) -> ReadinessStrategy`, returning a fresh probe. Context supplies tab, stage, phase and options. |
 | `ReadinessStrategy` | `budget`, `delay`, `reason`; `async check() -> bool`; `timeout_status()`. The shared runner owns deadlines, dialogs, cancellation and events. |
@@ -144,6 +144,11 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 | `Motor` (`browserrig.input`) | `keystrokes(text, *, sensitive) -> Sequence[KeyStroke]`, `route(start, end) -> Sequence[CursorPath]`, `aim(width, height)`, `press()` and `landing(width, height)`. How input is performed; install it with `Pacing(motor)`. A plan types characters and may correct slips with `Backspace`; sensitive text must be typed exactly. A route's strokes join end to start. No events, no viewer concerns. |
 | `Presenter` (`browserrig.input`) | `shows_cursor_style()`, `async leave(...)`, `async enter(...)` and `async show(target, event)`. What viewers see of input; `Choreography` installs one. |
 | `ActionChainPolicy` (`browserrig.tools`) | `async check(observe, tab) -> str`: empty allows continuing; otherwise explain why a fresh observation is required. Failed comparison ends the chain without turning successful input into failed input. |
+
+`CaptureContent.fingerprint` is copied into the snapshot unchanged, including an
+empty string. A strategy can use it to reflect changes its extracted DOM fields
+cannot describe. When it is `None`, including with `DomCapture`, the runner keeps
+deriving the existing fingerprint from the redacted page and document identity.
 
 ## Initial readiness and ongoing readiness
 

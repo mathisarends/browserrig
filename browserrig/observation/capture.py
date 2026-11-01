@@ -123,7 +123,9 @@ async def capture(
         page_height=page.page_height,
         readiness=report.status,
         readiness_reason=report.reason,
-        fingerprint=_fingerprint(page, document_id),
+        fingerprint=content.fingerprint
+        if content.fingerprint is not None
+        else _fingerprint(page, document_id),
         tabs=tabs,
         text=page.text,
         elements=elements,
@@ -141,13 +143,17 @@ async def capture(
 
 @dataclass(frozen=True, slots=True)
 class CaptureContent:
-    """`area` is the viewport region `image` shows, at `scale` image pixels per CSS pixel."""
+    """`area` is the viewport region `image` shows, at `scale` image pixels per CSS pixel.
+
+    `fingerprint=None` uses the runner's DOM semantic fingerprint.
+    """
 
     page: Extraction
     image: str | None = None
     geometry: Geometry | None = None
     area: Bounds | None = None
     scale: float = 1
+    fingerprint: str | None = None
 
 
 class CaptureStrategy(Protocol):
