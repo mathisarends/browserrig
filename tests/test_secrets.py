@@ -12,7 +12,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from PIL import Image
 
-from browserrig import Secret, Secrets, env, totp
+from browserrig import Secret, Secrets, Totp, env
 from browserrig.core import ActionKind, Bounds, SecretError
 from browserrig.events import ActionFailedEvent, KeyPressedEvent, SecretEnteredEvent
 from browserrig.input import Input
@@ -22,7 +22,8 @@ from browserrig.observation.capture import _redact
 from browserrig.observation.extraction import Extraction
 from browserrig.observation.marks import blackout
 from browserrig.secrets import SecretEntry
-from browserrig.secrets.models import OriginPattern, resolve
+from browserrig.secrets.models import resolve
+from browserrig.secrets.origin import OriginPattern
 from browserrig.secrets.redaction import Redactor
 from tests.fakes import FakeChrome
 
@@ -76,7 +77,7 @@ def test_secret_reprs_never_show_values():
     secret = Secret(PASSWORD, domains="github.com")
     assert PASSWORD not in repr(secret)
     assert PASSWORD not in repr(Secrets({"pw": secret}))
-    assert "JBSWY3DP" not in repr(totp("JBSWY3DPEHPK3PXP"))
+    assert "JBSWY3DP" not in repr(Totp("JBSWY3DPEHPK3PXP"))
     assert secret.domains == ("github.com",)
 
 
@@ -99,12 +100,12 @@ def test_secrets_reject_invalid_names_and_domainless_secrets():
 )
 def test_totp_matches_rfc_6238_vectors(timestamp, code):
     seed = base64.b32encode(b"12345678901234567890").decode()
-    assert totp(seed, digits=8).at(timestamp) == code
+    assert Totp(seed, digits=8).at(timestamp) == code
 
 
 def test_totp_rejects_invalid_seeds_without_echoing_them():
     with pytest.raises(SecretError) as error:
-        totp("not base32 !!")
+        Totp("not base32 !!")
     assert "not base32" not in str(error.value)
 
 
@@ -292,7 +293,7 @@ def _secrets():
     return Secrets(
         {
             "pw": Secret(PASSWORD, domains=("example.org",)),
-            "otp": Secret(totp("JBSWY3DPEHPK3PXP"), domains=("example.org",)),
+            "otp": Secret(Totp("JBSWY3DPEHPK3PXP"), domains=("example.org",)),
         }
     )
 
