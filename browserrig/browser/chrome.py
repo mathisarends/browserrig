@@ -40,7 +40,7 @@ from browserrig.files import Download, FileSystem
 from browserrig.input import Input, Keyboard, Mouse
 
 from .base import BrowserEvents, EventSink, _discard
-from .config import BrowserOptions, CdpEndpoint, Launch, Viewport
+from .config import BrowserOptions, CdpEndpoint, Launch
 from .downloads import Downloads
 from .frame import Frame
 from .frames import discover_frames
@@ -329,7 +329,7 @@ class ChromeBrowser:
             )
             cdp = self.client.session(attached.session_id)
             try:
-                await _enable_session(cdp, self._options.viewport)
+                await _enable_session(cdp, self._options)
                 tab = Tab(
                     target_id,
                     cdp,
@@ -412,7 +412,12 @@ class ChromeBrowser:
                 self._sessions[sid] = frame_id
                 assert self._stack is not None
                 self._stack.push_async_callback(self._detach, sid)
-                await _enable_session(self.client.session(sid))
+                cdp = self.client.session(sid)
+                try:
+                    await _enable_session(cdp, self._options, frame=True)
+                except (Exception, asyncio.CancelledError):
+                    await self._detach(sid)
+                    raise
             return self.client.session(sid)
 
     def _start_listeners(self) -> None:
@@ -499,20 +504,22 @@ class ChromeBrowser:
                     await self.events.emit(DisconnectedEvent())
 
 
-async def _enable_session(cdp: CdpSession, viewport: Viewport | None = None) -> None:
-    """Enable the domains browserrig listens to, plus optional viewport emulation."""
-    steps = [
+async def _enable_session(
+    cdp: CdpSession, options: BrowserOptions, *, frame: bool = False
+) -> None:
+    """Enable browserrig's domains, then apply the viewport and custom setup."""
+    await asyncio.gather(
         cdp.page.enable(),
         cdp.page.set_lifecycle_events_enabled(enabled=True),
         cdp.runtime.enable(),
-    ]
-    if viewport:
-        steps.append(
-            cdp.emulation.set_device_metrics_override(
-                width=viewport.width,
-                height=viewport.height,
-                device_scale_factor=viewport.scale,
-                mobile=False,
-            )
+    )
+    viewport = options.viewport
+    if viewport is not None and not frame:
+        await cdp.emulation.set_device_metrics_override(
+            width=viewport.width,
+            height=viewport.height,
+            device_scale_factor=viewport.scale,
+            mobile=False,
         )
-    await asyncio.gather(*steps)
+    for setup in options.session_setup:
+        await setup.apply(cdp, frame=frame)

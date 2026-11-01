@@ -2,7 +2,7 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from browserrig import ChromeBrowser, Connect
+from browserrig import ChromeBrowser, Connect, Launch, Viewport, wait_for_page
 from browserrig.choreography import CursorEnteredEvent, Stage, TabPressedEvent
 from browserrig.core import Point
 from browserrig.events import CursorStateEvent, TabOpenedEvent
@@ -11,6 +11,29 @@ from browserrig.kinds import TabGesture
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
+
+
+async def test_custom_setup_reaches_page_and_oopif_sessions(site):
+    setup = _SessionProbe()
+    viewport = Viewport(width=900, height=700, scale=2)
+    options = Launch(
+        url=site + "/frame-cross-middle",
+        arguments=("--site-per-process",),
+        viewport=viewport,
+        session_setup=(setup,),
+    )
+    async with ChromeBrowser(options) as browser:
+        tab = browser.active_tab
+        await wait_for_page(tab)
+        frames = await tab.frames()
+        assert len(frames) == 2
+        assert frames[0].cdp.session_id != frames[1].cdp.session_id
+        assert setup.sessions == [
+            (tab.cdp.session_id, False),
+            (frames[1].cdp.session_id, True),
+        ]
+        assert await tab.viewport_size() == (900, 700)
+        assert await evaluate(tab, "devicePixelRatio") == 2
 
 
 async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site):
@@ -79,3 +102,12 @@ async def test_launch_stable_tabs_and_isolated_connect(discovery):
         assert connected_target not in {tab.id for tab in await browser.tabs()}
     assert not browser.client.is_connected
     assert first.closed and second.closed
+
+
+class _SessionProbe:
+    def __init__(self):
+        self.sessions = []
+
+    async def apply(self, cdp, *, frame):
+        await cdp.page.get_frame_tree()
+        self.sessions.append((cdp.session_id, frame))

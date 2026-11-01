@@ -37,6 +37,14 @@ Connecting creates an isolated context in the running browser. Use
 `--target-id TARGET` to explicitly select an existing tab. The external browser
 must already expose a CDP endpoint and stays running after disconnecting.
 
+Both `Launch` and `Connect` accept `session_setup=(setup, ...)`. Each setup
+implements `SessionSetup` from `browserrig`: `async apply(cdp, *, frame) -> None`.
+It runs once for each newly attached page (`frame=False`) or out-of-process frame
+(`frame=True`) session, after page, lifecycle and runtime are enabled. The browser
+applies the optional `viewport` metrics to pages first; custom setups then run in
+the supplied order. `Viewport` only holds configuration data. Same-process frames
+share their page's session.
+
 ## Element references and screenshot marks
 
 `DomCapture` reads every frame document with one `DOMSnapshot.captureSnapshot` call per

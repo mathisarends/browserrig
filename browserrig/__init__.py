@@ -6,6 +6,7 @@ from .browser import (
     ChromeBrowser,
     Connect,
     Launch,
+    SessionSetup,
     Viewport,
 )
 from .choreography import Choreography, TabStrip
@@ -118,6 +119,7 @@ __all__ = [
     "FileSystem",
     "FileSystemOptions",
     "Launch",
+    "SessionSetup",
     "Nudges",
     "Observe",
     "Pacing",

@@ -4,12 +4,13 @@ from pathlib import Path
 from typing import ClassVar, Self
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import Field, InstanceOf, SecretStr, field_validator, model_validator
 
 from browserrig.core import Options, TargetId
 from browserrig.files import FileSystemOptions
 
 from .process import ChromeProcess
+from .setup import SessionSetup
 
 
 class Viewport(Options):
@@ -36,6 +37,7 @@ class Launch(Options):
     headless: bool = True
     url: str = "about:blank"
     viewport: Viewport = Viewport()
+    session_setup: tuple[InstanceOf[SessionSetup], ...] = ()
     timeout: float = Field(default=20, gt=0, le=120)
     arguments: tuple[str, ...] = ()
     download_directory: str | None = None
@@ -81,6 +83,7 @@ class Connect(Options):
     timeout: float = Field(default=20, gt=0, le=120)
     headers: dict[str, SecretStr] = Field(default_factory=dict, repr=False)
     viewport: Viewport | None = None
+    session_setup: tuple[InstanceOf[SessionSetup], ...] = ()
     download_directory: str | None = None
     # A browser running elsewhere gets a local workspace only when one is configured.
     files: FileSystemOptions | None = None

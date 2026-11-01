@@ -4,14 +4,15 @@
 import asyncio
 from contextlib import AsyncExitStack
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 from cdpify import ReceivedEvent
 from cdpify.domains.browser import DownloadWillBeginEvent
 from cdpify.domains.page import JavascriptDialogOpeningEvent
+from pydantic import ValidationError
 
-from browserrig import ChromeBrowser, Connect
+from browserrig import ChromeBrowser, Connect, Launch, SessionSetup, Viewport
 from browserrig.browser import Tab
 from browserrig.browser import chrome as chrome_module
 from browserrig.events import (
@@ -21,6 +22,81 @@ from browserrig.events import (
     TabOpenedEvent,
 )
 from browserrig.kinds import TabGesture
+
+
+@pytest.mark.parametrize(
+    "options", [Launch, lambda **kwargs: Connect(endpoint="ws://localhost", **kwargs)]
+)
+def test_session_setup_options_validate_entries_and_freeze_the_sequence(options):
+    setup = _RecordingSetup("custom", [])
+    entries = [setup]
+    configured = options(session_setup=entries)
+    entries.clear()
+    assert configured.session_setup == (setup,)
+    assert options().session_setup == ()
+    assert isinstance(setup, SessionSetup)
+    with pytest.raises(ValidationError, match="SessionSetup"):
+        options(session_setup=[object()])
+    with pytest.raises(ValidationError, match="frozen"):
+        configured.session_setup = ()
+
+
+@pytest.mark.parametrize("options", [Launch, Connect])
+async def test_setups_run_in_order_on_new_page_and_frame_sessions(options):
+    calls = []
+    viewport = Viewport(width=900, height=700, scale=2)
+    kwargs = {"endpoint": "ws://localhost"} if options is Connect else {}
+    configured = options(
+        viewport=viewport,
+        session_setup=(
+            _RecordingSetup("first", calls),
+            _RecordingSetup("second", calls),
+        ),
+        **kwargs,
+    )
+    browser, _ = _browser(configured)
+    browser.client.target.attach_to_target.side_effect = [
+        SimpleNamespace(session_id="page-session"),
+        SimpleNamespace(session_id="frame-session"),
+    ]
+    tab = await browser._attach("page")
+    assert await browser._attach("page") is tab
+    cdp = await browser._frame_session("frame")
+    assert await browser._frame_session("frame") is cdp
+    assert calls == [
+        ("first", tab.cdp, False, 1),
+        ("second", tab.cdp, False, 1),
+        ("first", cdp, True, 1),
+        ("second", cdp, True, 1),
+    ]
+    assert cdp.page.enable.await_count == 2
+    assert cdp.runtime.enable.await_count == 2
+    assert cdp.page.set_lifecycle_events_enabled.await_args_list == [
+        call(enabled=True),
+        call(enabled=True),
+    ]
+    cdp.emulation.set_device_metrics_override.assert_awaited_once_with(
+        width=900, height=700, device_scale_factor=2, mobile=False
+    )
+
+
+@pytest.mark.parametrize("frame", [False, True])
+async def test_failed_setup_detaches_session_and_allows_retry(frame):
+    setup = SimpleNamespace(apply=AsyncMock(side_effect=ValueError("setup failed")))
+    options = Connect(endpoint="ws://localhost", session_setup=(setup,))
+    browser, _ = _browser(options)
+    attach = browser._frame_session if frame else browser._attach
+    with pytest.raises(ValueError, match="setup failed"):
+        await attach("target")
+    assert not browser._sessions
+    browser.client.target.detach_from_target.assert_awaited_once_with(
+        session_id="session"
+    )
+    setup.apply.side_effect = None
+    await attach("target")
+    assert setup.apply.await_count == 2
+    assert browser.client.target.attach_to_target.await_count == 2
+    assert browser._sessions == {"session": "target"}
 
 
 async def test_event_handler_failure_does_not_stop_subscription(monkeypatch, caplog):
@@ -178,10 +254,23 @@ class _Subscription:
             raise self.error
 
 
-def _browser():
+class _RecordingSetup:
+    def __init__(self, name, calls):
+        self.name = name
+        self.calls = calls
+
+    async def apply(self, cdp, *, frame):
+        assert cdp.page.enable.await_count > 0
+        assert cdp.runtime.enable.await_count > 0
+        assert cdp.page.set_lifecycle_events_enabled.await_count > 0
+        metrics = cdp.emulation.set_device_metrics_override.await_count
+        self.calls.append((self.name, cdp, frame, metrics))
+
+
+def _browser(options=None):
     events = []
     browser = ChromeBrowser(
-        Connect(endpoint="ws://localhost/devtools/browser/test"),
+        options or Connect(endpoint="ws://localhost/devtools/browser/test"),
         emit=AsyncMock(side_effect=events.append),
     )
     browser._stack = AsyncExitStack()
@@ -200,6 +289,7 @@ def _browser():
             ),
         ),
         runtime=SimpleNamespace(enable=AsyncMock()),
+        emulation=SimpleNamespace(set_device_metrics_override=AsyncMock()),
     )
     browser.client = SimpleNamespace(
         is_connected=True,

@@ -134,6 +134,7 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 
 | Contract | Implementation |
 | --- | --- |
+| `SessionSetup` | `async apply(cdp, *, frame) -> None`. Install ordered entries with `Launch(session_setup=(setup, ...))` or `Connect(session_setup=(setup, ...))`. Each new page or out-of-process frame session enables page, lifecycle and runtime first, then the browser applies viewport metrics to pages and runs each entry. `Viewport` only holds configuration data. |
 | `CaptureStrategy` | Implement `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent`. Collected refs must support `Observe.element()`. Honor `screenshots=False`. The runner handles dialogs, document coherence, fingerprints and snapshots. |
 | `Renderer` | `instructions(screenshots)`, `refs()` and `render(snapshot)`. Pure presentation, no browser input or waits. |
 | `ReadinessPolicy` | `create(context) -> ReadinessStrategy`, returning a fresh probe. Context supplies tab, stage, phase and options. |
