@@ -1,6 +1,8 @@
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from pathlib import Path
 
+from .config import FileSystemOptions
 from .models import FileContent, FileReadStatus
 
 
@@ -11,6 +13,16 @@ class ReadRequest:
     cell_range: str | None = None
     member: str | None = None
     ocr: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ReadContext:
+    """Everything a format reader may use; each reader takes only this."""
+
+    path: Path
+    format: str
+    request: ReadRequest
+    options: FileSystemOptions
 
 
 @dataclass

@@ -1,17 +1,16 @@
 import sqlite3
-from pathlib import Path
 
 import mutagen
 
-from .content import ParsedContent, ReadRequest, cell_text
+from .content import ParsedContent, ReadContext, cell_text
 
 
-def read_sqlite(path: Path, request: ReadRequest) -> ParsedContent:
+def read_sqlite(context: ReadContext) -> ParsedContent:
     details = ParsedContent((), "sqlite")
 
     def blocks():
         connection = sqlite3.connect(
-            path.resolve().as_uri() + "?mode=ro&immutable=1", uri=True
+            context.path.resolve().as_uri() + "?mode=ro&immutable=1", uri=True
         )
         try:
             connection.execute("PRAGMA trusted_schema=OFF")
@@ -26,7 +25,7 @@ def read_sqlite(path: Path, request: ReadRequest) -> ParsedContent:
             yield "# Database tables\n\n" + ", ".join(names) + "\n\n"
             if not names:
                 return
-            selected = request.sheet or names[0]
+            selected = context.request.sheet or names[0]
             if selected not in names:
                 raise ValueError(
                     f"Unknown table {selected!r}; available: {', '.join(names)}"
@@ -61,10 +60,10 @@ def read_sqlite(path: Path, request: ReadRequest) -> ParsedContent:
     return details
 
 
-def read_media(path: Path) -> ParsedContent:
-    media = mutagen.File(path)
+def read_media(context: ReadContext) -> ParsedContent:
+    media = mutagen.File(context.path)
     blocks = [
-        f"# Media file\n\nName: {path.name}\nSize: {path.stat().st_size} bytes\n\n"
+        f"# Media file\n\nName: {context.path.name}\nSize: {context.path.stat().st_size} bytes\n\n"
     ]
     if media is not None:
         for name in ("length", "bitrate", "sample_rate", "channels"):
@@ -73,7 +72,7 @@ def read_media(path: Path) -> ParsedContent:
                 blocks.append(f"{name}: {value}\n")
     return ParsedContent(
         blocks,
-        path.suffix.lstrip("."),
+        context.path.suffix.lstrip("."),
         [
             "Metadata only; audio transcription and video understanding are not available"
         ],

@@ -16,16 +16,16 @@ from pypdf.generic import DictionaryObject
 if TYPE_CHECKING:
     from rapidocr import RapidOCR
 
-from .content import ParsedContent, ReadRequest
+from .content import ParsedContent, ReadContext
 
 _OCR_LOCK = Lock()
 _PDF_LOCK = Lock()
 
 
-def read_pdf(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedContent:
-    number = 1 if request.page_number is None else request.page_number
+def read_pdf(context: ReadContext) -> ParsedContent:
+    number = 1 if context.request.page_number is None else context.request.page_number
     try:
-        with path.open("rb") as stream:
+        with context.path.open("rb") as stream:
             reader = PdfReader(stream)
             if reader.is_encrypted:
                 raise ValueError(
@@ -43,10 +43,10 @@ def read_pdf(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedConten
     except PyPdfError as error:
         raise ValueError("Could not read PDF: invalid or damaged document") from error
     details = ParsedContent((), "pdf", page_number=number, page_count=count)
-    if request.ocr is True or (
-        not text.strip() and enable_ocr and request.ocr is not False
+    if context.request.ocr is True or (
+        not text.strip() and context.options.ocr and context.request.ocr is not False
     ):
-        with _pdf_image(path, number) as image:
+        with _pdf_image(context.path, number) as image:
             text = _image_text(image)
         details.limitations.append(
             "Text was recognized with local OCR and may contain recognition errors"
@@ -61,10 +61,10 @@ def read_pdf(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedConten
     return details
 
 
-def read_image(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedContent:
-    number = 1 if request.page_number is None else request.page_number
-    with Image.open(path) as image:
-        format_ = (image.format or path.suffix.lstrip(".")).lower()
+def read_image(context: ReadContext) -> ParsedContent:
+    number = 1 if context.request.page_number is None else context.request.page_number
+    with Image.open(context.path) as image:
+        format_ = (image.format or context.path.suffix.lstrip(".")).lower()
         count = getattr(image, "n_frames", 1)
         if not 1 <= number <= count:
             raise ValueError(
@@ -75,7 +75,9 @@ def read_image(path: Path, request: ReadRequest, enable_ocr: bool) -> ParsedCont
             f"# Image\n\nFormat: {image.format}\n"
             f"Dimensions: {image.width} × {image.height}\n\n"
         )
-        if request.ocr is False or (request.ocr is None and not enable_ocr):
+        if context.request.ocr is False or (
+            context.request.ocr is None and not context.options.ocr
+        ):
             return ParsedContent(
                 (metadata,),
                 format_,

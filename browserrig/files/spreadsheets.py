@@ -13,20 +13,20 @@ from odf.opendocument import load as load_odf
 from openpyxl import load_workbook
 from openpyxl.utils.cell import coordinate_to_tuple, get_column_letter, range_boundaries
 
-from .content import ParsedContent, ReadRequest, cell_text
+from .content import ParsedContent, ReadContext, cell_text
 from .text import text_encoding
 from .xlsx import value_source
 
 
-def read_xlsx(path: Path, request: ReadRequest) -> ParsedContent:
-    extension = path.suffix.lower().lstrip(".")
+def read_xlsx(context: ReadContext) -> ParsedContent:
+    extension = context.path.suffix.lower().lstrip(".")
     details = ParsedContent(
         (), extension if extension in {"xlsx", "xlsm", "xltx", "xltm"} else "xlsx"
     )
 
     def blocks() -> Iterator[str]:
         with ExitStack() as stack:
-            source = stack.enter_context(value_source(path))
+            source = stack.enter_context(value_source(context.path))
             book = load_workbook(
                 source, read_only=True, data_only=False, keep_links=False
             )
@@ -36,7 +36,7 @@ def read_xlsx(path: Path, request: ReadRequest) -> ParsedContent:
             )
             stack.callback(values.close)
             details.sheets = tuple(book.sheetnames)
-            selected = request.sheet or book.sheetnames[0]
+            selected = context.request.sheet or book.sheetnames[0]
             if selected not in book.sheetnames:
                 raise ValueError(
                     f"Unknown sheet {selected!r}; available: {', '.join(book.sheetnames)}"
@@ -44,8 +44,8 @@ def read_xlsx(path: Path, request: ReadRequest) -> ParsedContent:
             sheet = book[selected]
             cached = values[selected]
             details.sheet = selected
-            notes, row_count, column_count = _xlsx_layout(path, selected)
-            selection = request.cell_range
+            notes, row_count, column_count = _xlsx_layout(context.path, selected)
+            selection = context.request.cell_range
             if selection is None and row_count * column_count > 2_000_000:
                 selection = f"A1:{get_column_letter(min(column_count, 64))}{min(row_count, 200)}"
                 extent = f"{get_column_letter(column_count)}{row_count}"
@@ -74,7 +74,7 @@ def read_xlsx(path: Path, request: ReadRequest) -> ParsedContent:
             for index, (row, cached_row) in enumerate(
                 zip(rows, cached_rows, strict=True), top
             ):
-                if request.cell_range is None and all(
+                if context.request.cell_range is None and all(
                     cell.value is None for cell in row
                 ):
                     continue
@@ -114,14 +114,16 @@ def read_xlsx(path: Path, request: ReadRequest) -> ParsedContent:
     return details
 
 
-def read_xls(path: Path, request: ReadRequest) -> ParsedContent:
+def read_xls(context: ReadContext) -> ParsedContent:
     details = ParsedContent((), "xls")
 
     def blocks() -> Iterator[str]:
-        book = xlrd.open_workbook(str(path), on_demand=True, formatting_info=True)
+        book = xlrd.open_workbook(
+            str(context.path), on_demand=True, formatting_info=True
+        )
         try:
             details.sheets = tuple(book.sheet_names())
-            selected = request.sheet or details.sheets[0]
+            selected = context.request.sheet or details.sheets[0]
             if selected not in details.sheets:
                 raise ValueError(
                     f"Unknown sheet {selected!r}; available: {', '.join(details.sheets)}"
@@ -129,7 +131,7 @@ def read_xls(path: Path, request: ReadRequest) -> ParsedContent:
             sheet = book.sheet_by_name(selected)
             details.sheet = selected
             left, top, right, bottom = _bounds(
-                request.cell_range, sheet.nrows, sheet.ncols
+                context.request.cell_range, sheet.nrows, sheet.ncols
             )
             details.cell_range = (
                 f"{get_column_letter(left)}{top}:{get_column_letter(right)}{bottom}"
@@ -160,17 +162,17 @@ def read_xls(path: Path, request: ReadRequest) -> ParsedContent:
     return details
 
 
-def read_ods(path: Path, request: ReadRequest) -> ParsedContent:
-    document = load_odf(str(path))
+def read_ods(context: ReadContext) -> ParsedContent:
+    document = load_odf(str(context.path))
     tables = [
         node for node in document.spreadsheet.childNodes if node.qname[1] == "table"
     ]
     names = tuple(table.getAttribute("name") for table in tables)
-    selected = request.sheet or names[0]
+    selected = context.request.sheet or names[0]
     if selected not in names:
         raise ValueError(f"Unknown sheet {selected!r}; available: {', '.join(names)}")
     details = ParsedContent(
-        (), "ods", sheet=selected, sheets=names, cell_range=request.cell_range
+        (), "ods", sheet=selected, sheets=names, cell_range=context.request.cell_range
     )
 
     def blocks() -> Iterator[str]:
@@ -179,7 +181,7 @@ def read_ods(path: Path, request: ReadRequest) -> ParsedContent:
             + ", ".join(names)
             + f"\n\n## Sheet: {selected}\n\n"
         )
-        bounds = _bounds(request.cell_range, 1048576, 16384)
+        bounds = _bounds(context.request.cell_range, 1048576, 16384)
         yield from _odf_values(tables[names.index(selected)], bounds)
 
     details.blocks = blocks()
@@ -189,13 +191,13 @@ def read_ods(path: Path, request: ReadRequest) -> ParsedContent:
     return details
 
 
-def read_delimited(path: Path, request: ReadRequest) -> ParsedContent:
-    with path.open("rb") as source:
+def read_delimited(context: ReadContext) -> ParsedContent:
+    with context.path.open("rb") as source:
         sample = source.read(65536)
     encoding = text_encoding(sample)
     if encoding is None:
         raise ValueError("Cannot determine the table's text encoding")
-    delimiter = "\t" if path.suffix.lower() == ".tsv" else ","
+    delimiter = "\t" if context.path.suffix.lower() == ".tsv" else ","
     if delimiter == ",":
         with suppress(csv.Error):
             delimiter = (
@@ -203,17 +205,19 @@ def read_delimited(path: Path, request: ReadRequest) -> ParsedContent:
                 .sniff(sample.decode(encoding, errors="ignore"), delimiters=",;\t|")
                 .delimiter
             )
-    if request.sheet not in {None, "Data"}:
+    if context.request.sheet not in {None, "Data"}:
         raise ValueError("Delimited files have one sheet: Data")
     details = ParsedContent(
-        (), path.suffix.lower().lstrip("."), sheet="Data", sheets=("Data",)
+        (), context.path.suffix.lower().lstrip("."), sheet="Data", sheets=("Data",)
     )
 
     def blocks() -> Iterable[str]:
-        with path.open(encoding=encoding, newline="") as source:
+        with context.path.open(encoding=encoding, newline="") as source:
             rows = csv.reader(source, delimiter=delimiter)
             bounds = (
-                _bounds(request.cell_range, 1048576, 1) if request.cell_range else None
+                _bounds(context.request.cell_range, 1048576, 1)
+                if context.request.cell_range
+                else None
             )
             for index, row in enumerate(rows, 1):
                 if bounds and index > bounds[3]:

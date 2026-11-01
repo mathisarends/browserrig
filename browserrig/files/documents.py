@@ -3,7 +3,6 @@ import re
 from collections.abc import Iterator
 from email import policy
 from email.parser import BytesParser
-from pathlib import Path
 from urllib.parse import unquote, urlsplit
 from zipfile import ZipFile
 
@@ -17,24 +16,15 @@ from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from striprtf.striprtf import rtf_to_text
 
-from .content import ParsedContent, ReadRequest, cell_text
+from .content import ParsedContent, ReadContext, cell_text
 
 
-def _html_text(source: str | bytes) -> str:
-    soup = BeautifulSoup(source, "html.parser")
-    for node in soup.select(
-        "script, style, template, noscript, input, textarea, select"
-    ):
-        node.decompose()
-    return markdownify(str(soup), heading_style="ATX")
+def read_html(context: ReadContext) -> ParsedContent:
+    return ParsedContent((_html_text(context.path.read_bytes()),), "html")
 
 
-def read_html(path: Path) -> ParsedContent:
-    return ParsedContent((_html_text(path.read_bytes()),), "html")
-
-
-def read_docx(path: Path) -> ParsedContent:
-    document = Document(str(path))
+def read_docx(context: ReadContext) -> ParsedContent:
+    document = Document(str(context.path))
 
     def blocks() -> Iterator[str]:
         for section in document.sections:
@@ -56,10 +46,13 @@ def read_docx(path: Path) -> ParsedContent:
     )
 
 
-def read_pptx(path: Path, request: ReadRequest) -> ParsedContent:
-    presentation = Presentation(str(path))
+def read_pptx(context: ReadContext) -> ParsedContent:
+    presentation = Presentation(str(context.path))
     count = len(presentation.slides)
-    if request.page_number is not None and not 1 <= request.page_number <= count:
+    if (
+        context.request.page_number is not None
+        and not 1 <= context.request.page_number <= count
+    ):
         raise ValueError(
             f"Presentation has {count} slides; choose an existing page_number"
         )
@@ -80,7 +73,10 @@ def read_pptx(path: Path, request: ReadRequest) -> ParsedContent:
 
     def blocks() -> Iterator[str]:
         for index, slide in enumerate(presentation.slides, 1):
-            if request.page_number is not None and index != request.page_number:
+            if (
+                context.request.page_number is not None
+                and index != context.request.page_number
+            ):
                 continue
             yield f"# Slide {index} of {count}\n\n"
             yield from shapes_text(slide.shapes)
@@ -94,14 +90,14 @@ def read_pptx(path: Path, request: ReadRequest) -> ParsedContent:
         "pptx",
         ["Images, chart graphics, animations and embedded files are not extracted"],
         page_count=count,
-        page_number=request.page_number,
+        page_number=context.request.page_number,
     )
 
 
-def read_odf(path: Path) -> ParsedContent:
+def read_odf(context: ReadContext) -> ParsedContent:
     converter = ODF2XHTML()
-    converter.load(str(path))
-    with ZipFile(path) as archive:
+    converter.load(str(context.path))
+    with ZipFile(context.path) as archive:
         format_ = "odp" if archive.read("mimetype").endswith(b"presentation") else "odt"
     return ParsedContent(
         (_html_text(converter.xhtml()),),
@@ -110,8 +106,8 @@ def read_odf(path: Path) -> ParsedContent:
     )
 
 
-def read_rtf(path: Path) -> ParsedContent:
-    data = path.read_bytes()
+def read_rtf(context: ReadContext) -> ParsedContent:
+    data = context.path.read_bytes()
     match = re.search(rb"\\ansicpg(\d+)", data[:4096])
     encoding = "cp" + match[1].decode("ascii") if match else "cp1252"
     return ParsedContent(
@@ -121,9 +117,9 @@ def read_rtf(path: Path) -> ParsedContent:
     )
 
 
-def read_epub(path: Path) -> ParsedContent:
+def read_epub(context: ReadContext) -> ParsedContent:
     def blocks() -> Iterator[str]:
-        with ZipFile(path) as archive:
+        with ZipFile(context.path) as archive:
             encrypted = set()
             if "META-INF/encryption.xml" in archive.namelist():
                 encryption = fromstring(archive.read("META-INF/encryption.xml"))
@@ -179,8 +175,8 @@ def read_epub(path: Path) -> ParsedContent:
     return ParsedContent(blocks(), "epub", ["Embedded images are not extracted"])
 
 
-def read_email(path: Path) -> ParsedContent:
-    with path.open("rb") as stream:
+def read_email(context: ReadContext) -> ParsedContent:
+    with context.path.open("rb") as stream:
         message = BytesParser(policy=policy.default).parse(stream)
     blocks = [
         f"{name}: {message[name]}\n"
@@ -211,8 +207,8 @@ def read_email(path: Path) -> ParsedContent:
     return ParsedContent(blocks, "eml", limitations, entry_count=len(attachments))
 
 
-def read_mhtml(path: Path) -> ParsedContent:
-    with path.open("rb") as stream:
+def read_mhtml(context: ReadContext) -> ParsedContent:
+    with context.path.open("rb") as stream:
         message = BytesParser(policy=policy.default).parse(stream)
     blocks = []
     for part in message.walk():
@@ -221,6 +217,15 @@ def read_mhtml(path: Path) -> ParsedContent:
     return ParsedContent(
         blocks, "mhtml", ["Non-HTML embedded resources are not extracted"]
     )
+
+
+def _html_text(source: str | bytes) -> str:
+    soup = BeautifulSoup(source, "html.parser")
+    for node in soup.select(
+        "script, style, template, noscript, input, textarea, select"
+    ):
+        node.decompose()
+    return markdownify(str(soup), heading_style="ATX")
 
 
 def _docx_table(table: Table) -> Iterator[str]:

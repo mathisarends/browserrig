@@ -10,7 +10,7 @@ from zipfile import ZipFile, is_zipfile
 
 from . import containers
 from .config import FileSystemOptions
-from .content import ParsedContent, ReadRequest
+from .content import ParsedContent, ReadContext, ReadRequest
 from .formats import READERS, signature_format
 from .kinds import FileExtension as Ext
 from .models import FileContent
@@ -202,7 +202,7 @@ class FileReader:
         spec = READERS.get(format_)
         if spec is None:
             raise ValueError(f"No content reader for {format_}")
-        return spec.read(path, request, self.options)
+        return spec.read(ReadContext(path, format_, request, self.options))
 
     def _read_member(
         self,

@@ -12,15 +12,21 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import IO, Protocol
 from zipfile import ZipFile
 
-from .content import ParsedContent, cell_text
+from .content import ParsedContent, ReadContext, cell_text
+from .kinds import FileExtension as Ext
+
+_COMPRESSED = {Ext.GZ: gzip.open, Ext.BZ2: bz2.open, Ext.XZ: lzma.open}
 
 
-def container_index(path: Path, format_: str, limit: int) -> ParsedContent:
+def read_container(context: ReadContext) -> ParsedContent:
+    """List the entries of an archive, mailbox or single-file compression."""
+    path, format_ = context.path, context.format
+    limit = context.options.max_expanded_bytes
     details = ParsedContent((), format_)
 
     def blocks() -> Iterator[str]:
         yield "# Container entries\n\nRead an entry by passing member=its name.\n\n"
-        if format_ == "zip":
+        if format_ == Ext.ZIP:
             with ZipFile(path) as archive:
                 details.entry_count = len(archive.infolist())
                 for entry in archive.infolist():
@@ -29,7 +35,7 @@ def container_index(path: Path, format_: str, limit: int) -> ParsedContent:
                         + (" [encrypted]" if entry.flag_bits & 1 else "")
                         + "\n"
                     )
-        elif format_ == "tar":
+        elif format_ == Ext.TAR:
             with tarfile.open(path) as archive:
                 count = 0
                 for entry in _tar_entries(archive, limit):
@@ -43,7 +49,7 @@ def container_index(path: Path, format_: str, limit: int) -> ParsedContent:
                     )
                     yield f"- {cell_text(entry.name)} ({entry.size} bytes; {kind})\n"
                 details.entry_count = count
-        elif format_ == "mbox":
+        elif format_ == Ext.MBOX:
             archive = mailbox.mbox(path, create=False)
             try:
                 details.entry_count = len(archive)
@@ -52,14 +58,6 @@ def container_index(path: Path, format_: str, limit: int) -> ParsedContent:
                     yield f"- #{index}: {subject}\n"
             finally:
                 archive.close()
-        elif format_ == "eml":
-            with path.open("rb") as stream:
-                message = BytesParser(policy=policy.default).parse(stream)
-            entries = list(message.iter_attachments())
-            details.entry_count = len(entries)
-            for index, part in enumerate(entries, 1):
-                name = part.get_filename() or f"attachment-{index}"
-                yield f"- #{index}: {cell_text(name)} ({part.get_content_type()})\n"
         else:
             details.entry_count = 1
             yield f"- {cell_text(path.stem)}\n"
@@ -72,7 +70,7 @@ def copy_entry(
     path: Path, format_: str, name: str, target: IO[bytes], limit: int
 ) -> str:
     _safe_member(name)
-    if format_ == "zip":
+    if format_ == Ext.ZIP:
         with ZipFile(path) as archive:
             entries = [entry for entry in archive.infolist() if entry.filename == name]
             if len(entries) != 1:
@@ -91,7 +89,7 @@ def copy_entry(
                 raise ValueError("Container entry exceeds max_expanded_bytes")
             with archive.open(entry) as source:
                 _copy(source, target, limit)
-    elif format_ == "tar":
+    elif format_ == Ext.TAR:
         with tarfile.open(path) as archive:
             entries = [
                 entry for entry in _tar_entries(archive, limit) if entry.name == name
@@ -105,12 +103,12 @@ def copy_entry(
                 raise ValueError("Container entry cannot be read")
             with source:
                 _copy(source, target, limit)
-    elif format_ in {"eml", "mbox"}:
+    elif format_ in {Ext.EML, Ext.MBOX}:
         return _copy_message(path, format_, name, target, limit)
-    elif format_ in {"gz", "bz2", "xz"}:
+    elif format_ in _COMPRESSED:
         if name != path.stem:
             raise ValueError(f"This compressed file contains one entry: {path.stem}")
-        opener = {"gz": gzip.open, "bz2": bz2.open, "xz": lzma.open}[format_]
+        opener = _COMPRESSED[Ext(format_)]
         with opener(path, "rb") as source:
             _copy(source, target, limit)
     else:
@@ -156,7 +154,7 @@ def _tar_entries(archive: tarfile.TarFile, limit: int) -> Iterator[tarfile.TarIn
 def _copy_message(
     path: Path, format_: str, name: str, target: IO[bytes], limit: int
 ) -> str:
-    if format_ == "mbox":
+    if format_ == Ext.MBOX:
         if not name.startswith("#") or not name[1:].isdigit():
             raise ValueError("Select an mbox message using member='#1', '#2', etc.")
         archive = mailbox.mbox(path, create=False)

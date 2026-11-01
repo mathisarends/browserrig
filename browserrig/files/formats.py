@@ -1,12 +1,11 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import data, documents, imaging, spreadsheets
-from .adapters import Reader
-from .adapters import container as _container
-from .adapters import document as _document
-from .adapters import ocr as _ocr
-from .adapters import selected as _selected
+from . import containers, data, documents, imaging, spreadsheets
+from .content import ParsedContent, ReadContext
 from .kinds import FileExtension as Ext
+
+type Reader = Callable[[ReadContext], ParsedContent]
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,49 +20,42 @@ class FileFormat:
 
 FORMATS = {
     (Ext.XLSX, Ext.XLSM, Ext.XLTX, Ext.XLTM): FileFormat(
-        _selected(spreadsheets.read_xlsx), sheets=True, cell_ranges=True
+        spreadsheets.read_xlsx, sheets=True, cell_ranges=True
     ),
-    (Ext.XLS,): FileFormat(
-        _selected(spreadsheets.read_xls), sheets=True, cell_ranges=True
-    ),
-    (Ext.ODS,): FileFormat(
-        _selected(spreadsheets.read_ods), sheets=True, cell_ranges=True
-    ),
+    (Ext.XLS,): FileFormat(spreadsheets.read_xls, sheets=True, cell_ranges=True),
+    (Ext.ODS,): FileFormat(spreadsheets.read_ods, sheets=True, cell_ranges=True),
     (Ext.CSV, Ext.TSV): FileFormat(
-        _selected(spreadsheets.read_delimited), sheets=True, cell_ranges=True
+        spreadsheets.read_delimited, sheets=True, cell_ranges=True
     ),
     (Ext.SQLITE,): FileFormat(
-        _selected(data.read_sqlite), sheets=True, signatures=(b"SQLite format 3\0",)
+        data.read_sqlite, sheets=True, signatures=(b"SQLite format 3\0",)
     ),
-    (Ext.PDF,): FileFormat(_ocr(imaging.read_pdf), pages=True, signatures=(b"%PDF-",)),
+    (Ext.PDF,): FileFormat(imaging.read_pdf, pages=True, signatures=(b"%PDF-",)),
     (Ext.PNG,): FileFormat(
-        _ocr(imaging.read_image), pages=True, signatures=(b"\x89PNG\r\n\x1a\n",)
+        imaging.read_image, pages=True, signatures=(b"\x89PNG\r\n\x1a\n",)
     ),
     (Ext.JPEG, Ext.JPG): FileFormat(
-        _ocr(imaging.read_image), pages=True, signatures=(b"\xff\xd8\xff",)
+        imaging.read_image, pages=True, signatures=(b"\xff\xd8\xff",)
     ),
     (Ext.TIFF, Ext.TIF): FileFormat(
-        _ocr(imaging.read_image), pages=True, signatures=(b"II*\0", b"MM\0*")
+        imaging.read_image, pages=True, signatures=(b"II*\0", b"MM\0*")
     ),
     (Ext.GIF,): FileFormat(
-        _ocr(imaging.read_image), pages=True, signatures=(b"GIF87a", b"GIF89a")
+        imaging.read_image, pages=True, signatures=(b"GIF87a", b"GIF89a")
     ),
-    (Ext.BMP,): FileFormat(_ocr(imaging.read_image), pages=True),
-    (Ext.WEBP, Ext.ICO): FileFormat(_ocr(imaging.read_image), pages=True),
-    (Ext.PPTX,): FileFormat(_selected(documents.read_pptx), pages=True),
-    (Ext.DOCX,): FileFormat(_document(documents.read_docx)),
-    (Ext.ODT, Ext.ODP): FileFormat(_document(documents.read_odf)),
-    (Ext.HTML,): FileFormat(_document(documents.read_html)),
-    (Ext.RTF,): FileFormat(_document(documents.read_rtf)),
-    (Ext.EPUB,): FileFormat(_document(documents.read_epub)),
-    (Ext.EML,): FileFormat(_document(documents.read_email), members=True),
-    (Ext.MHTML,): FileFormat(_document(documents.read_mhtml)),
-    (Ext.ZIP,): FileFormat(_container(Ext.ZIP), members=True),
-    (Ext.TAR,): FileFormat(_container(Ext.TAR), members=True),
-    (Ext.GZ,): FileFormat(_container(Ext.GZ), members=True),
-    (Ext.BZ2,): FileFormat(_container(Ext.BZ2), members=True),
-    (Ext.XZ,): FileFormat(_container(Ext.XZ), members=True),
-    (Ext.MBOX,): FileFormat(_container(Ext.MBOX), members=True),
+    (Ext.BMP,): FileFormat(imaging.read_image, pages=True),
+    (Ext.WEBP, Ext.ICO): FileFormat(imaging.read_image, pages=True),
+    (Ext.PPTX,): FileFormat(documents.read_pptx, pages=True),
+    (Ext.DOCX,): FileFormat(documents.read_docx),
+    (Ext.ODT, Ext.ODP): FileFormat(documents.read_odf),
+    (Ext.HTML,): FileFormat(documents.read_html),
+    (Ext.RTF,): FileFormat(documents.read_rtf),
+    (Ext.EPUB,): FileFormat(documents.read_epub),
+    (Ext.EML,): FileFormat(documents.read_email, members=True),
+    (Ext.MHTML,): FileFormat(documents.read_mhtml),
+    (Ext.ZIP, Ext.TAR, Ext.GZ, Ext.BZ2, Ext.XZ, Ext.MBOX): FileFormat(
+        containers.read_container, members=True
+    ),
     (
         Ext.MP3,
         Ext.WAV,
@@ -75,7 +67,7 @@ FORMATS = {
         Ext.WEBM,
         Ext.MOV,
         Ext.AVI,
-    ): FileFormat(_document(data.read_media)),
+    ): FileFormat(data.read_media),
 }
 
 READERS = {str(name): format_ for names, format_ in FORMATS.items() for name in names}
