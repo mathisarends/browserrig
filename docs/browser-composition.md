@@ -9,7 +9,7 @@ readiness and action-chain decisions. Browserrig targets Harnessed 0.8.0.
 ```python
 from harnessed import Agent
 from browserrig import (
-    Actions, Activity, Chrome, DomCapture, DomRenderer, DomTools,
+    Actions, Activity, Chrome, DomCapture, DomRenderer, FormTools,
     ImageContext, KeyboardTools, LaunchBrowser, NavigationTools, Observe,
     PointerTools, Readiness, Screenshots, ScreenshotTrigger, TabTools,
     TrimInBatches,
@@ -27,9 +27,9 @@ agent = Agent(
         ),
         ImageContext(TrimInBatches(max_images=6, min_images=3)),
         Actions(),
-        DomTools(),
         PointerTools(),
         KeyboardTools(),
+        FormTools(),
         NavigationTools(),
         TabTools(),
         Activity(),
@@ -42,10 +42,11 @@ from their packages as needed. `UploadTools` requires DOM refs and a
 browser file workspace. The same readiness checks apply to web pages and
 local document previews.
 
-`DomTools` owns ref-based click, drag, typing and form tools; `PointerTools`
-uses screenshot or viewport coordinates, and `KeyboardTools` sends input to the
-current focus. DOM tools validate the capture's `provides_dom_refs` capability at
-setup. Empty pages can still have that capability. `Actions()` uses
+Tool groups follow the input device, not the capture: `PointerTools` clicks and drags by
+screenshot or viewport coordinates and by ref, `KeyboardTools` sends keys to the current
+focus and types into a ref, and `FormTools` sets native form controls. Ref-based tools
+are only offered while the capture's `provides_dom_refs` capability holds, so the
+same groups work for screenshot-only captures. Empty pages can still have that capability. `Actions()` uses
 `DomActionChains()` for captures with refs; `ObserveAfterInput()` requires a fresh
 observation after each input when selected explicitly.
 
@@ -289,14 +290,12 @@ Composition also accepts `readiness=Readiness(...)`,
 `image_context=ImageContext(...)`, `actions=Actions(...)` and `local_files=False`
 when local file tools should be omitted.
 
-The default recipe mounts `DomTools`; custom captures without refs omit DOM and
-upload tools. Transient availability (for example a missing workspace) still uses
+The default recipe mounts every tool group; ref-based tools hide themselves for
+captures without refs. Transient availability (for example a missing workspace) still uses
 tool gates, including execution-time rechecks. Existing upload path validation is retained.
 Keep file readers as ordinary functions/strategies, not one plugin per file format.
 
 For manual compositions, add `ImageContext()` explicitly: `Observe` no longer
-injects images itself. Configure `Readiness` and `Observe` independently. Move
-`type_text` from custom `KeyboardTools` compositions into `DomTools`. `MouseTools` remains a compatibility group for DOM
-and coordinate mouse tools; do not install it alongside overlapping tool groups.
+injects images itself. Configure `Readiness` and `Observe` independently.
 Harnessed filesystem tools can replace local file tools by selecting
 `local_files=False`; browser download paths are not automatically sandbox paths.

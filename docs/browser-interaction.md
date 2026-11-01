@@ -175,11 +175,11 @@ ancestor hit tests are refreshed after scrolling and before dispatching input.
 Typing, selecting options, setting date inputs, and uploads use this preparation
 as well as clicks. Focus uses `preventScroll` to avoid an extra browser jump.
 
-`DomTools` provides `click(ref=..., count=2)` and
-`drag(source_ref=..., target_ref=...)`. Both drag endpoints are prepared first and
+`PointerTools` provides `click(ref=..., count=2)` and
+`drag(source_ref=..., target_ref=...)` when the capture has DOM refs. Both drag endpoints are prepared first and
 must fit in the viewport together before the gesture starts.
 
-`PointerTools` provides `move_mouse(x=..., y=...)`,
+It always provides `move_mouse(x=..., y=...)`,
 `scroll(delta_y=...)`,
 `click_at(x=..., y=..., count=2)` and
 `drag_at(start=Point(...), end=Point(...))`.
@@ -260,7 +260,7 @@ focus and takes exactly one of `text` or `key`:
 `hold_control`, `hold_shift`, `hold_alt`, and `hold_meta` apply to `key`. All held
 modifiers are released after the key. Literal text uses `text` without modifier flags.
 
-For DOM input, `DomTools` supplies `type_text(ref=..., text=...)` to focus and
+With DOM refs, `KeyboardTools` also supplies `type_text(ref=..., text=...)` to focus and
 replace a referenced field. Use `clear=False` to type at its current selection.
 
 Keys and modifiers are released on failure or cancellation. Unicode text is

@@ -20,8 +20,8 @@ from browserrig import (
     WindowRatio,
 )
 from browserrig.tools import (
-    DomTools,
     FileTools,
+    FormTools,
     JavaScriptTools,
     PointerTools,
     UploadTools,
@@ -73,11 +73,11 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     assert not file_system.directory.exists()
 
 
-def test_facade_mounts_dom_and_coordinate_tool_capabilities():
+def test_facade_mounts_every_tool_group_once():
     agent = BrowserAgent(model=ScriptedModel(["ok"]))
     for plugin in (PointerTools, JavaScriptTools):
         assert sum(isinstance(item, plugin) for item in agent.plugins) == 1
-    for plugin in (DomTools, UploadTools):
+    for plugin in (FormTools, UploadTools):
         assert any(isinstance(item, plugin) for item in agent.plugins)
     assert sum(isinstance(item, FileTools) for item in agent.plugins) == 1
 

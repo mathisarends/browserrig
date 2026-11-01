@@ -20,6 +20,11 @@ type _ClickButton = Annotated[
 
 
 class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
+    """Mouse input by screenshot coordinates, plus by DOM ref when refs exist.
+
+    Coordinates also reach unreferenced regions, so text-only agents keep them too.
+    """
+
     _browser: Inject[Browser]
     _observe: Inject[Observe]
 
@@ -72,8 +77,6 @@ class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
         actions: Inject[Actions],
     ) -> ToolResult:
         async def click(_tab: Tab) -> Effect:
-            snapshot = self._observe.snapshot
-            assert snapshot is not None
             point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
             await self._browser.mouse.click(point, count=count, button=button)
             return Effect(_click_message(count, button), break_chain=button == "right")
@@ -117,8 +120,6 @@ class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
         actions: Inject[Actions],
     ) -> ToolResult:
         async def drag(_tab: Tab) -> Effect:
-            snapshot = self._observe.snapshot
-            assert snapshot is not None
             await self._browser.mouse.drag(
                 start=_image_point(self._observe.coordinate_source(), start),
                 end=_image_point(self._observe.coordinate_source(), end),
@@ -130,12 +131,6 @@ class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
             kind=ActionKind.DRAG_AT, operation=drag, expects_change=True
         )
 
-
-class DomPointerTools(Plugin, needs=(Actions, Browser, Observe)):
-    _browser: Inject[Browser]
-    _observe: Inject[Observe]
-
-    # Coordinate input also supports pointing at unreferenced screenshot regions.
     @tool(
         kind=ActionKind.CLICK,
         chainable=True,
@@ -207,10 +202,6 @@ class DomPointerTools(Plugin, needs=(Actions, Browser, Observe)):
         return await actions.run(
             kind=ActionKind.DRAG, operation=drag, expects_change=True
         )
-
-
-class MouseTools(PointerTools, DomPointerTools):
-    """Compatibility group. New recipes mount PointerTools and DomTools explicitly."""
 
 
 def _click_message(count: Literal[1, 2], button: Literal["left", "right"]) -> str:

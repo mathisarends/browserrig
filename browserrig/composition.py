@@ -13,9 +13,9 @@ from .secrets import Secret, Secrets
 from .tools import (
     Actions,
     DialogTools,
-    DomTools,
     FileTools,
     FindTools,
+    FormTools,
     JavaScriptTools,
     KeyboardTools,
     NavigationTools,
@@ -56,16 +56,13 @@ def browser_plugins(
         JavaScriptTools(),
         KeyboardTools(),
         PointerTools(),
+        FormTools(),
         TabTools(),
         DialogTools(),
         FindTools(),
     ]
-    if observation.capture_strategy.provides_dom_refs:
-        plugins.append(DomTools())
     if local_files:
-        plugins.append(FileTools())
-        if observation.capture_strategy.provides_dom_refs:
-            plugins.append(UploadTools())
+        plugins += [FileTools(), UploadTools()]
     if handoff is not None:
         plugins.append(handoff)
     return plugins
