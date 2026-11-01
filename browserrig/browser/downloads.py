@@ -1,4 +1,3 @@
-import asyncio
 from time import monotonic
 
 from cdpify import CdpClient
@@ -77,8 +76,8 @@ class Downloads:
         path, error = event.file_path, None
         if event.state == DownloadState.COMPLETED and self._files is not None:
             try:
-                path = await asyncio.to_thread(
-                    self._files.complete_download, guid, previous.filename, path
+                path = await self._files.complete_download(
+                    guid, previous.filename, path
                 )
             except (OSError, ValueError) as failure:
                 # A single missing file must not stop browser event processing.

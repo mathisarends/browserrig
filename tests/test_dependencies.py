@@ -304,13 +304,13 @@ async def test_file_tools_follow_workspace_availability_and_reject_stale_calls(
         assert (await tools.execute(upload)).is_error
         browser = session.ctx[Browser]
         browser.files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
-        browser.files.initialize()
+        await browser.files.initialize()
         assert workspace_tools <= {item.name for item in tools.definitions}
         call = ToolCall("write_file", {"path": "note.txt", "content": "test"})
         plan = tools.plan(call)
         upload_plan = tools.plan(upload)
         assert not (await tools.execute(call)).is_error
-        assert browser.files.read_file("note.txt").text == "test"
+        assert (await browser.files.read_file("note.txt")).text == "test"
         browser.files = None
         assert tools.check_enabled(plan, ctx=session.ctx).is_error
         assert tools.check_enabled(upload_plan, ctx=session.ctx).is_error

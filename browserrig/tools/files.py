@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
-from collections.abc import Callable
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
@@ -117,9 +118,8 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
         limit: Annotated[int, Field(ge=1, le=200)] = 100,
     ) -> FileListing:
         files = self._files()
-        listing = await _file_call(
-            lambda: files.list_files(path, offset=offset, limit=limit)
-        )
+        with _file_errors():
+            listing = await files.list_files(path, offset=offset, limit=limit)
         await self._events.emit(
             FilesListedEvent(
                 directory=listing.directory,
@@ -171,20 +171,18 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
                 offset=offset,
             )
         )
-        read = _file_call(
-            lambda: files.read_file(
-                path,
-                page_number=page_number,
-                sheet=sheet,
-                cell_range=cell_range,
-                member=member,
-                ocr=ocr,
-                offset=offset,
-                max_chars=max_chars,
-            )
-        )
         try:
-            content = await read
+            with _file_errors():
+                content = await files.read_file(
+                    path,
+                    page_number=page_number,
+                    sheet=sheet,
+                    cell_range=cell_range,
+                    member=member,
+                    ocr=ocr,
+                    offset=offset,
+                    max_chars=max_chars,
+                )
         except (ToolError, asyncio.CancelledError) as error:
             # Viewers must never keep a reading indicator for a read that ended.
             reason = (
@@ -224,11 +222,9 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
     ) -> FileEntry:
         files = self._files()
 
-        def write() -> tuple[FileEntry, bool]:
-            created = not files.resolve(path).exists()
-            return files.write_file(path, content, overwrite=overwrite), created
-
-        entry, created = await _file_call(write)
+        with _file_errors():
+            created = not await files.exists(path)
+            entry = await files.write_file(path, content, overwrite=overwrite)
         size = entry.size if entry.size is not None else len(content.encode("utf-8"))
         await self._events.emit(
             FileWrittenEvent(path=entry.path, size=size, created=created)
@@ -242,9 +238,8 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
     )
     async def open_file(self, path: str) -> ToolResult:
         files = self._files()
-        resolved = await _file_call(lambda: files.resolve(path))
-        if not await asyncio.to_thread(resolved.is_file):
-            raise ToolError(f"File not found: {path}")
+        with _file_errors():
+            resolved = await files.resolve(path, require_file=True)
         return await self._open(resolved, ActionKind.OPEN_FILE, FileSource.WORKSPACE)
 
     @tool(
@@ -267,10 +262,11 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
             raise ToolError(
                 download.error or "Download has no accessible path; download it again"
             )
-        download_path = download.path
-        resolved = await _file_call(lambda: self._files().resolve(download_path))
-        if not await asyncio.to_thread(resolved.is_file):
-            raise ToolError("Downloaded file is no longer available")
+        with _file_errors():
+            try:
+                resolved = await self._files().resolve(download.path, require_file=True)
+            except FileNotFoundError as error:
+                raise ToolError("Downloaded file is no longer available") from error
         return await self._open(
             resolved, ActionKind.OPEN_DOWNLOADED_FILE, FileSource.DOWNLOAD, download.id
         )
@@ -375,7 +371,8 @@ class UploadTools(Plugin, needs=(Actions, Browser, BrowserEvents, Observe)):
                 raise ToolError(
                     "Uploads require a shared local file system for this browser"
                 )
-            selected.extend(await _file_call(lambda: files.upload_paths(paths)))
+            with _file_errors():
+                selected.extend(await files.upload_paths(paths))
 
         async def upload(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
@@ -402,8 +399,9 @@ class UploadTools(Plugin, needs=(Actions, Browser, BrowserEvents, Observe)):
         )
 
 
-async def _file_call[T](operation: Callable[[], T]) -> T:
+@contextmanager
+def _file_errors() -> Generator[None, None, None]:
     try:
-        return await asyncio.to_thread(operation)
+        yield
     except (OSError, ValueError) as error:
         raise ToolError(str(error)) from error

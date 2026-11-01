@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import hashlib
 import json
 import subprocess
@@ -54,11 +55,11 @@ def _source(directory: Path, entry: dict, download: bool) -> Path:
     return path
 
 
-def _inspect(path: Path, workspace: Path, entry: dict) -> dict:
+async def _inspect(path: Path, workspace: Path, entry: dict) -> dict:
     files = FileSystem(
         FileSystemOptions(directory=workspace), download_directory=str(path.parent)
     )
-    first = files.read_file(str(path), max_chars=200000)
+    first = await files.read_file(str(path), max_chars=200000)
     selections = [{}]
     if first.sheets:
         selections = [{"sheet": sheet} for sheet in first.sheets]
@@ -68,7 +69,7 @@ def _inspect(path: Path, workspace: Path, entry: dict) -> dict:
     for selection in selections:
         offset = 0
         while True:
-            result = files.read_file(
+            result = await files.read_file(
                 str(path), offset=offset, max_chars=200000, **selection
             )
             chunks.append(result.text)
@@ -98,7 +99,7 @@ def _inspect(path: Path, workspace: Path, entry: dict) -> dict:
 
 def _worker(path: Path, workspace: Path, entry: dict) -> dict:
     try:
-        result = _inspect(path, workspace, entry)
+        result = asyncio.run(_inspect(path, workspace, entry))
     except (OSError, ValueError) as error:
         if entry.get("expected_error") and entry["expected_error"] in str(error):
             return {"name": path.name, "passed": True, "expected_error": str(error)}

@@ -5,6 +5,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from io import BytesIO
 from pathlib import Path
+from threading import Event
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -36,52 +37,86 @@ from browserrig.events import (
     FileWrittenEvent,
 )
 from browserrig.files import DownloadState
+from browserrig.files.reading import FileReader
 from browserrig.kinds import FileSource, ReadinessPhase
 from browserrig.tools import Actions, FileTools
 from tests.fakes import mounted
 
 
-def test_workspace_text_round_trip_pagination_and_explicit_overwrite(files):
+async def test_workspace_text_round_trip_pagination_and_explicit_overwrite(files):
     content = "Grüße aus dem Weltall 🌍\n" * 10
-    saved = files.write_file("notes/research.md", content)
+    assert not await files.exists("notes/research.md")
+    saved = await files.write_file("notes/research.md", content)
+    assert await files.exists(saved.path)
+    assert await files.resolve(saved.path, require_file=True) == Path(saved.path)
     assert saved.size == len(content.encode())
-    assert files.list_files().entries[1].name == "notes"
-    assert files.list_files("notes").entries[0].path == saved.path
+    assert (await files.list_files()).entries[1].name == "notes"
+    assert (await files.list_files("notes")).entries[0].path == saved.path
     with pytest.raises(FileExistsError):
-        files.write_file("notes/research.md", "oops")
-    first = files.read_file(saved.path, max_chars=17)
-    second = files.read_file(saved.path, offset=first.next_offset, max_chars=20000)
+        await files.write_file("notes/research.md", "oops")
+    first = await files.read_file(saved.path, max_chars=17)
+    second = await files.read_file(
+        saved.path, offset=first.next_offset, max_chars=20000
+    )
     assert first.text + second.text == content
     assert second.next_offset is None
-    files.write_file(saved.path, "updated", overwrite=True)
-    assert files.read_file(saved.path).text == "updated"
+    await files.write_file(saved.path, "updated", overwrite=True)
+    assert (await files.read_file(saved.path)).text == "updated"
 
 
-def test_directory_listing_is_bounded(files):
+async def test_directory_listing_is_bounded(files):
     for index in range(5):
-        files.write_file(f"note-{index}.txt", "test")
-    first = files.list_files(limit=2)
-    second = files.list_files(offset=first.next_offset, limit=2)
+        await files.write_file(f"note-{index}.txt", "test")
+    first = await files.list_files(limit=2)
+    second = await files.list_files(offset=first.next_offset, limit=2)
     assert len(first.entries) == len(second.entries) == 2
     assert {entry.name for entry in first.entries}.isdisjoint(
         entry.name for entry in second.entries
     )
 
 
+async def test_read_file_keeps_the_event_loop_responsive(files, monkeypatch):
+    await files.write_file("report.txt", "threaded read")
+    loop = asyncio.get_running_loop()
+    started = asyncio.Event()
+    release = Event()
+    read = FileReader.read
+
+    def delayed_read(reader, *args, **kwargs):
+        loop.call_soon_threadsafe(started.set)
+        if not release.wait(timeout=5):
+            raise TimeoutError("The event loop did not release the reader")
+        return read(reader, *args, **kwargs)
+
+    monkeypatch.setattr(FileReader, "read", delayed_read)
+    task = asyncio.create_task(files.read_file("report.txt"))
+    try:
+        await asyncio.wait_for(started.wait(), timeout=2)
+        # The parser is still waiting, but unrelated async file work can finish.
+        assert not task.done()
+        assert (await files.list_files()).entries[1].name == "report.txt"
+    finally:
+        release.set()
+        content = await asyncio.wait_for(task, timeout=5)
+    assert content.text == "threaded read"
+
+
 @pytest.mark.parametrize("path", ["../private.txt", "notes/../../private.txt"])
-def test_workspace_rejects_traversal_for_read_write_and_list(files, path):
+async def test_workspace_rejects_traversal_for_read_write_and_list(files, path):
     for operation in (
+        files.resolve,
+        files.exists,
         files.read_file,
         files.list_files,
         lambda p: files.write_file(p, "secret"),
     ):
         with pytest.raises(ValueError, match="outside"):
-            operation(path)
+            await operation(path)
     with pytest.raises(ValueError, match="outside"):
-        files.resolve(files.directory.parent / "secret.txt")
+        await files.resolve(files.directory.parent / "secret.txt")
 
 
-def test_workspace_rejects_symlink_escapes(files, tmp_path):
+async def test_workspace_rejects_symlink_escapes(files, tmp_path):
     outside = tmp_path / "private"
     outside.mkdir()
     (outside / "secret.txt").write_text("secret")
@@ -91,71 +126,75 @@ def test_workspace_rejects_symlink_escapes(files, tmp_path):
     except OSError:
         pytest.skip("Creating symlinks is unavailable on this host")
     with pytest.raises(ValueError, match="outside"):
-        files.read_file("shortcut/secret.txt")
+        await files.read_file("shortcut/secret.txt")
     with pytest.raises(ValueError, match="outside"):
-        files.write_file("shortcut/secret.txt", "changed", overwrite=True)
-    assert "shortcut" not in {entry.name for entry in files.list_files().entries}
+        await files.write_file("shortcut/secret.txt", "changed", overwrite=True)
+    with pytest.raises(ValueError, match="outside"):
+        await files.exists("shortcut/secret.txt")
+    assert "shortcut" not in {
+        entry.name for entry in (await files.list_files()).entries
+    }
     assert (outside / "secret.txt").read_text() == "secret"
 
 
-def test_pdf_pages_and_character_continuation(files, pdf_document):
+async def test_pdf_pages_and_character_continuation(files, pdf_document):
     path = files.directory / "report.pdf"
     path.write_bytes(pdf_document)
-    first = files.read_file(str(path), max_chars=8)
-    rest = files.read_file(str(path), page_number=1, offset=first.next_offset)
+    first = await files.read_file(str(path), max_chars=8)
+    rest = await files.read_file(str(path), page_number=1, offset=first.next_offset)
     assert "First page: Voyager 1" in first.text + rest.text
     assert first.page_count == 2
     assert first.page_number == 1
-    second = files.read_file(str(path), page_number=2)
+    second = await files.read_file(str(path), page_number=2)
     assert "Second page: Voyager 2" in second.text
     assert "First page" not in second.text
     with pytest.raises(ValueError, match="2 pages"):
-        files.read_file(str(path), page_number=3)
+        await files.read_file(str(path), page_number=3)
     with pytest.raises(ValueError, match="at least 1"):
-        files.read_file(str(path), page_number=0)
+        await files.read_file(str(path), page_number=0)
 
 
-def test_empty_encrypted_and_invalid_pdf_report_usable_errors(files):
+async def test_empty_encrypted_and_invalid_pdf_report_usable_errors(files):
     path = files.directory / "report.pdf"
     writer = PdfWriter()
     writer.add_blank_page(width=100, height=100)
     writer.write(path)
-    empty = files.read_file(str(path))
+    empty = await files.read_file(str(path))
     assert empty.status == "partial"
     assert any("No extractable text" in item for item in empty.limitations)
     writer.encrypt("secret")
     writer.write(path)
     with pytest.raises(ValueError, match="encrypted"):
-        files.read_file(str(path))
+        await files.read_file(str(path))
     path.write_bytes(b"not a PDF")
     with pytest.raises(ValueError, match="Could not read PDF"):
-        files.read_file(str(path))
+        await files.read_file(str(path))
 
 
-def test_binary_missing_and_oversized_files_are_not_read_as_text(files):
+async def test_binary_missing_and_oversized_files_are_not_read_as_text(files):
     path = files.directory / "image.png"
     path.write_bytes(b"\x89PNG\x00\x01")
     with pytest.raises(OSError, match="identify image"):
-        files.read_file(str(path))
+        await files.read_file(str(path))
     with pytest.raises(FileNotFoundError):
-        files.read_file("missing.txt")
+        await files.read_file("missing.txt")
     small = FileSystem(FileSystemOptions(directory=files.directory, max_file_bytes=2))
     with pytest.raises(ValueError, match="max_file_bytes"):
-        small.read_file(str(path))
+        await small.read_file(str(path))
     with pytest.raises(ValueError, match="max_file_bytes"):
-        small.write_file("large.txt", "abc")
-    files.write_file("notes.txt", "test")
+        await small.write_file("large.txt", "abc")
+    await files.write_file("notes.txt", "test")
     with pytest.raises(ValueError, match="only supported for PDF"):
-        files.read_file("notes.txt", page_number=1)
+        await files.read_file("notes.txt", page_number=1)
 
 
-def test_downloads_keep_extensions_and_duplicate_names_without_overwriting(
+async def test_downloads_keep_extensions_and_duplicate_names_without_overwriting(
     files, pdf_document
 ):
     paths = []
     for download_id in ("first", "second"):
         (files.pending_directory / download_id).write_bytes(pdf_document)
-        paths.append(files.complete_download(download_id, "report.pdf", None))
+        paths.append(await files.complete_download(download_id, "report.pdf", None))
     assert paths[0] != paths[1]
     assert all(Path(path).name == "report.pdf" for path in paths)
     assert all(Path(path).read_bytes() == pdf_document for path in paths)
@@ -165,56 +204,61 @@ def test_downloads_keep_extensions_and_duplicate_names_without_overwriting(
 @pytest.mark.parametrize(
     "filename", ["../../report.pdf", "CON.pdf", "bad:name?.pdf", "a" * 300 + ".pdf"]
 )
-def test_download_names_are_safe_on_windows_and_preserve_suffix(files, filename):
+async def test_download_names_are_safe_on_windows_and_preserve_suffix(files, filename):
     (files.pending_directory / "download-id").write_bytes(b"content")
-    saved = Path(files.complete_download("download-id", filename, None))
+    saved = Path(await files.complete_download("download-id", filename, None))
     assert saved.is_relative_to(files.download_directory)
     assert saved.suffix == ".pdf"
     assert saved.read_bytes() == b"content"
 
 
-def test_explicit_download_directory_is_accessible_without_opening_other_paths(
+async def test_explicit_download_directory_is_accessible_without_opening_other_paths(
     tmp_path,
 ):
     files = FileSystem(
         FileSystemOptions(directory=tmp_path / "workspace"),
         download_directory=str(tmp_path / "downloads"),
     )
-    files.initialize()
+    await files.initialize()
     (files.pending_directory / "id").write_text("download")
-    path = files.complete_download("id", "note.txt", None)
-    assert files.read_file(path).text == "download"
+    path = await files.complete_download("id", "note.txt", None)
+    assert (await files.read_file(path)).text == "download"
     with pytest.raises(ValueError, match="outside"):
-        files.resolve(tmp_path / "other")
+        await files.resolve(tmp_path / "other")
 
 
-def test_uploads_resolve_workspace_and_separate_download_paths(tmp_path):
+async def test_uploads_resolve_workspace_and_separate_download_paths(tmp_path):
     files = FileSystem(
         FileSystemOptions(directory=tmp_path / "workspace"),
         download_directory=str(tmp_path / "downloads"),
     )
-    files.initialize()
-    saved = files.write_file("report.txt", "report")
+    await files.initialize()
+    saved = await files.write_file("report.txt", "report")
     (files.pending_directory / "id").write_text("download")
-    downloaded = files.complete_download("id", "note.txt", None)
-    assert files.upload_paths(["report.txt", downloaded]) == [saved.path, downloaded]
+    downloaded = await files.complete_download("id", "note.txt", None)
+    assert await files.upload_paths(["report.txt", downloaded]) == [
+        saved.path,
+        downloaded,
+    ]
 
 
-def test_uploads_reject_empty_missing_directory_and_outside_paths(files, tmp_path):
-    saved = files.write_file("report.txt", "report")
+async def test_uploads_reject_empty_missing_directory_and_outside_paths(
+    files, tmp_path
+):
+    saved = await files.write_file("report.txt", "report")
     secret = tmp_path / "secret.txt"
     secret.write_text("private")
     for path in (str(secret), "../secret.txt"):
         with pytest.raises(ValueError, match="outside"):
-            files.upload_paths([saved.path, path])
+            await files.upload_paths([saved.path, path])
     for path in ("missing.txt", "."):
         with pytest.raises(FileNotFoundError, match="existing file"):
-            files.upload_paths([path])
+            await files.upload_paths([path])
     with pytest.raises(ValueError, match="at least one"):
-        files.upload_paths([])
+        await files.upload_paths([])
 
 
-def test_uploads_reject_symlinks_to_outside_files(files, tmp_path):
+async def test_uploads_reject_symlinks_to_outside_files(files, tmp_path):
     secret = tmp_path / "secret.txt"
     secret.write_text("private")
     link = files.directory / "report.txt"
@@ -223,7 +267,7 @@ def test_uploads_reject_symlinks_to_outside_files(files, tmp_path):
     except OSError:
         pytest.skip("Creating symlinks is unavailable on this host")
     with pytest.raises(ValueError, match="outside"):
-        files.upload_paths([str(link)])
+        await files.upload_paths([str(link)])
 
 
 _COMPLETED = DownloadProgressEvent(
@@ -240,7 +284,7 @@ async def test_download_completion_falls_back_to_guid_and_tolerates_repeated_eve
     await downloads.handle(_COMPLETED)
     (download,) = downloads.all()
     assert download.state is DownloadState.COMPLETED
-    assert files.read_file(download.path).text == "download"
+    assert (await files.read_file(download.path)).text == "download"
     assert download.error is None
     completed = [call.args[0] for call in emit.await_args_list]
     assert [type(event) for event in completed].count(DownloadCompletedEvent) == 1
@@ -286,8 +330,8 @@ async def test_download_progress_without_a_known_size_reports_no_total(tmp_path)
 
 
 async def test_file_tools_report_listing_reads_and_writes(files):
-    saved = files.write_file("a.txt", "hello")
-    listing = files.list_files()
+    saved = await files.write_file("a.txt", "hello")
+    listing = await files.list_files()
     async with _file_tools(files) as (services, tools):
         await tools.list_files()
         await tools.read_file("a.txt")
@@ -316,7 +360,7 @@ async def test_file_tools_report_listing_reads_and_writes(files):
 async def test_open_file_reports_the_file_in_its_new_tab(files, monkeypatch):
     sleep = AsyncMock()
     monkeypatch.setattr(asyncio, "sleep", sleep)
-    saved = files.write_file("report.txt", "report")
+    saved = await files.write_file("report.txt", "report")
     opened = SimpleNamespace(id="new", document_id="new-document")
     async with _file_tools(files) as (services, tools):
         browser = services.browser
@@ -349,11 +393,33 @@ async def test_io_errors_become_model_visible_tool_errors(files):
             await tools.list_files("missing")
 
 
+@pytest.mark.parametrize("path", ["missing.txt", "downloads"])
+async def test_open_file_requires_an_existing_regular_file(files, path):
+    async with _file_tools(files) as (_services, tools):
+        with pytest.raises(ToolError, match="File not found"):
+            await tools.open_file(path)
+
+
+async def test_cancelled_read_reports_failure_and_propagates_cancellation(
+    files, monkeypatch
+):
+    read = AsyncMock(side_effect=asyncio.CancelledError)
+    monkeypatch.setattr(files, "read_file", read)
+    async with _file_tools(files) as (services, tools):
+        with pytest.raises(asyncio.CancelledError):
+            await tools.read_file("report.txt")
+    read.assert_awaited_once()
+    started, failed = services.events
+    assert isinstance(started, FileReadStartedEvent)
+    assert isinstance(failed, FileReadFailedEvent)
+    assert failed.read_id == started.read_id and failed.reason == "Read cancelled"
+
+
 @pytest.fixture(name="files")
-def _files(tmp_path):
+async def _files(tmp_path):
     workspace = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
     assert not workspace.directory.exists()
-    workspace.initialize()
+    await workspace.initialize()
     return workspace
 
 
@@ -380,7 +446,7 @@ def _first(events, kind):
 
 async def _started_download(tmp_path):
     files = FileSystem(FileSystemOptions(directory=tmp_path))
-    files.initialize()
+    await files.initialize()
     emit = AsyncMock()
     downloads = Downloads(files=files, directory=None, emit=emit)
     await downloads.handle(

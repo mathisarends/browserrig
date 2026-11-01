@@ -121,8 +121,7 @@ async def test_downloaded_workbook_is_read_as_context_without_browser_preview(
                 or downloads[-1].state != DownloadState.COMPLETED
             ):
                 await asyncio.sleep(0.02)
-        document = await asyncio.to_thread(
-            browser.files.read_file,
+        document = await browser.files.read_file(
             downloads[-1].path,
             sheet="Revenue",
             cell_range="A1:C2",
@@ -216,9 +215,9 @@ async def test_default_downloads_can_be_read_and_viewed_as_pdf_in_a_new_tab(
                 await asyncio.sleep(0.02)
         downloaded = downloads[-1]
         assert downloaded.error is None
-        document = browser.files.read_file(downloaded.path, page_number=2)
+        document = await browser.files.read_file(downloaded.path, page_number=2)
         assert "Second page: Voyager 2" in document.text
-        opened = await browser.open_tab(browser.files.resolve(downloaded.path))
+        opened = await browser.open_tab(await browser.files.resolve(downloaded.path))
         await wait_for_page(opened)
         assert opened.id != original.id
         assert opened.url == Path(downloaded.path).as_uri()

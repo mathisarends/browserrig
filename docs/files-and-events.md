@@ -114,10 +114,13 @@ input. Uploads are disabled without a shared local filesystem, including remote
 browsers without explicit `FileSystemOptions`. Stage external files in the workspace
 from application code before asking the agent to upload them.
 
-Direct Python callers can use `browser.files.read_file(path, page_number=2)` and
-`await browser.open_tab(browser.files.resolve(path))`; `open_tab` opens a `Path`
-as a local file and only accepts HTTP(S) URLs as strings. Filesystem methods are synchronous; use
-`asyncio.to_thread` when processing files inside an async application.
+Direct Python callers can use `await browser.files.read_file(path, page_number=2)` and
+`await browser.open_tab(await browser.files.resolve(path))`; `open_tab` opens a `Path`
+as a local file and only accepts HTTP(S) URLs as strings. Filesystem operations are
+asynchronous: await initialization, path resolution, existence checks, reads, writes,
+listings, upload validation and download completion. Blocking filesystem work and
+document parsing run internally in worker threads. Standalone synchronous programs
+can call these methods from an async entry point using `asyncio.run`.
 
 ### File access boundaries and optional sandboxes
 

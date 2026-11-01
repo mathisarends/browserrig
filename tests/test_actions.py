@@ -57,8 +57,8 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(
     tmp_path, selection
 ):
     files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
-    files.initialize()
-    saved = files.write_file("report.txt", "report")
+    await files.initialize()
+    saved = await files.write_file("report.txt", "report")
     secret = tmp_path / "secret.txt"
     secret.write_text("private")
     invalid = {"outside": str(secret), "missing": "missing.txt", "directory": "."}
@@ -74,8 +74,8 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(
 
 async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path):
     files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
-    files.initialize()
-    saved = files.write_file("report.txt", "report")
+    await files.initialize()
+    saved = await files.write_file("report.txt", "report")
     async with _uploads(files) as upload:
         result = await upload.tools.upload_files(
             "input", ["report.txt"], actions=upload.actions

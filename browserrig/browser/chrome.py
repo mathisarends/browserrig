@@ -116,7 +116,7 @@ class ChromeBrowser:
         try:
             options = self._options
             if self.files is not None:
-                await asyncio.to_thread(self.files.initialize)
+                await self.files.initialize()
             async with asyncio.timeout(options.timeout):
                 endpoint = await self._resolve_endpoint()
                 self.client = await self._stack.enter_async_context(
