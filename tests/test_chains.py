@@ -22,7 +22,7 @@ from harnessed.testing import ScriptedModel, call
 
 from browserrig.core import ActionKind
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent, PageState
-from browserrig.observation import Element, Snapshot, decision_change
+from browserrig.observation import DomReferences, Element, Snapshot, decision_change
 from browserrig.observation.models import Offscreen
 from browserrig.tools import Actions, BrowserToolMetadata, DomActionChains, browser_tool
 from browserrig.tools.execution import Effect
@@ -224,6 +224,7 @@ async def test_failed_comparison_keeps_input_successful_and_breaks_the_chain():
     actions = SimpleNamespace(
         observe=SimpleNamespace(
             snapshot=before,
+            references=DomReferences(),
             probe=AsyncMock(side_effect=RuntimeError("lost")),
         ),
         chain_policy=DomActionChains(),

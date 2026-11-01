@@ -23,14 +23,19 @@ class FormTools(Plugin, needs=(Actions, Observe)):
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
+        async def check(tab: Tab) -> None:
+            await self._observe.dom_element(tab, ref)
+
         async def select(tab: Tab) -> Effect:
             await actions.element_point(tab=tab, ref=ref)
-            await (await self._observe.element(tab, ref)).select(value)
+            handle = await self._observe.dom_element(tab, ref)
+            await handle.select(value)
             return Effect("Option selected.")
 
         return await actions.run(
             kind=ActionKind.SELECT,
             operation=select,
+            check=check,
         )
 
     @tool(
@@ -46,7 +51,7 @@ class FormTools(Plugin, needs=(Actions, Observe)):
         actions: Inject[Actions],
     ) -> ToolResult:
         async def check(tab: Tab) -> None:
-            handle = await self._observe.element(tab, ref)
+            handle = await self._observe.dom_element(tab, ref)
             if handle.element.input_type not in {
                 "date",
                 "time",
@@ -58,7 +63,8 @@ class FormTools(Plugin, needs=(Actions, Observe)):
 
         async def set_date(tab: Tab) -> Effect:
             await actions.element_point(tab=tab, ref=ref)
-            await (await self._observe.element(tab, ref)).set_value(value)
+            handle = await self._observe.dom_element(tab, ref)
+            await handle.set_value(value)
             return Effect("Date/time value set and verified.")
 
         return await actions.run(

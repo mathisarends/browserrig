@@ -1,17 +1,34 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from pydantic import BaseModel
 
-from browserrig.browser import Frame
-from browserrig.core import Bounds, ElementOperation, ElementPoint
-from browserrig.scripts import ELEMENT, ElementArgs, Script
+from browserrig.browser import Frame, Tab
+from browserrig.core import (
+    Bounds,
+    BrowserError,
+    ElementOperation,
+    ElementPoint,
+    Point,
+    StaleElement,
+)
+from browserrig.scripts import (
+    ELEMENT,
+    SCROLL,
+    SCROLL_OWNER,
+    ElementArgs,
+    OwnerScrollArgs,
+    Script,
+    ScrollArgs,
+    ScrollPlan,
+)
 
 from .models import Element, Snapshot
+from .references import ScrollStep
 
 
 @dataclass(frozen=True, slots=True)
-class ElementHandle:
+class DomElementHandle:
     """An element from the latest observation, bound to the frame it lives in.
 
     Methods run in the element's own document; only `locate` returns viewport coordinates.
@@ -20,6 +37,7 @@ class ElementHandle:
     frame: Frame
     element: Element
     snapshot: Snapshot
+    tab: Tab
 
     async def locate(self, *, aim: tuple[float, float] | None = None) -> ElementPoint:
         """Return a hit-tested viewport point and the element's visible bounds.
@@ -44,6 +62,33 @@ class ElementHandle:
     async def bounds(self) -> Bounds:
         """Return the element's layout box in its frame's CSS pixels."""
         return Bounds.model_validate(await self._run(ElementOperation.BOUNDS))
+
+    async def scroll_step(self) -> ScrollStep | None:
+        await self.tab.sync_document()
+        if self.tab.document_id != self.snapshot.document_id:
+            raise StaleElement(
+                "Document changed while scrolling; use refs from the next observation"
+            )
+        frame = next(
+            (item for item in await self.tab.frames() if item.id == self.frame.id), None
+        )
+        if frame is None:
+            raise StaleElement(
+                "Element frame no longer exists; use refs from the next observation"
+            )
+        current = replace(self, frame=frame)
+        planned = await _plan(current)
+        if planned is None:
+            return None
+        owner, plan = planned
+        x, y = owner.transform.to_viewport(plan.x, plan.y)
+        await owner.check_point(x, y)
+        return ScrollStep(
+            point=Point(x=x, y=y),
+            delta_x=plan.delta_x,
+            delta_y=plan.delta_y,
+            key=f"{owner.id}:{plan.model_dump_json()}",
+        )
 
     async def focus(self, *, select_all: bool) -> None:
         await self._run(ElementOperation.FOCUS, select_all)
@@ -79,3 +124,47 @@ class ElementHandle:
             ElementArgs(operation=operation, value=value, clip=clip, aim=aim),
             user_gesture=True,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class DomReferences:
+    """Resolve the DOM addresses carried by the current observation's element data."""
+
+    async def resolve(self, tab: Tab, snapshot: Snapshot, ref: str) -> DomElementHandle:
+        element = snapshot.element(ref)
+        if not isinstance(element, Element):
+            raise BrowserError(
+                "Target is not a DOM element; the capture strategy must supply References"
+            )
+        for frame in await tab.frames():
+            if frame.id == element.frame_id:
+                return DomElementHandle(frame, element, snapshot, tab)
+        raise StaleElement(
+            "Element frame no longer exists; use refs from the next observation"
+        )
+
+
+async def _plan(handle: DomElementHandle) -> tuple[Frame, ScrollPlan] | None:
+    frame = handle.frame
+    ancestors: list[Frame] = []
+    current = frame
+    while current.parent is not None:
+        ancestors.append(current)
+        current = current.parent
+    target = None
+    if ancestors:
+        target = frame.transform.bounds_to_viewport(await handle.bounds())
+    for child in reversed(ancestors):
+        parent = child.parent
+        assert parent is not None
+        clip = parent.local_visible
+        assert target is not None
+        local = parent.transform.bounds_to_local(target)
+        raw = await child.run_on_owner(
+            SCROLL_OWNER, OwnerScrollArgs(clip=clip, target_bounds=local)
+        )
+        if raw is not None:
+            return parent, raw
+    clip = frame.local_visible
+    raw = await handle.run(SCROLL, ScrollArgs(clip=clip))
+    return (frame, raw) if raw is not None else None

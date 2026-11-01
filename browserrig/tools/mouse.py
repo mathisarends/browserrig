@@ -20,7 +20,7 @@ type _ClickButton = Annotated[
 
 
 class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
-    """Mouse input by screenshot coordinates, plus by DOM ref when refs exist.
+    """Mouse input by screenshot coordinates, plus by observed ref when refs exist.
 
     Coordinates also reach unreferenced regions, so text-only agents keep them too.
     """
@@ -135,7 +135,7 @@ class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
         kind=ActionKind.CLICK,
         chainable=True,
         description=(
-            "Automatically move the cursor to a current DOM ref and click it; "
+            "Automatically move the cursor to a current observed ref and click it; "
             "count=2 performs a native double click; "
             "button=right performs a right click."
         ),
@@ -174,8 +174,8 @@ class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
     @tool(
         kind=ActionKind.DRAG,
         description=(
-            "Drag between DOM refs, scrolling them into view first. Both endpoints must fit "
-            "in the viewport together."
+            "Drag between observed refs, scrolling them into view when supported. "
+            "Both endpoints must fit in the viewport together."
         ),
     )
     async def drag(

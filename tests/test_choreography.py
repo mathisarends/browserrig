@@ -371,7 +371,7 @@ async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
     async def element(_tab, _ref):
         return handle
 
-    async def prepare(*_):
+    async def prepare(*_, **_kwargs):
         return False
 
     monkeypatch.setattr(execution_module, "prepare_element", prepare)

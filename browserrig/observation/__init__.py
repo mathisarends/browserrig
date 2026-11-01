@@ -2,10 +2,18 @@ from .capture import CaptureContent, CaptureStrategy, DomCapture, capture
 from .changes import decision_change
 from .config import Screenshots, ScreenshotTrigger
 from .find import FindMark, FoundMatch, PageMatches, close_find, find_text
-from .handle import ElementHandle
+from .handle import DomElementHandle, DomReferences
 from .images import ImageContext, ImageRetention, TrimInBatches, UntilCompaction
-from .models import CapturedImage, Element, Snapshot
+from .models import (
+    CapturedImage,
+    Element,
+    ElementInfo,
+    ElementRef,
+    PageContent,
+    Snapshot,
+)
 from .plugin import Observe
+from .references import ElementHandle, References, ScrollableElement, ScrollStep
 from .render import render
 from .renderer import DomRenderer, Renderer
 
@@ -29,6 +37,14 @@ __all__ = [
     "FoundMatch",
     "PageMatches",
     "ElementHandle",
+    "DomElementHandle",
+    "DomReferences",
+    "ElementInfo",
+    "PageContent",
+    "ElementRef",
+    "References",
+    "ScrollableElement",
+    "ScrollStep",
     "Snapshot",
     "close_find",
     "decision_change",

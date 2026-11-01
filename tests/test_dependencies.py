@@ -222,7 +222,7 @@ async def test_facade_renders_configured_observation_prompt(
         assert rendered.count("## Browser observations") == 1
         assert "## Browser content and action results" in rendered
         assert "## Workspace and downloads" in rendered
-        assert "## DOM element references" in rendered
+        assert "## Element references" in rendered
         assert ("labeled with its ref" in rendered) == capture.marks
         assert ("bounded page-text excerpt" in rendered) == bool(capture.max_text_chars)
         assert ("Every observation includes a screenshot" in rendered) == (

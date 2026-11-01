@@ -363,7 +363,7 @@ class UploadTools(Plugin, needs=(Actions, Browser, BrowserEvents, Observe)):
         selected: list[str] = []
 
         async def check(tab: Tab) -> None:
-            handle = await self._observe.element(tab, ref)
+            handle = await self._observe.dom_element(tab, ref)
             if handle.element.input_type != "file":
                 raise BrowserError("Target is not a file input")
             files = self._browser.files
@@ -379,7 +379,8 @@ class UploadTools(Plugin, needs=(Actions, Browser, BrowserEvents, Observe)):
             await self._browser.mouse.move_to(point)
 
             async def assign() -> None:
-                await (await self._observe.element(tab, ref)).upload_files(selected)
+                handle = await self._observe.dom_element(tab, ref)
+                await handle.upload_files(selected)
                 await self._events.emit(
                     FilesUploadedEvent(
                         target_id=tab.id,

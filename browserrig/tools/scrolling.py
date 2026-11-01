@@ -1,82 +1,39 @@
 import asyncio
-from dataclasses import replace
 
-from browserrig.browser import Frame, Tab
-from browserrig.core import BrowserError, Point, StaleElement
+from browserrig.browser import Tab
+from browserrig.core import BrowserError, StaleElement
 from browserrig.input import Mouse
-from browserrig.observation import ElementHandle
-from browserrig.scripts import (
-    SCROLL,
-    SCROLL_OWNER,
-    OwnerScrollArgs,
-    ScrollArgs,
-    ScrollPlan,
-)
+from browserrig.observation import ElementHandle, ScrollableElement
 
 
-async def prepare_element(tab: Tab, handle: ElementHandle, mouse: Mouse) -> bool:
-    """Bring a DOM target into a comfortable view using native wheel input, outer frames first."""
+async def prepare_element(
+    tab: Tab, handle: ElementHandle, mouse: Mouse, *, document_id: str
+) -> bool:
+    """Execute a backend's wheel plan through normal mouse input, when supported."""
+    if not isinstance(handle, ScrollableElement):
+        return False
     scrolled = False
     previous = None
     stalled = 0
     async with asyncio.timeout(20):
         for _ in range(32):
             await tab.sync_document()
-            if tab.document_id != handle.snapshot.document_id:
+            if tab.document_id != document_id:
                 raise StaleElement(
                     "Document changed while scrolling; use refs from the next observation"
                 )
-            frame = next(
-                (item for item in await tab.frames() if item.id == handle.frame.id),
-                None,
-            )
-            if frame is None:
-                raise StaleElement(
-                    "Element frame no longer exists; use refs from the next observation"
-                )
-            handle = replace(handle, frame=frame)
-            planned = await _plan(handle)
-            if planned is None:
+            step = await handle.scroll_step()
+            if step is None:
                 return scrolled
-            owner, plan = planned
-            signature = (owner.id, plan.model_dump_json())
-            stalled = stalled + 1 if signature == previous else 0
+            stalled = stalled + 1 if step.key == previous else 0
             if stalled >= 2:
                 break
-            previous = signature
-            x, y = owner.transform.to_viewport(plan.x, plan.y)
-            await owner.check_point(x, y)
+            previous = step.key
             await mouse.scroll(
-                point=Point(x=x, y=y), delta_x=plan.delta_x, delta_y=plan.delta_y
+                point=step.point, delta_x=step.delta_x, delta_y=step.delta_y
             )
             scrolled = True
             await asyncio.sleep(0.05)
     raise BrowserError(
         "Element could not be brought into view using wheel input; try another way to reach it"
     )
-
-
-async def _plan(handle: ElementHandle) -> tuple[Frame, ScrollPlan] | None:
-    frame = handle.frame
-    ancestors: list[Frame] = []
-    current = frame
-    while current.parent is not None:
-        ancestors.append(current)
-        current = current.parent
-    target = None
-    if ancestors:
-        target = frame.transform.bounds_to_viewport(await handle.bounds())
-    for child in reversed(ancestors):
-        parent = child.parent
-        assert parent is not None
-        clip = parent.local_visible
-        assert target is not None
-        local = parent.transform.bounds_to_local(target)
-        raw = await child.run_on_owner(
-            SCROLL_OWNER, OwnerScrollArgs(clip=clip, target_bounds=local)
-        )
-        if raw is not None:
-            return parent, raw
-    clip = frame.local_visible
-    raw = await handle.run(SCROLL, ScrollArgs(clip=clip))
-    return (frame, raw) if raw is not None else None

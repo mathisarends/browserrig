@@ -29,16 +29,19 @@ class Option(Options):
     disabled: bool = False
 
 
-class Element(Options):
-    """One interactive element. `ref` stays valid while the element stays in its document."""
+class ElementRef(Options):
+    """An opaque reference owned by a capture backend within one tab and document."""
 
     ref: str
-    frame_id: str
-    backend_id: int
+
+
+class ElementInfo(ElementRef):
+    """Observed target data, independent of how the backend finds the target."""
+
     order: int = 0
     role: str
     name: str
-    tag: str
+    tag: str = ""
     input_type: str = ""
     value: str | None = None
     placeholder: str = ""
@@ -65,10 +68,17 @@ class Element(Options):
     draggable: bool = False
 
 
-class Offscreen(Options):
-    """A control outside the viewport, known only by identity until it is scrolled in."""
+class Element(ElementInfo):
+    """A DOM target. Existing DOM refs stay valid while their node stays in its document."""
 
-    ref: str
+    frame_id: str
+    backend_id: int
+    tag: str
+
+
+class Offscreen(ElementRef):
+    """A DOM control outside the viewport, known by identity until scrolled in."""
+
     frame_id: str
     backend_id: int
 
@@ -101,6 +111,26 @@ class Canvas(Options):
     clipped: bool = False
 
 
+@dataclass(slots=True)
+class PageContent:
+    """Captured page data shared by DOM and non-DOM strategies."""
+
+    url: str
+    title: str
+    width: float
+    height: float
+    scroll_y: float
+    page_height: float
+    elements: tuple[ElementInfo, ...] = ()
+    offscreen: tuple[ElementRef, ...] = ()
+    headings: tuple[Heading, ...] = ()
+    alerts: tuple[str, ...] = ()
+    modal: Modal | None = None
+    canvases: tuple[Canvas, ...] = ()
+    text: str = ""
+    limitations: tuple[str, ...] = ()
+
+
 class Snapshot(Options):
     id: str
     tab_id: str
@@ -117,8 +147,8 @@ class Snapshot(Options):
     tabs: tuple[TabInfo, ...] = ()
     text: str = ""
     # Only controls the viewport shows are described; the rest are known by identity.
-    elements: tuple[Element, ...] = ()
-    offscreen: tuple[Offscreen, ...] = Field(default=(), repr=False)
+    elements: tuple[Element | ElementInfo, ...] = ()
+    offscreen: tuple[Offscreen | ElementRef, ...] = Field(default=(), repr=False)
     headings: tuple[Heading, ...] = ()
     alerts: tuple[str, ...] = ()
     modal: Modal | None = None
@@ -131,7 +161,7 @@ class Snapshot(Options):
     cursor: Point | None = None
     captured_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-    def element(self, ref: str) -> Element:
+    def element(self, ref: str) -> ElementInfo:
         for element in self.elements:
             if element.ref == ref:
                 return element

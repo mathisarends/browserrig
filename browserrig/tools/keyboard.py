@@ -78,12 +78,15 @@ class KeyboardTools(Plugin, needs=(Actions, Browser, Observe)):
         actions: Inject[Actions],
         secrets: Inject[Secrets | None] = None,
     ) -> ToolResult:
+        async def check(tab: Tab) -> None:
+            await self._observe.dom_element(tab, ref)
+
         async def type_text(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
             await self._browser.mouse.move_to(point)
             # Hover may reveal an overlay over the field; hit-test before focusing it.
             await actions.element_point(tab=tab, ref=ref, scroll=False)
-            field = await self._observe.element(tab, ref)
+            field = await self._observe.dom_element(tab, ref)
             # Check the secrets' domains before the field is touched.
             entry = (
                 await secrets.prepare(text, browser=self._browser, field=field)
@@ -99,7 +102,7 @@ class KeyboardTools(Plugin, needs=(Actions, Browser, Observe)):
                 )
             return _entered(await self._browser.keyboard.type_text(text))
 
-        return await actions.run(kind=ActionKind.TYPE, operation=type_text)
+        return await actions.run(kind=ActionKind.TYPE, operation=type_text, check=check)
 
 
 def _entered(typed: TypedText) -> Effect:

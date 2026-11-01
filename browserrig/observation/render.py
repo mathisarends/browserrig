@@ -11,7 +11,7 @@ from urllib.parse import unquote, urlsplit
 
 from browserrig.core import ReadinessStatus
 
-from .models import CHECKABLE_ROLES, Canvas, Element, Heading, Snapshot
+from .models import CHECKABLE_ROLES, Canvas, ElementInfo, Heading, Snapshot
 from .redirects import unwrap_redirect
 
 _PLAIN_TYPES = frozenset(
@@ -82,7 +82,7 @@ def _header(snapshot: Snapshot) -> list[str]:
 
 def _body(snapshot: Snapshot) -> list[str]:
     """Only what the viewport shows; the header's scroll position tells what lies beyond."""
-    items: list[Element | Heading] = [
+    items: list[ElementInfo | Heading] = [
         *(element for element in snapshot.elements if element.in_viewport),
         *(heading for heading in snapshot.headings if heading.in_viewport),
     ]
@@ -137,7 +137,7 @@ def _canvases(canvases: tuple[Canvas, ...]) -> list[str]:
     return lines
 
 
-def _blocks(items: list[Element | Heading], url: str) -> list[str]:
+def _blocks(items: list[ElementInfo | Heading], url: str) -> list[str]:
     """Lines for items in document order, with section and group header lines."""
     lines: list[str] = []
     section: str | None = None
@@ -148,7 +148,7 @@ def _blocks(items: list[Element | Heading], url: str) -> list[str]:
             section, group = item.section, ""
             if item.section:
                 lines.append(f"  [{item.section}]")
-        current = item.group if isinstance(item, Element) else group
+        current = item.group if isinstance(item, ElementInfo) else group
         if current != group:
             group = current
             if group:
@@ -168,7 +168,7 @@ def _blocks(items: list[Element | Heading], url: str) -> list[str]:
 
 
 def _titles(
-    heading: Element | Heading | None, following: list[Element | Heading]
+    heading: ElementInfo | Heading | None, following: list[ElementInfo | Heading]
 ) -> Heading | None:
     """`heading` when the next item is an element named exactly like it."""
     if not isinstance(heading, Heading) or not following:
@@ -176,12 +176,12 @@ def _titles(
     element = following[0]
     return (
         heading
-        if isinstance(element, Element) and element.name == heading.text
+        if isinstance(element, ElementInfo) and element.name == heading.text
         else None
     )
 
 
-def _element(element: Element, url: str) -> str:
+def _element(element: ElementInfo, url: str) -> str:
     role = element.role if element.role and element.role != "generic" else element.tag
     parts = [f"{'*' if element.new else ''}[{element.ref}] {role}"]
     if element.input_type not in _PLAIN_TYPES:
@@ -218,7 +218,7 @@ def _element(element: Element, url: str) -> str:
     return " ".join(parts)
 
 
-def _states(element: Element) -> list[str]:
+def _states(element: ElementInfo) -> list[str]:
     unchecked = "unchecked" if element.role in CHECKABLE_ROLES else ""
     current = element.current
     states = [
@@ -272,7 +272,7 @@ def _origin(url: str) -> str:
     )
 
 
-def _summary(elements: list[Element]) -> str:
+def _summary(elements: list[ElementInfo]) -> str:
     counts = Counter(element.role or element.tag for element in elements)
     detail = ", ".join(f"{count} {role}" for role, count in counts.most_common(6))
     noun = "element" if len(elements) == 1 else "elements"

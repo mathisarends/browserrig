@@ -5,12 +5,13 @@ from harnessed import Context
 
 from browserrig.core import DocumentId, Region, TargetId
 
-from .models import CapturedImage, Snapshot
+from .capture import CapturedObservation
+from .models import CapturedImage
 
 
 @dataclass
 class ObserveState:
-    snapshot: Snapshot | None = None
+    observation: CapturedObservation | None = None
     delivered_image: CapturedImage | None = None
     screenshot_requested: bool = False
     screenshot_region: Region | None = None

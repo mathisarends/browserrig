@@ -135,7 +135,10 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 | Contract | Implementation |
 | --- | --- |
 | `SessionSetup` | `async apply(cdp, *, frame) -> None`. Install ordered entries with `Launch(session_setup=(setup, ...))` or `Connect(session_setup=(setup, ...))`. Each new page or out-of-process frame session enables page, lifecycle and runtime first, then the browser applies viewport metrics to pages and runs each entry. `Viewport` only holds configuration data. |
-| `CaptureStrategy` | Implement `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent`. Collected refs must support `Observe.element()`. Honor `screenshots=False`. Set `CaptureContent.fingerprint` to supply a comparison key; `None` keeps the DOM semantic fingerprint. The runner handles dialogs, document coherence and snapshots. |
+| `CaptureStrategy` | Implement `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent`. Return `PageContent` and optional per-observation `references`. Honor `screenshots=False`. Set `CaptureContent.fingerprint` to supply a comparison key; `None` keeps the DOM semantic fingerprint. The runner handles dialogs, document coherence and snapshots. |
+| `References` | `async resolve(tab, snapshot, ref) -> ElementHandle`. Resolve an opaque ref from the published observation without input. Supply a fresh resolver with each capture; `None` uses `DomReferences`. |
+| `ElementHandle` | `element: ElementInfo`; `async locate(*, aim=None) -> ElementPoint`. Validate the live target and return a hit-tested point and bounds in viewport CSS pixels. `aim` is a preferred pair of fractions within the visible target. Input runs through `Mouse`, `Keyboard` and their `Motor`. |
+| `ScrollableElement` | Optional `async scroll_step() -> ScrollStep | None`. Plan one wheel input with a viewport `point`, `delta_x`, `delta_y` and a `key` identifying the current plan. The shared runner sends ordinary mouse input and bounds retries. |
 | `Renderer` | `instructions(screenshots)`, `refs()` and `render(snapshot)`. Pure presentation, no browser input or waits. |
 | `ReadinessPolicy` | `create(context) -> ReadinessStrategy`, returning a fresh probe. Context supplies tab, stage, phase and options. |
 | `ReadinessStrategy` | `budget`, `delay`, `reason`; `async check() -> bool`; `timeout_status()`. The shared runner owns deadlines, dialogs, cancellation and events. |
@@ -149,6 +152,52 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 empty string. A strategy can use it to reflect changes its extracted DOM fields
 cannot describe. When it is `None`, including with `DomCapture`, the runner keeps
 deriving the existing fingerprint from the redacted page and document identity.
+
+### References from other capture backends
+
+`ElementInfo` holds target data without requiring a frame or DOM node ID.
+`ElementRef(ref=...)` records an offscreen target. The existing `Element` and
+`Offscreen` types extend those data with DOM addresses and remain supported.
+`PageContent` is the shared page data container; the existing extraction module's
+`Extraction` name remains an alias for it. DOM and non-DOM data can coexist in a
+snapshot and survive JSON round trips.
+
+A custom strategy returns `CaptureContent(page=PageContent(...), references=resolver)`.
+Keep object bindings in that capture's resolver, not in reusable strategy configuration.
+`resolve(tab, snapshot, ref)` receives the redacted published snapshot. Its handle's
+`element.ref` must match the requested ref. Both resolution and location only read
+state; location must check that the object still exists, is reachable and is not
+covered, and must recompute its current viewport coordinates. A cached rectangle
+alone does not establish that the target is still actionable.
+
+Refs are opaque and must be unique within an observation, including offscreen refs.
+Keep them stable for the same object and never reuse one for another object in the
+same tab/document. The runner rejects duplicates. `Observe.element(tab, ref)` checks
+the published membership and tab/document before resolving, then checks that the
+observation and document did not change while awaiting resolution. A comparison
+probe keeps its own resolver and never replaces the published snapshot or bindings.
+`Observe.invalidate()` discards both together. Snapshots contain data only; runtime
+resolvers stay in session state.
+
+`DomElementHandle` supplies the additional DOM operations used by native form
+tools: focus, select, value setting, upload and scripts. Those tools call
+`Observe.dom_element(tab, ref)` and reject other handles before input, including in
+mixed captures. Existing native select/date/upload behavior is preserved.
+`KeyboardTools.type_text(ref, ...)` likewise requires a DOM handle; another backend
+can use pointer tools to activate its target and `send_keys` to type through the
+ordinary keyboard path. Select tool plugins explicitly for each integration.
+
+Automatic reveal uses `ScrollableElement` when available. `ScrollStep.key` must
+reflect progress in the plan; repeated unchanged keys stop a stalled scroll.
+Handles without that optional contract locate visible targets, while the agent
+can use normal scrolling or dragging to reveal more. DOM frame traversal and
+scroll planning live in the DOM adapter, including nested and OOPIF transforms.
+
+The default `DomActionChains` conservatively ends chains after input when a custom
+resolver is installed. Hover checks still compare the custom fingerprint and
+shared navigation/modal state before dispatching a click. Supply a fingerprint
+that reflects relevant backend state, and a matching `Renderer` for its reference
+instructions. A custom `ActionChainPolicy` can provide stronger continuation checks.
 
 ## Initial readiness and ongoing readiness
 

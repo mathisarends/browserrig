@@ -35,7 +35,7 @@ from browserrig.events import (
     ActionStartedEvent,
     PageState,
 )
-from browserrig.observation import Observe, Snapshot, decision_change
+from browserrig.observation import DomReferences, Observe, Snapshot, decision_change
 from browserrig.readiness import Readiness
 
 from .intents import Intent, Perform, TargetLocated
@@ -105,13 +105,9 @@ class ObserveAfterInput:
 
 class DomActionChains:
     async def check(self, observe: Observe, tab: Tab) -> str:
-        before = observe.snapshot
-        if before is None:
+        if not isinstance(observe.references, DomReferences):
             return "A fresh observation is required after this input."
-        after = await observe.probe(tab)
-        if after.readiness != ReadinessStatus.READY or after.limitations:
-            return "The page could not be checked completely after input."
-        return decision_change(before, after)
+        return await _probe_change(observe, tab)
 
 
 class Actions(
@@ -243,8 +239,9 @@ class Actions(
         if tab.closed or self.browser.active_tab.id != tab.id:
             return "The active tab changed."
         try:
-            policy = self.chain_policy if after_input else DomActionChains()
-            return await policy.check(self.observe, tab)
+            if not after_input:
+                return await _probe_change(self.observe, tab)
+            return await self.chain_policy.check(self.observe, tab)
         except Exception:  # pylint: disable=broad-exception-caught
             # Successful input remains successful even if comparison fails.
             return "The page could not be checked after input."
@@ -262,7 +259,9 @@ class Actions(
         handle = await self.observe.element(tab, ref)
         scrolled = False
         if scroll:
-            scrolled = await prepare_element(tab, handle, self.browser.mouse)
+            scrolled = await prepare_element(
+                tab, handle, self.browser.mouse, document_id=tab.document_id
+            )
             # Wheel input may have moved ancestor documents; refresh their transforms.
             handle = await self.observe.element(tab, ref)
         point = await handle.locate(aim=self._aim(ref, handle.element.bounds))
@@ -387,6 +386,18 @@ class Actions(
                 reason=reason,
             )
         )
+
+
+async def _probe_change(observe: Observe, tab: Tab) -> str:
+    before = observe.snapshot
+    if before is None:
+        return "A fresh observation is required after this input."
+    after = await observe.probe(tab)
+    if after.readiness != ReadinessStatus.READY or after.limitations:
+        return "The page could not be checked completely after input."
+    return decision_change(
+        before, after, dom=isinstance(observe.references, DomReferences)
+    )
 
 
 def _stop_on_failure(result: ToolResult, tool: ToolInfo | None) -> ToolResult:

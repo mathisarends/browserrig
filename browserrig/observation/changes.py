@@ -1,8 +1,8 @@
-from .models import Element, Offscreen, Snapshot
+from .models import Element, ElementInfo, ElementRef, Offscreen, Snapshot
 
 
-def decision_change(before: Snapshot, after: Snapshot) -> str:
-    """Detect a new browser decision, ignoring entered values and cosmetic text changes."""
+def decision_change(before: Snapshot, after: Snapshot, *, dom: bool = True) -> str:
+    """Detect new decisions: DOM semantics or a backend's own comparison key."""
     if (before.tab_id, before.document_id, before.url) != (
         after.tab_id,
         after.document_id,
@@ -13,9 +13,28 @@ def decision_change(before: Snapshot, after: Snapshot) -> str:
         return "The set of open tabs changed."
     if before.modal != after.modal or set(after.alerts) - set(before.alerts):
         return "A modal or alert appeared or changed."
+    if (
+        not dom
+        or any(
+            not isinstance(el, Element) for el in (*before.elements, *after.elements)
+        )
+        or any(
+            not isinstance(el, Offscreen)
+            for el in (*before.offscreen, *after.offscreen)
+        )
+    ):
+        return (
+            "The observed content changed."
+            if before.fingerprint != after.fingerprint
+            else ""
+        )
+    return _dom_change(before, after)
+
+
+def _dom_change(before: Snapshot, after: Snapshot) -> str:
     # Backend identities survive observation refreshes. Controls outside the viewport count as
     # known, so scrolling a field into view does not itself interrupt form filling.
-    known: dict[tuple[str, int], Element | None] = {
+    known: dict[tuple[str, int], ElementInfo | None] = {
         _identity(control): None for control in before.offscreen
     }
     known.update(
@@ -39,5 +58,6 @@ def decision_change(before: Snapshot, after: Snapshot) -> str:
     return ""
 
 
-def _identity(control: Element | Offscreen) -> tuple[str, int]:
+def _identity(control: ElementRef) -> tuple[str, int]:
+    assert isinstance(control, (Element, Offscreen))
     return control.frame_id, control.backend_id

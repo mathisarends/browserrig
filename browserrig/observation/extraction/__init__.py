@@ -8,7 +8,6 @@ tree then supplies the names of the listed controls.
 
 import asyncio
 from contextlib import suppress
-from dataclasses import dataclass, field
 
 from cdpify import CdpSession
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
@@ -16,7 +15,13 @@ from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser import Frame
 from browserrig.core import BrowserError
-from browserrig.observation.models import Canvas, Element, Heading, Modal, Offscreen
+from browserrig.observation.models import (
+    Canvas,
+    Element,
+    Heading,
+    Modal,
+)
+from browserrig.observation.models import PageContent as Extraction
 from browserrig.scripts import FOCUSED
 
 from .accessibility import chrome_names, preferred
@@ -28,24 +33,6 @@ __all__ = ["Extraction", "extract"]
 
 _TIMEOUT = 5
 SPARSE_CONTROLS = 5
-
-
-@dataclass(slots=True)
-class Extraction:
-    url: str
-    title: str
-    width: float
-    height: float
-    scroll_y: float
-    page_height: float
-    elements: tuple[Element, ...] = ()
-    offscreen: tuple[Offscreen, ...] = ()
-    headings: tuple[Heading, ...] = ()
-    alerts: tuple[str, ...] = ()
-    modal: Modal | None = None
-    canvases: tuple[Canvas, ...] = ()
-    text: str = ""
-    limitations: tuple[str, ...] = field(default_factory=tuple)
 
 
 async def extract(
@@ -94,7 +81,8 @@ async def extract(
         max_elements, max_text, sparse_text
     )
     names = await chrome_names(
-        {frame.id: frame.cdp for frame in frames}, extraction.elements
+        {frame.id: frame.cdp for frame in frames},
+        (element for element in extraction.elements if isinstance(element, Element)),
     )
     if names:
         extraction.elements = tuple(

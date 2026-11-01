@@ -20,6 +20,7 @@ from pydantic import Field
 from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
     ActionKind,
+    BrowserError,
     ReadinessPhase,
     ReadinessStatus,
     Region,
@@ -33,13 +34,13 @@ from browserrig.nudges import Nudges
 from browserrig.readiness import Readiness
 from browserrig.secrets import Secrets
 
-from .capture import CaptureStrategy, DomCapture
-from .capture import capture as capture_snapshot
+from .capture import CaptureStrategy, DomCapture, capture_observation
 from .config import Screenshots, ScreenshotTrigger
 from .content import extract_content
 from .delta import delta, unmarked
-from .handle import ElementHandle
+from .handle import DomElementHandle
 from .models import CapturedImage, Snapshot
+from .references import ElementHandle, References
 from .renderer import DomRenderer, Renderer
 from .state import ObserveState
 
@@ -84,7 +85,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
     def page_state(self) -> str:
         return self.renderer.instructions(self.screenshots)
 
-    @system_section(title="DOM element references")
+    @system_section(title="Element references")
     def refs(self) -> str | None:
         return self.renderer.refs()
 
@@ -98,13 +99,19 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
 
     @property
     def snapshot(self) -> Snapshot | None:
-        return self._state.snapshot
+        observation = self._state.observation
+        return observation.snapshot if observation is not None else None
+
+    @property
+    def references(self) -> References | None:
+        observation = self._state.observation
+        return observation.references if observation is not None else None
 
     def invalidate(self) -> None:
         """Require a complete, fresh observation after external browser control."""
         state = self._state
         state.screenshot_requested |= state.delivered_image is not None
-        state.snapshot, state.delivered_image = None, None
+        state.observation, state.delivered_image = None, None
         state.sent_key, state.sent_ref, state.visible = None, None, False
         state.bases.clear()
         state.included = frozenset()
@@ -113,15 +120,16 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         """Compare current controls without publishing or replacing the delivered observation."""
         async with self._state.lock:
             report = await self._readiness.wait(tab, phase=ReadinessPhase.ACTION)
-            return await capture_snapshot(
+            observation = await capture_observation(
                 tab,
                 self.capture_strategy,
                 report,
                 tabs=tuple(await self._browser.tabs()),
-                previous=self._state.snapshot,
+                previous=self.snapshot,
                 screenshots=False,
                 redaction=self._secrets(),
             )
+            return observation.snapshot
 
     async def capture(
         self,
@@ -136,12 +144,12 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         async with self._state.lock:
             selected = tab or browser.active_tab
             report = await readiness.wait(selected, phase=phase)
-            snapshot = await capture_snapshot(
+            observation = await capture_observation(
                 selected,
                 self.capture_strategy,
                 report,
                 tabs=tuple(await browser.tabs()),
-                previous=self._state.snapshot,
+                previous=self.snapshot,
                 region=region,
                 zoom=zoom,
                 cursor=browser.mouse.position_in(selected.id),
@@ -150,7 +158,8 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 else screenshots,
                 redaction=self._secrets(),
             )
-            self._state.snapshot = snapshot
+            self._state.observation = observation
+            snapshot = observation.snapshot
             await self._events.emit(
                 ObservationCapturedEvent(
                     observation_id=snapshot.id,
@@ -165,7 +174,8 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             return snapshot
 
     async def element(self, tab: Tab, ref: str) -> ElementHandle:
-        snapshot = self._state.snapshot
+        observation = self._state.observation
+        snapshot = observation.snapshot if observation is not None else None
         await tab.sync_document()
         if (
             snapshot is None
@@ -175,13 +185,32 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             raise StaleElement(
                 "Observation belongs to another tab or document; use refs from the next observation"
             )
-        element = snapshot.element(ref)
-        for frame in await tab.frames():
-            if frame.id == element.frame_id:
-                return ElementHandle(frame, element, snapshot)
-        raise StaleElement(
-            "Element frame no longer exists; use refs from the next observation"
-        )
+        snapshot.element(ref)
+        assert observation is not None
+        handle = await observation.references.resolve(tab, snapshot, ref)
+        if handle.element.ref != ref:
+            raise StaleElement(
+                "Resolver returned another target; use refs from the next observation"
+            )
+        await tab.sync_document()
+        if self._state.observation is not observation:
+            raise StaleElement(
+                "Observation changed while resolving the target; use refs from the next observation"
+            )
+        if snapshot.document_id != tab.document_id:
+            raise StaleElement(
+                "Document changed while resolving the target; use refs from the next observation"
+            )
+        return handle
+
+    async def dom_element(self, tab: Tab, ref: str) -> DomElementHandle:
+        """Require DOM capabilities before a native form tool performs input."""
+        handle = await self.element(tab, ref)
+        if not isinstance(handle, DomElementHandle):
+            raise BrowserError(
+                "This tool requires a DOM element; use pointer and keyboard tools"
+            )
+        return handle
 
     @tool(
         kind=ActionKind.SCREENSHOT,
@@ -214,7 +243,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         if region is None and zoom != 1:
             raise ToolError("zoom needs a region; pass the viewport area to magnify")
         if region is not None:
-            snapshot = self._state.snapshot
+            snapshot = self.snapshot
             if (
                 snapshot is not None
                 and snapshot.width
@@ -274,7 +303,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         self._state.delivered_image = image
 
     def coordinate_source(self) -> Snapshot | CapturedImage:
-        snapshot = self._state.snapshot
+        snapshot = self.snapshot
         if snapshot is None:
             raise StaleElement("Observe before using coordinates")
         image = self._state.delivered_image

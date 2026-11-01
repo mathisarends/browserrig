@@ -9,7 +9,7 @@ from browserrig import Browser
 from browserrig.browser import BrowserEvents
 from browserrig.core import ReadinessStatus
 from browserrig.input import Input
-from browserrig.observation import Observe
+from browserrig.observation import DomReferences, Observe
 from browserrig.readiness import Readiness, ReadinessReport
 from browserrig.scripts import DOMProbe
 
@@ -103,6 +103,13 @@ class FakeObserve:
 
     def __init__(self):
         self.snapshot = None
+        self.references = DomReferences()
+
+    async def element(self, _tab, _ref):
+        raise AssertionError("No fake element resolver configured")
+
+    async def dom_element(self, tab, ref):
+        return await self.element(tab, ref)
 
     async def capture(self, tab):
         return SimpleNamespace(

@@ -44,7 +44,7 @@ from .state import SecretsState
 if TYPE_CHECKING:
     from browserrig.browser import Frame
     from browserrig.input import Keyboard
-    from browserrig.observation import ElementHandle, Snapshot
+    from browserrig.observation import DomElementHandle, Snapshot
 
 # Only these tools resolve placeholders, and only in their `text` argument.
 _TYPING_TOOLS = frozenset({"type_text", "send_keys"})
@@ -140,7 +140,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         )
 
     async def prepare(  # pylint: disable=too-many-branches
-        self, text: str, *, browser: Browser, field: ElementHandle | None = None
+        self, text: str, *, browser: Browser, field: DomElementHandle | None = None
     ) -> SecretEntry | None:
         """Check where `text`'s placeholders would be typed; None when it has none.
 
@@ -293,7 +293,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
         self._redactor.add(name, value)
 
 
-async def _field_origins(field: ElementHandle) -> tuple[str, ...]:
+async def _field_origins(field: DomElementHandle) -> tuple[str, ...]:
     """The field's origin, then each embedding document's origin up to the main frame."""
     origins = [(await field.run(SECRET_FIELD, SecretFieldArgs())).origin]
     frame: Frame | None = field.frame
@@ -306,7 +306,7 @@ async def _field_origins(field: ElementHandle) -> tuple[str, ...]:
 
 
 def _field_guard(
-    browser: Browser, tab_id: str, field: ElementHandle, origins: tuple[str, ...]
+    browser: Browser, tab_id: str, field: DomElementHandle, origins: tuple[str, ...]
 ) -> Callable[[], Awaitable[None]]:
     async def guard() -> None:
         if browser.active_tab.id != tab_id:

@@ -93,10 +93,18 @@ agent scrolls to see more. A leading
 the truncation. Hidden, inert and fully clipped controls are omitted. Controls behind
 a positioned overlay are reported as covered and are not listed individually.
 
-Refs such as `482` or `f1:93` are CDP backend node ids, prefixed for out-of-process
+DOM refs such as `482` or `f1:93` are CDP backend node ids, prefixed for out-of-process
 frames. They stay valid across observations as long as the element stays in the same
 document, and an action on a removed element fails with a stale-element error. Pass
 the ref to `click`, `type_text` and other element tools.
+
+Other capture backends can supply opaque refs through `CaptureContent.references`
+and targets through `ElementInfo`, without DOM addresses. `click` and `drag` resolve
+their current viewport positions and use the same mouse input and motor. A custom
+target can be activated with pointer input and then receive `send_keys`. Native
+form tools and `type_text(ref)` require a `DomElementHandle`; a mismatched ref is
+rejected before input. See [reference contracts](browser-composition.md#references-from-other-capture-backends)
+for resolver lifetime, live hit testing and optional wheel plans.
 
 Requested DOM screenshots draw a labeled, colored dashed border around every element
 in the viewport; each label is the element's ref. Links use blue borders, buttons

@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from browserrig.core import Bounds, Point
 
-from .models import Element
+from .models import ElementInfo
 
 
 class _Color(StrEnum):
@@ -38,7 +38,7 @@ _COLORS = {
 
 def annotate(
     image: str,
-    elements: tuple[Element, ...],
+    elements: tuple[ElementInfo, ...],
     area: Bounds,
     scale: float = 1,
     *,

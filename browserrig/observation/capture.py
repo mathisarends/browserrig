@@ -20,9 +20,17 @@ from browserrig.core import (
 )
 from browserrig.readiness import ReadinessReport
 
-from .extraction import Extraction, extract
+from .extraction import extract
+from .handle import DomReferences
 from .marks import annotate, blackout
-from .models import Element, ElementFingerprint, PageFingerprint, Snapshot
+from .models import (
+    ElementFingerprint,
+    ElementInfo,
+    PageContent,
+    PageFingerprint,
+    Snapshot,
+)
+from .references import References
 
 # Longest side of a zoomed region image, to bound image tokens.
 _MAX_REGION_SIDE = 2000
@@ -32,6 +40,14 @@ class Redaction(Protocol):
     """Hides known secret values, e.g. the Secrets plugin."""
 
     def redact[T](self, value: T) -> T: ...
+
+
+@dataclass(frozen=True, slots=True)
+class CapturedObservation:
+    """Serializable observed data paired with its per-observation reference resolver."""
+
+    snapshot: Snapshot
+    references: References
 
 
 async def capture(
@@ -47,6 +63,35 @@ async def capture(
     cursor: Point | None = None,
     redaction: Redaction | None = None,
 ) -> Snapshot:
+    """Capture a serializable snapshot; Observe also retains its reference resolver."""
+    observation = await capture_observation(
+        tab,
+        strategy,
+        report,
+        tabs=tabs,
+        previous=previous,
+        region=region,
+        zoom=zoom,
+        screenshots=screenshots,
+        cursor=cursor,
+        redaction=redaction,
+    )
+    return observation.snapshot
+
+
+async def capture_observation(
+    tab: Tab,
+    strategy: CaptureStrategy,
+    report: ReadinessReport,
+    *,
+    tabs: tuple[TabInfo, ...] = (),
+    previous: Snapshot | None = None,
+    region: Region | None = None,
+    zoom: float = 1,
+    screenshots: bool = False,
+    cursor: Point | None = None,
+    redaction: Redaction | None = None,
+) -> CapturedObservation:
     """Observe `tab`. With `previous` from the same document, unseen elements get `new`.
 
     `region` crops a screenshot to a viewport area, magnified by `zoom`.
@@ -55,7 +100,7 @@ async def capture(
     """
     snapshot_id = uuid4().hex
     if tab.dialog:
-        return Snapshot(
+        snapshot = Snapshot(
             id=snapshot_id,
             tab_id=tab.id,
             document_id=tab.document_id,
@@ -70,6 +115,7 @@ async def capture(
             text=f"Open {tab.dialog[0]} dialog: {tab.dialog[1]}",
             cursor=cursor,
         )
+        return CapturedObservation(snapshot, DomReferences())
     try:
         # A pending renderer must not hold the next model iteration indefinitely
         # after the readiness budget has already expired.
@@ -92,7 +138,7 @@ async def capture(
     except (BrowserError, CDPCommandError, TimeoutError):
         if not report.timed_out:
             raise
-        return Snapshot(
+        snapshot = Snapshot(
             id=snapshot_id,
             tab_id=tab.id,
             document_id=tab.document_id,
@@ -107,11 +153,15 @@ async def capture(
             tabs=tabs,
             text="The page is still loading. Observe again before using page controls.",
         )
+        return CapturedObservation(snapshot, DomReferences())
     page, image = content.page, content.image
     if redaction is not None:
         page, image = await _redact(page, image, content, redaction)
+    refs = [element.ref for element in (*page.elements, *page.offscreen)]
+    if len(set(refs)) != len(refs):
+        raise BrowserError("Capture returned duplicate element refs")
     elements = _mark_new(page.elements, previous, tab.id, document_id)
-    return Snapshot(
+    snapshot = Snapshot(
         id=snapshot_id,
         tab_id=tab.id,
         document_id=document_id,
@@ -139,6 +189,10 @@ async def capture(
         geometry=content.geometry,
         cursor=cursor,
     )
+    references = (
+        content.references if content.references is not None else DomReferences()
+    )
+    return CapturedObservation(snapshot, references)
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,19 +202,20 @@ class CaptureContent:
     `fingerprint=None` uses the runner's DOM semantic fingerprint.
     """
 
-    page: Extraction
+    page: PageContent
     image: str | None = None
     geometry: Geometry | None = None
     area: Bounds | None = None
     scale: float = 1
     fingerprint: str | None = None
+    references: References | None = None
 
 
 class CaptureStrategy(Protocol):
     """Collect content; the shared capture runner owns dialogs and document coherence.
 
     Implementations are reusable configuration. Keep per-observation state local.
-    Collected refs must support Observe.element().
+    Set CaptureContent.references for non-DOM refs. The default resolves DOM addresses.
     """
 
     async def collect(  # pylint: disable=unused-argument
@@ -239,8 +294,8 @@ class DomCapture(Options):
 
 
 async def _redact(
-    page: Extraction, image: str | None, content: CaptureContent, redaction: Redaction
-) -> tuple[Extraction, str | None]:
+    page: PageContent, image: str | None, content: CaptureContent, redaction: Redaction
+) -> tuple[PageContent, str | None]:
     """Redact page text before the snapshot and its fingerprint are built.
 
     Elements whose text holds a secret are blacked out in the image. An image without a
@@ -268,11 +323,11 @@ async def _redact(
 
 
 def _mark_new(
-    elements: tuple[Element, ...],
+    elements: tuple[ElementInfo, ...],
     previous: Snapshot | None,
     tab_id: str,
     document_id: str,
-) -> tuple[Element, ...]:
+) -> tuple[ElementInfo, ...]:
     if (
         previous is None
         or previous.tab_id != tab_id
@@ -288,7 +343,7 @@ def _mark_new(
     )
 
 
-def _fingerprint(page: Extraction, document_id: str) -> str:
+def _fingerprint(page: PageContent, document_id: str) -> str:
     fingerprint = PageFingerprint(
         url=page.url,
         document_id=document_id,
