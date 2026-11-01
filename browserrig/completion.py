@@ -5,11 +5,10 @@ from dataclasses import replace
 
 from harnessed import (
     Context,
-    Inject,
+    Instructions,
     Plugin,
     PolicyDecision,
     Session,
-    SystemSection,
     ToolChain,
     ToolResult,
     ToolStatus,
@@ -21,6 +20,7 @@ from harnessed.core.model import OutputSchema
 from harnessed.core.runtime.output import OutputHandler
 from harnessed.events import AssistantMessageEvent, ToolCallFinishedEvent
 from harnessed.hooks import ExecuteTool, Next, ToolPolicy, TurnStopping
+from harnessed.kernel import dependency
 from harnessed.models import (
     AssistantMessage,
     Model,
@@ -37,16 +37,16 @@ _FINAL_INSTRUCTION = (
 )
 
 
-class Done(Plugin, slot="completion", needs=(Session,)):
+class Done(Plugin, slot="completion"):
     """Require done() before the final answer; ordinary text remains commentary.
 
     Mount with plugins=[Done()]. The final response uses the run's native output
     contract, if any. Both phases count toward the existing step/token budgets.
     """
 
-    _session: Inject[Session]
+    _session = dependency(Session)
 
-    usage = SystemSection(
+    usage = Instructions(
         title="Explicit task completion",
         text=(
             "You may write brief progress messages between tool calls, including "
@@ -60,7 +60,7 @@ class Done(Plugin, slot="completion", needs=(Session,)):
     )
 
     async def setup(self, ctx: Context) -> None:
-        # Harnessed 0.8.0 has no output-policy hook. Isolate the per-session bridge
+        # Harnessed 0.9.0 has no output-policy hook. Isolate the per-session bridge
         # here; requests, validation, retries, streaming and limits remain native.
         # pylint: disable=protected-access
         steps = self._session._steps

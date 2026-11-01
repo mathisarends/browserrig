@@ -2,7 +2,16 @@ import json
 
 import pytest
 from cdpify.exceptions import CDPCommandError
-from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
+from harnessed import (
+    Agent,
+    Context,
+    Inject,
+    Plugin,
+    PluginInstructions,
+    PolicyDecision,
+    SystemPrompt,
+    ToolCall,
+)
 from harnessed.events import ToolExecutionFinishedEvent
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
@@ -131,6 +140,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
             yield ModelChunk(text="Done")
 
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(

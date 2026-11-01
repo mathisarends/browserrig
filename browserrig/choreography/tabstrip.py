@@ -2,7 +2,8 @@ import asyncio
 from contextlib import suppress
 from dataclasses import dataclass
 
-from harnessed import Context, Inject, Plugin, hook
+from harnessed import Context, Plugin, hook
+from harnessed.kernel import dependency
 
 from browserrig.browser import Browser, Tab, TabChanged
 from browserrig.core import BrowserError
@@ -12,7 +13,7 @@ from browserrig.events import TAB_STRIP_EVENTS, TabUpdatedEvent
 _STRIP_SECONDS = 10
 
 
-class TabStrip(Plugin, needs=(Browser,)):
+class TabStrip(Plugin):
     """Stream what a viewer's tab strip shows: url, title, loading state and favicon.
 
     Once a page stops loading, its document title and icon are read in the background,
@@ -21,7 +22,7 @@ class TabStrip(Plugin, needs=(Browser,)):
     """
 
     events = TAB_STRIP_EVENTS
-    _browser: Inject[Browser]
+    _browser = dependency(Browser)
 
     def __init__(self) -> None:
         super().__init__()

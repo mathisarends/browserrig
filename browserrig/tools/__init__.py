@@ -2,7 +2,7 @@ from browserrig.core import BrowserToolMetadata, browser_tool
 
 from .dialogs import DialogTools
 from .execution import ActionChainPolicy, Actions, DomActionChains, ObserveAfterInput
-from .files import FileTools, UploadTools
+from .files import FileTools
 from .find import FindTools
 from .forms import FormTools
 from .intents import (
@@ -45,5 +45,4 @@ __all__ = [
     "KeyboardTools",
     "NavigationTools",
     "TabTools",
-    "UploadTools",
 ]

@@ -6,10 +6,9 @@ from uuid import uuid4
 
 from harnessed import (
     Context,
-    Inject,
+    Instructions,
     Plugin,
     PluginState,
-    SystemSection,
     ToolError,
     ToolInfo,
     ToolResult,
@@ -17,6 +16,7 @@ from harnessed import (
     hook,
 )
 from harnessed.hooks import ExecuteTool, Next, ReviewToolResult
+from harnessed.kernel import dependency
 
 from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
@@ -110,17 +110,15 @@ class DomActionChains:
         return await _probe_change(observe, tab)
 
 
-class Actions(
-    Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness, Observe)
-):
+class Actions(Plugin, slot="browserrig.actions", provides=True):
     """Own the action transaction: serialization, readiness, dispatch and receipts."""
 
     events = ACTION_EVENTS
     _mount = PluginState(_Mount)
-    browser: Inject[Browser]
-    _events: Inject[BrowserEvents]
-    readiness: Inject[Readiness]
-    observe: Inject[Observe]
+    browser = dependency(Browser)
+    _events = dependency(BrowserEvents)
+    readiness = dependency(Readiness)
+    observe = dependency(Observe)
 
     def __init__(self, *, chain_policy: ActionChainPolicy | None = None) -> None:
         super().__init__()
@@ -129,7 +127,7 @@ class Actions(
     async def setup(self, ctx: Context) -> None:
         self._mount.context = ctx
 
-    chains = SystemSection(
+    chains = Instructions(
         title="Browser action chains",
         text=(
             "Combine actions only when no intermediate observation is needed, and put "
@@ -286,17 +284,11 @@ class Actions(
                 self._mount.aims[ref] = aim
         return aim
 
-    @hook(ExecuteTool)
+    @hook(ExecuteTool, ReviewToolResult)
     async def _execute_browser_result(
-        self, event: ExecuteTool, next_: Next[ToolResult]
+        self, event: ExecuteTool | ReviewToolResult, next_: Next[ToolResult]
     ) -> ToolResult:
         # Set the signal before the execution receipt is persisted, including on errors.
-        return _stop_on_failure(await next_(), event.tool)
-
-    @hook(ReviewToolResult)
-    async def _review_browser_result(
-        self, event: ReviewToolResult, next_: Next[ToolResult]
-    ) -> ToolResult:
         return _stop_on_failure(await next_(), event.tool)
 
     async def _prepare(self, tab: Tab, kind: ActionKind) -> PageState:

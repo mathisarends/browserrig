@@ -1,6 +1,5 @@
 # Internal state is inspected to verify lifecycle and cleanup.
 # pylint: disable=protected-access
-
 import sys
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
@@ -10,7 +9,7 @@ from harnessed import (
     Agent,
     Context,
     Plugin,
-    PluginSections,
+    PluginInstructions,
     PluginValidation,
     PromptFormat,
     SectionDelivery,
@@ -30,6 +29,7 @@ from browserrig import (
     DomCapture,
     FileSystem,
     FileSystemOptions,
+    FileTools,
     Observe,
     Readiness,
     Screenshots,
@@ -94,6 +94,7 @@ async def test_each_browser_tool_has_a_unique_stable_kind(fake_chrome):
 async def test_incomplete_browser_composition_reports_transitive_dependencies_before_model_use():
     model = ScriptedModel(["unused"])
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=model,
         plugins=[KeyboardTools(), Actions(), Observe(), Readiness(), DialogTools()],
     )
@@ -212,7 +213,7 @@ async def test_facade_renders_configured_observation_prompt(
     agent = browserrig.Agent(
         model=ScriptedModel(["unused"]),
         system_prompt=SystemPrompt(
-            format=PromptFormat.MARKDOWN, sections=("Custom role.",)
+            "Custom role.", PluginInstructions(), format=PromptFormat.MARKDOWN
         ),
         plugins=[Observe(capture=capture, screenshots=Screenshots(trigger=trigger))],
     )
@@ -238,8 +239,10 @@ async def test_native_composition_can_place_and_exclude_browser_sections(fake_ch
         model=ScriptedModel(["unused"]),
         plugins=plugins,
         system_prompt=SystemPrompt(
+            observe.trust,
+            "Custom role.",
+            PluginInstructions(),
             format=PromptFormat.XML,
-            sections=(observe.trust, "Custom role.", PluginSections()),
             exclude=(observe.refs,),
         ),
     )
@@ -318,8 +321,30 @@ async def test_file_tools_follow_workspace_availability_and_reject_stale_calls(
     assert fake_chrome[0].closed
 
 
+async def test_omitting_file_tools_removes_workspace_downloads_and_uploads(fake_chrome):
+    agent = browserrig.Agent(model=ScriptedModel(["unused"]), without=(FileTools,))
+    async with agent.session() as session:
+        names = {tool.name for tool in session.ctx[ToolRegistry].definitions}
+        assert not names.intersection(
+            {
+                "list_downloads",
+                "list_files",
+                "read_file",
+                "write_file",
+                "open_file",
+                "open_downloaded_file",
+                "upload_files",
+            }
+        )
+    assert fake_chrome[0].closed
+
+
 async def test_runtime_browser_sections_need_explicit_context_delivery(fake_chrome):
-    agent = Agent(model=ScriptedModel(["unused"]), plugins=[Chrome(), Readiness()])
+    agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
+        model=ScriptedModel(["unused"]),
+        plugins=[Chrome(), Readiness()],
+    )
     async with agent.session() as session:
         fixed_prompt = await session.prompt.render()
         with pytest.raises(ConfigError):

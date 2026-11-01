@@ -1,5 +1,14 @@
 import pytest
-from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
+from harnessed import (
+    Agent,
+    Context,
+    Inject,
+    Plugin,
+    PluginInstructions,
+    PolicyDecision,
+    SystemPrompt,
+    ToolCall,
+)
 from harnessed.events import ModelRequestedEvent, ObservationsIncludedEvent
 from harnessed.models import ImagePart, ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
@@ -56,6 +65,7 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
         ]
     )
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=model,
         plugins=[
             *browser_plugins(browser=Launch(url=site)),
@@ -132,6 +142,7 @@ async def test_model_tools_yaml_and_activity(site):
 
     model = CallbackModel(respond)
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=model,
         plugins=[*browser_plugins(), Approvals(default=PolicyDecision.ALLOW)],
     )
@@ -186,6 +197,7 @@ async def test_dom_screenshots_are_native_images(site):
             await browser.active_tab.navigate(site + "/canvas")
 
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=model,
         plugins=[
             Chrome(),
@@ -228,6 +240,7 @@ async def test_no_progress_hint_is_derived_from_events(site):
         yield ModelChunk(tool_call=result)
 
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(

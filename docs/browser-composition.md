@@ -2,12 +2,12 @@
 
 Harnessed `Agent` is the composition root. Browserrig plugins own session state,
 tools and hooks; ordinary Python strategies implement capture, rendering,
-readiness and action-chain decisions. Browserrig targets Harnessed 0.8.0.
+readiness and action-chain decisions. Browserrig targets Harnessed 0.9.0.
 
 ## A browser agent with screenshots
 
 ```python
-from harnessed import Agent
+from harnessed import Agent, PluginInstructions, SystemPrompt
 from browserrig import (
     Actions, Activity, Chrome, DomCapture, DomRenderer, FormTools,
     ImageContext, KeyboardTools, Launch, NavigationTools, Observe,
@@ -17,6 +17,7 @@ from browserrig import (
 
 agent = Agent(
     model=model,
+    system_prompt=SystemPrompt("Complete the browser task.", PluginInstructions()),
     plugins=[
         Chrome(Launch(url=url)),
         Readiness(),
@@ -37,8 +38,8 @@ agent = Agent(
 )
 ```
 
-Add `DialogTools`, `JavaScriptTools`, `FileTools`, `UploadTools` or `Nudges`
-from their packages as needed. `UploadTools` requires a browser file workspace. The same readiness checks apply to web pages and
+Add `DialogTools`, `JavaScriptTools`, `FileTools` or `Nudges`
+from their packages as needed. `FileTools` includes uploads from the shared browser workspace. The same readiness checks apply to web pages and
 local document previews.
 
 Tool groups follow the input device, not the capture: `PointerTools` clicks and drags by
@@ -341,7 +342,7 @@ custom-event support does not imply every persisted SDK event appears in a turn 
 replaces the built-in one: `plugins=[Observe(capture=DomCapture(...),
 screenshots=Screenshots(...)), Readiness(...), ImageContext(...), Actions(...),
 Pacing(motor)]`.
-Pass `without=(FileTools, UploadTools)` when local file tools should be omitted.
+Pass `without=(FileTools,)` when local file tools should be omitted.
 
 The default recipe mounts every tool group; ref-based tools hide themselves for
 captures without refs. Transient availability (for example a missing workspace) still uses
@@ -351,4 +352,4 @@ Keep file readers as ordinary functions/strategies, not one plugin per file form
 For manual compositions, add `ImageContext()` explicitly: `Observe` no longer
 injects images itself. Configure `Readiness` and `Observe` independently.
 Harnessed filesystem tools can replace local file tools by passing
-`without=(FileTools, UploadTools)`; browser download paths are not automatically sandbox paths.
+`without=(FileTools,)`; browser download paths are not automatically sandbox paths.

@@ -1,9 +1,10 @@
 from dataclasses import dataclass, replace
 from typing import Protocol
 
-from harnessed import Inject, Observation, Plugin, PluginState, SystemSection, hook
+from harnessed import Instructions, Observation, Plugin, PluginState, hook
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
+from harnessed.kernel import dependency
 from harnessed.models import ImagePart, ImageReference, ModelRequest, TextPart
 
 from browserrig.events import ObservationCapturedEvent
@@ -57,7 +58,7 @@ class UntilCompaction:
 _NOTE_SOURCE = "browser-image"
 
 
-class ImageContext(Plugin, slot="browserrig.images", needs=(Observe,)):
+class ImageContext(Plugin, slot="browserrig.images"):
     """Deliver screenshots inside immutable, session-owned browser observations.
 
     Retention can remove old image parts while keeping their DOM text. Native
@@ -66,9 +67,9 @@ class ImageContext(Plugin, slot="browserrig.images", needs=(Observe,)):
     """
 
     _state = PluginState(ImageState)
-    _observe: Inject[Observe]
+    _observe = dependency(Observe)
 
-    usage = SystemSection(
+    usage = Instructions(
         title="Browser image history",
         text=(
             "Screenshots belong to the browser observations they were captured with and are "

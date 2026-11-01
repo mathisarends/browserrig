@@ -2,7 +2,7 @@ import asyncio
 import json
 
 import pytest
-from harnessed import Agent, PolicyDecision
+from harnessed import Agent, PluginInstructions, PolicyDecision, SystemPrompt
 from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
@@ -111,6 +111,7 @@ async def test_find_tool_types_into_the_find_bar_and_reports_matches(site):
         ]
     )
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=model,
         plugins=[
             *browser_plugins(browser=Launch(url=site)),

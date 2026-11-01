@@ -2,9 +2,10 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from uuid import uuid4
 
-from harnessed import Context, Inject, Plugin, PluginState, hook
+from harnessed import Context, Plugin, PluginState, hook
 from harnessed.events import AgentControlChangedEvent, ControlState
 from harnessed.hooks import Next
+from harnessed.kernel import dependency
 
 from browserrig.browser import BrowserEvents, Tab
 from browserrig.core import (
@@ -25,10 +26,10 @@ from .state import ReadinessState
 from .wait import wait_for_page
 
 
-class Readiness(Plugin, provides=True, needs=(BrowserEvents,)):
+class Readiness(Plugin, slot="browserrig.readiness", provides=True):
     events = READINESS_EVENTS
     _state = PluginState(ReadinessState)
-    _events: Inject[BrowserEvents]
+    _events = dependency(BrowserEvents)
 
     def __init__(
         self,

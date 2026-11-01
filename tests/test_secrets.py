@@ -6,7 +6,17 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolResult, tool
+from harnessed import (
+    Agent,
+    Context,
+    Inject,
+    Plugin,
+    PluginInstructions,
+    PolicyDecision,
+    SystemPrompt,
+    ToolResult,
+    tool,
+)
 from harnessed.events import InboxAddedEvent, UserMessageEvent
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
@@ -284,7 +294,9 @@ def _agent(secrets, *, model, plugins=()):
 
     allow = Approvals(default=PolicyDecision.ALLOW)
     agent = Agent(
-        model=model, plugins=[Chrome(holder), secrets, Capture(), allow, *plugins]
+        system_prompt=SystemPrompt(PluginInstructions()),
+        model=model,
+        plugins=[Chrome(holder), secrets, Capture(), allow, *plugins],
     )
     return agent, holder
 
@@ -442,6 +454,7 @@ async def test_observe_redacts_with_secrets_mounted_after_it():
             holder["observe"] = observe
 
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=ScriptedModel(["done"]),
         plugins=[FakeChrome(holder), Readiness(), Observe(), Hold(), _secrets()],
     )

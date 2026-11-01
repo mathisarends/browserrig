@@ -3,7 +3,16 @@ import json
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent, Plugin, PolicyDecision, SessionState, ToolStatus, tool
+from harnessed import (
+    Agent,
+    Plugin,
+    PluginInstructions,
+    PolicyDecision,
+    SessionState,
+    SystemPrompt,
+    ToolStatus,
+    tool,
+)
 from harnessed.events import (
     CompactionAppliedEvent,
     EventRegistry,
@@ -84,6 +93,7 @@ def _agent(responses, ask, *, extra=(), **options):
     holder = {}
     model = ScriptedModel(responses)
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=model,
         plugins=[
             Activity(),

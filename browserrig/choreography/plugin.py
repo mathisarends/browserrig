@@ -1,8 +1,9 @@
 from typing import Any
 
-from harnessed import Context, Inject, Plugin, hook
+from harnessed import Context, Plugin, hook
 from harnessed.events import TurnStartedEvent
 from harnessed.hooks import Next
+from harnessed.kernel import dependency
 
 from browserrig.browser import Browser
 from browserrig.events import INPUT_EVENTS
@@ -21,7 +22,7 @@ from .events import SCENE_EVENTS, HighlightElementEvent
 from .stage import Stage
 
 
-class Choreography(Plugin, slot="browserrig.choreography", needs=(Browser,)):
+class Choreography(Plugin, slot="browserrig.choreography"):
     """Stage the browser for people watching: visible input and browser UI.
 
     Tools and input devices only describe what they do. This plugin streams input as
@@ -31,7 +32,7 @@ class Choreography(Plugin, slot="browserrig.choreography", needs=(Browser,)):
     """
 
     events = INPUT_EVENTS + SCENE_EVENTS
-    _browser: Inject[Browser]
+    _browser = dependency(Browser)
 
     async def setup(self, ctx: Context) -> None:
         inputs = self._browser.input

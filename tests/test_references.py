@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from harnessed import Agent, Plugin, ToolError
+from harnessed import Agent, Plugin, PluginInstructions, SystemPrompt, ToolError
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
@@ -31,10 +31,10 @@ from browserrig.observation import (
 from browserrig.observation.models import Offscreen
 from browserrig.tools import (
     Actions,
+    FileTools,
     FormTools,
     KeyboardTools,
     PointerTools,
-    UploadTools,
 )
 from browserrig.tools.scrolling import prepare_element
 from tests.fakes import FakeChrome, FakeReadiness, FakeTab
@@ -363,7 +363,7 @@ class _Keys(KeyboardTools, provides=True):
     pass
 
 
-class _Uploads(UploadTools, provides=True):
+class _Uploads(FileTools, provides=True):
     pass
 
 
@@ -470,6 +470,7 @@ class _Handle:
 async def _observed(backend):
     holder, events = {}, []
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=ScriptedModel(["Done"]),
         plugins=[
             FakeChrome(holder),

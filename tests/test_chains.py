@@ -7,7 +7,9 @@ import pytest
 from harnessed import (
     Agent,
     Plugin,
+    PluginInstructions,
     PolicyDecision,
+    SystemPrompt,
     ToolChain,
     ToolError,
     ToolResult,
@@ -146,6 +148,7 @@ async def test_native_chain_skips_trailing_calls_after_boundary_or_failure(
         ]
     )
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=model,
         plugins=[
             *_browser(),
@@ -171,6 +174,7 @@ async def test_denied_boundary_does_not_discard_unrelated_followup():
         [_batch(call(_Tools.change), call(_Tools.fill, value="allowed")), "Done"]
     )
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=model,
         plugins=[
             *_browser(),
@@ -196,6 +200,7 @@ async def test_browser_metadata_is_captured_for_review_without_reaching_the_mode
 
     model = ScriptedModel([call(_Tools.fill, value="value"), "Done"])
     await Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=model,
         plugins=[
             *_browser(),

@@ -1,10 +1,9 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 
-from harnessed import Plugin
-from harnessed.errors import PluginConflict
+from harnessed import Kit, Plugin
+from harnessed.core.composition import compose_plugins
 from harnessed.kernel import PluginLike
-from harnessed.kernel.plugin import as_plugin_spec
 from harnessed.plugins import Compaction, ContextState
 
 from .activity import Activity
@@ -25,51 +24,57 @@ from .tools import (
     NavigationTools,
     PointerTools,
     TabTools,
-    UploadTools,
 )
 
 
 def browser_plugins(
-    *plugins: PluginLike | None,
+    *plugins: PluginLike | Kit | None,
     browser: BrowserOptions | None = None,
     without: Iterable[type[Plugin]] = (),
 ) -> list[PluginLike]:
     """The default browser agent plugins, adjusted by `plugins` and `without`.
 
-    A plugin that provides the same service or fills the same slot as a default
+    A plugin that fills the same slot as a default
     replaces it in place, such as `Observe(...)`, `Readiness(...)` or
     `Compaction(...)`; any other plugin is added. `without` drops defaults by type,
-    such as `(FileTools, UploadTools)` for an agent without local files. `None`
+    such as `(FileTools,)` for an agent without local files. `None`
     entries are skipped, so optional plugins can be written inline.
     """
-    defaults: list[PluginLike] = [
-        Activity(),
-        Chrome(browser),
-        # Types and moves the pointer at a person's pace.
-        Pacing(),
-        # Streams input and browser UI for anyone watching the session.
-        Choreography(),
-        # Titles and favicons for a viewer's tab strip; the agent reads tabs without it.
-        TabStrip(),
-        Readiness(),
-        DownloadReadiness(),
-        Nudges(),
-        Observe(),
-        ImageContext(),
-        Actions(),
-        NavigationTools(),
-        JavaScriptTools(),
-        KeyboardTools(),
-        PointerTools(),
-        FormTools(),
-        TabTools(),
-        DialogTools(),
-        FindTools(),
-        FileTools(),
-        UploadTools(),
-        Compaction(trigger=WindowRatio()),
-    ]
-    return _compose(defaults, plugins, without=tuple(without))
+    kit = browser_kit(browser=browser).without(*without)
+    return list(compose_plugins([kit, *(p for p in plugins if p is not None)]).plugins)
+
+
+def browser_kit(*, browser: BrowserOptions | None = None) -> Kit:
+    """Browser defaults as a native Harnessed kit, with explicit instruction ordering."""
+    return Kit(
+        "browserrig",
+        [
+            Activity(),
+            Chrome(browser),
+            # Types and moves the pointer at a person's pace.
+            Pacing(),
+            # Streams input and browser UI for anyone watching the session.
+            Choreography(),
+            # Titles and favicons for a viewer's tab strip; the agent reads tabs without it.
+            TabStrip(),
+            Readiness(),
+            DownloadReadiness(),
+            Nudges(),
+            Observe(),
+            ImageContext(),
+            Actions(),
+            NavigationTools(),
+            JavaScriptTools(),
+            KeyboardTools(),
+            PointerTools(),
+            FormTools(),
+            TabTools(),
+            DialogTools(),
+            FindTools(),
+            FileTools(),
+            Compaction(trigger=WindowRatio()),
+        ],
+    )
 
 
 @dataclass(frozen=True)
@@ -86,52 +91,3 @@ class WindowRatio:
         if state.ratio is None:
             return state.input_tokens + state.reserve_tokens >= self.fallback_tokens
         return state.ratio >= self.at
-
-
-def _compose(
-    defaults: list[PluginLike],
-    plugins: Sequence[PluginLike | None],
-    *,
-    without: tuple[type[Plugin], ...],
-) -> list[PluginLike]:
-    unknown = [
-        kind.__name__
-        for kind in without
-        if not any(isinstance(plugin, kind) for plugin in defaults)
-    ]
-    if unknown:
-        raise ValueError(f"Not a browserrig default: {', '.join(unknown)}")
-    composed = [plugin for plugin in defaults if not isinstance(plugin, without)]
-    positions = {
-        key: index
-        for index, plugin in enumerate(composed)
-        if (key := _identity(plugin)) is not None
-    }
-    chosen: set[str | frozenset[object]] = set()
-    for plugin in plugins:
-        if plugin is None:
-            continue
-        key = _identity(plugin)
-        if key is None:
-            composed.append(plugin)
-            continue
-        if key in chosen:
-            raise PluginConflict(f"Two plugins for {_describe(key)}")
-        chosen.add(key)
-        if key in positions:
-            composed[positions[key]] = plugin
-        else:
-            composed.append(plugin)
-    return composed
-
-
-def _identity(plugin: PluginLike) -> str | frozenset[object] | None:
-    """The slot a plugin fills, or else the services it provides."""
-    spec = as_plugin_spec(plugin)
-    return spec.slot or frozenset(spec.provides) or None
-
-
-def _describe(key: str | frozenset[object]) -> str:
-    if isinstance(key, str):
-        return f"slot {key!r}"
-    return ", ".join(sorted(getattr(item, "__name__", repr(item)) for item in key))

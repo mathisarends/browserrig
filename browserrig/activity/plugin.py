@@ -1,7 +1,7 @@
 from typing import assert_never
 from uuid import uuid4
 
-from harnessed import Context, Inject, Plugin, PluginState, SessionLog, ToolStatus, hook
+from harnessed import Context, Plugin, PluginState, SessionLog, ToolStatus, hook
 from harnessed.events import (
     AgentControlChangedEvent,
     AssistantMessageEvent,
@@ -17,6 +17,7 @@ from harnessed.events import (
     ToolExecutionStartedEvent,
     TurnEndedEvent,
 )
+from harnessed.kernel import dependency
 
 from browserrig.core import ActivityKind, ActivityOutcome
 from browserrig.events import (
@@ -39,10 +40,10 @@ from .state import ActivityState
 _PAUSE = ActivityKey(ActivityKind.PAUSED)
 
 
-class Activity(Plugin, provides=True, needs=(SessionLog,)):
+class Activity(Plugin, slot="browserrig.activity", provides=True):
     events = ACTIVITY_EVENTS
     _state = PluginState(ActivityState)
-    _log: Inject[SessionLog]
+    _log = dependency(SessionLog)
 
     async def setup(self, ctx: Context) -> None:
         ctx.effect(self._close_all)

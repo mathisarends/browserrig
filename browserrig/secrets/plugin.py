@@ -8,12 +8,11 @@ from urllib.parse import urlsplit
 
 from harnessed import (
     Context,
-    Inject,
+    Instructions,
     Observation,
     Plugin,
     PluginState,
     SessionLog,
-    SystemSection,
     ToolInfo,
     ToolResult,
     hook,
@@ -25,6 +24,7 @@ from harnessed.hooks import (
     Priority,
     ReviewToolResult,
 )
+from harnessed.kernel import dependency
 from harnessed.models import TextPart
 
 from browserrig.browser import Browser, BrowserEvents
@@ -63,7 +63,7 @@ class SecretEntry:
     guard: Callable[[], Awaitable[None]] = dataclass_field(repr=False)
 
 
-class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
+class Secrets(Plugin, provides=True, needs=(SessionLog,)):
     """Let the agent type credentials as `{{secret:NAME}}` without ever seeing them.
 
     Values live only in this plugin. Each secret is typed only on its domains; every text
@@ -72,7 +72,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
 
     events = SECRET_EVENTS
     _state = PluginState(SecretsState)
-    _events: Inject[BrowserEvents]
+    _events = dependency(BrowserEvents)
 
     def __init__(self, secrets: Mapping[str, Secret]) -> None:
         super().__init__()
@@ -90,7 +90,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
     def __repr__(self) -> str:
         return f"Secrets({', '.join(self._secrets)})"
 
-    instructions = SystemSection(
+    instructions = Instructions(
         title="Secrets",
         text=(
             "Credentials are never shown to you. Type one by writing its placeholder, such as "

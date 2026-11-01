@@ -2,7 +2,7 @@ import subprocess
 import sys
 
 import pytest
-from harnessed import Agent, Plugin, PolicyDecision, SystemSection
+from harnessed import Agent, Instructions, Plugin, PolicyDecision
 from harnessed.errors import PluginConflict
 from harnessed.plugins import Approvals, Compaction, ContextState
 from harnessed.plugins.filesystem import FilesystemTools
@@ -34,7 +34,6 @@ from browserrig.tools import (
     FormTools,
     JavaScriptTools,
     PointerTools,
-    UploadTools,
 )
 
 
@@ -42,9 +41,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     tmp_path,
 ):
     class Extension(Plugin):
-        usage = SystemSection(
-            title="Custom extension", text="Use the custom extension."
-        )
+        usage = Instructions(title="Custom extension", text="Use the custom extension.")
 
     file_system = FileSystemOptions(directory=tmp_path / "files")
     options = Launch(url="https://example.com", headless=False, files=file_system)
@@ -84,7 +81,7 @@ def test_facade_mounts_every_tool_group_once():
     agent = browserrig.Agent(model=ScriptedModel(["ok"]))
     for plugin in (PointerTools, JavaScriptTools):
         assert sum(isinstance(item, plugin) for item in agent.plugins) == 1
-    for plugin in (FormTools, UploadTools):
+    for plugin in (FormTools, FileTools):
         assert any(isinstance(item, plugin) for item in agent.plugins)
     assert sum(isinstance(item, FileTools) for item in agent.plugins) == 1
 
@@ -181,7 +178,7 @@ def test_without_drops_defaults_and_rejects_types_that_are_not_defaults():
     assert not any(
         isinstance(plugin, (Choreography, TabStrip, Compaction)) for plugin in composed
     )
-    with pytest.raises(ValueError, match="Not a browserrig default: Secrets"):
+    with pytest.raises(ValueError, match="contains no recipes matching: Secrets"):
         browser_plugins(without=(Secrets,))
 
 

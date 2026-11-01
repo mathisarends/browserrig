@@ -1,13 +1,20 @@
 from dataclasses import replace
 
 import pytest
-from harnessed import Agent, Context, Inject, Plugin, hook
+from harnessed import (
+    Agent,
+    Context,
+    Inject,
+    Plugin,
+    hook,
+)
 from harnessed.events import (
     IncludedObservation,
     ModelRequestedEvent,
     ObservationsIncludedEvent,
 )
 from harnessed.hooks import ConfigureRequest, Next, PreStep, StepDecision
+from harnessed.kernel import dependency
 from harnessed.models import ModelInfo, ModelRequest, UserMessage
 from harnessed.testing import ScriptedModel
 
@@ -44,7 +51,10 @@ async def test_scroll_nudge_requires_exact_same_url_document_and_unrequested_scr
     class Producer(FakeChrome):
         events = (ActionStartedEvent, ActionFinishedEvent, ObservationCapturedEvent)
 
-    agent = Agent(model=ScriptedModel(["ok"]), plugins=[Producer(holder), Nudges()])
+    agent = Agent(
+        model=ScriptedModel(["ok"]),
+        plugins=[Producer(holder), Nudges()],
+    )
     async with agent.session() as session:
         await session.emit(
             ActionStartedEvent(action_id="click-1", kind="click", target_id="tab-1")
@@ -91,7 +101,10 @@ async def test_pending_actions_are_separate_per_tab_and_closed_tabs_are_forgotte
             TabClosedEvent,
         )
 
-    agent = Agent(model=ScriptedModel(["unused"]), plugins=[Producer({}), Nudges()])
+    agent = Agent(
+        model=ScriptedModel(["unused"]),
+        plugins=[Producer({}), Nudges()],
+    )
     async with agent.session() as session:
         for target in ("first", "second"):
             await session.emit(
@@ -296,7 +309,7 @@ async def test_hints_stay_queued_until_the_unchanged_observation_is_submitted(
 
 
 class _Access(Plugin, needs=(Nudges,)):
-    nudges: Inject[Nudges]
+    nudges = dependency(Nudges)
 
     def __init__(self, holder):
         super().__init__()
@@ -373,7 +386,10 @@ async def test_bot_checks_get_one_hint_per_document(title, text, controls, expec
 
     holder = {}
     model = ScriptedModel(["first", "second"])
-    agent = Agent(model=model, plugins=[FakeChrome(holder), Nudges(), Hints()])
+    agent = Agent(
+        model=model,
+        plugins=[FakeChrome(holder), Nudges(), Hints()],
+    )
     async with agent.session() as session:
         await session.run("Look")
         await session.run("Look again")

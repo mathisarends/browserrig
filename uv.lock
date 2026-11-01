@@ -141,11 +141,11 @@ requires-dist = [
     { name = "cdpify", extras = ["websocket"], specifier = ">=0.4.0,<0.5" },
     { name = "charset-normalizer", specifier = ">=3.4,<4" },
     { name = "defusedxml", specifier = ">=0.7.1,<0.8" },
-    { name = "harnessed", specifier = "==0.8.0" },
-    { name = "harnessed", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = "==0.8.0" },
-    { name = "harnessed", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==0.8.0" },
-    { name = "harnessed", extras = ["openai"], marker = "extra == 'openai'", specifier = "==0.8.0" },
-    { name = "harnessed", extras = ["otel"], marker = "extra == 'otel'", specifier = "==0.8.0" },
+    { name = "harnessed", specifier = "==0.9.0" },
+    { name = "harnessed", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = "==0.9.0" },
+    { name = "harnessed", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==0.9.0" },
+    { name = "harnessed", extras = ["openai"], marker = "extra == 'openai'", specifier = "==0.9.0" },
+    { name = "harnessed", extras = ["otel"], marker = "extra == 'otel'", specifier = "==0.9.0" },
     { name = "httpx2", specifier = ">=2.16,<3" },
     { name = "markdownify", specifier = ">=1.2,<2" },
     { name = "mutagen", specifier = ">=1.47,<2" },
@@ -713,14 +713,14 @@ wheels = [
 
 [[package]]
 name = "harnessed"
-version = "0.8.0"
+version = "0.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0e/03/2f7d3f9e5fa47205b650ee758f0416c2a6ad7c3f97b2330eeb27567152eb/harnessed-0.8.0.tar.gz", hash = "sha256:dc3606e8359210e0efa9935c10a1bedfb82666c89eed1478b64105f96985e736", size = 177242, upload-time = "2026-10-30T18:32:28.248Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/e9/f80658897526745524c890734447e5db64e7ab8fd8e7480b45b3ea432232/harnessed-0.9.0.tar.gz", hash = "sha256:fd4727063d80a4137f7d26cf44678405dafcccc94da8111bb183220f91f7279f", size = 185253, upload-time = "2026-11-01T15:26:03.564Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/99/15/30a0aa0eae6a1cc54eb1247b11cfb701f9760d0f597e96b1c1b20a35a2fb/harnessed-0.8.0-py3-none-any.whl", hash = "sha256:b408d86cc00bef04053ba5c8565de94298b7fd59ba60a5b2a26fe50b630c06d7", size = 216492, upload-time = "2026-10-30T18:32:26.556Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/93/5dac120e15652264403e69a9ffda5cdc8b3fd88cef72470c8b65be6912c0/harnessed-0.9.0-py3-none-any.whl", hash = "sha256:06614fb6b739f6154f304af1edeedb690930b06c62dae12aec62ef66107404a2", size = 224758, upload-time = "2026-11-01T15:26:01.758Z" },
 ]
 
 [package.optional-dependencies]
@@ -2411,6 +2411,10 @@ dependencies = [
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/49/e5/ef1b02afb4a501c3a000282c4e1c61730fa24f1f804bff7e10929430bced/smelt_cli-0.2.0.tar.gz", hash = "sha256:b5ebd4ae7bc51c81b84f3212fec9922e9e831e5be1520b23a7476a869dfebb89", size = 551326, upload-time = "2026-10-31T20:18:43.529Z" }
 wheels = [
+    { url = "https://files.pythonhosted.org/packages/3a/4a/c5135b398183fb80904eb34e430a1d97e665661644e852b2866010b977bc/smelt_cli-0.2.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:61dc248f08eadd02598067907c7835f272cf47c539dff185e12bd9672358710d", size = 1216858, upload-time = "2026-10-31T21:17:27.532Z" },
+    { url = "https://files.pythonhosted.org/packages/77/52/645fccc5c2476e868fdfc7418496f77d44fce2c86d9172bfd984c017c930/smelt_cli-0.2.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:f4c2c4b4fb6995700fefc5317a1c7dfa2e20e0b623ac195928ae2a8becaae1b4", size = 1155674, upload-time = "2026-10-31T21:17:29.504Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/ef/43edbfc68be9a32a613fc1d2ebd85b2c9fb401dd05abf2ab7771a8940cef/smelt_cli-0.2.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:1508a0032cd6637fb13ac92e4e3781c9d3f8bfcc9597dcd90bcb1efc3c6955f3", size = 1191431, upload-time = "2026-10-31T21:17:31.233Z" },
+    { url = "https://files.pythonhosted.org/packages/92/ae/39f040165da879786425597a8cc84de5a6bfca9c0da74b253fb29cd06e13/smelt_cli-0.2.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:f6ad2cb4783c654dc340c9c7e6a63e09191f09d94288ad8431e25768b6211250", size = 1239451, upload-time = "2026-10-31T21:17:32.917Z" },
     { url = "https://files.pythonhosted.org/packages/fb/69/d0def9bb9b39c3658ad64223e5ef74b13a114f38a2d8e57e0baf0cc80493/smelt_cli-0.2.0-py3-none-win_amd64.whl", hash = "sha256:45cbbb3ffe23df91ea0f98ad228368c1b86c636759cbe44a0ab2d92e5d442cd2", size = 1242977, upload-time = "2026-10-31T20:18:41.714Z" },
 ]
 

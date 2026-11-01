@@ -1,5 +1,6 @@
-from harnessed import Inject, Plugin, hook
+from harnessed import Plugin, hook
 from harnessed.hooks import Next
+from harnessed.kernel import dependency
 
 from browserrig.browser import Browser
 from browserrig.files import DownloadState
@@ -8,10 +9,10 @@ from .hooks import CheckReadiness, ReadinessCheck
 from .plugin import Readiness
 
 
-class DownloadReadiness(Plugin, needs=(Browser, Readiness)):
+class DownloadReadiness(Plugin, needs=(Readiness,)):
     """Include active downloads in the same readiness budget as page activity."""
 
-    _browser: Inject[Browser]
+    _browser = dependency(Browser)
 
     @hook(CheckReadiness)
     async def _check(

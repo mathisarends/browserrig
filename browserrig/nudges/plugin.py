@@ -5,8 +5,9 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import yaml
-from harnessed import Inject, Observation, Plugin, PluginState, SessionLog, hook
+from harnessed import Observation, Plugin, PluginState, SessionLog, hook
 from harnessed.events import ObservationsIncludedEvent
+from harnessed.kernel import dependency
 
 from browserrig.browser import BrowserEvents
 from browserrig.core import ActionKind, ReadinessStatus
@@ -50,10 +51,10 @@ if TYPE_CHECKING:
     from browserrig.observation import Snapshot
 
 
-class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
+class Nudges(Plugin, slot="browserrig.nudges", provides=True, needs=(SessionLog,)):
     events = NUDGE_EVENTS
     _state = PluginState(NudgeState)
-    _events: Inject[BrowserEvents]
+    _events = dependency(BrowserEvents)
 
     def __init__(self, *, max_hints: int = 5, max_chars: int = 2000) -> None:
         super().__init__()

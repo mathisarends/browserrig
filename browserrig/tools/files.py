@@ -10,16 +10,17 @@ from uuid import uuid4
 import yaml
 from harnessed import (
     Inject,
+    Instructions,
     Observation,
     Plugin,
     PluginState,
-    SystemSection,
     ToolError,
     ToolResult,
     hook,
 )
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
+from harnessed.kernel import dependency
 from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab
@@ -71,16 +72,19 @@ class _Delivery:
     visible: bool = False
 
 
-class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
-    events = FILE_EVENTS
+class FileTools(Plugin):
+    """Workspace files, downloads and uploads to observed file inputs."""
+
+    events = FILE_EVENTS + UPLOAD_EVENTS
     _delivery = PluginState(_Delivery)
 
-    _browser: Inject[Browser]
-    _events: Inject[BrowserEvents]
-    _readiness: Inject[Readiness]
+    _browser = dependency(Browser)
+    _events = dependency(BrowserEvents)
+    _readiness = dependency(Readiness)
+    _observe = dependency(Observe)
 
-    _actions: Inject[Actions]
-    usage = SystemSection(
+    _actions = dependency(Actions)
+    usage = Instructions(
         title="Workspace and downloads",
         text=(
             "The file system observation identifies the available workspace and recent downloads. "
@@ -271,6 +275,60 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
             resolved, ActionKind.OPEN_DOWNLOADED_FILE, FileSource.DOWNLOAD, download.id
         )
 
+    @tool(
+        kind=ActionKind.UPLOAD,
+        enabled=_has_files,
+        description=(
+            "Set a file input using existing workspace/download files. Paths are relative to "
+            "the workspace or absolute paths returned by file tools."
+        ),
+    )
+    async def upload_files(
+        self,
+        ref: str,
+        paths: Annotated[list[str], Field(min_length=1)],
+        *,
+        actions: Inject[Actions],
+    ) -> ToolResult:
+        selected: list[str] = []
+
+        async def check(tab: Tab) -> None:
+            handle = await self._observe.dom_element(tab, ref)
+            if handle.element.input_type != "file":
+                raise BrowserError("Target is not a file input")
+            files = self._browser.files
+            if files is None:
+                raise ToolError(
+                    "Uploads require a shared local file system for this browser"
+                )
+            with _file_errors():
+                selected.extend(await files.upload_paths(paths))
+
+        async def upload(tab: Tab) -> Effect:
+            point = await actions.element_point(tab=tab, ref=ref)
+            await self._browser.mouse.move_to(point)
+
+            async def assign() -> None:
+                handle = await self._observe.dom_element(tab, ref)
+                await handle.upload_files(selected)
+                await self._events.emit(
+                    FilesUploadedEvent(
+                        target_id=tab.id,
+                        document_id=tab.document_id,
+                        paths=tuple(selected),
+                        ref=ref,
+                    )
+                )
+
+            await actions.stage(UploadIntent(tuple(selected), point), tab, assign)
+            return Effect("Files assigned to input.")
+
+        return await actions.run(
+            kind=ActionKind.UPLOAD,
+            operation=upload,
+            check=check,
+        )
+
     def _files(self) -> FileSystem:
         files = self._browser.files
         if files is None:
@@ -336,68 +394,6 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
             return Effect(f"Opened file in tab {opened.id}: {path}")
 
         return await self._actions.run(kind=kind, operation=open_file, settle=False)
-
-
-class UploadTools(Plugin, needs=(Actions, Browser, BrowserEvents, Observe)):
-    events = UPLOAD_EVENTS
-
-    _browser: Inject[Browser]
-    _events: Inject[BrowserEvents]
-    _observe: Inject[Observe]
-
-    @tool(
-        kind=ActionKind.UPLOAD,
-        enabled=_has_files,
-        description=(
-            "Set a file input using existing workspace/download files. Paths are relative to "
-            "the workspace or absolute paths returned by file tools."
-        ),
-    )
-    async def upload_files(
-        self,
-        ref: str,
-        paths: Annotated[list[str], Field(min_length=1)],
-        *,
-        actions: Inject[Actions],
-    ) -> ToolResult:
-        selected: list[str] = []
-
-        async def check(tab: Tab) -> None:
-            handle = await self._observe.dom_element(tab, ref)
-            if handle.element.input_type != "file":
-                raise BrowserError("Target is not a file input")
-            files = self._browser.files
-            if files is None:
-                raise ToolError(
-                    "Uploads require a shared local file system for this browser"
-                )
-            with _file_errors():
-                selected.extend(await files.upload_paths(paths))
-
-        async def upload(tab: Tab) -> Effect:
-            point = await actions.element_point(tab=tab, ref=ref)
-            await self._browser.mouse.move_to(point)
-
-            async def assign() -> None:
-                handle = await self._observe.dom_element(tab, ref)
-                await handle.upload_files(selected)
-                await self._events.emit(
-                    FilesUploadedEvent(
-                        target_id=tab.id,
-                        document_id=tab.document_id,
-                        paths=tuple(selected),
-                        ref=ref,
-                    )
-                )
-
-            await actions.stage(UploadIntent(tuple(selected), point), tab, assign)
-            return Effect("Files assigned to input.")
-
-        return await actions.run(
-            kind=ActionKind.UPLOAD,
-            operation=upload,
-            check=check,
-        )
 
 
 @contextmanager

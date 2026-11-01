@@ -1,4 +1,5 @@
 from harnessed import Inject, Plugin, ToolResult
+from harnessed.kernel import dependency
 
 from browserrig.browser import Browser, Tab, TabInfo
 from browserrig.core import ActionKind, ReadinessPhase
@@ -9,9 +10,9 @@ from .execution import Actions, Effect
 from .navigation import NEW_TAB_URL
 
 
-class TabTools(Plugin, needs=(Actions, Browser, Readiness)):
-    _browser: Inject[Browser]
-    _readiness: Inject[Readiness]
+class TabTools(Plugin, needs=(Actions,)):
+    _browser = dependency(Browser)
+    _readiness = dependency(Readiness)
 
     @tool(
         kind=ActionKind.LIST_TABS,

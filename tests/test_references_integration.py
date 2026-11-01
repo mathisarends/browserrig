@@ -1,7 +1,15 @@
 from dataclasses import dataclass
 
 import pytest
-from harnessed import Agent, Inject, Plugin, PolicyDecision, ToolCall
+from harnessed import (
+    Agent,
+    Inject,
+    Plugin,
+    PluginInstructions,
+    PolicyDecision,
+    SystemPrompt,
+    ToolCall,
+)
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
@@ -69,6 +77,7 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
             yield ModelChunk(text="Done")
 
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=CallbackModel(respond),
         plugins=[
             Chrome(Launch(url=site)),

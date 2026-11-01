@@ -55,7 +55,7 @@ above allows actions automatically. The constructor does not open Chrome or file
 
 `Agent` and `browser_plugins()` share one rule:
 
-- A plugin that fills the same slot or provides the same service as a default
+- A plugin that fills the same slot as a default
   replaces it in place, such as `Observe(...)`, `Readiness(...)`, `ImageContext(...)`
   or `Compaction(...)`. Two plugins for the same default raise `PluginConflict`.
 - Any other plugin is added after the defaults.
@@ -72,7 +72,6 @@ from browserrig import (
     Pacing,
     Screenshots,
     ScreenshotTrigger,
-    UploadTools,
 )
 
 agent = Agent(
@@ -81,12 +80,31 @@ agent = Agent(
         Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
         handoff if interactive else None,
     ],
-    without=(Pacing, Choreography, FileTools, UploadTools),
+    without=(Pacing, Choreography, FileTools),
 )
 ```
 
-`browser_plugins(*plugins, browser=..., without=...)` returns the same list for a
-plain Harnessed `Agent`: `harnessed.Agent(model=model, plugins=browser_plugins(MyPlugin()))`.
+`browser_kit()` publishes the defaults as a native Harnessed `Kit`. Use it with
+a plain Harnessed agent and place its instructions explicitly:
+
+```python
+from harnessed import Agent, PluginInstructions, SystemPrompt
+from browserrig import FileTools, browser_kit
+
+browser = browser_kit().without(FileTools)
+agent = Agent(
+    model=model,
+    plugins=[browser, MyPlugin()],
+    system_prompt=SystemPrompt("Complete the task.", browser.instructions, PluginInstructions()),
+)
+print(agent.describe())
+```
+
+Direct plugins override kit defaults by slot; sibling kits with conflicting slots
+need an explicit override. `agent.describe()` reports origins, replacements and
+exclusions without opening Chrome. `browser_plugins(*plugins, browser=..., without=...)`
+remains available when a resolved flat list is needed; place its instructions with
+`SystemPrompt("Complete the task.", PluginInstructions())`.
 Individual capabilities such as `Chrome`, `Readiness`, `Observe`, `Actions`, tool
 plugins, `Nudges`, `Activity`, and `TerminalEvents` are also available directly.
 See [composing browser agents](browser-composition.md) for the explicit plugin API:
@@ -96,11 +114,18 @@ screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` and
 `ImageContext(UntilCompaction())`. Capture, rendering, image retention and
 tool capabilities can be selected independently. `ScreenshotTrigger.ON_REQUEST`
 captures only after a screenshot tool call. Configure extraction through `DomCapture(...)`.
-Shared plugin services use class-level `Inject[T]` and `provides=True`; explicit
+Shared plugin services use `dependency(T)` from `harnessed.kernel` and `provides=True`; explicit
 `needs=(...)` declarations control waiting, teardown, and restart when a provider changes.
-Injection binds values without inferring dependencies. Optional services resolve
+Dependency fields bind values and declare lifetime requirements. Call-scoped
+`Inject[T]` parameters still require explicit `needs` for lifetime requirements. Optional services resolve
 on each hook invocation and remain optional unless explicitly listed in `needs`.
 Tool decorators declare model-facing descriptions independently of developer docstrings.
+
+Plugin recipes replay their explicit constructor arguments for every activation.
+Constructors validate configuration; acquire resources in `setup` and register
+cleanup with `ctx.effect(...)`. Keep mount-owned mutable data in `PluginState`.
+Direct tool calls need an active instance. In isolated tests, use
+`harnessed.testing.mount_plugin(recipe, services=...)` to obtain one.
 
 ## Action chains and stable tool kinds
 
@@ -239,17 +264,19 @@ tools. For structured output, read `.text` on incomplete results; `.output` rais
 
 ## System prompts and optional MCP tools
 
-`Agent(system_prompt="...")` appends browser plugin sections automatically.
+`browserrig.Agent(system_prompt="...")` places browser kit instructions and remaining
+plugin instructions automatically, including with `system_prompt=None`.
 For titled Markdown or XML, pass a native `SystemPrompt`:
 
 ```python
-from harnessed import PromptFormat, SystemPrompt
+from harnessed import PluginInstructions, PromptFormat, SystemPrompt
 from browserrig import Agent
 
 agent = Agent(
     system_prompt=SystemPrompt(
+        "Complete the requested browser task using the observed page state.",
+        PluginInstructions(),
         format=PromptFormat.MARKDOWN,
-        sections=("Complete the requested browser task using the observed page state.",),
     ),
 )
 print(agent.prompt)
@@ -262,8 +289,11 @@ settings; coordinate tools describe how image pixels map to the viewport.
 Single-tool instructions live in tool descriptions.
 
 With a custom `browser_plugins()` composition, use the configured recipes' section
-attributes in `SystemPrompt(sections=..., exclude=...)` to reorder or replace
-individual sections. `PluginSections()` places the remaining declarations.
+attributes in `SystemPrompt(*parts, exclude=...)` to reorder or replace
+individual instructions. `PluginInstructions()` places the remaining declarations.
+An explicit `SystemPrompt` follows Harnessed's strict placement rules: every
+selected instruction must be placed or excluded. Declare content with `Instructions`
+or `@instructions`.
 For manual compositions, configure `Observe` independently of `Readiness` and add
 `ImageContext()` to deliver captured images. Configure DOM observation settings
 through `Observe(capture=DomCapture(...))`; readiness is configured separately.
@@ -275,7 +305,7 @@ mount closes or suspends; `SectionDelivery.IGNORE` skips it. Import `SectionDeli
 from `harnessed`. The fixed system prompt stays unchanged.
 
 Install the optional MCP client with `uv sync --locked --extra openai --extra mcp`.
-All Harnessed extras are pinned to **0.8.0**. Add MCP servers through the native plugin:
+All Harnessed extras are pinned to **0.9.0**. Add MCP servers through the native plugin:
 
 ```python
 from harnessed.plugins.mcp import MCP
@@ -288,7 +318,7 @@ agent = Agent(
 `MCP.stdio("catalog", command=..., args=[...])` starts a local server instead.
 Connections belong to each session, tool names are prefixed (for example
 `catalog__search`), and existing approval policies apply. See the
-[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.8.0/docs/guides/mcp.md).
+[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.9.0/docs/guides/mcp.md).
 
 Harnessed closes failed MCP transports, hides their tools, wakes pending
 calls and drains owned tasks. Failed operations are not retried automatically;
@@ -301,12 +331,13 @@ Browser plugins declare their required services explicitly, including dependenci
 used only by tool or hook parameters. Custom plugins must do the same:
 
 ```python
-from harnessed import Inject, Plugin
+from harnessed import Plugin
+from harnessed.kernel import dependency
 from browserrig import Browser
 
 
-class Extension(Plugin, needs=(Browser,)):
-    browser: Inject[Browser]
+class Extension(Plugin):
+    browser = dependency(Browser)
 ```
 
 `Agent` keeps Harnessed's strict startup validation by default. Missing

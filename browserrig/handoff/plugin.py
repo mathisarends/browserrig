@@ -6,9 +6,9 @@ from uuid import uuid4
 from harnessed import (
     Context,
     Inject,
+    Instructions,
     Plugin,
     PluginState,
-    SystemSection,
     ToolChain,
     ToolContext,
     hook,
@@ -17,6 +17,7 @@ from harnessed.core.prompt.context import DynamicContext
 from harnessed.core.tools import ToolRegistry
 from harnessed.events import AgentControlChangedEvent, ControlState
 from harnessed.hooks import Next, PreStep, StepDecision
+from harnessed.kernel import dependency
 from pydantic import Field, TypeAdapter, ValidationError
 
 from browserrig.browser import Browser, BrowserEvents
@@ -42,7 +43,7 @@ _HISTORY = TypeAdapter(list[HandoffReceipt])
 class HumanHandoff(
     Plugin,
     provides=True,
-    needs=(Browser, BrowserEvents, Observe, DynamicContext, ToolRegistry),
+    needs=(ToolRegistry,),
 ):
     """Opt-in human control with measured receipts and durable, bounded context.
 
@@ -52,10 +53,10 @@ class HumanHandoff(
 
     events = HANDOFF_EVENTS
     _state = PluginState(HandoffState)
-    _browser: Inject[Browser]
-    _events: Inject[BrowserEvents]
-    _observe: Inject[Observe]
-    _context: Inject[DynamicContext]
+    _browser = dependency(Browser)
+    _events = dependency(BrowserEvents)
+    _observe = dependency(Observe)
+    _context = dependency(DynamicContext)
 
     def __init__(
         self,
@@ -83,7 +84,7 @@ class HumanHandoff(
         self.track_pauses = track_pauses
         self.history_limit = history_limit
 
-    usage = SystemSection(
+    usage = Instructions(
         title="Human handoff",
         text=(
             "Use request_human when a person must log in, confirm 2FA, or complete a blocked "

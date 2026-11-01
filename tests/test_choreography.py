@@ -40,7 +40,7 @@ from browserrig.events import (
 from browserrig.files import FileSystem, FileSystemOptions
 from browserrig.pacing import Pacing
 from browserrig.scripts import FindResult
-from browserrig.tools import Actions, FileTools, FindTools, NavigationTools, UploadTools
+from browserrig.tools import Actions, FileTools, FindTools, NavigationTools
 from browserrig.tools import execution as execution_module
 from tests.fakes import mounted
 
@@ -217,10 +217,6 @@ class _FileTools(FileTools, provides=True):
     pass
 
 
-class _UploadTools(UploadTools, provides=True):
-    pass
-
-
 async def test_find_in_page_shows_ctrl_f_typing_results_and_escape(timeline):
     async with _staged(timeline, _FindTools()) as (_, ctx):
         await ctx[_FindTools].find_in_page("ab", ("c",), actions=ctx[Actions])
@@ -375,13 +371,13 @@ async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
         return False
 
     monkeypatch.setattr(execution_module, "prepare_element", prepare)
-    async with _staged(timeline, _UploadTools()) as (services, ctx):
+    async with _staged(timeline, _FileTools()) as (services, ctx):
         services.browser.files = files
         services.observe.element = element
         # Already resting on the input, so the pointer does not travel.
         await services.browser.mouse.move_to(Point(x=40, y=30))
         timeline.clear()
-        await ctx[_UploadTools].upload_files(
+        await ctx[_FileTools].upload_files(
             "input", ["report.txt"], actions=ctx[Actions]
         )
     assert _shown(timeline) == [

@@ -1,6 +1,7 @@
 from typing import Annotated, Literal
 
-from harnessed import Inject, Plugin, SystemSection, ToolResult
+from harnessed import Inject, Instructions, Plugin, ToolResult
+from harnessed.kernel import dependency
 from pydantic import Field
 
 from browserrig.browser import Browser, Tab
@@ -19,16 +20,16 @@ type _ClickButton = Annotated[
 ]
 
 
-class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
+class PointerTools(Plugin, needs=(Actions,)):
     """Mouse input by screenshot coordinates, plus by observed ref when refs exist.
 
     Coordinates also reach unreferenced regions, so text-only agents keep them too.
     """
 
-    _browser: Inject[Browser]
-    _observe: Inject[Observe]
+    _browser = dependency(Browser)
+    _observe = dependency(Observe)
 
-    coordinates = SystemSection(
+    coordinates = Instructions(
         title="Screenshot coordinates",
         text=(
             "Coordinates are pixels from the top-left of the newest shown image for this document; "

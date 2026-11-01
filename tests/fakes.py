@@ -2,7 +2,15 @@ import asyncio
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
-from harnessed import Agent, Context, Inject, Plugin, SessionLog
+from harnessed import (
+    Agent,
+    Context,
+    Inject,
+    Plugin,
+    PluginInstructions,
+    SessionLog,
+    SystemPrompt,
+)
 from harnessed.testing import ScriptedModel
 
 from browserrig import Browser
@@ -121,7 +129,7 @@ class FakeObserve:
         )
 
 
-class FakeServices(Plugin):
+class FakeServices(Plugin, provides=True):
     """Provide fake browser services, so real tool plugins run without Chrome."""
 
     def __init__(self):
@@ -145,6 +153,10 @@ class FakeServices(Plugin):
 async def mounted(*plugins):
     """Start a session with `plugins` on fake services; yield the services and context."""
     services = FakeServices()
-    agent = Agent(model=ScriptedModel(["Done"]), plugins=[services, *plugins])
+    agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
+        model=ScriptedModel(["Done"]),
+        plugins=[services, *plugins],
+    )
     async with agent.session() as session:
-        yield services, session.ctx
+        yield session.ctx[FakeServices], session.ctx

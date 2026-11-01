@@ -76,28 +76,15 @@ class TerminalEvents(Plugin):
     def _appended(self, receipt: SessionAppended) -> None:
         self._write(receipt.event)
 
-    @hook(LiveEvent)
-    def _live_event(self, event: LiveEvent) -> None:
-        self._write(event)
-
-    @hook(CompactionStartedEvent)
-    def _compaction_started(self, event: CompactionStartedEvent) -> None:
-        self._write(event)
-
-    @hook(CompactionFinishedEvent)
-    def _compaction_finished(self, event: CompactionFinishedEvent) -> None:
-        self._write(event)
-
-    @hook(ModelAttemptStartedEvent)
-    def _attempt_started(self, event: ModelAttemptStartedEvent) -> None:
-        self._write(event)
-
-    @hook(ModelRetryScheduledEvent)
-    def _retry_scheduled(self, event: ModelRetryScheduledEvent) -> None:
-        self._write(event)
-
-    @hook(ModelAttemptFinishedEvent)
-    def _attempt_finished(self, event: ModelAttemptFinishedEvent) -> None:
+    @hook(
+        LiveEvent,
+        CompactionStartedEvent,
+        CompactionFinishedEvent,
+        ModelAttemptStartedEvent,
+        ModelRetryScheduledEvent,
+        ModelAttemptFinishedEvent,
+    )
+    def _transient(self, event: _TerminalEvent) -> None:
         self._write(event)
 
 

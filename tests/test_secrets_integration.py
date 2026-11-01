@@ -1,7 +1,16 @@
 import json
 
 import pytest
-from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
+from harnessed import (
+    Agent,
+    Context,
+    Inject,
+    Plugin,
+    PluginInstructions,
+    PolicyDecision,
+    SystemPrompt,
+    ToolCall,
+)
 from harnessed.events import ToolExecutionFinishedEvent
 from harnessed.models import ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
@@ -88,7 +97,9 @@ def _agent(site, model, domains, holder, *, path="/", screenshots=False, live=No
     ]
     if live is not None:
         plugins.append(live)
-    return Agent(model=model, plugins=plugins)
+    return Agent(
+        system_prompt=SystemPrompt(PluginInstructions()), model=model, plugins=plugins
+    )
 
 
 async def test_typed_secret_reaches_the_page_but_never_the_model(site):

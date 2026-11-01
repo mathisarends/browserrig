@@ -88,8 +88,11 @@ Very large or sparse XLSX sheets expose a bounded initial view with a limitation
 and support targeted `cell_range` reads elsewhere in the sheet. These processing
 bounds are separate from response pagination.
 
+`FileTools` includes workspace operations, downloads and `upload_files`.
+Omit it with `without=(FileTools,)` to remove the entire file capability.
+
 File tools report facts as durable `browser.files.*` events, registered by
-`FileTools` (`FILE_EVENTS`) and `UploadTools` (`UPLOAD_EVENTS`). Presentation,
+`FileTools` (`FILE_EVENTS` and `UPLOAD_EVENTS`). Presentation,
 such as a file drawer, is left to the viewer:
 
 | Event | Emitted by | Payload |
@@ -107,7 +110,7 @@ exactly one finished or failed event.
 
 `open_file` and `open_downloaded_file` remain available for a visual preview.
 `switch_tab` returns to the original page. DOM uploads through
-`UploadTools.upload_files` accept workspace-relative paths or absolute paths
+`FileTools.upload_files` accept workspace-relative paths or absolute paths
 returned by file tools. Every selected file must exist within the workspace or
 configured download directory; the whole selection is checked before browser
 input. Uploads are disabled without a shared local filesystem, including remote
@@ -146,7 +149,7 @@ failure never falls back to host execution. See the
 
 These backends do not redirect Browserrig's local `FileTools`, uploads, Chrome
 downloads or document readers. In a custom composition, omit Browserrig's
-`FileTools` and `UploadTools` before adding `FilesystemTools` to avoid duplicate
+`FileTools` before adding `FilesystemTools` to avoid duplicate
 tool names and host file access through those tools. Transfer files explicitly
 from application code; copied sandbox results must be exported before session
 close. Browserrig does not implement Harnessed's `FileSystemBackend` protocol, so

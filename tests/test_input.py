@@ -9,6 +9,8 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from harnessed import ToolError
 from harnessed.events import EventRegistry
+from harnessed.plugins import Service
+from harnessed.testing import mount_plugin
 
 from browserrig.browser import Tab
 from browserrig.choreography import (
@@ -47,7 +49,8 @@ from browserrig.input import mouse as mouse_module
 from browserrig.input.pointer import movement
 from browserrig.input.wheel import wheel_duration, wheel_progress
 from browserrig.kinds import BrowserBar, CursorStyle, TabGesture
-from browserrig.tools import KeyboardTools, NavigateIntent
+from browserrig.tools import Actions, KeyboardTools, NavigateIntent
+from tests.fakes import FakeServices
 
 
 async def test_mouse_and_keyboard_share_action_correlation_without_sharing_cursor_state(
@@ -234,8 +237,11 @@ async def test_modifier_flags_reach_cdp_and_key_events(modifier, name, flag, key
 )
 async def test_send_keys_rejects_ambiguous_arguments_before_dispatch(arguments):
     actions = SimpleNamespace(run=AsyncMock())
-    with pytest.raises(ToolError):
-        await KeyboardTools().send_keys(**arguments, actions=actions)
+    async with mount_plugin(
+        KeyboardTools(), services=[FakeServices(), Service(Actions, actions)]
+    ) as tools:
+        with pytest.raises(ToolError):
+            await tools.send_keys(**arguments, actions=actions)
     actions.run.assert_not_awaited()
 
 

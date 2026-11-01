@@ -1,7 +1,16 @@
 import asyncio
 
 import pytest
-from harnessed import Agent, Context, Inject, Plugin, PolicyDecision, ToolCall
+from harnessed import (
+    Agent,
+    Context,
+    Inject,
+    Plugin,
+    PluginInstructions,
+    PolicyDecision,
+    SystemPrompt,
+    ToolCall,
+)
 from harnessed.events import ToolExecutionFinishedEvent
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
@@ -164,6 +173,7 @@ async def _perform(site, name, arguments):
             yield ModelChunk(text="Gesture completed")
 
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(browser=Launch(url=site + "/gestures")),

@@ -17,7 +17,7 @@ from browserrig.events import (
 )
 from browserrig.input import Instant
 from browserrig.kinds import ActionKind, ReadinessPhase
-from browserrig.tools import Actions, UploadTools
+from browserrig.tools import Actions, FileTools
 from browserrig.tools.execution import Effect
 from tests.fakes import FakeServices, mounted
 
@@ -178,20 +178,20 @@ async def test_an_action_aims_once_at_each_target():
     assert motor.sizes == [(80, 20), (80, 20)]
 
 
-class _UploadTools(UploadTools, provides=True):
+class _FileTools(FileTools, provides=True):
     """Expose the mounted plugin, so tests can call its tool directly."""
 
 
 class _Upload(NamedTuple):
     services: FakeServices
     actions: Actions
-    tools: UploadTools
+    tools: FileTools
     handle: SimpleNamespace
 
 
 @asynccontextmanager
 async def _uploads(files):
-    async with mounted(Actions(), _UploadTools()) as (services, ctx):
+    async with mounted(Actions(), _FileTools()) as (services, ctx):
         cdp = SimpleNamespace(input=SimpleNamespace(dispatch_mouse_event=AsyncMock()))
         services.browser.active_tab = Tab("tab", cdp, emit=services.record)
         services.browser.files = files
@@ -201,4 +201,4 @@ async def _uploads(files):
         services.observe.element = AsyncMock(return_value=handle)
         actions = ctx[Actions]
         actions.element_point = AsyncMock(return_value=ElementPoint(x=40, y=30))
-        yield _Upload(services, actions, ctx[_UploadTools], handle)
+        yield _Upload(services, actions, ctx[_FileTools], handle)

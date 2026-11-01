@@ -10,9 +10,11 @@ from harnessed import (
     Agent,
     Inject,
     Plugin,
+    PluginInstructions,
     PolicyDecision,
     SessionLog,
     SessionState,
+    SystemPrompt,
     hook,
     tool,
 )
@@ -59,7 +61,7 @@ from browserrig.nudges import Nudges
 from browserrig.observation import CaptureContent, Element, Snapshot
 from browserrig.observation.delta import INTRO
 from browserrig.observation.extraction import Extraction
-from browserrig.tools import Actions, FileTools, UploadTools
+from browserrig.tools import Actions, FileTools
 from browserrig.tools.mouse import _image_point
 from tests.fakes import FakeChrome
 from tests.observations import has_image, image_id
@@ -134,6 +136,7 @@ def _agent(
     capture = CountingCapture(frames)
     model = ScriptedModel(responses)
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=model,
         plugins=[
             *extra,
@@ -651,6 +654,7 @@ async def test_initial_per_document_and_ongoing_readiness_with_stream_stage():
     holder = {}
     initial, ongoing = Policy(), Policy()
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
@@ -687,6 +691,7 @@ async def test_failed_initial_retries_and_navigation_reselects_policy():
     holder = {}
     app = Policy(ready=False)
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
@@ -727,6 +732,7 @@ async def test_invalidation_cancels_old_wait_and_starts_a_fresh_initial_probe():
             return WaitingProbe(context, self)
 
     agent = Agent(
+        system_prompt=SystemPrompt(PluginInstructions()),
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
@@ -784,8 +790,8 @@ async def test_native_stream_forwards_custom_events_and_browser_readiness_withou
 
 def test_recipe_can_omit_local_file_tools():
     assert not any(
-        isinstance(plugin, (FileTools, UploadTools))
-        for plugin in browser_plugins(without=(FileTools, UploadTools))
+        isinstance(plugin, (FileTools,))
+        for plugin in browser_plugins(without=(FileTools,))
     )
 
 

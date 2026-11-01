@@ -276,11 +276,12 @@ class _Watched:
     @asynccontextmanager
     async def mounted(self):
         services = FakeServices()
-        services.browser.active_tab = self.tab
         agent = Agent(
-            model=ScriptedModel(["Done"]), plugins=[services, TabStripPlugin()]
+            model=ScriptedModel(["Done"]),
+            plugins=[services, TabStripPlugin()],
         )
         async with agent.session() as session:
+            session.ctx[FakeServices].browser.active_tab = self.tab
             self._ctx = session.ctx
             yield
 

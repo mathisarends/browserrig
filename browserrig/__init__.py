@@ -13,6 +13,7 @@ from .choreography import Choreography, TabStrip
 from .completion import Done
 from .composition import (  # smelt: ignore[SMT106] -- public facade
     WindowRatio,
+    browser_kit,
     browser_plugins,
 )
 from .core import Point
@@ -72,7 +73,6 @@ from .tools import (
     ObserveAfterInput,
     PointerTools,
     TabTools,
-    UploadTools,
 )
 
 __version__ = "0.1.0"
@@ -116,7 +116,6 @@ __all__ = [
     "DialogTools",
     "FileTools",
     "JavaScriptTools",
-    "UploadTools",
     "Choreography",
     "TabStrip",
     "FormTools",
@@ -152,5 +151,6 @@ __all__ = [
     "WindowRatio",
     "TerminalEvents",
     "browser_plugins",
+    "browser_kit",
     "wait_for_page",
 ]
