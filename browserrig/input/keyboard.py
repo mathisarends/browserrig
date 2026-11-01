@@ -118,7 +118,8 @@ class Keyboard:
         """
         # CRLF is one line break. Other Unicode characters are inserted unchanged.
         text = text.replace("\r\n", "\n")
-        plan = tuple(self._motor().keystrokes(text, sensitive=sensitive))
+        motor = self._motor()
+        plan = tuple(motor.keystrokes(text, sensitive=sensitive))
         typed = TypedText(intended=text, entered=_replay(plan))
         if sensitive and (typed.entered != text or len(plan) != len(text)):
             raise BrowserError("Sensitive text must be typed exactly, without slips")

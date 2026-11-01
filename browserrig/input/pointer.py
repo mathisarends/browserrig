@@ -1,41 +1,56 @@
 import math
 from dataclasses import dataclass
+from typing import Self
 
 from browserrig.core import Point
+
+type ControlPoint = tuple[float, float]
 
 _FRAME_INTERVAL_SECONDS = 1 / 60
 
 
-def _ease(progress: float) -> float:
-    return 4 * progress**3 if progress < 0.5 else 1 - (-2 * progress + 2) ** 3 / 2
-
-
 @dataclass(frozen=True, slots=True)
 class CursorPath:
+    """One eased cubic Bézier stroke of the pointer, taking `duration` seconds."""
+
     start: Point
     end: Point
     duration: float
+    control_points: tuple[ControlPoint, ControlPoint]
 
-    @property
-    def control_points(self) -> tuple[tuple[float, float], tuple[float, float]]:
-        dx, dy = self.end.x - self.start.x, self.end.y - self.start.y
+    @classmethod
+    def curved(
+        cls,
+        start: Point,
+        end: Point,
+        duration: float,
+        *,
+        bend: tuple[float, float] = (0.06, 0.04),
+    ) -> Self:
+        """A gentle arc: each control point leans sideways by `bend` of the distance.
 
-        def bounded(x: float, y: float) -> tuple[float, float]:
+        The control points stay within the box spanned by `start` and `end`.
+        """
+        dx, dy = end.x - start.x, end.y - start.y
+
+        def bounded(x: float, y: float) -> ControlPoint:
             return (
-                max(
-                    min(self.start.x, self.end.x), min(max(self.start.x, self.end.x), x)
-                ),
-                max(
-                    min(self.start.y, self.end.y), min(max(self.start.y, self.end.y), y)
-                ),
+                max(min(start.x, end.x), min(max(start.x, end.x), x)),
+                max(min(start.y, end.y), min(max(start.y, end.y), y)),
             )
 
-        return (
-            bounded(
-                self.start.x + dx * 0.3 - dy * 0.06, self.start.y + dy * 0.3 + dx * 0.06
-            ),
-            bounded(
-                self.start.x + dx * 0.7 - dy * 0.04, self.start.y + dy * 0.7 + dx * 0.04
+        first, second = bend
+        return cls(
+            start,
+            end,
+            duration,
+            (
+                bounded(
+                    start.x + dx * 0.3 - dy * first, start.y + dy * 0.3 + dx * first
+                ),
+                bounded(
+                    start.x + dx * 0.7 - dy * second, start.y + dy * 0.7 + dx * second
+                ),
             ),
         )
 
@@ -62,4 +77,8 @@ class CursorPath:
 def movement(start: Point, end: Point) -> CursorPath:
     distance = math.hypot(end.x - start.x, end.y - start.y)
     duration = min(0.6, max(0.08, 0.05 + 0.075 * math.log2(distance / 20 + 1)))
-    return CursorPath(start, end, duration if distance >= 2 else 0)
+    return CursorPath.curved(start, end, duration if distance >= 2 else 0)
+
+
+def _ease(progress: float) -> float:
+    return 4 * progress**3 if progress < 0.5 else 1 - (-2 * progress + 2) ** 3 / 2

@@ -12,6 +12,8 @@ class ElementArgs(ScriptArgs):
     operation: ElementOperation
     value: str | bool | None = None
     clip: Bounds | None = None
+    # Preferred spot for `point`, as fractions of the element's visible box.
+    aim: tuple[float, float] | None = None
 
 
 class ScrollArgs(ScriptArgs):

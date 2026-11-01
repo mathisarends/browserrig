@@ -9,6 +9,8 @@ from .pointer import CursorPath, movement
 
 # Seconds between keys a person types, in the page and in the browser's own bars.
 TYPING_INTERVAL_SECONDS = 0.05
+# The middle of a target, as fractions of its visible box.
+CENTER = (0.5, 0.5)
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,7 +23,7 @@ class KeyStroke:
 
 
 class Motor(Protocol):
-    """How the hand moves: typing rhythm, pointer paths and where the pointer lands.
+    """How the hand moves: typing rhythm, pointer routes, aim and clicks.
 
     The devices ask it how to perform input; what viewers see is the `Presenter`'s
     concern. Without one, input runs as fast as the page accepts it.
@@ -35,8 +37,22 @@ class Motor(Protocol):
         """
         ...
 
-    def path(self, start: Point, end: Point) -> CursorPath:
-        """The pointer's way from `start` to `end`; its duration paces the native moves."""
+    def route(self, start: Point, end: Point) -> Sequence[CursorPath]:
+        """The pointer's way from `start` to `end`, in strokes that join end to start.
+
+        Their durations pace the native moves; one stroke is a direct move.
+        """
+        ...
+
+    def aim(self, width: float, height: float) -> tuple[float, float]:
+        """Where to point on a target of this size, as fractions of its visible box.
+
+        A spot that something else covers falls back to the target's visible points.
+        """
+        ...
+
+    def press(self) -> float:
+        """Seconds a mouse button stays down for one click."""
         ...
 
     def landing(self, width: float, height: float) -> Point:
@@ -45,22 +61,31 @@ class Motor(Protocol):
 
 
 class Instant:
-    """Input at machine speed: no pauses, straight pointer moves, centered landing."""
+    """Input at machine speed: no pauses, direct pointer moves, centered targets."""
 
     def keystrokes(  # pylint: disable=unused-argument
         self, text: str, *, sensitive: bool
     ) -> Sequence[KeyStroke]:
         return tuple(KeyStroke(key) for key in text)
 
-    def path(self, start: Point, end: Point) -> CursorPath:
-        return CursorPath(start, end, 0)
+    def route(self, start: Point, end: Point) -> Sequence[CursorPath]:
+        return (CursorPath.curved(start, end, 0),)
+
+    def aim(  # pylint: disable=unused-argument
+        self, width: float, height: float
+    ) -> tuple[float, float]:
+        return CENTER
+
+    def press(self) -> float:
+        return 0
 
     def landing(self, width: float, height: float) -> Point:
         return Point(x=width / 2, y=height / 2)
 
 
 class HumanMotor:
-    """Input at a person's pace: steady typing without slips and eased pointer paths.
+    """Input at a person's pace: steady typing without slips, eased pointer paths and
+    clicks in the middle of a target.
 
     `rng` draws the varying parts, such as where the pointer lands in a new tab; pass a
     seeded `random.Random` for repeatable runs.
@@ -82,8 +107,16 @@ class HumanMotor:
     ) -> Sequence[KeyStroke]:
         return tuple(KeyStroke(key, self._typing_interval) for key in text)
 
-    def path(self, start: Point, end: Point) -> CursorPath:
-        return movement(start, end)
+    def route(self, start: Point, end: Point) -> Sequence[CursorPath]:
+        return (movement(start, end),)
+
+    def aim(  # pylint: disable=unused-argument
+        self, width: float, height: float
+    ) -> tuple[float, float]:
+        return CENTER
+
+    def press(self) -> float:
+        return 0
 
     def landing(self, width: float, height: float) -> Point:
         # Near the middle, but not on the same spot in every tab.

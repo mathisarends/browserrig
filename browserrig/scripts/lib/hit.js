@@ -46,7 +46,7 @@ function containsComposed(target, hit) {
   return false;
 }
 
-function pointFor(el, area = null, styleFor = getComputedStyle) {
+function pointFor(el, area = null, styleFor = getComputedStyle, aim = null) {
   const viewport = intersect(
     {x: 0, y: 0, width: innerWidth, height: innerHeight},
     area || {x: 0, y: 0, width: innerWidth, height: innerHeight},
@@ -56,7 +56,7 @@ function pointFor(el, area = null, styleFor = getComputedStyle) {
     if (!bounds) {
       continue;
     }
-    const point = hitPoint(el, bounds);
+    const point = hitPoint(el, bounds, aim);
     if (point) {
       return {...point, bounds};
     }
@@ -64,8 +64,10 @@ function pointFor(el, area = null, styleFor = getComputedStyle) {
   return null;
 }
 
-function hitPoint(el, bounds) {
+// `aim` is a preferred spot as fractions of the box; covered spots fall back.
+function hitPoint(el, bounds, aim = null) {
   for (const [fx, fy] of [
+    ...(aim ? [aim] : []),
     [0.5, 0.5],
     [0.15, 0.15],
     [0.85, 0.15],

@@ -226,8 +226,9 @@ optional plugins. Tools and devices only describe what they do. `Pacing` (from
 at full speed, `without=(Choreography,)` to emit no input events, or both. They build
 on four seams, which other plugins can use the same way:
 
-- `browser.input.pace(motor)` installs a `Motor` that plans keystrokes and sets
-  pointer paths and landing points. `Pacing(motor)` installs one for a session; its
+- `browser.input.pace(motor)` installs a `Motor` that plans keystrokes, pointer
+  routes, where to aim on a target, how long a click holds the button, and landing
+  points. `Pacing(motor)` installs one for a session; its
   default is `HumanMotor()`, and `HumanMotor(rng=random.Random(seed))` makes the
   varying parts repeatable. The default without a plugin, `Instant`, never pauses.
 - `browser.input.present(presenter)` installs a `Presenter` that plays tab-strip
@@ -260,7 +261,15 @@ in an overlay spanning its tab strip and the viewport. The first tab of a
 session skips steps 1 and 2. `Choreography` publishes the current cursor state at
 each agent turn start, so live subscribers attached after browser setup can display
 it before the first model request or input action.
-Cursor movements follow bounded cubic paths. Scrolling looks like Chrome's
+Cursor movements follow the motor's route: one or more cubic strokes
+(`CursorPath`), each joined to the last and reported as its own
+`browser.cursor.moved`. A route that does not run unbroken from the pointer to its
+destination is refused before the pointer moves. The built-in motors move in one
+bounded stroke (`CursorPath.curved`), aim at the middle of a target and click
+without holding the button. A custom motor's aim is a pair of fractions of the
+target's visible box; if something covers that spot, the hit test falls back to the
+target's other visible points. Within one action, a target keeps its aim, so the
+re-check after hover lands on the same spot. Scrolling looks like Chrome's
 `scroll-behavior: smooth` but uses real wheel input: one trusted CDP wheel event
 per frame along Chrome's smooth scroll curve (`cubic-bezier(0.4, 0, 0, 1)`),
 lasting about one 60 Hz frame per square root of the distance (150 ms to 1.5 s).

@@ -21,10 +21,16 @@ class ElementHandle:
     element: Element
     snapshot: Snapshot
 
-    async def locate(self) -> ElementPoint:
-        """Return a hit-tested viewport point and the element's visible bounds."""
+    async def locate(self, *, aim: tuple[float, float] | None = None) -> ElementPoint:
+        """Return a hit-tested viewport point and the element's visible bounds.
+
+        `aim` is a preferred spot as fractions of the visible box; when something
+        covers it, the point falls back to the middle or near a corner.
+        """
         local = ElementPoint.model_validate(
-            await self._run(ElementOperation.POINT, clip=self.frame.local_visible)
+            await self._run(
+                ElementOperation.POINT, clip=self.frame.local_visible, aim=aim
+            )
         )
         x, y = self.frame.transform.to_viewport(local.x, local.y)
         await self.frame.check_point(x, y)
@@ -66,9 +72,10 @@ class ElementHandle:
         value: str | bool | None = None,
         *,
         clip: Bounds | None = None,
+        aim: tuple[float, float] | None = None,
     ) -> Any:
         return await self.run(
             ELEMENT,
-            ElementArgs(operation=operation, value=value, clip=clip),
+            ElementArgs(operation=operation, value=value, clip=clip, aim=aim),
             user_gesture=True,
         )

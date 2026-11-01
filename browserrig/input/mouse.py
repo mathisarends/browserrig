@@ -1,6 +1,6 @@
 import asyncio
 import math
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -18,6 +18,7 @@ from browserrig.events import (
 )
 
 from .motor import Motor
+from .pointer import CursorPath
 from .presenter import Presenter
 from .target import Focus, InputTarget, focused
 from .wheel import FRAME_SECONDS, wheel_duration, wheel_progress
@@ -86,7 +87,9 @@ class Mouse:
         target = focused(self._focus)
         rest = self._rest(target)
         if not rest.placed:
-            rest.position = self._motor().landing(*await target.viewport_size())
+            motor = self._motor()
+            width, height = await target.viewport_size()
+            rest.position = motor.landing(width, height)
         if source is not None:
             await presenter.enter(target, rest.position)
         # The renderer learns where the pointer is, so hover state matches the viewer.
@@ -114,7 +117,9 @@ class Mouse:
         await self._move(target, point)
         mouse_button = MouseButton(button)
         buttons = 2 if button == "right" else 1
+        motor = self._motor()
         for click_count in range(1, count + 1):
+            hold = motor.press()
             try:
                 await self._dispatch(
                     target,
@@ -124,6 +129,8 @@ class Mouse:
                     buttons=buttons,
                     click_count=click_count,
                 )
+                if hold > 0:
+                    await asyncio.sleep(hold)
             finally:
                 await self._dispatch(
                     target,
@@ -223,27 +230,35 @@ class Mouse:
         await self._refresh_style(target)
 
     async def _move(self, target: InputTarget, point: Point) -> None:
-        path = self._motor().path(self._rest(target).position, point)
+        start = self._rest(target).position
+        motor = self._motor()
+        planned = motor.route(start, point)
+        route = _joined(planned, start, point)
+        try:
+            for path in route:
+                await self._stroke(target, path)
+        finally:
+            await self._publish_position(target)
+        await self._refresh_style(target)
+
+    async def _stroke(self, target: InputTarget, path: CursorPath) -> None:
         cp1, cp2 = path.control_points
         await self._emit(
             target,
             CursorMovedEvent(
                 from_position=(path.start.x, path.start.y),
-                to_position=(point.x, point.y),
+                to_position=(path.end.x, path.end.y),
                 control_point_1=cp1,
                 control_point_2=cp2,
                 duration=path.duration,
             ),
         )
-        try:
-            for step in range(1, path.steps + 1):
-                current = path.point(step / path.steps)
-                await self._dispatch(target, MouseEventKind.MOVED, current)
-                if path.duration:
-                    await asyncio.sleep(path.duration / path.steps)
-        finally:
-            await self._publish_position(target)
-        await self._refresh_style(target)
+        for step in range(1, path.steps + 1):
+            await self._dispatch(
+                target, MouseEventKind.MOVED, path.point(step / path.steps)
+            )
+            if path.duration:
+                await asyncio.sleep(path.duration / path.steps)
 
     async def _publish(self, target: InputTarget) -> None:
         await self._publish_position(target)
@@ -256,7 +271,8 @@ class Mouse:
         await self._emit(target, CursorStateEvent(x=position.x, y=position.y))
 
     async def _refresh_style(self, target: InputTarget) -> None:
-        if not self._presenter().shows_cursor_style():
+        presenter = self._presenter()
+        if not presenter.shows_cursor_style():
             return
         rest = self._rest(target)
         style = await target.cursor_style(rest.position)
@@ -309,3 +325,22 @@ class Mouse:
 
     def _rest(self, target: InputTarget) -> _Rest:
         return self._rests.setdefault(target.id, _Rest())
+
+
+def _joined(
+    route: Sequence[CursorPath], start: Point, end: Point
+) -> tuple[CursorPath, ...]:
+    """Check that a route runs unbroken from `start` to `end`, before the pointer moves."""
+    strokes = tuple(route)
+    if not strokes or strokes[0].start != start or strokes[-1].end != end:
+        raise BrowserError(
+            "A pointer route must run from the pointer to its destination"
+        )
+    for previous, path in zip(strokes, strokes[1:], strict=False):
+        if path.start != previous.end:
+            raise BrowserError(
+                "Each stroke of a pointer route starts where the last ended"
+            )
+    if any(path.duration < 0 for path in strokes):
+        raise BrowserError("Pointer strokes must not have a negative duration")
+    return strokes

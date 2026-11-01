@@ -1,5 +1,5 @@
 /* global resolveElement, pointFor */
-function browserrigElement({operation, value, clip = null}) {
+function browserrigElement({operation, value, clip = null, aim = null}) {
   const el = resolveElement(this);
   function selectOption() {
     if (el.localName !== 'select') {
@@ -68,7 +68,7 @@ function browserrigElement({operation, value, clip = null}) {
   if (operation === 'focus') {
     return focus();
   }
-  const point = pointFor(el, clip);
+  const point = pointFor(el, clip, getComputedStyle, aim);
   if (!point) {
     throw new Error('ELEMENT_BLOCKED');
   }

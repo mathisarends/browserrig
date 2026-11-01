@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Protocol, cast
 from uuid import uuid4
 
@@ -21,6 +21,7 @@ from harnessed.hooks import ExecuteTool, Next, ReviewToolResult
 from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
     ActionKind,
+    Bounds,
     BrowserError,
     BrowserToolMetadata,
     ElementPoint,
@@ -79,6 +80,9 @@ _NAVIGATION_KINDS = {
 @dataclass
 class _Mount:
     context: Context | None = None
+    # Where the current action aims on each ref, so a re-check hits the same spot.
+    aim_action: str = ""
+    aims: dict[str, tuple[float, float]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,7 +254,8 @@ class Actions(
     ) -> ElementPoint:
         """Reveal a ref with wheel input, then return a hit-tested point.
 
-        Plugins learn about the target through `TargetLocated`.
+        The point is where the motor aims on the target, unless something covers that
+        spot. Plugins learn about the target through `TargetLocated`.
 
         Use `scroll=False` to re-check the target after hover or other input moved it.
         """
@@ -260,13 +265,27 @@ class Actions(
             scrolled = await prepare_element(tab, handle, self.browser.mouse)
             # Wheel input may have moved ancestor documents; refresh their transforms.
             handle = await self.observe.element(tab, ref)
-        point = await handle.locate()
+        point = await handle.locate(aim=self._aim(ref, handle.element.bounds))
         context = self._mount.context
         if point.bounds is not None and context is not None:
             await context.dispatch(
                 TargetLocated(tab, ref, point.bounds, self.browser.input.action_id)
             )
         return point.model_copy(update={"scrolled": scrolled})
+
+    def _aim(self, ref: str, bounds: Bounds | None) -> tuple[float, float]:
+        """The motor's spot on `ref`, chosen once per action."""
+        action_id = self.browser.input.action_id
+        if self._mount.aim_action != action_id:
+            self._mount.aim_action, self._mount.aims = action_id, {}
+        aim = self._mount.aims.get(ref)
+        if aim is None:
+            width, height = (bounds.width, bounds.height) if bounds else (0, 0)
+            motor = self.browser.input.motor()
+            aim = motor.aim(width, height)
+            if action_id:
+                self._mount.aims[ref] = aim
+        return aim
 
     @hook(ExecuteTool)
     async def _execute_browser_result(

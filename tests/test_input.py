@@ -33,6 +33,7 @@ from browserrig.events import (
     ScrolledEvent,
 )
 from browserrig.input import (
+    CENTER,
     CursorPath,
     Focus,
     HumanMotor,
@@ -595,8 +596,16 @@ class _SlowMotor:
     ) -> tuple[KeyStroke, ...]:
         return tuple(KeyStroke(key, 0.2) for key in text)
 
-    def path(self, start: Point, end: Point) -> CursorPath:
-        return CursorPath(start, end, 1 / 30)
+    def route(self, start: Point, end: Point) -> tuple[CursorPath, ...]:
+        return (CursorPath.curved(start, end, 1 / 30),)
+
+    def aim(  # pylint: disable=unused-argument
+        self, width: float, height: float
+    ) -> tuple[float, float]:
+        return CENTER
+
+    def press(self) -> float:
+        return 0
 
     def landing(self, width: float, height: float) -> Point:
         return Point(x=width - 1, y=height - 1)
@@ -626,6 +635,73 @@ async def test_a_motor_paces_input_that_nobody_watches(monkeypatch):
         (1 / 60,),
         (0.2,),
         (0.2,),
+    ]
+
+
+class _Detour(Instant):
+    """Goes round a corner on the way, and holds the button down for each click."""
+
+    def __init__(self, *, hold: float = 0) -> None:
+        self._hold = hold
+
+    def route(self, start: Point, end: Point) -> tuple[CursorPath, ...]:
+        corner = Point(x=end.x, y=start.y)
+        return (
+            CursorPath.curved(start, corner, 0),
+            CursorPath.curved(corner, end, 0),
+        )
+
+    def press(self) -> float:
+        return self._hold
+
+
+class _Gapped(Instant):
+    """Lifts the pointer halfway, which no hand can do."""
+
+    def route(self, start: Point, end: Point) -> tuple[CursorPath, ...]:
+        return (
+            CursorPath.curved(start, Point(x=50, y=0), 0),
+            CursorPath.curved(Point(x=60, y=0), end, 0),
+        )
+
+
+async def test_a_route_moves_the_pointer_stroke_by_stroke():
+    devices, tab, events, commands = _rig()
+    devices.pace(_Detour())
+    await devices.mouse.move_to(Point(x=100, y=60))
+    moves = [(c["x"], c["y"]) for c in commands if c["type"] == "mouseMoved"]
+    assert moves == [(100, 0), (100, 60)]
+    strokes = [event for event in events if isinstance(event, CursorMovedEvent)]
+    assert [(e.from_position, e.to_position) for e in strokes] == [
+        ((0, 0), (100, 0)),
+        ((100, 0), (100, 60)),
+    ]
+    assert devices.mouse.position_in(tab.id) == Point(x=100, y=60)
+
+
+async def test_a_broken_route_is_refused_before_the_pointer_moves():
+    devices, _tab, events, commands = _rig()
+    devices.pace(_Gapped())
+    with pytest.raises(BrowserError, match="starts where the last ended"):
+        await devices.mouse.move_to(Point(x=100, y=60))
+    assert not commands and not events
+
+
+async def test_a_click_holds_the_button_as_long_as_the_motor_presses(monkeypatch):
+    devices, _tab, _events, commands = _rig()
+    devices.pace(_Detour(hold=0.12))
+
+    async def hold(seconds):
+        commands.append({"type": f"hold {seconds}"})
+
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", hold)
+    await devices.mouse.click(Point(x=0, y=0))
+    assert [c["type"] for c in commands] == [
+        "mouseMoved",
+        "mouseMoved",
+        "mousePressed",
+        "hold 0.12",
+        "mouseReleased",
     ]
 
 

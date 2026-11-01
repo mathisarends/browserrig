@@ -8,13 +8,14 @@ from harnessed import ToolError
 
 from browserrig import FileSystem, FileSystemOptions
 from browserrig.browser import Tab
-from browserrig.core import BrowserError, ElementPoint, Point
+from browserrig.core import Bounds, BrowserError, ElementPoint, Point
 from browserrig.events import (
     ActionFailedEvent,
     ActionFinishedEvent,
     FilesUploadedEvent,
     PageState,
 )
+from browserrig.input import Instant
 from browserrig.kinds import ActionKind, ReadinessPhase
 from browserrig.tools import Actions, UploadTools
 from browserrig.tools.execution import Effect
@@ -136,6 +137,45 @@ async def test_navigation_does_not_wait_for_the_current_dom_to_stop_changing():
 
 def _first(events, kind):
     return next(event for event in events if isinstance(event, kind))
+
+
+class _Aiming(Instant):
+    """Aims somewhere new each time it is asked, and remembers the target sizes."""
+
+    def __init__(self, *aims: tuple[float, float]) -> None:
+        self._aims = list(aims)
+        self.sizes: list[tuple[float, float]] = []
+
+    def aim(self, width: float, height: float) -> tuple[float, float]:
+        self.sizes.append((width, height))
+        return self._aims.pop(0)
+
+
+async def test_an_action_aims_once_at_each_target():
+    motor = _Aiming((0.2, 0.3), (0.7, 0.6))
+    aims = []
+
+    async def locate(*, aim):
+        aims.append(aim)
+        return ElementPoint(x=1, y=1)
+
+    async with mounted(Actions()) as (services, ctx):
+        services.browser.input.pace(motor)
+        bounds = Bounds(x=0, y=0, width=80, height=20)
+        services.observe.element = AsyncMock(
+            return_value=SimpleNamespace(
+                element=SimpleNamespace(bounds=bounds), locate=locate
+            )
+        )
+        tab = services.browser.active_tab
+        with services.browser.input.action("first"):
+            await ctx[Actions].element_point(tab=tab, ref="e1", scroll=False)
+            # The re-check after hover resolves the same spot.
+            await ctx[Actions].element_point(tab=tab, ref="e1", scroll=False)
+        with services.browser.input.action("second"):
+            await ctx[Actions].element_point(tab=tab, ref="e1", scroll=False)
+    assert aims == [(0.2, 0.3), (0.2, 0.3), (0.7, 0.6)]
+    assert motor.sizes == [(80, 20), (80, 20)]
 
 
 class _UploadTools(UploadTools, provides=True):
