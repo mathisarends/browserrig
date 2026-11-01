@@ -12,7 +12,7 @@ from .config import BrowserOptions, Launch
 from .tab import Tab
 
 
-class Chrome(Plugin, needs=(SessionLog,)):
+class Chrome(Plugin, slot="browserrig.browser", needs=(SessionLog,)):
     events = BROWSER_EVENTS
 
     def __init__(

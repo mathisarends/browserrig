@@ -57,7 +57,7 @@ class UntilCompaction:
 _NOTE_SOURCE = "browser-image"
 
 
-class ImageContext(Plugin, needs=(Observe,)):
+class ImageContext(Plugin, slot="browserrig.images", needs=(Observe,)):
     """Deliver screenshots inside immutable, session-owned browser observations.
 
     Retention can remove old image parts while keeping their DOM text. Native
