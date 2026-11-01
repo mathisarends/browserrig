@@ -11,7 +11,7 @@ from browserrig import (
     BrowserAgent,
     Chrome,
     FileSystemOptions,
-    LaunchBrowser,
+    Launch,
     Observe,
     Readiness,
     ReadinessOptions,
@@ -36,7 +36,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
             title="Custom extension", text="Use the custom extension."
         )
 
-    options = LaunchBrowser(url="https://example.com", headless=False)
+    options = Launch(url="https://example.com", headless=False)
     readiness = ReadinessOptions(quiet_ms=123)
     file_system = FileSystemOptions(directory=tmp_path / "files")
     approvals = Approvals(default=PolicyDecision.DENY)

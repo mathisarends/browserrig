@@ -9,7 +9,7 @@ from browserrig import (
     Actions,
     Browser,
     ChromeBrowser,
-    LaunchBrowser,
+    Launch,
     Observe,
     Point,
     ReadinessOptions,
@@ -83,7 +83,7 @@ async def readiness_server():
 async def test_delayed_click_navigation_settles_the_destination(readiness_site):
     agent = Agent(
         model=ScriptedModel(["Done"]),
-        plugins=browser_plugins(LaunchBrowser(url=readiness_site), local_files=False),
+        plugins=browser_plugins(Launch(url=readiness_site), local_files=False),
     )
     async with agent.session() as session:
         browser, observe = session.ctx[Browser], session.ctx[Observe]
@@ -101,7 +101,7 @@ async def test_delayed_click_navigation_settles_the_destination(readiness_site):
 
 
 async def test_shadow_mutations_and_newly_attached_roots_are_observed(readiness_site):
-    async with ChromeBrowser(LaunchBrowser(url=readiness_site)) as browser:
+    async with ChromeBrowser(Launch(url=readiness_site)) as browser:
         tab = browser.active_tab
         await wait_for_page(tab, options=_options())
         await tab.evaluate("""
@@ -132,7 +132,7 @@ async def test_navigation_command_itself_is_bounded_before_the_response_commits(
     agent = Agent(
         model=ScriptedModel(["Done"]),
         plugins=browser_plugins(
-            LaunchBrowser(url=readiness_site),
+            Launch(url=readiness_site),
             readiness=_options(timeout=0.5, navigation_min_ms=0),
             local_files=False,
         ),
@@ -161,7 +161,7 @@ async def test_navigation_command_itself_is_bounded_before_the_response_commits(
 async def test_frame_content_settles_including_cross_origin_frames(
     readiness_site, path
 ):
-    async with ChromeBrowser(LaunchBrowser(url=readiness_site + path)) as browser:
+    async with ChromeBrowser(Launch(url=readiness_site + path)) as browser:
         tab = browser.active_tab
         await wait_for_page(tab, options=_options())
         await tab.evaluate(
@@ -180,7 +180,7 @@ async def test_frame_content_settles_including_cross_origin_frames(
 async def test_visible_finite_animations_settle_but_infinite_spinners_do_not_block(
     readiness_site,
 ):
-    async with ChromeBrowser(LaunchBrowser(url=readiness_site)) as browser:
+    async with ChromeBrowser(Launch(url=readiness_site)) as browser:
         tab = browser.active_tab
         await wait_for_page(tab, options=_options())
         await tab.evaluate("""
@@ -198,7 +198,7 @@ async def test_visible_finite_animations_settle_but_infinite_spinners_do_not_blo
 async def test_an_observed_frame_can_navigate_from_same_origin_to_cross_origin(
     readiness_site,
 ):
-    async with ChromeBrowser(LaunchBrowser(url=readiness_site + "/frame")) as browser:
+    async with ChromeBrowser(Launch(url=readiness_site + "/frame")) as browser:
         tab = browser.active_tab
         await wait_for_page(tab, options=_options())
         destination = readiness_site.replace("127.0.0.1", "localhost") + "/child"
@@ -213,7 +213,7 @@ async def test_an_observed_frame_can_navigate_from_same_origin_to_cross_origin(
 async def test_visible_busy_content_defers_readiness_and_hidden_busy_content_does_not(
     readiness_site,
 ):
-    async with ChromeBrowser(LaunchBrowser(url=readiness_site)) as browser:
+    async with ChromeBrowser(Launch(url=readiness_site)) as browser:
         tab = browser.active_tab
         await wait_for_page(tab, options=_options())
         await tab.evaluate("""
@@ -235,7 +235,7 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
     agent = Agent(
         model=model,
         plugins=browser_plugins(
-            LaunchBrowser(url=readiness_site),
+            Launch(url=readiness_site),
             readiness=_options(timeout=0.5, action_min_ms=0),
             local_files=False,
         ),

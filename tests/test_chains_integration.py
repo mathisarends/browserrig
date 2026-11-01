@@ -16,7 +16,7 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import AgentLoop, Approvals, FinalStepPolicy
 from harnessed.testing import CallbackModel, ScriptedModel
 
-from browserrig import Browser, BrowserAgent, LaunchBrowser, Observe, ReadinessOptions
+from browserrig import Browser, BrowserAgent, Launch, Observe, ReadinessOptions
 from browserrig.events import ActionFinishedEvent, ObservationCapturedEvent
 from browserrig.kinds import ActionKind
 from tests.javascript import evaluate
@@ -214,7 +214,7 @@ async def test_tab_actions_keep_their_distinct_kinds_in_durable_receipts(site):
 
     agent = BrowserAgent(
         model=CallbackModel(respond),
-        browser=LaunchBrowser(url=site),
+        browser=Launch(url=site),
         plugins=[Access()],
         approvals=Approvals(default=PolicyDecision.ALLOW),
     )
@@ -243,7 +243,7 @@ async def test_reserved_final_summary_uses_effective_limit_and_remains_incomplet
     model = ScriptedModel(["Partial browser findings"])
     agent = BrowserAgent(
         model=model,
-        browser=LaunchBrowser(url=site),
+        browser=Launch(url=site),
         plugins=[
             AgentLoop(max_steps=10, final_step=FinalStepPolicy.SUMMARIZE),
             Progress(),
@@ -288,7 +288,7 @@ async def _run(site, markup, plan):
 
     agent = BrowserAgent(
         model=CallbackModel(respond),
-        browser=LaunchBrowser(url=site),
+        browser=Launch(url=site),
         readiness=ReadinessOptions(quiet_ms=30, navigation_min_ms=50),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[Page()],

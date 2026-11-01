@@ -8,7 +8,7 @@ from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import ChromeBrowser, LaunchBrowser, browser_plugins
+from browserrig import ChromeBrowser, Launch, browser_plugins
 from browserrig.events import NavigationStartedEvent, TabOpenedEvent, TabUpdatedEvent
 
 pytestmark = pytest.mark.integration
@@ -74,7 +74,7 @@ async def test_tab_updates_carry_loading_title_and_icons(icon_site):
         if isinstance(event, TabUpdatedEvent):
             events.append(event)
 
-    async with ChromeBrowser(LaunchBrowser(), emit=collect) as browser:
+    async with ChromeBrowser(Launch(), emit=collect) as browser:
         tab = browser.active_tab
         for path, prefix in (
             ("/", "data:image/png;base64,"),
@@ -100,7 +100,7 @@ async def test_navigate_can_open_the_url_in_a_new_tab(icon_site):
     agent = Agent(
         model=model,
         plugins=[
-            *browser_plugins(LaunchBrowser(url=icon_site + "/inline")),
+            *browser_plugins(Launch(url=icon_site + "/inline")),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

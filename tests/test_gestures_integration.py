@@ -7,7 +7,7 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
-from browserrig import Browser, ChromeBrowser, LaunchBrowser, browser_plugins
+from browserrig import Browser, ChromeBrowser, Launch, browser_plugins
 from browserrig.core import Point
 from browserrig.events import CursorStateEvent
 from tests.observations import latest
@@ -75,7 +75,7 @@ async def test_drag_pointer_and_html5_transfer(site, native, coordinates):
 
 @pytest.mark.parametrize("prevented", [False, True])
 async def test_drag_uses_browser_behavior_for_draggable_ancestor(site, prevented):
-    async with ChromeBrowser(LaunchBrowser(url=site + "/gestures")) as browser:
+    async with ChromeBrowser(Launch(url=site + "/gestures")) as browser:
         tab = browser.active_tab
         await evaluate(
             tab,
@@ -114,9 +114,7 @@ async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site)
             reached_target.set()
             await asyncio.Event().wait()
 
-    async with ChromeBrowser(
-        LaunchBrowser(url=site + "/gestures"), emit=emit
-    ) as browser:
+    async with ChromeBrowser(Launch(url=site + "/gestures"), emit=emit) as browser:
         tab = browser.active_tab
         await evaluate(
             tab,
@@ -163,7 +161,7 @@ async def _perform(site, name, arguments):
     agent = Agent(
         model=CallbackModel(respond),
         plugins=[
-            *browser_plugins(LaunchBrowser(url=site + "/gestures")),
+            *browser_plugins(Launch(url=site + "/gestures")),
             Access(),
             Approvals(default=PolicyDecision.ALLOW),
         ],

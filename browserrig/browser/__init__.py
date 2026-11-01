@@ -2,7 +2,7 @@ from browserrig.files import Download, DownloadState
 
 from .base import Browser, BrowserEvents
 from .chrome import ChromeBrowser
-from .config import BrowserOptions, ConnectBrowser, LaunchBrowser, Viewport
+from .config import BrowserOptions, Connect, Launch, Viewport
 from .frame import Frame
 from .images import screenshot
 from .models import TabInfo
@@ -15,11 +15,11 @@ __all__ = [
     "BrowserOptions",
     "Chrome",
     "ChromeBrowser",
-    "ConnectBrowser",
+    "Connect",
     "Frame",
     "Download",
     "DownloadState",
-    "LaunchBrowser",
+    "Launch",
     "Tab",
     "TabInfo",
     "Viewport",

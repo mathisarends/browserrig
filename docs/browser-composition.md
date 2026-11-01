@@ -10,7 +10,7 @@ readiness and action-chain decisions. Browserrig targets Harnessed 0.8.0.
 from harnessed import Agent
 from browserrig import (
     Actions, Activity, Chrome, DomCapture, DomRenderer, FormTools,
-    ImageContext, KeyboardTools, LaunchBrowser, NavigationTools, Observe,
+    ImageContext, KeyboardTools, Launch, NavigationTools, Observe,
     PointerTools, Readiness, Screenshots, ScreenshotTrigger, TabTools,
     TrimInBatches,
 )
@@ -18,7 +18,7 @@ from browserrig import (
 agent = Agent(
     model=model,
     plugins=[
-        Chrome(LaunchBrowser(url=url)),
+        Chrome(Launch(url=url)),
         Readiness(),
         Observe(
             capture=DomCapture(),

@@ -16,7 +16,7 @@ from browserrig import (
     BrowserAgent,
     ChromeBrowser,
     DomCapture,
-    LaunchBrowser,
+    Launch,
     Observe,
     Screenshots,
     ScreenshotTrigger,
@@ -34,7 +34,7 @@ pytestmark = pytest.mark.integration
 
 
 async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await wait_for_page(tab)
         await evaluate(
@@ -99,7 +99,7 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
 
 
 async def test_element_names_come_from_chrome_accessibility_tree(site):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await wait_for_page(tab)
         await evaluate(
@@ -135,9 +135,7 @@ async def test_element_names_come_from_chrome_accessibility_tree(site):
 
 @pytest.mark.parametrize("marks", [False, True])
 async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site, marks):
-    async with ChromeBrowser(
-        LaunchBrowser(url=site, viewport=Viewport(scale=2))
-    ) as browser:
+    async with ChromeBrowser(Launch(url=site, viewport=Viewport(scale=2))) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         before = await evaluate(tab, "document.documentElement.outerHTML")
@@ -211,7 +209,7 @@ async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site)
 
     agent = BrowserAgent(
         model=CallbackModel(respond),
-        browser=LaunchBrowser(url=site + "/canvas", viewport=Viewport(scale=2)),
+        browser=Launch(url=site + "/canvas", viewport=Viewport(scale=2)),
         observe=Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
         approvals=Approvals(default=PolicyDecision.ALLOW),
     )
@@ -222,7 +220,7 @@ async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site)
 
 
 async def test_limits_are_reported_and_checkbox_state_changes_fingerprint(site):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         await evaluate(
@@ -247,7 +245,7 @@ async def test_limits_are_reported_and_checkbox_state_changes_fingerprint(site):
 
 
 async def test_visible_text_is_shown_only_when_the_viewport_holds_few_controls(site):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         await evaluate(
@@ -271,7 +269,7 @@ async def test_visible_text_is_shown_only_when_the_viewport_holds_few_controls(s
 
 
 async def test_challenge_overlay_reads_its_text_but_not_the_page_beneath(site):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         tiles = "<div tabindex=0 style='width:60px;height:60px'></div>" * 6
@@ -288,7 +286,7 @@ async def test_challenge_overlay_reads_its_text_but_not_the_page_beneath(site):
 
 
 async def test_partially_covered_element_uses_exposed_hit_point(site):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await wait_for_page(tab)
         markup = """<button style='position:absolute;left:20px;top:20px;width:200px;height:80px'>
@@ -320,9 +318,7 @@ _CANVASES = """<style>body{margin:0}</style>
 
 
 async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(site):
-    async with ChromeBrowser(
-        LaunchBrowser(url=site, viewport=Viewport(scale=2))
-    ) as browser:
+    async with ChromeBrowser(Launch(url=site, viewport=Viewport(scale=2))) as browser:
         tab = browser.active_tab
         await wait_for_page(tab)
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(_CANVASES)}")
@@ -403,7 +399,7 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
 
     agent = BrowserAgent(
         model=CallbackModel(respond),
-        browser=LaunchBrowser(url=site),
+        browser=Launch(url=site),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[Access()],
     )

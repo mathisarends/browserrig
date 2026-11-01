@@ -7,7 +7,7 @@ from harnessed import Context, Inject, Plugin, PolicyDecision, tool
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Browser, BrowserAgent, HumanHandoff, HumanResponse, LaunchBrowser
+from browserrig import Browser, BrowserAgent, HumanHandoff, HumanResponse, Launch
 from browserrig.events import ActivityFinishedEvent, HandoffFinishedEvent
 from tests.javascript import evaluate
 from tests.observations import latest
@@ -33,7 +33,7 @@ async def test_pause_steer_resume_observes_external_page_change(site, handoff_en
     model = ScriptedModel([call(Gate.hold), "Resumed"])
     agent = BrowserAgent(
         model=model,
-        browser=LaunchBrowser(url=site),
+        browser=Launch(url=site),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         handoff=HumanHandoff(ask=AsyncMock(return_value=HumanResponse()))
         if handoff_enabled
@@ -100,7 +100,7 @@ async def test_handoff_observes_human_navigation_and_a_short_lived_popup(site):
     )
     agent = BrowserAgent(
         model=model,
-        browser=LaunchBrowser(url=site),
+        browser=Launch(url=site),
         handoff=HumanHandoff(ask=ask),
         plugins=[BrowserHandle()],
     )

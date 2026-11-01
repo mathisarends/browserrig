@@ -22,11 +22,11 @@ from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import BrowserAgent, LaunchBrowser, TerminalEvents
+from browserrig import BrowserAgent, Launch, TerminalEvents
 
 agent = BrowserAgent(
     model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
-    browser=LaunchBrowser(url="https://en.wikipedia.org/wiki/Voyager_program"),
+    browser=Launch(url="https://en.wikipedia.org/wiki/Voyager_program"),
     approvals=Approvals(default=PolicyDecision.ALLOW),
     plugins=[TerminalEvents()],
 )

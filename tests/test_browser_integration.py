@@ -2,7 +2,7 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from browserrig import ChromeBrowser, ConnectBrowser
+from browserrig import ChromeBrowser, Connect
 from browserrig.core import Point
 from browserrig.events import (
     CursorEnteredEvent,
@@ -74,7 +74,7 @@ async def test_launch_stable_tabs_and_isolated_connect(discovery):
         endpoint = browser.client.transport.url
         if discovery:
             endpoint = f"http://{urlsplit(endpoint).netloc}/"
-        async with ChromeBrowser(ConnectBrowser(endpoint=endpoint)) as connected:
+        async with ChromeBrowser(Connect(endpoint=endpoint)) as connected:
             assert connected.active_tab.id != first.id
             connected_target = connected.active_tab.id
         assert browser.client.is_connected

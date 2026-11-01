@@ -13,7 +13,7 @@ from browserrig import (
     Browser,
     ChromeBrowser,
     DomCapture,
-    LaunchBrowser,
+    Launch,
     browser_plugins,
     wait_for_page,
 )
@@ -28,7 +28,7 @@ pytestmark = pytest.mark.integration
 
 
 async def test_frame_extraction_and_old_reference_is_rejected(site):
-    async with ChromeBrowser(LaunchBrowser(url=site + "/frames")) as browser:
+    async with ChromeBrowser(Launch(url=site + "/frames")) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         snapshot = await capture(tab, DomCapture(), report)
@@ -133,9 +133,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(
-                LaunchBrowser(
-                    url=site + "/frame-host", arguments=("--site-per-process",)
-                )
+                Launch(url=site + "/frame-host", arguments=("--site-per-process",))
             ),
             Prepare(),
             Approvals(default=PolicyDecision.ALLOW),
@@ -169,7 +167,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
 async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_discovered(
     site,
 ):
-    async with ChromeBrowser(LaunchBrowser(url=site + "/frame-host")) as browser:
+    async with ChromeBrowser(Launch(url=site + "/frame-host")) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         before = await capture(tab, DomCapture(), report)
@@ -204,7 +202,7 @@ async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_d
 
 
 async def test_unrendered_sibling_does_not_discard_usable_frame(site):
-    async with ChromeBrowser(LaunchBrowser(url=site + "/frame-host")) as browser:
+    async with ChromeBrowser(Launch(url=site + "/frame-host")) as browser:
         tab = browser.active_tab
         await evaluate(
             tab,
@@ -218,7 +216,7 @@ async def test_unrendered_sibling_does_not_discard_usable_frame(site):
 
 
 async def test_detaching_sibling_retains_root_and_other_frame(site, monkeypatch):
-    async with ChromeBrowser(LaunchBrowser(url=site + "/frame-host")) as browser:
+    async with ChromeBrowser(Launch(url=site + "/frame-host")) as browser:
         tab = browser.active_tab
         await evaluate(
             tab,
@@ -245,7 +243,7 @@ async def test_detaching_sibling_retains_root_and_other_frame(site, monkeypatch)
 
 
 async def test_main_snapshot_failure_asks_to_observe_again(site, monkeypatch):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
 

@@ -13,7 +13,7 @@ from browserrig import (
     BrowserAgent,
     ChromeBrowser,
     DomCapture,
-    LaunchBrowser,
+    Launch,
     wait_for_page,
 )
 from browserrig.core import StaleElement
@@ -28,7 +28,7 @@ _LINE = re.compile(r'^\s*\*?\[(?P<ref>[^\]]+)\] \S+ "(?P<name>[^"]*)"')
 
 
 async def test_only_viewport_controls_are_described_and_the_rest_are_known(site):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(
             tab,
@@ -113,7 +113,7 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
 
     agent = BrowserAgent(
         model=CallbackModel(respond),
-        browser=LaunchBrowser(url=site),
+        browser=Launch(url=site),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[Prepare()],
     )
@@ -201,7 +201,7 @@ async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
 
     agent = BrowserAgent(
         model=CallbackModel(respond),
-        browser=LaunchBrowser(url=site),
+        browser=Launch(url=site),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[Prepare()],
     )
@@ -270,7 +270,7 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(
 
     agent = BrowserAgent(
         model=CallbackModel(respond),
-        browser=LaunchBrowser(url=site + "/frames", arguments=("--site-per-process",)),
+        browser=Launch(url=site + "/frames", arguments=("--site-per-process",)),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[Prepare()],
     )
@@ -318,7 +318,7 @@ async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target
 
     agent = BrowserAgent(
         model=CallbackModel(respond),
-        browser=LaunchBrowser(url=site),
+        browser=Launch(url=site),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[Prepare()],
     )

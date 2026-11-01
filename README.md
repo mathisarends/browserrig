@@ -30,10 +30,10 @@ The example explores the Voyager missions. Use `--url` and `--task` to change th
 ## Use from Python
 
 ```python
-from browserrig import ChromeBrowser, LaunchBrowser, wait_for_page
+from browserrig import ChromeBrowser, Launch, wait_for_page
 from browserrig.scripts import PAGE_FACTS
 
-async with ChromeBrowser(LaunchBrowser(url="https://example.com")) as browser:
+async with ChromeBrowser(Launch(url="https://example.com")) as browser:
     tab = browser.active_tab
     await wait_for_page(tab)
     frame = await tab.main_frame()

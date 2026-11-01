@@ -7,7 +7,7 @@ from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import ChromeBrowser, LaunchBrowser, browser_plugins
+from browserrig import ChromeBrowser, Launch, browser_plugins
 from browserrig.events import (
     BarTypedEvent,
     FindBarEvent,
@@ -33,7 +33,7 @@ _GUIDE = """<h1>Guide</h1>
 async def test_find_matches_rendered_text_opens_collapsed_sections_and_marks_the_viewport(
     site,
 ):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(_GUIDE)}")
         found = await find_text(tab, ("widget",), session="s", count=10)
@@ -82,7 +82,7 @@ async def test_find_matches_rendered_text_opens_collapsed_sections_and_marks_the
 
 
 async def test_find_numbers_matches_across_frames_in_page_order(site):
-    async with ChromeBrowser(LaunchBrowser(url=site + "/frames")) as browser:
+    async with ChromeBrowser(Launch(url=site + "/frames")) as browser:
         tab = browser.active_tab
         await evaluate(
             tab, "document.body.insertAdjacentHTML('afterbegin', '<p>Inside out</p>')"
@@ -118,7 +118,7 @@ async def test_find_tool_types_into_the_find_bar_and_reports_matches(site):
     agent = Agent(
         model=model,
         plugins=[
-            *browser_plugins(LaunchBrowser(url=site)),
+            *browser_plugins(Launch(url=site)),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

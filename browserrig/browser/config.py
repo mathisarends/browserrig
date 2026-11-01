@@ -1,11 +1,14 @@
-from enum import StrEnum
+from contextlib import AsyncExitStack
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Literal, Self
+from typing import ClassVar, Self
 from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 
-from browserrig.core import Options
+from browserrig.core import Options, TargetId
+
+from .process import ChromeProcess
 
 
 class Viewport(Options):
@@ -14,13 +17,20 @@ class Viewport(Options):
     scale: float = Field(default=1, gt=0, le=4)
 
 
-class BrowserKind(StrEnum):
-    LAUNCH = "launch"
-    CONNECT = "connect"
+@dataclass(frozen=True, slots=True)
+class CdpEndpoint:
+    """Where to reach a browser over CDP, and the headers that request needs."""
+
+    url: str
+    headers: dict[str, str]
 
 
-class LaunchBrowser(Options):
-    kind: Literal[BrowserKind.LAUNCH] = BrowserKind.LAUNCH
+class Launch(Options):
+    """Start a Chrome process that browserrig owns and stops again."""
+
+    owns_process: ClassVar[bool] = True
+    # A launched browser always starts in a fresh tab of its own context.
+    target_id: ClassVar[None] = None
     executable: Path | None = None
     headless: bool = True
     url: str = "about:blank"
@@ -41,11 +51,29 @@ class LaunchBrowser(Options):
             )
         return arguments
 
+    def process(self) -> ChromeProcess:
+        """The Chrome process these options describe, not started yet."""
+        flags = [f"--window-size={self.viewport.width},{self.viewport.height}"]
+        if self.headless:
+            flags.append("--headless=new")
+        return ChromeProcess(
+            executable=self.executable,
+            flags=(*flags, *self.arguments),
+            timeout=self.timeout,
+        )
 
-class ConnectBrowser(Options):
-    kind: Literal[BrowserKind.CONNECT] = BrowserKind.CONNECT
+    async def cdp_endpoint(self, stack: AsyncExitStack) -> CdpEndpoint:
+        """Start Chrome and return its endpoint; closing `stack` stops the process."""
+        process = await stack.enter_async_context(self.process())
+        return CdpEndpoint(url=process.endpoint, headers={})
+
+
+class Connect(Options):
+    """Attach to a browser that runs elsewhere; browserrig never stops it."""
+
+    owns_process: ClassVar[bool] = False
     endpoint: SecretStr
-    target_id: str | None = None
+    target_id: TargetId | None = None
     url: str = "about:blank"
     timeout: float = Field(default=20, gt=0, le=120)
     headers: dict[str, SecretStr] = Field(default_factory=dict, repr=False)
@@ -74,7 +102,10 @@ class ConnectBrowser(Options):
             )
         return endpoint
 
+    async def cdp_endpoint(self, _stack: AsyncExitStack) -> CdpEndpoint:
+        """Return the configured endpoint and its request headers."""
+        headers = {key: value.get_secret_value() for key, value in self.headers.items()}
+        return CdpEndpoint(url=self.endpoint.get_secret_value(), headers=headers)
 
-type BrowserOptions = Annotated[
-    LaunchBrowser | ConnectBrowser, Field(discriminator="kind")
-]
+
+type BrowserOptions = Launch | Connect

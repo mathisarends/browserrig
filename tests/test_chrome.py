@@ -11,7 +11,7 @@ from cdpify import ReceivedEvent
 from cdpify.domains.browser import DownloadWillBeginEvent
 from cdpify.domains.page import JavascriptDialogOpeningEvent
 
-from browserrig import ChromeBrowser, ConnectBrowser
+from browserrig import ChromeBrowser, Connect
 from browserrig.browser import Tab
 from browserrig.browser import chrome as chrome_module
 from browserrig.events import (
@@ -181,7 +181,7 @@ class _Subscription:
 def _browser():
     events = []
     browser = ChromeBrowser(
-        ConnectBrowser(endpoint="ws://localhost/devtools/browser/test"),
+        Connect(endpoint="ws://localhost/devtools/browser/test"),
         emit=AsyncMock(side_effect=events.append),
     )
     browser._stack = AsyncExitStack()

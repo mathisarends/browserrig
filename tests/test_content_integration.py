@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, LaunchBrowser, wait_for_page
+from browserrig import ChromeBrowser, DomCapture, Launch, wait_for_page
 from browserrig.kinds import ElementOperation
 from browserrig.observation import capture
 from browserrig.observation.content import extract_content
@@ -31,7 +31,7 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
         <div id=closed></div><script>Script secret</script>
         <div style='position:absolute;top:3000px'>
             <h2>Below viewport</h2><p>Last paragraph</p></div>"""
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         await evaluate(
@@ -101,7 +101,7 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
 
 
 async def test_markdown_limits_are_explicit_and_output_is_bounded(site):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(
             tab,
@@ -116,7 +116,7 @@ async def test_markdown_limits_are_explicit_and_output_is_bounded(site):
 
 
 async def test_offset_reads_a_long_page_in_parts_without_losing_lines(site):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(
             tab,
@@ -151,7 +151,7 @@ async def test_main_region_replaces_page_chrome_unless_it_holds_too_little(
         f"<main><h1>Article</h1><p>{'word ' * (article_chars // 5)}</p></main>"
         "<footer>Imprint</footer>"
     )
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         await wait_for_page(tab)
@@ -176,7 +176,7 @@ async def test_links_are_compact_and_controls_are_left_to_observe(site):
         <p>Before <button>Hide</button> after</p>
         <h3><button aria-expanded=false>Question?</button></h3>
         <label><input type=radio name=size>Small</label>"""
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         await wait_for_page(tab)
@@ -194,7 +194,7 @@ async def test_search_results_and_cards_read_as_compact_list_items(site):
         <li><h2><a href='https://www.google.com/url?q=https://docs.example.org/a&amp;sa=U'>
         Result</a></h2></li>
         <li><a href='/card'><h3>Card title</h3><p>Card text</p></a></li></ol>"""
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         await wait_for_page(tab)
@@ -208,7 +208,7 @@ async def test_search_results_and_cards_read_as_compact_list_items(site):
 @pytest.mark.parametrize("cross_origin", [False, True])
 async def test_markdown_includes_available_frame_documents(site, cross_origin):
     async with ChromeBrowser(
-        LaunchBrowser(url=site + "/frames", arguments=("--site-per-process",))
+        Launch(url=site + "/frames", arguments=("--site-per-process",))
     ) as browser:
         tab = browser.active_tab
         origin = site.replace("127.0.0.1", "localhost") if cross_origin else site
@@ -231,7 +231,7 @@ async def test_spanned_table_cells_fill_every_row_and_column_they_cover(site):
         <tr><td colspan=3>Asia</td></tr>
         <tr><td>Tower</td><td rowspan=2>828</td><td>2717</td></tr>
         <tr><td>Twin</td><td>2716</td></tr></table>"""
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         await wait_for_page(tab)
@@ -256,7 +256,7 @@ async def test_grid_layouts_with_aria_table_roles_read_as_tables(site):
         <div role=row><div role=rowheader>SSO</div><div role=cell>No</div>
         <div role=cell>Yes</div></div></div></div>
         <div role=grid><p>Grid without rows</p></div>"""
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         await wait_for_page(tab)
@@ -281,7 +281,7 @@ async def test_layout_tables_read_as_text_and_data_tables_stay_tables(site):
         <tr><td>Pro</td><td>$10</td></tr><tr><td>Team</td><td>$20</td></tr>
         <tr><td>Enterprise</td><td>Custom</td></tr><tr><td>Edu</td><td>$5</td></tr></table>
         <table><tr><th>Name</th></tr><tr><td>Ada</td></tr></table>"""
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         await wait_for_page(tab)
@@ -319,7 +319,7 @@ async def test_collapsed_menus_and_site_chrome_are_left_out_without_main_landmar
         <div style='height:0;overflow:hidden'>Closed panel</div>
         <article><header>Plan header</header><p>Plan text</p></article></div>
         <footer>Imprint</footer>"""
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         await wait_for_page(tab)

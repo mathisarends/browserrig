@@ -7,7 +7,7 @@ uv run python -m evals.probe https://example.com --js "document.title"
 import argparse
 import asyncio
 
-from browserrig import ChromeBrowser, LaunchBrowser, wait_for_page
+from browserrig import ChromeBrowser, Launch, wait_for_page
 from browserrig.observation import DomCapture, capture, render
 from browserrig.observation.content import extract_content
 
@@ -22,7 +22,7 @@ async def main() -> None:
     parser.add_argument("--js", action="append", default=[], help="Evaluate after load")
     parser.add_argument("--wait", type=float, default=0, help="Extra seconds after load")
     args = parser.parse_args()
-    async with ChromeBrowser(LaunchBrowser(url=args.url)) as browser:
+    async with ChromeBrowser(Launch(url=args.url)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         if args.wait:

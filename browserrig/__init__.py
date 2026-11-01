@@ -4,8 +4,8 @@ from .browser import (
     Browser,
     Chrome,
     ChromeBrowser,
-    ConnectBrowser,
-    LaunchBrowser,
+    Connect,
+    Launch,
     Viewport,
 )
 from .completion import Done
@@ -99,10 +99,10 @@ __all__ = [
     "BrowserAgent",
     "Chrome",
     "ChromeBrowser",
-    "ConnectBrowser",
+    "Connect",
     "FileSystem",
     "FileSystemOptions",
-    "LaunchBrowser",
+    "Launch",
     "Nudges",
     "Observe",
     "Readiness",

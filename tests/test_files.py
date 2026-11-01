@@ -14,10 +14,10 @@ from pypdf import PdfReader, PdfWriter
 
 from browserrig import (
     ChromeBrowser,
-    ConnectBrowser,
+    Connect,
     FileSystem,
     FileSystemOptions,
-    LaunchBrowser,
+    Launch,
 )
 from browserrig.browser import Tab
 from browserrig.browser import downloads as downloads_module
@@ -342,11 +342,11 @@ async def test_open_file_moves_the_file_out_of_the_current_tab_before_reporting_
 
 
 def test_remote_browser_requires_explicit_shared_filesystem(tmp_path):
-    remote = ConnectBrowser(endpoint="http://127.0.0.1:9222")
+    remote = Connect(endpoint="http://127.0.0.1:9222")
     assert ChromeBrowser(remote).files is None
     shared = ChromeBrowser(remote, file_system=FileSystemOptions(directory=tmp_path))
     assert shared.files.directory == tmp_path
-    assert ChromeBrowser(LaunchBrowser()).files is not None
+    assert ChromeBrowser(Launch()).files is not None
 
 
 async def test_io_errors_become_model_visible_tool_errors(files):

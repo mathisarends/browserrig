@@ -6,7 +6,7 @@ from browserrig.files import FileSystemOptions
 
 from .base import Browser, BrowserEvents
 from .chrome import ChromeBrowser
-from .config import BrowserOptions, LaunchBrowser
+from .config import BrowserOptions, Launch
 
 
 class Chrome(Plugin, needs=(SessionLog,)):
@@ -19,7 +19,7 @@ class Chrome(Plugin, needs=(SessionLog,)):
         file_system: FileSystemOptions | None = None,
     ) -> None:
         super().__init__()
-        self.options = options or LaunchBrowser()
+        self.options = options or Launch()
         self.file_system = file_system
 
     async def setup(self, ctx: Context, log: Inject[SessionLog]) -> None:

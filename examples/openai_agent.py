@@ -16,7 +16,7 @@ from browserrig import (
     Done,
     FileSystemOptions,
     ImageContext,
-    LaunchBrowser,
+    Launch,
     TerminalEvents,
     UntilCompaction,
 )
@@ -70,7 +70,7 @@ async def main() -> None:
             model=PydanticAIModel(
                 OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra"))
             ),
-            browser=LaunchBrowser(url=args.url, headless=not args.headed),
+            browser=Launch(url=args.url, headless=not args.headed),
             image_context=ImageContext(UntilCompaction()),
             file_system=FileSystemOptions(directory=args.workspace)
             if args.workspace

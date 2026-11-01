@@ -21,7 +21,7 @@ from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import BrowserAgent, FileSystemOptions, LaunchBrowser
+from browserrig import BrowserAgent, FileSystemOptions, Launch
 
 from .tasks import Task, select
 
@@ -33,7 +33,7 @@ async def run_task(task: Task, *, provider, model_name: str, workspace: Path, he
     workspace.mkdir(parents=True, exist_ok=True)
     agent = BrowserAgent(
         model=PydanticAIModel(OpenAIResponsesModel(model_name)),
-        browser=LaunchBrowser(url=task.url, headless=not headed),
+        browser=Launch(url=task.url, headless=not headed),
         file_system=FileSystemOptions(directory=workspace),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[

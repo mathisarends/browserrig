@@ -3,7 +3,7 @@
 import argparse
 import asyncio
 
-from browserrig import ChromeBrowser, LaunchBrowser, wait_for_page
+from browserrig import ChromeBrowser, Launch, wait_for_page
 from browserrig.observation import DomCapture, capture, render
 
 
@@ -14,9 +14,7 @@ async def main() -> None:
     parser.add_argument("--url", default="https://example.com")
     parser.add_argument("--headed", action="store_true")
     args = parser.parse_args()
-    async with ChromeBrowser(
-        LaunchBrowser(url=args.url, headless=not args.headed)
-    ) as browser:
+    async with ChromeBrowser(Launch(url=args.url, headless=not args.headed)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         snapshot = await capture(tab, DomCapture(), report)

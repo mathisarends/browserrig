@@ -3,7 +3,7 @@
 import argparse
 import asyncio
 
-from browserrig import ChromeBrowser, ConnectBrowser, wait_for_page
+from browserrig import ChromeBrowser, Connect, wait_for_page
 from browserrig.scripts import PAGE_FACTS
 
 
@@ -20,9 +20,7 @@ async def main() -> None:
         "--url", default="about:blank", help="URL in the new isolated context"
     )
     args = parser.parse_args()
-    options = ConnectBrowser(
-        endpoint=args.endpoint, target_id=args.target_id, url=args.url
-    )
+    options = Connect(endpoint=args.endpoint, target_id=args.target_id, url=args.url)
     async with ChromeBrowser(options) as browser:
         tab = browser.active_tab
         await wait_for_page(tab)

@@ -10,18 +10,22 @@ from typing import Self
 
 from browserrig.core import BrowserError
 
-from .config import LaunchBrowser
-
 
 class ChromeProcess:
-    def __init__(self, options: LaunchBrowser) -> None:
-        self._options = options
+    """Chrome on a throwaway profile; `flags` are added to the ones it owns."""
+
+    def __init__(
+        self, *, executable: Path | None, flags: tuple[str, ...], timeout: float
+    ) -> None:
+        self._executable = executable
+        self._flags = flags
+        self._timeout = timeout
         self._process: Process | None = None
         self._profile: TemporaryDirectory[str] | None = None
         self.endpoint = ""
 
     async def __aenter__(self) -> Self:
-        binary = _chrome_executable(self._options.executable)
+        binary = _chrome_executable(self._executable)
         # The profile outlives this method; __aexit__ removes it with the process.
         self._profile = TemporaryDirectory(  # pylint: disable=consider-using-with
             prefix="browserrig-chrome-"
@@ -33,12 +37,9 @@ class ChromeProcess:
             f"--user-data-dir={self._profile.name}",
             "--no-first-run",
             "--no-default-browser-check",
-            f"--window-size={self._options.viewport.width},{self._options.viewport.height}",
+            *self._flags,
+            "about:blank",
         ]
-        if self._options.headless:
-            flags.append("--headless=new")
-        flags.extend(self._options.arguments)
-        flags.append("about:blank")
         try:
             self._process = await asyncio.create_subprocess_exec(
                 *flags,
@@ -48,7 +49,7 @@ class ChromeProcess:
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
             active_port = Path(self._profile.name) / "DevToolsActivePort"
-            async with asyncio.timeout(self._options.timeout):
+            async with asyncio.timeout(self._timeout):
                 while True:
                     if self._process.returncode is not None:
                         raise BrowserError(
@@ -124,7 +125,7 @@ def _chrome_executable(explicit: Path | None = None) -> str:
         if candidate and Path(candidate).is_file():
             return str(Path(candidate).resolve())
     raise BrowserError(
-        "Chrome was not found; set LaunchBrowser(executable=...) or BROWSERRIG_CHROME"
+        "Chrome was not found; set Launch(executable=...) or BROWSERRIG_CHROME"
     )
 
 

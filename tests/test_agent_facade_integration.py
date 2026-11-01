@@ -8,7 +8,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel
 
-from browserrig import Browser, BrowserAgent, Done, LaunchBrowser
+from browserrig import Browser, BrowserAgent, Done, Launch
 from browserrig.events import ActionStartedEvent, ActivityStartedEvent
 from browserrig.kinds import ActivityKind
 
@@ -25,7 +25,7 @@ async def test_facade_restores_saved_state_and_owns_a_fresh_browser_per_session(
     model = ScriptedModel(["First answer", "Restored answer"])
     agent = BrowserAgent(
         model=model,
-        browser=LaunchBrowser(url=site),
+        browser=Launch(url=site),
         plugins=[Access()],
     )
     async with agent.session() as session:
@@ -53,7 +53,7 @@ async def test_facade_honors_explicit_tool_policy(site):
     model = ScriptedModel([call("navigate", url=site + "/other"), "Denied"])
     agent = BrowserAgent(
         model=model,
-        browser=LaunchBrowser(url=site),
+        browser=Launch(url=site),
         approvals=Approvals(default=PolicyDecision.ALLOW, deny=["navigate"]),
     )
     result = await agent.run("Try navigation")
@@ -72,7 +72,7 @@ async def test_facade_manages_wrapped_native_model_context_on_reuse(site, monkey
     enter, leave = AsyncMock(return_value=model), AsyncMock()
     monkeypatch.setattr(native.TestModel, "__aenter__", enter)
     monkeypatch.setattr(native.TestModel, "__aexit__", leave)
-    agent = BrowserAgent(model=PydanticAIModel(model), browser=LaunchBrowser(url=site))
+    agent = BrowserAgent(model=PydanticAIModel(model), browser=Launch(url=site))
     result = await agent.run("Inspect the page")
     assert result.text == "Native model adapted"
     assert model.last_model_request_parameters is not None
@@ -98,7 +98,7 @@ async def test_facade_streams_commentary_and_returns_a_typed_answer_after_done(s
     )
     agent = BrowserAgent(
         model=model,
-        browser=LaunchBrowser(url=site),
+        browser=Launch(url=site),
         approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[Done()],
     )

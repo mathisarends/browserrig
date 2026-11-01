@@ -40,12 +40,11 @@ from browserrig.files import Download, FileSystem, FileSystemOptions
 from browserrig.input import Input, Keyboard, Mouse
 
 from .base import BrowserEvents, EventSink, _discard
-from .config import BrowserOptions, ConnectBrowser, LaunchBrowser, Viewport
+from .config import BrowserOptions, CdpEndpoint, Launch, Viewport
 from .downloads import Downloads
 from .frame import Frame
 from .frames import discover_frames
 from .models import TabInfo
-from .process import ChromeProcess
 from .tab import Tab, validated_url
 from .worlds import Worlds
 
@@ -78,10 +77,10 @@ class ChromeBrowser:
         file_system: FileSystemOptions | None = None,
         emit: EventSink = _discard,
     ) -> None:
-        self._options = options or LaunchBrowser()
+        self._options = options or Launch()
         self.files = (
             FileSystem(file_system, download_directory=self._options.download_directory)
-            if isinstance(self._options, LaunchBrowser) or file_system is not None
+            if self._options.owns_process or file_system is not None
             else None
         )
         self.id = uuid4().hex
@@ -117,11 +116,11 @@ class ChromeBrowser:
             if self.files is not None:
                 await asyncio.to_thread(self.files.initialize)
             async with asyncio.timeout(options.timeout):
-                endpoint, headers = await self._resolve_endpoint()
+                endpoint = await self._resolve_endpoint()
                 self.client = await self._stack.enter_async_context(
                     CdpClient(
-                        endpoint,
-                        additional_headers=headers,
+                        endpoint.url,
+                        additional_headers=endpoint.headers,
                         default_timeout=options.timeout,
                     )
                 )
@@ -129,7 +128,7 @@ class ChromeBrowser:
                 self._start_listeners()
                 self._stack.push_async_callback(self._stop_listeners)
                 await self.client.target.set_discover_targets(discover=True)
-                if isinstance(options, ConnectBrowser) and options.target_id:
+                if options.target_id:
                     tab = await self._attach(options.target_id)
                     await self.mouse.switch_tab(
                         TabGesture.ACTIVATE,
@@ -140,7 +139,7 @@ class ChromeBrowser:
                     await self.open_tab(options.url)
                 self._connected = True
                 await self.events.emit(
-                    ConnectedEvent(owned_process=isinstance(options, LaunchBrowser))
+                    ConnectedEvent(owned_process=options.owns_process)
                 )
             return self
         except (Exception, asyncio.CancelledError):
@@ -255,33 +254,28 @@ class ChromeBrowser:
             )
         await asyncio.shield(self._close_task)
 
-    async def _resolve_endpoint(self) -> tuple[str, dict[str, str]]:
+    async def _resolve_endpoint(self) -> CdpEndpoint:
+        """Resolve an HTTP discovery endpoint to the browser's WebSocket."""
         assert self._stack is not None
         options = self._options
-        if isinstance(options, LaunchBrowser):
-            process = await self._stack.enter_async_context(ChromeProcess(options))
-            endpoint, headers = process.endpoint, {}
-        else:
-            endpoint = options.endpoint.get_secret_value()
-            headers = {
-                key: value.get_secret_value() for key, value in options.headers.items()
-            }
-        if endpoint.startswith(("http://", "https://")):
+        endpoint = await options.cdp_endpoint(self._stack)
+        url = endpoint.url
+        if url.startswith(("http://", "https://")):
             async with httpx2.AsyncClient(
-                timeout=options.timeout, headers=headers, trust_env=False
+                timeout=options.timeout, headers=endpoint.headers, trust_env=False
             ) as http:
-                response = await http.get(endpoint.rstrip("/") + "/json/version")
+                response = await http.get(url.rstrip("/") + "/json/version")
                 response.raise_for_status()
-                endpoint = response.json()["webSocketDebuggerUrl"]
-        if "/devtools/page/" in endpoint:
+                url = response.json()["webSocketDebuggerUrl"]
+        if "/devtools/page/" in url:
             raise BrowserError(
                 "Discovery returned a page endpoint; a browser endpoint is needed"
             )
-        return endpoint, headers
+        return CdpEndpoint(url=url, headers=endpoint.headers)
 
     async def _create_context(self) -> None:
         options = self._options
-        if isinstance(options, ConnectBrowser) and options.target_id is not None:
+        if options.target_id is not None:
             return
         assert self._stack is not None
         context = await self.client.target.create_browser_context(

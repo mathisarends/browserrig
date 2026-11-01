@@ -9,7 +9,7 @@ from browserrig import (
     Browser,
     Chrome,
     ImageContext,
-    LaunchBrowser,
+    Launch,
     Observe,
     Readiness,
     ReadinessOptions,
@@ -58,7 +58,7 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
     agent = Agent(
         model=model,
         plugins=[
-            *browser_plugins(LaunchBrowser(url=site)),
+            *browser_plugins(Launch(url=site)),
             CountScreenshots(),
             Approvals(default=PolicyDecision.ALLOW),
         ],

@@ -1,8 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from browserrig.browser import ConnectBrowser, LaunchBrowser
-from browserrig.browser.config import BrowserKind
+from browserrig.browser import Connect, Launch
 from browserrig.core import Bounds, Geometry, Point, Region, StaleElement
 from browserrig.observation import DomCapture, Element, Observe, Snapshot, render
 from browserrig.observation.models import (
@@ -196,13 +195,11 @@ def test_fingerprint_changes_with_semantics_and_url():
     assert original.model_copy(update={"scroll_y": 5}).digest() != original.digest()
 
 
-def test_configuration_discriminators_are_enums_and_credentials_are_hidden():
-    assert LaunchBrowser().kind is BrowserKind.LAUNCH
-    connected = ConnectBrowser(endpoint="ws://127.0.0.1:9222/devtools/browser/secret")
-    assert connected.kind is BrowserKind.CONNECT
+def test_browser_options_hide_credentials_and_reject_owned_flags():
+    connected = Connect(endpoint="ws://127.0.0.1:9222/devtools/browser/secret")
     assert "secret" not in repr(connected)
     with pytest.raises(ValidationError):
-        LaunchBrowser(arguments=("--user-data-dir=unexpected",))
+        Launch(arguments=("--user-data-dir=unexpected",))
 
 
 @pytest.mark.parametrize(

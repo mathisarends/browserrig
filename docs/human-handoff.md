@@ -6,7 +6,7 @@ to complete in the browser. Configure it on `BrowserAgent`, through
 plugin, no handoff tool, prompt section or pause tracking is added.
 
 ```python
-from browserrig import BrowserAgent, HumanHandoff, HumanResponse, LaunchBrowser
+from browserrig import BrowserAgent, HumanHandoff, HumanResponse, Launch
 from browserrig.events import HandoffRequestedEvent
 
 async def ask_human(request: HandoffRequestedEvent) -> HumanResponse:
@@ -23,7 +23,7 @@ handoff = HumanHandoff(
 )
 agent = BrowserAgent(
     model=model,
-    browser=LaunchBrowser(url=url, headless=False),
+    browser=Launch(url=url, headless=False),
     handoff=handoff,
 )
 ```

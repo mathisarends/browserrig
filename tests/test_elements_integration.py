@@ -1,6 +1,6 @@
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, LaunchBrowser, wait_for_page
+from browserrig import ChromeBrowser, DomCapture, Launch, wait_for_page
 from browserrig.core import BrowserError
 from browserrig.kinds import ElementOperation
 from browserrig.observation import capture
@@ -11,7 +11,7 @@ pytestmark = pytest.mark.integration
 
 
 async def test_select_notifies_bubbling_listeners_and_rejects_disabled_options(site):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         frame = await tab.main_frame()
@@ -62,7 +62,7 @@ async def test_select_notifies_bubbling_listeners_and_rejects_disabled_options(s
     "markup", ["<textarea>Hello</textarea>", "<div contenteditable=true>Hello</div>"]
 )
 async def test_focus_selects_text_in_native_and_contenteditable_controls(site, markup):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         frame = await tab.main_frame()
@@ -92,7 +92,7 @@ async def test_focus_selects_text_in_native_and_contenteditable_controls(site, m
 async def test_native_value_setter_preserves_password_redaction_and_value_validation(
     site,
 ):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
         snapshot = await capture(tab, DomCapture(), report)

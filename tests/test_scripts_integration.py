@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, LaunchBrowser, wait_for_page
+from browserrig import ChromeBrowser, DomCapture, Launch, wait_for_page
 from browserrig.core import Point
 from browserrig.kinds import CursorStyle
 from browserrig.observation import capture
@@ -16,7 +16,7 @@ pytestmark = pytest.mark.integration
 async def test_visible_descendant_of_hidden_parent_is_extracted_and_inert_content_is_not(
     site,
 ):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         markup = (
             '<div style="visibility:hidden">Hidden parent text'
@@ -40,7 +40,7 @@ async def test_visible_descendant_of_hidden_parent_is_extracted_and_inert_conten
 
 @pytest.mark.parametrize("limit", [2, 4, 7, 20, 40, 80])
 async def test_truncated_markdown_keeps_code_fences_closed(site, limit):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(
             tab,
@@ -54,7 +54,7 @@ async def test_truncated_markdown_keeps_code_fences_closed(site, limit):
 
 
 async def test_frame_heading_budget_does_not_reopen_a_truncated_code_fence(site):
-    async with ChromeBrowser(LaunchBrowser(url=site + "/frames")) as browser:
+    async with ChromeBrowser(Launch(url=site + "/frames")) as browser:
         tab = browser.active_tab
         await wait_for_page(tab)
         child = next(frame for frame in await tab.frames() if frame.parent is not None)
@@ -67,7 +67,7 @@ async def test_frame_heading_budget_does_not_reopen_a_truncated_code_fence(site)
 
 
 async def test_cursor_probe_reads_css_and_text_cursors_through_shadow_roots(site):
-    async with ChromeBrowser(LaunchBrowser(url=site)) as browser:
+    async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         markup = (
             "<style>body{margin:0} div,a,input,p{position:absolute;margin:0;width:100px;"

@@ -9,7 +9,7 @@ from harnessed.testing import CallbackModel
 
 from browserrig import (
     Browser,
-    LaunchBrowser,
+    Launch,
     Observe,
     Screenshots,
     ScreenshotTrigger,
@@ -73,7 +73,7 @@ def _agent(site, model, domains, holder, *, path="/", screenshots=False, live=No
     secrets = Secrets({"pw": Secret(PASSWORD, domains=domains)})
     plugins = [
         *browser_plugins(
-            LaunchBrowser(url=site + path, arguments=("--site-per-process",)),
+            Launch(url=site + path, arguments=("--site-per-process",)),
             observe=Observe(
                 screenshots=Screenshots(
                     trigger=ScreenshotTrigger.EACH_STEP
@@ -221,7 +221,7 @@ async def test_secrets_mounted_after_observe_fail_closed(site):
     secrets = Secrets({"pw": Secret(PASSWORD, domains=(site,))})
     agent = Agent(
         model=_model([lambda state, _: "Done"]),
-        plugins=[*browser_plugins(LaunchBrowser(url=site)), secrets],
+        plugins=[*browser_plugins(Launch(url=site)), secrets],
     )
     with pytest.raises(ExceptionGroup) as failure:
         async with agent.session():

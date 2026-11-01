@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from browserrig.browser import LaunchBrowser
+from browserrig.browser import Launch
 from browserrig.browser import process as process_module
 from browserrig.browser.process import ChromeProcess, _active_endpoint
 from browserrig.core import BrowserError
@@ -95,7 +95,7 @@ def _profile(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Mock:
 
 
 def _process() -> ChromeProcess:
-    return ChromeProcess(LaunchBrowser(executable=Path(sys.executable)))
+    return Launch(executable=Path(sys.executable)).process()
 
 
 async def _no_sleep(_: float) -> None:
