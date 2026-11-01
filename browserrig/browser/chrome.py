@@ -92,7 +92,9 @@ class ChromeBrowser:
         self._context: str | None = None
         self._sessions: dict[str, str] = {}
         self._downloads = Downloads(
-            self.files, self._options.download_directory, self.events.emit
+            files=self.files,
+            directory=self._options.download_directory,
+            emit=self.events.emit,
         )
         self._tasks: list[asyncio.Task[None]] = []
         self._failure: Exception | None = None

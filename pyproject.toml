@@ -96,7 +96,6 @@ disable = [
     "too-few-public-methods",
     "too-many-instance-attributes",
     "too-many-arguments",
-    "too-many-positional-arguments",
     "too-many-locals",
     "duplicate-code",
 ]

@@ -388,7 +388,7 @@ async def _started_download(tmp_path):
     files = FileSystem(FileSystemOptions(directory=tmp_path))
     files.initialize()
     emit = AsyncMock()
-    downloads = Downloads(files, None, emit)
+    downloads = Downloads(files=files, directory=None, emit=emit)
     await downloads.handle(
         DownloadWillBeginEvent(
             frame_id="frame",

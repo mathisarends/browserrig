@@ -23,7 +23,7 @@ class Downloads:
     """Track browser downloads and move completed files into the workspace."""
 
     def __init__(
-        self, files: FileSystem | None, directory: str | None, emit: EventSink
+        self, *, files: FileSystem | None, directory: str | None, emit: EventSink
     ) -> None:
         self._files = files
         self._directory = directory

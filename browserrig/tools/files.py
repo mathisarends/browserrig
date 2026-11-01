@@ -152,6 +152,7 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
     async def read_file(
         self,
         path: str,
+        *,
         page_number: Annotated[int | None, Field(ge=1)] = None,
         sheet: str | None = None,
         cell_range: str | None = None,

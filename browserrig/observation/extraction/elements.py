@@ -142,15 +142,23 @@ def extract_frame(
     fallback_section: str,
     text_limit: int,
 ) -> FrameExtraction:
-    return _FrameExtractor(
-        document, frame_id, transform, visible, ref_prefix, focused, fallback_section
-    ).run(text_limit)
+    extractor = _FrameExtractor(
+        document,
+        frame_id=frame_id,
+        transform=transform,
+        visible=visible,
+        ref_prefix=ref_prefix,
+        focused=focused,
+        fallback_section=fallback_section,
+    )
+    return extractor.run(text_limit)
 
 
 class _FrameExtractor:
     def __init__(
         self,
         document: Document,
+        *,
         frame_id: str,
         transform: FrameTransform,
         visible: Bounds | None,

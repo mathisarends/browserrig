@@ -25,7 +25,7 @@ def _screenshot():
     ],
 )
 def test_cursor_tip_matches_viewport_and_zoomed_crop_with_or_without_refs(
-    screenshot, marks, area, scale, cursor, pixel
+    *, screenshot, marks, area, scale, cursor, pixel
 ):
     elements = (
         (

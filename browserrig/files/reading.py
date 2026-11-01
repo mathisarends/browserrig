@@ -70,7 +70,9 @@ class FileReader:
             sample = stream.read(65536)
         format_ = _format(path, sample)
         if request.member is not None:
-            return self._read_member(path, format_, request, offset, max_chars, depth)
+            return self._read_member(
+                path, format_, request, offset=offset, max_chars=max_chars, depth=depth
+            )
         _validate_selection(format_, request)
         if format_ == "text":
             encoding = text_encoding(sample)
@@ -209,6 +211,7 @@ class FileReader:
         path: Path,
         format_: str,
         request: ReadRequest,
+        *,
         offset: int,
         max_chars: int,
         depth: int,

@@ -123,6 +123,7 @@ class PageRenderer:
 
 def _agent(
     responses,
+    *,
     trigger=ScreenshotTrigger.ON_REQUEST,
     retention=None,
     extra=(),
@@ -205,7 +206,8 @@ async def test_image_fifo_and_one_capture_per_boundary_with_custom_strategies(
     trigger, counts
 ):
     agent, model, capture, holder = _agent(
-        [call("screenshot"), call("screenshot"), call("screenshot"), "Done"], trigger
+        [call("screenshot"), call("screenshot"), call("screenshot"), "Done"],
+        trigger=trigger,
     )
     async with agent.session() as session:
         _browser_ready(holder)
@@ -287,8 +289,8 @@ def test_image_history_trims_to_half_by_default_and_rejects_inverted_bounds():
 async def test_images_stay_where_captured_and_keep_the_prompt_prefix_until_a_batch_trim():
     agent, model, _capture, holder = _agent(
         [call("step")] * 5 + ["Done"],
-        ScreenshotTrigger.EACH_STEP,
-        TrimInBatches(max_images=4, min_images=2),
+        trigger=ScreenshotTrigger.EACH_STEP,
+        retention=TrimInBatches(max_images=4, min_images=2),
     )
     async with agent.session() as session:
         _browser_ready(holder)
@@ -344,8 +346,8 @@ def _notes(model):
 async def test_unchanged_screens_are_not_added_again():
     agent, model, _capture, holder = _agent(
         [*_steps(3), "Done"],
-        ScreenshotTrigger.EACH_STEP,
-        TrimInBatches(max_images=4, min_images=4),
+        trigger=ScreenshotTrigger.EACH_STEP,
+        retention=TrimInBatches(max_images=4, min_images=4),
         frames=[("a", 2), ("a", 2), ("b", 2), ("b", 2)],
     )
     async with agent.session() as session:
@@ -364,8 +366,8 @@ async def test_unchanged_screens_are_not_added_again():
 async def test_same_pixels_with_other_geometry_or_disabled_skipping_are_added():
     agent, model, _capture, holder = _agent(
         [*_steps(2), "Done"],
-        ScreenshotTrigger.EACH_STEP,
-        TrimInBatches(max_images=4, min_images=4),
+        trigger=ScreenshotTrigger.EACH_STEP,
+        retention=TrimInBatches(max_images=4, min_images=4),
         frames=[("a", 2), ("a", 3), ("a", 3)],
         skip_unchanged=False,
     )
@@ -376,8 +378,8 @@ async def test_same_pixels_with_other_geometry_or_disabled_skipping_are_added():
 
     agent, model, _capture, holder = _agent(
         [*_steps(1), "Done"],
-        ScreenshotTrigger.EACH_STEP,
-        TrimInBatches(max_images=4, min_images=4),
+        trigger=ScreenshotTrigger.EACH_STEP,
+        retention=TrimInBatches(max_images=4, min_images=4),
         frames=[("a", 2), ("a", 3)],
     )
     async with agent.session() as session:
@@ -401,8 +403,8 @@ async def test_until_compaction_keeps_images_until_their_steps_are_summarized():
     )
     agent, model, _capture, holder = _agent(
         [*_steps(5), "Done"],
-        ScreenshotTrigger.EACH_STEP,
-        UntilCompaction(),
+        trigger=ScreenshotTrigger.EACH_STEP,
+        retention=UntilCompaction(),
         extra=(compaction,),
     )
     async with agent.session() as session:
@@ -421,8 +423,8 @@ async def test_until_compaction_keeps_images_until_their_steps_are_summarized():
 async def test_multimodal_observations_use_session_assets_and_survive_saved_state():
     agent, model, _capture, holder = _agent(
         [call("step"), "Done"],
-        ScreenshotTrigger.EACH_STEP,
-        UntilCompaction(),
+        trigger=ScreenshotTrigger.EACH_STEP,
+        retention=UntilCompaction(),
         frames=[("same screenshot", 2), ("same screenshot", 2)],
         skip_unchanged=False,
     )
@@ -494,7 +496,7 @@ class StripRequestImages(Plugin):
 
 async def test_coordinate_geometry_uses_final_receipts_after_request_image_removal():
     agent, model, _capture, holder = _agent(
-        ["Done"], ScreenshotTrigger.EACH_STEP, extra=(StripRequestImages(),)
+        ["Done"], trigger=ScreenshotTrigger.EACH_STEP, extra=(StripRequestImages(),)
     )
     async with agent.session() as session:
         _browser_ready(holder)
@@ -770,7 +772,7 @@ class AppEvents(Plugin):
 
 async def test_native_stream_forwards_custom_events_and_browser_readiness_without_image_data():
     agent, _model, _capture, holder = _agent(
-        ["Done"], ScreenshotTrigger.EACH_STEP, extra=(AppEvents(),)
+        ["Done"], trigger=ScreenshotTrigger.EACH_STEP, extra=(AppEvents(),)
     )
     async with agent.session() as session:
         _browser_ready(holder)
