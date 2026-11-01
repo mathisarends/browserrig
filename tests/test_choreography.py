@@ -6,7 +6,6 @@ happen, so moving the staging between modules cannot change it unnoticed.
 
 import asyncio
 import inspect
-import random
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from types import SimpleNamespace
@@ -15,12 +14,12 @@ import pytest
 
 from browserrig.choreography import (
     BarTypedEvent,
-    Choreography,
     CursorEnteredEvent,
     FileTransferEvent,
     FindBarEvent,
     FindResultsEvent,
     HighlightElementEvent,
+    InputVisualization,
     TabPressedEvent,
     WaitingEvent,
 )
@@ -38,14 +37,14 @@ from browserrig.events import (
     NavigationStartedEvent,
 )
 from browserrig.files import FileSystem, FileSystemOptions
-from browserrig.pacing import Pacing
+from browserrig.pacing import InputPacing
 from browserrig.scripts import FindResult
 from browserrig.tools import Actions, FileTools, FindTools, NavigationTools
-from browserrig.tools import execution as execution_module
+from browserrig.tools import targeting as targeting_module
 from tests.fakes import mounted
 
 # The plugins that pace input like a person and stage actions for viewers.
-STAGING = (Pacing, Choreography)
+STAGING = (InputPacing, InputVisualization)
 
 
 class _Frame:
@@ -71,6 +70,7 @@ class _Tab:
     """A tab that records its input, navigation and find calls on the timeline."""
 
     def __init__(self, timeline, tab_id):
+        self.input = self
         self.id = tab_id
         self.document_id = f"{tab_id}-document"
         self.url = "https://example.org/"
@@ -122,10 +122,6 @@ def _timeline(monkeypatch):
         return result
 
     monkeypatch.setattr(asyncio, "sleep", sleep)
-    # The pointer lands in the middle of a tab it has not been in yet.
-    monkeypatch.setattr(
-        random.Random, "uniform", lambda _rng, low, high: (low + high) / 2
-    )
     return timeline
 
 
@@ -147,7 +143,7 @@ async def _staged(timeline, *plugins, staging=STAGING):
             await browser.mouse.switch_tab(TabGesture.OPEN, "", show)
             return tab
 
-        browser.open_tab = open_tab
+        browser.tabs.open = open_tab
         yield services, ctx
 
 
@@ -370,7 +366,7 @@ async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
     async def prepare(*_, **_kwargs):
         return False
 
-    monkeypatch.setattr(execution_module, "prepare_element", prepare)
+    monkeypatch.setattr(targeting_module, "prepare_element", prepare)
     async with _staged(timeline, _FileTools()) as (services, ctx):
         services.browser.files = files
         services.observe.element = element
@@ -399,7 +395,7 @@ async def test_switching_back_returns_to_where_the_pointer_rested(timeline):
         browser = services.browser
         first = browser.active_tab
         await browser.mouse.move_to(Point(x=10, y=0))
-        await browser.open_tab()
+        await browser.tabs.open()
         timeline.clear()
 
         async def back() -> None:

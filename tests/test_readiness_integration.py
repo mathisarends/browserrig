@@ -20,7 +20,7 @@ from browserrig import (
 )
 from browserrig.core import ActionKind, ReadinessPhase
 from browserrig.events import ReadinessDegradedEvent
-from browserrig.tools.execution import Effect
+from browserrig.tools.effects import Effect
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration

@@ -365,7 +365,7 @@ async def test_open_file_reports_the_file_in_its_new_tab(files, monkeypatch):
     async with _file_tools(files) as (services, tools):
         browser = services.browser
         browser.active_tab = Tab("current", SimpleNamespace(), emit=services.record)
-        browser.open_tab = AsyncMock(return_value=opened)
+        browser.tabs.open = AsyncMock(return_value=opened)
         await tools.open_file("report.txt")
     report = _first(services.events, FileOpenedEvent)
     # Nobody watches, so nothing is staged and nothing pauses.

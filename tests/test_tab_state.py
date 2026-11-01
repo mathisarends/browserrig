@@ -231,7 +231,7 @@ async def test_input_that_opens_a_dialog_returns_without_waiting_for_its_reply()
     )
     tab = Tab("tab", cdp)
     click = asyncio.create_task(
-        tab.dispatch_mouse(
+        tab.input.dispatch_mouse(
             MouseEventKind.RELEASED,
             Point(x=1, y=2),
             button=MouseButton.LEFT,

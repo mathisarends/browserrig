@@ -6,7 +6,8 @@ from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
 from browserrig.observation import Observe
 
-from .execution import Actions, Effect
+from .effects import Effect
+from .execution import Actions
 
 
 class FormTools(Plugin, needs=(Actions,)):

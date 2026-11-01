@@ -380,8 +380,8 @@ class _Aiming(Instant):
     def __init__(self):
         self.sizes = []
 
-    def aim(self, width, height):
-        self.sizes.append((width, height))
+    def aim_fractions(self, target_width, target_height):
+        self.sizes.append((target_width, target_height))
         return 0.25, 0.75
 
 
@@ -485,7 +485,7 @@ async def _observed(backend):
     )
     async with agent.session() as session:
         browser = holder["browser"]
-        browser.tabs = AsyncMock(return_value=())
+        browser.tabs.list = AsyncMock(return_value=())
         browser.log = SimpleNamespace(emit=AsyncMock(side_effect=events.append))
         tab = browser.active_tab
         tab.frames = AsyncMock(

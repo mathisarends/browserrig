@@ -7,7 +7,8 @@ from browserrig.browser import Tab
 from browserrig.core import ActionKind
 from browserrig.core import browser_tool as tool
 
-from .execution import Actions, Effect
+from .effects import Effect
+from .execution import Actions
 
 
 class JavaScriptTools(Plugin, needs=(Actions,)):

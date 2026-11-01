@@ -11,14 +11,14 @@ from .events import (
     TabPressedEvent,
     WaitingEvent,
 )
-from .plugin import Choreography
+from .plugin import InputVisualization
 from .stage import Stage
 from .tabstrip import TabStrip
 
 __all__ = [
     "SCENE_EVENTS",
     "BarTypedEvent",
-    "Choreography",
+    "InputVisualization",
     "CursorEnteredEvent",
     "FileTransferEvent",
     "FindBarEvent",

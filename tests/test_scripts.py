@@ -1,10 +1,13 @@
 import ast
+import asyncio
 import re
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from cdpify.domains.runtime import RemoteObject
+from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser import Frame
 from browserrig.core import BrowserError
@@ -113,3 +116,76 @@ def test_unexpected_page_exception_does_not_expose_its_message():
 async def test_fake_tab_rejects_unknown_scripts():
     with pytest.raises(AssertionError, match="Unexpected fake script"):
         await FakeTab().run(RESET)
+
+
+@pytest.mark.parametrize("by_value", [True, False])
+async def test_node_calls_use_the_resolved_receiver_and_preserve_result_handles(
+    by_value,
+):
+    value = RemoteObject(type="object", value=[80, 20], object_id="result")
+    frame, cdp = _node_call(value)
+    result = await frame.run_on_node(
+        7, OWNER_SIZE, by_value=by_value, user_gesture=True
+    )
+    assert result == (80, 20) if by_value else result is value
+    cdp.dom.resolve_node.assert_awaited_once_with(
+        backend_node_id=7, execution_context_id=1
+    )
+    arguments = cdp.runtime.call_function_on.await_args.kwargs
+    assert arguments["object_id"] == "receiver"
+    assert arguments["execution_context_id"] is None
+    assert arguments["return_by_value"] is by_value
+    assert arguments["user_gesture"]
+    cdp.runtime.release_object.assert_awaited_once_with(object_id="receiver")
+
+
+@pytest.mark.parametrize(
+    "error", [RuntimeError("disconnected"), asyncio.CancelledError()]
+)
+async def test_node_calls_release_the_receiver_on_failure_and_cancellation(error):
+    frame, cdp = _node_call()
+    cdp.runtime.call_function_on.side_effect = error
+    with pytest.raises(type(error)):
+        await frame.run_on_node(7, RESET)
+    cdp.runtime.call_function_on.assert_awaited_once()
+    cdp.runtime.release_object.assert_awaited_once_with(object_id="receiver")
+
+
+@pytest.mark.parametrize("missing_handle", [False, True])
+async def test_stale_nodes_fail_before_calling_the_script(missing_handle):
+    frame, cdp = _node_call()
+    if missing_handle:
+        cdp.dom.resolve_node.return_value.object.object_id = None
+    else:
+        cdp.dom.resolve_node.side_effect = CDPCommandError(
+            "DOM.resolveNode", -32000, "No node with given id found"
+        )
+    with pytest.raises(BrowserError, match="^STALE_ELEMENT$"):
+        await frame.run_on_node(7, RESET)
+    cdp.runtime.call_function_on.assert_not_awaited()
+    cdp.runtime.release_object.assert_not_awaited()
+
+
+def _node_call(value=None):
+    cdp = SimpleNamespace(
+        session_id="session",
+        page=SimpleNamespace(
+            create_isolated_world=AsyncMock(
+                return_value=SimpleNamespace(execution_context_id=1)
+            )
+        ),
+        dom=SimpleNamespace(
+            resolve_node=AsyncMock(
+                return_value=SimpleNamespace(
+                    object=SimpleNamespace(object_id="receiver")
+                )
+            )
+        ),
+        runtime=SimpleNamespace(
+            call_function_on=AsyncMock(
+                return_value=SimpleNamespace(exception_details=None, result=value)
+            ),
+            release_object=AsyncMock(),
+        ),
+    )
+    return Frame("frame", cdp), cdp

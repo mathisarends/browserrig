@@ -118,7 +118,7 @@ browsers without explicit `FileSystemOptions`. Stage external files in the works
 from application code before asking the agent to upload them.
 
 Direct Python callers can use `await browser.files.read_file(path, page_number=2)` and
-`await browser.open_tab(await browser.files.resolve(path))`; `open_tab` opens a `Path`
+`await browser.tabs.open(await browser.files.resolve(path))`; `tabs.open` opens a `Path`
 as a local file and only accepts HTTP(S) URLs as strings. Filesystem operations are
 asynchronous: await initialization, path resolution, existence checks, reads, writes,
 listings, upload validation and download completion. Blocking filesystem work and
@@ -136,7 +136,7 @@ is available to the agent.
 This is a tool-level path policy. Chrome, document parsers, custom Python plugins
 and MCP servers still run with their process permissions. Concurrent host changes
 to links or directories are outside this boundary. Application calls such as
-`ChromeBrowser.open_tab(Path(...))` and `Frame.upload_files(...)` remain trusted
+`browser.tabs.open(Path(...))` and `Frame.upload_files(...)` remain trusted
 host APIs. Use a separate OS/container boundary when the whole browser or parser
 process must be isolated.
 

@@ -1,4 +1,3 @@
-import random
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
@@ -37,15 +36,17 @@ class Motor(Protocol):
         """
         ...
 
-    def route(self, start: Point, end: Point) -> Sequence[CursorPath]:
-        """The pointer's way from `start` to `end`, in strokes that join end to start.
+    def pointer_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
+        """Plan consecutive cursor strokes from `start` to `destination`.
 
-        Their durations pace the native moves; one stroke is a direct move.
+        Stroke endpoints must meet; their durations pace native mouse movement.
         """
         ...
 
-    def aim(self, width: float, height: float) -> tuple[float, float]:
-        """Where to point on a target of this size, as fractions of its visible box.
+    def aim_fractions(
+        self, target_width: float, target_height: float
+    ) -> tuple[float, float]:
+        """Choose horizontal and vertical fractions within the target's visible box.
 
         A spot that something else covers falls back to the target's visible points.
         """
@@ -55,8 +56,8 @@ class Motor(Protocol):
         """Seconds a mouse button stays down for one click."""
         ...
 
-    def landing(self, width: float, height: float) -> Point:
-        """Where the pointer first appears in a tab whose viewport has this size."""
+    def landing(self, viewport_width: float, viewport_height: float) -> Point:
+        """Initial cursor position in viewport pixels; built-in motors use the center."""
         ...
 
 
@@ -68,59 +69,50 @@ class Instant:
     ) -> Sequence[KeyStroke]:
         return tuple(KeyStroke(key) for key in text)
 
-    def route(self, start: Point, end: Point) -> Sequence[CursorPath]:
-        return (CursorPath.curved(start, end, 0),)
+    def pointer_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
+        return (CursorPath.curved(start, destination, 0),)
 
-    def aim(  # pylint: disable=unused-argument
-        self, width: float, height: float
+    def aim_fractions(  # pylint: disable=unused-argument
+        self, target_width: float, target_height: float
     ) -> tuple[float, float]:
         return CENTER
 
     def press(self) -> float:
         return 0
 
-    def landing(self, width: float, height: float) -> Point:
-        return Point(x=width / 2, y=height / 2)
+    def landing(self, viewport_width: float, viewport_height: float) -> Point:
+        return Point(x=viewport_width / 2, y=viewport_height / 2)
 
 
 class HumanMotor:
     """Input at a person's pace: steady typing without slips, eased pointer paths and
     clicks in the middle of a target.
-
-    `rng` draws the varying parts, such as where the pointer lands in a new tab; pass a
-    seeded `random.Random` for repeatable runs.
     """
 
     def __init__(
         self,
         *,
         typing_interval: float = TYPING_INTERVAL_SECONDS,
-        rng: random.Random | None = None,
     ) -> None:
         if typing_interval < 0:
             raise ValueError("typing_interval must not be negative")
         self._typing_interval = typing_interval
-        self._rng = rng or random.Random()
 
     def keystrokes(  # pylint: disable=unused-argument
         self, text: str, *, sensitive: bool
     ) -> Sequence[KeyStroke]:
         return tuple(KeyStroke(key, self._typing_interval) for key in text)
 
-    def route(self, start: Point, end: Point) -> Sequence[CursorPath]:
-        return (movement(start, end),)
+    def pointer_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
+        return (movement(start, destination),)
 
-    def aim(  # pylint: disable=unused-argument
-        self, width: float, height: float
+    def aim_fractions(  # pylint: disable=unused-argument
+        self, target_width: float, target_height: float
     ) -> tuple[float, float]:
         return CENTER
 
     def press(self) -> float:
         return 0
 
-    def landing(self, width: float, height: float) -> Point:
-        # Near the middle, but not on the same spot in every tab.
-        return Point(
-            x=self._rng.uniform(width * 0.4, width * 0.6),
-            y=self._rng.uniform(height * 0.4, height * 0.6),
-        )
+    def landing(self, viewport_width: float, viewport_height: float) -> Point:
+        return Point(x=viewport_width / 2, y=viewport_height / 2)

@@ -4,14 +4,15 @@ from dataclasses import dataclass
 from harnessed import Kit, Plugin
 from harnessed.core.composition import compose_plugins
 from harnessed.kernel import PluginLike
-from harnessed.plugins import Compaction, ContextState
+from harnessed.plugins import Compaction as ContextCompaction
+from harnessed.plugins import ContextState
 
 from .activity import Activity
 from .browser import BrowserOptions, Chrome
-from .choreography import Choreography, TabStrip
+from .choreography import InputVisualization, TabStrip
 from .nudges import Nudges
 from .observation import ImageContext, Observe
-from .pacing import Pacing
+from .pacing import InputPacing
 from .readiness import DownloadReadiness, Readiness
 from .tools import (
     Actions,
@@ -36,7 +37,7 @@ def browser_plugins(
 
     A plugin that fills the same slot as a default
     replaces it in place, such as `Observe(...)`, `Readiness(...)` or
-    `Compaction(...)`; any other plugin is added. `without` drops defaults by type,
+    `ContextCompaction(...)`; any other plugin is added. `without` drops defaults by type,
     such as `(FileTools,)` for an agent without local files. `None`
     entries are skipped, so optional plugins can be written inline.
     """
@@ -47,14 +48,14 @@ def browser_plugins(
 def browser_kit(*, browser: BrowserOptions | None = None) -> Kit:
     """Browser defaults as a native Harnessed kit, with explicit instruction ordering."""
     return Kit(
-        "browserrig",
-        [
+        name="browserrig",
+        plugins=[
             Activity(),
             Chrome(browser),
             # Types and moves the pointer at a person's pace.
-            Pacing(),
+            InputPacing(),
             # Streams input and browser UI for anyone watching the session.
-            Choreography(),
+            InputVisualization(),
             # Titles and favicons for a viewer's tab strip; the agent reads tabs without it.
             TabStrip(),
             Readiness(),
@@ -72,7 +73,7 @@ def browser_kit(*, browser: BrowserOptions | None = None) -> Kit:
             DialogTools(),
             FindTools(),
             FileTools(),
-            Compaction(trigger=WindowRatio()),
+            ContextCompaction(trigger=WindowRatio()),
         ],
     )
 

@@ -62,7 +62,7 @@ pause/resume context. It is absent from the default recipe.
 | `Screenshots(trigger=ScreenshotTrigger.EACH_STEP)` | One new screenshot at the observation boundary before each model step. |
 | `Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)` | Capture at the next boundary only after the `screenshot` tool was called. This is the default for explicit composition. |
 | `ImageContext(TrimInBatches(max_images=6, min_images=3))` | Keep up to six captures; when a seventh arrives, drop the oldest until three remain. Defaults: `max_images=1`, `min_images=max_images // 2` (at least one). Both must be positive integers with `min_images <= max_images`. `ImageContext()` keeps one image. |
-| `ImageContext(UntilCompaction())` | Never trim. Images leave history when compaction summarizes the steps they were captured in. Use it with a `Compaction` plugin, otherwise image history grows without limit. |
+| `ImageContext(UntilCompaction())` | Never trim. Images leave history when compaction summarizes the steps they were captured in. Use it with a `ContextCompaction` plugin, otherwise image history grows without limit. |
 | `ImageContext(..., skip_unchanged=False)` | Also add captures identical to the latest image. By default, a capture with the same pixels, crop, tab and document is not added again, and the last line of the request says the screen is unchanged. |
 
 Calling `screenshot` with `EACH_STEP` does not create a second image. There is no
@@ -94,12 +94,12 @@ no special exemption for the latest screenshot. For long tasks, configure native
 compaction, for example:
 
 ```python
-from harnessed.plugins import Compaction
+from browserrig import ContextCompaction
 from browserrig import Agent, ImageContext, UntilCompaction
 
 agent = Agent(
     model=model,
-    plugins=[ImageContext(UntilCompaction()), Compaction(
+    plugins=[ImageContext(UntilCompaction()), ContextCompaction(
         trigger=lambda state: state.input_tokens >= 32000,
         keep_steps=4,
     )],
@@ -145,8 +145,8 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 | `ReadinessStrategy` | `budget`, `delay`, `reason`; `async check() -> bool`; `timeout_status()`. The shared runner owns deadlines, dialogs, cancellation and events. |
 | `SelectReadiness` | Native Harnessed `Bail[ReadinessPolicy]`: the first non-`None` policy overrides the configured initial/ongoing policy for this document. |
 | `CheckReadiness` | Native Harnessed `Waterfall[ReadinessCheck]`: call `await next_()` and compose application conditions around the selected policy. The shared deadline includes the middleware. |
-| `Motor` (`browserrig.input`) | `keystrokes(text, *, sensitive) -> Sequence[KeyStroke]`, `route(start, end) -> Sequence[CursorPath]`, `aim(width, height)`, `press()` and `landing(width, height)`. How input is performed; install it with `Pacing(motor)`. A plan types characters and may correct slips with `Backspace`; sensitive text must be typed exactly. A route's strokes join end to start. No events, no viewer concerns. |
-| `Presenter` (`browserrig.input`) | `shows_cursor_style()`, `async leave(...)`, `async enter(...)` and `async show(target, event)`. What viewers see of input; `Choreography` installs one. |
+| `Motor` (`browserrig.input`) | `keystrokes(text, *, sensitive) -> Sequence[KeyStroke]`, `pointer_route(start, destination) -> Sequence[CursorPath]`, `aim_fractions(target_width, target_height) -> tuple[float, float]`, `press()` and `landing(viewport_width, viewport_height)`. How input is performed; install it with `InputPacing(motor)`. A plan types characters and may correct slips with `Backspace`; sensitive text must be typed exactly. A route's strokes join end to start. No events, no viewer concerns. |
+| `Presenter` (`browserrig.input`) | `shows_cursor_style()`, `async leave(...)`, `async enter(...)` and `async show(target, event)`. What viewers see of input; `InputVisualization` installs one. |
 | `ActionChainPolicy` (`browserrig.tools`) | `async check(observe, tab) -> str`: empty allows continuing; otherwise explain why a fresh observation is required. Failed comparison ends the chain without turning successful input into failed input. |
 
 `CaptureContent.fingerprint` is copied into the snapshot unchanged, including an
@@ -341,7 +341,7 @@ custom-event support does not imply every persisted SDK event appears in a turn 
 `Agent` and `browser_plugins()` remain convenience recipes. A configured default
 replaces the built-in one: `plugins=[Observe(capture=DomCapture(...),
 screenshots=Screenshots(...)), Readiness(...), ImageContext(...), Actions(...),
-Pacing(motor)]`.
+InputPacing(motor)]`.
 Pass `without=(FileTools,)` when local file tools should be omitted.
 
 The default recipe mounts every tool group; ref-based tools hide themselves for

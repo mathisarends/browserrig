@@ -10,7 +10,10 @@ type KeyEventType = Literal["keyDown", "keyUp", "rawKeyDown", "char"]
 
 
 class InputTarget(Protocol):
-    """A document that receives native input. The browser points its devices at the focused tab."""
+    """Transport for native input to a focused document, with cursor and event feedback.
+
+    Implemented by the browser backend's input adapter, independently of its Tab API.
+    """
 
     @property
     def id(self) -> str: ...
@@ -53,7 +56,7 @@ class InputTarget(Protocol):
     async def emit(self, event: InputEvent) -> None: ...
 
 
-# The browser's currently focused tab, or None while no tab has focus.
+# Transport for the browser's currently focused tab, or None while none has focus.
 type Focus = Callable[[], InputTarget | None]
 
 

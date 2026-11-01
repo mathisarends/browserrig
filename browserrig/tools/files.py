@@ -55,7 +55,8 @@ from browserrig.files import (
 from browserrig.observation import Observe
 from browserrig.readiness import Readiness
 
-from .execution import Actions, Effect
+from .effects import Effect
+from .execution import Actions
 from .intents import OpenFileIntent, UploadIntent
 
 
@@ -377,7 +378,7 @@ class FileTools(Plugin):
     ) -> ToolResult:
         async def open_file(tab: Tab) -> Effect:
             async def show() -> Tab:
-                opened = await self._browser.open_tab(path)
+                opened = await self._browser.tabs.open(path)
                 await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
                 await self._events.emit(
                     FileOpenedEvent(

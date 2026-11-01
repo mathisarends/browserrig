@@ -1,6 +1,6 @@
 """Events of the staged scene: what a viewer sees beyond raw input.
 
-They are only emitted while the `Choreography` plugin is mounted.
+They are only emitted while the `InputVisualization` plugin is mounted.
 """
 
 from dataclasses import dataclass, field

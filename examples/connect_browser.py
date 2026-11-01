@@ -25,7 +25,7 @@ async def main() -> None:
         tab = browser.active_tab
         await wait_for_page(tab)
         print((await (await tab.main_frame()).run(PAGE_FACTS)).title)
-        print(await browser.tabs())
+        print(await browser.tabs.list())
     # This disconnects our client. The external Chrome process remains alive.
 
 

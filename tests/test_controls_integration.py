@@ -88,9 +88,9 @@ async def test_handoff_observes_human_navigation_and_a_short_lived_popup(site):
     async def ask(_request):
         browser = holder["browser"]
         tab = browser.active_tab
-        popup = await browser.open_tab(f"{site}/other")
-        await browser.close_tab(popup.id)
-        await browser.activate_tab(tab.id)
+        popup = await browser.tabs.open(f"{site}/other")
+        await browser.tabs.close(popup.id)
+        await browser.tabs.activate(tab.id)
         await tab.navigate(f"{site}/other")
         return HumanResponse()
 

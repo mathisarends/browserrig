@@ -3,8 +3,9 @@
 
 import asyncio
 import math
+from collections.abc import Callable
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import ToolError
@@ -37,7 +38,6 @@ from browserrig.events import (
 from browserrig.input import (
     CENTER,
     CursorPath,
-    Focus,
     HumanMotor,
     Input,
     Instant,
@@ -286,7 +286,7 @@ async def test_cursor_style_is_reported_only_when_it_changes(monkeypatch):
     devices, tab, events, _ = _rig()
     styles = iter([CursorStyle.POINTER, CursorStyle.POINTER, None, CursorStyle.TEXT])
     probe = AsyncMock(side_effect=lambda point: next(styles))
-    tab.cursor_style = probe
+    tab.input.cursor_style = probe
     for x in (10, 20, 30, 40):
         await devices.mouse.move_to(Point(x=x, y=10))
     reported = [event.style for event in events if isinstance(event, CursorStyleEvent)]
@@ -301,8 +301,8 @@ async def test_cursor_style_is_reported_only_when_it_changes(monkeypatch):
 async def test_unwatched_pointer_never_asks_the_page_for_its_cursor():
     tab, events, _ = _tab()
     probe = AsyncMock(return_value=CursorStyle.POINTER)
-    tab.cursor_style = probe
-    devices = Input(lambda: tab)
+    tab.input.cursor_style = probe
+    devices = Input(lambda: tab.input)
     await devices.mouse.move_to(Point(x=10, y=10))
     probe.assert_not_awaited()
     assert not events
@@ -372,10 +372,10 @@ def _rest(devices, tab, point):
     rest.position, rest.placed = point, True
 
 
-def _devices(focus: Focus, *, rng=None) -> Input:
+def _devices(focus: Callable[[], Tab | None]) -> Input:
     """Input paced like a person and watched by people, so it is reported."""
-    devices = Input(focus)
-    devices.pace(HumanMotor(rng=rng))
+    devices = Input(lambda: None if (tab := focus()) is None else tab.input)
+    devices.pace(HumanMotor())
     devices.present(Stage(lambda: devices.action_id))
     return devices
 
@@ -424,17 +424,16 @@ async def test_first_tab_seeds_the_pointer_without_a_tab_press(monkeypatch):
     monkeypatch.setattr(mouse_module.asyncio, "sleep", sleep)
     tab, events, commands = _tab()
     focus: dict[str, Tab | None] = {"tab": None}
-    rng = Mock(uniform=Mock(side_effect=[450, 330]))
-    devices = _devices(lambda: focus["tab"], rng=rng)
+    devices = _devices(lambda: focus["tab"])
 
     async def switch():
         focus["tab"] = tab
 
     await devices.mouse.switch_tab(TabGesture.ACTIVATE, tab.id, switch)
-    assert devices.mouse.position_in(tab.id) == Point(x=450, y=330)
-    assert [(c["type"], c["x"], c["y"]) for c in commands] == [("mouseMoved", 450, 330)]
+    assert devices.mouse.position_in(tab.id) == Point(x=500, y=300)
+    assert [(c["type"], c["x"], c["y"]) for c in commands] == [("mouseMoved", 500, 300)]
     assert [type(event) for event in events] == [CursorStateEvent]
-    assert (events[0].x, events[0].y) == (450, 330) and events[0].target_id == tab.id
+    assert (events[0].x, events[0].y) == (500, 300) and events[0].target_id == tab.id
     sleep.assert_not_awaited()
 
 
@@ -445,8 +444,7 @@ async def test_tab_switch_presses_the_tab_then_enters_the_new_page(monkeypatch):
     first, _, first_commands = _tab("first", events=events)
     second, _, second_commands = _tab("second", events=events)
     focus = {"tab": first}
-    rng = Mock(uniform=Mock(side_effect=[500, 300]))
-    devices = _devices(lambda: focus["tab"], rng=rng)
+    devices = _devices(lambda: focus["tab"])
     _rest(devices, first, Point(x=100, y=80))
 
     async def switch():
@@ -482,8 +480,7 @@ async def test_returning_to_a_tab_lands_where_its_pointer_rested(monkeypatch):
     first, _, first_commands = _tab("first", events=events)
     second, _, _ = _tab("second", events=events)
     focus = {"tab": second}
-    rng = Mock()
-    devices = _devices(lambda: focus["tab"], rng=rng)
+    devices = _devices(lambda: focus["tab"])
     _rest(devices, first, Point(x=100, y=80))
     _rest(devices, second, Point(x=700, y=400))
 
@@ -491,7 +488,6 @@ async def test_returning_to_a_tab_lands_where_its_pointer_rested(monkeypatch):
         focus["tab"] = first
 
     await devices.mouse.switch_tab(TabGesture.CLOSE, "second", switch)
-    rng.uniform.assert_not_called()
     pressed = next(event for event in events if isinstance(event, TabPressedEvent))
     assert pressed.gesture is TabGesture.CLOSE and pressed.from_position == (700, 400)
     entered = next(event for event in events if isinstance(event, CursorEnteredEvent))
@@ -561,7 +557,7 @@ async def test_unwatched_input_reports_nothing_and_never_pauses(monkeypatch):
     monkeypatch.setattr(asyncio, "sleep", sleep)
     tab, events, commands = _tab()
     focus: dict[str, Tab | None] = {"tab": None}
-    devices = Input(lambda: focus["tab"])
+    devices = Input(lambda: None if (tab := focus["tab"]) is None else tab.input)
 
     async def switch():
         focus["tab"] = tab
@@ -602,11 +598,11 @@ class _SlowMotor:
     ) -> tuple[KeyStroke, ...]:
         return tuple(KeyStroke(key, 0.2) for key in text)
 
-    def route(self, start: Point, end: Point) -> tuple[CursorPath, ...]:
-        return (CursorPath.curved(start, end, 1 / 30),)
+    def pointer_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
+        return (CursorPath.curved(start, destination, 1 / 30),)
 
-    def aim(  # pylint: disable=unused-argument
-        self, width: float, height: float
+    def aim_fractions(  # pylint: disable=unused-argument
+        self, target_width: float, target_height: float
     ) -> tuple[float, float]:
         return CENTER
 
@@ -622,7 +618,7 @@ async def test_a_motor_paces_input_that_nobody_watches(monkeypatch):
     monkeypatch.setattr(mouse_module.asyncio, "sleep", sleep)
     tab, events, commands = _tab()
     focus: dict[str, Tab | None] = {"tab": None}
-    devices = Input(lambda: focus["tab"])
+    devices = Input(lambda: None if (tab := focus["tab"]) is None else tab.input)
     devices.pace(_SlowMotor())
 
     async def switch():
@@ -650,11 +646,11 @@ class _Detour(Instant):
     def __init__(self, *, hold: float = 0) -> None:
         self._hold = hold
 
-    def route(self, start: Point, end: Point) -> tuple[CursorPath, ...]:
-        corner = Point(x=end.x, y=start.y)
+    def pointer_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
+        corner = Point(x=destination.x, y=start.y)
         return (
             CursorPath.curved(start, corner, 0),
-            CursorPath.curved(corner, end, 0),
+            CursorPath.curved(corner, destination, 0),
         )
 
     def press(self) -> float:
@@ -664,10 +660,10 @@ class _Detour(Instant):
 class _Gapped(Instant):
     """Lifts the pointer halfway, which no hand can do."""
 
-    def route(self, start: Point, end: Point) -> tuple[CursorPath, ...]:
+    def pointer_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
         return (
             CursorPath.curved(start, Point(x=50, y=0), 0),
-            CursorPath.curved(Point(x=60, y=0), end, 0),
+            CursorPath.curved(Point(x=60, y=0), destination, 0),
         )
 
 

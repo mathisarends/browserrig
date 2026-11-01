@@ -1,14 +1,12 @@
 import asyncio
 import json
-from collections.abc import Awaitable, Callable, Coroutine
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import replace
-from typing import Any, Literal
 from urllib.parse import urlsplit
 from uuid import uuid4
 
 from cdpify import CdpSession
-from cdpify.domains.input import MouseButton
 from cdpify.domains.page import (
     FrameNavigatedEvent,
     FrameStartedLoadingEvent,
@@ -23,12 +21,7 @@ from cdpify.domains.page import (
 from cdpify.domains.runtime import RemoteObject
 from cdpify.exceptions import CDPCommandError
 
-from browserrig.core import (
-    BrowserError,
-    CursorStyle,
-    MouseEventKind,
-    Point,
-)
+from browserrig.core import BrowserError
 from browserrig.events import (
     BrowserEvent,
     DialogHandledEvent,
@@ -36,21 +29,15 @@ from browserrig.events import (
     LiveEvent,
     NavigationCommittedEvent,
 )
-from browserrig.input import KeyEventType
 from browserrig.scripts import (
-    CURSOR,
     TAB_STRIP,
-    CursorArgs,
     TabStrip,
 )
 
 from .favicon import load_favicon
 from .frame import Frame
+from .input import CdpInput
 from .worlds import Worlds
-
-# A cursor shape is presentation only and must never hold up input.
-_CURSOR_PROBE_SECONDS = 0.25
-
 
 type FrameDiscovery = Callable[
     [Tab], Awaitable[tuple[tuple[Frame, ...], tuple[str, ...]]]
@@ -59,7 +46,7 @@ type FrameDiscovery = Callable[
 type TabListener = Callable[[Tab, bool], Awaitable[None]]
 
 
-class Tab:  # pylint: disable=too-many-public-methods  # document API plus InputTarget
+class Tab:  # pylint: disable=too-many-public-methods  # document API
     def __init__(
         self,
         target_id: str,
@@ -77,7 +64,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         self.url = "about:blank"
         self.title = ""
         self.dialog: tuple[str, str] | None = None
-        self._dialog_opened = asyncio.Event()
+        self.input = CdpInput(self)
         self.closed = False
         self.loading = False
         self.navigation_pending = False
@@ -119,82 +106,9 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         """Load an icon through the page's own network stack, as a `data:` URI."""
         return await load_favicon(self.cdp, self._main_frame_id, url)
 
-    async def cursor_style(self, point: Point) -> CursorStyle | None:
-        """Return the CSS cursor under a viewport point, or None when the page cannot say."""
-        if self.dialog is not None:
-            return None
-        try:
-            async with asyncio.timeout(_CURSOR_PROBE_SECONDS):
-                frame = await self.main_frame()
-                style = await frame.run(CURSOR, CursorArgs(x=point.x, y=point.y))
-        except Exception:  # pylint: disable=broad-exception-caught
-            # Navigation, dialogs and detached sessions must not fail the input itself.
-            return None
-        return CursorStyle.parse(style)
-
     def layout_changed(self) -> None:
         """Forget cached frame geometry after input, scrolling or navigation moved content."""
         self._layout_revision += 1
-
-    # Native input lands here; the browser's mouse and keyboard aim at the focused tab.
-    async def dispatch_mouse(
-        self,
-        kind: Literal[
-            MouseEventKind.MOVED, MouseEventKind.PRESSED, MouseEventKind.RELEASED
-        ],
-        point: Point,
-        *,
-        button: MouseButton,
-        buttons: int,
-        click_count: int,
-    ) -> None:
-        await self._input(
-            self.cdp.input.dispatch_mouse_event(
-                type=kind.value,
-                x=point.x,
-                y=point.y,
-                button=button,
-                buttons=buttons,
-                click_count=click_count,
-            )
-        )
-
-    async def dispatch_wheel(
-        self, point: Point, *, delta_x: float, delta_y: float
-    ) -> None:
-        await self._input(
-            self.cdp.input.dispatch_mouse_event(
-                type=MouseEventKind.WHEEL.value,  # smelt: ignore[SMT318] -- cdpify wants a Literal
-                x=point.x,
-                y=point.y,
-                delta_x=delta_x,
-                delta_y=delta_y,
-            )
-        )
-
-    async def dispatch_key(
-        self,
-        kind: KeyEventType,
-        *,
-        modifiers: int,
-        key: str,
-        code: str,
-        windows_virtual_key_code: int,
-        text: str | None = None,
-    ) -> None:
-        await self._input(
-            self.cdp.input.dispatch_key_event(
-                type=kind,
-                modifiers=modifiers,
-                key=key,
-                code=code,
-                windows_virtual_key_code=windows_virtual_key_code,
-                text=text,
-            )
-        )
-
-    async def cancel_drag(self) -> None:
-        await self.cdp.input.cancel_dragging()
 
     async def viewport_size(self) -> tuple[float, float]:
         viewport = (await self.cdp.page.get_layout_metrics()).css_layout_viewport
@@ -269,13 +183,13 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
                 await self.report_change(settled=True)
             case JavascriptDialogOpeningEvent(type=kind, message=message):
                 self.dialog = (str(kind), message)
-                self._dialog_opened.set()
+                self.input.dialog_opened.set()
                 await self.emit(
                     DialogOpenedEvent(kind=str(kind), message=message[:1000])
                 )
             case JavascriptDialogClosedEvent(result=accepted):
                 self.dialog = None
-                self._dialog_opened.clear()
+                self.input.dialog_opened.clear()
                 await self.emit(DialogHandledEvent(accepted=accepted))
 
     async def main_frame(self) -> Frame:
@@ -365,32 +279,6 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         if result.error_text:
             raise BrowserError(f"Navigation failed: {result.error_text}")
 
-    async def _input(self, command: Coroutine[Any, Any, None]) -> None:
-        """Send input, returning early when it opens a JavaScript dialog.
-
-        Chrome answers an input event only after its handlers finish, and an alert, confirm
-        or prompt holds them until the dialog closes. The input has landed by then, so the
-        reply is left to arrive later.
-        """
-        if self.dialog is not None:
-            await command
-            return
-        # Started eagerly, input that needs no reply lands within the caller's step.
-        sent = asyncio.Task(command, loop=asyncio.get_running_loop(), eager_start=True)
-        if not sent.done():
-            opened = asyncio.ensure_future(self._dialog_opened.wait())
-            try:
-                await asyncio.wait((sent, opened), return_when=asyncio.FIRST_COMPLETED)
-            except asyncio.CancelledError:
-                sent.cancel()
-                raise
-            finally:
-                opened.cancel()
-        if not sent.done():
-            sent.add_done_callback(_discard_result)
-            return
-        sent.result()
-
     async def _history(self, offset: int) -> bool:
         history = await self.cdp.page.get_navigation_history()
         index = history.current_index + offset
@@ -407,12 +295,6 @@ def validated_url(url: str) -> str:
     if url == "about:blank" or (parsed.scheme in {"http", "https"} and parsed.hostname):
         return url
     raise BrowserError("Navigation requires an HTTP(S) URL or about:blank")
-
-
-def _discard_result(task: asyncio.Future[None]) -> None:
-    # The reply of input that opened a dialog only reports when the dialog closed.
-    if not task.cancelled():
-        task.exception()
 
 
 def _javascript_value(value: RemoteObject) -> str:

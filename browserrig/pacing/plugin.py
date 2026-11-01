@@ -5,7 +5,7 @@ from browserrig.browser import Browser
 from browserrig.input import HumanMotor, Motor
 
 
-class Pacing(Plugin, slot="browserrig.pacing"):
+class InputPacing(Plugin, slot="browserrig.pacing"):
     """Operate the browser's mouse and keyboard through a `Motor`.
 
     The default motor types and moves the pointer at a person's pace. Pass another

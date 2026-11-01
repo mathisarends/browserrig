@@ -18,7 +18,7 @@ from browserrig.events import (
 from browserrig.input import Instant
 from browserrig.kinds import ActionKind, ReadinessPhase
 from browserrig.tools import Actions, FileTools
-from browserrig.tools.execution import Effect
+from browserrig.tools.effects import Effect
 from tests.fakes import FakeServices, mounted
 
 
@@ -146,8 +146,10 @@ class _Aiming(Instant):
         self._aims = list(aims)
         self.sizes: list[tuple[float, float]] = []
 
-    def aim(self, width: float, height: float) -> tuple[float, float]:
-        self.sizes.append((width, height))
+    def aim_fractions(
+        self, target_width: float, target_height: float
+    ) -> tuple[float, float]:
+        self.sizes.append((target_width, target_height))
         return self._aims.pop(0)
 
 

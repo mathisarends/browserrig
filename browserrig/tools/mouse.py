@@ -9,7 +9,8 @@ from browserrig.core import ActionKind, BrowserError, Point
 from browserrig.core import browser_tool as tool
 from browserrig.observation import CapturedImage, Observe, Snapshot
 
-from .execution import Actions, Effect
+from .effects import Effect
+from .execution import Actions
 
 type _ClickCount = Annotated[
     Literal[1, 2],

@@ -51,7 +51,7 @@ async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site
         browser.input.pace(HumanMotor())
         browser.input.present(Stage(lambda: browser.input.action_id))
         await browser.mouse.move_to(Point(x=100, y=120))
-        second = await browser.open_tab(site)
+        second = await browser.tabs.open(site)
         assert (
             len(
                 [
@@ -67,7 +67,7 @@ async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site
         opened = next(event for event in events if isinstance(event, TabPressedEvent))
         assert opened.gesture is TabGesture.OPEN and opened.target_id == first.id
         assert opened.from_position == (100, 120)
-        await browser.activate_tab(first.id)
+        await browser.tabs.activate(first.id)
         pressed = [event for event in events if isinstance(event, TabPressedEvent)][-1]
         assert pressed.gesture is TabGesture.ACTIVATE and pressed.tab_id == first.id
         assert pressed.target_id == second.id
@@ -94,12 +94,12 @@ async def test_launch_stable_tabs_and_isolated_connect(discovery):
             connected_target = connected.active_tab.id
         assert browser.client.is_connected
         assert await evaluate(first, "2 + 2") == 4
-        second = await browser.open_tab()
+        second = await browser.tabs.open()
         assert first.cdp.session_id != second.cdp.session_id
         assert first.id != second.id
         assert await evaluate(first, "location.href") == "about:blank"
-        assert await browser.activate_tab(first.id) is first
-        assert connected_target not in {tab.id for tab in await browser.tabs()}
+        assert await browser.tabs.activate(first.id) is first
+        assert connected_target not in {tab.id for tab in await browser.tabs.list()}
     assert not browser.client.is_connected
     assert first.closed and second.closed
 

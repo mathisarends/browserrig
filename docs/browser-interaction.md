@@ -229,24 +229,29 @@ The browser has one mouse and one keyboard, `browser.mouse` and
 `browser.input.keyboard`. Both act on the active tab. `browser.input` shares the
 action context and event correlation across both devices. Browser tools
 use these same devices; `Actions` owns action serialization and readiness.
-A tab is only the document: JavaScript, navigation, frames, dialogs and element
-references stay on `Tab`, which receives input through the `InputTarget`
-protocol. Each gesture resolves the active tab once when it starts, so a click or
-drag never splits across tabs; without an active tab, input raises `BrowserError`.
+Tab management lives in `browser.tabs`: `list()`, `open(target)`,
+`activate(target_id)` and `close(target_id)`. `browser.tabs.active` and
+`browser.active_tab` return the focused document.
+
+JavaScript, navigation, frames, dialogs and element references stay on `Tab`.
+Its `input` adapter implements the `InputTarget` transport protocol and owns CDP
+dispatch, cursor probes and dialog-aware replies. Mouse and keyboard gestures
+resolve this adapter once when they start, so a click or drag stays on the same
+session; without an active tab, input raises `BrowserError`.
 
 How input is performed and how it looks to people watching are two separate,
-optional plugins. Tools and devices only describe what they do. `Pacing` (from
-`browserrig.pacing`) types and moves the pointer like a person; `Choreography` (from
+optional plugins. Tools and devices only describe what they do. `InputPacing` (from
+`browserrig.pacing`) types and moves the pointer like a person; `InputVisualization` (from
 `browserrig.choreography`) plays the gestures below and streams them as live events.
-`browser_plugins` and `Agent` include both by default; pass `without=(Pacing,)` to work
-at full speed, `without=(Choreography,)` to emit no input events, or both. They build
+`browser_plugins` and `Agent` include both by default; pass `without=(InputPacing,)` to work
+at full speed, `without=(InputVisualization,)` to emit no input events, or both. They build
 on four seams, which other plugins can use the same way:
 
 - `browser.input.pace(motor)` installs a `Motor` that plans keystrokes, pointer
   routes, where to aim on a target, how long a click holds the button, and landing
-  points. `Pacing(motor)` installs one for a session; its
-  default is `HumanMotor()`, and `HumanMotor(rng=random.Random(seed))` makes the
-  varying parts repeatable. The default without a plugin, `Instant`, never pauses.
+  points. `InputPacing(motor)` installs one for a session; its
+  default is `HumanMotor()`. Both built-in motors land in the center of a new
+  tab. The default without a plugin, `Instant`, never pauses.
 - `browser.input.present(presenter)` installs a `Presenter` that plays tab-strip
   gestures and reports each input event. The default, `Unseen`, reports nothing.
   Both calls return a callback that restores the previous motor or presenter.
@@ -257,9 +262,9 @@ on four seams, which other plugins can use the same way:
 
 The mouse remembers where it last rested in each tab (`browser.mouse.position_in(tab.id)`)
 and returns there when that tab comes back to the front. The first time a tab
-receives the pointer, it lands where the motor puts it: the center of the actual
-viewport, or with `Pacing` at a random position within the central 40–60% on each axis. There
-is no animation from the top-left corner. With `Choreography`, opening, activating
+receives the pointer, both built-in motors put it in the center of the actual
+viewport. A custom motor can choose another landing point. There is no animation
+from the top-left corner. With `InputVisualization`, opening, activating
 and closing tabs play a tab-strip gesture:
 
 1. `TabPressedEvent` (`browser.tab.pressed`) belongs to the tab the pointer
@@ -274,10 +279,10 @@ and closing tabs play a tab-strip gesture:
 The backend does not know the viewer's layout. A viewer places the tab chip
 itself, for example through a `data-target-id` attribute, and draws the gesture
 in an overlay spanning its tab strip and the viewport. The first tab of a
-session skips steps 1 and 2. `Choreography` publishes the current cursor state at
+session skips steps 1 and 2. `InputVisualization` publishes the current cursor state at
 each agent turn start, so live subscribers attached after browser setup can display
 it before the first model request or input action.
-Cursor movements follow the motor's route: one or more cubic strokes
+Cursor movements follow `Motor.pointer_route(start, destination)`: one or more cubic strokes
 (`CursorPath`), each joined to the last and reported as its own
 `browser.cursor.moved`. A route that does not run unbroken from the pointer to its
 destination is refused before the pointer moves. The built-in motors move in one
@@ -291,7 +296,7 @@ per frame along Chrome's smooth scroll curve (`cubic-bezier(0.4, 0, 0, 1)`),
 lasting about one 60 Hz frame per square root of the distance (150 ms to 1.5 s).
 Chrome does not animate CDP wheel events itself, and `Input.synthesizeScrollGesture`
 moves at constant speed, so the harness paces the wheel events.
-With `Pacing`, typing uses a fixed 50 ms interval
+With `InputPacing`, typing uses a fixed 50 ms interval
 (`browserrig.input.TYPING_INTERVAL_SECONDS`) and pointer paths take their
 time; without it, keys and moves are dispatched without pauses.
 
@@ -323,7 +328,7 @@ clears the field. Direct Python callers can use `browser.keyboard.type_text(...)
 `browser.mouse.scroll(delta_y=..., point=Point(...))`. Acquire `browser.action_lock`
 when combining direct inputs with other browser actions.
 
-The choreography uses Harnessed's native transient event extension. `Choreography`
+The choreography uses Harnessed's native transient event extension. `InputVisualization`
 registers the input events (`browserrig.events.INPUT_EVENTS`) and its scene events
 (`browserrig.choreography.SCENE_EVENTS`); `TabStrip` registers the tab updates
 (`browserrig.events.TAB_STRIP_EVENTS`), and `Chrome` registers download progress
@@ -356,7 +361,7 @@ carry its `action_id`. `CursorMovedEvent` describes the path before execution;
 Key and pointer receipts follow successful dispatch. Action failure events close
 interrupted sequences. Key events contain the dispatched key and modifiers.
 
-`Choreography` paces what it shows: events with a `duration` describe an
+`InputVisualization` paces what it shows: events with a `duration` describe an
 animation the browser waits through before continuing. `open_file` and
 `open_downloaded_file` emit a `FileTransferEvent` in the current tab, wait for it,
 and only then open the new tab, which plays the tab-strip gesture. Uploads move the cursor onto the file input, emit
@@ -365,7 +370,7 @@ the transfer with that point, wait, and then assign the files.
 the style changes. It reads the page's computed CSS cursor and treats text inputs,
 editable content and plain text as `text`; custom cursor images show `default`.
 The probe is best-effort and never delays input by more than 250 ms; it runs
-only while a presenter such as `Choreography`'s `Stage` asks for it, so unwatched
+only while a presenter such as `InputVisualization`'s `Stage` asks for it, so unwatched
 input never probes.
 `DownloadProgressedEvent` is sent at most every 200 ms per download; completion,
 failure and cancellation remain durable events.
@@ -383,11 +388,11 @@ only when rendered through `<img>`. A loading tab keeps its previous icon.
 `navigate(url, new_tab=True)` opens the URL in a new tab; `open_tab` without a URL
 starts on DuckDuckGo. The durable `NavigationStartedEvent` carries `typed`, the text
 a person would enter in the address bar: the URL without `https://` (and without a
-bare trailing `/`), or the query for `search`. With `Choreography`, `BarTypedEvent`s show
+bare trailing `/`), or the query for `search`. With `InputVisualization`, `BarTypedEvent`s show
 the text being typed into the address bar key by key, ending with `Enter`; nothing
 is typed into the page.
 
-With `Choreography`, `find_in_page` plays a person's Ctrl+F: a `KeyPressedEvent` for `f` with
+With `InputVisualization`, `find_in_page` plays a person's Ctrl+F: a `KeyPressedEvent` for `f` with
 `Control`, `FindBarEvent(visible=True)`, one `BarTypedEvent` per key with a
 `FindResultsEvent` after each, then the final results with the current match in
 view, and finally `Escape` and `FindBarEvent(visible=False)`. `FindResultsEvent.marks`

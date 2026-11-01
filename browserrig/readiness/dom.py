@@ -9,7 +9,8 @@ from .config import ReadinessOptions
 from .strategy import ReadinessStrategy
 
 
-async def _probe_dom(tab: Tab) -> DOMProbe:
+async def probe_dom(tab: Tab) -> DOMProbe:
+    """Read DOM activity across the tab's frames, keeping its main viewport geometry."""
     main = await tab.main_frame()
     state = await main.run(STABILITY)
     if not state.unobserved_frames:
@@ -24,17 +25,18 @@ async def _probe_dom(tab: Tab) -> DOMProbe:
         if isinstance(result, BaseException):
             raise result
         children.append(result)
-    return state.model_copy(
-        update={
-            "loaded": state.loaded and all(child.loaded for child in children),
-            "quiet_ms": min([state.quiet_ms, *(child.quiet_ms for child in children)]),
-            "animations": state.animations
-            + sum(child.animations for child in children),
-            "busy": state.busy or any(child.busy for child in children),
-            "limited": state.limited
-            or bool(tab.frame_limitations)
-            or any(child.limited for child in children),
-        }
+    return DOMProbe(
+        loaded=state.loaded and all(child.loaded for child in children),
+        body=state.body,
+        quiet_ms=min([state.quiet_ms, *(child.quiet_ms for child in children)]),
+        width=state.width,
+        height=state.height,
+        unobserved_frames=state.unobserved_frames,
+        animations=state.animations + sum(child.animations for child in children),
+        busy=state.busy or any(child.busy for child in children),
+        limited=state.limited
+        or bool(tab.frame_limitations)
+        or any(child.limited for child in children),
     )
 
 
@@ -54,7 +56,7 @@ class DomReadiness(ReadinessStrategy):
         self._earliest = self._started + minimum / 1000
 
     async def check(self) -> bool:
-        state = await _probe_dom(self._tab)
+        state = await probe_dom(self._tab)
         now = monotonic()
         quiet = state.quiet_ms
         if self._after_action:

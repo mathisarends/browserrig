@@ -114,7 +114,7 @@ def _prepare(holder):
     browser = holder["browser"]
     browser.active_tab.title = "Login"
     browser.active_tab.logged_in = False
-    browser.tabs = AsyncMock(
+    browser.tabs.list = AsyncMock(
         side_effect=lambda: (
             TabInfo(
                 id=browser.active_tab.id,

@@ -91,7 +91,7 @@ async def test_cursor_probe_reads_css_and_text_cursors_through_shadow_roots(site
             " '<button style=\"cursor:pointer;width:100px;height:30px\">Shadow</button>'",
         )
         styles = [
-            await tab.cursor_style(Point(x=10, y=y))
+            await tab.input.cursor_style(Point(x=10, y=y))
             for y in (10, 50, 90, 130, 170, 210, 250)
         ]
         assert styles == [

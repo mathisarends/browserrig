@@ -11,13 +11,13 @@ from harnessed.testing import ScriptedModel
 
 import browserrig
 from browserrig import (
-    Choreography,
     Chrome,
     FileSystemOptions,
     ImageContext,
+    InputPacing,
+    InputVisualization,
     Launch,
     Observe,
-    Pacing,
     Readiness,
     ReadinessOptions,
     Screenshots,
@@ -166,17 +166,18 @@ def test_two_plugins_for_the_same_default_conflict():
 
 def test_configured_pacing_and_choreography_replace_their_defaults_in_place():
     defaults = browser_plugins()
-    pacing, choreography = Pacing(Instant()), Choreography()
+    pacing, choreography = InputPacing(Instant()), InputVisualization()
     composed = browser_plugins(choreography, pacing)
     assert len(composed) == len(defaults)
-    assert composed[_index(defaults, Pacing)] is pacing
-    assert composed[_index(defaults, Choreography)] is choreography
+    assert composed[_index(defaults, InputPacing)] is pacing
+    assert composed[_index(defaults, InputVisualization)] is choreography
 
 
 def test_without_drops_defaults_and_rejects_types_that_are_not_defaults():
-    composed = browser_plugins(without=(Choreography, TabStrip, Compaction))
+    composed = browser_plugins(without=(InputVisualization, TabStrip, Compaction))
     assert not any(
-        isinstance(plugin, (Choreography, TabStrip, Compaction)) for plugin in composed
+        isinstance(plugin, (InputVisualization, TabStrip, Compaction))
+        for plugin in composed
     )
     with pytest.raises(ValueError, match="contains no recipes matching: Secrets"):
         browser_plugins(without=(Secrets,))

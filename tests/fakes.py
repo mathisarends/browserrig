@@ -24,6 +24,7 @@ from browserrig.scripts import DOMProbe
 
 class FakeTab:
     def __init__(self):
+        self.input = self
         self.id = "tab-1"
         self.document_id = "doc-1"
         self.url = "https://example.org/"
@@ -54,15 +55,21 @@ class FakeTab:
         )
 
 
+class FakeTabs:
+    async def list(self):
+        return ()
+
+
 class FakeBrowser:
     def __init__(self, log):
         self.id = "browser-1"
         self.active_tab = FakeTab()
+        self.tabs = FakeTabs()
         self.action_lock = asyncio.Lock()
         self.log = log
         self.files = None
         self.events = BrowserEvents(self.id, self._emit)
-        self.input = Input(lambda: self.active_tab)
+        self.input = Input(lambda: self.active_tab.input)
         self.mouse = self.input.mouse
         self.keyboard = self.input.keyboard
 

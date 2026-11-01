@@ -24,7 +24,9 @@ from browserrig.core import ReadinessError, ReadinessPhase
 from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent, ReadyEvent
 from browserrig.files import Download
 from browserrig.observation import capture
+from browserrig.readiness import probe_dom
 from browserrig.readiness import wait as wait_module
+from browserrig.scripts import STABILITY, DOMProbe
 from tests.fakes import FakeBrowser, FakeChrome, FakeTab
 
 
@@ -389,6 +391,63 @@ async def test_timed_out_capture_has_a_bounded_fallback_without_stale_controls()
     )
     assert not snapshot.elements and snapshot.image is None
     assert "still loading" in snapshot.text
+
+
+async def test_dom_probe_combines_child_activity_and_preserves_main_geometry():
+    main_state = DOMProbe(
+        loaded=True,
+        body=True,
+        quiet_ms=100,
+        width=1280,
+        height=800,
+        unobserved_frames=2,
+        animations=1,
+    )
+    child_state = DOMProbe(
+        loaded=False,
+        body=True,
+        quiet_ms=20,
+        width=300,
+        height=200,
+        animations=2,
+        busy=True,
+    )
+    main = SimpleNamespace(id="main", run=AsyncMock(return_value=main_state))
+    child = SimpleNamespace(id="child", run=AsyncMock(return_value=child_state))
+    tab = SimpleNamespace(
+        main_frame=AsyncMock(return_value=main),
+        frames=AsyncMock(return_value=(main, child)),
+        frame_limitations=("A frame was detached",),
+    )
+    state = await probe_dom(tab)
+    assert state == DOMProbe(
+        loaded=False,
+        body=True,
+        quiet_ms=20,
+        width=1280,
+        height=800,
+        unobserved_frames=2,
+        animations=3,
+        busy=True,
+        limited=True,
+    )
+    main.run.assert_awaited_once_with(STABILITY)
+    child.run.assert_awaited_once_with(STABILITY)
+    tab.frames.assert_awaited_once_with()
+
+
+async def test_dom_probe_keeps_the_main_state_when_no_child_can_be_discovered():
+    state = DOMProbe(
+        loaded=True, body=True, quiet_ms=40, width=800, height=600, unobserved_frames=1
+    )
+    main = SimpleNamespace(id="main", run=AsyncMock(return_value=state))
+    tab = SimpleNamespace(
+        main_frame=AsyncMock(return_value=main),
+        frames=AsyncMock(return_value=(main,)),
+        frame_limitations=(),
+    )
+    assert await probe_dom(tab) == state
+    main.run.assert_awaited_once_with(STABILITY)
 
 
 def _fast_options(**kwargs):

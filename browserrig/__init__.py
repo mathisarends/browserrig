@@ -9,9 +9,10 @@ from .browser import (
     SessionSetup,
     Viewport,
 )
-from .choreography import Choreography, TabStrip
+from .choreography import InputVisualization, TabStrip
 from .completion import Done
 from .composition import (  # smelt: ignore[SMT106] -- public facade
+    ContextCompaction,
     WindowRatio,
     browser_kit,
     browser_plugins,
@@ -44,7 +45,7 @@ from .observation import (
     TrimInBatches,
     UntilCompaction,
 )
-from .pacing import Pacing
+from .pacing import InputPacing
 from .readiness import (
     CheckReadiness,
     DomReady,
@@ -79,6 +80,7 @@ __version__ = "0.1.0"
 
 __all__ = [
     "Agent",
+    "ContextCompaction",
     "CheckReadiness",
     "DownloadReadiness",
     "ReadinessCheck",
@@ -116,7 +118,7 @@ __all__ = [
     "DialogTools",
     "FileTools",
     "JavaScriptTools",
-    "Choreography",
+    "InputVisualization",
     "TabStrip",
     "FormTools",
     "PointerTools",
@@ -139,7 +141,7 @@ __all__ = [
     "SessionSetup",
     "Nudges",
     "Observe",
-    "Pacing",
+    "InputPacing",
     "Readiness",
     "ReadinessOptions",
     "Secret",

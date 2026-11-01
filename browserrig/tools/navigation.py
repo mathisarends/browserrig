@@ -12,7 +12,8 @@ from browserrig.core import browser_tool as tool
 from browserrig.events import NavigationStartedEvent
 from browserrig.readiness import Readiness
 
-from .execution import Actions, Effect
+from .effects import Effect
+from .execution import Actions
 from .intents import NavigateIntent, WaitIntent
 
 # Where a new tab lands when the agent gives no URL.
@@ -152,7 +153,7 @@ class NavigationTools(Plugin, needs=(Actions,)):
 
         async def navigate_new(_tab: Tab) -> Effect:
             # An empty tab first, so the address can be entered in a fresh tab.
-            opened = await self._browser.open_tab()
+            opened = await self._browser.tabs.open()
 
             async def dispatch() -> None:
                 await navigate(opened)

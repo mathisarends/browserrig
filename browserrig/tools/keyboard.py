@@ -8,7 +8,8 @@ from browserrig.input import TypedText
 from browserrig.observation import Observe
 from browserrig.secrets import Secrets
 
-from .execution import Actions, Effect
+from .effects import Effect
+from .execution import Actions
 
 
 class KeyboardTools(Plugin, needs=(Actions,)):

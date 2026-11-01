@@ -6,7 +6,8 @@ from browserrig.core import ActionKind, ReadinessPhase
 from browserrig.core import browser_tool as tool
 from browserrig.readiness import Readiness
 
-from .execution import Actions, Effect
+from .effects import Effect
+from .execution import Actions
 from .navigation import NEW_TAB_URL
 
 
@@ -21,7 +22,7 @@ class TabTools(Plugin, needs=(Actions,)):
         description="List controlled tabs and identify the active tab.",
     )
     async def list_tabs(self) -> tuple[TabInfo, ...]:
-        return await self._browser.tabs()
+        return await self._browser.tabs.list()
 
     @tool(
         kind=ActionKind.OPEN_TAB,
@@ -34,7 +35,7 @@ class TabTools(Plugin, needs=(Actions,)):
         actions: Inject[Actions],
     ) -> ToolResult:
         async def open_tab(_tab: Tab) -> Effect:
-            opened = await self._browser.open_tab(url)
+            opened = await self._browser.tabs.open(url)
             await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
             return Effect(f"Opened tab {opened.id}.")
 
@@ -53,7 +54,7 @@ class TabTools(Plugin, needs=(Actions,)):
         actions: Inject[Actions],
     ) -> ToolResult:
         async def switch(_tab: Tab) -> Effect:
-            selected = await self._browser.activate_tab(target_id)
+            selected = await self._browser.tabs.activate(target_id)
             await self._readiness.wait(selected)
             return Effect(f"Activated tab {selected.id}.")
 
@@ -72,7 +73,7 @@ class TabTools(Plugin, needs=(Actions,)):
         actions: Inject[Actions],
     ) -> ToolResult:
         async def close(_tab: Tab) -> Effect:
-            selected = await self._browser.close_tab(target_id)
+            selected = await self._browser.tabs.close(target_id)
             return Effect(f"Tab closed. Active tab: {selected.id}.")
 
         return await actions.run(

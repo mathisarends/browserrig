@@ -22,12 +22,12 @@ from .events import SCENE_EVENTS, HighlightElementEvent
 from .stage import Stage
 
 
-class Choreography(Plugin, slot="browserrig.choreography"):
+class InputVisualization(Plugin, slot="browserrig.choreography"):
     """Stage the browser for people watching: visible input and browser UI.
 
     Tools and input devices only describe what they do. This plugin streams input as
     live events, shows browser UI such as the address and find bars and highlights the
-    elements tools act on. How fast input runs is up to `Pacing`. Without this plugin
+    elements tools act on. How fast input runs is up to `InputPacing`. Without this plugin
     no input events are emitted.
     """
 

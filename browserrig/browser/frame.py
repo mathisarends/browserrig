@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from contextlib import suppress
+from collections.abc import AsyncGenerator, Sequence
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Literal, overload
 
 from cdpify import CdpSession
 from cdpify.domains.page import FrameTree
-from cdpify.domains.runtime import CallArgument
+from cdpify.domains.runtime import CallArgument, RemoteObject
 from cdpify.exceptions import CDPCommandError
 from pydantic import BaseModel
 
@@ -56,6 +56,28 @@ class Frame:
         except CDPCommandError as error:
             raise BrowserError("STALE_ELEMENT") from error
 
+    @overload
+    async def run_on_node[A: BaseModel, R](
+        self,
+        backend_node_id: int,
+        script: Script[A, R],
+        args: A | None = None,
+        *,
+        by_value: Literal[True] = True,
+        user_gesture: bool = False,
+    ) -> R: ...
+
+    @overload
+    async def run_on_node[A: BaseModel, R](
+        self,
+        backend_node_id: int,
+        script: Script[A, R],
+        args: A | None = None,
+        *,
+        by_value: Literal[False],
+        user_gesture: bool = False,
+    ) -> RemoteObject: ...
+
     async def run_on_node[A: BaseModel, R](
         self,
         backend_node_id: int,
@@ -64,21 +86,14 @@ class Frame:
         *,
         by_value: bool = True,
         user_gesture: bool = False,
-    ) -> R:
-        """Run with one of this frame's DOM nodes as `this`, resolved by backend node id."""
-        return await self.worlds.run(
-            self.cdp,
-            self.id,
-            self.document_id,
-            lambda context: _call_on_node(
-                self.cdp,
-                backend_node_id,
-                script,
-                args,
-                context,
-                by_value=by_value,
-                user_gesture=user_gesture,
-            ),
+    ) -> R | RemoteObject:
+        """Run with one of this frame's DOM nodes as `this`."""
+        return await self.run(
+            script,
+            args,
+            node=backend_node_id,
+            by_value=by_value,
+            user_gesture=user_gesture,
         )
 
     async def run_on_owner[A: BaseModel, R](
@@ -127,42 +142,75 @@ class Frame:
     async def context(self) -> int:
         return await self.worlds.context(self.cdp, self.id, self.document_id)
 
+    @overload
     async def run[A: BaseModel, R](
         self,
         script: Script[A, R],
         args: A | None = None,
         *,
+        node: int | None = None,
+        objects: Sequence[str] = (),
+        by_value: Literal[True] = True,
+        user_gesture: bool = False,
+    ) -> R: ...
+
+    @overload
+    async def run[A: BaseModel, R](
+        self,
+        script: Script[A, R],
+        args: A | None = None,
+        *,
+        node: int | None = None,
+        objects: Sequence[str] = (),
+        by_value: Literal[False],
+        user_gesture: bool = False,
+    ) -> RemoteObject: ...
+
+    async def run[A: BaseModel, R](
+        self,
+        script: Script[A, R],
+        args: A | None = None,
+        *,
+        node: int | None = None,
         objects: Sequence[str] = (),
         by_value: bool = True,
         user_gesture: bool = False,
-    ) -> R:
-        return await self.worlds.run(
-            self.cdp,
-            self.id,
-            self.document_id,
-            lambda context: _call(
-                self.cdp,
-                script,
-                args,
-                objects=objects,
-                by_value=by_value,
-                user_gesture=user_gesture,
-                context_id=context,
-            ),
-            retry=not objects,
+    ) -> R | RemoteObject:
+        async def call(context: int) -> RemoteObject:
+            async with _receiver(self.cdp, context, node) as object_id:
+                payload = script.arguments.model_validate({} if args is None else args)
+                result = await self.cdp.runtime.call_function_on(
+                    function_declaration=script.declaration,
+                    execution_context_id=context if object_id is None else None,
+                    object_id=object_id,
+                    arguments=[
+                        CallArgument(
+                            value=payload.model_dump(mode="json", by_alias=True)
+                        ),
+                        *(CallArgument(object_id=handle) for handle in objects),
+                    ],
+                    return_by_value=by_value,
+                    await_promise=True,
+                    user_gesture=user_gesture,
+                )
+                if result.exception_details:
+                    raise BrowserError(failure(script, result.exception_details))
+                return result.result
+
+        result = await self.worlds.run(
+            self.cdp, self.id, self.document_id, call, retry=not objects
         )
+        return script.parse(result.value) if by_value else result
 
 
-async def _call_on_node[A: BaseModel, R](
-    cdp: CdpSession,
-    backend_node_id: int,
-    script: Script[A, R],
-    args: A | None,
-    context: int,
-    *,
-    by_value: bool,
-    user_gesture: bool,
-) -> Any:
+@asynccontextmanager
+async def _receiver(
+    cdp: CdpSession, context: int, backend_node_id: int | None
+) -> AsyncGenerator[str | None, None]:
+    """Resolve `this` in the isolated world and release it on every exit path."""
+    if backend_node_id is None:
+        yield None
+        return
     try:
         resolved = await cdp.dom.resolve_node(
             backend_node_id=backend_node_id, execution_context_id=context
@@ -173,43 +221,7 @@ async def _call_on_node[A: BaseModel, R](
     if object_id is None:
         raise BrowserError("STALE_ELEMENT")
     try:
-        return await _call(
-            cdp,
-            script,
-            args,
-            object_id=object_id,
-            by_value=by_value,
-            user_gesture=user_gesture,
-        )
+        yield object_id
     finally:
         with suppress(CDPCommandError):
             await cdp.runtime.release_object(object_id=object_id)
-
-
-async def _call[A: BaseModel, R](
-    cdp: CdpSession,
-    script: Script[A, R],
-    args: A | None,
-    *,
-    objects: Sequence[str] = (),
-    by_value: bool = True,
-    user_gesture: bool = False,
-    context_id: int | None = None,
-    object_id: str | None = None,
-) -> Any:
-    payload = script.arguments.model_validate({} if args is None else args)
-    result = await cdp.runtime.call_function_on(
-        function_declaration=script.declaration,
-        execution_context_id=context_id,
-        object_id=object_id,
-        arguments=[
-            CallArgument(value=payload.model_dump(mode="json", by_alias=True)),
-            *(CallArgument(object_id=node) for node in objects),
-        ],
-        return_by_value=by_value,
-        await_promise=True,
-        user_gesture=user_gesture,
-    )
-    if result.exception_details:
-        raise BrowserError(failure(script, result.exception_details))
-    return script.parse(result.result.value) if by_value else result.result

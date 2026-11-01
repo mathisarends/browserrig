@@ -1,4 +1,5 @@
 from .config import ReadinessOptions
+from .dom import probe_dom
 from .downloads import DownloadReadiness
 from .hooks import CheckReadiness, ReadinessCheck, SelectReadiness
 from .models import ReadinessReport
@@ -20,4 +21,5 @@ __all__ = [
     "ReadinessOptions",
     "ReadinessReport",
     "wait_for_page",
+    "probe_dom",
 ]

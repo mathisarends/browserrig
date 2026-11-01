@@ -9,6 +9,7 @@ from .models import TabInfo
 from .plugin import Chrome, TabChanged
 from .setup import SessionSetup
 from .tab import Tab, validated_url
+from .tabs import Tabs
 
 __all__ = [
     "Browser",
@@ -25,6 +26,7 @@ __all__ = [
     "Tab",
     "TabChanged",
     "TabInfo",
+    "Tabs",
     "Viewport",
     "screenshot",
     "validated_url",

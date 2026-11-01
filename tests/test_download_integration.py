@@ -128,7 +128,7 @@ async def test_downloaded_workbook_is_read_as_context_without_browser_preview(
         )
         assert "Voyager" in document.text and "=B2*2" in document.text
         assert document.extracted_path and Path(document.extracted_path).is_file()
-        assert len(await browser.tabs()) == 1 and browser.active_tab.id == tab.id
+        assert len(await browser.tabs.list()) == 1 and browser.active_tab.id == tab.id
 
 
 async def test_agent_reads_selected_workbook_cells_as_context(
@@ -217,13 +217,13 @@ async def test_default_downloads_can_be_read_and_viewed_as_pdf_in_a_new_tab(
         assert downloaded.error is None
         document = await browser.files.read_file(downloaded.path, page_number=2)
         assert "Second page: Voyager 2" in document.text
-        opened = await browser.open_tab(await browser.files.resolve(downloaded.path))
+        opened = await browser.tabs.open(await browser.files.resolve(downloaded.path))
         await wait_for_page(opened)
         assert opened.id != original.id
         assert opened.url == Path(downloaded.path).as_uri()
         assert await evaluate(opened, "document.contentType") == "application/pdf"
         assert original.url == site + "/"
-        assert len(await browser.tabs()) == 2
+        assert len(await browser.tabs.list()) == 2
         image = await screenshot(opened)
         assert len(image) > 1000
         (tmp_path / "pdf-preview.png").write_bytes(base64.b64decode(image))

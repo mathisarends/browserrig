@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from browserrig import ChromeBrowser, Connect, Launch, SessionSetup, Viewport
 from browserrig.browser import Tab
-from browserrig.browser import chrome as chrome_module
+from browserrig.browser import tabs as tabs_module
 from browserrig.events import (
     DialogOpenedEvent,
     DisconnectedEvent,
@@ -59,10 +59,10 @@ async def test_setups_run_in_order_on_new_page_and_frame_sessions(options):
         SimpleNamespace(session_id="page-session"),
         SimpleNamespace(session_id="frame-session"),
     ]
-    tab = await browser._attach("page")
-    assert await browser._attach("page") is tab
-    cdp = await browser._frame_session("frame")
-    assert await browser._frame_session("frame") is cdp
+    tab = await browser.tabs._attach("page")
+    assert await browser.tabs._attach("page") is tab
+    cdp = await browser.tabs._frame_session("frame")
+    assert await browser.tabs._frame_session("frame") is cdp
     assert calls == [
         ("first", tab.cdp, False, 1),
         ("second", tab.cdp, False, 1),
@@ -85,10 +85,10 @@ async def test_failed_setup_detaches_session_and_allows_retry(frame):
     setup = SimpleNamespace(apply=AsyncMock(side_effect=ValueError("setup failed")))
     options = Connect(endpoint="ws://localhost", session_setup=(setup,))
     browser, _ = _browser(options)
-    attach = browser._frame_session if frame else browser._attach
+    attach = browser.tabs._frame_session if frame else browser.tabs._attach
     with pytest.raises(ValueError, match="setup failed"):
         await attach("target")
-    assert not browser._sessions
+    assert not browser.tabs._sessions
     browser.client.target.detach_from_target.assert_awaited_once_with(
         session_id="session"
     )
@@ -96,7 +96,7 @@ async def test_failed_setup_detaches_session_and_allows_retry(frame):
     await attach("target")
     assert setup.apply.await_count == 2
     assert browser.client.target.attach_to_target.await_count == 2
-    assert browser._sessions == {"session": "target"}
+    assert browser.tabs._sessions == {"session": "target"}
 
 
 async def test_event_handler_failure_does_not_stop_subscription(monkeypatch, caplog):
@@ -112,7 +112,7 @@ async def test_event_handler_failure_does_not_stop_subscription(monkeypatch, cap
 
 async def test_root_events_reach_downloads_and_session_events_reach_their_tab():
     browser, events = _browser()
-    tab = await browser._attach("tab")
+    tab = await browser.tabs._attach("tab")
     dialog = JavascriptDialogOpeningEvent(
         url="about:blank",
         frame_id="frame",
@@ -151,7 +151,8 @@ async def test_subscription_failure_is_fatal_but_cancellation_propagates():
 async def test_concurrent_attaches_publish_exactly_one_open_event():
     browser, events = _browser()
     first, second = await asyncio.gather(
-        browser._attach("popup", opened=True), browser._attach("popup", opened=True)
+        browser.tabs._attach("popup", opened=True),
+        browser.tabs._attach("popup", opened=True),
     )
     assert first is second
     browser.client.target.attach_to_target.assert_awaited_once()
@@ -160,18 +161,18 @@ async def test_concurrent_attaches_publish_exactly_one_open_event():
 
 async def test_close_forgets_sessions_and_ignores_stale_target_listing(monkeypatch):
     browser, events = _browser()
-    closed = await browser._attach("closing")
+    closed = await browser.tabs._attach("closing")
     remaining = Tab(
         "remaining", SimpleNamespace(page=SimpleNamespace(bring_to_front=AsyncMock()))
     )
-    browser._active = closed.id
+    browser.tabs._active = closed.id
     browser.client.target.get_targets.return_value = SimpleNamespace(
         target_infos=[
             SimpleNamespace(target_id=tid, type="page", title="", url="about:blank")
             for tid in ("closing", "remaining")
         ]
     )
-    browser._tabs[remaining.id] = remaining
+    browser.tabs._tabs[remaining.id] = remaining
     gestures = []
 
     async def switch_tab(gesture, tab_id, switch):
@@ -179,13 +180,13 @@ async def test_close_forgets_sessions_and_ignores_stale_target_listing(monkeypat
         await switch()
 
     monkeypatch.setattr(browser.mouse, "switch_tab", switch_tab)
-    assert await browser.close_tab(closed.id) is remaining
+    assert await browser.tabs.close(closed.id) is remaining
     assert gestures == [(TabGesture.CLOSE, "closing")]
     remaining.cdp.page.bring_to_front.assert_awaited_once_with()
     assert browser.active_tab is remaining
-    assert closed.closed and closed.id not in browser._tabs
-    assert "session" not in browser._sessions
-    await browser._forget(closed.id)
+    assert closed.closed and closed.id not in browser.tabs._tabs
+    assert "session" not in browser.tabs._sessions
+    await browser.tabs._forget(closed.id)
     assert len([event for event in events if isinstance(event, TabClosedEvent)]) == 1
 
 
@@ -199,10 +200,10 @@ async def test_frame_cache_is_action_scoped_and_invalidated_by_layout_and_docume
     monkeypatch,
 ):
     browser, _ = _browser()
-    tab = await browser._attach("tab")
+    tab = await browser.tabs._attach("tab")
     browser.client.target.get_targets.return_value = SimpleNamespace(target_infos=[])
     discover = AsyncMock(return_value=((), ()))
-    monkeypatch.setattr(chrome_module, "discover_frames", discover)
+    monkeypatch.setattr(tabs_module, "discover_frames", discover)
     with browser.input.action("action"):
         await tab.frames()
         await tab.frames()
@@ -220,7 +221,7 @@ async def test_frame_cache_is_action_scoped_and_invalidated_by_layout_and_docume
 
 async def test_main_frame_query_does_not_update_document_metadata():
     browser, _ = _browser()
-    tab = await browser._attach("tab")
+    tab = await browser.tabs._attach("tab")
     frame = SimpleNamespace(
         id="frame", loader_id="new-document", url="https://example.org"
     )
@@ -273,7 +274,8 @@ def _browser(options=None):
         options or Connect(endpoint="ws://localhost/devtools/browser/test"),
         emit=AsyncMock(side_effect=events.append),
     )
-    browser._stack = AsyncExitStack()
+    stack = AsyncExitStack()
+    browser._stack = stack
     cdp = SimpleNamespace(
         page=SimpleNamespace(
             enable=AsyncMock(),
@@ -303,4 +305,6 @@ def _browser(options=None):
             get_targets=AsyncMock(),
         ),
     )
+    browser.tabs.client = browser.client
+    browser.tabs._stack = stack
     return browser, events

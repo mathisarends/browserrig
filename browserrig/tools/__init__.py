@@ -1,7 +1,9 @@
 from browserrig.core import BrowserToolMetadata, browser_tool
 
+from .chains import ActionChainPolicy, DomActionChains, ObserveAfterInput
 from .dialogs import DialogTools
-from .execution import ActionChainPolicy, Actions, DomActionChains, ObserveAfterInput
+from .effects import Effect
+from .execution import Actions
 from .files import FileTools
 from .find import FindTools
 from .forms import FormTools
@@ -29,6 +31,7 @@ __all__ = [
     "BrowserToolMetadata",
     "browser_tool",
     "Actions",
+    "Effect",
     "DialogTools",
     "FileTools",
     "FindIntent",

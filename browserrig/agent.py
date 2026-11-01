@@ -19,9 +19,9 @@ class Agent(harnessed.Agent):
     remain caller-owned. Conversations stay in memory; continue one by passing a
     saved `SessionState` to `run` or `session`. Long runs summarize older steps
     once the request fills 80% of the model's context window, or 100k tokens when
-    the model reports none; pass `without=(Compaction,)` to keep everything, or a
-    configured `Compaction`. Input is paced like a person and streamed for people
-    watching; pass `without=(Pacing, Choreography)` to work at full speed unseen.
+    the model reports none; pass `without=(ContextCompaction,)` to keep everything, or a
+    configured `ContextCompaction`. Input is paced like a person and streamed for people
+    watching; pass `without=(InputPacing, InputVisualization)` to work at full speed unseen.
     """
 
     def __init__(

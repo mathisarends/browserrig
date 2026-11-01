@@ -9,7 +9,8 @@ from browserrig.core import ActionKind
 from browserrig.core import browser_tool as tool
 from browserrig.observation import FoundMatch, PageMatches, close_find, find_text
 
-from .execution import Actions, Effect
+from .effects import Effect
+from .execution import Actions
 from .intents import FindIntent
 
 type _Query = Annotated[str, Field(min_length=1, max_length=200)]

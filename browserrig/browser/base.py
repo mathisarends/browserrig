@@ -1,15 +1,18 @@
+from __future__ import annotations
+
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
-from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from browserrig.events import BrowserEvent, LiveEvent
 from browserrig.files import Download, FileSystem
 from browserrig.input import Input, Keyboard, Mouse
 
-from .models import TabInfo
 from .tab import Tab
+
+if TYPE_CHECKING:
+    from .tabs import Tabs
 
 type EventSink = Callable[[BrowserEvent | LiveEvent], Awaitable[None]]
 type EventFilter = Callable[[BrowserEvent | LiveEvent], BrowserEvent | LiveEvent]
@@ -49,6 +52,7 @@ class Browser(Protocol):
     files: FileSystem | None
     # The browser's one mouse and keyboard; they act on the active tab.
     input: Input
+    tabs: Tabs
 
     @property
     def active_tab(self) -> Tab: ...
@@ -59,10 +63,6 @@ class Browser(Protocol):
     @property
     def keyboard(self) -> Keyboard: ...
 
-    async def tabs(self) -> tuple[TabInfo, ...]: ...
-    async def open_tab(self, target: str | Path = "about:blank") -> Tab: ...
-    async def activate_tab(self, target_id: str) -> Tab: ...
-    async def close_tab(self, target_id: str) -> Tab: ...
     async def downloads(self) -> tuple[Download, ...]: ...
 
 

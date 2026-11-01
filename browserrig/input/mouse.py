@@ -232,7 +232,7 @@ class Mouse:
     async def _move(self, target: InputTarget, point: Point) -> None:
         start = self._rest(target).position
         motor = self._motor()
-        planned = motor.route(start, point)
+        planned = motor.pointer_route(start, point)
         route = _joined(planned, start, point)
         try:
             for path in route:

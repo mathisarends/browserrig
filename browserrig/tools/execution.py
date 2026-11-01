@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field, replace
-from typing import Protocol, cast
+from dataclasses import dataclass
+from typing import cast
 from uuid import uuid4
 
 from harnessed import (
@@ -10,9 +10,7 @@ from harnessed import (
     Plugin,
     PluginState,
     ToolError,
-    ToolInfo,
     ToolResult,
-    ToolStatus,
     hook,
 )
 from harnessed.hooks import ExecuteTool, Next, ReviewToolResult
@@ -21,9 +19,7 @@ from harnessed.kernel import dependency
 from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
     ActionKind,
-    Bounds,
     BrowserError,
-    BrowserToolMetadata,
     ElementPoint,
     ReadinessPhase,
     ReadinessStatus,
@@ -35,11 +31,19 @@ from browserrig.events import (
     ActionStartedEvent,
     PageState,
 )
-from browserrig.observation import DomReferences, Observe, Snapshot, decision_change
+from browserrig.observation import Observe
 from browserrig.readiness import Readiness
 
-from .intents import Intent, Perform, TargetLocated
-from .scrolling import prepare_element
+from .chains import (
+    ActionChainPolicy,
+    DomActionChains,
+    observes,
+    probe_change,
+    stop_on_failure,
+)
+from .effects import Effect
+from .intents import Intent, Perform
+from .targeting import Targeting
 
 # Pointer actions aim at coordinates from the last observation, so it must still be current.
 _POINTER_KINDS = frozenset(
@@ -80,34 +84,7 @@ _NAVIGATION_KINDS = {
 @dataclass
 class _Mount:
     context: Context | None = None
-    # Where the current action aims on each ref, so a re-check hits the same spot.
-    aim_action: str = ""
-    aims: dict[str, tuple[float, float]] = field(default_factory=dict)
-
-
-@dataclass(frozen=True, slots=True)
-class Effect:
-    text: str
-    prepared_scroll: bool = False
-    break_chain: bool = False
-
-
-class ActionChainPolicy(Protocol):
-    async def check(self, observe: Observe, tab: Tab) -> str:
-        """Empty means continue; otherwise explain why a new observation is needed."""
-        ...
-
-
-class ObserveAfterInput:
-    async def check(self, _observe: Observe, _tab: Tab) -> str:
-        return "A fresh observation is required after this input."
-
-
-class DomActionChains:
-    async def check(self, observe: Observe, tab: Tab) -> str:
-        if not isinstance(observe.references, DomReferences):
-            return "A fresh observation is required after this input."
-        return await _probe_change(observe, tab)
+    targeting: Targeting | None = None
 
 
 class Actions(Plugin, slot="browserrig.actions", provides=True):
@@ -126,6 +103,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
 
     async def setup(self, ctx: Context) -> None:
         self._mount.context = ctx
+        self._mount.targeting = Targeting(self.browser, self.observe, ctx)
 
     chains = Instructions(
         title="Browser action chains",
@@ -238,7 +216,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
             return "The active tab changed."
         try:
             if not after_input:
-                return await _probe_change(self.observe, tab)
+                return await probe_change(self.observe, tab)
             return await self.chain_policy.check(self.observe, tab)
         except Exception:  # pylint: disable=broad-exception-caught
             # Successful input remains successful even if comparison fails.
@@ -247,49 +225,17 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     async def element_point(
         self, *, tab: Tab, ref: str, scroll: bool = True
     ) -> ElementPoint:
-        """Reveal a ref with wheel input, then return a hit-tested point.
-
-        The point is where the motor aims on the target, unless something covers that
-        spot. Plugins learn about the target through `TargetLocated`.
-
-        Use `scroll=False` to re-check the target after hover or other input moved it.
-        """
-        handle = await self.observe.element(tab, ref)
-        scrolled = False
-        if scroll:
-            scrolled = await prepare_element(
-                tab, handle, self.browser.mouse, document_id=tab.document_id
-            )
-            # Wheel input may have moved ancestor documents; refresh their transforms.
-            handle = await self.observe.element(tab, ref)
-        point = await handle.locate(aim=self._aim(ref, handle.element.bounds))
-        context = self._mount.context
-        if point.bounds is not None and context is not None:
-            await context.dispatch(
-                TargetLocated(tab, ref, point.bounds, self.browser.input.action_id)
-            )
-        return point.model_copy(update={"scrolled": scrolled})
-
-    def _aim(self, ref: str, bounds: Bounds | None) -> tuple[float, float]:
-        """The motor's spot on `ref`, chosen once per action."""
-        action_id = self.browser.input.action_id
-        if self._mount.aim_action != action_id:
-            self._mount.aim_action, self._mount.aims = action_id, {}
-        aim = self._mount.aims.get(ref)
-        if aim is None:
-            width, height = (bounds.width, bounds.height) if bounds else (0, 0)
-            motor = self.browser.input.motor()
-            aim = motor.aim(width, height)
-            if action_id:
-                self._mount.aims[ref] = aim
-        return aim
+        """Reveal a ref and return a hit-tested point with an action-scoped aim."""
+        targeting = self._mount.targeting
+        assert targeting is not None
+        return await targeting.locate(tab=tab, ref=ref, scroll=scroll)
 
     @hook(ExecuteTool, ReviewToolResult)
     async def _execute_browser_result(
         self, event: ExecuteTool | ReviewToolResult, next_: Next[ToolResult]
     ) -> ToolResult:
         # Set the signal before the execution receipt is persisted, including on errors.
-        return _stop_on_failure(await next_(), event.tool)
+        return stop_on_failure(await next_(), event.tool)
 
     async def _prepare(self, tab: Tab, kind: ActionKind) -> PageState:
         """Return the pre-action baseline once the page accepts input."""
@@ -307,7 +253,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         if (
             before is not None
             and kind in _POINTER_KINDS | _CHAINABLE_KINDS
-            and not _observes(before, tab)
+            and not observes(before, tab)
         ):
             raise BrowserError(
                 "The observed tab or document changed; act on the next observation"
@@ -378,32 +324,3 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
                 reason=reason,
             )
         )
-
-
-async def _probe_change(observe: Observe, tab: Tab) -> str:
-    before = observe.snapshot
-    if before is None:
-        return "A fresh observation is required after this input."
-    after = await observe.probe(tab)
-    if after.readiness != ReadinessStatus.READY or after.limitations:
-        return "The page could not be checked completely after input."
-    return decision_change(
-        before, after, dom=isinstance(observe.references, DomReferences)
-    )
-
-
-def _stop_on_failure(result: ToolResult, tool: ToolInfo | None) -> ToolResult:
-    metadata = tool.metadata.get(BrowserToolMetadata) if tool else None
-    # Calls denied, disabled or skipped before execution retain native approval semantics.
-    if (
-        metadata is not None
-        and result.is_error
-        and result.status
-        not in {ToolStatus.DENIED, ToolStatus.UNAVAILABLE, ToolStatus.SKIPPED}
-    ):
-        return replace(result, break_chain=True)
-    return result
-
-
-def _observes(snapshot: Snapshot, tab: Tab) -> bool:
-    return snapshot.tab_id == tab.id and snapshot.document_id == tab.document_id

@@ -188,7 +188,7 @@ async def test_handoff_refreshes_a_previously_delivered_screenshot_before_coordi
 
 def _browser_ready(holder):
     browser = holder["browser"]
-    browser.tabs = AsyncMock(return_value=())
+    browser.tabs.list = AsyncMock(return_value=())
     return browser
 
 

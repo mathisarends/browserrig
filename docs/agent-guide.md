@@ -42,12 +42,12 @@ defaults by type (see [Composing plugins](#composing-plugins)). Conversations
 stay in memory; see
 [Saving and restoring sessions](#saving-and-restoring-sessions).
 By default, older steps are summarized once a request reaches 80% of the model's
-context window (the default `Compaction(trigger=WindowRatio(0.8))`), so long runs do
+context window (the default `ContextCompaction(trigger=WindowRatio(0.8))`), so long runs do
 not stop at the context limit. Many providers report no window; the trigger then
 fires at 100k tokens (`WindowRatio(fallback_tokens=...)`), or pass
 `PydanticAIModel(..., context_window=...)` to use the ratio. Pass your own
-`Compaction(...)` from `harnessed.plugins` in `plugins` to tune it, or
-`without=(Compaction,)` to keep every step.
+`ContextCompaction(...)` from `browserrig` in `plugins` to tune it, or
+`without=(ContextCompaction,)` to keep every step.
 Without an `Approvals` plugin, Harnessed's default `ASK` policy applies; the example
 above allows actions automatically. The constructor does not open Chrome or files.
 
@@ -57,7 +57,7 @@ above allows actions automatically. The constructor does not open Chrome or file
 
 - A plugin that fills the same slot as a default
   replaces it in place, such as `Observe(...)`, `Readiness(...)`, `ImageContext(...)`
-  or `Compaction(...)`. Two plugins for the same default raise `PluginConflict`.
+  or `ContextCompaction(...)`. Two plugins for the same default raise `PluginConflict`.
 - Any other plugin is added after the defaults.
 - `without=(...)` drops defaults by type; a type that is not a default raises
   `ValueError`.
@@ -66,10 +66,10 @@ above allows actions automatically. The constructor does not open Chrome or file
 ```python
 from browserrig import (
     Agent,
-    Choreography,
+    InputVisualization,
     FileTools,
     Observe,
-    Pacing,
+    InputPacing,
     Screenshots,
     ScreenshotTrigger,
 )
@@ -80,7 +80,7 @@ agent = Agent(
         Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
         handoff if interactive else None,
     ],
-    without=(Pacing, Choreography, FileTools),
+    without=(InputPacing, InputVisualization, FileTools),
 )
 ```
 

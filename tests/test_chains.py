@@ -27,7 +27,7 @@ from browserrig.events import ActionFailedEvent, ActionFinishedEvent, PageState
 from browserrig.observation import DomReferences, Element, Snapshot, decision_change
 from browserrig.observation.models import Offscreen
 from browserrig.tools import Actions, BrowserToolMetadata, DomActionChains, browser_tool
-from browserrig.tools.execution import Effect
+from browserrig.tools.effects import Effect
 from tests.fakes import FakeServices
 
 
