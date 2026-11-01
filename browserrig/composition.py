@@ -5,7 +5,6 @@ from harnessed import Plugin
 from .activity import Activity
 from .browser import BrowserOptions, Chrome
 from .choreography import Choreography, TabStrip
-from .files import FileSystemOptions
 from .handoff import HumanHandoff
 from .nudges import Nudges
 from .observation import ImageContext, Observe
@@ -30,7 +29,6 @@ def browser_plugins(
     options: BrowserOptions | None = None,
     *,
     readiness: ReadinessOptions | Readiness | None = None,
-    file_system: FileSystemOptions | None = None,
     observe: Observe | None = None,
     image_context: ImageContext | None = None,
     actions: Actions | None = None,
@@ -43,7 +41,7 @@ def browser_plugins(
     observation = observe or Observe()
     plugins: list[Plugin] = [
         Activity(),
-        Chrome(options, file_system=file_system),
+        Chrome(options),
     ]
     if choreography:
         # Paces input like a person and streams it, for anyone watching the session.

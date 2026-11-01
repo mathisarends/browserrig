@@ -86,8 +86,7 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
 
     agent = BrowserAgent(
         model=CallbackModel(respond),
-        browser=Launch(url=site),
-        file_system=FileSystemOptions(directory=workspace),
+        browser=Launch(url=site, files=FileSystemOptions(directory=workspace)),
         approvals=Approvals(default=PolicyDecision.ALLOW),
     )
     async with agent.session() as session:
@@ -106,8 +105,7 @@ async def test_downloaded_workbook_is_read_as_context_without_browser_preview(
     site, tmp_path
 ):
     async with ChromeBrowser(
-        Launch(url=site),
-        file_system=FileSystemOptions(directory=tmp_path / "workspace"),
+        Launch(url=site, files=FileSystemOptions(directory=tmp_path / "workspace")),
     ) as browser:
         tab = browser.active_tab
         await wait_for_page(tab)
@@ -165,8 +163,7 @@ async def test_agent_reads_selected_workbook_cells_as_context(
 
     result = await BrowserAgent(
         model=CallbackModel(respond),
-        browser=Launch(url=site),
-        file_system=FileSystemOptions(directory=tmp_path),
+        browser=Launch(url=site, files=FileSystemOptions(directory=tmp_path)),
         approvals=Approvals(default=PolicyDecision.ALLOW),
     ).run("Read the downloaded workbook", max_steps=2)
     assert result.text == "Workbook read as context"
@@ -205,8 +202,7 @@ async def test_default_downloads_can_be_read_and_viewed_as_pdf_in_a_new_tab(
     site, tmp_path
 ):
     async with ChromeBrowser(
-        Launch(url=site),
-        file_system=FileSystemOptions(directory=tmp_path / "workspace"),
+        Launch(url=site, files=FileSystemOptions(directory=tmp_path / "workspace")),
     ) as browser:
         original = browser.active_tab
         await wait_for_page(original)
@@ -312,8 +308,9 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(
     model = CallbackModel(respond)
     agent = BrowserAgent(
         model=model,
-        browser=Launch(url=site),
-        file_system=FileSystemOptions(directory=tmp_path / "workspace"),
+        browser=Launch(
+            url=site, files=FileSystemOptions(directory=tmp_path / "workspace")
+        ),
         approvals=Approvals(default=PolicyDecision.ALLOW),
     )
     result = await agent.run(
@@ -357,10 +354,11 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
 
     result = await BrowserAgent(
         model=CallbackModel(respond),
-        browser=Launch(url=site + "/canvas"),
+        browser=Launch(
+            url=site + "/canvas", files=FileSystemOptions(directory=tmp_path)
+        ),
         observe=Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
         readiness=ReadinessOptions(timeout=3),
-        file_system=FileSystemOptions(directory=tmp_path),
         approvals=Approvals(default=PolicyDecision.ALLOW),
     ).run("Preview the PDF and return to the original tab", max_steps=3)
     assert result.text == "Back on original tab"

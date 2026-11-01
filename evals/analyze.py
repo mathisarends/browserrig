@@ -22,7 +22,9 @@ def px_spans(project: str, session_id: str) -> list[dict]:
         "span", "list", "--project", project, "--attribute", f"session.id:{session_id}",
         "--limit", "2000", "--format", "raw", "--no-progress",
     ]  # fmt: skip
-    out = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", check=True)
+    out = subprocess.run(
+        command, capture_output=True, text=True, encoding="utf-8", check=True
+    )
     return json.loads(out.stdout or "[]")
 
 
@@ -45,10 +47,14 @@ def _text(message: dict) -> str:
             else str(part)
             for part in content
         )
-    body = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+    body = (
+        content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+    )
     calls = message.get("tool_calls") or []
     if calls:
-        body += "\n" + "\n".join(f"→ {c['name']}({json.dumps(c.get('arguments'))})" for c in calls)
+        body += "\n" + "\n".join(
+            f"→ {c['name']}({json.dumps(c.get('arguments'))})" for c in calls
+        )
     return body
 
 
@@ -88,7 +94,8 @@ def _noise(text: str, seen: set[str]) -> dict[str, float]:
 def analyze(record: dict, project: str, dump_dir: Path | None) -> dict:
     spans = px_spans(project, record["session_id"])
     models = sorted(
-        (s for s in spans if s["name"] == "harnessed.model"), key=lambda s: s["start_time"]
+        (s for s in spans if s["name"] == "harnessed.model"),
+        key=lambda s: s["start_time"],
     )
     tools = [s for s in spans if s["name"] == "harnessed.tool"]
     steps = []
@@ -106,7 +113,8 @@ def analyze(record: dict, project: str, dump_dir: Path | None) -> dict:
             # Append-only histories share the previous prefix; anything else is a rewrite.
             shared = 0
             while (
-                shared < min(len(previous), len(messages)) and previous[shared] == messages[shared]
+                shared < min(len(previous), len(messages))
+                and previous[shared] == messages[shared]
             ):
                 shared += 1
             rewritten = len(previous) - shared
@@ -115,14 +123,18 @@ def analyze(record: dict, project: str, dump_dir: Path | None) -> dict:
                 kind = _kind(message)
                 added[kind] = added.get(kind, 0) + len(_text(message))
                 if kind == "observation" or kind.startswith("tool:"):
-                    noise.append({"step": index, "kind": kind, **_noise(_text(message), seen)})
+                    noise.append(
+                        {"step": index, "kind": kind, **_noise(_text(message), seen)}
+                    )
             if dump_dir is not None:
                 lines.append(
                     f"\n## step {index} · prompt {prompt} · cached {cached}"
                     + (f" · REWROTE {rewritten} messages" if rewritten else "")
                 )
                 for message in new:
-                    lines.append(f"\n### {_kind(message)} ({len(_text(message))} chars)\n")
+                    lines.append(
+                        f"\n### {_kind(message)} ({len(_text(message))} chars)\n"
+                    )
                     lines.append("```\n" + _text(message) + "\n```")
             previous = messages
         else:
@@ -142,8 +154,12 @@ def analyze(record: dict, project: str, dump_dir: Path | None) -> dict:
         )
     if dump_dir is not None:
         dump_dir.mkdir(parents=True, exist_ok=True)
-        header = f"# {record['task']}\n\n{record.get('answer', record.get('error', ''))}\n"
-        (dump_dir / f"{record['task']}.md").write_text(header + "\n".join(lines), encoding="utf-8")
+        header = (
+            f"# {record['task']}\n\n{record.get('answer', record.get('error', ''))}\n"
+        )
+        (dump_dir / f"{record['task']}.md").write_text(
+            header + "\n".join(lines), encoding="utf-8"
+        )
     prompts = [step["prompt"] for step in steps]
     total = sum(prompts)
     cached = sum(step["cached"] for step in steps)
@@ -165,9 +181,13 @@ def analyze(record: dict, project: str, dump_dir: Path | None) -> dict:
         "cache_hit": round(cached / total, 3) if total else None,
         "uncached_total": total - cached,
         "rewrites": sum(1 for step in steps if step["rewritten"]),
-        "obs_avg": round(sum(observation_chars) / max(1, sum(1 for c in observation_chars if c))),
+        "obs_avg": round(
+            sum(observation_chars) / max(1, sum(1 for c in observation_chars if c))
+        ),
         "obs_max": max(observation_chars, default=0),
-        "tools": {name: (len(sizes), max(sizes)) for name, sizes in sorted(tool_chars.items())},
+        "tools": {
+            name: (len(sizes), max(sizes)) for name, sizes in sorted(tool_chars.items())
+        },
         "errors": errors,
         "noise": noise,
         "steps_detail": steps,

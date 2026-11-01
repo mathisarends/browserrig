@@ -20,7 +20,9 @@ async def main() -> None:
     parser.add_argument("--max-chars", type=int, default=50000)
     parser.add_argument("--no-observe", action="store_true")
     parser.add_argument("--js", action="append", default=[], help="Evaluate after load")
-    parser.add_argument("--wait", type=float, default=0, help="Extra seconds after load")
+    parser.add_argument(
+        "--wait", type=float, default=0, help="Extra seconds after load"
+    )
     args = parser.parse_args()
     async with ChromeBrowser(Launch(url=args.url)) as browser:
         tab = browser.active_tab
@@ -35,7 +37,9 @@ async def main() -> None:
             print(f"--- observation ({len(text)} chars)\n{text}")
         if args.extract:
             content = (
-                await extract_content(tab, max_chars=args.max_chars, full_page=args.full_page)
+                await extract_content(
+                    tab, max_chars=args.max_chars, full_page=args.full_page
+                )
             ).render()
             print(f"--- extract_content ({len(content)} chars)\n{content}")
 

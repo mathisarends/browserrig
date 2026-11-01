@@ -334,9 +334,11 @@ async def test_open_file_reports_the_file_in_its_new_tab(files, monkeypatch):
 
 
 def test_remote_browser_requires_explicit_shared_filesystem(tmp_path):
-    remote = Connect(endpoint="http://127.0.0.1:9222")
-    assert ChromeBrowser(remote).files is None
-    shared = ChromeBrowser(remote, file_system=FileSystemOptions(directory=tmp_path))
+    endpoint = "http://127.0.0.1:9222"
+    assert ChromeBrowser(Connect(endpoint=endpoint)).files is None
+    shared = ChromeBrowser(
+        Connect(endpoint=endpoint, files=FileSystemOptions(directory=tmp_path))
+    )
     assert shared.files.directory == tmp_path
     assert ChromeBrowser(Launch()).files is not None
 

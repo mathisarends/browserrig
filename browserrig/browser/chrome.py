@@ -36,7 +36,7 @@ from browserrig.events import (
     TabClosedEvent,
     TabOpenedEvent,
 )
-from browserrig.files import Download, FileSystem, FileSystemOptions
+from browserrig.files import Download, FileSystem
 from browserrig.input import Input, Keyboard, Mouse
 
 from .base import BrowserEvents, EventSink, _discard
@@ -74,14 +74,14 @@ class ChromeBrowser:
         self,
         options: BrowserOptions | None = None,
         *,
-        file_system: FileSystemOptions | None = None,
         emit: EventSink = _discard,
         on_tab_change: TabListener | None = None,
     ) -> None:
         self._options = options or Launch()
+        files = self._options.files
         self.files = (
-            FileSystem(file_system, download_directory=self._options.download_directory)
-            if self._options.owns_process or file_system is not None
+            FileSystem(files, download_directory=self._options.download_directory)
+            if files is not None
             else None
         )
         self.id = uuid4().hex

@@ -4,7 +4,6 @@ from harnessed import Context, Inject, Plugin, SessionLog
 from harnessed.kernel import Event
 
 from browserrig.events import BROWSER_EVENTS
-from browserrig.files import FileSystemOptions
 
 from .base import Browser, BrowserEvents
 from .chrome import ChromeBrowser
@@ -15,15 +14,9 @@ from .tab import Tab
 class Chrome(Plugin, slot="browserrig.browser", needs=(SessionLog,)):
     events = BROWSER_EVENTS
 
-    def __init__(
-        self,
-        options: BrowserOptions | None = None,
-        *,
-        file_system: FileSystemOptions | None = None,
-    ) -> None:
+    def __init__(self, options: BrowserOptions | None = None) -> None:
         super().__init__()
         self.options = options or Launch()
-        self.file_system = file_system
 
     async def setup(self, ctx: Context, log: Inject[SessionLog]) -> None:
         async def tab_changed(tab: Tab, settled: bool) -> None:
@@ -32,7 +25,6 @@ class Chrome(Plugin, slot="browserrig.browser", needs=(SessionLog,)):
         browser = await ctx.enter(
             ChromeBrowser(
                 self.options,
-                file_system=self.file_system,
                 emit=log.emit,
                 on_tab_change=tab_changed,
             )

@@ -8,7 +8,6 @@ from harnessed.plugins import Approvals, Compaction, ContextState
 
 from .browser import BrowserOptions
 from .composition import browser_plugins
-from .files import FileSystemOptions
 from .handoff import HumanHandoff
 from .observation import ImageContext, Observe
 from .readiness import Readiness, ReadinessOptions
@@ -53,7 +52,6 @@ class BrowserAgent(Agent):
         model: Model | str | None = None,
         browser: BrowserOptions | None = None,
         readiness: ReadinessOptions | Readiness | None = None,
-        file_system: FileSystemOptions | None = None,
         observe: Observe | None = None,
         image_context: ImageContext | None = None,
         actions: Actions | None = None,
@@ -74,7 +72,6 @@ class BrowserAgent(Agent):
             browser_plugins(
                 browser,
                 readiness=readiness,
-                file_system=file_system,
                 observe=observe,
                 image_context=image_context,
                 actions=actions,

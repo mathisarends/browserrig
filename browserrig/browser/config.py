@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 from pydantic import Field, SecretStr, field_validator, model_validator
 
 from browserrig.core import Options, TargetId
+from browserrig.files import FileSystemOptions
 
 from .process import ChromeProcess
 
@@ -38,6 +39,8 @@ class Launch(Options):
     timeout: float = Field(default=20, gt=0, le=120)
     arguments: tuple[str, ...] = ()
     download_directory: str | None = None
+    # The agent's workspace for downloads and local files.
+    files: FileSystemOptions = FileSystemOptions()
 
     @field_validator("arguments")
     @classmethod
@@ -79,6 +82,8 @@ class Connect(Options):
     headers: dict[str, SecretStr] = Field(default_factory=dict, repr=False)
     viewport: Viewport | None = None
     download_directory: str | None = None
+    # A browser running elsewhere gets a local workspace only when one is configured.
+    files: FileSystemOptions | None = None
 
     @model_validator(mode="after")
     def _target_ownership(self) -> Self:

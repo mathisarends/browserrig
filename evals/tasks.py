@@ -20,7 +20,11 @@ class Task:
 
     def check(self, answer: str) -> list[str]:
         """Patterns the answer misses."""
-        return [pattern for pattern in self.expect if not re.search(pattern, answer, re.I | re.S)]
+        return [
+            pattern
+            for pattern in self.expect
+            if not re.search(pattern, answer, re.I | re.S)
+        ]
 
 
 TASKS: tuple[Task, ...] = (
@@ -40,7 +44,14 @@ TASKS: tuple[Task, ...] = (
         "From the main ranking table, list the five tallest completed buildings with height in "
         "metres, city and completion year. Then tell how many of the buildings in that table "
         "are located in Dubai.",
-        expect=(r"Burj Khalifa", r"828", r"Merdeka", r"Shanghai Tower", r"632", r"Dubai"),
+        expect=(
+            r"Burj Khalifa",
+            r"828",
+            r"Merdeka",
+            r"Shanghai Tower",
+            r"632",
+            r"Dubai",
+        ),
         tags=("large-table",),
     ),
     Task(
@@ -228,7 +239,9 @@ def select(names: str | None) -> list[Task]:
         return list(TASKS)
     wanted = [name.strip() for name in names.split(",") if name.strip()]
     found = {task.name: task for task in TASKS}
-    missing = [name for name in wanted if name not in found and not name.startswith("@")]
+    missing = [
+        name for name in wanted if name not in found and not name.startswith("@")
+    ]
     if missing:
         raise SystemExit(f"Unknown tasks: {', '.join(missing)}")
     chosen = []

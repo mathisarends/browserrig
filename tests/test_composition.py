@@ -36,9 +36,9 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
             title="Custom extension", text="Use the custom extension."
         )
 
-    options = Launch(url="https://example.com", headless=False)
-    readiness = ReadinessOptions(quiet_ms=123)
     file_system = FileSystemOptions(directory=tmp_path / "files")
+    options = Launch(url="https://example.com", headless=False, files=file_system)
+    readiness = ReadinessOptions(quiet_ms=123)
     approvals = Approvals(default=PolicyDecision.DENY)
     extension = Extension()
     agent = BrowserAgent(
@@ -46,7 +46,6 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
         browser=options,
         observe=Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
         readiness=readiness,
-        file_system=file_system,
         compaction=None,
         approvals=approvals,
         system_prompt="Custom instructions.",
@@ -60,10 +59,6 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     assert (
         next(item for item in agent.plugins if isinstance(item, Readiness)).options
         == readiness
-    )
-    assert (
-        next(item for item in agent.plugins if isinstance(item, Chrome)).file_system
-        == file_system
     )
     assert extension in agent.plugins
     assert [item for item in agent.plugins if isinstance(item, Approvals)] == [

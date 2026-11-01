@@ -24,12 +24,15 @@ from browserrig import BrowserAgent, FileSystemOptions, Launch
 
 agent = BrowserAgent(
     model=model,
-    browser=Launch(url="https://example.com"),
-    file_system=FileSystemOptions(directory=Path(".browserrig/research")),
+    browser=Launch(
+        url="https://example.com",
+        files=FileSystemOptions(directory=Path(".browserrig/research")),
+    ),
 )
 ```
 
-`file_system` is also accepted by `browser_plugins()`, `Chrome`, and `ChromeBrowser`.
+`files` belongs to the browser options, so `browser_plugins()`, `Chrome` and
+`ChromeBrowser` use it as well.
 The constructor creates no files or directories; browser startup creates the directories.
 File access is confined to the workspace and any explicitly configured download
 directory, including checks for path traversal and symlinks leaving those roots.
@@ -159,7 +162,7 @@ Duplicate filenames get separate folders. `DownloadState` includes `IN_PROGRESS`
 Canceled downloads emit `DownloadCanceledEvent` instead of `DownloadFailedEvent`.
 
 Connected browsers keep their existing host semantics: `Connect` enables
-workspace tools only when `file_system=FileSystemOptions(...)` explicitly identifies
+workspace tools only when `Connect(files=FileSystemOptions(...))` explicitly identifies
 a directory shared with the browser host at the same absolute path. Without it,
 download tracking still works but local file reads and previews are unavailable.
 Attaching to an existing `target_id` retains its browser-wide download policy.

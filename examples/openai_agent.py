@@ -70,11 +70,12 @@ async def main() -> None:
             model=PydanticAIModel(
                 OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra"))
             ),
-            browser=Launch(url=args.url, headless=not args.headed),
+            browser=Launch(
+                url=args.url,
+                headless=not args.headed,
+                files=FileSystemOptions(directory=args.workspace),
+            ),
             image_context=ImageContext(UntilCompaction()),
-            file_system=FileSystemOptions(directory=args.workspace)
-            if args.workspace
-            else None,
             approvals=Approvals(default=PolicyDecision.ALLOW),
             plugins=[
                 *telemetry,
