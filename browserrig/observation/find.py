@@ -4,11 +4,18 @@ from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser import Frame, Tab
 from browserrig.core import Bounds, BrowserError
-from browserrig.events import FindMark
 from browserrig.scripts import FIND, FindArgs, FoundText
 
 # Matches each frame keeps as ranges for marks and listing; more are only counted.
 _MARKED_PER_FRAME = 1000
+
+
+@dataclass(frozen=True, slots=True)
+class FindMark:
+    """One match in the viewport: its number and its line boxes as (x, y, width, height)."""
+
+    index: int
+    rects: tuple[tuple[float, float, float, float], ...]
 
 
 @dataclass(frozen=True, slots=True)

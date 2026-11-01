@@ -9,9 +9,9 @@ from typing import TypedDict
 from browserrig.core import BrowserError
 from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
 
+from .presenter import Presenter
 from .target import Focus, InputTarget, focused
 
-TYPING_INTERVAL_SECONDS = 0.05
 # Key events of sensitive text show this instead of the character and its modifiers.
 _HIDDEN_KEY = "•"
 
@@ -62,9 +62,11 @@ class Keyboard:
         focus: Focus,
         *,
         emit: Callable[[InputTarget, InputEvent], Awaitable[None]],
+        presenter: Callable[[], Presenter],
     ) -> None:
         self._focus = focus
         self._emit = emit
+        self._presenter = presenter
 
     async def press_key(
         self,
@@ -86,25 +88,6 @@ class Keyboard:
         finally:
             await self._emit(target, KeyboardVisibilityEvent(visible=False))
 
-    async def show_key(
-        self,
-        target: InputTarget,
-        key: str,
-        *,
-        hold_control: bool = False,
-        hold_shift: bool = False,
-        hold_alt: bool = False,
-        hold_meta: bool = False,
-    ) -> None:
-        """Show a key handled by the browser itself, such as Ctrl+F; nothing reaches the page."""
-        stroke = _key_stroke(
-            key,
-            _held(control=hold_control, shift=hold_shift, alt=hold_alt, meta=hold_meta),
-        )
-        await self._emit(
-            target, KeyPressedEvent(key=stroke.key, modifiers=stroke.modifiers)
-        )
-
     async def type_text(
         self,
         text: str,
@@ -118,6 +101,7 @@ class Keyboard:
         and aborts typing by raising, e.g. when focus left the intended field.
         """
         target = focused(self._focus)
+        interval = self._presenter().typing_interval()
         try:
             await self._emit(target, KeyboardVisibilityEvent(visible=True))
             # CRLF is one line break. Other Unicode characters are inserted unchanged.
@@ -127,10 +111,11 @@ class Keyboard:
                 await self._stroke(
                     target,
                     _character(value),
-                    duration=TYPING_INTERVAL_SECONDS,
+                    duration=interval,
                     sensitive=sensitive,
                 )
-                await asyncio.sleep(TYPING_INTERVAL_SECONDS)
+                if interval:
+                    await asyncio.sleep(interval)
         finally:
             await self._emit(target, KeyboardVisibilityEvent(visible=False))
 

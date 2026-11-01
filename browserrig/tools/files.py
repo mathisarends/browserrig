@@ -26,7 +26,6 @@ from browserrig.core import (
     ActionKind,
     BrowserError,
     FileSource,
-    FileTransferDirection,
     ReadinessPhase,
 )
 from browserrig.core import browser_tool as tool
@@ -55,6 +54,7 @@ from browserrig.observation import Observe
 from browserrig.readiness import Readiness
 
 from .execution import Actions, Effect
+from .intents import OpenFileIntent, UploadIntent
 
 
 def _has_files(browser: Inject[Browser]) -> bool:
@@ -321,20 +321,22 @@ class FileTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)):
     async def _open(
         self, path: Path, kind: ActionKind, source: FileSource, download_id: str = ""
     ) -> ToolResult:
-        async def open_file(_tab: Tab) -> Effect:
-            # The file leaves the current tab first, so viewers can follow it into the new one.
-            await self._browser.input.transfer(FileTransferDirection.OPEN, (str(path),))
-            opened = await self._browser.open_tab(path)
-            await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
-            await self._events.emit(
-                FileOpenedEvent(
-                    target_id=opened.id,
-                    document_id=opened.document_id,
-                    path=str(path),
-                    source=source,
-                    download_id=download_id,
+        async def open_file(tab: Tab) -> Effect:
+            async def show() -> Tab:
+                opened = await self._browser.open_tab(path)
+                await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
+                await self._events.emit(
+                    FileOpenedEvent(
+                        target_id=opened.id,
+                        document_id=opened.document_id,
+                        path=str(path),
+                        source=source,
+                        download_id=download_id,
+                    )
                 )
-            )
+                return opened
+
+            opened = await self._actions.stage(OpenFileIntent(str(path)), tab, show)
             return Effect(f"Opened file in tab {opened.id}: {path}")
 
         return await self._actions.run(kind=kind, operation=open_file, settle=False)
@@ -378,18 +380,19 @@ class UploadTools(Plugin, needs=(Actions, Browser, BrowserEvents, Observe)):
         async def upload(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
             await self._browser.mouse.move_to(point)
-            await self._browser.input.transfer(
-                FileTransferDirection.UPLOAD, tuple(selected), point
-            )
-            await (await self._observe.element(tab, ref)).upload_files(selected)
-            await self._events.emit(
-                FilesUploadedEvent(
-                    target_id=tab.id,
-                    document_id=tab.document_id,
-                    paths=tuple(selected),
-                    ref=ref,
+
+            async def assign() -> None:
+                await (await self._observe.element(tab, ref)).upload_files(selected)
+                await self._events.emit(
+                    FilesUploadedEvent(
+                        target_id=tab.id,
+                        document_id=tab.document_id,
+                        paths=tuple(selected),
+                        ref=ref,
+                    )
                 )
-            )
+
+            await actions.stage(UploadIntent(tuple(selected), point), tab, assign)
             return Effect("Files assigned to input.")
 
         return await actions.run(

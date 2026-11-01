@@ -47,9 +47,7 @@ _CHALLENGE_HINT = (
 
 if TYPE_CHECKING:
     # Type-only edge: Observe injects Nudges at runtime.
-    from browserrig.observation import (  # smelt: ignore[SMT104] -- type-only edge
-        Snapshot,
-    )
+    from browserrig.observation import Snapshot
 
 
 class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):

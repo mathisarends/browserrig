@@ -8,13 +8,8 @@ from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import ChromeBrowser, Launch, browser_plugins
-from browserrig.events import (
-    BarTypedEvent,
-    FindBarEvent,
-    FindResultsEvent,
-    KeyPressedEvent,
-    NavigationStartedEvent,
-)
+from browserrig.choreography import BarTypedEvent, FindBarEvent, FindResultsEvent
+from browserrig.events import KeyPressedEvent, NavigationStartedEvent
 from browserrig.kinds import BrowserBar
 from browserrig.observation import close_find, find_text
 from tests.javascript import evaluate

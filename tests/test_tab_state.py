@@ -1,5 +1,6 @@
 import asyncio
 import base64
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -13,14 +14,17 @@ from cdpify.domains.page import (
     JavascriptDialogOpeningEvent,
     LifecycleEventEvent,
 )
+from harnessed import Agent
+from harnessed.testing import ScriptedModel
 
-from browserrig.browser import Tab, favicon
-from browserrig.browser import tab as tab_module
+from browserrig.browser import Tab, TabChanged, favicon
 from browserrig.browser.favicon import load_favicon
+from browserrig.choreography import TabStrip as TabStripPlugin
 from browserrig.core import MouseEventKind, Point
 from browserrig.events import TabUpdatedEvent
 from browserrig.scripts import TabStrip
 from browserrig.tools.navigation import site_url, typed_address
+from tests.fakes import FakeServices
 
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
 
@@ -139,28 +143,32 @@ async def test_navigation_pending_ends_at_its_dom_content_loaded_before_all_reso
     assert not tab.navigation_pending and tab.loading
 
 
-async def test_tab_publishes_loading_then_the_settled_icon_once(monkeypatch):
+async def test_tab_strip_publishes_loading_then_the_settled_icon_once(monkeypatch):
     events = []
-    tab = Tab("tab", SimpleNamespace(), emit=AsyncMock(side_effect=events.append))
-    tab.url, tab.title = "https://example.org/", "example.org"
+    watched = _Watched(emit=AsyncMock(side_effect=events.append))
+    tab = watched.tab
+    # Already loading when the strip starts watching.
+    tab.url, tab.title, tab.loading = "https://example.org/", "example.org", True
     icon = "https://example.org/icon.png"
     strips = [
         TabStrip(title="Example", icon=icon),
         TabStrip(title="Renamed", icon=icon),
     ]
-    frame = SimpleNamespace(id="tab", run=AsyncMock(side_effect=strips))
-    monkeypatch.setattr(tab, "main_frame", AsyncMock(return_value=frame))
+    monkeypatch.setattr(tab, "read_strip", AsyncMock(side_effect=strips))
     load = AsyncMock(return_value="data:image/png;base64,AA==")
-    monkeypatch.setattr(tab_module, "load_favicon", load)
+    monkeypatch.setattr(tab, "load_icon", load)
 
-    await tab.handle(FrameStartedLoadingEvent(frame_id="tab"))
-    await tab.handle(FrameStartedLoadingEvent(frame_id="tab"))
-    await tab.handle(FrameStartedLoadingEvent(frame_id="child"))
-    await tab.handle(FrameStoppedLoadingEvent(frame_id="tab"))
-    await _until(lambda: len(events) == 4)
-    # A later read with the same icon updates the title without fetching the icon again.
-    await tab.handle(FrameStoppedLoadingEvent(frame_id="tab"))
-    await _until(lambda: len(events) == 5)
+    async with watched.mounted():
+        await tab.handle(FrameStartedLoadingEvent(frame_id="tab"))
+        await tab.handle(FrameStartedLoadingEvent(frame_id="child"))
+        await tab.handle(FrameStoppedLoadingEvent(frame_id="tab"))
+        await _until(lambda: len(events) == 4)
+        # A later read with the same icon updates the title without fetching the icon.
+        await tab.handle(FrameStoppedLoadingEvent(frame_id="tab"))
+        await _until(lambda: len(events) == 5)
+        # A newer title from Chrome replaces the one the document declared.
+        tab.title = "From Chrome"
+        await tab.report_change()
 
     # The document title arrives before the icon has loaded.
     states = [(event.loading, event.title, event.favicon) for event in events]
@@ -171,15 +179,17 @@ async def test_tab_publishes_loading_then_the_settled_icon_once(monkeypatch):
         (False, "Example", ""),
         (False, "Example", "data:image/png;base64,AA=="),
         (False, "Renamed", "data:image/png;base64,AA=="),
+        (False, "From Chrome", "data:image/png;base64,AA=="),
     ]
-    load.assert_awaited_once()
+    load.assert_awaited_once_with(icon)
 
 
-async def test_a_discarded_tab_stops_resolving_its_icon(monkeypatch):
-    tab = Tab("tab", SimpleNamespace(), emit=AsyncMock())
+async def test_a_closed_tab_stops_resolving_its_strip(monkeypatch):
+    watched = _Watched(emit=AsyncMock())
+    tab = watched.tab
     started, cancelled = asyncio.Event(), asyncio.Event()
 
-    async def main_frame():
+    async def read_strip():
         started.set()
         try:
             await asyncio.Event().wait()
@@ -187,11 +197,24 @@ async def test_a_discarded_tab_stops_resolving_its_icon(monkeypatch):
             cancelled.set()
             raise
 
-    monkeypatch.setattr(tab, "main_frame", main_frame)
-    tab.refresh_strip()
-    await asyncio.wait_for(started.wait(), 5)
-    tab.discard()
-    await asyncio.wait_for(cancelled.wait(), 5)
+    monkeypatch.setattr(tab, "read_strip", read_strip)
+    async with watched.mounted():
+        await tab.handle(FrameStoppedLoadingEvent(frame_id="tab"))
+        await asyncio.wait_for(started.wait(), 5)
+        await tab.discard()
+        await asyncio.wait_for(cancelled.wait(), 5)
+
+
+async def test_a_tab_without_a_strip_reads_and_reports_nothing(monkeypatch):
+    emit = AsyncMock()
+    tab = Tab("tab", SimpleNamespace(), emit=emit)
+    read = AsyncMock()
+    monkeypatch.setattr(tab, "read_strip", read)
+    await tab.handle(FrameStartedLoadingEvent(frame_id="tab"))
+    await tab.handle(FrameStoppedLoadingEvent(frame_id="tab"))
+    assert not tab.loading
+    emit.assert_not_awaited()
+    read.assert_not_awaited()
 
 
 async def test_input_that_opens_a_dialog_returns_without_waiting_for_its_reply():
@@ -237,6 +260,29 @@ def _dialog() -> JavascriptDialogOpeningEvent:
         type="alert",
         has_browser_handler=False,
     )
+
+
+class _Watched:
+    """A tab whose changes reach a mounted `TabStrip`, the way Chrome passes them on."""
+
+    def __init__(self, *, emit):
+        self.tab = Tab("tab", SimpleNamespace(), emit=emit, on_change=self._changed)
+        self._ctx = None
+
+    async def _changed(self, tab, settled):
+        assert self._ctx is not None
+        await self._ctx.dispatch(TabChanged(tab, settled))
+
+    @asynccontextmanager
+    async def mounted(self):
+        services = FakeServices()
+        services.browser.active_tab = self.tab
+        agent = Agent(
+            model=ScriptedModel(["Done"]), plugins=[services, TabStripPlugin()]
+        )
+        async with agent.session() as session:
+            self._ctx = session.ctx
+            yield
 
 
 async def _until(condition):

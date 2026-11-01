@@ -8,7 +8,9 @@ from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import ChromeBrowser, Launch, browser_plugins
+from browserrig import Launch, browser_plugins
+from browserrig.browser import Browser, Chrome
+from browserrig.choreography import TabStrip
 from browserrig.events import NavigationStartedEvent, TabOpenedEvent, TabUpdatedEvent
 
 pytestmark = pytest.mark.integration
@@ -68,26 +70,33 @@ async def icon_site_fixture() -> AsyncIterator[str]:
 
 
 async def test_tab_updates_carry_loading_title_and_icons(icon_site):
+    agent = Agent(model=ScriptedModel(["Done"]), plugins=[Chrome(Launch()), TabStrip()])
     events: list[TabUpdatedEvent] = []
+    async with agent.session() as session:
 
-    async def collect(event):
-        if isinstance(event, TabUpdatedEvent):
-            events.append(event)
+        async def collect() -> None:
+            async for event in session.subscribe(transient=True):
+                if isinstance(event, TabUpdatedEvent):
+                    events.append(event)
 
-    async with ChromeBrowser(Launch(), emit=collect) as browser:
-        tab = browser.active_tab
-        for path, prefix in (
-            ("/", "data:image/png;base64,"),
-            ("/inline", "data:image/svg+xml"),
-        ):
-            await tab.navigate(icon_site + path)
-            async with asyncio.timeout(10):
-                while not (
-                    events
-                    and events[-1].url == icon_site + path
-                    and events[-1].favicon.startswith(prefix)
-                ):
-                    await asyncio.sleep(0.05)
+        collector = asyncio.create_task(collect())
+        await asyncio.sleep(0)
+        tab = session.ctx[Browser].active_tab
+        try:
+            for path, prefix in (
+                ("/", "data:image/png;base64,"),
+                ("/inline", "data:image/svg+xml"),
+            ):
+                await tab.navigate(icon_site + path)
+                async with asyncio.timeout(10):
+                    while not (
+                        events
+                        and events[-1].url == icon_site + path
+                        and events[-1].favicon.startswith(prefix)
+                    ):
+                        await asyncio.sleep(0.05)
+        finally:
+            collector.cancel()
     assert any(event.loading for event in events)
     assert not events[-1].loading
     assert {event.title for event in events} >= {"Icons", "Inline"}

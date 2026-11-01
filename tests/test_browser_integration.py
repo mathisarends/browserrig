@@ -3,22 +3,16 @@ from urllib.parse import urlsplit
 import pytest
 
 from browserrig import ChromeBrowser, Connect
+from browserrig.choreography import CursorEnteredEvent, HumanPace, TabPressedEvent
 from browserrig.core import Point
-from browserrig.events import (
-    CursorEnteredEvent,
-    CursorStateEvent,
-    TabOpenedEvent,
-    TabPressedEvent,
-)
+from browserrig.events import CursorStateEvent, TabOpenedEvent
 from browserrig.kinds import TabGesture
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
 
 
-async def test_tabs_seed_centered_cursor_and_activation_republishes_existing_position(
-    site,
-):
+async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site):
     events = []
 
     async def emit(event):
@@ -26,15 +20,11 @@ async def test_tabs_seed_centered_cursor_and_activation_republishes_existing_pos
 
     async with ChromeBrowser(emit=emit) as browser:
         first = browser.active_tab
-        viewport = (await first.cdp.page.get_layout_metrics()).css_layout_viewport
-        initial = [event for event in events if isinstance(event, CursorStateEvent)]
-        assert len(initial) == 1 and initial[0].target_id == first.id
-        assert (
-            0.4 * viewport.client_width <= initial[0].x <= 0.6 * viewport.client_width
-        )
-        assert (
-            0.4 * viewport.client_height <= initial[0].y <= 0.6 * viewport.client_height
-        )
+        # Unwatched, the cursor lands centered and nothing is reported.
+        assert not any(isinstance(event, CursorStateEvent) for event in events)
+        width, height = await first.viewport_size()
+        assert browser.mouse.position == Point(x=width / 2, y=height / 2)
+        browser.input.present(HumanPace(lambda: browser.input.action_id))
         await browser.mouse.move_to(Point(x=100, y=120))
         second = await browser.open_tab(site)
         assert (

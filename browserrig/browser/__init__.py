@@ -6,7 +6,7 @@ from .config import BrowserOptions, Connect, Launch, Viewport
 from .frame import Frame
 from .images import screenshot
 from .models import TabInfo
-from .plugin import Chrome
+from .plugin import Chrome, TabChanged
 from .tab import Tab, validated_url
 
 __all__ = [
@@ -21,6 +21,7 @@ __all__ = [
     "DownloadState",
     "Launch",
     "Tab",
+    "TabChanged",
     "TabInfo",
     "Viewport",
     "screenshot",

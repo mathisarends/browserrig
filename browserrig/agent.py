@@ -42,7 +42,9 @@ class BrowserAgent(Agent):
     to `run` or `session`. Long runs summarize older steps once the request fills
     80% of the model's context window, or 100k tokens when the model reports none;
     pass `compaction=None` to keep everything, or a configured `Compaction`.
-    Approvals use Harnessed's defaults unless configured.
+    Approvals use Harnessed's defaults unless configured. Input is paced and streamed
+    for people watching; pass `choreography=False` to work at full speed instead, and
+    `tab_strip=False` to skip reading titles and favicons for a viewer's tab strip.
     """
 
     def __init__(
@@ -58,6 +60,8 @@ class BrowserAgent(Agent):
         local_files: bool = True,
         secrets: Secrets | Mapping[str, Secret] | None = None,
         handoff: HumanHandoff | None = None,
+        choreography: bool = True,
+        tab_strip: bool = True,
         compaction: Compaction | None = DEFAULT_COMPACTION,
         approvals: Approvals | None = None,
         system_prompt: str | SystemPrompt | None = (
@@ -77,6 +81,8 @@ class BrowserAgent(Agent):
                 local_files=local_files,
                 secrets=secrets,
                 handoff=handoff,
+                choreography=choreography,
+                tab_strip=tab_strip,
             )
         )
         if compaction is not None:

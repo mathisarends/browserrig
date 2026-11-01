@@ -45,7 +45,7 @@ from .downloads import Downloads
 from .frame import Frame
 from .frames import discover_frames
 from .models import TabInfo
-from .tab import Tab, validated_url
+from .tab import Tab, TabListener, validated_url
 from .worlds import Worlds
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,7 @@ class ChromeBrowser:
         *,
         file_system: FileSystemOptions | None = None,
         emit: EventSink = _discard,
+        on_tab_change: TabListener | None = None,
     ) -> None:
         self._options = options or Launch()
         self.files = (
@@ -85,6 +86,7 @@ class ChromeBrowser:
         )
         self.id = uuid4().hex
         self.events = BrowserEvents(self.id, emit)
+        self._on_tab_change = on_tab_change
         self._stack: AsyncExitStack | None = None
         self._tabs: dict[TargetId, Tab] = {}
         self._active = ""
@@ -335,6 +337,7 @@ class ChromeBrowser:
                     worlds=self._worlds,
                     discover_frames=self._discover_frames,
                     current_action=lambda: self.input.action_id,
+                    on_change=self._on_tab_change,
                 )
                 await tab.sync_document()
                 if target_id in self._closed_targets:
@@ -347,7 +350,8 @@ class ChromeBrowser:
                             target_id=tab.id, url=tab.url, opener_id=opener_id
                         )
                     )
-                tab.refresh_strip()
+                # A tab attached mid-session already shows a page worth reading.
+                await tab.report_change(settled=True)
                 if self._context is None:
                     assert self._stack is not None
                     self._stack.push_async_callback(self._detach, attached.session_id)
@@ -375,7 +379,7 @@ class ChromeBrowser:
             self._active = ""
         self.mouse.forget(target_id)
         if tab is not None:
-            tab.discard()
+            await tab.discard()
             await self.events.emit(TabClosedEvent(target_id=target_id))
 
     async def _discover_frames(
@@ -466,7 +470,7 @@ class ChromeBrowser:
     async def _on_target_info(self, info: TargetInfo) -> None:
         if known := self._tabs.get(info.target_id):
             known.url, known.title = info.url, info.title
-            await known.publish_state()
+            await known.report_change()
         elif (
             info.type == "page"
             and self._context
@@ -488,8 +492,8 @@ class ChromeBrowser:
             try:
                 await stack.aclose()
             finally:
-                for tab in self._tabs.values():
-                    tab.discard()
+                for tab in tuple(self._tabs.values()):
+                    await tab.discard()
                 if self._connected:
                     self._connected = False
                     await self.events.emit(DisconnectedEvent())

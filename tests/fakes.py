@@ -22,10 +22,15 @@ class FakeTab:
         self.title = "Example"
         self.dialog = None
         self.navigation_pending = False
+        self.loading = False
+        self.closed = False
         self.quiet_ms = 1000
         self.probes = 0
 
     async def sync_document(self):
+        pass
+
+    async def emit(self, event):
         pass
 
     async def main_frame(self):

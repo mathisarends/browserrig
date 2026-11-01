@@ -1,6 +1,5 @@
 import asyncio
 import math
-import random
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Literal
@@ -9,7 +8,6 @@ from cdpify.domains.input import MouseButton
 
 from browserrig.core import BrowserError, CursorStyle, MouseEventKind, Point, TabGesture
 from browserrig.events import (
-    CursorEnteredEvent,
     CursorMovedEvent,
     CursorStateEvent,
     CursorStyleEvent,
@@ -17,16 +15,11 @@ from browserrig.events import (
     PointerPressedEvent,
     PointerReleasedEvent,
     ScrolledEvent,
-    TabPressedEvent,
 )
 
-from .pointer import movement
+from .presenter import Presenter
 from .target import Focus, InputTarget, focused
 from .wheel import FRAME_SECONDS, wheel_duration, wheel_progress
-
-# Travel to the tab strip plus the press, then the way back into the page.
-_TAB_PRESS_SECONDS = 0.45
-_TAB_ENTER_SECONDS = 0.35
 
 type Emit = Callable[[InputTarget, InputEvent], Awaitable[None]]
 
@@ -49,9 +42,12 @@ class Mouse:
     there when that tab comes back to the front.
     """
 
-    def __init__(self, focus: Focus, *, emit: Emit) -> None:
+    def __init__(
+        self, focus: Focus, *, emit: Emit, presenter: Callable[[], Presenter]
+    ) -> None:
         self._focus = focus
         self._emit = emit
+        self._presenter = presenter
         self._rests: dict[str, _Rest] = {}
 
     @property
@@ -73,39 +69,19 @@ class Mouse:
         """Press a tab-strip control, let `switch` change focus, then return into the page.
 
         Without a focused tab there is nothing to leave: the pointer only appears in the
-        new tab, near the center of its viewport the first time.
+        new tab, where the presenter lands it the first time.
         """
         source = self._focus()
+        presenter = self._presenter()
         if source is not None:
-            position = self._rest(source).position
-            await self._emit(
-                source,
-                TabPressedEvent(
-                    gesture=gesture,
-                    tab_id=tab_id,
-                    from_position=(position.x, position.y),
-                    duration=_TAB_PRESS_SECONDS,
-                ),
-            )
-            await asyncio.sleep(_TAB_PRESS_SECONDS)
+            await presenter.leave(source, gesture, tab_id, self._rest(source).position)
         await switch()
         target = focused(self._focus)
         rest = self._rest(target)
         if not rest.placed:
-            width, height = await target.viewport_size()
-            rest.position = Point(
-                x=random.uniform(width * 0.4, width * 0.6),
-                y=random.uniform(height * 0.4, height * 0.6),
-            )
+            rest.position = presenter.landing(*await target.viewport_size())
         if source is not None:
-            position = rest.position
-            await self._emit(
-                target,
-                CursorEnteredEvent(
-                    to_position=(position.x, position.y), duration=_TAB_ENTER_SECONDS
-                ),
-            )
-            await asyncio.sleep(_TAB_ENTER_SECONDS)
+            await presenter.enter(target, rest.position)
         # The renderer learns where the pointer is, so hover state matches the viewer.
         await self._dispatch(target, MouseEventKind.MOVED, rest.position)
         rest.placed = True
@@ -113,7 +89,9 @@ class Mouse:
 
     async def publish_cursor(self) -> None:
         """Republish position and known cursor shape for viewers that attached late."""
-        await self._publish(focused(self._focus))
+        target = self._focus()
+        if target is not None:
+            await self._publish(target)
 
     async def move_to(self, point: Point) -> None:
         await self._move(focused(self._focus), point)
@@ -238,7 +216,7 @@ class Mouse:
         await self._refresh_style(target)
 
     async def _move(self, target: InputTarget, point: Point) -> None:
-        path = movement(self._rest(target).position, point)
+        path = self._presenter().path(self._rest(target).position, point)
         cp1, cp2 = path.control_points
         await self._emit(
             target,
@@ -271,6 +249,8 @@ class Mouse:
         await self._emit(target, CursorStateEvent(x=position.x, y=position.y))
 
     async def _refresh_style(self, target: InputTarget) -> None:
+        if not self._presenter().shows_cursor_style():
+            return
         rest = self._rest(target)
         style = await target.cursor_style(rest.position)
         if style is not None and style != rest.style:

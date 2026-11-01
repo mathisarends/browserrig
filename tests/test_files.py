@@ -1,6 +1,7 @@
+import asyncio
+
 # CDP handlers are exercised directly for missing and repeated completion events.
 # pylint: disable=protected-access
-
 from contextlib import asynccontextmanager
 from io import BytesIO
 from pathlib import Path
@@ -32,12 +33,10 @@ from browserrig.events import (
     FileReadFinishedEvent,
     FileReadStartedEvent,
     FilesListedEvent,
-    FileTransferEvent,
     FileWrittenEvent,
 )
 from browserrig.files import DownloadState
-from browserrig.input import controller as controller_module
-from browserrig.kinds import FileSource, FileTransferDirection, ReadinessPhase
+from browserrig.kinds import FileSource, ReadinessPhase
 from browserrig.tools import Actions, FileTools
 from tests.fakes import mounted
 
@@ -314,11 +313,9 @@ async def test_file_tools_report_listing_reads_and_writes(files):
     assert isinstance(replaced, FileWrittenEvent) and not replaced.created
 
 
-async def test_open_file_moves_the_file_out_of_the_current_tab_before_reporting_it(
-    files, monkeypatch
-):
+async def test_open_file_reports_the_file_in_its_new_tab(files, monkeypatch):
     sleep = AsyncMock()
-    monkeypatch.setattr(controller_module.asyncio, "sleep", sleep)
+    monkeypatch.setattr(asyncio, "sleep", sleep)
     saved = files.write_file("report.txt", "report")
     opened = SimpleNamespace(id="new", document_id="new-document")
     async with _file_tools(files) as (services, tools):
@@ -326,17 +323,12 @@ async def test_open_file_moves_the_file_out_of_the_current_tab_before_reporting_
         browser.active_tab = Tab("current", SimpleNamespace(), emit=services.record)
         browser.open_tab = AsyncMock(return_value=opened)
         await tools.open_file("report.txt")
-    transfer, report = (
-        _first(services.events, kind) for kind in (FileTransferEvent, FileOpenedEvent)
-    )
-    assert transfer.target_id == "current"
-    assert transfer.direction == FileTransferDirection.OPEN
-    assert transfer.paths == (saved.path,)
-    sleep.assert_awaited_once_with(transfer.duration)
+    report = _first(services.events, FileOpenedEvent)
+    # Nobody watches, so nothing is staged and nothing pauses.
+    sleep.assert_not_awaited()
     assert report.source == FileSource.WORKSPACE
     assert (report.target_id, report.document_id) == ("new", "new-document")
     assert report.path == saved.path
-    assert services.events.index(transfer) < services.events.index(report)
     # Only the new tab is awaited; the current page is not settled afterwards.
     assert services.readiness.phases == [ReadinessPhase.NAVIGATION]
 

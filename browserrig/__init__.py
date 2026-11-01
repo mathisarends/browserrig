@@ -1,5 +1,5 @@
 from .activity import Activity
-from .agent import BrowserAgent, WindowRatio
+from .agent import BrowserAgent, WindowRatio  # smelt: ignore[SMT106] -- public facade
 from .browser import (
     Browser,
     Chrome,
@@ -9,7 +9,7 @@ from .browser import (
     Viewport,
 )
 from .completion import Done
-from .composition import browser_plugins
+from .composition import browser_plugins  # smelt: ignore[SMT106] -- public facade
 from .core import Point
 from .files import FileSystem, FileSystemOptions
 from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanResponse

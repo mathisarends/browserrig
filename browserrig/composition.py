@@ -4,6 +4,7 @@ from harnessed import Plugin
 
 from .activity import Activity
 from .browser import BrowserOptions, Chrome
+from .choreography import Choreography, TabStrip
 from .files import FileSystemOptions
 from .handoff import HumanHandoff
 from .nudges import Nudges
@@ -36,11 +37,21 @@ def browser_plugins(
     local_files: bool = True,
     secrets: Secrets | Mapping[str, Secret] | None = None,
     handoff: HumanHandoff | None = None,
+    choreography: bool = True,
+    tab_strip: bool = True,
 ) -> list[Plugin]:
     observation = observe or Observe()
     plugins: list[Plugin] = [
         Activity(),
         Chrome(options, file_system=file_system),
+    ]
+    if choreography:
+        # Paces input like a person and streams it, for anyone watching the session.
+        plugins.append(Choreography())
+    if tab_strip:
+        # Titles and favicons for a viewer's tab strip; the agent reads tabs without it.
+        plugins.append(TabStrip())
+    plugins += [
         readiness if isinstance(readiness, Readiness) else Readiness(options=readiness),
         DownloadReadiness(),
         Nudges(),

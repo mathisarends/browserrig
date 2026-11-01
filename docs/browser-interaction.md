@@ -217,11 +217,28 @@ references stay on `Tab`, which receives input through the `InputTarget`
 protocol. Each gesture resolves the active tab once when it starts, so a click or
 drag never splits across tabs; without an active tab, input raises `BrowserError`.
 
+How input looks to people watching is a separate, optional plugin. Tools and devices
+only describe what they do; `Choreography` (from `browserrig.choreography`) paces
+typing and pointer paths like a person, plays the gestures below and streams them
+as live events. `browser_plugins` and `BrowserAgent` include it by default; pass
+`choreography=False` to work at full speed with no pauses and no input events. It
+builds on three seams, which other plugins can use the same way:
+
+- `browser.input.present(presenter)` installs a `Presenter` that sets the typing
+  interval, pointer paths, landing points and tab-strip gestures, and reports each
+  input event. It returns a callback that restores the previous one. The default,
+  `Unseen`, is instant and reports nothing.
+- `Actions.stage(intent, tab, step)` dispatches a `Perform` waterfall around a tool
+  step. A hook that matches the intent (`FindIntent`, `NavigateIntent`, `WaitIntent`,
+  `OpenFileIntent`, `UploadIntent`) stages the step and calls `next_()` to run it.
+- `TargetLocated` is observed once a tool has resolved its target element.
+
 The mouse remembers where it last rested in each tab (`browser.mouse.position_in(tab.id)`)
 and returns there when that tab comes back to the front. The first time a tab
-receives the pointer, it lands at a random position within the central 40–60% of
-the actual viewport on each axis. There is no animation from the top-left corner.
-Opening, activating and closing tabs play a tab-strip gesture:
+receives the pointer, it lands in the center of the actual viewport, or with
+`Choreography` at a random position within the central 40–60% on each axis. There
+is no animation from the top-left corner. With `Choreography`, opening, activating
+and closing tabs play a tab-strip gesture:
 
 1. `TabPressedEvent` (`browser.tab.pressed`) belongs to the tab the pointer
    leaves. It carries `gesture` (`TabGesture.OPEN`, `ACTIVATE` or `CLOSE`), the
@@ -235,17 +252,18 @@ Opening, activating and closing tabs play a tab-strip gesture:
 The backend does not know the viewer's layout. A viewer places the tab chip
 itself, for example through a `data-target-id` attribute, and draws the gesture
 in an overlay spanning its tab strip and the viewport. The first tab of a
-session skips steps 1 and 2. Agent turn starts publish the current cursor state
-so live subscribers attached after browser setup can display it before the
-first model request or input action.
+session skips steps 1 and 2. `Choreography` publishes the current cursor state at
+each agent turn start, so live subscribers attached after browser setup can display
+it before the first model request or input action.
 Cursor movements follow bounded cubic paths. Scrolling looks like Chrome's
 `scroll-behavior: smooth` but uses real wheel input: one trusted CDP wheel event
 per frame along Chrome's smooth scroll curve (`cubic-bezier(0.4, 0, 0, 1)`),
 lasting about one 60 Hz frame per square root of the distance (150 ms to 1.5 s).
 Chrome does not animate CDP wheel events itself, and `Input.synthesizeScrollGesture`
 moves at constant speed, so the harness paces the wheel events.
-Typing uses a fixed 50 ms interval, configured by the internal
-`_TYPING_INTERVAL_SECONDS` constant in `browserrig/input/keyboard.py`.
+With `Choreography`, typing uses a fixed 50 ms interval
+(`browserrig.choreography.TYPING_INTERVAL_SECONDS`) and pointer paths take their
+time; without it, keys and moves are dispatched without pauses.
 
 `KeyboardTools` supplies `send_keys`. It addresses the current page
 focus and takes exactly one of `text` or `key`:
@@ -270,8 +288,11 @@ clears the field. Direct Python callers can use `browser.keyboard.type_text(...)
 `browser.mouse.scroll(delta_y=..., point=Point(...))`. Acquire `browser.action_lock`
 when combining direct inputs with other browser actions.
 
-The choreography uses Harnessed's native transient event extension. `Chrome`
-registers these frozen event types alongside its durable browser events:
+The choreography uses Harnessed's native transient event extension. `Choreography`
+registers the input events (`browserrig.events.INPUT_EVENTS`) and its scene events
+(`browserrig.choreography.SCENE_EVENTS`); `TabStrip` registers the tab updates
+(`browserrig.events.TAB_STRIP_EVENTS`), and `Chrome` registers download progress
+alongside its durable browser events:
 
 | Event | Payload |
 | --- | --- |
@@ -300,7 +321,7 @@ carry its `action_id`. `CursorMovedEvent` describes the path before execution;
 Key and pointer receipts follow successful dispatch. Action failure events close
 interrupted sequences. Key events contain the dispatched key and modifiers.
 
-The harness paces its choreography: events with a `duration` describe an
+`Choreography` paces what it shows: events with a `duration` describe an
 animation the browser waits through before continuing. `open_file` and
 `open_downloaded_file` emit a `FileTransferEvent` in the current tab, wait for it,
 and only then open the new tab, which plays the tab-strip gesture. Uploads move the cursor onto the file input, emit
@@ -308,24 +329,30 @@ the transfer with that point, wait, and then assign the files.
 `CursorStyleEvent` follows cursor movement and scrolling and is only emitted when
 the style changes. It reads the page's computed CSS cursor and treats text inputs,
 editable content and plain text as `text`; custom cursor images show `default`.
-The probe is best-effort and never delays input by more than 250 ms.
+The probe is best-effort and never delays input by more than 250 ms; it runs
+only while a presenter such as `HumanPace` asks for it, so unwatched input never
+probes.
 `DownloadProgressedEvent` is sent at most every 200 ms per download; completion,
 failure and cancellation remain durable events.
 
-`TabUpdatedEvent` lets a viewer draw its own tab strip. It is sent whenever a field
-changes: `loading` follows the main frame, and the title and icon are read from the
-page once it stops loading. Icons are fetched through the browser without cookies,
+`TabUpdatedEvent` lets a viewer draw its own tab strip. The `TabStrip` plugin
+(`browserrig.choreography`, on by default, `tab_strip=False` to opt out) sends it
+whenever a field changes: `loading` follows the main frame, and the title and icon
+are read from the page once it stops loading. A newer title from Chrome replaces
+the one the document declared. The tab itself only reports that it changed,
+through the `TabChanged` hook event from `browserrig.browser`; without `TabStrip`
+no titles or icons are read. Icons are fetched through the browser without cookies,
 capped at 64 KiB, typed from their bytes and dropped otherwise. SVG icons are safe
 only when rendered through `<img>`. A loading tab keeps its previous icon.
 
 `navigate(url, new_tab=True)` opens the URL in a new tab; `open_tab` without a URL
 starts on DuckDuckGo. The durable `NavigationStartedEvent` carries `typed`, the text
 a person would enter in the address bar: the URL without `https://` (and without a
-bare trailing `/`), or the query for `search`. Before it, `BarTypedEvent`s show
+bare trailing `/`), or the query for `search`. With `Choreography`, `BarTypedEvent`s show
 the text being typed into the address bar key by key, ending with `Enter`; nothing
 is typed into the page.
 
-`find_in_page` plays a person's Ctrl+F: a `KeyPressedEvent` for `f` with
+With `Choreography`, `find_in_page` plays a person's Ctrl+F: a `KeyPressedEvent` for `f` with
 `Control`, `FindBarEvent(visible=True)`, one `BarTypedEvent` per key with a
 `FindResultsEvent` after each, then the final results with the current match in
 view, and finally `Escape` and `FindBarEvent(visible=False)`. `FindResultsEvent.marks`

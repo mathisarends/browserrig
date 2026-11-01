@@ -5,6 +5,16 @@ from .execution import ActionChainPolicy, Actions, DomActionChains, ObserveAfter
 from .files import FileTools, UploadTools
 from .find import FindTools
 from .forms import FormTools
+from .intents import (
+    FindIntent,
+    Intent,
+    NavigateIntent,
+    OpenFileIntent,
+    Perform,
+    TargetLocated,
+    UploadIntent,
+    WaitIntent,
+)
 from .javascript import JavaScriptTools
 from .keyboard import KeyboardTools
 from .mouse import PointerTools
@@ -21,7 +31,15 @@ __all__ = [
     "Actions",
     "DialogTools",
     "FileTools",
+    "FindIntent",
     "FindTools",
+    "Intent",
+    "NavigateIntent",
+    "OpenFileIntent",
+    "Perform",
+    "TargetLocated",
+    "UploadIntent",
+    "WaitIntent",
     "FormTools",
     "JavaScriptTools",
     "KeyboardTools",

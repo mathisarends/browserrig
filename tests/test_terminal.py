@@ -24,13 +24,14 @@ from harnessed.events import (
 from harnessed.testing import ScriptedModel
 
 from browserrig import TerminalEvents
-from browserrig.events import INPUT_EVENTS, BrowserEvent, KeyPressedEvent, WaitingEvent
+from browserrig.choreography import SCENE_EVENTS, WaitingEvent
+from browserrig.events import INPUT_EVENTS, BrowserEvent, KeyPressedEvent
 from browserrig.terminal import _event_record
 
 
 async def test_terminal_observes_native_and_live_events_without_model_or_log_pollution():
-    class Choreography(Plugin, needs=(SessionLog,)):
-        events = INPUT_EVENTS
+    class Stage(Plugin, needs=(SessionLog,)):
+        events = INPUT_EVENTS + SCENE_EVENTS
 
         @hook(ModelRequestedEvent)
         async def input(self, _event: ModelRequestedEvent, log: Inject[SessionLog]):
@@ -41,7 +42,7 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
 
     output = io.StringIO()
     model = ScriptedModel(["Final answer"])
-    agent = Agent(model=model, plugins=[TerminalEvents(output), Choreography()])
+    agent = Agent(model=model, plugins=[TerminalEvents(output), Stage()])
     async with agent.session() as session:
         result = await session.run("PRIVATE PROMPT")
         assert result.text == "Final answer"

@@ -8,18 +8,14 @@ from harnessed import ToolError
 
 from browserrig import FileSystem, FileSystemOptions
 from browserrig.browser import Tab
-from browserrig.core import BrowserError, ElementPoint
+from browserrig.core import BrowserError, ElementPoint, Point
 from browserrig.events import (
     ActionFailedEvent,
     ActionFinishedEvent,
-    CursorMovedEvent,
     FilesUploadedEvent,
-    FileTransferEvent,
     PageState,
 )
-from browserrig.input import controller as controller_module
-from browserrig.input import mouse as mouse_module
-from browserrig.kinds import ActionKind, FileTransferDirection, ReadinessPhase
+from browserrig.kinds import ActionKind, ReadinessPhase
 from browserrig.tools import Actions, UploadTools
 from browserrig.tools.execution import Effect
 from tests.fakes import FakeServices, mounted
@@ -76,11 +72,7 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(
     assert not _first(upload.services.events, ActionFailedEvent).dispatched
 
 
-async def test_upload_sends_only_resolved_workspace_paths_to_chrome(
-    tmp_path, monkeypatch
-):
-    monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
-    monkeypatch.setattr(controller_module.asyncio, "sleep", AsyncMock())
+async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path):
     files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
     files.initialize()
     saved = files.write_file("report.txt", "report")
@@ -91,15 +83,8 @@ async def test_upload_sends_only_resolved_workspace_paths_to_chrome(
     assert result.text == "Files assigned to input."
     upload.handle.upload_files.assert_awaited_once_with([saved.path])
     upload.actions.element_point.assert_awaited_once()
-    events = upload.services.events
-    moved, transfer, uploaded = (
-        _first(events, kind)
-        for kind in (CursorMovedEvent, FileTransferEvent, FilesUploadedEvent)
-    )
-    assert moved.to_position == (40, 30)
-    assert transfer.direction == FileTransferDirection.UPLOAD
-    assert transfer.paths == (saved.path,) and (transfer.x, transfer.y) == (40, 30)
-    assert events.index(moved) < events.index(transfer) < events.index(uploaded)
+    assert upload.services.browser.mouse.position == Point(x=40, y=30)
+    uploaded = _first(upload.services.events, FilesUploadedEvent)
     assert uploaded.paths == (saved.path,) and uploaded.ref == "input"
     assert uploaded.target_id == "tab"
 

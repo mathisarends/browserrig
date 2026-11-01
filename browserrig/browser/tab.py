@@ -35,13 +35,13 @@ from browserrig.events import (
     DialogOpenedEvent,
     LiveEvent,
     NavigationCommittedEvent,
-    TabUpdatedEvent,
 )
 from browserrig.input import KeyEventType
 from browserrig.scripts import (
     CURSOR,
     TAB_STRIP,
     CursorArgs,
+    TabStrip,
 )
 
 from .favicon import load_favicon
@@ -50,12 +50,13 @@ from .worlds import Worlds
 
 # A cursor shape is presentation only and must never hold up input.
 _CURSOR_PROBE_SECONDS = 0.25
-_STRIP_SECONDS = 10
 
 
 type FrameDiscovery = Callable[
     [Tab], Awaitable[tuple[tuple[Frame, ...], tuple[str, ...]]]
 ]
+# Told when url, title or loading may have changed; `settled` once loading stopped.
+type TabListener = Callable[[Tab, bool], Awaitable[None]]
 
 
 class Tab:  # pylint: disable=too-many-public-methods  # document API plus InputTarget
@@ -68,6 +69,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         worlds: Worlds | None = None,
         discover_frames: FrameDiscovery | None = None,
         current_action: Callable[[], str] = lambda: "",
+        on_change: TabListener | None = None,
     ) -> None:
         self.id = target_id
         self.cdp = cdp
@@ -77,16 +79,11 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         self.dialog: tuple[str, str] | None = None
         self._dialog_opened = asyncio.Event()
         self.closed = False
-        # Tab-strip state for live viewers; see `TabUpdatedEvent`.
-        self.loading = False  # smelt: ignore[SMT430] -- public Tab state like url/title
+        self.loading = False
         self.navigation_pending = False
         self._navigation_loader = ""
         self._navigation_document = ""
-        self.favicon = ""
         self._main_frame_id = target_id
-        self._icon_url = ""
-        self._strip_task: asyncio.Task[None] | None = None
-        self._shown: tuple[str, str, bool, str] | None = None
         self.changed = asyncio.Event()
         self.frame_limitations: tuple[str, ...] = ()
         self.worlds = worlds if worlds is not None else Worlds()
@@ -96,6 +93,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         self._frames_key: tuple[str, str, int] | None = None
         self._frames: tuple[Frame, ...] = ()
         self._current_action = current_action
+        self._on_change = on_change
 
     async def emit(self, event: BrowserEvent | LiveEvent) -> None:
         if self._emit is not None:
@@ -103,40 +101,27 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
                 replace(event, target_id=self.id, document_id=self.document_id)
             )
 
-    async def publish_state(self) -> None:
-        """Tell live viewers what the tab strip shows, once per distinct state."""
-        state = (self.url, self.title, self.loading, self.favicon)
-        if self._emit is None or self.closed or state == self._shown:
-            return
-        self._shown = state
-        await self.emit(
-            TabUpdatedEvent(
-                url=self.url,
-                title=self.title,
-                loading=self.loading,
-                favicon=self.favicon,
-            )
-        )
+    async def report_change(self, *, settled: bool = False) -> None:
+        """Tell the change listener that url, title or loading may have changed."""
+        if self._on_change is not None:
+            await self._on_change(self, settled)
 
-    def refresh_strip(self) -> None:
-        """Read title and icon in the background; a slow icon host never holds up events."""
-        if self._emit is None or self.closed:
-            return
-        if self._strip_task is not None:
-            self._strip_task.cancel()
-        self._strip_task = asyncio.create_task(
-            self._load_strip(), name=f"browserrig:tab-strip:{self.id}"
-        )
-
-    def discard(self) -> None:
+    async def discard(self) -> None:
         self.closed = True
-        if self._strip_task is not None:
-            self._strip_task.cancel()
-            self._strip_task = None
+        await self.report_change()
+
+    async def read_strip(self) -> TabStrip:
+        """Read the title and icon URL the document declares for a tab strip."""
+        frame = await self.main_frame()
+        return await frame.run(TAB_STRIP)
+
+    async def load_icon(self, url: str) -> str:
+        """Load an icon through the page's own network stack, as a `data:` URI."""
+        return await load_favicon(self.cdp, self._main_frame_id, url)
 
     async def cursor_style(self, point: Point) -> CursorStyle | None:
         """Return the CSS cursor under a viewport point, or None when the page cannot say."""
-        if self._emit is None or self.dialog is not None:
+        if self.dialog is not None:
             return None
         try:
             async with asyncio.timeout(_CURSOR_PROBE_SECONDS):
@@ -244,7 +229,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
                 self._main_frame_id = frame.id
                 self.changed.set()
                 await self.emit(NavigationCommittedEvent(url=self.url))
-                await self.publish_state()
+                await self.report_change()
             case NavigatedWithinDocumentEvent(url=url, frame_id=frame_id) if (
                 frame_id == self._main_frame_id
             ):
@@ -252,7 +237,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
                 self.url = url
                 self.changed.set()
                 await self.emit(NavigationCommittedEvent(url=self.url))
-                await self.publish_state()
+                await self.report_change()
             case FrameStartedNavigatingEvent(frame_id=frame_id, loader_id=loader) if (
                 frame_id == self._main_frame_id
             ):
@@ -267,7 +252,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
                     self._navigation_loader = ""
                     self._navigation_document = self.document_id
                 self.navigation_pending = True
-                await self.publish_state()
+                await self.report_change()
             case LifecycleEventEvent(
                 frame_id=frame_id, loader_id=loader, name="DOMContentLoaded"
             ) if frame_id == self._main_frame_id:
@@ -281,8 +266,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
             ):
                 self.loading = False
                 self.navigation_pending = False
-                await self.publish_state()
-                self.refresh_strip()
+                await self.report_change(settled=True)
             case JavascriptDialogOpeningEvent(type=kind, message=message):
                 self.dialog = (str(kind), message)
                 self._dialog_opened.set()
@@ -380,27 +364,6 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API plus Input
         result = await self.cdp.page.navigate(url=validated_url(url))
         if result.error_text:
             raise BrowserError(f"Navigation failed: {result.error_text}")
-
-    async def _load_strip(self) -> None:
-        try:
-            async with asyncio.timeout(_STRIP_SECONDS):
-                if self.dialog is None:
-                    frame = await self.main_frame()
-                    strip = await frame.run(TAB_STRIP)
-                    # Chrome's target info often keeps the host as title; the document knows.
-                    self.title = strip.title or self.title
-                    if strip.icon != self._icon_url:
-                        await self.publish_state()
-                        self._icon_url = strip.icon
-                        self.favicon = (
-                            await load_favicon(self.cdp, frame.id, strip.icon)
-                            if strip.icon
-                            else ""
-                        )
-                await self.publish_state()
-        except Exception:  # pylint: disable=broad-exception-caught
-            # Navigation, dialogs and detached sessions only cost the strip state, never the tab.
-            return
 
     async def _input(self, command: Coroutine[Any, Any, None]) -> None:
         """Send input, returning early when it opens a JavaScript dialog.

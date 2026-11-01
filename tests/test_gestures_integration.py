@@ -8,6 +8,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
 from browserrig import Browser, ChromeBrowser, Launch, browser_plugins
+from browserrig.choreography import HumanPace
 from browserrig.core import Point
 from browserrig.events import CursorStateEvent
 from tests.observations import latest
@@ -115,6 +116,8 @@ async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site)
             await asyncio.Event().wait()
 
     async with ChromeBrowser(Launch(url=site + "/gestures"), emit=emit) as browser:
+        # Paced and reported, so the drag can be held right at its target.
+        browser.input.present(HumanPace(lambda: browser.input.action_id))
         tab = browser.active_tab
         await evaluate(
             tab,

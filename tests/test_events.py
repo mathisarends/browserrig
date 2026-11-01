@@ -5,6 +5,7 @@ import pytest
 from harnessed.events import EventRegistry
 
 from browserrig import events
+from browserrig.choreography import SCENE_EVENTS
 
 
 def test_enum_tags_and_registry_roundtrip():
@@ -52,6 +53,8 @@ def test_action_page_state_roundtrips_as_a_typed_nested_value():
     + events.HANDOFF_EVENTS
     + events.ACTIVITY_EVENTS
     + events.INPUT_EVENTS
+    + events.TAB_STRIP_EVENTS
+    + SCENE_EVENTS
     + events.FILE_EVENTS
     + events.UPLOAD_EVENTS
     + (events.ObservationCapturedEvent,),

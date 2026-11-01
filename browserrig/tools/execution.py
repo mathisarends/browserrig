@@ -1,12 +1,14 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
-from typing import Protocol
+from typing import Protocol, cast
 from uuid import uuid4
 
 from harnessed import (
+    Context,
     Inject,
     Plugin,
+    PluginState,
     SystemSection,
     ToolError,
     ToolInfo,
@@ -35,6 +37,7 @@ from browserrig.events import (
 from browserrig.observation import Observe, Snapshot, decision_change
 from browserrig.readiness import Readiness
 
+from .intents import Intent, Perform, TargetLocated
 from .scrolling import prepare_element
 
 # Pointer actions aim at coordinates from the last observation, so it must still be current.
@@ -73,6 +76,11 @@ _NAVIGATION_KINDS = {
 }
 
 
+@dataclass
+class _Mount:
+    context: Context | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class Effect:
     text: str
@@ -108,6 +116,7 @@ class Actions(
     """Own the action transaction: serialization, readiness, dispatch and receipts."""
 
     events = ACTION_EVENTS
+    _mount = PluginState(_Mount)
     browser: Inject[Browser]
     _events: Inject[BrowserEvents]
     readiness: Inject[Readiness]
@@ -116,6 +125,9 @@ class Actions(
     def __init__(self, *, chain_policy: ActionChainPolicy | None = None) -> None:
         super().__init__()
         self.chain_policy = chain_policy or DomActionChains()
+
+    async def setup(self, ctx: Context) -> None:
+        self._mount.context = ctx
 
     chains = SystemSection(
         title="Browser action chains",
@@ -213,6 +225,15 @@ class Actions(
                 )
                 raise ToolError(reason + hint) from error
 
+    async def stage[R](
+        self, intent: Intent, tab: Tab, step: Callable[[], Awaitable[R]]
+    ) -> R:
+        """Run `step`, which does what `intent` describes, letting plugins stage it."""
+        context = self._mount.context
+        assert context is not None
+        performed = Perform(intent, tab, self.browser.input.action_id)
+        return cast(R, await context.dispatch(performed, default=step))
+
     async def page_change(self, tab: Tab, *, after_input: bool = True) -> str:
         """A comparison probe must never replace the refs or image the model acted on."""
         if tab.closed or self.browser.active_tab.id != tab.id:
@@ -227,7 +248,9 @@ class Actions(
     async def element_point(
         self, *, tab: Tab, ref: str, scroll: bool = True
     ) -> ElementPoint:
-        """Reveal a ref with wheel input, then return a hit-tested point and highlight it.
+        """Reveal a ref with wheel input, then return a hit-tested point.
+
+        Plugins learn about the target through `TargetLocated`.
 
         Use `scroll=False` to re-check the target after hover or other input moved it.
         """
@@ -238,8 +261,11 @@ class Actions(
             # Wheel input may have moved ancestor documents; refresh their transforms.
             handle = await self.observe.element(tab, ref)
         point = await handle.locate()
-        if point.bounds is not None:
-            await self.browser.input.highlight(ref, point.bounds)
+        context = self._mount.context
+        if point.bounds is not None and context is not None:
+            await context.dispatch(
+                TargetLocated(tab, ref, point.bounds, self.browser.input.action_id)
+            )
         return point.model_copy(update={"scrolled": scrolled})
 
     @hook(ExecuteTool)

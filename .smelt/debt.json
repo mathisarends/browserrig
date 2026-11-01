@@ -2,6 +2,12 @@
   "version": 1,
   "violations": [
     {
+      "fingerprint": "99611d3762bdd0f15aa38654b23b9fbd",
+      "code": "SMT101",
+      "path": "browserrig/secrets/plugin.py",
+      "message": "secrets must not depend on observation"
+    },
+    {
       "fingerprint": "57c4c77eee7729fb96b74d1b3216eecb",
       "code": "SMT420",
       "path": "tests/test_browser_composition.py",

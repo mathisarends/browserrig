@@ -6,12 +6,13 @@ from harnessed import Inject, Plugin, ToolResult
 from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab, validated_url
-from browserrig.core import ActionKind, BrowserBar, BrowserError, ReadinessPhase
+from browserrig.core import ActionKind, BrowserError, ReadinessPhase
 from browserrig.core import browser_tool as tool
-from browserrig.events import NavigationStartedEvent, WaitingEvent
+from browserrig.events import NavigationStartedEvent
 from browserrig.readiness import Readiness
 
 from .execution import Actions, Effect
+from .intents import NavigateIntent, WaitIntent
 
 # Where a new tab lands when the agent gives no URL.
 NEW_TAB_URL = "https://duckduckgo.com/"
@@ -116,15 +117,15 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
     async def wait(
         self,
         seconds: Annotated[float, Field(ge=0, le=10)] = 1,
+        *,
+        actions: Inject[Actions],
     ) -> str:
         async with self._browser.action_lock:
-            tab = self._browser.active_tab
-            await self._events.emit(
-                WaitingEvent(
-                    duration=seconds, target_id=tab.id, document_id=tab.document_id
-                )
-            )
-            await asyncio.sleep(seconds)
+
+            async def pause() -> None:
+                await asyncio.sleep(seconds)
+
+            await actions.stage(WaitIntent(seconds), self._browser.active_tab, pause)
         return "Wait completed; the next observation shows the current state."
 
     async def _navigate(
@@ -139,18 +140,17 @@ class NavigationTools(Plugin, needs=(Actions, Browser, BrowserEvents, Readiness)
         validated_url(url)
 
         async def navigate(tab: Tab) -> Effect:
-            # Viewers see the address typed into the bar before the page starts loading.
-            await self._browser.input.type_in_bar(
-                tab, BrowserBar.ADDRESS, typed, submit=True
-            )
-            await self._events.emit(
-                NavigationStartedEvent(target_id=tab.id, url=url, typed=typed)
-            )
-            await tab.navigate(url)
+            async def load() -> None:
+                await self._events.emit(
+                    NavigationStartedEvent(target_id=tab.id, url=url, typed=typed)
+                )
+                await tab.navigate(url)
+
+            await actions.stage(NavigateIntent(url, typed), tab, load)
             return Effect("Navigation executed.")
 
         async def navigate_new(_tab: Tab) -> Effect:
-            # An empty tab first, so viewers see the address typed into a fresh tab.
+            # An empty tab first, so the address can be entered in a fresh tab.
             opened = await self._browser.open_tab()
 
             async def dispatch() -> None:

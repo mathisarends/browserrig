@@ -1,7 +1,7 @@
 from .capture import CaptureContent, CaptureStrategy, DomCapture, capture
 from .changes import decision_change
 from .config import Screenshots, ScreenshotTrigger
-from .find import FoundMatch, PageMatches, close_find, find_text
+from .find import FindMark, FoundMatch, PageMatches, close_find, find_text
 from .handle import ElementHandle
 from .images import ImageContext, ImageRetention, TrimInBatches, UntilCompaction
 from .models import CapturedImage, Element, Snapshot
@@ -25,6 +25,7 @@ __all__ = [
     "capture",
     "Observe",
     "Element",
+    "FindMark",
     "FoundMatch",
     "PageMatches",
     "ElementHandle",

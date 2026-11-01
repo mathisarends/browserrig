@@ -1,30 +1,22 @@
-import asyncio
 from typing import Annotated
 from uuid import uuid4
 
 from harnessed import Inject, Plugin, ToolError, ToolResult
 from pydantic import Field
 
-from browserrig.browser import Browser, Tab
-from browserrig.core import ActionKind, BrowserBar
+from browserrig.browser import Tab
+from browserrig.core import ActionKind
 from browserrig.core import browser_tool as tool
-from browserrig.events import FindBarEvent, FindResultsEvent
 from browserrig.observation import FoundMatch, PageMatches, close_find, find_text
 
 from .execution import Actions, Effect
-
-# How long viewers see the final results before the find bar closes.
-_HOLD_SECONDS = 0.6
-# Alternatives appear in the find bar joined by this, typed like one text.
-_OR = " | "
+from .intents import FindIntent
 
 type _Query = Annotated[str, Field(min_length=1, max_length=200)]
 
 
-class FindTools(Plugin, needs=(Actions, Browser)):
+class FindTools(Plugin, needs=(Actions,)):
     """Search the page's text the way a person uses the browser's find bar."""
-
-    _browser: Inject[Browser]
 
     @tool(
         kind=ActionKind.FIND_IN_PAGE,
@@ -56,23 +48,12 @@ class FindTools(Plugin, needs=(Actions, Browser)):
         )
         if not all(queries):
             raise ToolError("query and alternatives must contain visible text")
-        shown = _OR.join(queries)
-        inputs = self._browser.input
 
         async def find(tab: Tab) -> Effect:
             session = uuid4().hex
 
-            async def preview(typed: str) -> None:
-                # Like a browser's find bar: results follow each key, without scrolling.
-                if typing := _typed(queries, len(typed)):
-                    found = await find_text(tab, typing, session=session)
-                    await inputs.announce(tab, _results(typed, found, current=1))
-
-            await inputs.keyboard.show_key(tab, "f", hold_control=True)
-            await inputs.announce(tab, FindBarEvent(visible=True))
-            try:
-                await inputs.type_in_bar(tab, BrowserBar.FIND, shown, after_key=preview)
-                found = await find_text(
+            async def search() -> PageMatches:
+                return await find_text(
                     tab,
                     queries,
                     session=session,
@@ -81,36 +62,16 @@ class FindTools(Plugin, needs=(Actions, Browser)):
                     count=max_results,
                     reveal=True,
                 )
-                await inputs.announce(tab, _results(shown, found, current=match))
-                await asyncio.sleep(_HOLD_SECONDS)
+
+            try:
+                found = await actions.stage(
+                    FindIntent(queries, match, session), tab, search
+                )
                 return Effect(_report(queries, match, found), prepared_scroll=True)
             finally:
-                await inputs.keyboard.show_key(tab, "Escape")
                 await close_find(tab)
-                await inputs.announce(tab, FindBarEvent(visible=False))
 
         return await actions.run(kind=ActionKind.FIND_IN_PAGE, operation=find)
-
-
-def _results(query: str, found: PageMatches, *, current: int) -> FindResultsEvent:
-    return FindResultsEvent(
-        query=query,
-        total=found.total,
-        active=current if current <= found.total else 0,
-        marks=found.marks,
-    )
-
-
-def _typed(queries: tuple[str, ...], length: int) -> tuple[str, ...]:
-    """The alternatives typed so far once the find bar holds `length` characters."""
-    typed = []
-    position = 0
-    for query in queries:
-        if position >= length:
-            break
-        typed.append(query[: length - position].strip())
-        position += len(query) + len(_OR)
-    return tuple(query for query in typed if query)
 
 
 def _report(queries: tuple[str, ...], match: int, found: PageMatches) -> str:

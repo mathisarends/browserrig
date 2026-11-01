@@ -7,6 +7,9 @@ project:
   source_roots: [.]
   root_packages: [browserrig]
   test_roots: [tests]
+  exclude:
+    - {path: "evals/**", reason: "Eval scripts drive the library like a user would."}
+    - {path: "examples/**", reason: "Examples use the public API only."}
 
 debt: .smelt/debt.json
 
@@ -29,6 +32,45 @@ structure:
       match: browserrig.*
       public: ['.']
       bundle_imports_at: 2
+
+# Every package depends only on the packages listed under it (SMT101), so a new
+# dependency between packages is a decision made here, not an accident.
+architecture:
+  composition_root: [browserrig.composition, browserrig.agent]
+  # Annotations may name types from anywhere; only runtime imports couple packages.
+  imports: {type_checking: ignore}
+  modules:
+    browserrig.kinds: core
+    browserrig.events: core
+    browserrig.terminal: terminal
+    browserrig.completion: completion
+  layers:
+    core: {path: core}
+    scripts: {path: scripts, may_depend_on: [core]}
+    files: {path: files, may_depend_on: [core]}
+    input: {path: input, may_depend_on: [core]}
+    browser: {path: browser, may_depend_on: [core, scripts, files, input]}
+    readiness: {path: readiness, may_depend_on: [core, scripts, files, browser]}
+    observation:
+      path: observation
+      may_depend_on: [core, scripts, browser, readiness, nudges, secrets]
+    nudges: {path: nudges, may_depend_on: [core, browser]}
+    # Observation redacts with secrets; the way back is recorded debt.
+    secrets: {path: secrets, may_depend_on: [core, scripts, input, browser]}
+    tools:
+      path: tools
+      may_depend_on: [core, scripts, files, input, browser, readiness, observation, secrets]
+      third_party: {deny: [cdpify]}
+    activity: {path: activity, may_depend_on: [core]}
+    handoff:
+      path: handoff
+      may_depend_on: [core, browser, nudges, observation, secrets]
+    # Staging for viewers is optional: it builds on the rest, nothing builds on it.
+    choreography:
+      path: choreography
+      may_depend_on: [core, input, browser, observation, tools]
+    terminal: {path: terminal, may_depend_on: [core]}
+    completion: {path: completion}
 
 tests:
   layout: none  # tests are flat (tests/test_<topic>.py), not mirrored
