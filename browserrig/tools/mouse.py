@@ -6,7 +6,7 @@ from pydantic import Field
 from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind, BrowserError, Point
 from browserrig.core import browser_tool as tool
-from browserrig.observation import CapturedImage, Observe, Snapshot, has_dom_refs
+from browserrig.observation import CapturedImage, Observe, Snapshot
 
 from .execution import Actions, Effect
 
@@ -134,7 +134,6 @@ class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
     @tool(
         kind=ActionKind.CLICK,
         chainable=True,
-        enabled=has_dom_refs,
         description=(
             "Automatically move the cursor to a current DOM ref and click it; "
             "count=2 performs a native double click; "
@@ -174,7 +173,6 @@ class PointerTools(Plugin, needs=(Actions, Browser, Observe)):
 
     @tool(
         kind=ActionKind.DRAG,
-        enabled=has_dom_refs,
         description=(
             "Drag between DOM refs, scrolling them into view first. Both endpoints must fit "
             "in the viewport together."

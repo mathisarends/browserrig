@@ -5,7 +5,7 @@ from .find import FoundMatch, PageMatches, close_find, find_text
 from .handle import ElementHandle
 from .images import ImageContext, ImageRetention, TrimInBatches, UntilCompaction
 from .models import CapturedImage, Element, Snapshot
-from .plugin import Observe, has_dom_refs
+from .plugin import Observe
 from .render import render
 from .renderer import DomRenderer, Renderer
 
@@ -32,6 +32,5 @@ __all__ = [
     "close_find",
     "decision_change",
     "find_text",
-    "has_dom_refs",
     "render",
 ]

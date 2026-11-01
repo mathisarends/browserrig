@@ -94,7 +94,7 @@ class ObserveAfterInput:
 class DomActionChains:
     async def check(self, observe: Observe, tab: Tab) -> str:
         before = observe.snapshot
-        if before is None or not observe.capture_strategy.provides_dom_refs:
+        if before is None:
             return "A fresh observation is required after this input."
         after = await observe.probe(tab)
         if after.readiness != ReadinessStatus.READY or after.limitations:

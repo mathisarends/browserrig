@@ -66,8 +66,6 @@ from tests.observations import has_image, image_id
 
 
 class CountingCapture:
-    provides_dom_refs = False
-
     def __init__(self, frames=None):
         self.captures = []
         # (image, geometry scale) per capture; by default every capture shows a new screen.

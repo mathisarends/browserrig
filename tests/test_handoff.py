@@ -45,8 +45,6 @@ from tests.observations import latest
 
 
 class _Capture:
-    provides_dom_refs = True
-
     async def collect(self, tab, _report, **_options):
         return CaptureContent(
             page=Extraction(

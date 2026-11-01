@@ -224,7 +224,6 @@ async def test_failed_comparison_keeps_input_successful_and_breaks_the_chain():
     actions = SimpleNamespace(
         observe=SimpleNamespace(
             snapshot=before,
-            capture_strategy=SimpleNamespace(provides_dom_refs=True),
             probe=AsyncMock(side_effect=RuntimeError("lost")),
         ),
         chain_policy=DomActionChains(),

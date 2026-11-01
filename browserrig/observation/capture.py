@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import ClassVar, Protocol
+from typing import Protocol
 from uuid import uuid4
 
 from cdpify.exceptions import CDPCommandError
@@ -154,11 +154,8 @@ class CaptureStrategy(Protocol):
     """Collect content; the shared capture runner owns dialogs and document coherence.
 
     Implementations are reusable configuration. Keep per-observation state local.
-    `provides_dom_refs` promises that collected refs support Observe.element().
+    Collected refs must support Observe.element().
     """
-
-    @property
-    def provides_dom_refs(self) -> bool: ...
 
     async def collect(  # pylint: disable=unused-argument
         self,
@@ -173,7 +170,6 @@ class CaptureStrategy(Protocol):
 
 
 class DomCapture(Options):
-    provides_dom_refs: ClassVar[bool] = True
     max_elements: int | None = Field(default=None, ge=1, le=50000)
     max_text_chars: int = Field(default=0, ge=0, le=100000)
     # Show visible text on pages with fewer than five named controls.

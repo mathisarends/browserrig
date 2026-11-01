@@ -51,7 +51,7 @@ from browserrig.files import (
     FileSystemState,
     FileSystemView,
 )
-from browserrig.observation import Observe, has_dom_refs
+from browserrig.observation import Observe
 from browserrig.readiness import Readiness
 
 from .execution import Actions, Effect
@@ -59,10 +59,6 @@ from .execution import Actions, Effect
 
 def _has_files(browser: Inject[Browser]) -> bool:
     return browser.files is not None
-
-
-def _has_upload_files(browser: Inject[Browser], observe: Inject[Observe]) -> bool:
-    return _has_files(browser) and has_dom_refs(observe)
 
 
 _SOURCE = "files"
@@ -353,7 +349,7 @@ class UploadTools(Plugin, needs=(Actions, Browser, BrowserEvents, Observe)):
 
     @tool(
         kind=ActionKind.UPLOAD,
-        enabled=_has_upload_files,
+        enabled=_has_files,
         description=(
             "Set a file input using existing workspace/download files. Paths are relative to "
             "the workspace or absolute paths returned by file tools."

@@ -38,17 +38,14 @@ agent = Agent(
 ```
 
 Add `DialogTools`, `JavaScriptTools`, `FileTools`, `UploadTools` or `Nudges`
-from their packages as needed. `UploadTools` requires DOM refs and a
-browser file workspace. The same readiness checks apply to web pages and
+from their packages as needed. `UploadTools` requires a browser file workspace. The same readiness checks apply to web pages and
 local document previews.
 
 Tool groups follow the input device, not the capture: `PointerTools` clicks and drags by
 screenshot or viewport coordinates and by ref, `KeyboardTools` sends keys to the current
-focus and types into a ref, and `FormTools` sets native form controls. Ref-based tools
-are only offered while the capture's `provides_dom_refs` capability holds, so the
-same groups work for screenshot-only captures. Empty pages can still have that capability. `Actions()` uses
-`DomActionChains()` for captures with refs; `ObserveAfterInput()` requires a fresh
-observation after each input when selected explicitly.
+focus and types into a ref, and `FormTools` sets native form controls. `Actions()` uses `DomActionChains()`;
+`ObserveAfterInput()` requires a fresh observation after each input when selected
+explicitly.
 
 ## Human handoff
 
@@ -138,7 +135,7 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 
 | Contract | Implementation |
 | --- | --- |
-| `CaptureStrategy` | Declare `provides_dom_refs`; implement `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent`. Honor `screenshots=False`. The runner handles dialogs, document coherence, fingerprints and snapshots. |
+| `CaptureStrategy` | Implement `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent`. Collected refs must support `Observe.element()`. Honor `screenshots=False`. The runner handles dialogs, document coherence, fingerprints and snapshots. |
 | `Renderer` | `instructions(screenshots)`, `refs()` and `render(snapshot)`. Pure presentation, no browser input or waits. |
 | `ReadinessPolicy` | `create(context) -> ReadinessStrategy`, returning a fresh probe. Context supplies tab, stage, phase and options. |
 | `ReadinessStrategy` | `budget`, `delay`, `reason`; `async check() -> bool`; `timeout_status()`. The shared runner owns deadlines, dialogs, cancellation and events. |

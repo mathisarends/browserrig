@@ -3,7 +3,7 @@ from harnessed import Inject, Plugin, ToolError, ToolResult
 from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind
 from browserrig.core import browser_tool as tool
-from browserrig.observation import Observe, has_dom_refs
+from browserrig.observation import Observe
 from browserrig.secrets import Secrets
 
 from .execution import Actions, Effect
@@ -66,7 +66,6 @@ class KeyboardTools(Plugin, needs=(Actions, Browser, Observe)):
     @tool(
         kind=ActionKind.TYPE,
         chainable=True,
-        enabled=has_dom_refs,
         description="Type exact text into a DOM ref; clear replaces its value by default.",
     )
     async def type_text(

@@ -83,7 +83,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
 
     @system_section(title="DOM element references")
     def refs(self) -> str | None:
-        return self.renderer.refs() if self.capture_strategy.provides_dom_refs else None
+        return self.renderer.refs()
 
     trust = SystemSection(
         title="Browser content and action results",
@@ -211,10 +211,6 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         if region is None and zoom != 1:
             raise ToolError("zoom needs a region; pass the viewport area to magnify")
         if region is not None:
-            if not self.capture_strategy.provides_dom_refs:
-                raise ToolError(
-                    "Region screenshots require a capture strategy with DOM references"
-                )
             snapshot = self._state.snapshot
             if (
                 snapshot is not None
@@ -376,8 +372,3 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
 
     def _render(self, snapshot: Snapshot) -> str:
         return self.renderer.render(snapshot)
-
-
-def has_dom_refs(observe: Inject[Observe]) -> bool:
-    """Tool gate: ref-based tools only work while observations carry DOM element refs."""
-    return observe.capture_strategy.provides_dom_refs

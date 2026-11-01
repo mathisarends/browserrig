@@ -3,7 +3,7 @@ from harnessed import Inject, Plugin, ToolResult
 from browserrig.browser import Tab
 from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
-from browserrig.observation import Observe, has_dom_refs
+from browserrig.observation import Observe
 
 from .execution import Actions, Effect
 
@@ -14,7 +14,6 @@ class FormTools(Plugin, needs=(Actions, Observe)):
     @tool(
         kind=ActionKind.SELECT,
         chainable=True,
-        enabled=has_dom_refs,
         description="Select an exact option label or value in a native select element.",
     )
     async def select_option(
@@ -37,7 +36,6 @@ class FormTools(Plugin, needs=(Actions, Observe)):
     @tool(
         kind=ActionKind.SET_DATE,
         chainable=True,
-        enabled=has_dom_refs,
         description="Set a native date/time input in its HTML format, such as YYYY-MM-DD.",
     )
     async def set_date(
