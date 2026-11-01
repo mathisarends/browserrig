@@ -1,4 +1,3 @@
-from dataclasses import dataclass, field
 from typing import assert_never
 from uuid import uuid4
 
@@ -35,23 +34,14 @@ from browserrig.events import (
 )
 
 from .models import ActivityKey, project_intervals, step_outcome, turn_outcome
+from .state import ActivityState
 
 _PAUSE = ActivityKey(ActivityKind.PAUSED)
 
 
-@dataclass
-class _State:
-    open: dict[ActivityKey, ActivityStartedEvent] = field(default_factory=dict)
-    # The session log only holds the open turn, so intervals keep their own record.
-    records: list[ActivityStartedEvent | ActivityFinishedEvent] = field(
-        default_factory=list
-    )
-    epoch: str = field(default_factory=lambda: uuid4().hex)
-
-
 class Activity(Plugin, provides=True, needs=(SessionLog,)):
     events = ACTIVITY_EVENTS
-    _state = PluginState(_State)
+    _state = PluginState(ActivityState)
     _log: Inject[SessionLog]
 
     async def setup(self, ctx: Context) -> None:

@@ -1,6 +1,5 @@
 import asyncio
 import math
-from dataclasses import dataclass, field
 from typing import Annotated
 from uuid import uuid4
 
@@ -35,22 +34,9 @@ from browserrig.secrets import Secrets
 
 from .changes import page_changes, page_url
 from .models import HandoffCallback, HandoffReceipt, HumanResponse
+from .state import HandoffState, Transfer
 
 _HISTORY = TypeAdapter(list[HandoffReceipt])
-
-
-@dataclass
-class _Transfer:
-    request: HandoffRequestedEvent
-    before: Snapshot | None
-    nudges: Nudges | None
-    events: dict[str, int] = field(default_factory=dict)
-
-
-@dataclass
-class _State:
-    current: _Transfer | None = None
-    resume_pending: bool = False
 
 
 class HumanHandoff(
@@ -65,7 +51,7 @@ class HumanHandoff(
     """
 
     events = HANDOFF_EVENTS
-    _state = PluginState(_State)
+    _state = PluginState(HandoffState)
     _browser: Inject[Browser]
     _events: Inject[BrowserEvents]
     _observe: Inject[Observe]
@@ -150,7 +136,7 @@ class HumanHandoff(
         # A running pause is acknowledged before async event observers finish. Publish
         # its baseline synchronously so an immediate resume cannot overtake this hook.
         before = self._observe.snapshot
-        transfer = _Transfer(request, before, nudges)
+        transfer = Transfer(request, before, nudges)
         self._state.current = transfer
         if nudges is not None:
             await nudges.begin_human_control()

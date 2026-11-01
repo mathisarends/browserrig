@@ -1,6 +1,5 @@
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
 from uuid import uuid4
 
 from harnessed import Context, Inject, Plugin, PluginState, hook
@@ -22,24 +21,13 @@ from .config import ReadinessOptions
 from .hooks import CheckReadiness, ReadinessCheck, SelectReadiness
 from .models import ReadinessReport
 from .policies import DomReady, ReadinessContext, ReadinessPolicy
+from .state import ReadinessState
 from .wait import wait_for_page
-
-
-@dataclass
-class _State:
-    pending: dict[tuple[str, ...], asyncio.Task[ReadinessReport]] = field(
-        default_factory=dict
-    )
-    cancelling: set[asyncio.Task[ReadinessReport]] = field(default_factory=set)
-    initialized: set[tuple[str, str]] = field(default_factory=set)
-    deferred: dict[str, ReadinessReport] = field(default_factory=dict)
-    spent: dict[str, float] = field(default_factory=dict)
-    context: Context | None = None
 
 
 class Readiness(Plugin, provides=True, needs=(BrowserEvents,)):
     events = READINESS_EVENTS
-    _state = PluginState(_State)
+    _state = PluginState(ReadinessState)
     _events: Inject[BrowserEvents]
 
     def __init__(

@@ -1,6 +1,4 @@
-import asyncio
 import hashlib
-from dataclasses import dataclass, field
 from typing import Annotated
 
 from harnessed import (
@@ -42,33 +40,16 @@ from .delta import delta, unmarked
 from .handle import ElementHandle
 from .models import CapturedImage, Snapshot
 from .renderer import DomRenderer, Renderer
+from .state import ObserveState
 
 # Below the session's default 32,000-character tool output limit, which would cut the
 # middle out of a longer result instead of letting the agent page on with an offset.
 _MAX_CONTENT_CHARS = 30000
 
 
-@dataclass
-class _State:
-    snapshot: Snapshot | None = None
-    delivered_image: CapturedImage | None = None
-    screenshot_requested: bool = False
-    screenshot_region: Region | None = None
-    screenshot_zoom: float = 1
-    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-    # The last page state handed to the session, and whether the last request still showed it.
-    sent_key: str | None = None
-    sent_ref: str | None = None
-    visible: bool = False
-    # The last complete observation of each page (tab, document) with its ref, which later
-    # ones of that page may list changes to while a request still includes it.
-    bases: dict[tuple[str, str], tuple[str, str]] = field(default_factory=dict)
-    included: frozenset[str] = frozenset()
-
-
 class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
     events = (ObservationCapturedEvent,)
-    _state = PluginState(_State)
+    _state = PluginState(ObserveState)
     _browser: Inject[Browser]
     _events: Inject[BrowserEvents]
     _readiness: Inject[Readiness]

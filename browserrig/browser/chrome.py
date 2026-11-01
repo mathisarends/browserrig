@@ -28,7 +28,7 @@ from cdpify.domains.target import (
     TargetInfoChangedEvent,
 )
 
-from browserrig.core import BrowserClosed, BrowserError, TabGesture
+from browserrig.core import BrowserClosed, BrowserError, TabGesture, TargetId
 from browserrig.events import (
     ConnectedEvent,
     DisconnectedEvent,
@@ -87,7 +87,7 @@ class ChromeBrowser:
         self.id = uuid4().hex
         self.events = BrowserEvents(self.id, emit)
         self._stack: AsyncExitStack | None = None
-        self._tabs: dict[str, Tab] = {}
+        self._tabs: dict[TargetId, Tab] = {}
         self._active = ""
         self._context: str | None = None
         self._sessions: dict[str, str] = {}
@@ -99,7 +99,7 @@ class ChromeBrowser:
         self._tasks: list[asyncio.Task[None]] = []
         self._failure: Exception | None = None
         self._connected = False
-        self._closed_targets: set[str] = set()
+        self._closed_targets: set[TargetId] = set()
         self._worlds = Worlds()
         self._attach_lock = asyncio.Lock()
         self.action_lock = asyncio.Lock()

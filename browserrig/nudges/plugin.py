@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -27,6 +26,8 @@ from browserrig.events import (
     TabOpenedEvent,
 )
 
+from .state import NudgeState, TabState
+
 _CLICK_KINDS = {ActionKind.CLICK, ActionKind.CLICK_AT, ActionKind.DOUBLE_CLICK}
 _SOURCE = "browser.nudges"
 # Wording shared by captcha widgets and bot-check interstitials across vendors.
@@ -51,21 +52,9 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
-class _State:
-    queued: dict[str, NudgeQueuedEvent] = field(default_factory=dict)
-    tabs: dict[str, _TabState] = field(default_factory=dict)
-    effect_at: float = 0
-    # Documents already flagged as bot checks; each is flagged once.
-    challenges: set[str] = field(default_factory=set)
-    # Whether the last recorded hint observation listed any hints.
-    shown: bool = False
-    human_control: int = 0
-
-
 class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
     events = NUDGE_EVENTS
-    _state = PluginState(_State)
+    _state = PluginState(NudgeState)
     _events: Inject[BrowserEvents]
 
     def __init__(self, *, max_hints: int = 5, max_chars: int = 2000) -> None:
@@ -169,12 +158,12 @@ class Nudges(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
 
     @hook(ActionStartedEvent)
     async def _on_start(self, event: ActionStartedEvent) -> None:
-        state = self._state.tabs.setdefault(event.target_id, _TabState())
+        state = self._state.tabs.setdefault(event.target_id, TabState())
         state.starts[event.action_id] = event.at
 
     @hook(ActionFinishedEvent)
     async def _on_action(self, event: ActionFinishedEvent) -> None:
-        state = self._state.tabs.setdefault(event.target_id, _TabState())
+        state = self._state.tabs.setdefault(event.target_id, TabState())
         if state.pending is not None:
             state.starts.pop(state.pending.action_id, None)
         state.pending = None
@@ -305,9 +294,3 @@ def _challenge(snapshot: Snapshot) -> bool:
         *(element.name for element in snapshot.elements),
     )
     return any(_CHALLENGE.search(part) for part in parts)
-
-
-@dataclass
-class _TabState:
-    pending: ActionFinishedEvent | None = None
-    starts: dict[str, float] = field(default_factory=dict)

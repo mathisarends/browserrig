@@ -39,6 +39,7 @@ from browserrig.scripts import (
 
 from .models import NAME, PLACEHOLDER, Secret, resolve
 from .redaction import Redactor
+from .state import SecretsState
 
 if TYPE_CHECKING:
     from browserrig.browser import Frame
@@ -48,13 +49,6 @@ if TYPE_CHECKING:
 # Only these tools resolve placeholders, and only in their `text` argument.
 _TYPING_TOOLS = frozenset({"type_text", "send_keys"})
 _SOURCE = "browser.secrets"
-
-
-@dataclass
-class _State:
-    # Set once a secret reached a page; the page may keep it beyond its field.
-    entered: bool = False
-    listed: bool = False
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -77,7 +71,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
     """
 
     events = SECRET_EVENTS
-    _state = PluginState(_State)
+    _state = PluginState(SecretsState)
     _events: Inject[BrowserEvents]
 
     def __init__(self, secrets: Mapping[str, Secret]) -> None:

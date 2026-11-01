@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 from harnessed import Inject, Observation, Plugin, PluginState, SystemSection, hook
@@ -10,6 +10,7 @@ from browserrig.events import ObservationCapturedEvent
 
 from .models import CapturedImage
 from .plugin import Observe
+from .state import ImageState
 
 
 class ImageRetention(Protocol):
@@ -56,13 +57,6 @@ class UntilCompaction:
 _NOTE_SOURCE = "browser-image"
 
 
-@dataclass
-class _State:
-    images: list[CapturedImage] = field(default_factory=list)
-    # The last latest-screenshot note handed to the session.
-    note: str = ""
-
-
 class ImageContext(Plugin, needs=(Observe,)):
     """Deliver screenshots inside immutable, session-owned browser observations.
 
@@ -71,7 +65,7 @@ class ImageContext(Plugin, needs=(Observe,)):
     Coordinate geometry follows final inclusion receipts, after all request hooks.
     """
 
-    _state = PluginState(_State)
+    _state = PluginState(ImageState)
     _observe: Inject[Observe]
 
     usage = SystemSection(

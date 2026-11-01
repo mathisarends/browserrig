@@ -8,6 +8,7 @@ from .errors import (
     StaleElement,
 )
 from .geometry import Bounds, ElementPoint, FrameTransform, Geometry, Point, Region
+from .ids import ActionId, DocumentId, TargetId
 from .kinds import (
     ActionKind,
     ActivityKind,
@@ -27,6 +28,7 @@ from .options import Options
 from .tools import BrowserToolMetadata, browser_tool
 
 __all__ = [
+    "ActionId",
     "ActionKind",
     "ActivityKind",
     "ActivityOutcome",
@@ -36,6 +38,7 @@ __all__ = [
     "BrowserError",
     "BrowserToolMetadata",
     "CursorStyle",
+    "DocumentId",
     "ElementOperation",
     "ElementPoint",
     "FileSource",
@@ -53,5 +56,6 @@ __all__ = [
     "SecretError",
     "StaleElement",
     "TabGesture",
+    "TargetId",
     "browser_tool",
 ]
