@@ -42,10 +42,11 @@ from browserrig.input import Input, Keyboard, Mouse
 from .base import BrowserEvents, EventSink, _discard
 from .config import BrowserOptions, ConnectBrowser, LaunchBrowser, Viewport
 from .downloads import Downloads
+from .frame import Frame
 from .frames import discover_frames
 from .models import TabInfo
 from .process import ChromeProcess
-from .tab import Frame, Tab, validated_url
+from .tab import Tab, validated_url
 from .worlds import Worlds
 
 logger = logging.getLogger(__name__)

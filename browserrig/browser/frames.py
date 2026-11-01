@@ -10,7 +10,8 @@ from cdpify.exceptions import CDPCommandError
 from browserrig.core import Bounds, BrowserError, FrameTransform
 from browserrig.scripts import OWNER_SIZE, VIEWPORT
 
-from .tab import Frame, Tab
+from .frame import Frame
+from .tab import Tab
 
 _MAX_FRAMES = 64
 _MAX_DEPTH = 8
