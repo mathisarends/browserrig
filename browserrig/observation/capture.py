@@ -287,7 +287,7 @@ def _mark_new(
 
 
 def _fingerprint(page: Extraction, document_id: str) -> str:
-    return PageFingerprint(
+    fingerprint = PageFingerprint(
         url=page.url,
         document_id=document_id,
         text=(page.text,) if page.text else (),
@@ -308,4 +308,5 @@ def _fingerprint(page: Extraction, document_id: str) -> str:
         ),
         alerts=page.alerts,
         modal=page.modal,
-    ).digest()
+    )
+    return fingerprint.digest()

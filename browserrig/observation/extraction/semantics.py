@@ -5,7 +5,7 @@ without the cost of fetching Chrome's full accessibility tree. Chrome's own name
 replace these for the controls an observation lists; see `accessibility`.
 """
 
-from browserrig.observation.models import Option, Tristate
+from browserrig.observation.models import CHECKABLE_ROLES, Option, Tristate
 
 from .document import Document, clean
 
@@ -29,9 +29,6 @@ INTERACTIVE_ROLES = frozenset(
         "textbox",
         "treeitem",
     }
-)
-CHECKABLE_ROLES = frozenset(
-    {"checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio"}
 )
 
 _INPUT_ROLES = {

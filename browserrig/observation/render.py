@@ -11,12 +11,9 @@ from urllib.parse import unquote, urlsplit
 
 from browserrig.core import ReadinessStatus
 
-from .models import Canvas, Element, Heading, Snapshot
+from .models import CHECKABLE_ROLES, Canvas, Element, Heading, Snapshot
 from .redirects import unwrap_redirect
 
-_CHECKABLE = frozenset(
-    {"checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio"}
-)
 _PLAIN_TYPES = frozenset(
     {"", "text", "checkbox", "radio", "submit", "button", "search"}
 )
@@ -222,7 +219,7 @@ def _element(element: Element, url: str) -> str:
 
 
 def _states(element: Element) -> list[str]:
-    unchecked = "unchecked" if element.role in _CHECKABLE else ""
+    unchecked = "unchecked" if element.role in CHECKABLE_ROLES else ""
     current = element.current
     states = [
         "disabled" if element.disabled else "",

@@ -18,6 +18,9 @@ from browserrig.core import (
 )
 
 type Tristate = bool | Literal["mixed"] | None
+CHECKABLE_ROLES = frozenset(
+    {"checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio"}
+)
 
 
 class Option(Options):

@@ -6,7 +6,14 @@ from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
 from browserrig.core import Bounds, FrameTransform
-from browserrig.observation.models import Canvas, Element, Heading, Modal, Offscreen
+from browserrig.observation.models import (
+    CHECKABLE_ROLES,
+    Canvas,
+    Element,
+    Heading,
+    Modal,
+    Offscreen,
+)
 
 from . import semantics
 from .document import Document, Rect, clean
@@ -329,7 +336,7 @@ class _FrameExtractor:
             control = document.linked_control(label)
             if control is None or control in candidates:
                 continue
-            if semantics.role(document, control) not in semantics.CHECKABLE_ROLES:
+            if semantics.role(document, control) not in CHECKABLE_ROLES:
                 continue
             placement = self._placement(label)
             if placement is not None:
