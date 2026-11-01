@@ -18,6 +18,7 @@ async def test_visible_descendant_of_hidden_parent_is_extracted_and_inert_conten
 ):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         markup = (
             '<div style="visibility:hidden">Hidden parent text'
             '<a href="/next" style="visibility:visible">Visible child</a></div>'
@@ -42,10 +43,12 @@ async def test_visible_descendant_of_hidden_parent_is_extracted_and_inert_conten
 async def test_truncated_markdown_keeps_code_fences_closed(site, limit):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         await evaluate(
             tab,
             "document.body.innerHTML = '<pre><code>'+ 'x'.repeat(500) +'</code></pre>'",
         )
+        await wait_for_page(tab)
         content = await extract_content(tab, max_chars=limit)
         assert len(content.markdown) <= limit
         fences = re.findall(r"^`{3,}", content.markdown, flags=re.M)
@@ -69,6 +72,7 @@ async def test_frame_heading_budget_does_not_reopen_a_truncated_code_fence(site)
 async def test_cursor_probe_reads_css_and_text_cursors_through_shadow_roots(site):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         markup = (
             "<style>body{margin:0} div,a,input,p{position:absolute;margin:0;width:100px;"
             "height:30px;left:0}</style>"

@@ -87,6 +87,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
             self, _ctx: Context, browser: Inject[Browser], actions: Inject[Actions]
         ):
             holder.update(browser=browser, actions=actions)
+            await wait_for_page(browser.active_tab)
             origin = site.replace("127.0.0.1", "localhost") if cross else site
             path = "/frame-leaf"
             if nested:
