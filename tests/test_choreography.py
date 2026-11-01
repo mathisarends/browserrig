@@ -38,13 +38,14 @@ from browserrig.events import (
     NavigationStartedEvent,
 )
 from browserrig.files import FileSystem, FileSystemOptions
+from browserrig.pacing import Pacing
 from browserrig.scripts import FindResult
 from browserrig.tools import Actions, FileTools, FindTools, NavigationTools, UploadTools
 from browserrig.tools import execution as execution_module
 from tests.fakes import mounted
 
-# The plugins that stage actions for viewers.
-STAGING = (Choreography,)
+# The plugins that pace input like a person and stage actions for viewers.
+STAGING = (Pacing, Choreography)
 
 
 class _Frame:
@@ -122,7 +123,9 @@ def _timeline(monkeypatch):
 
     monkeypatch.setattr(asyncio, "sleep", sleep)
     # The pointer lands in the middle of a tab it has not been in yet.
-    monkeypatch.setattr(random, "uniform", lambda low, high: (low + high) / 2)
+    monkeypatch.setattr(
+        random.Random, "uniform", lambda _rng, low, high: (low + high) / 2
+    )
     return timeline
 
 

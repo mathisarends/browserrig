@@ -9,7 +9,7 @@ from typing import TypedDict
 from browserrig.core import BrowserError
 from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
 
-from .presenter import Presenter
+from .motor import Motor
 from .target import Focus, InputTarget, focused
 
 # Key events of sensitive text show this instead of the character and its modifiers.
@@ -62,11 +62,11 @@ class Keyboard:
         focus: Focus,
         *,
         emit: Callable[[InputTarget, InputEvent], Awaitable[None]],
-        presenter: Callable[[], Presenter],
+        motor: Callable[[], Motor],
     ) -> None:
         self._focus = focus
         self._emit = emit
-        self._presenter = presenter
+        self._motor = motor
 
     async def press_key(
         self,
@@ -101,7 +101,7 @@ class Keyboard:
         and aborts typing by raising, e.g. when focus left the intended field.
         """
         target = focused(self._focus)
-        interval = self._presenter().typing_interval()
+        interval = self._motor().typing_interval()
         try:
             await self._emit(target, KeyboardVisibilityEvent(visible=True))
             # CRLF is one line break. Other Unicode characters are inserted unchanged.

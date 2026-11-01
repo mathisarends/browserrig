@@ -65,6 +65,8 @@ architecture:
     handoff:
       path: handoff
       may_depend_on: [core, browser, nudges, observation, secrets]
+    # How input is performed is optional: it builds on the browser, nothing builds on it.
+    pacing: {path: pacing, may_depend_on: [core, input, browser]}
     # Staging for viewers is optional: it builds on the rest, nothing builds on it.
     choreography:
       path: choreography

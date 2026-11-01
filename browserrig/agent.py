@@ -20,8 +20,8 @@ class Agent(harnessed.Agent):
     saved `SessionState` to `run` or `session`. Long runs summarize older steps
     once the request fills 80% of the model's context window, or 100k tokens when
     the model reports none; pass `without=(Compaction,)` to keep everything, or a
-    configured `Compaction`. Input is paced and streamed for people watching; pass
-    `without=(Choreography,)` to work at full speed.
+    configured `Compaction`. Input is paced like a person and streamed for people
+    watching; pass `without=(Pacing, Choreography)` to work at full speed unseen.
     """
 
     def __init__(

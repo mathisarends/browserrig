@@ -17,6 +17,7 @@ from browserrig.events import (
     ScrolledEvent,
 )
 
+from .motor import Motor
 from .presenter import Presenter
 from .target import Focus, InputTarget, focused
 from .wheel import FRAME_SECONDS, wheel_duration, wheel_progress
@@ -43,10 +44,16 @@ class Mouse:
     """
 
     def __init__(
-        self, focus: Focus, *, emit: Emit, presenter: Callable[[], Presenter]
+        self,
+        focus: Focus,
+        *,
+        emit: Emit,
+        motor: Callable[[], Motor],
+        presenter: Callable[[], Presenter],
     ) -> None:
         self._focus = focus
         self._emit = emit
+        self._motor = motor
         self._presenter = presenter
         self._rests: dict[str, _Rest] = {}
 
@@ -69,7 +76,7 @@ class Mouse:
         """Press a tab-strip control, let `switch` change focus, then return into the page.
 
         Without a focused tab there is nothing to leave: the pointer only appears in the
-        new tab, where the presenter lands it the first time.
+        new tab, where the motor lands it the first time.
         """
         source = self._focus()
         presenter = self._presenter()
@@ -79,7 +86,7 @@ class Mouse:
         target = focused(self._focus)
         rest = self._rest(target)
         if not rest.placed:
-            rest.position = presenter.landing(*await target.viewport_size())
+            rest.position = self._motor().landing(*await target.viewport_size())
         if source is not None:
             await presenter.enter(target, rest.position)
         # The renderer learns where the pointer is, so hover state matches the viewer.
@@ -216,7 +223,7 @@ class Mouse:
         await self._refresh_style(target)
 
     async def _move(self, target: InputTarget, point: Point) -> None:
-        path = self._presenter().path(self._rest(target).position, point)
+        path = self._motor().path(self._rest(target).position, point)
         cp1, cp2 = path.control_points
         await self._emit(
             target,

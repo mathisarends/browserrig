@@ -33,6 +33,7 @@ from .observation import (
     TrimInBatches,
     UntilCompaction,
 )
+from .pacing import Pacing
 from .readiness import (
     CheckReadiness,
     DomReady,
@@ -119,6 +120,7 @@ __all__ = [
     "Launch",
     "Nudges",
     "Observe",
+    "Pacing",
     "Readiness",
     "ReadinessOptions",
     "Secret",

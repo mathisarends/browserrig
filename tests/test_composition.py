@@ -17,6 +17,7 @@ from browserrig import (
     ImageContext,
     Launch,
     Observe,
+    Pacing,
     Readiness,
     ReadinessOptions,
     Screenshots,
@@ -27,6 +28,7 @@ from browserrig import (
     WindowRatio,
     browser_plugins,
 )
+from browserrig.input import Instant
 from browserrig.tools import (
     FileTools,
     FormTools,
@@ -163,6 +165,15 @@ def test_two_plugins_for_the_same_default_conflict():
         browser_plugins(Observe(), Observe())
     with pytest.raises(PluginConflict, match="browserrig.images"):
         browser_plugins(ImageContext(), ImageContext())
+
+
+def test_configured_pacing_and_choreography_replace_their_defaults_in_place():
+    defaults = browser_plugins()
+    pacing, choreography = Pacing(Instant()), Choreography()
+    composed = browser_plugins(choreography, pacing)
+    assert len(composed) == len(defaults)
+    assert composed[_index(defaults, Pacing)] is pacing
+    assert composed[_index(defaults, Choreography)] is choreography
 
 
 def test_without_drops_defaults_and_rejects_types_that_are_not_defaults():

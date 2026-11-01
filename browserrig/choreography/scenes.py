@@ -9,6 +9,7 @@ from typing import Any
 from browserrig.browser import Tab
 from browserrig.core import BrowserBar, FileTransferDirection, Point
 from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
+from browserrig.input import TYPING_INTERVAL_SECONDS
 from browserrig.observation import PageMatches, find_text
 from browserrig.tools import (
     FindIntent,
@@ -25,11 +26,10 @@ from .events import (
     FindResultsEvent,
     WaitingEvent,
 )
-from .pacing import TYPING_INTERVAL_SECONDS
 
 type Step = Callable[[], Awaitable[Any]]
 
-# Bar text is typed at page typing speed, but a long URL speeds up to stay within this.
+# Bar text is typed at a person's typing speed, but a long URL speeds up to stay within this.
 _BAR_TYPING_SECONDS = 0.8
 # Long enough for a viewer to follow a file into its destination, short enough to stay brisk.
 _TRANSFER_SECONDS = 0.45

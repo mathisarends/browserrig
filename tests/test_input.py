@@ -15,11 +15,10 @@ from browserrig.choreography import (
     SCENE_EVENTS,
     BarTypedEvent,
     CursorEnteredEvent,
-    HumanPace,
+    Stage,
     TabPressedEvent,
     scenes,
 )
-from browserrig.choreography import pacing as pacing_module
 from browserrig.choreography.scenes import Scene
 from browserrig.core import BrowserError, Point
 from browserrig.events import (
@@ -33,7 +32,7 @@ from browserrig.events import (
     PointerReleasedEvent,
     ScrolledEvent,
 )
-from browserrig.input import Focus, Input, Unseen
+from browserrig.input import CursorPath, Focus, HumanMotor, Input, Instant, Unseen
 from browserrig.input import keyboard as keyboard_module
 from browserrig.input import mouse as mouse_module
 from browserrig.input.pointer import movement
@@ -358,10 +357,11 @@ def _rest(devices, tab, point):
     rest.position, rest.placed = point, True
 
 
-def _devices(focus: Focus) -> Input:
-    """Input watched by people, so it is paced and reported."""
+def _devices(focus: Focus, *, rng=None) -> Input:
+    """Input paced like a person and watched by people, so it is reported."""
     devices = Input(focus)
-    devices.present(HumanPace(lambda: devices.action_id))
+    devices.pace(HumanMotor(rng=rng))
+    devices.present(Stage(lambda: devices.action_id))
     return devices
 
 
@@ -407,10 +407,10 @@ def _tab(target_id="tab-1", *, dispatch=None, events=None, viewport=(1000, 600))
 async def test_first_tab_seeds_the_pointer_without_a_tab_press(monkeypatch):
     sleep = AsyncMock()
     monkeypatch.setattr(mouse_module.asyncio, "sleep", sleep)
-    monkeypatch.setattr(pacing_module.random, "uniform", Mock(side_effect=[450, 330]))
     tab, events, commands = _tab()
     focus: dict[str, Tab | None] = {"tab": None}
-    devices = _devices(lambda: focus["tab"])
+    rng = Mock(uniform=Mock(side_effect=[450, 330]))
+    devices = _devices(lambda: focus["tab"], rng=rng)
 
     async def switch():
         focus["tab"] = tab
@@ -426,12 +426,12 @@ async def test_first_tab_seeds_the_pointer_without_a_tab_press(monkeypatch):
 async def test_tab_switch_presses_the_tab_then_enters_the_new_page(monkeypatch):
     sleep = AsyncMock()
     monkeypatch.setattr(mouse_module.asyncio, "sleep", sleep)
-    monkeypatch.setattr(pacing_module.random, "uniform", Mock(side_effect=[500, 300]))
     events = []
     first, _, first_commands = _tab("first", events=events)
     second, _, second_commands = _tab("second", events=events)
     focus = {"tab": first}
-    devices = _devices(lambda: focus["tab"])
+    rng = Mock(uniform=Mock(side_effect=[500, 300]))
+    devices = _devices(lambda: focus["tab"], rng=rng)
     _rest(devices, first, Point(x=100, y=80))
 
     async def switch():
@@ -463,13 +463,12 @@ async def test_tab_switch_presses_the_tab_then_enters_the_new_page(monkeypatch):
 
 async def test_returning_to_a_tab_lands_where_its_pointer_rested(monkeypatch):
     monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
-    sample = Mock()
-    monkeypatch.setattr(pacing_module.random, "uniform", sample)
     events = []
     first, _, first_commands = _tab("first", events=events)
     second, _, _ = _tab("second", events=events)
     focus = {"tab": second}
-    devices = _devices(lambda: focus["tab"])
+    rng = Mock()
+    devices = _devices(lambda: focus["tab"], rng=rng)
     _rest(devices, first, Point(x=100, y=80))
     _rest(devices, second, Point(x=700, y=400))
 
@@ -477,7 +476,7 @@ async def test_returning_to_a_tab_lands_where_its_pointer_rested(monkeypatch):
         focus["tab"] = first
 
     await devices.mouse.switch_tab(TabGesture.CLOSE, "second", switch)
-    sample.assert_not_called()
+    rng.uniform.assert_not_called()
     pressed = next(event for event in events if isinstance(event, TabPressedEvent))
     assert pressed.gesture is TabGesture.CLOSE and pressed.from_position == (700, 400)
     entered = next(event for event in events if isinstance(event, CursorEnteredEvent))
@@ -564,8 +563,57 @@ async def test_unwatched_input_reports_nothing_and_never_pauses(monkeypatch):
 
 def test_restoring_a_presenter_brings_back_the_previous_one():
     devices = Input(lambda: None)
-    watched = HumanPace(lambda: devices.action_id)
+    watched = Stage(lambda: devices.action_id)
     restore = devices.present(watched)
     assert devices.presenter() is watched
     restore()
     assert isinstance(devices.presenter(), Unseen)
+
+
+def test_restoring_a_motor_brings_back_the_previous_one():
+    devices = Input(lambda: None)
+    human = HumanMotor()
+    restore = devices.pace(human)
+    assert devices.motor() is human
+    restore()
+    assert isinstance(devices.motor(), Instant)
+
+
+class _SlowMotor:
+    """A motor unlike any built in: slow keys, fixed paths, corner landings."""
+
+    def typing_interval(self) -> float:
+        return 0.2
+
+    def path(self, start: Point, end: Point) -> CursorPath:
+        return CursorPath(start, end, 1 / 30)
+
+    def landing(self, width: float, height: float) -> Point:
+        return Point(x=width - 1, y=height - 1)
+
+
+async def test_a_motor_paces_input_that_nobody_watches(monkeypatch):
+    sleep = AsyncMock()
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", sleep)
+    tab, events, commands = _tab()
+    focus: dict[str, Tab | None] = {"tab": None}
+    devices = Input(lambda: focus["tab"])
+    devices.pace(_SlowMotor())
+
+    async def switch():
+        focus["tab"] = tab
+
+    await devices.mouse.switch_tab(TabGesture.ACTIVATE, tab.id, switch)
+    await devices.mouse.move_to(Point(x=10, y=10))
+    await devices.keyboard.type_text("ab")
+    assert not events
+    assert devices.mouse.position_in(tab.id) == Point(x=10, y=10)
+    moves = [(c["x"], c["y"]) for c in commands if c["type"] == "mouseMoved"]
+    assert moves[0] == (999, 599) and len(moves) == 3
+    # Two frames along the path, then one pause after each key.
+    assert [call.args for call in sleep.await_args_list] == [
+        (1 / 60,),
+        (1 / 60,),
+        (0.2,),
+        (0.2,),
+    ]

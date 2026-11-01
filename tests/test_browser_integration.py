@@ -3,9 +3,10 @@ from urllib.parse import urlsplit
 import pytest
 
 from browserrig import ChromeBrowser, Connect
-from browserrig.choreography import CursorEnteredEvent, HumanPace, TabPressedEvent
+from browserrig.choreography import CursorEnteredEvent, Stage, TabPressedEvent
 from browserrig.core import Point
 from browserrig.events import CursorStateEvent, TabOpenedEvent
+from browserrig.input import HumanMotor
 from browserrig.kinds import TabGesture
 from tests.javascript import evaluate
 
@@ -24,7 +25,8 @@ async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site
         assert not any(isinstance(event, CursorStateEvent) for event in events)
         width, height = await first.viewport_size()
         assert browser.mouse.position == Point(x=width / 2, y=height / 2)
-        browser.input.present(HumanPace(lambda: browser.input.action_id))
+        browser.input.pace(HumanMotor())
+        browser.input.present(Stage(lambda: browser.input.action_id))
         await browser.mouse.move_to(Point(x=100, y=120))
         second = await browser.open_tab(site)
         assert (

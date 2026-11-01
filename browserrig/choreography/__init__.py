@@ -11,13 +11,12 @@ from .events import (
     TabPressedEvent,
     WaitingEvent,
 )
-from .pacing import TYPING_INTERVAL_SECONDS, HumanPace
 from .plugin import Choreography
+from .stage import Stage
 from .tabstrip import TabStrip
 
 __all__ = [
     "SCENE_EVENTS",
-    "TYPING_INTERVAL_SECONDS",
     "BarTypedEvent",
     "Choreography",
     "CursorEnteredEvent",
@@ -25,7 +24,7 @@ __all__ = [
     "FindBarEvent",
     "FindResultsEvent",
     "HighlightElementEvent",
-    "HumanPace",
+    "Stage",
     "TabPressedEvent",
     "TabStrip",
     "WaitingEvent",

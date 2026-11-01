@@ -69,6 +69,7 @@ from browserrig import (
     Choreography,
     FileTools,
     Observe,
+    Pacing,
     Screenshots,
     ScreenshotTrigger,
     UploadTools,
@@ -80,7 +81,7 @@ agent = Agent(
         Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
         handoff if interactive else None,
     ],
-    without=(Choreography, FileTools, UploadTools),
+    without=(Pacing, Choreography, FileTools, UploadTools),
 )
 ```
 

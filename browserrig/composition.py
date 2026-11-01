@@ -12,6 +12,7 @@ from .browser import BrowserOptions, Chrome
 from .choreography import Choreography, TabStrip
 from .nudges import Nudges
 from .observation import ImageContext, Observe
+from .pacing import Pacing
 from .readiness import DownloadReadiness, Readiness
 from .tools import (
     Actions,
@@ -44,7 +45,9 @@ def browser_plugins(
     defaults: list[PluginLike] = [
         Activity(),
         Chrome(browser),
-        # Paces input like a person and streams it, for anyone watching the session.
+        # Types and moves the pointer at a person's pace.
+        Pacing(),
+        # Streams input and browser UI for anyone watching the session.
         Choreography(),
         # Titles and favicons for a viewer's tab strip; the agent reads tabs without it.
         TabStrip(),

@@ -3,28 +3,14 @@ from typing import Protocol
 from browserrig.core import Point, TabGesture
 from browserrig.events import InputEvent
 
-from .pointer import CursorPath
 from .target import InputTarget
 
 
 class Presenter(Protocol):
-    """How input looks to viewers: how fast it goes and what they are told.
+    """What viewers see of input; how it is performed is the `Motor`'s concern.
 
-    The devices ask it for pacing and report what they did. Without one, input runs as
-    fast as the page accepts it and nothing is reported.
+    The devices report what they did. Without a presenter nothing is reported.
     """
-
-    def typing_interval(self) -> float:
-        """Seconds between keys typed into the page."""
-        ...
-
-    def path(self, start: Point, end: Point) -> CursorPath:
-        """The pointer's way from `start` to `end`; its duration paces the native moves."""
-        ...
-
-    def landing(self, width: float, height: float) -> Point:
-        """Where the pointer first appears in a tab whose viewport has this size."""
-        ...
 
     def shows_cursor_style(self) -> bool:
         """Whether to ask the page which cursor shape the pointer rests on."""
@@ -46,16 +32,7 @@ class Presenter(Protocol):
 
 
 class Unseen:
-    """Input nobody watches: no pauses, straight pointer moves, nothing reported."""
-
-    def typing_interval(self) -> float:
-        return 0
-
-    def path(self, start: Point, end: Point) -> CursorPath:
-        return CursorPath(start, end, 0)
-
-    def landing(self, width: float, height: float) -> Point:
-        return Point(x=width / 2, y=height / 2)
+    """Input nobody watches: nothing is reported or staged."""
 
     def shows_cursor_style(self) -> bool:
         return False

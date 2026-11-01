@@ -218,17 +218,21 @@ references stay on `Tab`, which receives input through the `InputTarget`
 protocol. Each gesture resolves the active tab once when it starts, so a click or
 drag never splits across tabs; without an active tab, input raises `BrowserError`.
 
-How input looks to people watching is a separate, optional plugin. Tools and devices
-only describe what they do; `Choreography` (from `browserrig.choreography`) paces
-typing and pointer paths like a person, plays the gestures below and streams them
-as live events. `browser_plugins` and `Agent` include it by default; pass
-`without=(Choreography,)` to work at full speed with no pauses and no input events. It
-builds on three seams, which other plugins can use the same way:
+How input is performed and how it looks to people watching are two separate,
+optional plugins. Tools and devices only describe what they do. `Pacing` (from
+`browserrig.pacing`) types and moves the pointer like a person; `Choreography` (from
+`browserrig.choreography`) plays the gestures below and streams them as live events.
+`browser_plugins` and `Agent` include both by default; pass `without=(Pacing,)` to work
+at full speed, `without=(Choreography,)` to emit no input events, or both. They build
+on four seams, which other plugins can use the same way:
 
-- `browser.input.present(presenter)` installs a `Presenter` that sets the typing
-  interval, pointer paths, landing points and tab-strip gestures, and reports each
-  input event. It returns a callback that restores the previous one. The default,
-  `Unseen`, is instant and reports nothing.
+- `browser.input.pace(motor)` installs a `Motor` that sets the typing interval,
+  pointer paths and landing points. `Pacing(motor)` installs one for a session; its
+  default is `HumanMotor()`, and `HumanMotor(rng=random.Random(seed))` makes the
+  varying parts repeatable. The default without a plugin, `Instant`, never pauses.
+- `browser.input.present(presenter)` installs a `Presenter` that plays tab-strip
+  gestures and reports each input event. The default, `Unseen`, reports nothing.
+  Both calls return a callback that restores the previous motor or presenter.
 - `Actions.stage(intent, tab, step)` dispatches a `Perform` waterfall around a tool
   step. A hook that matches the intent (`FindIntent`, `NavigateIntent`, `WaitIntent`,
   `OpenFileIntent`, `UploadIntent`) stages the step and calls `next_()` to run it.
@@ -236,8 +240,8 @@ builds on three seams, which other plugins can use the same way:
 
 The mouse remembers where it last rested in each tab (`browser.mouse.position_in(tab.id)`)
 and returns there when that tab comes back to the front. The first time a tab
-receives the pointer, it lands in the center of the actual viewport, or with
-`Choreography` at a random position within the central 40–60% on each axis. There
+receives the pointer, it lands where the motor puts it: the center of the actual
+viewport, or with `Pacing` at a random position within the central 40–60% on each axis. There
 is no animation from the top-left corner. With `Choreography`, opening, activating
 and closing tabs play a tab-strip gesture:
 
@@ -262,8 +266,8 @@ per frame along Chrome's smooth scroll curve (`cubic-bezier(0.4, 0, 0, 1)`),
 lasting about one 60 Hz frame per square root of the distance (150 ms to 1.5 s).
 Chrome does not animate CDP wheel events itself, and `Input.synthesizeScrollGesture`
 moves at constant speed, so the harness paces the wheel events.
-With `Choreography`, typing uses a fixed 50 ms interval
-(`browserrig.choreography.TYPING_INTERVAL_SECONDS`) and pointer paths take their
+With `Pacing`, typing uses a fixed 50 ms interval
+(`browserrig.input.TYPING_INTERVAL_SECONDS`) and pointer paths take their
 time; without it, keys and moves are dispatched without pauses.
 
 `KeyboardTools` supplies `send_keys`. It addresses the current page
@@ -331,8 +335,8 @@ the transfer with that point, wait, and then assign the files.
 the style changes. It reads the page's computed CSS cursor and treats text inputs,
 editable content and plain text as `text`; custom cursor images show `default`.
 The probe is best-effort and never delays input by more than 250 ms; it runs
-only while a presenter such as `HumanPace` asks for it, so unwatched input never
-probes.
+only while a presenter such as `Choreography`'s `Stage` asks for it, so unwatched
+input never probes.
 `DownloadProgressedEvent` is sent at most every 200 ms per download; completion,
 failure and cancellation remain durable events.
 
