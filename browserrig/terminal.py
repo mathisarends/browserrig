@@ -4,14 +4,18 @@ from dataclasses import asdict, fields, is_dataclass
 from enum import Enum
 from typing import TextIO
 
-from harnessed import Plugin, hook
+from harnessed import Plugin, ToolResult, hook
 from harnessed.events import (
+    ApprovalRequestedEvent,
     CompactionFinishedEvent,
     CompactionStartedEvent,
     ModelAttemptFinishedEvent,
     ModelAttemptStartedEvent,
     ModelRetryScheduledEvent,
     SessionEvent,
+    ToolCallFinishedEvent,
+    ToolCallRequestedEvent,
+    ToolExecutionFinishedEvent,
 )
 from harnessed.hooks import SessionAppended
 
@@ -111,12 +115,19 @@ def _event_record(event: _TerminalEvent) -> dict[str, object]:
             value is None or isinstance(value, str | int | float | bool | Enum)
         ):
             record[item.name] = value
-    call = getattr(event, "call", None)
-    if call is not None:
-        record.update(tool=call.name, call_id=call.id)
-    result = getattr(event, "result", None)
-    if result is not None and hasattr(result, "is_error"):
-        record["is_error"] = result.is_error
-        record["tool_status"] = result.status
-        record["break_chain"] = result.break_chain
+    match event:
+        case ApprovalRequestedEvent(call=call) | ToolCallRequestedEvent(call=call):
+            record.update(tool=call.name, call_id=call.id)
+        case ToolCallFinishedEvent(call=call, result=result):
+            record.update(tool=call.name, call_id=call.id, **_result_record(result))
+        case ToolExecutionFinishedEvent(result=result):
+            record.update(_result_record(result))
     return record
+
+
+def _result_record(result: ToolResult) -> dict[str, object]:
+    return {
+        "is_error": result.is_error,
+        "tool_status": result.status,
+        "break_chain": result.break_chain,
+    }
