@@ -106,7 +106,6 @@ __all__ = [
     "Nudges",
     "Observe",
     "Readiness",
-    "SecretValue",
     "ReadinessOptions",
     "Secret",
     "SecretValue",
