@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from harnessed import Kit, Plugin
+from harnessed import Kit, Plugin, SystemPrompt
 from harnessed.core.composition import compose_plugins
 from harnessed.kernel import PluginLike
 from harnessed.plugins import Compaction as ContextCompaction
@@ -46,7 +46,14 @@ def browser_plugins(
 
 
 def browser_kit(*, browser: BrowserOptions | None = None) -> Kit:
-    """Browser defaults as a native Harnessed kit, with explicit instruction ordering."""
+    """Browser defaults as a native Harnessed kit, with explicit instruction ordering.
+
+    Its `observation`, `actions` and `files` fragments group the instructions in
+    reading order; `browser_instructions` places them in that order.
+    """
+    observe, images = Observe(), ImageContext()
+    actions, pointer = Actions(), PointerTools()
+    files = FileTools()
     return Kit(
         name="browserrig",
         plugins=[
@@ -61,20 +68,38 @@ def browser_kit(*, browser: BrowserOptions | None = None) -> Kit:
             Readiness(),
             DownloadReadiness(),
             Nudges(),
-            Observe(),
-            ImageContext(),
-            Actions(),
+            observe,
+            images,
+            actions,
             NavigationTools(),
             JavaScriptTools(),
             KeyboardTools(),
-            PointerTools(),
+            pointer,
             FormTools(),
             TabTools(),
             DialogTools(),
             FindTools(),
-            FileTools(),
+            files,
             ContextCompaction(trigger=WindowRatio()),
         ],
+        # Instruction order differs from mount order: coordinates are explained right
+        # after screenshots and before the chain rules that refer to them.
+        fragments={
+            "observation": (observe, images),
+            "actions": (pointer, actions),
+            "files": (files,),
+        },
+    )
+
+
+def browser_instructions(kit: Kit) -> SystemPrompt:
+    """`browser_kit` instructions in reading order: what the agent sees, how it acts, files.
+
+    Removed and replaced recipes follow the kit, like `kit.instructions`. Kit plugins
+    outside these fragments declare no instructions; place them with `PluginInstructions()`.
+    """
+    return SystemPrompt(
+        kit.fragment("observation"), kit.fragment("actions"), kit.fragment("files")
     )
 
 

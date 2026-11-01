@@ -85,17 +85,24 @@ agent = Agent(
 ```
 
 `browser_kit()` publishes the defaults as a native Harnessed `Kit`. Use it with
-a plain Harnessed agent and place its instructions explicitly:
+a plain Harnessed agent and place its instructions explicitly.
+`browser_instructions(browser)` places them in reading order, as the `Agent`
+facade does; `browser.instructions` keeps the kit's plugin order:
 
 ```python
-from harnessed import Agent, PluginInstructions, SystemPrompt
-from browserrig import FileTools, browser_kit
+from harnessed import Agent, PluginInstructions, PromptFormat, SystemPrompt
+from browserrig import FileTools, browser_instructions, browser_kit
 
 browser = browser_kit().without(FileTools)
 agent = Agent(
     model=model,
     plugins=[browser, MyPlugin()],
-    system_prompt=SystemPrompt("Complete the task.", browser.instructions, PluginInstructions()),
+    system_prompt=SystemPrompt(
+        "Complete the task.",
+        browser_instructions(browser),
+        PluginInstructions(),
+        format=PromptFormat.MARKDOWN,
+    ),
 )
 print(agent.describe())
 ```
@@ -264,9 +271,12 @@ tools. For structured output, read `.text` on incomplete results; `.output` rais
 
 ## System prompts and optional MCP tools
 
-`browserrig.Agent(system_prompt="...")` places browser kit instructions and remaining
-plugin instructions automatically, including with `system_prompt=None`.
-For titled Markdown or XML, pass a native `SystemPrompt`:
+`browserrig.Agent(system_prompt="...")` builds a Markdown prompt, with each section
+under its `## title`, also with `system_prompt=None`. Sections follow the order of
+work: observations, element refs, page-content trust and screenshots; then
+coordinates and action chains; then files, then other plugins such as `Secrets` or
+`HumanHandoff` in plugin order, and a `Done` passed in `plugins` last. `print(agent.prompt)` lists the
+resulting order. To choose another format or order, pass a native `SystemPrompt`:
 
 ```python
 from harnessed import PluginInstructions, PromptFormat, SystemPrompt
@@ -276,7 +286,7 @@ agent = Agent(
     system_prompt=SystemPrompt(
         "Complete the requested browser task using the observed page state.",
         PluginInstructions(),
-        format=PromptFormat.MARKDOWN,
+        format=PromptFormat.XML,
     ),
 )
 print(agent.prompt)

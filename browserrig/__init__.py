@@ -14,6 +14,7 @@ from .completion import Done
 from .composition import (  # smelt: ignore[SMT106] -- public facade
     ContextCompaction,
     WindowRatio,
+    browser_instructions,
     browser_kit,
     browser_plugins,
 )
@@ -154,5 +155,6 @@ __all__ = [
     "TerminalEvents",
     "browser_plugins",
     "browser_kit",
+    "browser_instructions",
     "wait_for_page",
 ]
