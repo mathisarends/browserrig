@@ -32,7 +32,15 @@ from browserrig.events import (
     PointerReleasedEvent,
     ScrolledEvent,
 )
-from browserrig.input import CursorPath, Focus, HumanMotor, Input, Instant, Unseen
+from browserrig.input import (
+    CursorPath,
+    Focus,
+    HumanMotor,
+    Input,
+    Instant,
+    KeyStroke,
+    Unseen,
+)
 from browserrig.input import keyboard as keyboard_module
 from browserrig.input import mouse as mouse_module
 from browserrig.input.pointer import movement
@@ -582,8 +590,10 @@ def test_restoring_a_motor_brings_back_the_previous_one():
 class _SlowMotor:
     """A motor unlike any built in: slow keys, fixed paths, corner landings."""
 
-    def typing_interval(self) -> float:
-        return 0.2
+    def keystrokes(  # pylint: disable=unused-argument
+        self, text: str, *, sensitive: bool
+    ) -> tuple[KeyStroke, ...]:
+        return tuple(KeyStroke(key, 0.2) for key in text)
 
     def path(self, start: Point, end: Point) -> CursorPath:
         return CursorPath(start, end, 1 / 30)
@@ -617,3 +627,66 @@ async def test_a_motor_paces_input_that_nobody_watches(monkeypatch):
         (0.2,),
         (0.2,),
     ]
+
+
+class _Slipping(Instant):
+    """Types whatever keys it was given, regardless of the text asked for."""
+
+    def __init__(self, *keys: str) -> None:
+        self._keys = keys
+
+    def keystrokes(  # pylint: disable=unused-argument
+        self, text: str, *, sensitive: bool
+    ) -> tuple[KeyStroke, ...]:
+        return tuple(KeyStroke(key) for key in self._keys)
+
+
+async def test_a_corrected_slip_enters_the_text_asked_for():
+    devices, _tab, events, commands = _rig()
+    devices.pace(_Slipping("a", "x", "Backspace", "b"))
+    typed = await devices.keyboard.type_text("ab")
+    assert typed.exact and typed.entered == "ab"
+    keys = [event.key for event in events if isinstance(event, KeyPressedEvent)]
+    assert keys == ["a", "x", "Backspace", "b"]
+    assert [c["text"] for c in commands if c["type"] == "char"] == ["a", "x", "b"]
+
+
+async def test_send_keys_reports_a_slip_that_stayed():
+    devices, tab, _events, _commands = _rig()
+    devices.pace(_Slipping("h", "e", "l", "o"))
+
+    async def run(*, kind, operation):
+        assert kind == "press"
+        return (await operation(tab)).text
+
+    tools = SimpleNamespace(_browser=SimpleNamespace(keyboard=devices.keyboard))
+    reply = await KeyboardTools.send_keys(
+        tools, text="hello", actions=SimpleNamespace(run=run)
+    )
+    assert "typed 'helo' instead of 'hello'" in reply
+
+
+@pytest.mark.parametrize(
+    "keys",
+    [("p", "x", "Backspace", "w"), ("p",), ("p", "w", "!")],
+)
+async def test_sensitive_text_refuses_a_plan_that_is_not_exact(keys):
+    devices, _tab, events, commands = _rig()
+    devices.pace(_Slipping(*keys))
+    with pytest.raises(BrowserError, match="exactly"):
+        await devices.keyboard.type_text("pw", sensitive=True)
+    assert not commands and not events
+
+
+@pytest.mark.parametrize(
+    "keys,message",
+    [(("Backspace", "a"), "only erase"), (("Enter",), "not 'Enter'")],
+)
+async def test_a_plan_the_keyboard_cannot_follow_is_refused_before_any_key(
+    keys, message
+):
+    devices, _tab, _events, commands = _rig()
+    devices.pace(_Slipping(*keys))
+    with pytest.raises(BrowserError, match=message):
+        await devices.keyboard.type_text("a")
+    assert not commands

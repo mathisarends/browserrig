@@ -140,7 +140,7 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 | `ReadinessStrategy` | `budget`, `delay`, `reason`; `async check() -> bool`; `timeout_status()`. The shared runner owns deadlines, dialogs, cancellation and events. |
 | `SelectReadiness` | Native Harnessed `Bail[ReadinessPolicy]`: the first non-`None` policy overrides the configured initial/ongoing policy for this document. |
 | `CheckReadiness` | Native Harnessed `Waterfall[ReadinessCheck]`: call `await next_()` and compose application conditions around the selected policy. The shared deadline includes the middleware. |
-| `Motor` (`browserrig.input`) | `typing_interval()`, `path(start, end) -> CursorPath` and `landing(width, height)`. How input is performed; install it with `Pacing(motor)`. No events, no viewer concerns. |
+| `Motor` (`browserrig.input`) | `keystrokes(text, *, sensitive) -> Sequence[KeyStroke]`, `path(start, end) -> CursorPath` and `landing(width, height)`. How input is performed; install it with `Pacing(motor)`. A plan types characters and may correct slips with `Backspace`; sensitive text must be typed exactly. No events, no viewer concerns. |
 | `Presenter` (`browserrig.input`) | `shows_cursor_style()`, `async leave(...)`, `async enter(...)` and `async show(target, event)`. What viewers see of input; `Choreography` installs one. |
 | `ActionChainPolicy` (`browserrig.tools`) | `async check(observe, tab) -> str`: empty allows continuing; otherwise explain why a fresh observation is required. Failed comparison ends the chain without turning successful input into failed input. |
 

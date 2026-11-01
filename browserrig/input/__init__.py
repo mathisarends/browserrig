@@ -1,6 +1,6 @@
 from .controller import Input
-from .keyboard import Keyboard
-from .motor import TYPING_INTERVAL_SECONDS, HumanMotor, Instant, Motor
+from .keyboard import Keyboard, TypedText
+from .motor import TYPING_INTERVAL_SECONDS, HumanMotor, Instant, KeyStroke, Motor
 from .mouse import Mouse
 from .pointer import CursorPath, movement
 from .presenter import Presenter, Unseen
@@ -15,10 +15,12 @@ __all__ = [
     "InputTarget",
     "Instant",
     "KeyEventType",
+    "KeyStroke",
     "Keyboard",
     "Motor",
     "Mouse",
     "Presenter",
+    "TypedText",
     "Unseen",
     "movement",
 ]

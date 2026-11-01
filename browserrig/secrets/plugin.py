@@ -198,8 +198,12 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
             guard = _focus_guard(browser, tab.id, main, origins)
         return SecretEntry(names, origins[0], tab.id, tab.document_id, parts, guard)
 
-    async def enter(self, entry: SecretEntry, keyboard: Keyboard) -> None:
-        """Type prepared text; focus is re-checked before each secret character."""
+    async def enter(self, entry: SecretEntry, keyboard: Keyboard) -> bool:
+        """Type prepared text; focus is re-checked before each secret character.
+
+        Returns whether every part entered what was asked. Secrets are always typed
+        exactly, so only the plain text around them can keep a slip.
+        """
         # The page may keep the value beyond the field, so mark the session before typing.
         self._state.entered = True
         await self._events.emit(
@@ -210,12 +214,13 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
                 document_id=entry.document_id,
             )
         )
+        exact = True
         try:
             for text, secret in entry.parts:
                 if secret:
                     await keyboard.type_text(text, sensitive=True, guard=entry.guard)
                 else:
-                    await keyboard.type_text(text)
+                    exact = (await keyboard.type_text(text)).exact and exact
         except SecretError:
             raise
         except Exception:  # pylint: disable=broad-exception-caught
@@ -223,6 +228,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
             raise SecretError(
                 "Typing the secret stopped; the field may be partly filled. Observe before retrying"
             ) from None
+        return exact
 
     @hook(ExecuteTool, priority=Priority.GUARD)
     async def _guard_tool(

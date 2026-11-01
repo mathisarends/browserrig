@@ -1,4 +1,6 @@
 import random
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Protocol
 
 from browserrig.core import Point
@@ -9,6 +11,15 @@ from .pointer import CursorPath, movement
 TYPING_INTERVAL_SECONDS = 0.05
 
 
+@dataclass(frozen=True, slots=True)
+class KeyStroke:
+    """One key of typed text: a character, or `Backspace` to erase the last one typed."""
+
+    key: str
+    # Seconds before the next key.
+    delay_after: float = 0
+
+
 class Motor(Protocol):
     """How the hand moves: typing rhythm, pointer paths and where the pointer lands.
 
@@ -16,8 +27,12 @@ class Motor(Protocol):
     concern. Without one, input runs as fast as the page accepts it.
     """
 
-    def typing_interval(self) -> float:
-        """Seconds between keys typed into the page."""
+    def keystrokes(self, text: str, *, sensitive: bool) -> Sequence[KeyStroke]:
+        """The keys that type `text`, with the pause after each.
+
+        A plan may slip and correct itself with `Backspace`, or leave a slip in place.
+        Sensitive text must be typed exactly as given; only the pauses may vary.
+        """
         ...
 
     def path(self, start: Point, end: Point) -> CursorPath:
@@ -32,8 +47,10 @@ class Motor(Protocol):
 class Instant:
     """Input at machine speed: no pauses, straight pointer moves, centered landing."""
 
-    def typing_interval(self) -> float:
-        return 0
+    def keystrokes(  # pylint: disable=unused-argument
+        self, text: str, *, sensitive: bool
+    ) -> Sequence[KeyStroke]:
+        return tuple(KeyStroke(key) for key in text)
 
     def path(self, start: Point, end: Point) -> CursorPath:
         return CursorPath(start, end, 0)
@@ -43,7 +60,7 @@ class Instant:
 
 
 class HumanMotor:
-    """Input at a person's pace: steady typing and eased pointer paths.
+    """Input at a person's pace: steady typing without slips and eased pointer paths.
 
     `rng` draws the varying parts, such as where the pointer lands in a new tab; pass a
     seeded `random.Random` for repeatable runs.
@@ -60,8 +77,10 @@ class HumanMotor:
         self._typing_interval = typing_interval
         self._rng = rng or random.Random()
 
-    def typing_interval(self) -> float:
-        return self._typing_interval
+    def keystrokes(  # pylint: disable=unused-argument
+        self, text: str, *, sensitive: bool
+    ) -> Sequence[KeyStroke]:
+        return tuple(KeyStroke(key, self._typing_interval) for key in text)
 
     def path(self, start: Point, end: Point) -> CursorPath:
         return movement(start, end)

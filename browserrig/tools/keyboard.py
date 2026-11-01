@@ -3,6 +3,7 @@ from harnessed import Inject, Plugin, ToolError, ToolResult
 from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind
 from browserrig.core import browser_tool as tool
+from browserrig.input import TypedText
 from browserrig.observation import Observe
 from browserrig.secrets import Secrets
 
@@ -56,10 +57,10 @@ class KeyboardTools(Plugin, needs=(Actions, Browser, Observe)):
             if secrets is not None:
                 entry = await secrets.prepare(text, browser=self._browser)
                 if entry is not None:
-                    await secrets.enter(entry, self._browser.keyboard)
-                    return Effect("Text entered.")
-            await self._browser.keyboard.type_text(text)
-            return Effect("Text entered.")
+                    return _secret_entered(
+                        await secrets.enter(entry, self._browser.keyboard)
+                    )
+            return _entered(await self._browser.keyboard.type_text(text))
 
         return await actions.run(kind=ActionKind.PRESS, operation=send)
 
@@ -93,9 +94,28 @@ class KeyboardTools(Plugin, needs=(Actions, Browser, Observe)):
             if clear:
                 await self._browser.keyboard.press_key("Backspace")
             if entry is not None and secrets is not None:
-                await secrets.enter(entry, self._browser.keyboard)
-            else:
-                await self._browser.keyboard.type_text(text)
-            return Effect("Text entered.")
+                return _secret_entered(
+                    await secrets.enter(entry, self._browser.keyboard)
+                )
+            return _entered(await self._browser.keyboard.type_text(text))
 
         return await actions.run(kind=ActionKind.TYPE, operation=type_text)
+
+
+def _entered(typed: TypedText) -> Effect:
+    if typed.exact:
+        return Effect("Text entered.")
+    return Effect(
+        f"Text entered with a slip: typed {typed.entered!r} instead of "
+        f"{typed.intended!r}. Check the field before continuing."
+    )
+
+
+def _secret_entered(exact: bool) -> Effect:
+    if exact:
+        return Effect("Text entered.")
+    # Never echo text that surrounds a secret.
+    return Effect(
+        "Text entered with a slip in the text around the secret. "
+        "Check the field before continuing."
+    )

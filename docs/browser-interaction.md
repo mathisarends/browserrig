@@ -226,7 +226,7 @@ optional plugins. Tools and devices only describe what they do. `Pacing` (from
 at full speed, `without=(Choreography,)` to emit no input events, or both. They build
 on four seams, which other plugins can use the same way:
 
-- `browser.input.pace(motor)` installs a `Motor` that sets the typing interval,
+- `browser.input.pace(motor)` installs a `Motor` that plans keystrokes and sets
   pointer paths and landing points. `Pacing(motor)` installs one for a session; its
   default is `HumanMotor()`, and `HumanMotor(rng=random.Random(seed))` makes the
   varying parts repeatable. The default without a plugin, `Instant`, never pauses.
@@ -286,8 +286,13 @@ modifiers are released after the key. Literal text uses `text` without modifier 
 With DOM refs, `KeyboardTools` also supplies `type_text(ref=..., text=...)` to focus and
 replace a referenced field. Use `clear=False` to type at its current selection.
 
-Keys and modifiers are released on failure or cancellation. Unicode text is
-dispatched once per character, without simulated typos. Empty replacement text
+Keys and modifiers are released on failure or cancellation. The motor plans the
+keys for text as `KeyStroke(key, delay_after)`: characters, and `Backspace` to erase
+one it typed. The built-in motors dispatch each character once, without slips. A
+custom motor may slip and correct itself; the plan is checked before the first key,
+and `type_text` returns `TypedText(intended, entered)`. When a slip stays, the tools
+say so (without echoing text around a secret). Sensitive text refuses any plan
+that does not type it exactly. Empty replacement text
 clears the field. Direct Python callers can use `browser.keyboard.type_text(...)`,
 `browser.keyboard.press_key(...)`, `browser.mouse.move_to(Point(...))`, and
 `browser.mouse.scroll(delta_y=..., point=Point(...))`. Acquire `browser.action_lock`

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from typing import TypedDict
@@ -9,11 +9,14 @@ from typing import TypedDict
 from browserrig.core import BrowserError
 from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
 
-from .motor import Motor
+from .motor import KeyStroke, Motor
 from .target import Focus, InputTarget, focused
 
 # Key events of sensitive text show this instead of the character and its modifiers.
 _HIDDEN_KEY = "•"
+
+# The one named key a keystroke plan may use, to correct a slip.
+_ERASE = "Backspace"
 
 _MODIFIERS = {"Alt": 1, "Control": 2, "Meta": 4, "Shift": 8}
 _SPECIAL_KEYS = {
@@ -52,6 +55,18 @@ _PUNCTUATION = {
 }
 _SHIFTED = dict(zip('!@#$%^&*()_+{}|:"<>?~', "1234567890-=[]\\;',./`", strict=True))
 _SHIFTED_BY_BASE = {base: shifted for shifted, base in _SHIFTED.items()}
+
+
+@dataclass(frozen=True, slots=True)
+class TypedText:
+    """Text asked for and what the keys entered, which differs if a slip stayed."""
+
+    intended: str
+    entered: str
+
+    @property
+    def exact(self) -> bool:
+        return self.entered == self.intended
 
 
 class Keyboard:
@@ -94,30 +109,36 @@ class Keyboard:
         *,
         sensitive: bool = False,
         guard: Callable[[], Awaitable[None]] | None = None,
-    ) -> None:
-        """Type `text` key by key.
+    ) -> TypedText:
+        """Type `text` key by key, as the motor plans the keys.
 
-        `sensitive` keeps the characters out of key events. `guard` runs before each key
-        and aborts typing by raising, e.g. when focus left the intended field.
+        `sensitive` keeps the characters out of key events and requires a plan that
+        types exactly `text`. `guard` runs before each key and aborts typing by raising,
+        e.g. when focus left the intended field.
         """
+        # CRLF is one line break. Other Unicode characters are inserted unchanged.
+        text = text.replace("\r\n", "\n")
+        plan = tuple(self._motor().keystrokes(text, sensitive=sensitive))
+        typed = TypedText(intended=text, entered=_replay(plan))
+        if sensitive and (typed.entered != text or len(plan) != len(text)):
+            raise BrowserError("Sensitive text must be typed exactly, without slips")
         target = focused(self._focus)
-        interval = self._motor().typing_interval()
         try:
             await self._emit(target, KeyboardVisibilityEvent(visible=True))
-            # CRLF is one line break. Other Unicode characters are inserted unchanged.
-            for value in text.replace("\r\n", "\n"):
+            for key in plan:
                 if guard is not None:
                     await guard()
                 await self._stroke(
                     target,
-                    _character(value),
-                    duration=interval,
+                    _Stroke("Backspace") if key.key == _ERASE else _character(key.key),
+                    duration=key.delay_after,
                     sensitive=sensitive,
                 )
-                if interval:
-                    await asyncio.sleep(interval)
+                if key.delay_after:
+                    await asyncio.sleep(key.delay_after)
         finally:
             await self._emit(target, KeyboardVisibilityEvent(visible=False))
+        return typed
 
     async def _stroke(
         self,
@@ -196,6 +217,25 @@ class _Stroke:
             virtual = ord(base.upper())
             code = f"Key{base.upper()}" if base.isalpha() else f"Digit{base}"
         return {"key": self.key, "code": code, "windows_virtual_key_code": virtual}
+
+
+def _replay(plan: Sequence[KeyStroke]) -> str:
+    """The text a keystroke plan enters; rejects plans the keyboard cannot follow."""
+    entered: list[str] = []
+    for key in plan:
+        if key.delay_after < 0:
+            raise BrowserError("Keystroke delays must not be negative")
+        if key.key == _ERASE:
+            if not entered:
+                raise BrowserError("A keystroke plan may only erase what it typed")
+            entered.pop()
+        elif len(key.key) == 1:
+            entered.append(key.key)
+        else:
+            raise BrowserError(
+                f"A keystroke plan types characters or Backspace, not {key.key!r}"
+            )
+    return "".join(entered)
 
 
 def _held(*, control: bool, shift: bool, alt: bool, meta: bool) -> tuple[str, ...]:
