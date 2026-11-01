@@ -145,8 +145,12 @@ async def test_tab_publishes_loading_then_the_settled_icon_once(monkeypatch):
     events = []
     tab = Tab("tab", SimpleNamespace(), emit=AsyncMock(side_effect=events.append))
     tab.url, tab.title = "https://example.org/", "example.org"
-    strip = TabStrip(title="Example", icon="https://example.org/icon.png")
-    frame = SimpleNamespace(id="tab", run=AsyncMock(return_value=strip))
+    icon = "https://example.org/icon.png"
+    strips = [
+        TabStrip(title="Example", icon=icon),
+        TabStrip(title="Renamed", icon=icon),
+    ]
+    frame = SimpleNamespace(id="tab", run=AsyncMock(side_effect=strips))
     monkeypatch.setattr(tab, "main_frame", AsyncMock(return_value=frame))
     load = AsyncMock(return_value="data:image/png;base64,AA==")
     monkeypatch.setattr(tab_module, "load_favicon", load)
@@ -155,10 +159,10 @@ async def test_tab_publishes_loading_then_the_settled_icon_once(monkeypatch):
     await tab.handle(FrameStartedLoadingEvent(frame_id="tab"))
     await tab.handle(FrameStartedLoadingEvent(frame_id="child"))
     await tab.handle(FrameStoppedLoadingEvent(frame_id="tab"))
-    assert tab._strip_task is not None  # pylint: disable=protected-access
-    await tab._strip_task  # pylint: disable=protected-access
+    await _until(lambda: len(events) == 4)
+    # A later read with the same icon updates the title without fetching the icon again.
     await tab.handle(FrameStoppedLoadingEvent(frame_id="tab"))
-    await tab._strip_task  # pylint: disable=protected-access
+    await _until(lambda: len(events) == 5)
 
     # The document title arrives before the icon has loaded.
     states = [(event.loading, event.title, event.favicon) for event in events]
@@ -168,25 +172,28 @@ async def test_tab_publishes_loading_then_the_settled_icon_once(monkeypatch):
         (False, "example.org", ""),
         (False, "Example", ""),
         (False, "Example", "data:image/png;base64,AA=="),
+        (False, "Renamed", "data:image/png;base64,AA=="),
     ]
     load.assert_awaited_once()
 
 
 async def test_a_discarded_tab_stops_resolving_its_icon(monkeypatch):
     tab = Tab("tab", SimpleNamespace(), emit=AsyncMock())
-    started = asyncio.Event()
+    started, cancelled = asyncio.Event(), asyncio.Event()
 
     async def main_frame():
         started.set()
-        await asyncio.Event().wait()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
 
     monkeypatch.setattr(tab, "main_frame", main_frame)
     tab.refresh_strip()
-    task = tab._strip_task  # pylint: disable=protected-access
     await asyncio.wait_for(started.wait(), 5)
     tab.discard()
-    with pytest.raises(asyncio.CancelledError):
-        await task
+    await asyncio.wait_for(cancelled.wait(), 5)
 
 
 async def test_input_that_opens_a_dialog_returns_without_waiting_for_its_reply():
@@ -232,3 +239,9 @@ def _dialog() -> JavascriptDialogOpeningEvent:
         type="alert",
         has_browser_handler=False,
     )
+
+
+async def _until(condition):
+    async with asyncio.timeout(5):
+        while not condition():
+            await asyncio.sleep(0)

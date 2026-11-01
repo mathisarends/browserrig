@@ -1,14 +1,15 @@
-# Internal state is inspected to verify lifecycle and cleanup.
-# pylint: disable=protected-access
-
 import asyncio
 import errno
-from unittest.mock import Mock
+import sys
+from pathlib import Path
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from browserrig.browser import process as process_module
 from browserrig.browser.config import LaunchBrowser
 from browserrig.browser.process import ChromeProcess, _active_endpoint
+from browserrig.core.errors import BrowserError
 
 
 @pytest.mark.parametrize(
@@ -17,35 +18,34 @@ from browserrig.browser.process import ChromeProcess, _active_endpoint
     ids=["locked-file", "directory-repopulated"],
 )
 async def test_profile_cleanup_retries_transient_errors_and_retains_ownership(
-    error: OSError,
+    error: OSError, profile: Mock
 ) -> None:
-    process = ChromeProcess(LaunchBrowser())
-    profile = Mock()
     profile.cleanup.side_effect = [error, None]
-    process._profile = profile
-    await process.aclose()
+    process = _process()
+    with pytest.raises(BrowserError, match="exited during startup"):
+        async with process:
+            pass
     assert profile.cleanup.call_count == 2
-    assert process._profile is None
     await process.aclose()
     assert profile.cleanup.call_count == 2
 
 
-async def test_profile_cleanup_propagates_unexpected_errors_and_retains_ownership() -> (
-    None
-):
-    process = ChromeProcess(LaunchBrowser())
-    profile = Mock()
+async def test_profile_cleanup_propagates_unexpected_errors_and_retains_ownership(
+    profile: Mock,
+) -> None:
     error = OSError(errno.EIO, "disk failure")
     profile.cleanup.side_effect = [error, None]
-    process._profile = profile
+    process = _process()
     with pytest.raises(OSError) as caught:
-        await process.aclose()
+        async with process:
+            pass
     assert caught.value is error
     assert profile.cleanup.call_count == 1
-    assert process._profile is profile
+    # The profile is still owned, so the next close retries it once.
     await process.aclose()
     assert profile.cleanup.call_count == 2
-    assert process._profile is None
+    await process.aclose()
+    assert profile.cleanup.call_count == 2
 
 
 def test_startup_retries_locked_and_incomplete_port_file():
@@ -61,20 +61,41 @@ def test_startup_retries_locked_and_incomplete_port_file():
 
 
 async def test_profile_cleanup_gives_up_on_persistent_lock_without_failing(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, profile: Mock
 ) -> None:
-    process = ChromeProcess(LaunchBrowser())
-    profile = Mock()
-    profile.name = "missing-profile-dir"
     profile.cleanup.side_effect = PermissionError("held by a Chrome helper")
-    process._profile = profile
+    process = _process()
     clock = iter(range(0, 1000, 5))
     monkeypatch.setattr(asyncio, "sleep", _no_sleep)
     monkeypatch.setattr(  # smelt: ignore[SMT426] -- sleep is patched; no wait uses this clock
         asyncio.get_running_loop(), "time", lambda: next(clock)
     )
+    # The startup error is reported, not the leftover profile.
+    with pytest.raises(BrowserError, match="exited during startup"):
+        async with process:
+            pass
+    attempts = profile.cleanup.call_count
     await process.aclose()
-    assert process._profile is None
+    assert profile.cleanup.call_count == attempts
+
+
+@pytest.fixture(name="profile")
+def _profile(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Mock:
+    """A temporary profile for a Chrome that exits during startup."""
+    profile = Mock()
+    profile.name = str(tmp_path / "profile")
+    monkeypatch.setattr(process_module, "TemporaryDirectory", lambda **_: profile)
+    exited = Mock(returncode=1)
+    monkeypatch.setattr(
+        process_module.asyncio,
+        "create_subprocess_exec",
+        AsyncMock(return_value=exited),
+    )
+    return profile
+
+
+def _process() -> ChromeProcess:
+    return ChromeProcess(LaunchBrowser(executable=Path(sys.executable)))
 
 
 async def _no_sleep(_: float) -> None:

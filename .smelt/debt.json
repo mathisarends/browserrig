@@ -32,30 +32,6 @@
       "message": "test accesses private production name browserrig.Observe._page_key"
     },
     {
-      "fingerprint": "59372a60c788db8cf6c982d0507c69de",
-      "code": "SMT420",
-      "path": "tests/test_process.py",
-      "message": "test accesses private production name browserrig.browser.process.ChromeProcess._profile"
-    },
-    {
-      "fingerprint": "59372a60c788db8cf6c982d0507c69de",
-      "code": "SMT420",
-      "path": "tests/test_process.py",
-      "message": "test accesses private production name browserrig.browser.process.ChromeProcess._profile"
-    },
-    {
-      "fingerprint": "59372a60c788db8cf6c982d0507c69de",
-      "code": "SMT420",
-      "path": "tests/test_process.py",
-      "message": "test accesses private production name browserrig.browser.process.ChromeProcess._profile"
-    },
-    {
-      "fingerprint": "59372a60c788db8cf6c982d0507c69de",
-      "code": "SMT420",
-      "path": "tests/test_process.py",
-      "message": "test accesses private production name browserrig.browser.process.ChromeProcess._profile"
-    },
-    {
       "fingerprint": "dfa52a2d2d3e26242ede3e4d0b8cfa66",
       "code": "SMT420",
       "path": "tests/test_process.py",
@@ -72,30 +48,6 @@
       "code": "SMT420",
       "path": "tests/test_tab_state.py",
       "message": "test accesses private production name browserrig.browser.favicon._media_type"
-    },
-    {
-      "fingerprint": "9daa497215f60c8f9e11e5c240d7be9a",
-      "code": "SMT420",
-      "path": "tests/test_tab_state.py",
-      "message": "test accesses private production name browserrig.browser.tab.Tab._strip_task"
-    },
-    {
-      "fingerprint": "9daa497215f60c8f9e11e5c240d7be9a",
-      "code": "SMT420",
-      "path": "tests/test_tab_state.py",
-      "message": "test accesses private production name browserrig.browser.tab.Tab._strip_task"
-    },
-    {
-      "fingerprint": "9daa497215f60c8f9e11e5c240d7be9a",
-      "code": "SMT420",
-      "path": "tests/test_tab_state.py",
-      "message": "test accesses private production name browserrig.browser.tab.Tab._strip_task"
-    },
-    {
-      "fingerprint": "9daa497215f60c8f9e11e5c240d7be9a",
-      "code": "SMT420",
-      "path": "tests/test_tab_state.py",
-      "message": "test accesses private production name browserrig.browser.tab.Tab._strip_task"
     },
     {
       "fingerprint": "a1c9880469f7f66d5e1e8b9a3399f5f4",
