@@ -2,6 +2,7 @@ import hashlib
 from typing import Annotated
 
 from harnessed import (
+    Context,
     Inject,
     Observation,
     Plugin,
@@ -53,8 +54,6 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
     _browser: Inject[Browser]
     _events: Inject[BrowserEvents]
     _readiness: Inject[Readiness]
-    # Mounted before Observe when used; it redacts every snapshot and screenshot.
-    _secrets: Inject[Secrets | None]
 
     def __init__(
         self,
@@ -76,6 +75,10 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 renderer = DomRenderer()
         self.renderer = renderer
         self.screenshots = screenshots or Screenshots()
+
+    async def setup(self, ctx: Context) -> None:
+        # Secrets is looked up per capture, so it redacts wherever it sits in the plugins.
+        self._state.context = ctx
 
     @system_section(title="Browser observations")
     def page_state(self) -> str:
@@ -117,7 +120,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 tabs=tuple(await self._browser.tabs()),
                 previous=self._state.snapshot,
                 screenshots=False,
-                redaction=self._secrets,
+                redaction=self._secrets(),
             )
 
     async def capture(
@@ -145,7 +148,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 screenshots=(self.screenshots.trigger == ScreenshotTrigger.EACH_STEP)
                 if screenshots is None
                 else screenshots,
-                redaction=self._secrets,
+                redaction=self._secrets(),
             )
             self._state.snapshot = snapshot
             await self._events.emit(
@@ -263,7 +266,8 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         observation = Observation(
             source="browser", content=self._render(snapshot), refs=(snapshot.id,)
         )
-        return self._secrets.redact(observation) if self._secrets else observation
+        secrets = self._secrets()
+        return secrets.redact(observation) if secrets else observation
 
     def image_delivered(self, image: CapturedImage | None) -> None:
         """Select geometry from final observation inclusion receipts."""
@@ -313,7 +317,7 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
             and (hints := await nudges.observation(snapshot)) is not None
         ):
             observations.append(hints)
-        secrets = self._secrets
+        secrets = self._secrets()
         if secrets is not None:
             listed = secrets.project(snapshot)
             if listed is not None:
@@ -340,9 +344,8 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
                 observation = Observation(
                     source="browser", content=changes, refs=(snapshot.id,)
                 )
-                return (
-                    self._secrets.redact(observation) if self._secrets else observation
-                )
+                secrets = self._secrets()
+                return secrets.redact(observation) if secrets else observation
         state.bases[page] = (plain, snapshot.id)
         return self.project(snapshot)
 
@@ -369,6 +372,10 @@ class Observe(Plugin, provides=True, needs=(Browser, BrowserEvents, Readiness)):
         )
         text = self._render(snapshot.model_copy(update={"elements": elements}))
         return hashlib.sha256(text.encode()).hexdigest()
+
+    def _secrets(self) -> Secrets | None:
+        ctx = self._state.context
+        return ctx[Secrets] if ctx is not None and Secrets in ctx else None
 
     def _render(self, snapshot: Snapshot) -> str:
         return self.renderer.render(snapshot)

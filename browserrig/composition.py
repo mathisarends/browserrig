@@ -57,7 +57,6 @@ def browser_plugins(
         Nudges(),
     ]
     if secrets is not None:
-        # Before Observe, which redacts every observation with it.
         plugins.append(secrets if isinstance(secrets, Secrets) else Secrets(secrets))
     plugins += [
         observation,

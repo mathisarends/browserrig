@@ -215,15 +215,3 @@ async def test_secret_is_refused_inside_a_cross_origin_frame_of_an_allowed_page(
     replies = _replies(model)
     assert replies[0].is_error and "not allowed on http://localhost" in replies[0].text
     assert replies[2].is_error and "cross-origin frame" in replies[2].text
-
-
-async def test_secrets_mounted_after_observe_fail_closed(site):
-    secrets = Secrets({"pw": Secret(PASSWORD, domains=(site,))})
-    agent = Agent(
-        model=_model([lambda state, _: "Done"]),
-        plugins=[*browser_plugins(Launch(url=site)), secrets],
-    )
-    with pytest.raises(ExceptionGroup) as failure:
-        async with agent.session():
-            pass
-    assert failure.group_contains(ValueError, match="Mount Secrets before Observe")

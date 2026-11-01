@@ -12,7 +12,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from PIL import Image
 
-from browserrig import Secret, Secrets, Totp, env
+from browserrig import Observe, Readiness, Secret, Secrets, Totp, env
 from browserrig.core import ActionKind, Bounds, SecretError
 from browserrig.events import ActionFailedEvent, KeyPressedEvent, SecretEnteredEvent
 from browserrig.input import Input
@@ -432,3 +432,32 @@ async def test_prepare_rejects_unknown_names_before_touching_the_page():
         with pytest.raises(SecretError, match="Unknown secret missing"):
             await holder["secrets"].prepare("{{secret:missing}}", browser=browser)
         browser.active_tab.main_frame.assert_not_awaited()
+
+
+async def test_observe_redacts_with_secrets_mounted_after_it():
+    holder = {}
+
+    class Hold(Plugin, needs=(Observe,)):
+        async def setup(self, _ctx: Context, observe: Inject[Observe]):
+            holder["observe"] = observe
+
+    agent = Agent(
+        model=ScriptedModel(["done"]),
+        plugins=[FakeChrome(holder), Readiness(), Observe(), Hold(), _secrets()],
+    )
+    snapshot = Snapshot(
+        id="s",
+        tab_id="t",
+        document_id="d",
+        url="https://example.org/",
+        title=f"Welcome {PASSWORD}",
+        readiness="ready",
+        width=1,
+        height=1,
+        scroll_y=0,
+        fingerprint="f",
+    )
+    async with agent.session():
+        observation = holder["observe"].project(snapshot)
+    assert "Welcome {{secret:pw}}" in observation.content
+    assert PASSWORD not in observation.content

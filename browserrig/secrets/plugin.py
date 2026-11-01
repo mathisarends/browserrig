@@ -103,16 +103,6 @@ class Secrets(Plugin, provides=True, needs=(SessionLog, BrowserEvents)):
     )
 
     async def setup(self, ctx: Context) -> None:
-        # Imported here: observation imports this package to redact snapshots.
-        from browserrig.observation import (  # pylint: disable=import-outside-toplevel,cyclic-import
-            Observe,
-        )
-
-        if Observe in ctx:
-            # Observe binds Secrets when mounted; mounted earlier, it would never redact.
-            raise ValueError(
-                "Mount Secrets before Observe, e.g. via browser_plugins(secrets=...)"
-            )
         for name, secret in self._secrets.items():
             if not secret.rotating:
                 self._learn(name, await resolve(name, secret.value))
