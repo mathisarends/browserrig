@@ -1,6 +1,6 @@
 from cdpify.domains.page import Viewport
 
-from browserrig.core.geometry import Geometry
+from browserrig.core import Geometry
 
 from .tab import Tab
 

@@ -1,4 +1,4 @@
-from browserrig.core.tools import BrowserToolMetadata, browser_tool
+from browserrig.core import BrowserToolMetadata, browser_tool
 
 from .dialogs import DialogTools
 from .dom import DomTools

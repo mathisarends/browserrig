@@ -16,12 +16,15 @@ from harnessed import (
 )
 from harnessed.hooks import ExecuteTool, Next, ReviewToolResult
 
-from browserrig.browser import Tab
-from browserrig.browser.base import Browser, BrowserEvents
-from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import ElementPoint
-from browserrig.core.kinds import ActionKind, ReadinessPhase, ReadinessStatus
-from browserrig.core.tools import BrowserToolMetadata
+from browserrig.browser import Browser, BrowserEvents, Tab
+from browserrig.core import (
+    ActionKind,
+    BrowserError,
+    BrowserToolMetadata,
+    ElementPoint,
+    ReadinessPhase,
+    ReadinessStatus,
+)
 from browserrig.events import (
     ACTION_EVENTS,
     ActionFailedEvent,
@@ -29,8 +32,7 @@ from browserrig.events import (
     ActionStartedEvent,
     PageState,
 )
-from browserrig.observation import Observe, Snapshot
-from browserrig.observation.changes import decision_change
+from browserrig.observation import Observe, Snapshot, decision_change
 from browserrig.readiness import Readiness
 
 from .scrolling import prepare_element

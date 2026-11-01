@@ -1,8 +1,8 @@
 from harnessed import Inject, Plugin, ToolError
 
 from browserrig.browser import Browser
-from browserrig.core.kinds import ActionKind
-from browserrig.core.tools import browser_tool as tool
+from browserrig.core import ActionKind
+from browserrig.core import browser_tool as tool
 
 
 class DialogTools(Plugin, needs=(Browser,)):

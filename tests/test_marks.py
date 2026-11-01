@@ -4,9 +4,9 @@ from io import BytesIO
 import pytest
 from PIL import Image
 
-from browserrig.core.geometry import Bounds, Point
+from browserrig.core import Bounds, Point
+from browserrig.observation import Element
 from browserrig.observation.marks import annotate
-from browserrig.observation.models import Element
 
 
 @pytest.fixture(name="screenshot")

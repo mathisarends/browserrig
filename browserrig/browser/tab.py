@@ -26,9 +26,14 @@ from cdpify.domains.runtime import CallArgument, RemoteObject
 from cdpify.exceptions import CDPCommandError
 from pydantic import BaseModel
 
-from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import Bounds, FrameTransform, Point
-from browserrig.core.kinds import CursorStyle, MouseEventKind
+from browserrig.core import (
+    Bounds,
+    BrowserError,
+    CursorStyle,
+    FrameTransform,
+    MouseEventKind,
+    Point,
+)
 from browserrig.events import (
     BrowserEvent,
     DialogHandledEvent,
@@ -37,7 +42,7 @@ from browserrig.events import (
     NavigationCommittedEvent,
     TabUpdatedEvent,
 )
-from browserrig.input.target import KeyEventType
+from browserrig.input import KeyEventType
 from browserrig.scripts import (
     CURSOR,
     OWNER_HITS,

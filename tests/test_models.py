@@ -1,21 +1,18 @@
 import pytest
 from pydantic import ValidationError
 
-from browserrig.browser.config import BrowserKind, ConnectBrowser, LaunchBrowser
-from browserrig.core.errors import StaleElement
-from browserrig.core.geometry import Bounds, Geometry, Point, Region
-from browserrig.observation import DomCapture, Observe
+from browserrig.browser import ConnectBrowser, LaunchBrowser
+from browserrig.browser.config import BrowserKind
+from browserrig.core import Bounds, Geometry, Point, Region, StaleElement
+from browserrig.observation import DomCapture, Element, Observe, Snapshot, render
 from browserrig.observation.models import (
     Canvas,
-    Element,
     ElementFingerprint,
     Heading,
     Modal,
     Offscreen,
     PageFingerprint,
-    Snapshot,
 )
-from browserrig.observation.render import render
 
 
 def test_render_lists_visible_elements_by_section_and_group_without_routing_data():

@@ -1,4 +1,4 @@
-from browserrig.core.options import Options
+from browserrig.core import Options
 
 
 class TabInfo(Options):

@@ -1,9 +1,8 @@
 from harnessed import Inject, Plugin, ToolResult
 
-from browserrig.browser import Browser, Tab
-from browserrig.browser.models import TabInfo
-from browserrig.core.kinds import ActionKind, ReadinessPhase
-from browserrig.core.tools import browser_tool as tool
+from browserrig.browser import Browser, Tab, TabInfo
+from browserrig.core import ActionKind, ReadinessPhase
+from browserrig.core import browser_tool as tool
 from browserrig.readiness import Readiness
 
 from .execution import Actions, Effect

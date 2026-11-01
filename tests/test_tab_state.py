@@ -14,14 +14,12 @@ from cdpify.domains.page import (
     LifecycleEventEvent,
 )
 
-from browserrig.browser import favicon
+from browserrig.browser import Tab, favicon
 from browserrig.browser import tab as tab_module
 from browserrig.browser.favicon import load_favicon
-from browserrig.browser.tab import Tab
-from browserrig.core.geometry import Point
-from browserrig.core.kinds import MouseEventKind
+from browserrig.core import MouseEventKind, Point
 from browserrig.events import TabUpdatedEvent
-from browserrig.scripts.models import TabStrip
+from browserrig.scripts import TabStrip
 from browserrig.tools.navigation import site_url, typed_address
 
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8

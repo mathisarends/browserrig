@@ -16,7 +16,7 @@ from browserrig.events import (
     NavigationStartedEvent,
 )
 from browserrig.kinds import BrowserBar
-from browserrig.observation.find import close_find, find_text
+from browserrig.observation import close_find, find_text
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration

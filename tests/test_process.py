@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from browserrig.browser import LaunchBrowser
 from browserrig.browser import process as process_module
-from browserrig.browser.config import LaunchBrowser
 from browserrig.browser.process import ChromeProcess, _active_endpoint
-from browserrig.core.errors import BrowserError
+from browserrig.core import BrowserError
 
 
 @pytest.mark.parametrize(

@@ -12,8 +12,8 @@ from cdpify.domains.browser import DownloadWillBeginEvent
 from cdpify.domains.page import JavascriptDialogOpeningEvent
 
 from browserrig import ChromeBrowser, ConnectBrowser
+from browserrig.browser import Tab
 from browserrig.browser import chrome as chrome_module
-from browserrig.browser.tab import Tab
 from browserrig.events import (
     DialogOpenedEvent,
     DisconnectedEvent,

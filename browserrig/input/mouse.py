@@ -7,9 +7,7 @@ from typing import Literal
 
 from cdpify.domains.input import MouseButton
 
-from browserrig.core import Point
-from browserrig.core.errors import BrowserError
-from browserrig.core.kinds import CursorStyle, MouseEventKind, TabGesture
+from browserrig.core import BrowserError, CursorStyle, MouseEventKind, Point, TabGesture
 from browserrig.events import (
     CursorEnteredEvent,
     CursorMovedEvent,

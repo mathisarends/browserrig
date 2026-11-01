@@ -5,11 +5,9 @@ from urllib.parse import quote_plus, urljoin, urlsplit
 from harnessed import Inject, Plugin, ToolResult
 from pydantic import Field
 
-from browserrig.browser.base import Browser, BrowserEvents
-from browserrig.browser.tab import Tab, validated_url
-from browserrig.core.errors import BrowserError
-from browserrig.core.kinds import ActionKind, BrowserBar, ReadinessPhase
-from browserrig.core.tools import browser_tool as tool
+from browserrig.browser import Browser, BrowserEvents, Tab, validated_url
+from browserrig.core import ActionKind, BrowserBar, BrowserError, ReadinessPhase
+from browserrig.core import browser_tool as tool
 from browserrig.events import NavigationStartedEvent, WaitingEvent
 from browserrig.readiness import Readiness
 

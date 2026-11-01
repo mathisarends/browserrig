@@ -8,7 +8,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
 from browserrig import Browser, ChromeBrowser, LaunchBrowser, browser_plugins
-from browserrig.core.geometry import Point
+from browserrig.core import Point
 from browserrig.events import CursorStateEvent
 from tests.observations import latest
 

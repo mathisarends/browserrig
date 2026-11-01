@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from inspect import isawaitable
 from urllib.parse import urlsplit
 
-from browserrig.core.errors import SecretError
+from browserrig.core import SecretError
 
 NAME = re.compile(r"[A-Za-z0-9_.-]+")
 PLACEHOLDER = re.compile(r"\{\{secret:([A-Za-z0-9_.-]+)\}\}")

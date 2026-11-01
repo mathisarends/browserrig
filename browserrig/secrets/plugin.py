@@ -27,10 +27,8 @@ from harnessed.hooks import (
 )
 from harnessed.models import TextPart
 
-from browserrig.browser.base import Browser, BrowserEvents
-from browserrig.core.errors import SecretError
-from browserrig.core.kinds import ActionKind
-from browserrig.core.tools import BrowserToolMetadata
+from browserrig.browser import Browser, BrowserEvents
+from browserrig.core import ActionKind, BrowserToolMetadata, SecretError
 from browserrig.events import SECRET_EVENTS, BrowserEvent, LiveEvent, SecretEnteredEvent
 from browserrig.scripts import (
     SECRET_FIELD,

@@ -4,8 +4,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from browserrig.browser import Frame
-from browserrig.core.geometry import Bounds, ElementPoint
-from browserrig.core.kinds import ElementOperation
+from browserrig.core import Bounds, ElementOperation, ElementPoint
 from browserrig.scripts import ELEMENT, ElementArgs, Script
 
 from .models import Element, Snapshot

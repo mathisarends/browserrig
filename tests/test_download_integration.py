@@ -21,8 +21,7 @@ from browserrig import (
     ScreenshotTrigger,
     wait_for_page,
 )
-from browserrig.browser import DownloadState
-from browserrig.browser.images import screenshot
+from browserrig.browser import DownloadState, screenshot
 from browserrig.events import DownloadCompletedEvent, DownloadStartedEvent
 from tests.javascript import evaluate
 from tests.observations import all_states, has_image

@@ -16,10 +16,9 @@ from browserrig import (
     LaunchBrowser,
     wait_for_page,
 )
-from browserrig.core.errors import StaleElement
+from browserrig.core import StaleElement
 from browserrig.events import ActionFinishedEvent
-from browserrig.observation.capture import capture
-from browserrig.observation.render import render
+from browserrig.observation import capture, render
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration

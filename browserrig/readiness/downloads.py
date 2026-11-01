@@ -2,7 +2,7 @@ from harnessed import Inject, Plugin, hook
 from harnessed.hooks import Next
 
 from browserrig.browser import Browser
-from browserrig.files.models import DownloadState
+from browserrig.files import DownloadState
 
 from .hooks import CheckReadiness, ReadinessCheck
 from .plugin import Readiness

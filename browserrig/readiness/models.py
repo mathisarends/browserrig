@@ -1,5 +1,4 @@
-from browserrig.core.kinds import ReadinessPhase, ReadinessStage, ReadinessStatus
-from browserrig.core.options import Options
+from browserrig.core import Options, ReadinessPhase, ReadinessStage, ReadinessStatus
 
 
 class ReadinessReport(Options):

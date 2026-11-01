@@ -23,13 +23,10 @@ from browserrig import (
     Viewport,
     wait_for_page,
 )
-from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import Bounds, Geometry, Point, Region
+from browserrig.core import Bounds, BrowserError, Geometry, Point, Region
 from browserrig.kinds import ElementOperation
-from browserrig.observation import capture
-from browserrig.observation.render import render
-from browserrig.scripts import ELEMENT
-from browserrig.scripts.models import ElementArgs
+from browserrig.observation import capture, render
+from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
 from tests.observations import has_image
 

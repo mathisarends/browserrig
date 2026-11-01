@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from browserrig.core.options import Options
+from browserrig.core import Options
 from browserrig.events import HandoffRequestedEvent, HandoffStatus
 
 

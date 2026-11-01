@@ -19,7 +19,7 @@ from harnessed.events import (
     TurnEndedEvent,
 )
 
-from browserrig.core.kinds import ActivityKind, ActivityOutcome
+from browserrig.core import ActivityKind, ActivityOutcome
 from browserrig.events import (
     ACTIVITY_EVENTS,
     ActivityFinishedEvent,

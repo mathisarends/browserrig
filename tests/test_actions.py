@@ -7,9 +7,8 @@ import pytest
 from harnessed import ToolError
 
 from browserrig import FileSystem, FileSystemOptions
-from browserrig.browser.tab import Tab
-from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import ElementPoint
+from browserrig.browser import Tab
+from browserrig.core import BrowserError, ElementPoint
 from browserrig.events import (
     ActionFailedEvent,
     ActionFinishedEvent,
@@ -21,8 +20,8 @@ from browserrig.events import (
 from browserrig.input import controller as controller_module
 from browserrig.input import mouse as mouse_module
 from browserrig.kinds import ActionKind, FileTransferDirection, ReadinessPhase
-from browserrig.tools.execution import Actions, Effect
-from browserrig.tools.files import UploadTools
+from browserrig.tools import Actions, UploadTools
+from browserrig.tools.execution import Effect
 from tests.fakes import FakeServices, mounted
 
 

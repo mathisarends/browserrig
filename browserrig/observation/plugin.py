@@ -18,12 +18,15 @@ from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
 from pydantic import Field
 
-from browserrig.browser import Tab
-from browserrig.browser.base import Browser, BrowserEvents
-from browserrig.core.errors import StaleElement
-from browserrig.core.geometry import Region
-from browserrig.core.kinds import ActionKind, ReadinessPhase, ReadinessStatus
-from browserrig.core.tools import browser_tool as tool
+from browserrig.browser import Browser, BrowserEvents, Tab
+from browserrig.core import (
+    ActionKind,
+    ReadinessPhase,
+    ReadinessStatus,
+    Region,
+    StaleElement,
+)
+from browserrig.core import browser_tool as tool
 from browserrig.events import (
     ObservationCapturedEvent,
 )

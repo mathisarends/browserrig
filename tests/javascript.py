@@ -1,8 +1,7 @@
 from typing import Any
 
-from browserrig.browser.tab import Frame, Tab
-from browserrig.scripts import Script
-from browserrig.scripts.models import ScriptArgs
+from browserrig.browser import Frame, Tab
+from browserrig.scripts import Script, ScriptArgs
 
 
 class _EvalArgs(ScriptArgs):

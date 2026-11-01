@@ -5,7 +5,7 @@ from typing import assert_never
 
 from harnessed.events import SessionEvent, StepOutcome, TurnOutcome
 
-from browserrig.core.kinds import ActivityKind, ActivityOutcome
+from browserrig.core import ActivityKind, ActivityOutcome
 from browserrig.events import ActivityFinishedEvent, ActivityStartedEvent
 
 

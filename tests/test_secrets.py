@@ -13,18 +13,16 @@ from harnessed.testing import ScriptedModel, call
 from PIL import Image
 
 from browserrig import Secret, Secrets, env, totp
-from browserrig.core.errors import SecretError
-from browserrig.core.geometry import Bounds
-from browserrig.core.kinds import ActionKind
+from browserrig.core import ActionKind, Bounds, SecretError
 from browserrig.events import ActionFailedEvent, KeyPressedEvent, SecretEnteredEvent
 from browserrig.input import Input
 from browserrig.input import keyboard as keyboard_module
-from browserrig.observation.capture import CaptureContent, _redact
+from browserrig.observation import CaptureContent, Element, Snapshot
+from browserrig.observation.capture import _redact
 from browserrig.observation.extraction import Extraction
 from browserrig.observation.marks import blackout
-from browserrig.observation.models import Element, Snapshot
+from browserrig.secrets import SecretEntry
 from browserrig.secrets.models import OriginPattern, resolve
-from browserrig.secrets.plugin import SecretEntry
 from browserrig.secrets.redaction import Redactor
 from tests.fakes import FakeChrome
 

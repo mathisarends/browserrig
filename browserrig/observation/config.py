@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from browserrig.core.options import Options
+from browserrig.core import Options
 
 
 class ScreenshotTrigger(StrEnum):

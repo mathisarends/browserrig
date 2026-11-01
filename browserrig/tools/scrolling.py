@@ -2,8 +2,7 @@ import asyncio
 from dataclasses import replace
 
 from browserrig.browser import Frame, Tab
-from browserrig.core import Point
-from browserrig.core.errors import BrowserError, StaleElement
+from browserrig.core import BrowserError, Point, StaleElement
 from browserrig.input import Mouse
 from browserrig.observation import ElementHandle
 from browserrig.scripts import (

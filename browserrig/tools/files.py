@@ -21,16 +21,15 @@ from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
 from pydantic import Field
 
-from browserrig.browser import Tab
-from browserrig.browser.base import Browser, BrowserEvents
-from browserrig.core.errors import BrowserError
-from browserrig.core.kinds import (
+from browserrig.browser import Browser, BrowserEvents, Tab
+from browserrig.core import (
     ActionKind,
+    BrowserError,
     FileSource,
     FileTransferDirection,
     ReadinessPhase,
 )
-from browserrig.core.tools import browser_tool as tool
+from browserrig.core import browser_tool as tool
 from browserrig.events import (
     FILE_EVENTS,
     UPLOAD_EVENTS,
@@ -43,6 +42,8 @@ from browserrig.events import (
     FileWrittenEvent,
 )
 from browserrig.files import (
+    Download,
+    DownloadState,
     FileContent,
     FileEntry,
     FileListing,
@@ -50,8 +51,7 @@ from browserrig.files import (
     FileSystemState,
     FileSystemView,
 )
-from browserrig.files.models import Download, DownloadState
-from browserrig.observation.plugin import Observe, has_dom_refs
+from browserrig.observation import Observe, has_dom_refs
 from browserrig.readiness import Readiness
 
 from .execution import Actions, Effect

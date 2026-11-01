@@ -17,11 +17,10 @@ from browserrig import (
     browser_plugins,
     wait_for_page,
 )
-from browserrig.core.errors import BrowserError
+from browserrig.core import BrowserError
 from browserrig.kinds import ElementOperation
 from browserrig.observation import capture
-from browserrig.scripts import ELEMENT
-from browserrig.scripts.models import ElementArgs
+from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
 from tests.observations import latest
 

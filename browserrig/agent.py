@@ -8,7 +8,7 @@ from harnessed.kernel import PluginLike
 from harnessed.models import Model
 from harnessed.plugins import Approvals, Compaction, ContextState
 
-from .browser.config import BrowserOptions
+from .browser import BrowserOptions
 from .composition import browser_plugins
 from .files import FileSystemOptions
 from .handoff import HumanHandoff

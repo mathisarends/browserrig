@@ -9,8 +9,8 @@ import yaml
 from harnessed import Inject, Observation, Plugin, PluginState, SessionLog, hook
 from harnessed.events import ObservationsIncludedEvent
 
-from browserrig.browser.base import BrowserEvents
-from browserrig.core.kinds import ActionKind, ReadinessStatus
+from browserrig.browser import BrowserEvents
+from browserrig.core import ActionKind, ReadinessStatus
 from browserrig.events import (
     NUDGE_EVENTS,
     ActionFailedEvent,

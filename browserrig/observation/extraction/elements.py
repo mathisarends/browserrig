@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
-from browserrig.core.geometry import Bounds, FrameTransform
+from browserrig.core import Bounds, FrameTransform
 from browserrig.observation.models import Canvas, Element, Heading, Modal, Offscreen
 
 from . import semantics

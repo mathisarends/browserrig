@@ -7,8 +7,7 @@ from cdpify.domains.page import FrameTree
 from cdpify.domains.target import TargetInfo
 from cdpify.exceptions import CDPCommandError
 
-from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import Bounds, FrameTransform
+from browserrig.core import Bounds, BrowserError, FrameTransform
 from browserrig.scripts import OWNER_SIZE, VIEWPORT
 
 from .tab import Frame, Tab

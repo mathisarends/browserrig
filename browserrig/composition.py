@@ -3,8 +3,7 @@ from collections.abc import Mapping
 from harnessed import Plugin
 
 from .activity import Activity
-from .browser import Chrome
-from .browser.config import BrowserOptions
+from .browser import BrowserOptions, Chrome
 from .files import FileSystemOptions
 from .handoff import HumanHandoff
 from .nudges import Nudges

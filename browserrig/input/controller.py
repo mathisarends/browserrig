@@ -4,8 +4,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from time import monotonic
 
-from browserrig.core.geometry import Bounds, Point
-from browserrig.core.kinds import BrowserBar, FileTransferDirection
+from browserrig.core import Bounds, BrowserBar, FileTransferDirection, Point
 from browserrig.events import (
     BarTypedEvent,
     FileTransferEvent,

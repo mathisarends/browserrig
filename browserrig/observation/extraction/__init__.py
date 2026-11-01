@@ -14,8 +14,8 @@ from cdpify import CdpSession
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from cdpify.exceptions import CDPCommandError
 
-from browserrig.browser.tab import Frame
-from browserrig.core.errors import BrowserError
+from browserrig.browser import Frame
+from browserrig.core import BrowserError
 from browserrig.observation.models import Canvas, Element, Heading, Modal, Offscreen
 from browserrig.scripts import FOCUSED
 

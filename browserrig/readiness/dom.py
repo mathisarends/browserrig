@@ -2,7 +2,7 @@ import asyncio
 from time import monotonic
 
 from browserrig.browser import Tab
-from browserrig.core.kinds import ReadinessPhase, ReadinessStatus
+from browserrig.core import ReadinessPhase, ReadinessStatus
 from browserrig.scripts import STABILITY, DOMProbe
 
 from .config import ReadinessOptions

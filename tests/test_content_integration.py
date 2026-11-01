@@ -7,8 +7,7 @@ from browserrig import ChromeBrowser, DomCapture, LaunchBrowser, wait_for_page
 from browserrig.kinds import ElementOperation
 from browserrig.observation import capture
 from browserrig.observation.content import extract_content
-from browserrig.scripts import ELEMENT
-from browserrig.scripts.models import ElementArgs
+from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration

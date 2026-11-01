@@ -6,8 +6,8 @@ import pytest
 from cdpify.domains.runtime import EvaluateResult, ExceptionDetails, RemoteObject
 from cdpify.exceptions import CDPCommandError
 
-from browserrig.browser.tab import Tab
-from browserrig.core.errors import BrowserError
+from browserrig.browser import Tab
+from browserrig.core import BrowserError
 
 
 @pytest.mark.parametrize(

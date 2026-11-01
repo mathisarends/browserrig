@@ -6,10 +6,10 @@ from harnessed import Inject, Plugin, ToolError, ToolResult
 from pydantic import Field
 
 from browserrig.browser import Browser, Tab
-from browserrig.core.kinds import ActionKind, BrowserBar
-from browserrig.core.tools import browser_tool as tool
+from browserrig.core import ActionKind, BrowserBar
+from browserrig.core import browser_tool as tool
 from browserrig.events import FindBarEvent, FindResultsEvent
-from browserrig.observation.find import FoundMatch, PageMatches, close_find, find_text
+from browserrig.observation import FoundMatch, PageMatches, close_find, find_text
 
 from .execution import Actions, Effect
 

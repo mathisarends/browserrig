@@ -21,7 +21,7 @@ from browserrig.events import (
     PageState,
     TabClosedEvent,
 )
-from browserrig.observation.models import Element, Snapshot
+from browserrig.observation import Element, Snapshot
 from tests.fakes import FakeChrome
 
 

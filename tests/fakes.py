@@ -6,12 +6,12 @@ from harnessed import Agent, Context, Inject, Plugin, SessionLog
 from harnessed.testing import ScriptedModel
 
 from browserrig import Browser
-from browserrig.browser.base import BrowserEvents
-from browserrig.core.kinds import ReadinessStatus
+from browserrig.browser import BrowserEvents
+from browserrig.core import ReadinessStatus
 from browserrig.input import Input
 from browserrig.observation import Observe
 from browserrig.readiness import Readiness, ReadinessReport
-from browserrig.scripts.models import DOMProbe
+from browserrig.scripts import DOMProbe
 
 
 class FakeTab:

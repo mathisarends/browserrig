@@ -9,7 +9,7 @@ import re
 from collections import Counter
 from urllib.parse import unquote, urlsplit
 
-from browserrig.core.kinds import ReadinessStatus
+from browserrig.core import ReadinessStatus
 
 from .models import Canvas, Element, Heading, Snapshot
 from .redirects import unwrap_redirect

@@ -44,18 +44,22 @@ from browserrig import (
     UntilCompaction,
     browser_plugins,
 )
-from browserrig.core.errors import ReadinessError, StaleElement
-from browserrig.core.geometry import Geometry, Point
-from browserrig.core.kinds import ReadinessPhase, ReadinessStage, ReadinessStatus
+from browserrig.core import (
+    Geometry,
+    Point,
+    ReadinessError,
+    ReadinessPhase,
+    ReadinessStage,
+    ReadinessStatus,
+    StaleElement,
+)
 from browserrig.events import ObservationCapturedEvent, ReadinessStartedEvent
-from browserrig.files.models import Download
+from browserrig.files import Download
 from browserrig.nudges import Nudges
-from browserrig.observation.capture import CaptureContent
+from browserrig.observation import CaptureContent, Element, Snapshot
 from browserrig.observation.delta import INTRO
 from browserrig.observation.extraction import Extraction
-from browserrig.observation.models import Element, Snapshot
-from browserrig.tools import FileTools, UploadTools
-from browserrig.tools.execution import Actions
+from browserrig.tools import Actions, FileTools, UploadTools
 from browserrig.tools.mouse import _image_point
 from tests.fakes import FakeChrome
 from tests.observations import has_image, image_id

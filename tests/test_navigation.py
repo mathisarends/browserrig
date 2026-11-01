@@ -4,11 +4,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from browserrig.browser.base import BrowserEvents
-from browserrig.browser.tab import Tab
+from browserrig.browser import BrowserEvents, Tab
 from browserrig.events import WaitingEvent
+from browserrig.tools import NavigationTools
 from browserrig.tools import navigation as navigation_module
-from browserrig.tools.navigation import NavigationTools
 
 
 @pytest.mark.parametrize(

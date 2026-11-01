@@ -3,11 +3,9 @@ from dataclasses import dataclass
 from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser import Frame, Tab
-from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import Bounds
+from browserrig.core import Bounds, BrowserError
 from browserrig.events import FindMark
-from browserrig.scripts import FIND
-from browserrig.scripts.models import FindArgs, FoundText
+from browserrig.scripts import FIND, FindArgs, FoundText
 
 # Matches each frame keeps as ranges for marks and listing; more are only counted.
 _MARKED_PER_FRAME = 1000

@@ -8,7 +8,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import Browser, ChromeBrowser, LaunchBrowser, browser_plugins
-from browserrig.core.errors import BrowserError
+from browserrig.core import BrowserError
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent
 from browserrig.kinds import ActionKind
 from tests.javascript import evaluate

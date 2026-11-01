@@ -6,7 +6,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from typing import TypedDict
 
-from browserrig.core.errors import BrowserError
+from browserrig.core import BrowserError
 from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
 
 from .target import Focus, InputTarget, focused

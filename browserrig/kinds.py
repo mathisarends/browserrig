@@ -1,6 +1,6 @@
 """Public event and operation enums."""
 
-from .core.kinds import (
+from .core import (
     ActionKind,
     ActivityKind,
     ActivityOutcome,

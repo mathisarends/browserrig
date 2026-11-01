@@ -4,8 +4,8 @@ from harnessed import Inject, Plugin, ToolResult
 from pydantic import Field
 
 from browserrig.browser import Tab
-from browserrig.core.kinds import ActionKind
-from browserrig.core.tools import browser_tool as tool
+from browserrig.core import ActionKind
+from browserrig.core import browser_tool as tool
 
 from .execution import Actions, Effect
 

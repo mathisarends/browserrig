@@ -8,7 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Self
 
-from browserrig.core.errors import BrowserError
+from browserrig.core import BrowserError
 
 from .config import LaunchBrowser
 

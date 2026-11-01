@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 from cdpify.exceptions import CDPCommandError
 
-from browserrig.browser.tab import Frame
+from browserrig.browser import Frame
 from browserrig.browser.worlds import Worlds
 from browserrig.scripts import RESET
 

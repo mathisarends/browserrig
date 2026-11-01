@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from browserrig.core.options import Options
+from browserrig.core import Options
 
 type FileReadStatus = Literal["complete", "partial", "metadata_only", "unsupported"]
 

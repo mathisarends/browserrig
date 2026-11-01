@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from browserrig.core.options import Options
+from browserrig.core import Options
 
 
 class ReadinessOptions(Options):

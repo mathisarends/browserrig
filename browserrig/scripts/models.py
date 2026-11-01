@@ -1,9 +1,7 @@
 from pydantic import ConfigDict
 from pydantic.alias_generators import to_camel
 
-from browserrig.core.geometry import Bounds, Point
-from browserrig.core.kinds import ElementOperation
-from browserrig.core.options import Options
+from browserrig.core import Bounds, ElementOperation, Options, Point
 
 
 class ScriptArgs(Options):

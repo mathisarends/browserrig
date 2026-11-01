@@ -3,7 +3,7 @@ from time import monotonic
 from typing import Protocol
 
 from browserrig.browser import Tab
-from browserrig.core.kinds import ReadinessPhase, ReadinessStage
+from browserrig.core import ReadinessPhase, ReadinessStage
 
 from .config import ReadinessOptions
 from .dom import DomReadiness

@@ -27,8 +27,8 @@ from browserrig import (
     Secrets,
     browser_plugins,
 )
-from browserrig.browser.models import TabInfo
-from browserrig.core.kinds import ActivityKind, ActivityOutcome
+from browserrig.browser import TabInfo
+from browserrig.core import ActivityKind, ActivityOutcome
 from browserrig.events import (
     BROWSER_EVENTS,
     HANDOFF_EVENTS,
@@ -38,9 +38,8 @@ from browserrig.events import (
     TabClosedEvent,
     TabOpenedEvent,
 )
-from browserrig.observation.capture import CaptureContent
+from browserrig.observation import CaptureContent, Element
 from browserrig.observation.extraction import Extraction
-from browserrig.observation.models import Element
 from tests.fakes import FakeChrome
 from tests.observations import latest
 

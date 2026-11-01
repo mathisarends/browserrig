@@ -3,9 +3,7 @@ from typing import Literal, Protocol
 
 from cdpify.domains.input import MouseButton
 
-from browserrig.core import Point
-from browserrig.core.errors import BrowserError
-from browserrig.core.kinds import CursorStyle, MouseEventKind
+from browserrig.core import BrowserError, CursorStyle, MouseEventKind, Point
 from browserrig.events import InputEvent
 
 type KeyEventType = Literal["keyDown", "keyUp", "rawKeyDown", "char"]

@@ -7,10 +7,13 @@ from harnessed import Context, Inject, Plugin, PluginState, hook
 from harnessed.events import AgentControlChangedEvent, ControlState
 from harnessed.hooks import Next
 
-from browserrig.browser import Tab
-from browserrig.browser.base import BrowserEvents
-from browserrig.core.errors import ReadinessError
-from browserrig.core.kinds import ReadinessPhase, ReadinessStage, ReadinessStatus
+from browserrig.browser import BrowserEvents, Tab
+from browserrig.core import (
+    ReadinessError,
+    ReadinessPhase,
+    ReadinessStage,
+    ReadinessStatus,
+)
 from browserrig.events import (
     READINESS_EVENTS,
 )

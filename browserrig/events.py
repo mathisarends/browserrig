@@ -5,7 +5,7 @@ from typing import Literal
 
 from harnessed.events import DurableEvent, TransientEvent
 
-from .core.kinds import (
+from .core import (
     ActionKind,
     ActivityKind,
     ActivityOutcome,

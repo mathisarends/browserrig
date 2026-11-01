@@ -5,8 +5,7 @@ from pathlib import Path
 from typing import Protocol
 
 from browserrig.events import BrowserEvent, LiveEvent
-from browserrig.files import FileSystem
-from browserrig.files.models import Download
+from browserrig.files import Download, FileSystem
 from browserrig.input import Input, Keyboard, Mouse
 
 from .models import TabInfo

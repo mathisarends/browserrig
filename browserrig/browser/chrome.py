@@ -28,8 +28,7 @@ from cdpify.domains.target import (
     TargetInfoChangedEvent,
 )
 
-from browserrig.core.errors import BrowserClosed, BrowserError
-from browserrig.core.kinds import TabGesture
+from browserrig.core import BrowserClosed, BrowserError, TabGesture
 from browserrig.events import (
     ConnectedEvent,
     DisconnectedEvent,
@@ -37,8 +36,7 @@ from browserrig.events import (
     TabClosedEvent,
     TabOpenedEvent,
 )
-from browserrig.files import FileSystem, FileSystemOptions
-from browserrig.files.models import Download
+from browserrig.files import Download, FileSystem, FileSystemOptions
 from browserrig.input import Input, Keyboard, Mouse
 
 from .base import BrowserEvents, EventSink, _discard

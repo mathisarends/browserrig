@@ -7,11 +7,15 @@ from typing import Literal
 
 from pydantic import Field
 
-from browserrig.browser.models import TabInfo
-from browserrig.core.errors import StaleElement
-from browserrig.core.geometry import Bounds, Geometry, Point
-from browserrig.core.kinds import ReadinessStatus
-from browserrig.core.options import Options
+from browserrig.browser import TabInfo
+from browserrig.core import (
+    Bounds,
+    Geometry,
+    Options,
+    Point,
+    ReadinessStatus,
+    StaleElement,
+)
 
 type Tristate = bool | Literal["mixed"] | None
 

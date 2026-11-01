@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 
-from browserrig.core.options import Options
+from browserrig.core import Options
 
 
 class Viewport(Options):

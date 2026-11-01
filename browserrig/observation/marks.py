@@ -5,7 +5,7 @@ from io import BytesIO
 
 from PIL import Image, ImageDraw, ImageFont
 
-from browserrig.core.geometry import Bounds, Point
+from browserrig.core import Bounds, Point
 
 from .models import Element
 

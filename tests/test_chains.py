@@ -20,12 +20,12 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig.core.kinds import ActionKind
+from browserrig.core import ActionKind
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent, PageState
-from browserrig.observation.changes import decision_change
-from browserrig.observation.models import Element, Offscreen, Snapshot
-from browserrig.tools import Actions, BrowserToolMetadata, browser_tool
-from browserrig.tools.execution import DomActionChains, Effect
+from browserrig.observation import Element, Snapshot, decision_change
+from browserrig.observation.models import Offscreen
+from browserrig.tools import Actions, BrowserToolMetadata, DomActionChains, browser_tool
+from browserrig.tools.execution import Effect
 from tests.fakes import FakeServices
 
 

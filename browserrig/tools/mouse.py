@@ -4,12 +4,9 @@ from harnessed import Inject, Plugin, SystemSection, ToolResult
 from pydantic import Field
 
 from browserrig.browser import Browser, Tab
-from browserrig.core import Point
-from browserrig.core.errors import BrowserError
-from browserrig.core.kinds import ActionKind
-from browserrig.core.tools import browser_tool as tool
-from browserrig.observation import CapturedImage, Snapshot
-from browserrig.observation.plugin import Observe, has_dom_refs
+from browserrig.core import ActionKind, BrowserError, Point
+from browserrig.core import browser_tool as tool
+from browserrig.observation import CapturedImage, Observe, Snapshot, has_dom_refs
 
 from .execution import Actions, Effect
 

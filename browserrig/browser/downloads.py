@@ -11,8 +11,7 @@ from browserrig.events import (
     DownloadProgressedEvent,
     DownloadStartedEvent,
 )
-from browserrig.files import FileSystem
-from browserrig.files.models import Download, DownloadState
+from browserrig.files import Download, DownloadState, FileSystem
 
 from .base import EventSink
 

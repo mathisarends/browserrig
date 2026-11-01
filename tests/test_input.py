@@ -10,9 +10,8 @@ import pytest
 from harnessed import ToolError
 from harnessed.events import EventRegistry
 
-from browserrig.browser.tab import Tab
-from browserrig.core.errors import BrowserError
-from browserrig.core.geometry import Point
+from browserrig.browser import Tab
+from browserrig.core import BrowserError, Point
 from browserrig.events import (
     INPUT_EVENTS,
     BarTypedEvent,
@@ -35,7 +34,7 @@ from browserrig.input import mouse as mouse_module
 from browserrig.input.pointer import movement
 from browserrig.input.wheel import wheel_duration, wheel_progress
 from browserrig.kinds import BrowserBar, CursorStyle, FileTransferDirection, TabGesture
-from browserrig.tools.keyboard import KeyboardTools
+from browserrig.tools import KeyboardTools
 
 
 async def test_mouse_and_keyboard_share_action_correlation_without_sharing_cursor_state(

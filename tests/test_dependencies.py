@@ -36,9 +36,9 @@ from browserrig import (
     ScreenshotTrigger,
     browser_plugins,
 )
+from browserrig.browser import BrowserEvents
 from browserrig.browser import plugin as plugin_module
-from browserrig.browser.base import BrowserEvents
-from browserrig.core.kinds import ActionKind
+from browserrig.core import ActionKind
 from browserrig.tools import BrowserToolMetadata, DialogTools, KeyboardTools
 from tests.fakes import FakeBrowser
 

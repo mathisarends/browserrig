@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from browserrig.browser.tab import Frame
-from browserrig.core.errors import BrowserError
+from browserrig.browser import Frame
+from browserrig.core import BrowserError
 from browserrig.scripts import OWNER_SIZE, RESET, ScriptError, failure
 from tests.fakes import FakeTab
 

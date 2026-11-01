@@ -20,10 +20,9 @@ from browserrig import (
     SelectReadiness,
     wait_for_page,
 )
-from browserrig.core.errors import ReadinessError
-from browserrig.core.kinds import ReadinessPhase
+from browserrig.core import ReadinessError, ReadinessPhase
 from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent, ReadyEvent
-from browserrig.files.models import Download
+from browserrig.files import Download
 from browserrig.observation import capture
 from browserrig.readiness import wait as wait_module
 from tests.fakes import FakeBrowser, FakeChrome, FakeTab

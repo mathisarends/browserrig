@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pydantic import Field
 
-from browserrig.core.options import Options
+from browserrig.core import Options
 
 
 class FileSystemOptions(Options):

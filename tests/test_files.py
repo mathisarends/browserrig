@@ -19,9 +19,9 @@ from browserrig import (
     FileSystemOptions,
     LaunchBrowser,
 )
+from browserrig.browser import Tab
 from browserrig.browser import downloads as downloads_module
 from browserrig.browser.downloads import Downloads
-from browserrig.browser.tab import Tab
 from browserrig.events import (
     DownloadCanceledEvent,
     DownloadCompletedEvent,
@@ -35,11 +35,10 @@ from browserrig.events import (
     FileTransferEvent,
     FileWrittenEvent,
 )
-from browserrig.files.models import DownloadState
+from browserrig.files import DownloadState
 from browserrig.input import controller as controller_module
 from browserrig.kinds import FileSource, FileTransferDirection, ReadinessPhase
-from browserrig.tools.execution import Actions
-from browserrig.tools.files import FileTools
+from browserrig.tools import Actions, FileTools
 from tests.fakes import mounted
 
 

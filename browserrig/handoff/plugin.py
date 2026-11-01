@@ -20,7 +20,7 @@ from harnessed.events import AgentControlChangedEvent, ControlState
 from harnessed.hooks import Next, PreStep, StepDecision
 from pydantic import Field, TypeAdapter, ValidationError
 
-from browserrig.browser.base import Browser, BrowserEvents
+from browserrig.browser import Browser, BrowserEvents
 from browserrig.events import (
     HANDOFF_EVENTS,
     BrowserEvent,

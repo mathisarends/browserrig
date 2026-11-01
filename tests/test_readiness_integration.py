@@ -16,7 +16,7 @@ from browserrig import (
     browser_plugins,
     wait_for_page,
 )
-from browserrig.core.kinds import ActionKind, ReadinessPhase
+from browserrig.core import ActionKind, ReadinessPhase
 from browserrig.events import ReadinessDegradedEvent
 from browserrig.tools.execution import Effect
 from tests.javascript import evaluate
