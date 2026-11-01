@@ -164,7 +164,7 @@ async def _perform(site, name, arguments):
     agent = Agent(
         model=CallbackModel(respond),
         plugins=[
-            *browser_plugins(Launch(url=site + "/gestures")),
+            *browser_plugins(browser=Launch(url=site + "/gestures")),
             Access(),
             Approvals(default=PolicyDecision.ALLOW),
         ],

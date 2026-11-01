@@ -1,6 +1,6 @@
 """Application-owned OTel setup shared by the runnable examples.
 
-BrowserAgent accepts Harnessed's tracer directly through plugins; no Browserrig
+Agent accepts Harnessed's tracer directly through plugins; no Browserrig
 tracer or global provider is needed. Imports stay lazy for runs without --trace.
 """
 

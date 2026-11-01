@@ -50,7 +50,7 @@ explicitly.
 ## Human handoff
 
 For optional human login and takeover, add `HumanHandoff(ask=...)` to the plugin
-list or pass it as `handoff=` to `BrowserAgent` / `browser_plugins()`.
+list of `Agent` or `browser_plugins()`.
 See [human handoff](human-handoff.md) for host callbacks, typed receipts and
 pause/resume context. It is absent from the default recipe.
 
@@ -94,12 +94,11 @@ compaction, for example:
 
 ```python
 from harnessed.plugins import Compaction
-from browserrig import BrowserAgent, ImageContext, UntilCompaction
+from browserrig import Agent, ImageContext, UntilCompaction
 
-agent = BrowserAgent(
+agent = Agent(
     model=model,
-    image_context=ImageContext(UntilCompaction()),
-    plugins=[Compaction(
+    plugins=[ImageContext(UntilCompaction()), Compaction(
         trigger=lambda state: state.input_tokens >= 32000,
         keep_steps=4,
     )],
@@ -281,11 +280,10 @@ custom-event support does not imply every persisted SDK event appears in a turn 
 
 ## Existing applications
 
-`BrowserAgent` and `browser_plugins()` remain convenience recipes. Configure
-observations with `observe=Observe(capture=DomCapture(...), screenshots=Screenshots(...))`.
-Composition also accepts `readiness=Readiness(...)`,
-`image_context=ImageContext(...)`, `actions=Actions(...)` and `local_files=False`
-when local file tools should be omitted.
+`Agent` and `browser_plugins()` remain convenience recipes. A configured default
+replaces the built-in one: `plugins=[Observe(capture=DomCapture(...),
+screenshots=Screenshots(...)), Readiness(...), ImageContext(...), Actions(...)]`.
+Pass `without=(FileTools, UploadTools)` when local file tools should be omitted.
 
 The default recipe mounts every tool group; ref-based tools hide themselves for
 captures without refs. Transient availability (for example a missing workspace) still uses
@@ -294,5 +292,5 @@ Keep file readers as ordinary functions/strategies, not one plugin per file form
 
 For manual compositions, add `ImageContext()` explicitly: `Observe` no longer
 injects images itself. Configure `Readiness` and `Observe` independently.
-Harnessed filesystem tools can replace local file tools by selecting
-`local_files=False`; browser download paths are not automatically sandbox paths.
+Harnessed filesystem tools can replace local file tools by passing
+`without=(FileTools, UploadTools)`; browser download paths are not automatically sandbox paths.

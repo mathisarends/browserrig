@@ -48,7 +48,8 @@ image in its next iteration. `ImageContext` keeps the latest screenshot by defau
 including during subsequent text-only steps until compaction removes its snapshot.
 `observe()` refreshes page state. Use
 `Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` to enable images
-on every step. Pass it as `observe=` to `BrowserAgent` or `browser_plugins()`.
+on every step. Pass it in `plugins` of `Agent` or `browser_plugins()`; it replaces
+the default `Observe()`.
 `Observe(capture=DomCapture(max_text_chars=N))` enables a page-text excerpt; its
 default is `0`. When the viewport holds fewer than five named controls, as on error, challenge
 and confirmation pages, observations add up to `sparse_text_chars` (default `1500`)
@@ -220,8 +221,8 @@ drag never splits across tabs; without an active tab, input raises `BrowserError
 How input looks to people watching is a separate, optional plugin. Tools and devices
 only describe what they do; `Choreography` (from `browserrig.choreography`) paces
 typing and pointer paths like a person, plays the gestures below and streams them
-as live events. `browser_plugins` and `BrowserAgent` include it by default; pass
-`choreography=False` to work at full speed with no pauses and no input events. It
+as live events. `browser_plugins` and `Agent` include it by default; pass
+`without=(Choreography,)` to work at full speed with no pauses and no input events. It
 builds on three seams, which other plugins can use the same way:
 
 - `browser.input.present(presenter)` installs a `Presenter` that sets the typing
@@ -336,7 +337,7 @@ probes.
 failure and cancellation remain durable events.
 
 `TabUpdatedEvent` lets a viewer draw its own tab strip. The `TabStrip` plugin
-(`browserrig.choreography`, on by default, `tab_strip=False` to opt out) sends it
+(`browserrig.choreography`, on by default, `without=(TabStrip,)` to opt out) sends it
 whenever a field changes: `loading` follows the main frame, and the title and icon
 are read from the page once it stops loading. A newer title from Chrome replaces
 the one the document declared. The tab itself only reports that it changed,

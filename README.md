@@ -6,7 +6,7 @@ Agents can navigate tabs, interact with DOM elements or screenshot coordinates, 
 
 ```mermaid
 flowchart LR
-    App[Python application] --> Agent[BrowserAgent]
+    App[Python application] --> Agent[browserrig.Agent]
     Agent --> Chrome
     Chrome --> State[Page observations and screenshots]
     State --> Agent

@@ -1,5 +1,5 @@
 from .activity import Activity
-from .agent import BrowserAgent, WindowRatio  # smelt: ignore[SMT106] -- public facade
+from .agent import Agent  # smelt: ignore[SMT106] -- public facade
 from .browser import (
     Browser,
     Chrome,
@@ -8,8 +8,12 @@ from .browser import (
     Launch,
     Viewport,
 )
+from .choreography import Choreography, TabStrip
 from .completion import Done
-from .composition import browser_plugins  # smelt: ignore[SMT106] -- public facade
+from .composition import (  # smelt: ignore[SMT106] -- public facade
+    WindowRatio,
+    browser_plugins,
+)
 from .core import Point
 from .files import FileSystem, FileSystemOptions
 from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanResponse
@@ -46,19 +50,24 @@ from .secrets import Secret, Secrets, SecretValue, Totp, env
 from .terminal import TerminalEvents
 from .tools import (
     Actions,
+    DialogTools,
     DomActionChains,
+    FileTools,
     FindTools,
     FormTools,
+    JavaScriptTools,
     KeyboardTools,
     NavigationTools,
     ObserveAfterInput,
     PointerTools,
     TabTools,
+    UploadTools,
 )
 
 __version__ = "0.1.0"
 
 __all__ = [
+    "Agent",
     "CheckReadiness",
     "DownloadReadiness",
     "ReadinessCheck",
@@ -84,6 +93,12 @@ __all__ = [
     "ReadinessPolicy",
     "ReadinessStrategy",
     "FindTools",
+    "DialogTools",
+    "FileTools",
+    "JavaScriptTools",
+    "UploadTools",
+    "Choreography",
+    "TabStrip",
     "FormTools",
     "PointerTools",
     "KeyboardTools",
@@ -96,7 +111,6 @@ __all__ = [
     "Point",
     "MouseEventKind",
     "Browser",
-    "BrowserAgent",
     "Chrome",
     "ChromeBrowser",
     "Connect",

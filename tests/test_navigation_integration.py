@@ -27,7 +27,7 @@ async def test_agent_go_forward_reports_success_and_missing_or_replaced_history(
     agent = Agent(
         model=model,
         plugins=[
-            *browser_plugins(Launch(url=site)),
+            *browser_plugins(browser=Launch(url=site)),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

@@ -1,12 +1,12 @@
 # Human handoff
 
 `HumanHandoff` is an opt-in plugin for login, 2FA and other steps a person needs
-to complete in the browser. Configure it on `BrowserAgent`, through
-`browser_plugins(handoff=...)`, or in a custom `Agent`'s plugin list. Without the
+to complete in the browser. Add it to the `plugins` of `browserrig.Agent`,
+to `browser_plugins(...)`, or to a plain Harnessed `Agent`'s plugin list. Without the
 plugin, no handoff tool, prompt section or pause tracking is added.
 
 ```python
-from browserrig import BrowserAgent, HumanHandoff, HumanResponse, Launch
+from browserrig import Agent, HumanHandoff, HumanResponse, Launch
 from browserrig.events import HandoffRequestedEvent
 
 async def ask_human(request: HandoffRequestedEvent) -> HumanResponse:
@@ -21,10 +21,10 @@ handoff = HumanHandoff(
     track_pauses=True,
     history_limit=5,
 )
-agent = BrowserAgent(
+agent = Agent(
     model=model,
     browser=Launch(url=url, headless=False),
-    handoff=handoff,
+    plugins=[handoff],
 )
 ```
 

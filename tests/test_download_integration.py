@@ -10,12 +10,13 @@ from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
 from browserrig import (
+    Agent,
     Browser,
-    BrowserAgent,
     ChromeBrowser,
     FileSystemOptions,
     Launch,
     Observe,
+    Readiness,
     ReadinessOptions,
     Screenshots,
     ScreenshotTrigger,
@@ -84,10 +85,10 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
             tool_call=ToolCall("upload_files", {"ref": ref, "paths": paths})
         )
 
-    agent = BrowserAgent(
+    agent = Agent(
         model=CallbackModel(respond),
         browser=Launch(url=site, files=FileSystemOptions(directory=workspace)),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
+        plugins=[Approvals(default=PolicyDecision.ALLOW)],
     )
     async with agent.session() as session:
         browser = session.ctx[Browser]
@@ -161,10 +162,10 @@ async def test_agent_reads_selected_workbook_cells_as_context(
         )
         yield ModelChunk(text="Workbook read as context")
 
-    result = await BrowserAgent(
+    result = await Agent(
         model=CallbackModel(respond),
         browser=Launch(url=site, files=FileSystemOptions(directory=tmp_path)),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
+        plugins=[Approvals(default=PolicyDecision.ALLOW)],
     ).run("Read the downloaded workbook", max_steps=2)
     assert result.text == "Workbook read as context"
 
@@ -306,12 +307,12 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(
         yield ModelChunk(tool_call=tool_call)
 
     model = CallbackModel(respond)
-    agent = BrowserAgent(
+    agent = Agent(
         model=model,
         browser=Launch(
             url=site, files=FileSystemOptions(directory=tmp_path / "workspace")
         ),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
+        plugins=[Approvals(default=PolicyDecision.ALLOW)],
     )
     result = await agent.run(
         "Download the PDF, inspect it and save notes", max_steps=30
@@ -352,13 +353,15 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
         stage += 1
         yield ModelChunk(tool_call=tool_call)
 
-    result = await BrowserAgent(
+    result = await Agent(
         model=CallbackModel(respond),
         browser=Launch(
             url=site + "/canvas", files=FileSystemOptions(directory=tmp_path)
         ),
-        observe=Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
-        readiness=ReadinessOptions(timeout=3),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
+        plugins=[
+            Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+            Readiness(options=ReadinessOptions(timeout=3)),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
     ).run("Preview the PDF and return to the original tab", max_steps=3)
     assert result.text == "Back on original tab"

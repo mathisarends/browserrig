@@ -16,7 +16,7 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import AgentLoop, Approvals, FinalStepPolicy
 from harnessed.testing import CallbackModel, ScriptedModel
 
-from browserrig import Browser, BrowserAgent, Launch, Observe, ReadinessOptions
+from browserrig import Agent, Browser, Launch, Observe, Readiness, ReadinessOptions
 from browserrig.events import ActionFinishedEvent, ObservationCapturedEvent
 from browserrig.kinds import ActionKind
 from tests.javascript import evaluate
@@ -212,11 +212,10 @@ async def test_tab_actions_keep_their_distinct_kinds_in_durable_receipts(site):
         else:
             yield ModelChunk(text="Done")
 
-    agent = BrowserAgent(
+    agent = Agent(
         model=CallbackModel(respond),
         browser=Launch(url=site),
-        plugins=[Access()],
-        approvals=Approvals(default=PolicyDecision.ALLOW),
+        plugins=[Access(), Approvals(default=PolicyDecision.ALLOW)],
     )
     result = await agent.run("Manage tabs")
     assert result.text == "Done"
@@ -241,7 +240,7 @@ async def test_reserved_final_summary_uses_effective_limit_and_remains_incomplet
             return await next_()
 
     model = ScriptedModel(["Partial browser findings"])
-    agent = BrowserAgent(
+    agent = Agent(
         model=model,
         browser=Launch(url=site),
         plugins=[
@@ -286,12 +285,14 @@ async def _run(site, markup, plan):
         else:
             yield ModelChunk(text="Done")
 
-    agent = BrowserAgent(
+    agent = Agent(
         model=CallbackModel(respond),
         browser=Launch(url=site),
-        readiness=ReadinessOptions(quiet_ms=30, navigation_min_ms=50),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
-        plugins=[Page()],
+        plugins=[
+            Readiness(options=ReadinessOptions(quiet_ms=30, navigation_min_ms=50)),
+            Approvals(default=PolicyDecision.ALLOW),
+            Page(),
+        ],
     )
     async with agent.session() as session:
         result = await session.run("Fill the form", max_steps=3)

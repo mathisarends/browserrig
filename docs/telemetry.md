@@ -118,7 +118,7 @@ for an agent running directly on your host.
 ## Use it in your own application
 
 Install `browserrig[otel]` plus the extra for your model provider. Supply the
-Harnessed plugin directly; `BrowserAgent` needs no telemetry-specific argument:
+Harnessed plugin directly; `Agent` needs no telemetry-specific argument:
 
 ```python
 import asyncio
@@ -129,7 +129,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-from browserrig import BrowserAgent
+from browserrig import Agent
 
 
 async def run_traced(model):
@@ -143,7 +143,7 @@ async def run_traced(model):
         provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(
             endpoint="http://127.0.0.1:6006/v1/traces",
         )))
-        agent = BrowserAgent(model=model, plugins=[OpenTelemetryTracer(
+        agent = Agent(model=model, plugins=[OpenTelemetryTracer(
             tracer_provider=provider,
             capture_content=True,
             max_content_length=16_384,

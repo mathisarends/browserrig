@@ -12,8 +12,8 @@ from harnessed.testing import CallbackModel
 from PIL import Image
 
 from browserrig import (
+    Agent,
     Browser,
-    BrowserAgent,
     ChromeBrowser,
     DomCapture,
     Launch,
@@ -207,11 +207,13 @@ async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site)
             yield ModelChunk(text="Done")
         step += 1
 
-    agent = BrowserAgent(
+    agent = Agent(
         model=CallbackModel(respond),
         browser=Launch(url=site + "/canvas", viewport=Viewport(scale=2)),
-        observe=Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
+        plugins=[
+            Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
     )
     result = await agent.run(
         "Move, click, and inspect the cursor after each action", max_steps=3
@@ -397,11 +399,10 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
             yield ModelChunk(text="Done")
         step += 1
 
-    agent = BrowserAgent(
+    agent = Agent(
         model=CallbackModel(respond),
         browser=Launch(url=site),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
-        plugins=[Access()],
+        plugins=[Approvals(default=PolicyDecision.ALLOW), Access()],
     )
     async with agent.session() as session:
         tab = holder["browser"].active_tab

@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-    Task --> Agent[BrowserAgent / Harnessed]
+    Task --> Agent[browserrig.Agent / Harnessed]
     Agent --> Tools[Browser tools and plugins]
     Tools --> Browser[Chrome]
     Browser --> Observation
@@ -12,9 +12,9 @@ flowchart LR
     Agent --> Result
 ```
 
-## BrowserAgent
+## Agent
 
-`BrowserAgent` configures Harnessed's `Agent` with browser capabilities:
+`browserrig.Agent` is Harnessed's `Agent` with browser capabilities:
 
 ```python
 from harnessed import PolicyDecision
@@ -22,13 +22,12 @@ from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import BrowserAgent, Launch, TerminalEvents
+from browserrig import Agent, Launch, TerminalEvents
 
-agent = BrowserAgent(
+agent = Agent(
     model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
     browser=Launch(url="https://en.wikipedia.org/wiki/Voyager_program"),
-    approvals=Approvals(default=PolicyDecision.ALLOW),
-    plugins=[TerminalEvents()],
+    plugins=[Approvals(default=PolicyDecision.ALLOW), TerminalEvents()],
 )
 result = await agent.run("Compare Voyager 1 and 2 and cite the source URLs.", max_steps=20)
 print(result.text)
@@ -37,21 +36,56 @@ print(result.text)
 `run()`, `session()`, and session controls remain native Harnessed APIs.
 Wrap native Pydantic AI models with `PydanticAIModel(...)`; Harnessed enters and exits
 the wrapper's resource context. Model strings remain supported. Explicitly supplied HTTP and provider SDK clients remain caller-owned.
-Use `system_prompt=...` to replace the default instruction and `plugins=[...]` to
-add capabilities. Conversations stay in memory; see
+Use `system_prompt=...` to replace the default instruction. `plugins=[...]`
+replaces the defaults it matches and adds the rest; `without=(...)` drops
+defaults by type (see [Composing plugins](#composing-plugins)). Conversations
+stay in memory; see
 [Saving and restoring sessions](#saving-and-restoring-sessions).
 By default, older steps are summarized once a request reaches 80% of the model's
-context window (`compaction=Compaction(trigger=WindowRatio(0.8))`), so long runs do
+context window (the default `Compaction(trigger=WindowRatio(0.8))`), so long runs do
 not stop at the context limit. Many providers report no window; the trigger then
 fires at 100k tokens (`WindowRatio(fallback_tokens=...)`), or pass
 `PydanticAIModel(..., context_window=...)` to use the ratio. Pass your own
-`Compaction(...)` from `harnessed.plugins` to tune it, or `compaction=None` to keep
-every step.
-Without explicit `approvals`, Harnessed's default `ASK` policy applies; the example
+`Compaction(...)` from `harnessed.plugins` in `plugins` to tune it, or
+`without=(Compaction,)` to keep every step.
+Without an `Approvals` plugin, Harnessed's default `ASK` policy applies; the example
 above allows actions automatically. The constructor does not open Chrome or files.
 
-For custom composition, `browser_plugins()` returns an inspectable plugin list:
-`Agent(model=model, plugins=[*browser_plugins(), MyPlugin()])`.
+## Composing plugins
+
+`Agent` and `browser_plugins()` share one rule:
+
+- A plugin that fills the same slot or provides the same service as a default
+  replaces it in place, such as `Observe(...)`, `Readiness(...)`, `ImageContext(...)`
+  or `Compaction(...)`. Two plugins for the same default raise `PluginConflict`.
+- Any other plugin is added after the defaults.
+- `without=(...)` drops defaults by type; a type that is not a default raises
+  `ValueError`.
+- `None` entries are skipped, so optional plugins can be written inline.
+
+```python
+from browserrig import (
+    Agent,
+    Choreography,
+    FileTools,
+    Observe,
+    Screenshots,
+    ScreenshotTrigger,
+    UploadTools,
+)
+
+agent = Agent(
+    model=model,
+    plugins=[
+        Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+        handoff if interactive else None,
+    ],
+    without=(Choreography, FileTools, UploadTools),
+)
+```
+
+`browser_plugins(*plugins, browser=..., without=...)` returns the same list for a
+plain Harnessed `Agent`: `harnessed.Agent(model=model, plugins=browser_plugins(MyPlugin()))`.
 Individual capabilities such as `Chrome`, `Readiness`, `Observe`, `Actions`, tool
 plugins, `Nudges`, `Activity`, and `TerminalEvents` are also available directly.
 See [composing browser agents](browser-composition.md) for the explicit plugin API:
@@ -119,9 +153,9 @@ such as Markdown or CSV, through the final-answer instructions. These natural-la
 format requests are instructions to the model, not schema validation.
 
 ```python
-from browserrig import BrowserAgent, Done
+from browserrig import Agent, Done
 
-agent = BrowserAgent(model=model, plugins=[Done()])
+agent = Agent(model=model, plugins=[Done()])
 result = await agent.run("Compare the two products. Return a Markdown table.")
 print(result.text)
 ```
@@ -186,7 +220,7 @@ Configure Harnessed's native loop through the existing plugin interface:
 ```python
 from harnessed.plugins import AgentLoop, FinalStepPolicy
 
-agent = BrowserAgent(
+agent = Agent(
     model=model,
     plugins=[AgentLoop(max_steps=20, final_step=FinalStepPolicy.SUMMARIZE)],
 )
@@ -204,14 +238,14 @@ tools. For structured output, read `.text` on incomplete results; `.output` rais
 
 ## System prompts and optional MCP tools
 
-`BrowserAgent(system_prompt="...")` appends browser plugin sections automatically.
+`Agent(system_prompt="...")` appends browser plugin sections automatically.
 For titled Markdown or XML, pass a native `SystemPrompt`:
 
 ```python
 from harnessed import PromptFormat, SystemPrompt
-from browserrig import BrowserAgent
+from browserrig import Agent
 
-agent = BrowserAgent(
+agent = Agent(
     system_prompt=SystemPrompt(
         format=PromptFormat.MARKDOWN,
         sections=("Complete the requested browser task using the observed page state.",),
@@ -245,7 +279,7 @@ All Harnessed extras are pinned to **0.8.0**. Add MCP servers through the native
 ```python
 from harnessed.plugins.mcp import MCP
 
-agent = BrowserAgent(
+agent = Agent(
     plugins=[MCP.http("catalog", url="http://localhost:8000/mcp", include_tools=["search"])],
 )
 ```
@@ -274,13 +308,13 @@ class Extension(Plugin, needs=(Browser,)):
     browser: Inject[Browser]
 ```
 
-`BrowserAgent` keeps Harnessed's strict startup validation by default. Missing
+`Agent` keeps Harnessed's strict startup validation by default. Missing
 services raise `PluginDependencyError` from `harnessed.errors` before the runtime
 starts, including through `run()`. Its `.issues` tuple identifies each waiting
 plugin through `.plugin` and its missing service keys through `.missing`.
 
 For plugins deliberately waiting for services added later, pass
-`plugin_validation=PluginValidation.WARN` to `BrowserAgent`, importing
+`plugin_validation=PluginValidation.WARN` to `Agent`, importing
 `PluginValidation` from `harnessed`. This emits `PluginDependencyWarning` with the
 same structured issues and retains waiting plugins for later activation; setup
 failures still propagate. Add services through native `session.use()` as usual.

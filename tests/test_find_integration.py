@@ -113,7 +113,7 @@ async def test_find_tool_types_into_the_find_bar_and_reports_matches(site):
     agent = Agent(
         model=model,
         plugins=[
-            *browser_plugins(Launch(url=site)),
+            *browser_plugins(browser=Launch(url=site)),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

@@ -24,7 +24,8 @@ from harnessed.plugins import AgentLoop, Approvals, FinalStepPolicy
 from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel, Field
 
-from browserrig import BrowserAgent, Done
+import browserrig
+from browserrig import Done
 
 
 class _Answer(BaseModel):
@@ -317,7 +318,7 @@ async def test_runtime_mount_and_removal_restore_native_completion_and_output():
 
 
 def test_browser_facade_accepts_the_opt_in_plugin_without_changing_defaults():
-    plain = BrowserAgent(model=ScriptedModel([]))
-    explicit = BrowserAgent(model=ScriptedModel([]), plugins=[Done()])
+    plain = browserrig.Agent(model=ScriptedModel([]))
+    explicit = browserrig.Agent(model=ScriptedModel([]), plugins=[Done()])
     assert not any(isinstance(plugin, Done) for plugin in plain.plugins)
     assert sum(isinstance(plugin, Done) for plugin in explicit.plugins) == 1

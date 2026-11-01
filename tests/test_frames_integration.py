@@ -133,7 +133,9 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(
-                Launch(url=site + "/frame-host", arguments=("--site-per-process",))
+                browser=Launch(
+                    url=site + "/frame-host", arguments=("--site-per-process",)
+                )
             ),
             Prepare(),
             Approvals(default=PolicyDecision.ALLOW),

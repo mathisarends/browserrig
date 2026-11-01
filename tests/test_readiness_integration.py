@@ -9,10 +9,13 @@ from browserrig import (
     Actions,
     Browser,
     ChromeBrowser,
+    FileTools,
     Launch,
     Observe,
     Point,
+    Readiness,
     ReadinessOptions,
+    UploadTools,
     browser_plugins,
     wait_for_page,
 )
@@ -83,7 +86,10 @@ async def readiness_server():
 async def test_delayed_click_navigation_settles_the_destination(readiness_site):
     agent = Agent(
         model=ScriptedModel(["Done"]),
-        plugins=browser_plugins(Launch(url=readiness_site), local_files=False),
+        plugins=browser_plugins(
+            browser=Launch(url=readiness_site),
+            without=(FileTools, UploadTools),
+        ),
     )
     async with agent.session() as session:
         browser, observe = session.ctx[Browser], session.ctx[Observe]
@@ -132,9 +138,9 @@ async def test_navigation_command_itself_is_bounded_before_the_response_commits(
     agent = Agent(
         model=ScriptedModel(["Done"]),
         plugins=browser_plugins(
-            Launch(url=readiness_site),
-            readiness=_options(timeout=0.5, navigation_min_ms=0),
-            local_files=False,
+            Readiness(options=_options(timeout=0.5, navigation_min_ms=0)),
+            browser=Launch(url=readiness_site),
+            without=(FileTools, UploadTools),
         ),
     )
     async with agent.session() as session:
@@ -235,9 +241,9 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
     agent = Agent(
         model=model,
         plugins=browser_plugins(
-            Launch(url=readiness_site),
-            readiness=_options(timeout=0.5, action_min_ms=0),
-            local_files=False,
+            Readiness(options=_options(timeout=0.5, action_min_ms=0)),
+            browser=Launch(url=readiness_site),
+            without=(FileTools, UploadTools),
         ),
     )
     async with agent.session() as session:

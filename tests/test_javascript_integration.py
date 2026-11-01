@@ -41,7 +41,7 @@ async def test_agent_javascript_shell_retains_main_world_state_awaits_and_report
     agent = Agent(
         model=model,
         plugins=[
-            *browser_plugins(Launch(url=url)),
+            *browser_plugins(browser=Launch(url=url)),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

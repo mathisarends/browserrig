@@ -8,7 +8,7 @@ from harnessed import PolicyDecision
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import BrowserAgent, Launch
+from browserrig import Agent, Launch
 
 
 async def main() -> None:
@@ -20,10 +20,10 @@ async def main() -> None:
     args = parser.parse_args()
     if not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY first")
-    agent = BrowserAgent(
+    agent = Agent(
         model=OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")),
         browser=Launch(url=args.url),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
+        plugins=[Approvals(default=PolicyDecision.ALLOW)],
     )
     async with agent.session() as session:
         handle = await session.submit(args.task)

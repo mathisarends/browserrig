@@ -13,9 +13,9 @@ from harnessed.models import ModelChunk, ToolMessage
 from harnessed.plugins import AgentLoop, Approvals, Compaction
 from harnessed.testing import ScriptedModel, call
 
+import browserrig
 from browserrig import (
     Activity,
-    BrowserAgent,
     HandoffReceipt,
     HumanHandoff,
     HumanResponse,
@@ -431,17 +431,17 @@ async def test_abort_cancels_the_callback_and_releases_the_handoff():
 async def test_handoff_is_opt_in_for_the_facade_and_explicit_composition():
     callback = AsyncMock(return_value=HumanResponse())
     handoff = HumanHandoff(ask=callback)
-    default = BrowserAgent(model=ScriptedModel(["Done"]))
+    default = browserrig.Agent(model=ScriptedModel(["Done"]))
     assert not any(isinstance(plugin, HumanHandoff) for plugin in default.plugins)
     assert "Use request_human" not in await default.prompt.render()
     assert not any(isinstance(plugin, HumanHandoff) for plugin in browser_plugins())
-    configured = BrowserAgent(model=ScriptedModel(["Done"]), handoff=handoff)
+    configured = browserrig.Agent(model=ScriptedModel(["Done"]), plugins=[handoff])
     assert (
         handoff in configured.plugins
         and "Use request_human" in await configured.prompt.render()
     )
-    assert handoff in browser_plugins(handoff=handoff)
-    composed = BrowserAgent(model=ScriptedModel(["Done"]), plugins=[handoff])
+    assert handoff in browser_plugins(handoff)
+    composed = browserrig.Agent(model=ScriptedModel(["Done"]), plugins=[handoff])
     assert handoff in composed.plugins
 
 

@@ -22,10 +22,10 @@ from harnessed.errors import ConfigError, PluginDependencyError, PluginDependenc
 from harnessed.plugins import Service
 from harnessed.testing import ScriptedModel
 
+import browserrig
 from browserrig import (
     Actions,
     Browser,
-    BrowserAgent,
     Chrome,
     DomCapture,
     FileSystem,
@@ -78,7 +78,7 @@ async def test_each_browser_tool_has_a_unique_stable_kind(fake_chrome):
         "screenshot": ActionKind.SCREENSHOT,
         "extract_content": ActionKind.EXTRACT_CONTENT,
     }
-    agent = BrowserAgent(model=ScriptedModel(["unused"]))
+    agent = browserrig.Agent(model=ScriptedModel(["unused"]))
     async with agent.session() as session:
         tools = session.ctx[ToolRegistry]
         kinds = []
@@ -161,7 +161,7 @@ async def test_facade_rejects_missing_services_and_closes_acquired_browser(
     fake_chrome, use_run
 ):
     model = ScriptedModel(["unused"])
-    agent = BrowserAgent(model=model, plugins=[Plugin(needs=(_DeferredService,))])
+    agent = browserrig.Agent(model=model, plugins=[Plugin(needs=(_DeferredService,))])
     with pytest.raises(PluginDependencyError) as caught:
         if use_run:
             await agent.run("Inspect the page")
@@ -183,10 +183,10 @@ async def test_facade_warning_policy_keeps_deferred_plugin_until_service_is_adde
         async def setup(self):
             mounted.append(self)
 
-    agent = BrowserAgent(
+    agent = browserrig.Agent(
         model=ScriptedModel(["unused"]),
-        plugins=[Deferred()],
         plugin_validation=PluginValidation.WARN,
+        plugins=[Deferred()],
     )
     with pytest.warns(PluginDependencyWarning) as warnings:
         async with agent.session() as session:
@@ -209,12 +209,12 @@ async def test_facade_warning_policy_keeps_deferred_plugin_until_service_is_adde
 async def test_facade_renders_configured_observation_prompt(
     fake_chrome, capture, trigger
 ):
-    agent = BrowserAgent(
+    agent = browserrig.Agent(
         model=ScriptedModel(["unused"]),
-        observe=Observe(capture=capture, screenshots=Screenshots(trigger=trigger)),
         system_prompt=SystemPrompt(
             format=PromptFormat.MARKDOWN, sections=("Custom role.",)
         ),
+        plugins=[Observe(capture=capture, screenshots=Screenshots(trigger=trigger))],
     )
     async with agent.session() as session:
         rendered = await session.prompt.render()
@@ -267,7 +267,7 @@ _REF_CALLS = (
 
 
 async def test_ref_and_coordinate_tools_are_exposed(fake_chrome, tmp_path):
-    agent = BrowserAgent(model=ScriptedModel(["unused"]))
+    agent = browserrig.Agent(model=ScriptedModel(["unused"]))
     ref_tools = {call.name for call in _REF_CALLS}
     async with agent.session() as session:
         session.ctx[Browser].files = FileSystem(FileSystemOptions(directory=tmp_path))
@@ -289,7 +289,7 @@ async def test_file_tools_follow_workspace_availability_and_reject_stale_calls(
         "open_downloaded_file",
         "upload_files",
     }
-    agent = BrowserAgent(model=ScriptedModel(["unused"]))
+    agent = browserrig.Agent(model=ScriptedModel(["unused"]))
     async with agent.session() as session:
         tools = session.ctx[ToolRegistry]
         assert "list_downloads" in {item.name for item in tools.definitions}
@@ -350,7 +350,7 @@ async def test_facade_owns_a_fresh_mcp_stdio_server_per_session(fake_chrome, tmp
         "server.run(transport='stdio')\n",
         encoding="utf-8",
     )
-    agent = BrowserAgent(
+    agent = browserrig.Agent(
         model=ScriptedModel(["unused"]),
         plugins=[
             mcp.MCP.stdio(

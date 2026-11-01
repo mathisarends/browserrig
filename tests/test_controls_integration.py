@@ -7,7 +7,7 @@ from harnessed import Context, Inject, Plugin, PolicyDecision, tool
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Browser, BrowserAgent, HumanHandoff, HumanResponse, Launch
+from browserrig import Agent, Browser, HumanHandoff, HumanResponse, Launch
 from browserrig.events import ActivityFinishedEvent, HandoffFinishedEvent
 from tests.javascript import evaluate
 from tests.observations import latest
@@ -31,14 +31,16 @@ async def test_pause_steer_resume_observes_external_page_change(site, handoff_en
             return "Step finished"
 
     model = ScriptedModel([call(Gate.hold), "Resumed"])
-    agent = BrowserAgent(
+    agent = Agent(
         model=model,
         browser=Launch(url=site),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
-        handoff=HumanHandoff(ask=AsyncMock(return_value=HumanResponse()))
-        if handoff_enabled
-        else None,
-        plugins=[Gate()],
+        plugins=[
+            Approvals(default=PolicyDecision.ALLOW),
+            HumanHandoff(ask=AsyncMock(return_value=HumanResponse()))
+            if handoff_enabled
+            else None,
+            Gate(),
+        ],
     )
     async with agent.session() as session:
         handle = await session.submit("Inspect the page")
@@ -98,11 +100,10 @@ async def test_handoff_observes_human_navigation_and_a_short_lived_popup(site):
             "Continued",
         ]
     )
-    agent = BrowserAgent(
+    agent = Agent(
         model=model,
         browser=Launch(url=site),
-        handoff=HumanHandoff(ask=ask),
-        plugins=[BrowserHandle()],
+        plugins=[HumanHandoff(ask=ask), BrowserHandle()],
     )
     async with agent.session() as session:
         result = await session.run("Continue after login")

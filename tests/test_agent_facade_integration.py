@@ -8,7 +8,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel
 
-from browserrig import Browser, BrowserAgent, Done, Launch
+from browserrig import Agent, Browser, Done, Launch
 from browserrig.events import ActionStartedEvent, ActivityStartedEvent
 from browserrig.kinds import ActivityKind
 
@@ -23,11 +23,7 @@ async def test_facade_restores_saved_state_and_owns_a_fresh_browser_per_session(
             browsers.append(browser)
 
     model = ScriptedModel(["First answer", "Restored answer"])
-    agent = BrowserAgent(
-        model=model,
-        browser=Launch(url=site),
-        plugins=[Access()],
-    )
+    agent = Agent(model=model, browser=Launch(url=site), plugins=[Access()])
     async with agent.session() as session:
         first = await session.run("Remember this page")
         assert first.text == "First answer"
@@ -51,10 +47,10 @@ async def test_facade_restores_saved_state_and_owns_a_fresh_browser_per_session(
 
 async def test_facade_honors_explicit_tool_policy(site):
     model = ScriptedModel([call("navigate", url=site + "/other"), "Denied"])
-    agent = BrowserAgent(
+    agent = Agent(
         model=model,
         browser=Launch(url=site),
-        approvals=Approvals(default=PolicyDecision.ALLOW, deny=["navigate"]),
+        plugins=[Approvals(default=PolicyDecision.ALLOW, deny=["navigate"])],
     )
     result = await agent.run("Try navigation")
     assert result.text == "Denied"
@@ -72,7 +68,7 @@ async def test_facade_manages_wrapped_native_model_context_on_reuse(site, monkey
     enter, leave = AsyncMock(return_value=model), AsyncMock()
     monkeypatch.setattr(native.TestModel, "__aenter__", enter)
     monkeypatch.setattr(native.TestModel, "__aexit__", leave)
-    agent = BrowserAgent(model=PydanticAIModel(model), browser=Launch(url=site))
+    agent = Agent(model=PydanticAIModel(model), browser=Launch(url=site))
     result = await agent.run("Inspect the page")
     assert result.text == "Native model adapted"
     assert model.last_model_request_parameters is not None
@@ -96,11 +92,10 @@ async def test_facade_streams_commentary_and_returns_a_typed_answer_after_done(s
             call("final_answer", title="Other", url=site + "/other"),
         ]
     )
-    agent = BrowserAgent(
+    agent = Agent(
         model=model,
         browser=Launch(url=site),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
-        plugins=[Done()],
+        plugins=[Approvals(default=PolicyDecision.ALLOW), Done()],
     )
     async with agent.session() as session:
         events = [

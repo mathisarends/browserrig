@@ -58,7 +58,7 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
     agent = Agent(
         model=model,
         plugins=[
-            *browser_plugins(Launch(url=site)),
+            *browser_plugins(browser=Launch(url=site)),
             CountScreenshots(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
@@ -231,7 +231,7 @@ async def test_no_progress_hint_is_derived_from_events(site):
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(
-                readiness=ReadinessOptions(quiet_ms=50, navigation_min_ms=100)
+                Readiness(options=ReadinessOptions(quiet_ms=50, navigation_min_ms=100))
             ),
             Approvals(default=PolicyDecision.ALLOW),
         ],

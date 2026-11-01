@@ -10,7 +10,7 @@ from harnessed.testing import CallbackModel
 
 from browserrig import (
     Actions,
-    BrowserAgent,
+    Agent,
     ChromeBrowser,
     DomCapture,
     Launch,
@@ -111,11 +111,10 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
         entry = _element(request, label)
         yield ModelChunk(tool_call=ToolCall(name, {"ref": entry["ref"], **arguments}))
 
-    agent = BrowserAgent(
+    agent = Agent(
         model=CallbackModel(respond),
         browser=Launch(url=site),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
-        plugins=[Prepare()],
+        plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
     )
     async with agent.session() as session:
         result = await session.run(
@@ -199,11 +198,10 @@ async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
             assert entry["in_viewport"]
             yield ModelChunk(text="Done")
 
-    agent = BrowserAgent(
+    agent = Agent(
         model=CallbackModel(respond),
         browser=Launch(url=site),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
-        plugins=[Prepare()],
+        plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
     )
     async with agent.session() as session:
         result = await session.run("Click the clipped nested target", max_steps=2)
@@ -268,11 +266,10 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(
             assert entry["in_viewport"]
             yield ModelChunk(text="Done")
 
-    agent = BrowserAgent(
+    agent = Agent(
         model=CallbackModel(respond),
         browser=Launch(url=site + "/frames", arguments=("--site-per-process",)),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
-        plugins=[Prepare()],
+        plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
     )
     async with agent.session() as session:
         result = await session.run("Click the target in an edge frame", max_steps=2)
@@ -316,11 +313,10 @@ async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target
         else:
             yield ModelChunk(text="Blocked")
 
-    agent = BrowserAgent(
+    agent = Agent(
         model=CallbackModel(respond),
         browser=Launch(url=site),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
-        plugins=[Prepare()],
+        plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
     )
     async with agent.session() as session:
         result = await session.run("Attempt the blocked scroll", max_steps=2)

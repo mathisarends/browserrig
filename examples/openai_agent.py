@@ -12,7 +12,7 @@ from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
-    BrowserAgent,
+    Agent,
     Done,
     FileSystemOptions,
     ImageContext,
@@ -66,7 +66,7 @@ async def main() -> None:
         capture_content=args.trace_content,
         max_content_length=args.trace_max_content_length,
     ) as telemetry:
-        agent = BrowserAgent(
+        agent = Agent(
             model=PydanticAIModel(
                 OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra"))
             ),
@@ -75,12 +75,12 @@ async def main() -> None:
                 headless=not args.headed,
                 files=FileSystemOptions(directory=args.workspace),
             ),
-            image_context=ImageContext(UntilCompaction()),
-            approvals=Approvals(default=PolicyDecision.ALLOW),
             plugins=[
+                ImageContext(UntilCompaction()),
+                Approvals(default=PolicyDecision.ALLOW),
                 *telemetry,
-                *([Done()] if args.done else []),
-                *([] if args.quiet else [TerminalEvents()]),
+                Done() if args.done else None,
+                None if args.quiet else TerminalEvents(),
             ],
         )
         async with agent.session() as session:

@@ -7,7 +7,7 @@ for upstream discussion; no issue has been submitted.
 ## Integration effort and abstraction fit
 
 The existing `plugins=[OpenTelemetryTracer(tracer_provider=provider)]` interface
-fits Browserrig's composition without changing `BrowserAgent` or any browser
+fits Browserrig's composition without changing `browserrig.Agent` or any browser
 plugin. A forwarding `otel` dependency extra, application startup/cleanup code
 and a single-container Phoenix setup are sufficient. The integration adds no
 Browserrig-specific tracing API.
@@ -43,7 +43,7 @@ capture, model and tool inputs/outputs, per-field truncation and batch delivery
 when the application exits through an exception. A subprocess test confirms
 disabled tracing imports no OTel modules.
 
-`examples/tracing_smoke.py` runs a real BrowserAgent with headless Chrome and a
+`examples/tracing_smoke.py` runs a real `browserrig.Agent` with headless Chrome and a
 scripted model, then sends its spans to the Docker-hosted Phoenix instance. The
 Phoenix `/v1/projects/browserrig/spans` endpoint permits checking persisted spans
 and their attributes independently of the exporter log. The smoke test checks

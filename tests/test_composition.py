@@ -1,23 +1,31 @@
 import subprocess
 import sys
 
+import pytest
 from harnessed import Agent, Plugin, PolicyDecision, SystemSection
+from harnessed.errors import PluginConflict
 from harnessed.plugins import Approvals, Compaction, ContextState
 from harnessed.plugins.filesystem import FilesystemTools
 from harnessed.plugins.shell import ShellTools
 from harnessed.testing import ScriptedModel
 
+import browserrig
 from browserrig import (
-    BrowserAgent,
+    Choreography,
     Chrome,
     FileSystemOptions,
+    ImageContext,
     Launch,
     Observe,
     Readiness,
     ReadinessOptions,
     Screenshots,
     ScreenshotTrigger,
+    Secret,
+    Secrets,
+    TabStrip,
     WindowRatio,
+    browser_plugins,
 )
 from browserrig.tools import (
     FileTools,
@@ -41,15 +49,17 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     readiness = ReadinessOptions(quiet_ms=123)
     approvals = Approvals(default=PolicyDecision.DENY)
     extension = Extension()
-    agent = BrowserAgent(
+    agent = browserrig.Agent(
         model=ScriptedModel(["ok"]),
         browser=options,
-        observe=Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
-        readiness=readiness,
-        compaction=None,
-        approvals=approvals,
         system_prompt="Custom instructions.",
-        plugins=iter([extension]),
+        plugins=[
+            Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+            Readiness(options=readiness),
+            approvals,
+            extension,
+        ],
+        without=(Compaction,),
     )
     assert isinstance(agent, Agent)
     assert (
@@ -69,7 +79,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
 
 
 def test_facade_mounts_every_tool_group_once():
-    agent = BrowserAgent(model=ScriptedModel(["ok"]))
+    agent = browserrig.Agent(model=ScriptedModel(["ok"]))
     for plugin in (PointerTools, JavaScriptTools):
         assert sum(isinstance(item, plugin) for item in agent.plugins) == 1
     for plugin in (FormTools, UploadTools):
@@ -78,7 +88,7 @@ def test_facade_mounts_every_tool_group_once():
 
 
 def test_facade_compacts_by_window_ratio_and_keeps_approval_defaults():
-    agent = BrowserAgent(model=ScriptedModel(["ok"]))
+    agent = browserrig.Agent(model=ScriptedModel(["ok"]))
     assert not any(
         isinstance(item, (ShellTools, FilesystemTools)) for item in agent.plugins
     )
@@ -107,9 +117,9 @@ def test_window_ratio_uses_the_token_fallback_only_without_a_known_window():
 def test_facade_import_and_scripted_model_do_not_require_provider_sdks():
     script = (
         "import sys; "
-        "from browserrig import BrowserAgent; "
+        "from browserrig import Agent; "
         "from harnessed.testing import ScriptedModel; "
-        "BrowserAgent(model=ScriptedModel(['ok'])); "
+        "Agent(model=ScriptedModel(['ok'])); "
         "assert 'pydantic_ai' not in sys.modules; "
         "assert 'openai' not in sys.modules; "
         "assert 'anthropic' not in sys.modules; "
@@ -124,3 +134,45 @@ def test_facade_import_and_scripted_model_do_not_require_provider_sdks():
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_plugins_replace_matching_defaults_in_place():
+    observe = Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))
+    images = ImageContext(skip_unchanged=False)
+    compaction = Compaction(trigger=WindowRatio(0.5))
+    defaults = browser_plugins()
+    composed = browser_plugins(compaction, images, observe)
+    assert [type(plugin) for plugin in composed] == [
+        type(plugin) for plugin in defaults
+    ]
+    assert observe in composed and images in composed and compaction in composed
+    assert composed.index(observe) == _index(defaults, Observe)
+    assert composed.index(images) == _index(defaults, ImageContext)
+
+
+def test_plugins_without_a_matching_default_are_added_and_none_is_skipped():
+    secrets = Secrets({"pw": Secret("value", domains="example.org")})
+    composed = browser_plugins(None, secrets, None)
+    assert composed[-1] is secrets
+    assert None not in composed
+    assert len(composed) == len(browser_plugins()) + 1
+
+
+def test_two_plugins_for_the_same_default_conflict():
+    with pytest.raises(PluginConflict, match="Observe"):
+        browser_plugins(Observe(), Observe())
+    with pytest.raises(PluginConflict, match="browserrig.images"):
+        browser_plugins(ImageContext(), ImageContext())
+
+
+def test_without_drops_defaults_and_rejects_types_that_are_not_defaults():
+    composed = browser_plugins(without=(Choreography, TabStrip, Compaction))
+    assert not any(
+        isinstance(plugin, (Choreography, TabStrip, Compaction)) for plugin in composed
+    )
+    with pytest.raises(ValueError, match="Not a browserrig default: Secrets"):
+        browser_plugins(without=(Secrets,))
+
+
+def _index(plugins, kind):
+    return next(i for i, plugin in enumerate(plugins) if isinstance(plugin, kind))

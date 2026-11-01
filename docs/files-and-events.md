@@ -20,9 +20,9 @@ browser closes. Choose a reusable workspace explicitly:
 
 ```python
 from pathlib import Path
-from browserrig import BrowserAgent, FileSystemOptions, Launch
+from browserrig import Agent, FileSystemOptions, Launch
 
-agent = BrowserAgent(
+agent = Agent(
     model=model,
     browser=Launch(
         url="https://example.com",

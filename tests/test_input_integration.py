@@ -12,8 +12,8 @@ from harnessed.testing import call as scripted_call
 
 from browserrig import (
     Actions,
+    Agent,
     Browser,
-    BrowserAgent,
     Launch,
     TerminalEvents,
 )
@@ -33,11 +33,14 @@ async def test_typing_shortcuts_stream_and_storage(site, coordinates):
         async def setup(self, browser: Inject[Browser]):
             holder["browser"] = browser
 
-    agent = BrowserAgent(
+    agent = Agent(
         model=_typing_model(holder, coordinates),
         browser=Launch(url=site),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
-        plugins=[TerminalEvents(output), Access()],
+        plugins=[
+            Approvals(default=PolicyDecision.ALLOW),
+            TerminalEvents(output),
+            Access(),
+        ],
     )
     async with agent.session() as session:
         streamed = []
@@ -73,7 +76,7 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
         async def setup(self, browser: Inject[Browser]):
             holder["browser"] = browser
 
-    agent = BrowserAgent(
+    agent = Agent(
         model=ScriptedModel(["First", "Second"]),
         browser=Launch(url=site),
         plugins=[TerminalEvents(output), Access()],
@@ -166,11 +169,10 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
             "Done",
         ]
     )
-    agent = BrowserAgent(
+    agent = Agent(
         model=ScriptedModel(requests),
         browser=Launch(url=site),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
-        plugins=[Panels()],
+        plugins=[Approvals(default=PolicyDecision.ALLOW), Panels()],
     )
     async with agent.session() as session:
         result = await session.run(
@@ -203,7 +205,7 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
         async def setup(self, actions: Inject[Actions]):
             holder["actions"] = actions
 
-    agent = BrowserAgent(
+    agent = Agent(
         model=ScriptedModel(["Observed"]),
         browser=Launch(url=site),
         plugins=[TerminalEvents(output), Access()],

@@ -21,7 +21,7 @@ from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import BrowserAgent, FileSystemOptions, Launch
+from browserrig import Agent, FileSystemOptions, Launch
 
 from .tasks import Task, select
 
@@ -33,20 +33,20 @@ async def run_task(
     task: Task, *, provider, model_name: str, workspace: Path, headed: bool
 ) -> dict:
     workspace.mkdir(parents=True, exist_ok=True)
-    agent = BrowserAgent(
+    agent = Agent(
         model=PydanticAIModel(OpenAIResponsesModel(model_name)),
         browser=Launch(
             url=task.url,
             headless=not headed,
             files=FileSystemOptions(directory=workspace),
         ),
-        approvals=Approvals(default=PolicyDecision.ALLOW),
         plugins=[
+            Approvals(default=PolicyDecision.ALLOW),
             OpenTelemetryTracer(
                 tracer_provider=provider,
                 capture_content=True,
                 max_content_length=400_000,
-            )
+            ),
         ],
     )
     started = time.monotonic()

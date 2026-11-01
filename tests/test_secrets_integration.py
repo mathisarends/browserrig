@@ -73,15 +73,15 @@ def _agent(site, model, domains, holder, *, path="/", screenshots=False, live=No
     secrets = Secrets({"pw": Secret(PASSWORD, domains=domains)})
     plugins = [
         *browser_plugins(
-            Launch(url=site + path, arguments=("--site-per-process",)),
-            observe=Observe(
+            Observe(
                 screenshots=Screenshots(
                     trigger=ScreenshotTrigger.EACH_STEP
                     if screenshots
                     else ScreenshotTrigger.ON_REQUEST
                 )
             ),
-            secrets=secrets,
+            secrets,
+            browser=Launch(url=site + path, arguments=("--site-per-process",)),
         ),
         _Hold(holder),
         Approvals(default=PolicyDecision.ALLOW),

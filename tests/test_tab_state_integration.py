@@ -109,7 +109,7 @@ async def test_navigate_can_open_the_url_in_a_new_tab(icon_site):
     agent = Agent(
         model=model,
         plugins=[
-            *browser_plugins(Launch(url=icon_site + "/inline")),
+            *browser_plugins(browser=Launch(url=icon_site + "/inline")),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

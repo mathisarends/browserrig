@@ -785,7 +785,7 @@ async def test_native_stream_forwards_custom_events_and_browser_readiness_withou
 def test_recipe_can_omit_local_file_tools():
     assert not any(
         isinstance(plugin, (FileTools, UploadTools))
-        for plugin in browser_plugins(local_files=False)
+        for plugin in browser_plugins(without=(FileTools, UploadTools))
     )
 
 
