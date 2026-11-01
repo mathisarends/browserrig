@@ -4,7 +4,7 @@
 
 ## Development
 
-Development tools require Python >=3.12, uv, and Node.js >=24.
+Development tools require Python >=3.12, uv, Node.js >=24, and pnpm 12.14.0.
 Python sources live in `browserrig/`.
 
 Keep public entry points before private helpers in modules, and public methods before
@@ -14,7 +14,7 @@ Apply this order to production code, tests and examples.
 
 ```powershell
 uv sync --locked --extra openai
-npm.cmd ci
+pnpm.cmd install --frozen-lockfile
 uv run prek install --overwrite
 uv run prek run --all-files
 
@@ -22,24 +22,24 @@ uv run ruff check browserrig examples tests
 uv run ruff format --check browserrig examples tests
 uv run pylint browserrig examples tests
 uv run ty check
-npm.cmd run lint
-npm.cmd run format:check
+pnpm.cmd run lint
+pnpm.cmd run format:check
 uv run pytest                  # unit tests only (default)
 uv run pytest -m integration   # real Chrome; `-m ""` runs everything
 uv build
 ```
 
-prek hooks use the uv and npm dependencies pinned in the lockfiles.
+prek hooks use the uv and pnpm dependencies pinned in the lockfiles.
 The existing `.pre-commit-config.yml` configures the checks; `--overwrite` replaces
 any previously installed pre-commit hook.
-On Linux and macOS, use `npm` instead of `npm.cmd` and `cp .env.example .env`
+On Linux and macOS, use `pnpm` instead of `pnpm.cmd` and `cp .env.example .env`
 instead of `Copy-Item`.
 
 JavaScript is checked with ESLint and Prettier: braces for every control block,
 at most two nested blocks, and no nested ternary expressions. Pylint limits Python
 blocks to three nesting levels; Ruff also checks for simplifications. CI runs the
 same lint, formatting, and type checks. To format code, run
-`uv run ruff format browserrig examples tests` and `npm.cmd run format`.
+`uv run ruff format browserrig examples tests` and `pnpm.cmd run format`.
 
 Integration tests require Chrome or Chromium. Set `BROWSERRIG_CHROME` or
 `Launch(executable=...)` to select the executable. Media validation also

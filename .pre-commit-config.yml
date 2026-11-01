@@ -35,13 +35,13 @@ repos:
         require_serial: true
       - id: eslint
         name: ESLint
-        entry: node node_modules/eslint/bin/eslint.js . --max-warnings 0
+        entry: pnpm run lint
         language: system
-        files: '(\.(js|mjs)$|^package(-lock)?\.json$)'
+        files: '(\.(js|mjs)$|^package\.json$|^pnpm-lock\.yaml$)'
         pass_filenames: false
       - id: prettier
         name: JavaScript format
-        entry: node node_modules/prettier/bin/prettier.cjs --check browserrig/**/*.js *.mjs
+        entry: pnpm run format:check
         language: system
-        files: '(\.(js|mjs)$|^\.prettier(rc\.json|ignore)$|^package(-lock)?\.json$)'
+        files: '(\.(js|mjs)$|^\.prettier(rc\.json|ignore)$|^package\.json$|^pnpm-lock\.yaml$)'
         pass_filenames: false
