@@ -22,6 +22,7 @@ class Redactor:
 
     def __init__(self) -> None:
         self._names: dict[str, str] = {}
+        self._variants: set[str] = set()
         self._pattern: re.Pattern[str] | None = None
 
     def __bool__(self) -> bool:
@@ -41,12 +42,13 @@ class Redactor:
         added = False
         for variant in variants:
             key = variant.casefold()
-            if key not in self._names:
-                self._names[key] = name
+            self._names.setdefault(key, name)
+            if variant not in self._variants:
+                self._variants.update((variant, key))
                 added = True
         if added:
             # Longest first, so a value never leaves the tail of a longer one visible.
-            ordered = sorted(self._names, key=len, reverse=True)
+            ordered = sorted(self._variants, key=len, reverse=True)
             self._pattern = re.compile(
                 "|".join(re.escape(variant) for variant in ordered), re.IGNORECASE
             )
