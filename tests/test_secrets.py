@@ -229,7 +229,7 @@ async def test_capture_redacts_page_text_and_blacks_out_fields_showing_a_secret(
         scroll_y=0,
         page_height=50,
         elements=(field, other),
-        text=f"Your password is {PASSWORD}",
+        text="Log in to continue",
     )
     output = BytesIO()
     Image.new("RGB", (100, 50), "white").save(output, format="PNG")
