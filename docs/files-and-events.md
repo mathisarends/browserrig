@@ -83,7 +83,8 @@ reader support explicitly.
 
 `max_file_bytes` defaults to 50 MB for document parser inputs and writes; plain
 text reads stream beyond that size. `max_expanded_bytes` defaults to 200 MB and
-`max_archive_depth` to 8. Exceeding a processing bound raises an explicit error.
+covers both expanded document inputs and the UTF-8 extraction saved to the cache.
+`max_archive_depth` defaults to 8. Exceeding a processing bound raises an explicit error.
 Very large or sparse XLSX sheets expose a bounded initial view with a limitation
 and support targeted `cell_range` reads elsewhere in the sheet. These processing
 bounds are separate from response pagination.
