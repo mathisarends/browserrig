@@ -351,13 +351,26 @@ async def test_active_downloads_can_finish_during_the_shared_wait():
         assert report.status == "ready" and browser.downloads.await_count == 2
 
 
-async def test_successive_checks_share_the_remaining_budget_until_observation():
+async def test_successive_checks_share_the_remaining_budget_until_observation(
+    monkeypatch,
+):
     budgets = []
+    elapsed = 0.0
+    loop = asyncio.get_running_loop()
+
+    def monotonic():
+        return loop.time() + elapsed
+
+    # Python 3.12 on Windows can report zero duration for an immediate probe.
+    # Account for controlled probe time without depending on clock resolution.
+    monkeypatch.setattr(wait_module, "monotonic", monotonic)
 
     class RecordBudget(Plugin):
         @hook(CheckReadiness)
         async def check(self, event: CheckReadiness, next_: Next[ReadinessCheck]):
+            nonlocal elapsed
             budgets.append(event.context.remaining)
+            elapsed += 0.25
             return await next_()
 
     holder = {}
