@@ -53,6 +53,7 @@ class Tabs:
         self._tabs: dict[TargetId, Tab] = {}
         self._active = ""
         self._context: str | None = None
+        self._target_context: str | None = None
         self._sessions: dict[str, str] = {}
         self._closed_targets: set[TargetId] = set()
         self._worlds = Worlds()
@@ -187,6 +188,10 @@ class Tabs:
     async def _create_context(self) -> None:
         options = self._options
         if options.target_id is not None:
+            target = await self.client.target.get_target_info(
+                target_id=options.target_id
+            )
+            self._target_context = target.target_info.browser_context_id
             return
         assert self._stack is not None
         context = await self.client.target.create_browser_context(
@@ -199,7 +204,7 @@ class Tabs:
 
     async def _create(self, url: str) -> Tab:
         result = await self.client.target.create_target(
-            url=url, browser_context_id=self._context
+            url=url, browser_context_id=self._context or self._target_context
         )
         return await self._attach(result.target_id, opened=True)
 
