@@ -16,7 +16,23 @@ flowchart LR
 
 ## Quick start
 
-From a checkout (Python 3.12+, uv, and Chrome required):
+Python 3.12+ and Chrome or Chromium are required. Install the package with the
+provider extra you need:
+
+```sh
+python -m pip install "browserrig[openai]"
+```
+
+Set `OPENAI_API_KEY` in your environment, save the Python example below as
+`agent.py`, and run `python agent.py`. The `anthropic`, `mcp`, and `otel` extras
+enable the corresponding Harnessed integrations. For direct browser access
+without a model provider, install `browserrig` without an extra.
+
+The base installation includes document readers and local CPU OCR, including
+ONNX Runtime and OpenCV. These native dependencies make the installation larger
+than the wheel for Browserrig itself.
+
+To run the examples from a source checkout instead (uv required):
 
 ```powershell
 uv sync --locked --extra openai
@@ -34,7 +50,9 @@ The example explores the Voyager missions. Use `--url` and `--task` to change th
 ```python
 import asyncio
 
+from harnessed import PolicyDecision
 from harnessed.models.pydantic_ai import PydanticAIModel
+from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
@@ -48,6 +66,7 @@ async def main():
         model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
         browser=Launch(url="https://en.wikipedia.org/wiki/Voyager_program", headless=False),
         plugins=[
+            Approvals(default=PolicyDecision.ALLOW),
             Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
             ImageContext(UntilCompaction()),
             ContextCompaction(trigger=WindowRatio(0.8)),
@@ -64,22 +83,42 @@ asyncio.run(main())
 
 Install the `openai` extra and set `OPENAI_API_KEY` as in the quick start. The example captures a screenshot at each model step, keeps images until their steps are compacted, and summarizes older context when the model window reaches 80% (or at 100,000 tokens when its size is unknown). The session also carries application context across the task.
 
+This example explicitly permits tool actions with `Approvals(default=PolicyDecision.ALLOW)`.
+By default, actions with side effects require approval. Configure an approval
+handler with `Approvals(approver=...)` when your application should ask before
+acting; without a handler or an explicit allow policy, those actions are rejected.
+
 Plugins replace matching defaults in place or add new capabilities; `without=(...)` removes defaults. By default, `InputPacing` moves the pointer and types at a person's pace, while `InputVisualization` stages actions for viewers through events such as cursor movement, highlights and browser UI. To run without that pacing and presentation, add `without=(InputPacing, InputVisualization)` to `Agent` (import both from `browserrig`). They can also be configured independently.
 
-Sessions support streaming events, pausing, steering and resuming a running task. See the [agent guide](docs/agent-guide.md) and [browser composition](docs/browser-composition.md) for controls, context policies and extension points. For direct browser access or connecting to an existing Chrome instance, see [browser interaction](docs/browser-interaction.md).
+Sessions support streaming events, pausing, steering and resuming a running task. See the [agent guide](https://github.com/mathisarends/browserrig/blob/main/docs/agent-guide.md) and [browser composition](https://github.com/mathisarends/browserrig/blob/main/docs/browser-composition.md) for controls, context policies and extension points. For direct browser access or connecting to an existing Chrome instance, see [browser interaction](https://github.com/mathisarends/browserrig/blob/main/docs/browser-interaction.md).
 
 Mount `plugins=[Done()]` to opt into [explicit completion and structured final
-answers](docs/agent-guide.md#explicit-completion-and-output-formats). Without it,
+answers](https://github.com/mathisarends/browserrig/blob/main/docs/agent-guide.md#explicit-completion-and-output-formats). Without it,
 ordinary text responses retain Harnessed's default completion behavior.
+
+## Release status
+
+Browserrig is an early 0.x release; public APIs may change between minor versions.
+CI covers Python 3.12–3.14 on Windows and Linux, with real Chrome integration tests
+on Linux. macOS is not covered by CI; select Chrome explicitly with
+`Launch(executable=...)` or `BROWSERRIG_CHROME` there.
+
+Perspective-transformed frames and recovery from browser process crashes remain
+limitations. See the [changelog](https://github.com/mathisarends/browserrig/blob/main/CHANGELOG.md)
+for release notes.
 
 ## Documentation
 
 | Guide | Contents |
 | --- | --- |
-| [Agent guide](docs/agent-guide.md) | Setup, action chains, prompts, sessions and controls |
-| [Browser interaction](docs/browser-interaction.md) | Direct access, observations, input and page content |
-| [Files and events](docs/files-and-events.md) | Downloads, workspace, file readers and event streams |
-| [Browser composition](docs/browser-composition.md) | Configure and compose browser plugins |
-| [Telemetry](docs/telemetry.md) | Local traces, configuration and troubleshooting |
-| [Development](docs/development.md) | Setup, checks, tests and project status |
-| [Harnessed telemetry feedback](docs/harnessed-telemetry-feedback.md) | Integration findings |
+| [Agent guide](https://github.com/mathisarends/browserrig/blob/main/docs/agent-guide.md) | Setup, action chains, prompts, sessions and controls |
+| [Browser interaction](https://github.com/mathisarends/browserrig/blob/main/docs/browser-interaction.md) | Direct access, observations, input and page content |
+| [Files and events](https://github.com/mathisarends/browserrig/blob/main/docs/files-and-events.md) | Downloads, workspace, file readers and event streams |
+| [Browser composition](https://github.com/mathisarends/browserrig/blob/main/docs/browser-composition.md) | Configure and compose browser plugins |
+| [Telemetry](https://github.com/mathisarends/browserrig/blob/main/docs/telemetry.md) | Local traces, configuration and troubleshooting |
+| [Development](https://github.com/mathisarends/browserrig/blob/main/docs/development.md) | Setup, checks, tests and project status |
+| [Harnessed telemetry feedback](https://github.com/mathisarends/browserrig/blob/main/docs/harnessed-telemetry-feedback.md) | Integration findings |
+
+## License
+
+[MIT](https://github.com/mathisarends/browserrig/blob/main/LICENSE).
