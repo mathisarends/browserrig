@@ -396,11 +396,9 @@ def _odf_row_text(
     yield f"### Row {number}\n\n"
     if row.getAttribute("visibility") in {"collapse", "filter"}:
         yield "Hidden row (included).\n\n"
-    yield "".join(
-        f"{get_column_letter(column)}{number}: {value}\n\n"
-        for column, value in enumerate(cells, 1)
-        if left <= column <= right and value
-    )
+    for column, value in enumerate(cells, 1):
+        if left <= column <= right and value:
+            yield f"{get_column_letter(column)}{number}: {value}\n\n"
 
 
 def _odf_values(table, bounds: tuple[int, int, int, int]) -> Iterator[str]:

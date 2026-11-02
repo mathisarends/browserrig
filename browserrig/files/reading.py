@@ -6,6 +6,7 @@ import tarfile
 from dataclasses import asdict, replace
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import IO
 from zipfile import ZipFile, is_zipfile
 
 from . import containers
@@ -39,7 +40,7 @@ _UNSUPPORTED = {
     Ext.EXE,
     Ext.DLL,
 }
-_CACHE_VERSION = 3
+_CACHE_VERSION = 4
 
 
 class FileReader:
@@ -169,11 +170,19 @@ class FileReader:
             ) as stream:
                 temporary = Path(stream.name)
                 for block in details.blocks:
-                    stream.write(block)
+                    _write_block(stream.file, block, self.options.max_expanded_bytes)
                 if details.limitations:
-                    stream.write("\n\n> Extraction limitations:\n")
+                    _write_block(
+                        stream.file,
+                        "\n\n> Extraction limitations:\n",
+                        self.options.max_expanded_bytes,
+                    )
                     for item in dict.fromkeys(details.limitations):
-                        stream.write(f"> - {item}\n")
+                        _write_block(
+                            stream.file,
+                            f"> - {item}\n",
+                            self.options.max_expanded_bytes,
+                        )
             after = path.stat()
             if (before.st_size, before.st_mtime_ns) != (
                 after.st_size,
@@ -274,6 +283,12 @@ class FileReader:
         if not re.fullmatch(r"\.[a-zA-Z0-9]{1,12}", suffix):
             suffix = ""
         return self._cache_path(f"{key}.source{suffix}")
+
+
+def _write_block(stream: IO[str], block: str, limit: int) -> None:
+    if stream.tell() + len(block.encode("utf-8")) > limit:
+        raise ValueError("Extracted content exceeds max_expanded_bytes")
+    stream.write(block)
 
 
 def _format(path: Path, sample: bytes) -> str:
