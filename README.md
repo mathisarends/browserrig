@@ -27,21 +27,46 @@ uv run --env-file .env --extra openai python -m examples.openai_agent --headed
 
 The example explores the Voyager missions. Use `--url` and `--task` to change the starting page and mission, `OPENAI_MODEL` to select a model, and `--quiet` to suppress streamed events. Add `--done` to allow standalone progress messages and require an explicit completion tool before the final answer. The final answer goes to stdout. Tests use scripted models and need no API key.
 
-## Use from Python
+## Compose an agent
+
+`Agent` is a browser-ready [Harnessed](https://github.com/mathisarends/harnessed) agent. Its plugins bring together page observations, tools, context management and the choreography of browser input. Configure the pieces you need while keeping the rest of the default kit:
 
 ```python
-from browserrig import ChromeBrowser, Launch, wait_for_page
-from browserrig.scripts import PAGE_FACTS
+import asyncio
 
-async with ChromeBrowser(Launch(url="https://example.com")) as browser:
-    tab = browser.active_tab
-    await wait_for_page(tab)
-    frame = await tab.main_frame()
-    facts = await frame.run(PAGE_FACTS)
-    print(facts.title)
+from harnessed.models.pydantic_ai import PydanticAIModel
+from pydantic_ai.models.openai import OpenAIResponsesModel
+
+from browserrig import (
+    Agent, ContextCompaction, ImageContext, Launch, Observe,
+    Screenshots, ScreenshotTrigger, UntilCompaction, WindowRatio,
+)
+
+
+async def main():
+    agent = Agent(
+        model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
+        browser=Launch(url="https://en.wikipedia.org/wiki/Voyager_program", headless=False),
+        plugins=[
+            Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+            ImageContext(UntilCompaction()),
+            ContextCompaction(trigger=WindowRatio(0.8)),
+        ],
+    )
+    async with agent.session() as session:
+        await session.context.set("constraints", "Include source URLs.")
+        result = await session.run("Compare the Voyager missions.", max_steps=20)
+        print(result.text)
+
+
+asyncio.run(main())
 ```
 
-For an LLM-powered agent, see the [agent guide](docs/agent-guide.md#browseragent). For connecting to an existing browser and controlling pages directly, see [browser interaction](docs/browser-interaction.md).
+Install the `openai` extra and set `OPENAI_API_KEY` as in the quick start. The example captures a screenshot at each model step, keeps images until their steps are compacted, and summarizes older context when the model window reaches 80% (or at 100,000 tokens when its size is unknown). The session also carries application context across the task.
+
+Plugins replace matching defaults in place or add new capabilities; `without=(...)` removes defaults. By default, `InputPacing` moves the pointer and types at a person's pace, while `InputVisualization` stages actions for viewers through events such as cursor movement, highlights and browser UI. To run without that pacing and presentation, add `without=(InputPacing, InputVisualization)` to `Agent` (import both from `browserrig`). They can also be configured independently.
+
+Sessions support streaming events, pausing, steering and resuming a running task. See the [agent guide](docs/agent-guide.md) and [browser composition](docs/browser-composition.md) for controls, context policies and extension points. For direct browser access or connecting to an existing Chrome instance, see [browser interaction](docs/browser-interaction.md).
 
 Mount `plugins=[Done()]` to opt into [explicit completion and structured final
 answers](docs/agent-guide.md#explicit-completion-and-output-formats). Without it,
