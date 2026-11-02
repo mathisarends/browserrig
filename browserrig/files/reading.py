@@ -69,6 +69,8 @@ class FileReader:
         with path.open("rb") as stream:
             sample = stream.read(65536)
         format_ = _format(path, sample)
+        if format_ in READERS and path.stat().st_size > self.options.max_file_bytes:
+            raise ValueError("File exceeds max_file_bytes for document parsing")
         if request.member is not None:
             return self._read_member(
                 path, format_, request, offset=offset, max_chars=max_chars, depth=depth
@@ -99,8 +101,6 @@ class FileReader:
                 offset,
                 max_chars,
             )
-        if path.stat().st_size > self.options.max_file_bytes:
-            raise ValueError("File exceeds max_file_bytes for document parsing")
         key = self._key(path, request)
         content_path = self._cache_path(f"{key}.md")
         metadata_path = self._cache_path(f"{key}.json")
