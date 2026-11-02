@@ -4,15 +4,20 @@ Agent accepts Harnessed's tracer directly through plugins; no Browserrig
 tracer or global provider is needed. Imports stay lazy for runs without --trace.
 """
 
+from __future__ import annotations
+
 # Optional imports intentionally happen only when tracing is enabled.
 # pylint: disable=import-outside-toplevel
-
 import argparse
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
 
 from harnessed.kernel import PluginLike
+
+if TYPE_CHECKING:
+    from harnessed.integrations.opentelemetry import ContentCapture, TraceContentFilter
 
 
 def _positive_int(value: str) -> int:
@@ -43,8 +48,9 @@ def add_tracing_arguments(parser: argparse.ArgumentParser) -> None:
 async def tracing_plugins(
     *,
     enabled: bool = False,
-    capture_content: bool = False,
+    capture_content: bool | ContentCapture = False,
     max_content_length: int = 16_384,
+    content_filter: TraceContentFilter | None = None,
 ) -> AsyncIterator[list[PluginLike]]:
     if not enabled and not capture_content:
         yield []
@@ -80,5 +86,6 @@ async def tracing_plugins(
                 tracer_provider=provider,
                 capture_content=capture_content,
                 max_content_length=max_content_length,
+                content_filter=content_filter,
             )
         ]

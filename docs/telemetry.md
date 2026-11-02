@@ -1,6 +1,6 @@
 # Telemetry: local agent traces with Docker
 
-Browserrig uses Harnessed 0.7.0's native `OpenTelemetryTracer`. Phoenix displays
+Browserrig uses Harnessed 0.11.0's native `OpenTelemetryTracer`. Phoenix displays
 the agent's turns, model requests, tool calls, timing, outcomes and available
 usage counters. Enable content capture to inspect what each model and tool
 receives and returns.
@@ -122,8 +122,9 @@ Harnessed plugin directly; `Agent` needs no telemetry-specific argument:
 
 ```python
 import asyncio
+import os
 
-from harnessed.integrations.opentelemetry import OpenTelemetryTracer
+from harnessed.integrations.opentelemetry import ContentCapture, OpenTelemetryTracer
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -145,7 +146,7 @@ async def run_traced(model):
         )))
         agent = Agent(model=model, plugins=[OpenTelemetryTracer(
             tracer_provider=provider,
-            capture_content=True,
+            capture_content=ContentCapture.redacted(os.environ["OPENAI_API_KEY"]),
             max_content_length=16_384,
         )])
         async with agent.session() as session:
@@ -159,6 +160,46 @@ into a backend, and shut it down once after its active sessions close. Do not
 flush after every model call or shut down a shared provider per session. The
 examples keep this startup/cleanup code in `examples/telemetry.py`; Browserrig
 does not install a global provider or add a second tracer abstraction.
+
+### Redaction and application filtering
+
+`ContentCapture.redacted(*secrets)` accepts literal strings and wrappers such as
+Pydantic `SecretStr`. Registered values are masked in model inputs/outputs, tool
+arguments/results and subsequent history before truncation. Execution and session
+history retain their original values. Exception messages remain disabled unless
+`include_exception_messages=True`; `capture_content=True` retains the existing plain
+opt-in, including exception text. CLI `--trace-content` uses that boolean behavior.
+Register credentials explicitly: Harnessed does not scan the environment or
+Browserrig's `Secrets` plugin. Recreate policies when credentials rotate; encoded
+values and unregistered secrets require application rules.
+
+The shared example helper also accepts the native policy and a synchronous
+`content_filter`. For example, omit a tool's result field:
+
+```python
+from harnessed.integrations.opentelemetry import (
+    ContentCapture, TraceContentKind,
+)
+from examples.telemetry import tracing_plugins
+
+def filter_content(content):
+    if content.kind is TraceContentKind.TOOL_RESULT and content.tool_name == "read_file":
+        return None
+    return content
+
+async with tracing_plugins(
+    capture_content=ContentCapture.redacted(token),
+    content_filter=filter_content,
+) as telemetry:
+    agent = Agent(model=model, plugins=telemetry)
+    await agent.run("Inspect the page.")
+```
+
+Filters receive detached `TraceContent` values and may return a replacement or
+`None` to omit the field. Registered literals are masked in replacements too.
+Tool results can also appear in model history, so apply corresponding model-input
+rules when omitting a value everywhere. Failed filters omit content with a marker
+and preserve the agent outcome. Optional OTel imports remain lazy when tracing is off.
 
 ## Stop, retain data and troubleshoot
 
@@ -184,7 +225,7 @@ the trace database.**
 
 ## References
 
-- [Harnessed 0.7.0 tracing guide](https://github.com/mathisarends/harnessed/blob/v0.7.0/docs/guides/tracing.md)
+- [Harnessed 0.11.0 tracing guide](https://github.com/mathisarends/harnessed/blob/v0.11.0/docs/guides/tracing.md)
 - [Phoenix Docker and persistent SQLite setup](https://arize.com/docs/phoenix/self-hosting/deployment-options/docker)
 - [Phoenix 21 release notes](https://github.com/Arize-ai/phoenix/releases/tag/arize-phoenix-v21.0.0)
 - [Integration feedback collected for Harnessed](harnessed-telemetry-feedback.md)

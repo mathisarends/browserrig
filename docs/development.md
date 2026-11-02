@@ -58,12 +58,14 @@ Before publishing, run the checks above and the Chrome integration suite, review
 ## Harnessed compatibility
 
 The opt-in `Done` plugin uses native hooks for continuation and tool execution.
-Harnessed 0.10.0 has no output-policy hook, so `browserrig/completion.py` contains
+Harnessed 0.11.0 has no output-policy hook, so `browserrig/completion.py` contains
 one reversible, per-session bridge around the step runner's output handler. This
 defers the declared output contract until finalization without changing the model
 or session APIs. When upgrading Harnessed, verify that bridge with
 `tests/test_completion.py`, including native/tool structured output, retries,
 limits, streaming, and runtime removal.
+`tests/test_session_store.py` also checks reopening a paused `Done` turn with
+`restore_outputs`, retained image assets and Browserrig's custom durable events.
 
 ## Project status
 

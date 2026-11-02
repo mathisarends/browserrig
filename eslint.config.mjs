@@ -8,6 +8,7 @@ export default defineConfig([
       '.venv/**',
       '.pytest_cache/**',
       '.ruff_cache/**',
+      '.uv-cache/**',
       '.browserrig/**',
       '**/__pycache__/**',
       'build/**',

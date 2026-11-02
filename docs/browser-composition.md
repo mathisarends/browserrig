@@ -2,7 +2,7 @@
 
 Harnessed `Agent` is the composition root. Browserrig plugins own session state,
 tools and hooks; ordinary Python strategies implement capture, rendering,
-readiness and action-chain decisions. Browserrig targets Harnessed 0.10.0.
+readiness and action-chain decisions. Browserrig targets Harnessed 0.11.0.
 
 ## A browser agent with screenshots
 
@@ -78,9 +78,9 @@ and manual replay. A new browser session obtains fresh state before acting.
 
 DOM text, a fixed screenshot caption and image form one native multimodal
 `Observation(content=..., refs=(snapshot.id,))`. Harnessed stores inline images as
-session-owned `ImageReference` assets before recording. JSONL stores the references;
-binary image data lives under `<session-id>.assets/` and is resolved only for
-selected provider requests. Keep that directory with the history when backing it up.
+session-owned `ImageReference` assets before recording. Conversation snapshots and
+persistent execution checkpoints include the retained image bytes; the JSON codec
+encodes them as Base64. Images resolve only for selected provider requests.
 
 Text observations remain unchanged in history until native compaction removes
 their steps. `browser_plugins()` does not install `LatestObservationOnly()`.

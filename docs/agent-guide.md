@@ -110,6 +110,22 @@ remains available when a resolved flat list is needed. With that API, pass
 import `PluginOrder` and `SystemPrompt` from `harnessed`.
 Individual capabilities such as `Chrome`, `Readiness`, `Observe`, `Actions`, tool
 plugins, `Nudges`, `Activity`, and `TerminalEvents` are also available directly.
+`browser_plugins()` uses Harnessed's public `Kit.resolve()` with
+`KitPromptPolicy.OMIT`, omitting kit prompt strategies recursively while retaining
+selected plugins' instructions and explicit `PromptRenderer` recipes. To inspect
+the original kit's provenance before flattening:
+
+```python
+from harnessed import KitPromptPolicy
+
+resolved = browser.resolve(prompt=KitPromptPolicy.INCLUDE)
+print(resolved.description)
+```
+
+`resolved.plugins` is a flat tuple. Its separate `description` retains kit paths,
+replacements and removals; passing the original kit to `Agent` preserves those
+scopes in the agent's own description.
+
 See [composing browser agents](browser-composition.md) for the explicit plugin API:
 `Readiness(initial=..., ongoing=...)`, `Observe(capture=..., renderer=...,
 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` and
@@ -326,7 +342,7 @@ with the synchronous method above. Existing state-format 1 conversation snapshot
 and version 3 audit envelopes remain compatible.
 
 Install the optional MCP client with `uv sync --locked --extra openai --extra mcp`.
-All Harnessed extras are pinned to **0.10.0**. Add MCP servers through the native plugin:
+All Harnessed extras are pinned to **0.11.0**. Add MCP servers through the native plugin:
 
 ```python
 from harnessed.plugins.mcp import MCP
@@ -339,7 +355,7 @@ agent = Agent(
 `MCP.stdio("catalog", command=..., args=[...])` starts a local server instead.
 Connections belong to each session, tool names are prefixed (for example
 `catalog__search`), and existing approval policies apply. See the
-[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.10.0/docs/guides/mcp.md).
+[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.11.0/docs/guides/mcp.md).
 
 Harnessed closes failed MCP transports, hides their tools, wakes pending
 calls and drains owned tasks. Failed operations are not retried automatically;
@@ -376,7 +392,55 @@ For standalone kernel compositions, call `await ctx.settle()` followed by
 
 ## Saving and restoring sessions
 
-Harnessed 0.8.0 replaces session stores with an explicit `SessionState`. Save
+Sessions stay in memory by default. To save conversations automatically and
+reopen them by application-owned ID, configure Harnessed 0.11.0's native store:
+
+```python
+from pathlib import Path
+from harnessed.integrations.json import JsonSessionStore
+from browserrig import Agent, FileSystemOptions, Launch
+
+agent = Agent(
+    model=model,
+    store=JsonSessionStore(root=Path(".browserrig/sessions")),
+    browser=Launch(files=FileSystemOptions(directory=Path(".browserrig/workspace"))),
+)
+async with agent.session(id="voyager") as session:
+    await session.run("Find the Voyager launch dates.", max_steps=20)
+
+# A later request or process can open the same conversation.
+async with agent.session(id="voyager") as session:
+    result = await session.run("Compare their trajectories.", max_steps=20)
+```
+
+`JsonSessionStore` ships in the base package. Storage is opt-in; no session files
+are written without a configured store, and `session(id=...)` requires one.
+An awaited run commits its terminal state, `await session.flush()` commits pending
+state, and closing drains the writer. Each reopened session creates fresh browser
+connections and plugin state. Browser tabs, DOM refs, JavaScript locks, handoff
+callbacks and pending Python handles are not restored. Reuse a workspace directory
+when files and downloads must survive closure; those files are separate from the
+checkpoint. Run `uv run python -m examples.session_store` for a local smoke example.
+
+An application-owned repository can implement `SessionStore` from
+`harnessed.sessions`. `save_session(id, commit, expected_revision=...)` receives a
+typed `SessionCommit`: atomically save `commit.checkpoint` and any domain message
+projections of its ordered `commit.changes`. Load with
+`StoredSession(checkpoint, revision)`. Changes include new durable Browserrig events;
+live token deltas and input animations remain transient. The bundled JSON store
+keeps the current checkpoint, not a complete message archive. Applications own
+store lifetime and coordinate execution per conversation; revision checks prevent
+lost updates but cannot prevent duplicate external browser actions.
+
+A deliberately paused stored session remains paused after closing and reopening.
+Use `agent.session(id=..., restore_outputs=[YourOutputType])` before calling
+`resume()` for pending structured work, including `Done()` finalization. Validators
+and the same event-declaring plugins must be configured again. After an unexpected
+interruption, Harnessed repairs incomplete work without replaying external tool
+actions. A reopened browser still starts fresh; persistence does not restore the
+previous page or its interaction state.
+
+Explicit `SessionState` continuation remains available without a store. Save
 `result.state`, or `session.snapshot()` between turns, and pass it back to `run` or
 `session`:
 
@@ -395,8 +459,12 @@ The state holds the conversation, including the screenshot bytes it still
 references; `session.assets.read(ref)` retrieves them. It holds no browser, plugin
 state or event log: a restored session launches a fresh browser, and queued hints,
 the JavaScript lock after secret entry, and activity intervals start empty.
-`session_directory` and the JSONL stores of Harnessed 0.7.0 are gone; existing
-`.browserrig/sessions*` directories are left untouched and are not migrated.
+Conversation snapshots retain format **1**; execution checkpoints and JSON store
+envelopes use format **2**. Old JSONL stores, raw `SessionState` JSON and unreleased
+format-1 checkpoints cannot be opened as new store files. Keep legacy data separate;
+there is no automatic migration. See the
+[Harnessed sessions guide](https://github.com/mathisarends/harnessed/blob/v0.11.0/docs/guides/sessions.md)
+for atomic repository adapters, recovery and storage details.
 
 Custom models expose immutable `GenerationSettings` from `harnessed.models`.
 Pass per-turn overrides with `session.run(..., settings=GenerationSettings(...))`;
