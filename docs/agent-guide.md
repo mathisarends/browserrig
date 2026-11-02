@@ -417,7 +417,7 @@ async with agent.session(id="voyager") as session:
 are written without a configured store, and `session(id=...)` requires one.
 An awaited run commits its terminal state, `await session.flush()` commits pending
 state, and closing drains the writer. Each reopened session creates fresh browser
-connections and plugin state. Browser tabs, DOM refs, JavaScript locks, handoff
+connections and plugin state. Browser tabs, DOM refs, handoff
 callbacks and pending Python handles are not restored. Reuse a workspace directory
 when files and downloads must survive closure; those files are separate from the
 checkpoint. Run `uv run python -m examples.session_store` for a local smoke example.
@@ -457,8 +457,9 @@ result = await agent.run(
 
 The state holds the conversation, including the screenshot bytes it still
 references; `session.assets.read(ref)` retrieves them. It holds no browser, plugin
-state or event log: a restored session launches a fresh browser, and queued hints,
-the JavaScript lock after secret entry, and activity intervals start empty.
+state or event log: a restored session launches a fresh browser, and queued hints
+and activity intervals start empty. JavaScript tools remain blocked whenever
+the restored agent is configured with secrets.
 Conversation snapshots retain format **1**; execution checkpoints and JSON store
 envelopes use format **2**. Old JSONL stores, raw `SessionState` JSON and unreleased
 format-1 checkpoints cannot be opened as new store files. Keep legacy data separate;

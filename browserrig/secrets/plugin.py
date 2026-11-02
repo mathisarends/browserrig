@@ -60,7 +60,7 @@ _INSTRUCTIONS = Instructions(
         "value. Observations list the secrets available on the current page. A secret "
         "works only on its own sites, other tools reject placeholders, and page content "
         "shows typed secrets as their placeholder. JavaScript execution is unavailable "
-        "after a secret was entered."
+        "while secrets are configured."
     ),
 )
 
@@ -209,8 +209,6 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
         Returns whether every part entered what was asked. Secrets are always typed
         exactly, so only the plain text around them can keep a slip.
         """
-        # The page may keep the value beyond the field, so mark the session before typing.
-        self._state.entered = True
         await self._events.emit(
             SecretEnteredEvent(
                 names=entry.names,
@@ -249,9 +247,9 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
             return ToolResult.error(
                 "Secret placeholders work only in the text of type_text or send_keys."
             )
-        if self._state.entered and _runs_javascript(call.name, event.tool):
+        if self._secrets and _runs_javascript(call.name, event.tool):
             return ToolResult.error(
-                "JavaScript execution is unavailable after a secret was entered in this session."
+                "JavaScript execution is unavailable while secrets are configured."
             )
         return self._redact_result(await next_())
 

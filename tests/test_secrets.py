@@ -349,7 +349,7 @@ async def test_placeholders_are_rejected_outside_typing_tools():
     assert "navigated to" not in reply
 
 
-async def test_javascript_is_blocked_once_a_secret_was_entered(monkeypatch):
+async def test_javascript_is_blocked_before_and_after_secret_entry(monkeypatch):
     monkeypatch.setattr(keyboard_module.asyncio, "sleep", AsyncMock())
     entered = False
 
@@ -381,7 +381,7 @@ async def test_javascript_is_blocked_once_a_secret_was_entered(monkeypatch):
     result = await agent.run("go", max_steps=5)
     assert entered
     replies = repr(model.requests[-1].messages)
-    assert "ran 1" in replies and "ran 2" not in replies
+    assert "ran 1" not in replies and "ran 2" not in replies
     assert "JavaScript execution is unavailable" in replies
     events = [event for event in result.events if isinstance(event, SecretEnteredEvent)]
     assert [(event.names, event.origin) for event in events] == [
