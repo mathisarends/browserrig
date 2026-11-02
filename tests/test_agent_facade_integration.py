@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 import pytest
 from harnessed import Context, Inject, Plugin, PolicyDecision, SessionState
 from harnessed.events import TextDeltaEvent, ToolCallFinishedEvent, TurnFinishedEvent
+from harnessed.integrations.json import JsonSessionStore
 from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
@@ -15,7 +16,10 @@ from browserrig.kinds import ActivityKind
 pytestmark = pytest.mark.integration
 
 
-async def test_facade_restores_saved_state_and_owns_a_fresh_browser_per_session(site):
+@pytest.mark.parametrize("persistent", [False, True])
+async def test_facade_restores_saved_state_and_owns_a_fresh_browser_per_session(
+    site, tmp_path, persistent
+):
     browsers = []
 
     class Access(Plugin, needs=(Browser,)):
@@ -23,13 +27,21 @@ async def test_facade_restores_saved_state_and_owns_a_fresh_browser_per_session(
             browsers.append(browser)
 
     model = ScriptedModel(["First answer", "Restored answer"])
-    agent = Agent(model=model, browser=Launch(url=site), plugins=[Access()])
-    async with agent.session() as session:
+    agent = Agent(
+        model=model,
+        browser=Launch(url=site),
+        plugins=[Access()],
+        store=JsonSessionStore(root=tmp_path / "sessions") if persistent else None,
+    )
+    async with agent.session(id="browser" if persistent else None) as session:
         first = await session.run("Remember this page")
         assert first.text == "First answer"
         saved = first.state.to_json()
     assert not browsers[0].client.is_connected
-    async with agent.session(state=SessionState.from_json(saved)) as session:
+    async with agent.session(
+        id="browser" if persistent else None,
+        state=None if persistent else SessionState.from_json(saved),
+    ) as session:
         second = await session.run("Continue the conversation")
         assert second.text == "Restored answer"
         assert any("First answer" in msg.text for msg in model.requests[-1].messages)

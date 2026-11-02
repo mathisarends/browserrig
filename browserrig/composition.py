@@ -1,8 +1,14 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from harnessed import Kit, Plugin, PluginOrder, PromptFormat, SystemPrompt
-from harnessed.core.composition import compose_plugins
+from harnessed import (
+    Kit,
+    KitPromptPolicy,
+    Plugin,
+    PluginOrder,
+    PromptFormat,
+    SystemPrompt,
+)
 from harnessed.kernel import PluginLike
 from harnessed.plugins import Compaction as ContextCompaction
 from harnessed.plugins import ContextState
@@ -43,8 +49,8 @@ def browser_plugins(
     """
     kit = browser_kit(browser=browser).without(*without)
     # The flat API leaves prompt configuration to its caller.
-    defaults = Kit(kit.name, plugins=kit.plugins)
-    return list(compose_plugins([defaults, *plugins]).plugins)
+    composition = Kit("browserrig.application", plugins=[kit, *plugins])
+    return list(composition.resolve(prompt=KitPromptPolicy.OMIT).plugins)
 
 
 def browser_kit(*, browser: BrowserOptions | None = None) -> Kit:

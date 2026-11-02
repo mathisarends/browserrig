@@ -3,12 +3,14 @@ from harnessed import (
     Agent,
     Instructions,
     Kit,
+    KitPromptPolicy,
     Plugin,
     PluginOrder,
     PromptFormat,
     SystemPrompt,
 )
 from harnessed.errors import ConfigError, PluginConflict
+from harnessed.plugins import PromptRenderer
 from harnessed.testing import ScriptedModel
 
 import browserrig
@@ -21,8 +23,42 @@ from browserrig import (
     Launch,
     Observe,
     browser_kit,
+    browser_plugins,
 )
 from tests.fakes import FakeChrome
+
+
+async def test_flat_plugins_omit_nested_kit_prompts_and_keep_explicit_prompt():
+    extension = Kit("extension", [], prompt=SystemPrompt("Kit-only guidance."))
+    explicit = PromptRenderer(
+        SystemPrompt.from_plugins("Application guidance.", order=PluginOrder.AS_LISTED)
+    )
+    plugins = browser_plugins(
+        extension, explicit, FakeChrome({}), without=(Chrome, FileTools)
+    )
+    agent = Agent(model=ScriptedModel([]), plugins=plugins)
+    async with agent.session() as session:
+        rendered = await session.prompt.render()
+    assert "Application guidance." in rendered
+    assert "Kit-only guidance." not in rendered
+    assert rendered.count("Each observation starts") == 1
+    assert extension.prompt is not None
+
+
+def test_resolved_browser_kit_retains_replacements_and_removal_provenance():
+    observe = Observe(capture=DomCapture(marks=False))
+    kit = Kit("application", [browser_kit().without(FileTools), observe])
+    resolved = kit.resolve(prompt=KitPromptPolicy.OMIT)
+    assert observe in resolved.plugins
+    assert not any(
+        isinstance(item, (FileTools, PromptRenderer)) for item in resolved.plugins
+    )
+    selected = next(
+        item for item in resolved.description.plugins if item.name == "Observe"
+    )
+    assert selected.kit_path == ("application",)
+    assert selected.replaces[0].kit_path == ("application", "browserrig")
+    assert resolved.description.removed[0].plugin.name == "FileTools"
 
 
 def test_facade_reports_kit_origins_replacements_and_exclusions_without_resources(

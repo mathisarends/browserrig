@@ -65,7 +65,7 @@ class Done(Plugin, slot="completion"):
         return SystemPrompt(_INSTRUCTIONS)
 
     async def setup(self, ctx: Context) -> None:
-        # Harnessed 0.10.0 has no output-policy hook. Isolate the per-session bridge
+        # Harnessed 0.11.0 has no output-policy hook. Isolate the per-session bridge
         # here; requests, validation, retries, streaming and limits remain native.
         # pylint: disable=protected-access
         steps = self._session._steps

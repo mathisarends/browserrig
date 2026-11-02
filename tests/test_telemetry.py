@@ -1,6 +1,7 @@
 import asyncio
 import subprocess
 import sys
+from dataclasses import replace
 
 import pytest
 from harnessed import Agent, Plugin, PolicyDecision, tool
@@ -166,3 +167,50 @@ async def test_content_is_bounded_and_batches_flush_when_host_fails(collector):
         assert len(model[f"{direction}.value"]) == 20
         assert model[f"harnessed.{direction}.truncated"] is True
         assert model[f"{direction}.mime_type"] == "text/plain"
+
+
+async def test_redaction_and_application_filter_leave_live_history_intact(collector):
+    from harnessed.integrations.opentelemetry import (  # pylint: disable=import-outside-toplevel
+        ContentCapture,
+        TraceContentKind,
+    )
+    from pydantic import SecretStr  # pylint: disable=import-outside-toplevel
+
+    secret = "credential-12345"
+    seen = []
+
+    def filter_content(content):
+        seen.append(content.kind)
+        if content.kind is TraceContentKind.TOOL_RESULT:
+            return None
+        if content.kind is TraceContentKind.TOOL_ARGUMENTS:
+            return replace(content, value={"replacement": secret})
+        return content
+
+    model = ScriptedModel([call("echo", value=secret), f"Answer: {secret}"])
+    async with tracing_plugins(
+        capture_content=ContentCapture.redacted(SecretStr(secret)),
+        content_filter=filter_content,
+    ) as plugins:
+        result = await Agent(
+            model=model,
+            plugins=[*plugins, Echo(), Approvals(default=PolicyDecision.ALLOW)],
+        ).run(f"Input: {secret}")
+    assert result.text == f"Answer: {secret}"
+    assert any(secret in str(message) for message in model.requests[-1].messages)
+    spans = [
+        span
+        for _, request in collector
+        for resource in request.resource_spans
+        for scope in resource.scope_spans
+        for span in scope.spans
+    ]
+    assert spans and secret not in str(spans)
+    tool_attributes = _attributes(
+        next(span for span in spans if span.name == "harnessed.tool").attributes
+    )
+    assert "replacement" in tool_attributes["input.value"]
+    assert "[redacted]" in tool_attributes["input.value"]
+    assert "output.value" not in tool_attributes
+    assert TraceContentKind.MODEL_INPUT in seen
+    assert TraceContentKind.MODEL_OUTPUT in seen

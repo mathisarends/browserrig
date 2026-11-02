@@ -9,6 +9,7 @@ from harnessed import (
 )
 from harnessed.kernel import PluginLike
 from harnessed.models import Model
+from harnessed.sessions import SessionStore
 
 from .browser import BrowserOptions
 from .composition import browser_kit
@@ -21,11 +22,12 @@ class Agent(harnessed.Agent):
 
     `plugins` replace the defaults they match and add the rest, and `without`
     drops defaults by type; see `browser_kit`. Explicit provider clients
-    remain caller-owned. Conversations stay in memory; continue one by passing a
-    saved `SessionState` to `run` or `session`. Long runs summarize older steps
-    once the request fills 80% of the model's context window, or 100k tokens when
-    the model reports none; pass `without=(ContextCompaction,)` to keep everything, or a
-    configured `ContextCompaction`. Input is paced like a person and streamed for people
+    remain caller-owned. Conversations stay in memory by default; pass `store`
+    to reopen them by ID, or continue with an explicit `SessionState`. Long runs
+    summarize older steps once the request fills 80% of the model's context window,
+    or 100k tokens when the model reports none. Pass `without=(ContextCompaction,)`
+    to keep everything, or a configured `ContextCompaction`. Input is paced like a
+    person and streamed for people
     watching; pass `without=(InputPacing, InputVisualization)` to work at full speed unseen.
     """
 
@@ -38,6 +40,7 @@ class Agent(harnessed.Agent):
         without: Iterable[type[Plugin]] = (),
         instructions: str | None = DEFAULT_PROMPT,
         prompt: SystemPrompt | None = None,
+        store: SessionStore | None = None,
         plugin_validation: PluginValidation = PluginValidation.ERROR,
     ) -> None:
         kit = browser_kit(browser=browser)
@@ -47,5 +50,6 @@ class Agent(harnessed.Agent):
             instructions=instructions,
             prompt=prompt,
             plugins=[kit, *plugins],
+            store=store,
             plugin_validation=plugin_validation,
         )

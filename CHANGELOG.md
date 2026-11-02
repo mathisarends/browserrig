@@ -11,6 +11,12 @@ automation and Harnessed browser agents.
 - Download, upload and read workspace files, including document parsing and local OCR.
 - Compose browser capabilities with Harnessed plugins, typed events, session controls,
   telemetry and human handoff.
+- Pin Harnessed and all provider extras to 0.11.0. Accept native `store=` for
+  persistent conversations, paused recovery and atomic application-owned projections.
+- Resolve flat browser plugins through public `Kit.resolve()` with recursive kit
+  prompt omission; expose native provenance inspection through `browser_kit()`.
+- Accept native trace redaction policies and application content filters in the
+  shared example telemetry helper, with lazy optional imports.
 
 Python 3.12–3.14 is covered by CI on Windows and Linux; real Chrome integration
 tests run on Linux. macOS requires explicit Chrome selection and has no CI coverage.
