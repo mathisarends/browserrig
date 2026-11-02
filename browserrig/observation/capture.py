@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 from uuid import uuid4
 
@@ -298,27 +298,32 @@ async def _redact(
 ) -> tuple[PageContent, str | None]:
     """Redact page text before the snapshot and its fingerprint are built.
 
-    Elements whose text holds a secret are blacked out in the image. An image without a
-    known area is dropped rather than shown with a secret it might contain.
+    Elements whose text holds a secret are blacked out in the image. Withhold the image
+    when a secret also occurs in page text or in an element without known bounds.
     """
     redacted = redaction.redact(page)
     if image is None or redacted is page:
         return redacted, image
-    hidden = tuple(
-        element.bounds
+    changed = tuple(
+        element
         for element, clean in zip(page.elements, redacted.elements, strict=True)
-        if element.bounds is not None and clean is not element
+        if clean is not element
     )
-    if not hidden:
-        return redacted, image
-    if content.area is None:
+    unlocated = replace(page, elements=redacted.elements) != redacted or any(
+        element.bounds is None for element in changed
+    )
+    if content.area is None or unlocated:
         redacted.limitations = (
             *redacted.limitations,
             "Screenshot withheld: it may show a secret",
         )
         return redacted, None
     return redacted, await asyncio.to_thread(
-        blackout, image, hidden, content.area, content.scale
+        blackout,
+        image,
+        tuple(element.bounds for element in changed if element.bounds is not None),
+        content.area,
+        content.scale,
     )
 
 
