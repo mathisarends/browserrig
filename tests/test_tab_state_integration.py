@@ -3,7 +3,7 @@ import base64
 from collections.abc import AsyncIterator
 
 import pytest
-from harnessed import Agent, PluginInstructions, PolicyDecision, SystemPrompt
+from harnessed import Agent, PluginOrder, PolicyDecision, SystemPrompt
 from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
@@ -108,7 +108,7 @@ async def test_navigate_can_open_the_url_in_a_new_tab(icon_site):
     )
     agent = Agent(
         model=model,
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         plugins=[
             *browser_plugins(browser=Launch(url=icon_site + "/inline")),
             Approvals(default=PolicyDecision.ALLOW),

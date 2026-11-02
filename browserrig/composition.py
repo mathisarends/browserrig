@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from harnessed import Kit, Plugin, SystemPrompt
+from harnessed import Kit, Plugin, PluginOrder, PromptFormat, SystemPrompt
 from harnessed.core.composition import compose_plugins
 from harnessed.kernel import PluginLike
 from harnessed.plugins import Compaction as ContextCompaction
@@ -42,18 +42,13 @@ def browser_plugins(
     entries are skipped, so optional plugins can be written inline.
     """
     kit = browser_kit(browser=browser).without(*without)
-    return list(compose_plugins([kit, *(p for p in plugins if p is not None)]).plugins)
+    # The flat API leaves prompt configuration to its caller.
+    defaults = Kit(kit.name, plugins=kit.plugins)
+    return list(compose_plugins([defaults, *plugins]).plugins)
 
 
 def browser_kit(*, browser: BrowserOptions | None = None) -> Kit:
-    """Browser defaults as a native Harnessed kit, with explicit instruction ordering.
-
-    Its `observation`, `actions` and `files` fragments group the instructions in
-    reading order; `browser_instructions` places them in that order.
-    """
-    observe, images = Observe(), ImageContext()
-    actions, pointer = Actions(), PointerTools()
-    files = FileTools()
+    """Browser defaults with Markdown instructions in configured plugin-list order."""
     return Kit(
         name="browserrig",
         plugins=[
@@ -68,38 +63,26 @@ def browser_kit(*, browser: BrowserOptions | None = None) -> Kit:
             Readiness(),
             DownloadReadiness(),
             Nudges(),
-            observe,
-            images,
-            actions,
+            Observe(),
+            ImageContext(),
+            # Explain screenshot coordinates before the chains that refer to them.
+            # Harnessed resolves setup dependencies independently of prompt order.
+            PointerTools(),
+            Actions(),
             NavigationTools(),
             JavaScriptTools(),
             KeyboardTools(),
-            pointer,
             FormTools(),
             TabTools(),
             DialogTools(),
             FindTools(),
-            files,
+            FileTools(),
             ContextCompaction(trigger=WindowRatio()),
         ],
-        # Instruction order differs from mount order: coordinates are explained right
-        # after screenshots and before the chain rules that refer to them.
-        fragments={
-            "observation": (observe, images),
-            "actions": (pointer, actions),
-            "files": (files,),
-        },
-    )
-
-
-def browser_instructions(kit: Kit) -> SystemPrompt:
-    """`browser_kit` instructions in reading order: what the agent sees, how it acts, files.
-
-    Removed and replaced recipes follow the kit, like `kit.instructions`. Kit plugins
-    outside these fragments declare no instructions; place them with `PluginInstructions()`.
-    """
-    return SystemPrompt(
-        kit.fragment("observation"), kit.fragment("actions"), kit.fragment("files")
+        prompt=SystemPrompt.from_plugins(
+            order=PluginOrder.AS_LISTED,
+            format=PromptFormat.MARKDOWN,
+        ),
     )
 
 

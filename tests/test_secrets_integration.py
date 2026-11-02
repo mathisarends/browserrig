@@ -6,7 +6,7 @@ from harnessed import (
     Context,
     Inject,
     Plugin,
-    PluginInstructions,
+    PluginOrder,
     PolicyDecision,
     SystemPrompt,
     ToolCall,
@@ -98,7 +98,9 @@ def _agent(site, model, domains, holder, *, path="/", screenshots=False, live=No
     if live is not None:
         plugins.append(live)
     return Agent(
-        system_prompt=SystemPrompt(PluginInstructions()), model=model, plugins=plugins
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
+        model=model,
+        plugins=plugins,
     )
 
 

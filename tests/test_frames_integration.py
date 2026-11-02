@@ -7,7 +7,7 @@ from harnessed import (
     Context,
     Inject,
     Plugin,
-    PluginInstructions,
+    PluginOrder,
     PolicyDecision,
     SystemPrompt,
     ToolCall,
@@ -140,7 +140,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
             yield ModelChunk(text="Done")
 
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(

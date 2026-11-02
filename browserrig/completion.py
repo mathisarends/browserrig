@@ -9,6 +9,7 @@ from harnessed import (
     Plugin,
     PolicyDecision,
     Session,
+    SystemPrompt,
     ToolChain,
     ToolResult,
     ToolStatus,
@@ -37,6 +38,20 @@ _FINAL_INSTRUCTION = (
 )
 
 
+_INSTRUCTIONS = Instructions(
+    title="Explicit task completion",
+    text=(
+        "You may write brief progress messages between tool calls, including "
+        "standalone text messages. These do not end the task. When browser work "
+        "is finished, call done alone, after inspecting the last action's result. "
+        "Then write the final answer in the next response, following the format "
+        "requested by the user and any declared output schema. Use success=false "
+        "if the task could not be completed. A success report is your assessment, "
+        "not independent verification. Do not call done before required work is finished."
+    ),
+)
+
+
 class Done(Plugin, slot="completion"):
     """Require done() before the final answer; ordinary text remains commentary.
 
@@ -46,21 +61,11 @@ class Done(Plugin, slot="completion"):
 
     _session = dependency(Session)
 
-    usage = Instructions(
-        title="Explicit task completion",
-        text=(
-            "You may write brief progress messages between tool calls, including "
-            "standalone text messages. These do not end the task. When browser work "
-            "is finished, call done alone, after inspecting the last action's result. "
-            "Then write the final answer in the next response, following the format "
-            "requested by the user and any declared output schema. Use success=false "
-            "if the task could not be completed. A success report is your assessment, "
-            "not independent verification. Do not call done before required work is finished."
-        ),
-    )
+    def instructions(self) -> SystemPrompt:
+        return SystemPrompt(_INSTRUCTIONS)
 
     async def setup(self, ctx: Context) -> None:
-        # Harnessed 0.9.0 has no output-policy hook. Isolate the per-session bridge
+        # Harnessed 0.10.0 has no output-policy hook. Isolate the per-session bridge
         # here; requests, validation, retries, streaming and limits remain native.
         # pylint: disable=protected-access
         steps = self._session._steps

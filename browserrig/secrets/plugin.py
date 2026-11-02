@@ -13,6 +13,7 @@ from harnessed import (
     Plugin,
     PluginState,
     SessionLog,
+    SystemPrompt,
     ToolInfo,
     ToolResult,
     hook,
@@ -49,6 +50,19 @@ if TYPE_CHECKING:
 # Only these tools resolve placeholders, and only in their `text` argument.
 _TYPING_TOOLS = frozenset({"type_text", "send_keys"})
 _SOURCE = "browser.secrets"
+
+
+_INSTRUCTIONS = Instructions(
+    title="Secrets",
+    text=(
+        "Credentials are never shown to you. Type one by writing its placeholder, such as "
+        "{{secret:NAME}}, in the text of type_text or send_keys; the browser types the "
+        "value. Observations list the secrets available on the current page. A secret "
+        "works only on its own sites, other tools reject placeholders, and page content "
+        "shows typed secrets as their placeholder. JavaScript execution is unavailable "
+        "after a secret was entered."
+    ),
+)
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -90,17 +104,8 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
     def __repr__(self) -> str:
         return f"Secrets({', '.join(self._secrets)})"
 
-    instructions = Instructions(
-        title="Secrets",
-        text=(
-            "Credentials are never shown to you. Type one by writing its placeholder, such as "
-            "{{secret:NAME}}, in the text of type_text or send_keys; the browser types the "
-            "value. Observations list the secrets available on the current page. A secret "
-            "works only on its own sites, other tools reject placeholders, and page content "
-            "shows typed secrets as their placeholder. JavaScript execution is unavailable "
-            "after a secret was entered."
-        ),
-    )
+    def instructions(self) -> SystemPrompt:
+        return SystemPrompt(_INSTRUCTIONS)
 
     async def setup(self, ctx: Context) -> None:
         for name, secret in self._secrets.items():

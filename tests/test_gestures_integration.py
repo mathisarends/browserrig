@@ -6,7 +6,7 @@ from harnessed import (
     Context,
     Inject,
     Plugin,
-    PluginInstructions,
+    PluginOrder,
     PolicyDecision,
     SystemPrompt,
     ToolCall,
@@ -173,7 +173,7 @@ async def _perform(site, name, arguments):
             yield ModelChunk(text="Gesture completed")
 
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(browser=Launch(url=site + "/gestures")),

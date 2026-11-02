@@ -2,7 +2,7 @@ import asyncio
 from contextlib import suppress
 
 import pytest
-from harnessed import Agent, PluginInstructions, SystemPrompt
+from harnessed import Agent, PluginOrder, SystemPrompt
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
@@ -84,7 +84,7 @@ async def readiness_server():
 
 async def test_delayed_click_navigation_settles_the_destination(readiness_site):
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["Done"]),
         plugins=browser_plugins(
             browser=Launch(url=readiness_site),
@@ -136,7 +136,7 @@ async def test_navigation_command_itself_is_bounded_before_the_response_commits(
     readiness_site,
 ):
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["Done"]),
         plugins=browser_plugins(
             Readiness(options=_options(timeout=0.5, navigation_min_ms=0)),
@@ -240,7 +240,7 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
 ):
     model = ScriptedModel(["Done"])
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=browser_plugins(
             Readiness(options=_options(timeout=0.5, action_min_ms=0)),

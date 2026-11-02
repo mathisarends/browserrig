@@ -2,12 +2,12 @@
 
 Harnessed `Agent` is the composition root. Browserrig plugins own session state,
 tools and hooks; ordinary Python strategies implement capture, rendering,
-readiness and action-chain decisions. Browserrig targets Harnessed 0.9.0.
+readiness and action-chain decisions. Browserrig targets Harnessed 0.10.0.
 
 ## A browser agent with screenshots
 
 ```python
-from harnessed import Agent, PluginInstructions, SystemPrompt
+from harnessed import Agent, PluginOrder, SystemPrompt
 from browserrig import (
     Actions, Activity, Chrome, DomCapture, DomRenderer, FormTools,
     ImageContext, KeyboardTools, Launch, NavigationTools, Observe,
@@ -17,7 +17,8 @@ from browserrig import (
 
 agent = Agent(
     model=model,
-    system_prompt=SystemPrompt("Complete the browser task.", PluginInstructions()),
+    instructions="Complete the browser task.",
+    prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
     plugins=[
         Chrome(Launch(url=url)),
         Readiness(),
@@ -27,8 +28,8 @@ agent = Agent(
             screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
         ),
         ImageContext(TrimInBatches(max_images=6, min_images=3)),
-        Actions(),
         PointerTools(),
+        Actions(),
         KeyboardTools(),
         FormTools(),
         NavigationTools(),

@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from harnessed import Inject, Instructions, Plugin, ToolResult
+from harnessed import Inject, Instructions, Plugin, SystemPrompt, ToolResult
 from harnessed.kernel import dependency
 from pydantic import Field
 
@@ -21,6 +21,18 @@ type _ClickButton = Annotated[
 ]
 
 
+_INSTRUCTIONS = Instructions(
+    title="Screenshot coordinates",
+    text=(
+        "Coordinates are pixels from the top-left of the newest shown image for this document; "
+        "region and canvas images are mapped back to the viewport automatically. "
+        "A red cursor marker shows the pointer position when the screenshot was captured; "
+        "it is omitted when outside the image. "
+        "Observe again if the tab or document changes before pointing."
+    ),
+)
+
+
 class PointerTools(Plugin, needs=(Actions,)):
     """Mouse input by screenshot coordinates, plus by observed ref when refs exist.
 
@@ -30,16 +42,8 @@ class PointerTools(Plugin, needs=(Actions,)):
     _browser = dependency(Browser)
     _observe = dependency(Observe)
 
-    coordinates = Instructions(
-        title="Screenshot coordinates",
-        text=(
-            "Coordinates are pixels from the top-left of the newest shown image for this document; "
-            "region and canvas images are mapped back to the viewport automatically. "
-            "A red cursor marker shows the pointer position when the screenshot was captured; "
-            "it is omitted when outside the image. "
-            "Observe again if the tab or document changes before pointing."
-        ),
-    )
+    def instructions(self) -> SystemPrompt:
+        return SystemPrompt(_INSTRUCTIONS)
 
     @tool(
         kind=ActionKind.MOVE_MOUSE,

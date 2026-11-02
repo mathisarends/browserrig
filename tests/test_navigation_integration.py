@@ -1,5 +1,5 @@
 import pytest
-from harnessed import Agent, PluginInstructions, PolicyDecision, SystemPrompt
+from harnessed import Agent, PluginOrder, PolicyDecision, SystemPrompt
 from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
@@ -25,7 +25,7 @@ async def test_agent_go_forward_reports_success_and_missing_or_replaced_history(
         ]
     )
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[
             *browser_plugins(browser=Launch(url=site)),

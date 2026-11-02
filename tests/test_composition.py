@@ -2,7 +2,7 @@ import subprocess
 import sys
 
 import pytest
-from harnessed import Agent, Instructions, Plugin, PolicyDecision
+from harnessed import Agent, Instructions, Plugin, PolicyDecision, SystemPrompt
 from harnessed.errors import PluginConflict
 from harnessed.plugins import Approvals, Compaction, ContextState
 from harnessed.plugins.filesystem import FilesystemTools
@@ -41,7 +41,10 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     tmp_path,
 ):
     class Extension(Plugin):
-        usage = Instructions(title="Custom extension", text="Use the custom extension.")
+        def instructions(self) -> SystemPrompt:
+            return SystemPrompt(
+                Instructions(title="Custom extension", text="Use the custom extension.")
+            )
 
     file_system = FileSystemOptions(directory=tmp_path / "files")
     options = Launch(url="https://example.com", headless=False, files=file_system)
@@ -51,7 +54,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     agent = browserrig.Agent(
         model=ScriptedModel(["ok"]),
         browser=options,
-        system_prompt="Custom instructions.",
+        instructions="Custom instructions.",
         plugins=[
             Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
             Readiness(options=readiness),

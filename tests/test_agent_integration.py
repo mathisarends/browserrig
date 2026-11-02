@@ -4,7 +4,7 @@ from harnessed import (
     Context,
     Inject,
     Plugin,
-    PluginInstructions,
+    PluginOrder,
     PolicyDecision,
     SystemPrompt,
     ToolCall,
@@ -65,7 +65,7 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
         ]
     )
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[
             *browser_plugins(browser=Launch(url=site)),
@@ -142,7 +142,7 @@ async def test_model_tools_yaml_and_activity(site):
 
     model = CallbackModel(respond)
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[*browser_plugins(), Approvals(default=PolicyDecision.ALLOW)],
     )
@@ -197,7 +197,7 @@ async def test_dom_screenshots_are_native_images(site):
             await browser.active_tab.navigate(site + "/canvas")
 
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[
             Chrome(),
@@ -240,7 +240,7 @@ async def test_no_progress_hint_is_derived_from_events(site):
         yield ModelChunk(tool_call=result)
 
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(

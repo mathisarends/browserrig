@@ -6,7 +6,7 @@ import pytest
 from harnessed import (
     Agent,
     Plugin,
-    PluginInstructions,
+    PluginOrder,
     PolicyDecision,
     SessionState,
     SystemPrompt,
@@ -93,7 +93,7 @@ def _agent(responses, ask, *, extra=(), **options):
     holder = {}
     model = ScriptedModel(responses)
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[
             Activity(),

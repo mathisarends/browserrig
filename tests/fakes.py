@@ -7,7 +7,7 @@ from harnessed import (
     Context,
     Inject,
     Plugin,
-    PluginInstructions,
+    PluginOrder,
     SessionLog,
     SystemPrompt,
 )
@@ -161,7 +161,7 @@ async def mounted(*plugins):
     """Start a session with `plugins` on fake services; yield the services and context."""
     services = FakeServices()
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["Done"]),
         plugins=[services, *plugins],
     )

@@ -9,6 +9,7 @@ from harnessed import (
     Instructions,
     Plugin,
     PluginState,
+    SystemPrompt,
     ToolError,
     ToolResult,
     hook,
@@ -81,6 +82,20 @@ _NAVIGATION_KINDS = {
 }
 
 
+_INSTRUCTIONS = Instructions(
+    title="Browser action chains",
+    text=(
+        "Combine actions only when no intermediate observation is needed, and put "
+        "submission last. Inputs may continue while the page remains suitable. "
+        "Navigation, tab changes, scrolling, "
+        "drags, coordinates, JavaScript, uploads, dialogs, waiting and screenshot end the "
+        "remaining chain. Use coordinate actions alone with a fresh screenshot. A navigation, "
+        "new menu, suggestions, modal, alert or input failure interrupts remaining actions; "
+        "skipped calls were not executed. Inspect the next observation before continuing."
+    ),
+)
+
+
 @dataclass
 class _Mount:
     context: Context | None = None
@@ -105,18 +120,8 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         self._mount.context = ctx
         self._mount.targeting = Targeting(self.browser, self.observe, ctx)
 
-    chains = Instructions(
-        title="Browser action chains",
-        text=(
-            "Combine actions only when no intermediate observation is needed, and put "
-            "submission last. Inputs may continue while the page remains suitable. "
-            "Navigation, tab changes, scrolling, "
-            "drags, coordinates, JavaScript, uploads, dialogs, waiting and screenshot end the "
-            "remaining chain. Use coordinate actions alone with a fresh screenshot. A navigation, "
-            "new menu, suggestions, modal, alert or input failure interrupts remaining actions; "
-            "skipped calls were not executed. Inspect the next observation before continuing."
-        ),
-    )
+    def instructions(self) -> SystemPrompt:
+        return SystemPrompt(_INSTRUCTIONS)
 
     async def run(
         self,

@@ -5,7 +5,7 @@ from harnessed import (
     Agent,
     Inject,
     Plugin,
-    PluginInstructions,
+    PluginOrder,
     PolicyDecision,
     SystemPrompt,
     ToolCall,
@@ -77,7 +77,7 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
             yield ModelChunk(text="Done")
 
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=CallbackModel(respond),
         plugins=[
             Chrome(Launch(url=site)),

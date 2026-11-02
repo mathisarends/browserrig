@@ -11,7 +11,7 @@ from harnessed import (
     Context,
     Inject,
     Plugin,
-    PluginInstructions,
+    PluginOrder,
     PolicyDecision,
     SystemPrompt,
     ToolResult,
@@ -294,7 +294,7 @@ def _agent(secrets, *, model, plugins=()):
 
     allow = Approvals(default=PolicyDecision.ALLOW)
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Chrome(holder), secrets, Capture(), allow, *plugins],
     )
@@ -454,7 +454,7 @@ async def test_observe_redacts_with_secrets_mounted_after_it():
             holder["observe"] = observe
 
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["done"]),
         plugins=[FakeChrome(holder), Readiness(), Observe(), Hold(), _secrets()],
     )

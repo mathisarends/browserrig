@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from harnessed import Agent, Plugin, PluginInstructions, SystemPrompt, ToolError
+from harnessed import Agent, Plugin, PluginOrder, SystemPrompt, ToolError
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
@@ -470,7 +470,7 @@ class _Handle:
 async def _observed(backend):
     holder, events = {}, []
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["Done"]),
         plugins=[
             FakeChrome(holder),

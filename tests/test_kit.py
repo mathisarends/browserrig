@@ -1,5 +1,13 @@
 import pytest
-from harnessed import Agent, Instructions, Kit, Plugin, SystemPrompt
+from harnessed import (
+    Agent,
+    Instructions,
+    Kit,
+    Plugin,
+    PluginOrder,
+    PromptFormat,
+    SystemPrompt,
+)
 from harnessed.errors import ConfigError, PluginConflict
 from harnessed.testing import ScriptedModel
 
@@ -12,7 +20,6 @@ from browserrig import (
     FileTools,
     Launch,
     Observe,
-    browser_instructions,
     browser_kit,
 )
 from tests.fakes import FakeChrome
@@ -47,11 +54,11 @@ async def test_nested_kit_instructions_follow_overrides_and_exclusions():
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[application, FakeChrome({})],
-        system_prompt=SystemPrompt("Before.", application.instructions, "After."),
+        instructions="Before.",
     )
     async with agent.session() as session:
         rendered = await session.prompt.render()
-        assert rendered.startswith("Before.") and rendered.endswith("After.")
+        assert rendered.startswith("Before.")
         assert rendered.count("Each observation starts") == 1
         assert "bounded page-text excerpt" in rendered
         assert "labeled with its ref" not in rendered
@@ -70,23 +77,23 @@ def test_sibling_kits_require_a_direct_slot_override():
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[browser, custom, selected],
-        system_prompt=SystemPrompt(browser.instructions),
     )
     assert [plugin for plugin in agent.plugins if isinstance(plugin, Observe)] == [
         selected
     ]
 
 
-@pytest.mark.parametrize("prompt", [None, "Custom role."])
-async def test_facade_places_browser_and_extension_instructions_for_plain_prompts(
-    prompt,
+@pytest.mark.parametrize("instructions", [None, "Custom role."])
+async def test_facade_collects_browser_and_extension_instructions(
+    instructions,
 ):
     class Extension(Plugin):
-        usage = Instructions(text="Extension guidance.")
+        def instructions(self) -> SystemPrompt:
+            return SystemPrompt("Extension guidance.")
 
     agent = browserrig.Agent(
         model=ScriptedModel([]),
-        system_prompt=prompt,
+        instructions=instructions,
         plugins=[FakeChrome({}), Extension()],
         without=(Chrome,),
     )
@@ -97,18 +104,25 @@ async def test_facade_places_browser_and_extension_instructions_for_plain_prompt
         assert rendered.index("Each observation starts") < rendered.index(
             "Extension guidance."
         )
-        if prompt is not None:
-            assert rendered.startswith(prompt)
+        if instructions is not None:
+            assert rendered.startswith(instructions)
 
 
-async def test_facade_renders_titled_sections_in_reading_order_with_completion_last():
+@pytest.mark.parametrize("completion_last", [False, True])
+async def test_facade_renders_complete_blocks_in_plugin_list_order(completion_last):
     class Extension(Plugin):
-        usage = Instructions(title="Extension", text="Extension guidance.")
+        def instructions(self) -> SystemPrompt:
+            return SystemPrompt(
+                Instructions(title="Extension", text="Extension guidance.")
+            )
+
+    plugins = [FakeChrome({}), Extension()]
+    plugins.insert(len(plugins) if completion_last else 0, Done())
 
     agent = browserrig.Agent(
         model=ScriptedModel([]),
-        system_prompt="Custom role.",
-        plugins=[Done(), FakeChrome({}), Extension()],
+        instructions="Custom role.",
+        plugins=plugins,
         without=(Chrome,),
     )
     async with agent.session() as session:
@@ -123,18 +137,21 @@ async def test_facade_renders_titled_sections_in_reading_order_with_completion_l
         "## Screenshot coordinates",
         "## Browser action chains",
         "## Workspace and downloads",
-        "## Extension",
-        "## Explicit task completion",
+        *(
+            ["## Extension", "## Explicit task completion"]
+            if completion_last
+            else ["## Explicit task completion", "## Extension"]
+        ),
     ]
 
 
-async def test_browser_instructions_follow_kit_removals_and_replacements():
+async def test_kit_prompt_follows_removals_and_replacements():
     browser = browser_kit().without(Chrome, FileTools)
     observe = Observe(capture=DomCapture(marks=False))
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[browser, observe, FakeChrome({})],
-        system_prompt=SystemPrompt("Role.", browser_instructions(browser)),
+        instructions="Role.",
     )
     async with agent.session() as session:
         rendered = await session.prompt.render()
@@ -148,8 +165,51 @@ async def test_browser_instructions_follow_kit_removals_and_replacements():
     )
 
 
-def test_facade_requires_explicit_placement_in_a_system_prompt():
-    with pytest.raises(ConfigError, match="Unplaced system sections"):
-        browserrig.Agent(
-            model=ScriptedModel([]), system_prompt=SystemPrompt("Custom role.")
-        )
+def test_facade_requires_explicit_collection_in_an_agent_prompt():
+    with pytest.raises(ConfigError, match="SystemPrompt.from_plugins"):
+        browserrig.Agent(model=ScriptedModel([]), prompt=SystemPrompt("Custom role."))
+
+
+async def test_explicit_prompt_overrides_kit_format_and_keeps_caller_text_first():
+    agent = browserrig.Agent(
+        model=ScriptedModel([]),
+        instructions="Caller role.",
+        prompt=SystemPrompt.from_plugins(
+            "Fixed guidance.",
+            None,
+            order=PluginOrder.AS_LISTED,
+            format=PromptFormat.XML,
+        ),
+        plugins=[None, FakeChrome({}), None],
+        without=(Chrome,),
+    )
+    async with agent.session() as session:
+        rendered = await session.prompt.render()
+    assert rendered.index("Caller role.") < rendered.index("Fixed guidance.")
+    assert rendered.index("Fixed guidance.") < rendered.index("Each observation starts")
+    assert '<section title="Browser observations">' in rendered
+    assert "## Browser observations" not in rendered
+
+
+async def test_instruction_providers_only_run_for_selected_recipes_once_per_agent():
+    calls = []
+
+    class CustomObserve(Observe):
+        def instructions(self) -> SystemPrompt:
+            calls.append(self)
+            return SystemPrompt("Custom observation guidance.")
+
+    removed = CustomObserve()
+    selected = CustomObserve()
+    kit = Kit("application", [browser_kit().without(Chrome), removed])
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[kit, selected, FakeChrome({})],
+    )
+    assert calls == [selected]
+    for _ in range(2):
+        async with agent.session() as session:
+            rendered = await session.prompt.render()
+            assert rendered.count("Custom observation guidance.") == 1
+            assert "Each observation starts" not in rendered
+    assert calls == [selected]

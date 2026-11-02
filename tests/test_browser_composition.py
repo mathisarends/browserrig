@@ -10,7 +10,7 @@ from harnessed import (
     Agent,
     Inject,
     Plugin,
-    PluginInstructions,
+    PluginOrder,
     PolicyDecision,
     SessionLog,
     SessionState,
@@ -136,7 +136,7 @@ def _agent(
     capture = CountingCapture(frames)
     model = ScriptedModel(responses)
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[
             *extra,
@@ -654,7 +654,7 @@ async def test_initial_per_document_and_ongoing_readiness_with_stream_stage():
     holder = {}
     initial, ongoing = Policy(), Policy()
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
@@ -691,7 +691,7 @@ async def test_failed_initial_retries_and_navigation_reselects_policy():
     holder = {}
     app = Policy(ready=False)
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
@@ -732,7 +732,7 @@ async def test_invalidation_cancels_old_wait_and_starts_a_fresh_initial_probe():
             return WaitingProbe(context, self)
 
     agent = Agent(
-        system_prompt=SystemPrompt(PluginInstructions()),
+        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),

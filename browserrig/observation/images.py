@@ -1,7 +1,7 @@
 from dataclasses import dataclass, replace
 from typing import Protocol
 
-from harnessed import Instructions, Observation, Plugin, PluginState, hook
+from harnessed import Instructions, Observation, Plugin, PluginState, SystemPrompt, hook
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
 from harnessed.kernel import dependency
@@ -12,6 +12,17 @@ from browserrig.events import ObservationCapturedEvent
 from .models import CapturedImage
 from .plugin import Observe
 from .state import ImageState
+
+_INSTRUCTIONS = Instructions(
+    title="Browser image history",
+    text=(
+        "Screenshots belong to the browser observations they were captured with and are "
+        "labelled with capture time, tab and document. A note names the latest captured "
+        "screenshot whenever that changes. Coordinate tools use the latest screenshot "
+        "included in the request, including its crop and zoom, while it shows the current "
+        "document. Without an included screenshot they use viewport CSS pixels."
+    ),
+)
 
 
 class ImageRetention(Protocol):
@@ -69,16 +80,8 @@ class ImageContext(Plugin, slot="browserrig.images"):
     _state = PluginState(ImageState)
     _observe = dependency(Observe)
 
-    usage = Instructions(
-        title="Browser image history",
-        text=(
-            "Screenshots belong to the browser observations they were captured with and are "
-            "labelled with capture time, tab and document. A note names the latest captured "
-            "screenshot whenever that changes. Coordinate tools use the latest screenshot "
-            "included in the request, including its crop and zoom, while it shows the current "
-            "document. Without an included screenshot they use viewport CSS pixels."
-        ),
-    )
+    def instructions(self) -> SystemPrompt:
+        return SystemPrompt(_INSTRUCTIONS)
 
     def __init__(
         self, retention: ImageRetention | None = None, *, skip_unchanged: bool = True

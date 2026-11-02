@@ -4,17 +4,14 @@ import harnessed
 from harnessed import (
     Kit,
     Plugin,
-    PluginInstructions,
     PluginValidation,
-    PromptFormat,
     SystemPrompt,
 )
 from harnessed.kernel import PluginLike
 from harnessed.models import Model
 
 from .browser import BrowserOptions
-from .completion import Done
-from .composition import browser_instructions, browser_kit
+from .composition import browser_kit
 
 DEFAULT_PROMPT = "Complete the requested browser task using the observed page state."
 
@@ -39,28 +36,16 @@ class Agent(harnessed.Agent):
         browser: BrowserOptions | None = None,
         plugins: Iterable[PluginLike | Kit | None] = (),
         without: Iterable[type[Plugin]] = (),
-        system_prompt: str | SystemPrompt | None = DEFAULT_PROMPT,
+        instructions: str | None = DEFAULT_PROMPT,
+        prompt: SystemPrompt | None = None,
         plugin_validation: PluginValidation = PluginValidation.ERROR,
     ) -> None:
         kit = browser_kit(browser=browser)
         kit = kit.without(*without)
-        plugins = [plugin for plugin in plugins if plugin is not None]
-        if not isinstance(system_prompt, SystemPrompt):
-            system_prompt = SystemPrompt(
-                *((system_prompt,) if system_prompt is not None else ()),
-                browser_instructions(kit),
-                PluginInstructions(),
-                # Finishing is the last step, so its guidance closes the prompt.
-                *(
-                    PluginInstructions(plugin)
-                    for plugin in plugins
-                    if isinstance(plugin, Done)
-                ),
-                format=PromptFormat.MARKDOWN,
-            )
         super().__init__(
             model=model,
-            system_prompt=system_prompt,
+            instructions=instructions,
+            prompt=prompt,
             plugins=[kit, *plugins],
             plugin_validation=plugin_validation,
         )
