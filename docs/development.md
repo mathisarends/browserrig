@@ -27,6 +27,7 @@ pnpm.cmd run format:check
 uv run pytest                  # unit tests only (default)
 uv run pytest -m integration   # real Chrome; `-m ""` runs everything
 uv build
+uv run --no-sync python tests/check_distribution.py
 ```
 
 prek hooks use the uv and pnpm dependencies pinned in the lockfiles.
@@ -44,6 +45,15 @@ same lint, formatting, and type checks. To format code, run
 Integration tests require Chrome or Chromium. Set `BROWSERRIG_CHROME` or
 `Launch(executable=...)` to select the executable. Media validation also
 uses ffprobe when available.
+
+## Distribution and release checks
+
+The distribution check installs the built wheel and its runtime dependencies in a
+temporary environment, checks JavaScript assets and typing data, and imports the
+public API outside the checkout. CI runs it on every supported Python/OS pair.
+
+Before publishing, run the checks above and the Chrome integration suite, review
+`CHANGELOG.md`, and verify the package metadata and license in the built artifacts.
 
 ## Harnessed compatibility
 

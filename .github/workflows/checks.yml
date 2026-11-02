@@ -23,6 +23,8 @@ jobs:
       - run: uv run --no-sync smelt check --fail-on warning --format github
       - run: uv run --no-sync pytest -m "not integration"
       - run: uv build
+      - name: Check installed wheel in a clean environment
+        run: uv run --no-sync python tests/check_distribution.py
       - run: uv run --no-sync python -m examples.openai_agent --help
 
   javascript:
