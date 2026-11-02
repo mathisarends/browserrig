@@ -7,7 +7,17 @@ name = "browserrig"
 version = "0.1.0"
 description = "Event-driven Chrome automation for Harnessed."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
 dependencies = [
     "harnessed==0.10.0",
     "cdpify[websocket]>=0.4.0,<0.5",
@@ -39,6 +49,13 @@ anthropic = ["harnessed[anthropic]==0.10.0"]
 mcp = ["harnessed[mcp]==0.10.0"]
 otel = ["harnessed[otel]==0.10.0"]
 
+[project.urls]
+Homepage = "https://github.com/mathisarends/browserrig"
+Documentation = "https://github.com/mathisarends/browserrig/blob/main/README.md#documentation"
+Repository = "https://github.com/mathisarends/browserrig"
+Issues = "https://github.com/mathisarends/browserrig/issues"
+Changelog = "https://github.com/mathisarends/browserrig/blob/main/CHANGELOG.md"
+
 [dependency-groups]
 dev = [
     "prek>=0.5.7,<0.6",
@@ -55,7 +72,7 @@ dev = [
 packages = ["browserrig"]
 
 [tool.hatch.build.targets.sdist]
-include = ["browserrig", "examples", "tests", "README.md",
+include = ["browserrig", "examples", "tests", "README.md", "CHANGELOG.md", "LICENSE",
            "pyproject.toml", "uv.lock", ".env.example", "compose.yml", "docs", ".github", ".gitattributes",
            ".pre-commit-config.yml", "smelt.yml", ".smelt", "package.json", "pnpm-lock.yaml", "eslint.config.mjs",
            ".prettierrc.json", ".prettierignore"]
