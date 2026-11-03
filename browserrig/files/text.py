@@ -34,6 +34,19 @@ def text_encoding(sample: bytes) -> str | None:
         return match.encoding if match is not None and match.chaos < 0.1 else None
 
 
+def text_result(path: Path, encoding: str, offset: int, max_chars: int) -> FileContent:
+    text = read_text(path, encoding, offset, max_chars)
+    return FileContent(
+        path=str(path),
+        media_type="text/plain",
+        text=text[:max_chars],
+        offset=offset,
+        next_offset=offset + max_chars if len(text) > max_chars else None,
+        encoding=encoding,
+        size=path.stat().st_size,
+    )
+
+
 def read_text(path: Path, encoding: str, offset: int, max_chars: int) -> str:
     try:
         with path.open(encoding=encoding, newline="") as stream:
@@ -49,16 +62,3 @@ def read_text(path: Path, encoding: str, offset: int, max_chars: int) -> str:
     if "\0" in text:
         raise ValueError("The file contains binary data, not readable text")
     return text
-
-
-def text_result(path: Path, encoding: str, offset: int, max_chars: int) -> FileContent:
-    text = read_text(path, encoding, offset, max_chars)
-    return FileContent(
-        path=str(path),
-        media_type="text/plain",
-        text=text[:max_chars],
-        offset=offset,
-        next_offset=offset + max_chars if len(text) > max_chars else None,
-        encoding=encoding,
-        size=path.stat().st_size,
-    )

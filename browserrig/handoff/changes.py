@@ -3,14 +3,6 @@ from urllib.parse import urlsplit, urlunsplit
 from browserrig.observation import Snapshot
 
 
-def page_url(url: str) -> str:
-    """Keep routing context without persisting credentials, OAuth queries or fragments."""
-    parts = urlsplit(url)
-    return urlunsplit(
-        (parts.scheme, parts.netloc.rsplit("@", 1)[-1], parts.path, "", "")
-    )
-
-
 def page_changes(before: Snapshot | None, after: Snapshot | None) -> tuple[str, ...]:
     if after is None:
         return (
@@ -46,3 +38,11 @@ def page_changes(before: Snapshot | None, after: Snapshot | None) -> tuple[str, 
             "A password field is still visible; login success is unverified."
         )
     return tuple(changes) or ("No observable page change was detected.",)
+
+
+def page_url(url: str) -> str:
+    """Keep routing context without persisting credentials, OAuth queries or fragments."""
+    parts = urlsplit(url)
+    return urlunsplit(
+        (parts.scheme, parts.netloc.rsplit("@", 1)[-1], parts.path, "", "")
+    )

@@ -87,7 +87,7 @@ class ImageContext(Plugin, slot="browserrig.images"):
         self, retention: ImageRetention | None = None, *, skip_unchanged: bool = True
     ) -> None:
         super().__init__()
-        self.retention = retention or TrimInBatches()
+        self.retention = retention if retention is not None else TrimInBatches()
         self.skip_unchanged = skip_unchanged
 
     @property

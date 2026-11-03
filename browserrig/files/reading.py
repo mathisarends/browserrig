@@ -120,30 +120,6 @@ class FileReader:
             }
         )
 
-    def _cache_path(self, name: str) -> Path:
-        root = self.directory.parent.resolve()
-        directory = self.directory.resolve()
-        if not directory.is_relative_to(root):
-            raise ValueError("Content cache is outside the workspace")
-        path = directory / name
-        if not path.resolve().is_relative_to(directory):
-            raise ValueError("Content cache file is outside the cache directory")
-        return path
-
-    def _key(self, path: Path, request: ReadRequest) -> str:
-        stat = path.stat()
-        source = (
-            str(path),
-            stat.st_mtime_ns,
-            stat.st_size,
-            asdict(request),
-            self.options.model_dump(),
-            _CACHE_VERSION,
-        )
-        return hashlib.sha256(
-            json.dumps(source, default=str, sort_keys=True).encode()
-        ).hexdigest()
-
     def _extract(
         self,
         path: Path,
@@ -208,12 +184,6 @@ class FileReader:
         finally:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
-
-    def _parse(self, path: Path, format_: str, request: ReadRequest) -> ParsedContent:
-        spec = READERS.get(format_)
-        if spec is None:
-            raise ValueError(f"No content reader for {format_}")
-        return spec.read(ReadContext(path, format_, request, self.options))
 
     def _read_member(
         self,
@@ -283,6 +253,36 @@ class FileReader:
         if not re.fullmatch(r"\.[a-zA-Z0-9]{1,12}", suffix):
             suffix = ""
         return self._cache_path(f"{key}.source{suffix}")
+
+    def _cache_path(self, name: str) -> Path:
+        root = self.directory.parent.resolve()
+        directory = self.directory.resolve()
+        if not directory.is_relative_to(root):
+            raise ValueError("Content cache is outside the workspace")
+        path = directory / name
+        if not path.resolve().is_relative_to(directory):
+            raise ValueError("Content cache file is outside the cache directory")
+        return path
+
+    def _key(self, path: Path, request: ReadRequest) -> str:
+        stat = path.stat()
+        source = (
+            str(path),
+            stat.st_mtime_ns,
+            stat.st_size,
+            asdict(request),
+            self.options.model_dump(),
+            _CACHE_VERSION,
+        )
+        return hashlib.sha256(
+            json.dumps(source, default=str, sort_keys=True).encode()
+        ).hexdigest()
+
+    def _parse(self, path: Path, format_: str, request: ReadRequest) -> ParsedContent:
+        spec = READERS.get(format_)
+        if spec is None:
+            raise ValueError(f"No content reader for {format_}")
+        return spec.read(ReadContext(path, format_, request, self.options))
 
 
 def _write_block(stream: IO[str], block: str, limit: int) -> None:

@@ -54,10 +54,6 @@ def _mark(sign: str, line: str) -> str:
     return sign + line[1:] if line.startswith(" ") else f"{sign} {line}"
 
 
-def _indent(line: str) -> int:
-    return len(line) - len(line.lstrip())
-
-
 def _context(lines: list[str], index: int) -> list[str]:
     """The section and group lines enclosing ``lines[index]``, outermost first."""
     found: list[str] = []
@@ -67,3 +63,7 @@ def _context(lines: list[str], index: int) -> list[str]:
             found.insert(0, line)
             depth = _indent(line)
     return found
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip())

@@ -90,10 +90,47 @@ _DISABLEABLE = frozenset(
 )
 
 
+def checked(document: Document, index: int, element_role: str) -> Tristate:
+    if document.tag(index) == "input" and input_type(document, index) in (
+        "checkbox",
+        "radio",
+    ):
+        return index in document.checked
+    state = _tristate(document.attributes(index).get("aria-checked"))
+    if state is None and element_role in CHECKABLE_ROLES:
+        return False
+    return state
+
+
 def input_type(document: Document, index: int) -> str:
     if document.tag(index) != "input":
         return ""
     return document.attributes(index).get("type", "text").strip().lower() or "text"
+
+
+def value(document: Document, index: int, element_role: str, kind: str) -> str | None:
+    attributes = document.attributes(index)
+    if element_role in _RANGE_ROLES:
+        text = attributes.get("aria-valuetext") or attributes.get("aria-valuenow")
+        if text:
+            return clean(text)
+    tag = document.tag(index)
+    if tag == "select":
+        chosen = [
+            option.label for option in options(document, index) if option.selected
+        ]
+        return ", ".join(chosen) or None
+    if tag in ("input", "textarea"):
+        if kind in _NO_VALUE_TYPES:
+            return None
+        return clean(document.input_value(index) or "", 200) or None
+    if editable(document, index) or element_role in (
+        "textbox",
+        "searchbox",
+        "combobox",
+    ):
+        return document.text(index, 200) or None
+    return None
 
 
 def editable(document: Document, index: int) -> bool:
@@ -135,31 +172,6 @@ def labelled_by(document: Document, index: int) -> str:
     return clean(" ".join(part for part in parts if part))
 
 
-def value(document: Document, index: int, element_role: str, kind: str) -> str | None:
-    attributes = document.attributes(index)
-    if element_role in _RANGE_ROLES:
-        text = attributes.get("aria-valuetext") or attributes.get("aria-valuenow")
-        if text:
-            return clean(text)
-    tag = document.tag(index)
-    if tag == "select":
-        chosen = [
-            option.label for option in options(document, index) if option.selected
-        ]
-        return ", ".join(chosen) or None
-    if tag in ("input", "textarea"):
-        if kind in _NO_VALUE_TYPES:
-            return None
-        return clean(document.input_value(index) or "", 200) or None
-    if editable(document, index) or element_role in (
-        "textbox",
-        "searchbox",
-        "combobox",
-    ):
-        return document.text(index, 200) or None
-    return None
-
-
 def options(document: Document, index: int) -> tuple[Option, ...]:
     result = []
     for node in document.descendants(index, frozenset({"option"})):
@@ -176,18 +188,6 @@ def options(document: Document, index: int) -> tuple[Option, ...]:
             )
         )
     return tuple(result)
-
-
-def checked(document: Document, index: int, element_role: str) -> Tristate:
-    if document.tag(index) == "input" and input_type(document, index) in (
-        "checkbox",
-        "radio",
-    ):
-        return index in document.checked
-    state = _tristate(document.attributes(index).get("aria-checked"))
-    if state is None and element_role in CHECKABLE_ROLES:
-        return False
-    return state
 
 
 def pressed(document: Document, index: int) -> Tristate:

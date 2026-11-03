@@ -114,7 +114,9 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
 
     def __init__(self, *, chain_policy: ActionChainPolicy | None = None) -> None:
         super().__init__()
-        self.chain_policy = chain_policy or DomActionChains()
+        self.chain_policy = (
+            chain_policy if chain_policy is not None else DomActionChains()
+        )
 
     async def setup(self, ctx: Context) -> None:
         self._mount.context = ctx

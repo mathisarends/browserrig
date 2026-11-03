@@ -16,7 +16,7 @@ class InputPacing(Plugin, slot="browserrig.pacing"):
 
     def __init__(self, motor: Motor | None = None) -> None:
         super().__init__()
-        self._motor = motor or HumanMotor()
+        self._motor = motor if motor is not None else HumanMotor()
 
     async def setup(self, ctx: Context) -> None:
         ctx.effect(self._browser.input.pace(self._motor))

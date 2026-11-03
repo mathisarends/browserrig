@@ -86,6 +86,13 @@ rules:
   public-definitions-first: error
   bundled-instance-assignment: error
   redundant-str-enum-value: error
+  prefer-str-enum-discriminator: hint
+  implicit-optional-default: warning
+  no-base-class-prefix: error
+  no-base-class-suffix: error
+  secret-settings-field: warning
+  package-only-dunder-all: error
+  caller-before-callee: hint
   prefer-package-import: error
   internal-public-member: error
   internal-static-helper: error
@@ -103,3 +110,4 @@ rules:
   unbounded-test-wait: warning
   async-mock-without-await-check: warning
   independent-test-case-loop: hint
+  nondeterministic-test-data: warning

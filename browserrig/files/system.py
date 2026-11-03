@@ -23,7 +23,7 @@ class FileSystem:
         *,
         download_directory: str | None = None,
     ) -> None:
-        self._options = options or FileSystemOptions()
+        self._options = options if options is not None else FileSystemOptions()
         self.directory = (
             self._options.directory or Path(".browserrig/files") / uuid4().hex
         ).resolve()
@@ -93,22 +93,6 @@ class FileSystem:
         self.directory.mkdir(parents=True, exist_ok=True)
         self.pending_directory.mkdir(parents=True, exist_ok=True)
 
-    def _resolve(self, path: str | Path, *, require_file: bool = False) -> Path:
-        resolved = Path(path)
-        if not resolved.is_absolute():
-            resolved = self.directory / resolved
-        resolved = resolved.resolve()
-        if not any(
-            resolved.is_relative_to(root)
-            for root in (self.directory, self.download_directory)
-        ):
-            raise ValueError(
-                "Path is outside the agent workspace and download directory"
-            )
-        if require_file and not resolved.is_file():
-            raise FileNotFoundError(f"File not found: {path}")
-        return resolved
-
     def _exists(self, path: str | Path) -> bool:
         return self._resolve(path).exists()
 
@@ -153,15 +137,6 @@ class FileSystem:
         resolved = self._resolve(path, require_file=True)
         return self._reader.read(resolved, request, offset, max_chars)
 
-    def _upload_paths(self, paths: list[str]) -> list[str]:
-        if not paths:
-            raise ValueError("Select at least one workspace file to upload")
-        resolved = [self._resolve(path) for path in paths]
-        for path in resolved:
-            if not path.is_file():
-                raise FileNotFoundError(f"Upload requires an existing file: {path}")
-        return [str(path) for path in resolved]
-
     def _write_file(self, path: str, content: str, overwrite: bool) -> FileEntry:
         resolved = self._resolve(path)
         data = content.encode("utf-8")
@@ -202,3 +177,28 @@ class FileSystem:
                 "Downloaded file is missing on disk; download it again"
             )
         return str(destination)
+
+    def _resolve(self, path: str | Path, *, require_file: bool = False) -> Path:
+        resolved = Path(path)
+        if not resolved.is_absolute():
+            resolved = self.directory / resolved
+        resolved = resolved.resolve()
+        if not any(
+            resolved.is_relative_to(root)
+            for root in (self.directory, self.download_directory)
+        ):
+            raise ValueError(
+                "Path is outside the agent workspace and download directory"
+            )
+        if require_file and not resolved.is_file():
+            raise FileNotFoundError(f"File not found: {path}")
+        return resolved
+
+    def _upload_paths(self, paths: list[str]) -> list[str]:
+        if not paths:
+            raise ValueError("Select at least one workspace file to upload")
+        resolved = [self._resolve(path) for path in paths]
+        for path in resolved:
+            if not path.is_file():
+                raise FileNotFoundError(f"Upload requires an existing file: {path}")
+        return [str(path) for path in resolved]

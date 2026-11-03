@@ -16,7 +16,7 @@ class Chrome(Plugin, slot="browserrig.browser", needs=(SessionLog,)):
 
     def __init__(self, options: BrowserOptions | None = None) -> None:
         super().__init__()
-        self.options = options or Launch()
+        self.options = options if options is not None else Launch()
 
     async def setup(self, ctx: Context, log: Inject[SessionLog]) -> None:
         async def tab_changed(tab: Tab, settled: bool) -> None:

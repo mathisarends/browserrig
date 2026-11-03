@@ -39,7 +39,7 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         ongoing: ReadinessPolicy | None = None,
     ) -> None:
         super().__init__()
-        self.options = options or ReadinessOptions()
+        self.options = options if options is not None else ReadinessOptions()
         self.initial = initial if initial is not None else DomReady()
         self.ongoing = ongoing if ongoing is not None else DomReady()
 

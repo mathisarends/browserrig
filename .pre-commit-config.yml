@@ -30,7 +30,7 @@ repos:
         name: Smelt
         entry: uv run --locked smelt check --fail-on warning
         language: system
-        files: '^((browserrig|tests)/.*\.py|smelt\.yml|\.smelt/debt\.json|pyproject\.toml|uv\.lock)$'
+        always_run: true
         pass_filenames: false
         require_serial: true
       - id: eslint
