@@ -119,6 +119,19 @@ class Document:  # pylint: disable=too-many-public-methods
             yield parent
             parent = self._parents[parent]
 
+    def linked_control(self, label: int) -> int | None:
+        """The control a <label> activates: its `for` target or first form control inside."""
+        target = self.attributes(label).get("for")
+        if target is not None:
+            control = self._ids.get(target)
+            return (
+                control
+                if control is not None and self._tags[control] in _LABELABLE
+                else None
+            )
+        controls = self.descendants(label, _FORM_CONTROLS)
+        return controls[0] if controls else None
+
     def descendants(self, index: int, tags: frozenset[str]) -> list[int]:
         return [
             node
@@ -172,23 +185,28 @@ class Document:  # pylint: disable=too-many-public-methods
     def labels(self, control: int) -> list[int]:
         return self._labels.get(control, [])
 
-    def linked_control(self, label: int) -> int | None:
-        """The control a <label> activates: its `for` target or first form control inside."""
-        target = self.attributes(label).get("for")
-        if target is not None:
-            control = self._ids.get(target)
-            return (
-                control
-                if control is not None and self._tags[control] in _LABELABLE
-                else None
-            )
-        controls = self.descendants(label, _FORM_CONTROLS)
-        return controls[0] if controls else None
-
     # Layout
 
     def has_layout(self, index: int) -> bool:
         return index in self._layout
+
+    def text_runs(self) -> list[tuple[int, str, Rect]]:
+        """Every rendered, visible text node with its parent element and box."""
+        runs: list[tuple[int, str, Rect]] = []
+        for node, layout in self._layout.items():
+            if self._types[node] != _TEXT:
+                continue
+            parent = self._parents[node]
+            if parent < 0 or self._hidden[parent] or self._tags[parent] in _NO_TEXT:
+                continue
+            if self.style(parent, Style.VISIBILITY) not in ("", "visible"):
+                continue
+            value = clean(self._strings[self._values[node]], 1000)
+            x, y, width, height = self._bounds[layout]
+            if value and width >= 1 and height >= 1:
+                runs.append((node, value, (x, y, x + width, y + height)))
+        runs.sort()
+        return runs
 
     def style(self, index: int, style: Style) -> str:
         layout = self._layout.get(index)
@@ -301,24 +319,6 @@ class Document:  # pylint: disable=too-many-public-methods
             limit,
         )
 
-    def text_runs(self) -> list[tuple[int, str, Rect]]:
-        """Every rendered, visible text node with its parent element and box."""
-        runs: list[tuple[int, str, Rect]] = []
-        for node, layout in self._layout.items():
-            if self._types[node] != _TEXT:
-                continue
-            parent = self._parents[node]
-            if parent < 0 or self._hidden[parent] or self._tags[parent] in _NO_TEXT:
-                continue
-            if self.style(parent, Style.VISIBILITY) not in ("", "visible"):
-                continue
-            value = clean(self._strings[self._values[node]], 1000)
-            x, y, width, height = self._bounds[layout]
-            if value and width >= 1 and height >= 1:
-                runs.append((node, value, (x, y, x + width, y + height)))
-        runs.sort()
-        return runs
-
     def _inline(self, index: int) -> bool:
         return self.style(index, Style.DISPLAY).startswith("inline")
 
@@ -337,53 +337,6 @@ class Document:  # pylint: disable=too-many-public-methods
         return None
 
     # Precomputation
-
-    def _string_id(self, value: str) -> int | None:
-        if self._string_ids is None:
-            self._string_ids = {
-                string: index for index, string in enumerate(self._strings)
-            }
-        return self._string_ids.get(value)
-
-    @cached_property
-    def _aria_hidden(self) -> frozenset[int]:
-        return frozenset(
-            index
-            for index in self.with_any_attribute(("aria-hidden",))
-            if self.attributes(index).get("aria-hidden", "").lower() == "true"
-        )
-
-    @cached_property
-    def _ids(self) -> dict[str, int]:
-        key = self._string_id("id")
-        if key is None:
-            return {}
-        strings, ids = self._strings, {}
-        for index, raw in enumerate(self._raw_attributes):
-            for position in range(0, len(raw) - 1, 2):
-                if raw[position] == key:
-                    ids.setdefault(strings[raw[position + 1]], index)
-                    break
-        return ids
-
-    @cached_property
-    def _labels(self) -> dict[int, list[int]]:
-        labels: dict[int, list[int]] = {}
-        for index, tag in enumerate(self._tags):
-            if tag == "label" and self._types[index] == _ELEMENT:
-                control = self.linked_control(index)
-                if control is not None:
-                    labels.setdefault(control, []).append(index)
-        return labels
-
-    def _subtree_ends(self) -> list[int]:
-        parents = self._parents
-        end = list(range(1, len(parents) + 1))
-        for index in range(len(parents) - 1, -1, -1):
-            parent = parents[index]
-            if parent >= 0 and end[index] > end[parent]:
-                end[parent] = end[index]
-        return end
 
     def _inherit(self) -> None:
         count = len(self._types)
@@ -445,6 +398,53 @@ class Document:  # pylint: disable=too-many-public-methods
         self._pinned = pinned
         self._clip = clip
         self._scroll_clip = scroll
+
+    def _string_id(self, value: str) -> int | None:
+        if self._string_ids is None:
+            self._string_ids = {
+                string: index for index, string in enumerate(self._strings)
+            }
+        return self._string_ids.get(value)
+
+    @cached_property
+    def _aria_hidden(self) -> frozenset[int]:
+        return frozenset(
+            index
+            for index in self.with_any_attribute(("aria-hidden",))
+            if self.attributes(index).get("aria-hidden", "").lower() == "true"
+        )
+
+    @cached_property
+    def _ids(self) -> dict[str, int]:
+        key = self._string_id("id")
+        if key is None:
+            return {}
+        strings, ids = self._strings, {}
+        for index, raw in enumerate(self._raw_attributes):
+            for position in range(0, len(raw) - 1, 2):
+                if raw[position] == key:
+                    ids.setdefault(strings[raw[position + 1]], index)
+                    break
+        return ids
+
+    @cached_property
+    def _labels(self) -> dict[int, list[int]]:
+        labels: dict[int, list[int]] = {}
+        for index, tag in enumerate(self._tags):
+            if tag == "label" and self._types[index] == _ELEMENT:
+                control = self.linked_control(index)
+                if control is not None:
+                    labels.setdefault(control, []).append(index)
+        return labels
+
+    def _subtree_ends(self) -> list[int]:
+        parents = self._parents
+        end = list(range(1, len(parents) + 1))
+        for index in range(len(parents) - 1, -1, -1):
+            parent = parents[index]
+            if parent >= 0 and end[index] > end[parent]:
+                end[parent] = end[index]
+        return end
 
 
 def _overflow(rect: Rect, overflow_x: str, overflow_y: str, hard: bool) -> Rect:

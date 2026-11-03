@@ -174,7 +174,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=1,<2" },
     { name = "python-dotenv", specifier = ">=1,<2" },
     { name = "ruff", specifier = ">=0.14,<1" },
-    { name = "smelt-cli", specifier = ">=0.2.0,<0.3" },
+    { name = "smelt-cli", specifier = "==0.5.0" },
     { name = "ty", specifier = ">=0.0.93,<0.1" },
 ]
 
@@ -2401,7 +2401,7 @@ wheels = [
 
 [[package]]
 name = "smelt-cli"
-version = "0.2.0"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "grimp" },
@@ -2409,13 +2409,13 @@ dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/49/e5/ef1b02afb4a501c3a000282c4e1c61730fa24f1f804bff7e10929430bced/smelt_cli-0.2.0.tar.gz", hash = "sha256:b5ebd4ae7bc51c81b84f3212fec9922e9e831e5be1520b23a7476a869dfebb89", size = 551326, upload-time = "2026-10-31T20:18:43.529Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/39/4b/ba0d85b859f98fdf3505a1ba2cf45362bb6434fa5eba46f91ea5c70e1a9c/smelt_cli-0.5.0.tar.gz", hash = "sha256:5316df0585608bf599ec1c4bbf0a7b90dc33c94748a0d133afd8f8a1ddca17c8", size = 702110, upload-time = "2026-11-02T21:53:48.088Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3a/4a/c5135b398183fb80904eb34e430a1d97e665661644e852b2866010b977bc/smelt_cli-0.2.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:61dc248f08eadd02598067907c7835f272cf47c539dff185e12bd9672358710d", size = 1216858, upload-time = "2026-10-31T21:17:27.532Z" },
-    { url = "https://files.pythonhosted.org/packages/77/52/645fccc5c2476e868fdfc7418496f77d44fce2c86d9172bfd984c017c930/smelt_cli-0.2.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:f4c2c4b4fb6995700fefc5317a1c7dfa2e20e0b623ac195928ae2a8becaae1b4", size = 1155674, upload-time = "2026-10-31T21:17:29.504Z" },
-    { url = "https://files.pythonhosted.org/packages/7b/ef/43edbfc68be9a32a613fc1d2ebd85b2c9fb401dd05abf2ab7771a8940cef/smelt_cli-0.2.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:1508a0032cd6637fb13ac92e4e3781c9d3f8bfcc9597dcd90bcb1efc3c6955f3", size = 1191431, upload-time = "2026-10-31T21:17:31.233Z" },
-    { url = "https://files.pythonhosted.org/packages/92/ae/39f040165da879786425597a8cc84de5a6bfca9c0da74b253fb29cd06e13/smelt_cli-0.2.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:f6ad2cb4783c654dc340c9c7e6a63e09191f09d94288ad8431e25768b6211250", size = 1239451, upload-time = "2026-10-31T21:17:32.917Z" },
-    { url = "https://files.pythonhosted.org/packages/fb/69/d0def9bb9b39c3658ad64223e5ef74b13a114f38a2d8e57e0baf0cc80493/smelt_cli-0.2.0-py3-none-win_amd64.whl", hash = "sha256:45cbbb3ffe23df91ea0f98ad228368c1b86c636759cbe44a0ab2d92e5d442cd2", size = 1242977, upload-time = "2026-10-31T20:18:41.714Z" },
+    { url = "https://files.pythonhosted.org/packages/67/be/5067998df965f3b4ed355caa55e647e5e4c96cd1df1ba0850e3c80e329e0/smelt_cli-0.5.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:31516691f7e3902c4e013689fe5cce7222e1ef0e4b6d83af56e68479ab38a415", size = 1281591, upload-time = "2026-11-02T21:53:40.247Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/4d/77bebc53a3251b04e22fb3d51fa046fa7b6b8faf09c5e5c8691913f41900/smelt_cli-0.5.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:7e49a7701a0997baa6578b6e5ffba859b1d86fed51430d16583c4a4a09030039", size = 1220421, upload-time = "2026-11-02T21:53:41.925Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/a9/2af7ac543b41b66cb0cc938ac606122ea3a8d3da5c9478e959dedd8eb37f/smelt_cli-0.5.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:45cff68a7a8d30bee6a1791b8098fae959d569ab7cd58cc8a86b4379a3314557", size = 1256163, upload-time = "2026-11-02T21:53:43.228Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/12/8bd8346ea1a7e5c4f9279e81acb7408542537562e5a40261b550b685c5f8/smelt_cli-0.5.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:00fbc81b22e2f05152c57461d9befaac0cce5ada4f7820d6ac830519471bf212", size = 1304173, upload-time = "2026-11-02T21:53:44.851Z" },
+    { url = "https://files.pythonhosted.org/packages/10/15/1ef17235575847f311b688ee4d27f94355b989f390a46c1e710617fda31a/smelt_cli-0.5.0-py3-none-win_amd64.whl", hash = "sha256:77474d00c1521f8354cdc4eecb9b13dbefadec31cd26430250640a11e7bc0550", size = 1290224, upload-time = "2026-11-02T21:53:46.425Z" },
 ]
 
 [[package]]

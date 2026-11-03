@@ -143,7 +143,10 @@ async def test_otlp_export_contains_correlated_model_and_tool_spans(
         assert "TOOL INPUT" in _attributes(tool_span.attributes)["output.value"]
 
 
-async def test_content_is_bounded_and_batches_flush_when_host_fails(collector):
+@pytest.mark.parametrize("direction", ["input", "output"])
+async def test_content_is_bounded_and_batches_flush_when_host_fails(
+    collector, direction
+):
     with pytest.raises(RuntimeError, match="host failed"):
         async with tracing_plugins(
             capture_content=True, max_content_length=20
@@ -163,10 +166,9 @@ async def test_content_is_bounded_and_batches_flush_when_host_fails(collector):
     model = _attributes(
         next(span for span in spans if span.name == "harnessed.model").attributes
     )
-    for direction in ("input", "output"):
-        assert len(model[f"{direction}.value"]) == 20
-        assert model[f"harnessed.{direction}.truncated"] is True
-        assert model[f"{direction}.mime_type"] == "text/plain"
+    assert len(model[f"{direction}.value"]) == 20
+    assert model[f"harnessed.{direction}.truncated"] is True
+    assert model[f"{direction}.mime_type"] == "text/plain"
 
 
 async def test_redaction_and_application_filter_leave_live_history_intact(collector):

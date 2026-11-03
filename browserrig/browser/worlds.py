@@ -13,6 +13,25 @@ class Worlds:
         self._generation = 0
         self._lock = asyncio.Lock()
 
+    async def run[T](
+        self,
+        cdp: CdpSession,
+        frame_id: str,
+        document_id: str,
+        operation: Callable[[int], Awaitable[T]],
+        *,
+        retry: bool = True,
+    ) -> T:
+        context = await self.context(cdp, frame_id, document_id)
+        try:
+            return await operation(context)
+        except CDPCommandError as error:
+            # Only a context rejected before execution is safe to retry.
+            if not retry or "cannot find context" not in error.message.lower():
+                raise
+            self.invalidate(session_id=cdp.session_id, frame_id=frame_id)
+        return await operation(await self.context(cdp, frame_id, document_id))
+
     async def context(self, cdp: CdpSession, frame_id: str, document_id: str) -> int:
         key = (cdp.session_id, frame_id, document_id)
         async with self._lock:
@@ -43,22 +62,3 @@ class Worlds:
                 and (context_id is None or value == context_id)
             )
         }
-
-    async def run[T](
-        self,
-        cdp: CdpSession,
-        frame_id: str,
-        document_id: str,
-        operation: Callable[[int], Awaitable[T]],
-        *,
-        retry: bool = True,
-    ) -> T:
-        context = await self.context(cdp, frame_id, document_id)
-        try:
-            return await operation(context)
-        except CDPCommandError as error:
-            # Only a context rejected before execution is safe to retry.
-            if not retry or "cannot find context" not in error.message.lower():
-                raise
-            self.invalidate(session_id=cdp.session_id, frame_id=frame_id)
-        return await operation(await self.context(cdp, frame_id, document_id))

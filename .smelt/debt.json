@@ -1,59 +1,56 @@
 {
-  "version": 1,
+  "version": 2,
   "violations": [
     {
-      "fingerprint": "57c4c77eee7729fb96b74d1b3216eecb",
       "code": "SMT420",
       "path": "tests/test_browser_composition.py",
-      "message": "test accesses private production name browserrig.tools.mouse._image_point"
+      "message": "test accesses private production name browserrig.Observe._page_key",
+      "fingerprints": [
+        "a1be727efcd1fb823790a19dde96d4f8",
+        "a1be727efcd1fb823790a19dde96d4f8",
+        "a1be727efcd1fb823790a19dde96d4f8",
+        "a1be727efcd1fb823790a19dde96d4f8"
+      ]
     },
     {
-      "fingerprint": "a1be727efcd1fb823790a19dde96d4f8",
       "code": "SMT420",
       "path": "tests/test_browser_composition.py",
-      "message": "test accesses private production name browserrig.Observe._page_key"
+      "message": "test accesses private production name browserrig.tools.mouse._image_point",
+      "fingerprints": [
+        "57c4c77eee7729fb96b74d1b3216eecb"
+      ]
     },
     {
-      "fingerprint": "a1be727efcd1fb823790a19dde96d4f8",
-      "code": "SMT420",
-      "path": "tests/test_browser_composition.py",
-      "message": "test accesses private production name browserrig.Observe._page_key"
-    },
-    {
-      "fingerprint": "a1be727efcd1fb823790a19dde96d4f8",
-      "code": "SMT420",
-      "path": "tests/test_browser_composition.py",
-      "message": "test accesses private production name browserrig.Observe._page_key"
-    },
-    {
-      "fingerprint": "a1be727efcd1fb823790a19dde96d4f8",
-      "code": "SMT420",
-      "path": "tests/test_browser_composition.py",
-      "message": "test accesses private production name browserrig.Observe._page_key"
-    },
-    {
-      "fingerprint": "dfa52a2d2d3e26242ede3e4d0b8cfa66",
       "code": "SMT420",
       "path": "tests/test_process.py",
-      "message": "test accesses private production name browserrig.browser.process._active_endpoint"
+      "message": "test accesses private production name browserrig.browser.process._active_endpoint",
+      "fingerprints": [
+        "dfa52a2d2d3e26242ede3e4d0b8cfa66"
+      ]
     },
     {
-      "fingerprint": "ed566f1f220074b0fd456472fa517c5c",
       "code": "SMT420",
       "path": "tests/test_secrets.py",
-      "message": "test accesses private production name browserrig.observation.capture._redact"
+      "message": "test accesses private production name browserrig.observation.capture._redact",
+      "fingerprints": [
+        "ed566f1f220074b0fd456472fa517c5c"
+      ]
     },
     {
-      "fingerprint": "4778f806842fe755f1da42cf078eaa06",
       "code": "SMT420",
       "path": "tests/test_tab_state.py",
-      "message": "test accesses private production name browserrig.browser.favicon._media_type"
+      "message": "test accesses private production name browserrig.browser.favicon._media_type",
+      "fingerprints": [
+        "4778f806842fe755f1da42cf078eaa06"
+      ]
     },
     {
-      "fingerprint": "a1c9880469f7f66d5e1e8b9a3399f5f4",
       "code": "SMT420",
       "path": "tests/test_terminal.py",
-      "message": "test accesses private production name browserrig.terminal._event_record"
+      "message": "test accesses private production name browserrig.terminal._event_record",
+      "fingerprints": [
+        "a1c9880469f7f66d5e1e8b9a3399f5f4"
+      ]
     }
   ]
 }

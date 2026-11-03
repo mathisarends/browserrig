@@ -69,7 +69,7 @@ class ChromeBrowser:
         emit: EventSink = _discard,
         on_tab_change: TabListener | None = None,
     ) -> None:
-        self._options = options or Launch()
+        self._options = options if options is not None else Launch()
         files = self._options.files
         self.files = (
             FileSystem(files, download_directory=self._options.download_directory)

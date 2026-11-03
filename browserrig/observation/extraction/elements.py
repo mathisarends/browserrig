@@ -313,20 +313,6 @@ class _FrameExtractor:
                 return document.style(parent, Style.CURSOR) != "pointer"
         return True
 
-    def _placement(self, index: int) -> tuple[Rect, Rect | None, bool] | None:
-        """Document rect, visible area and covered flag, or None when hidden."""
-        document = self._document
-        rect = document.rect(index)
-        if rect is None or hidden(document, index, rect):
-            return None
-        area = visible_area(document, index, rect, self._viewport)
-        return rect, area, area is not None and self._occluded(index, area)
-
-    def _occluded(self, index: int, area: Rect) -> bool:
-        if self._occlusion is None:
-            self._occlusion = Occlusion(self._document, self._viewport)
-        return self._occlusion.covered(index, area)
-
     def _covered(self, index: int) -> bool:
         placement = self._placement(index)
         return placement is not None and placement[2]
@@ -351,6 +337,114 @@ class _FrameExtractor:
                 placements[label] = placement
                 proxies.append((label, control))
         return proxies
+
+    def _canvases(self, listed: set[int]) -> list[tuple[int, Canvas]]:
+        """Visible, uncovered canvases; `listed` holds indexes already built as elements."""
+        document = self._document
+        canvases: list[tuple[int, Canvas]] = []
+        for index in document.elements():
+            if not document.is_element(index) or document.tag(index) != "canvas":
+                continue
+            if not document.has_layout(index):
+                continue
+            placement = self._placement(index)
+            if placement is None:
+                continue
+            rect, area, covered = placement
+            if area is None or covered:
+                continue
+            bounds = self._bounds(rect, area)
+            if min(bounds.width, bounds.height) < _MIN_CANVAS_SIDE:
+                continue
+            attributes = document.attributes(index)
+            canvases.append(
+                (
+                    index,
+                    Canvas.model_construct(
+                        frame_id=self._frame_id,
+                        bounds=bounds,
+                        name=semantics.labelled_by(document, index)
+                        or clean(
+                            attributes.get("aria-label") or attributes.get("title", ""),
+                            80,
+                        ),
+                        ref=f"{self._prefix}{document.backend_ids[index]}"
+                        if index in listed
+                        else "",
+                        clipped=area != rect,
+                    ),
+                )
+            )
+        return canvases
+
+    def _placement(self, index: int) -> tuple[Rect, Rect | None, bool] | None:
+        """Document rect, visible area and covered flag, or None when hidden."""
+        document = self._document
+        rect = document.rect(index)
+        if rect is None or hidden(document, index, rect):
+            return None
+        area = visible_area(document, index, rect, self._viewport)
+        return rect, area, area is not None and self._occluded(index, area)
+
+    def _headings_and_alerts(self) -> tuple[list[tuple[int, Heading]], list[str]]:
+        document = self._document
+        headings: list[tuple[int, Heading]] = []
+        alerts: list[str] = []
+        for index in document.elements():
+            if not document.is_element(index) or not document.has_layout(index):
+                continue
+            tag = document.tag(index)
+            is_heading = len(tag) == 2 and tag[0] == "h" and tag[1] in "123456"
+            explicit = semantics.role(document, index) if index in self._marked else ""
+            if not (is_heading or explicit in ("heading", *_ALERT_ROLES)):
+                continue
+            rect = document.rect(index)
+            if rect is None or hidden(document, index, rect):
+                continue
+            if explicit in _ALERT_ROLES:
+                text = document.text(index, 200)
+                if text:
+                    alerts.append(text)
+                continue
+            text = clean(
+                document.attributes(index).get("aria-label", "")
+            ) or document.text(index, 120)
+            area = visible_area(document, index, rect, self._viewport)
+            if text and area is not None and not self._occluded(index, area):
+                headings.append(
+                    (
+                        index,
+                        Heading.model_construct(
+                            level=semantics.heading_level(document, index),
+                            text=text,
+                            frame_id=self._frame_id,
+                            section=self._context(index)[0],
+                        ),
+                    )
+                )
+        return headings, list(dict.fromkeys(alerts))
+
+    def _text(self, limit: int) -> str:
+        document = self._document
+        parts: list[str] = []
+        length = 0
+        for node, value, rect in document.text_runs():
+            parent = document.parent(node)
+            area = visible_area(document, parent, rect, self._viewport)
+            # Text under an overlay is not what the page shows.
+            if area is None or self._occluded(parent, area):
+                continue
+            parts.append(value)
+            length += len(value) + 1
+            if length > limit:
+                break
+        # One extra character lets the caller detect truncation.
+        return " ".join(parts)[: limit + 1]
+
+    def _occluded(self, index: int, area: Rect) -> bool:
+        if self._occlusion is None:
+            self._occlusion = Occlusion(self._document, self._viewport)
+        return self._occlusion.covered(index, area)
 
     def _deduplicate(self, candidates: dict[int, bool]) -> list[int]:
         """Drop generic wrappers around real controls and generic boxes nested in controls."""
@@ -437,84 +531,7 @@ class _FrameExtractor:
 
     # Canvases
 
-    def _canvases(self, listed: set[int]) -> list[tuple[int, Canvas]]:
-        """Visible, uncovered canvases; `listed` holds indexes already built as elements."""
-        document = self._document
-        canvases: list[tuple[int, Canvas]] = []
-        for index in document.elements():
-            if not document.is_element(index) or document.tag(index) != "canvas":
-                continue
-            if not document.has_layout(index):
-                continue
-            placement = self._placement(index)
-            if placement is None:
-                continue
-            rect, area, covered = placement
-            if area is None or covered:
-                continue
-            bounds = self._bounds(rect, area)
-            if min(bounds.width, bounds.height) < _MIN_CANVAS_SIDE:
-                continue
-            attributes = document.attributes(index)
-            canvases.append(
-                (
-                    index,
-                    Canvas.model_construct(
-                        frame_id=self._frame_id,
-                        bounds=bounds,
-                        name=semantics.labelled_by(document, index)
-                        or clean(
-                            attributes.get("aria-label") or attributes.get("title", ""),
-                            80,
-                        ),
-                        ref=f"{self._prefix}{document.backend_ids[index]}"
-                        if index in listed
-                        else "",
-                        clipped=area != rect,
-                    ),
-                )
-            )
-        return canvases
-
     # Headings, alerts and dialogs
-
-    def _headings_and_alerts(self) -> tuple[list[tuple[int, Heading]], list[str]]:
-        document = self._document
-        headings: list[tuple[int, Heading]] = []
-        alerts: list[str] = []
-        for index in document.elements():
-            if not document.is_element(index) or not document.has_layout(index):
-                continue
-            tag = document.tag(index)
-            is_heading = len(tag) == 2 and tag[0] == "h" and tag[1] in "123456"
-            explicit = semantics.role(document, index) if index in self._marked else ""
-            if not (is_heading or explicit in ("heading", *_ALERT_ROLES)):
-                continue
-            rect = document.rect(index)
-            if rect is None or hidden(document, index, rect):
-                continue
-            if explicit in _ALERT_ROLES:
-                text = document.text(index, 200)
-                if text:
-                    alerts.append(text)
-                continue
-            text = clean(
-                document.attributes(index).get("aria-label", "")
-            ) or document.text(index, 120)
-            area = visible_area(document, index, rect, self._viewport)
-            if text and area is not None and not self._occluded(index, area):
-                headings.append(
-                    (
-                        index,
-                        Heading.model_construct(
-                            level=semantics.heading_level(document, index),
-                            text=text,
-                            frame_id=self._frame_id,
-                            section=self._context(index)[0],
-                        ),
-                    )
-                )
-        return headings, list(dict.fromkeys(alerts))
 
     def _find_modal(self) -> tuple[int, int] | None:
         """The topmost visible modal dialog, as (paint order, index).
@@ -553,26 +570,6 @@ class _FrameExtractor:
         document = self._document
         role = semantics.role(document, index) or "dialog"
         return Modal(role=role, name=self._dialog_name(index))
-
-    def _dialog_name(self, index: int) -> str:
-        document = self._document
-        name = semantics.labelled_by(document, index) or clean(
-            document.attributes(index).get("aria-label", ""), 80
-        )
-        if name:
-            return name
-        for node in range(index + 1, document.end(index)):
-            if document.is_element(node) and document.tag(node) in (
-                "h1",
-                "h2",
-                "h3",
-                "h4",
-                "legend",
-            ):
-                return document.text(node, 80)
-        return document.text(index, 60)
-
-    # Context
 
     def _context(self, index: int) -> Context:
         """Section and group of a node, memoized along the ancestor path."""
@@ -620,24 +617,27 @@ class _FrameExtractor:
                 return (inherited[0], group)
         return inherited
 
-    # Text and geometry
-
-    def _text(self, limit: int) -> str:
+    def _dialog_name(self, index: int) -> str:
         document = self._document
-        parts: list[str] = []
-        length = 0
-        for node, value, rect in document.text_runs():
-            parent = document.parent(node)
-            area = visible_area(document, parent, rect, self._viewport)
-            # Text under an overlay is not what the page shows.
-            if area is None or self._occluded(parent, area):
-                continue
-            parts.append(value)
-            length += len(value) + 1
-            if length > limit:
-                break
-        # One extra character lets the caller detect truncation.
-        return " ".join(parts)[: limit + 1]
+        name = semantics.labelled_by(document, index) or clean(
+            document.attributes(index).get("aria-label", ""), 80
+        )
+        if name:
+            return name
+        for node in range(index + 1, document.end(index)):
+            if document.is_element(node) and document.tag(node) in (
+                "h1",
+                "h2",
+                "h3",
+                "h4",
+                "legend",
+            ):
+                return document.text(node, 80)
+        return document.text(index, 60)
+
+    # Context
+
+    # Text and geometry
 
     def _document_viewport(self) -> Rect | None:
         if self._visible is None:

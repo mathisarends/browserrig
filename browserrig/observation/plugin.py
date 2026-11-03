@@ -72,7 +72,7 @@ class Observe(Plugin, slot="browserrig.observation", provides=True):
         screenshots: Screenshots | None = None,
     ) -> None:
         super().__init__()
-        self.capture_strategy = capture or DomCapture()
+        self.capture_strategy = capture if capture is not None else DomCapture()
         if renderer is None:
             if isinstance(self.capture_strategy, DomCapture):
                 renderer = DomRenderer(
@@ -83,7 +83,7 @@ class Observe(Plugin, slot="browserrig.observation", provides=True):
             else:
                 renderer = DomRenderer()
         self.renderer = renderer
-        self.screenshots = screenshots or Screenshots()
+        self.screenshots = screenshots if screenshots is not None else Screenshots()
 
     async def setup(self, ctx: Context) -> None:
         # Secrets is looked up per capture, so it redacts wherever it sits in the plugins.
@@ -145,7 +145,7 @@ class Observe(Plugin, slot="browserrig.observation", provides=True):
     ) -> Snapshot:
         browser, readiness = self._browser, self._readiness
         async with self._state.lock:
-            selected = tab or browser.active_tab
+            selected = tab if tab is not None else browser.active_tab
             report = await readiness.wait(selected, phase=phase)
             observation = await capture_observation(
                 selected,

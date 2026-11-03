@@ -378,6 +378,14 @@ def _runs_javascript(name: str, tool: ToolInfo | None) -> bool:
     )
 
 
+def _redact_message(redactor: Redactor, message: Any) -> Any:
+    content = getattr(message, "content", None)
+    if content is None or isinstance(content, (bytes, bytearray)):
+        return message
+    redacted = _redact_content(redactor, content)
+    return message if redacted is content else replace(message, content=redacted)
+
+
 def _redact_content(redactor: Redactor, content: Any) -> Any:
     if isinstance(content, str):
         redacted = redactor.text(content)
@@ -387,11 +395,3 @@ def _redact_content(redactor: Redactor, content: Any) -> Any:
         for part in content
     )
     return content if parts == tuple(content) else parts
-
-
-def _redact_message(redactor: Redactor, message: Any) -> Any:
-    content = getattr(message, "content", None)
-    if content is None or isinstance(content, (bytes, bytearray)):
-        return message
-    redacted = _redact_content(redactor, content)
-    return message if redacted is content else replace(message, content=redacted)

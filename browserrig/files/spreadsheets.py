@@ -344,6 +344,22 @@ def _xls_value(cell, datemode: int) -> object:
     return cell.value
 
 
+def _odf_values(table, bounds: tuple[int, int, int, int]) -> Iterator[str]:
+    index = 0
+    for row in _odf_rows(table):
+        repeats = int(row.getAttribute("numberrowsrepeated") or 1)
+        if not 1 <= repeats <= 1048576 or index + repeats > 1048576:
+            raise ValueError("ODS row repetition exceeds spreadsheet dimensions")
+        cells = _odf_cells(row)
+        first, last = max(index + 1, bounds[1]), min(index + repeats, bounds[3])
+        index += repeats
+        if any(cells):
+            for number in range(first, last + 1):
+                yield from _odf_row_text(row, cells, number, bounds[0], bounds[2])
+        if index >= bounds[3]:
+            return
+
+
 def _odf_rows(table) -> Iterator:
     for node in table.childNodes:
         tag = getattr(node, "qname", (None, None))[1]
@@ -351,6 +367,19 @@ def _odf_rows(table) -> Iterator:
             yield node
         elif tag in {"table-rows", "table-header-rows", "table-row-group"}:
             yield from _odf_rows(node)
+
+
+def _odf_cells(row) -> list[str]:
+    cells = []
+    for cell in row.childNodes:
+        tag = getattr(cell, "qname", (None, None))[1]
+        if tag not in {"table-cell", "covered-table-cell"}:
+            continue
+        count = int(cell.getAttribute("numbercolumnsrepeated") or 1)
+        if not 1 <= count <= 16384 or len(cells) + count > 16384:
+            raise ValueError("ODS column repetition exceeds spreadsheet dimensions")
+        cells.extend([_odf_cell_text(cell)] * count)
+    return cells
 
 
 def _odf_cell_text(cell) -> str:
@@ -377,19 +406,6 @@ def _odf_cell_text(cell) -> str:
     return value
 
 
-def _odf_cells(row) -> list[str]:
-    cells = []
-    for cell in row.childNodes:
-        tag = getattr(cell, "qname", (None, None))[1]
-        if tag not in {"table-cell", "covered-table-cell"}:
-            continue
-        count = int(cell.getAttribute("numbercolumnsrepeated") or 1)
-        if not 1 <= count <= 16384 or len(cells) + count > 16384:
-            raise ValueError("ODS column repetition exceeds spreadsheet dimensions")
-        cells.extend([_odf_cell_text(cell)] * count)
-    return cells
-
-
 def _odf_row_text(
     row, cells: list[str], number: int, left: int, right: int
 ) -> Iterator[str]:
@@ -399,19 +415,3 @@ def _odf_row_text(
     for column, value in enumerate(cells, 1):
         if left <= column <= right and value:
             yield f"{get_column_letter(column)}{number}: {value}\n\n"
-
-
-def _odf_values(table, bounds: tuple[int, int, int, int]) -> Iterator[str]:
-    index = 0
-    for row in _odf_rows(table):
-        repeats = int(row.getAttribute("numberrowsrepeated") or 1)
-        if not 1 <= repeats <= 1048576 or index + repeats > 1048576:
-            raise ValueError("ODS row repetition exceeds spreadsheet dimensions")
-        cells = _odf_cells(row)
-        first, last = max(index + 1, bounds[1]), min(index + repeats, bounds[3])
-        index += repeats
-        if any(cells):
-            for number in range(first, last + 1):
-                yield from _odf_row_text(row, cells, number, bounds[0], bounds[2])
-        if index >= bounds[3]:
-            return

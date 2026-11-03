@@ -17,6 +17,9 @@ automation and Harnessed browser agents.
   prompt omission; expose native provenance inspection through `browser_kit()`.
 - Accept native trace redaction policies and application content filters in the
   shared example telemetry helper, with lazy optional imports.
+- Upgrade development checks to Smelt 0.5.0 with an offline editor schema,
+  grouped debt baseline and additional source/test rules. Preserve explicitly
+  supplied falsy options and strategies instead of replacing them with defaults.
 
 Python 3.12–3.14 is covered by CI on Windows and Linux; real Chrome integration
 tests run on Linux. macOS requires explicit Chrome selection and has no CI coverage.

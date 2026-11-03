@@ -16,7 +16,7 @@ from .core import (
     TabGesture,
 )
 
-__all__ = [
+__all__ = [  # smelt: ignore[SMT330] -- browserrig.kinds is a public compatibility facade
     "ActionKind",
     "ActivityKind",
     "ActivityOutcome",

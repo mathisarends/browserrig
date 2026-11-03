@@ -216,6 +216,19 @@ class Tabs:
             TabActivatedEvent(target_id=tab.id, document_id=tab.document_id)
         )
 
+    async def _on_target_info(self, info: TargetInfo) -> None:
+        if known := self._tabs.get(info.target_id):
+            known.url, known.title = info.url, info.title
+            await known.report_change()
+        elif (
+            info.type == "page"
+            and self._context
+            and info.browser_context_id == self._context
+        ):
+            await self._attach(
+                info.target_id, opened=True, opener_id=info.opener_id or ""
+            )
+
     async def _attach(
         self, target_id: str, *, opened: bool = False, opener_id: str = ""
     ) -> Tab:
@@ -260,28 +273,6 @@ class Tabs:
                 await self._detach(attached.session_id)
                 raise
 
-    async def _detach(self, session_id: str) -> None:
-        self._sessions.pop(session_id, None)
-        self._worlds.invalidate(session_id=session_id)
-        if self.client.is_connected:
-            # The target may already have been destroyed by its owner.
-            with suppress(Exception):
-                await self.client.target.detach_from_target(session_id=session_id)
-
-    async def _forget(self, target_id: str) -> None:
-        self._closed_targets.add(target_id)
-        tab = self._tabs.pop(target_id, None)
-        for sid, tid in tuple(self._sessions.items()):
-            if tid == target_id:
-                self._sessions.pop(sid, None)
-                self._worlds.invalidate(session_id=sid)
-        if self._active == target_id:
-            self._active = ""
-        self._input.mouse.forget(target_id)
-        if tab is not None:
-            await tab.discard()
-            await self._emit(TabClosedEvent(target_id=target_id))
-
     async def _discover_frames(
         self, tab: Tab
     ) -> tuple[tuple[Frame, ...], tuple[str, ...]]:
@@ -293,10 +284,6 @@ class Tabs:
             if target_id not in self._tabs and target_id not in live:
                 await self._detach(sid)
         return await discover_frames(tab, targets, self._frame_session)
-
-    async def _targets(self) -> tuple[TargetInfo, ...]:
-        result = await self.client.target.get_targets()
-        return tuple(result.target_infos)
 
     async def _frame_session(self, frame_id: str) -> CdpSession:
         """Reuse owned OOPIF sessions; discard stale sessions when targets disappear."""
@@ -320,6 +307,32 @@ class Tabs:
                     raise
             return self.client.session(sid)
 
+    async def _detach(self, session_id: str) -> None:
+        self._sessions.pop(session_id, None)
+        self._worlds.invalidate(session_id=session_id)
+        if self.client.is_connected:
+            # The target may already have been destroyed by its owner.
+            with suppress(Exception):
+                await self.client.target.detach_from_target(session_id=session_id)
+
+    async def _forget(self, target_id: str) -> None:
+        self._closed_targets.add(target_id)
+        tab = self._tabs.pop(target_id, None)
+        for sid, tid in tuple(self._sessions.items()):
+            if tid == target_id:
+                self._sessions.pop(sid, None)
+                self._worlds.invalidate(session_id=sid)
+        if self._active == target_id:
+            self._active = ""
+        self._input.mouse.forget(target_id)
+        if tab is not None:
+            await tab.discard()
+            await self._emit(TabClosedEvent(target_id=target_id))
+
+    async def _targets(self) -> tuple[TargetInfo, ...]:
+        result = await self.client.target.get_targets()
+        return tuple(result.target_infos)
+
     def _invalidate_contexts(self, event: object, session_id: str) -> None:
         match event:
             case ExecutionContextsClearedEvent():
@@ -330,19 +343,6 @@ class Tabs:
                 self._worlds.invalidate(frame_id=frame.id)
                 for tab in self._tabs.values():
                     tab.layout_changed()
-
-    async def _on_target_info(self, info: TargetInfo) -> None:
-        if known := self._tabs.get(info.target_id):
-            known.url, known.title = info.url, info.title
-            await known.report_change()
-        elif (
-            info.type == "page"
-            and self._context
-            and info.browser_context_id == self._context
-        ):
-            await self._attach(
-                info.target_id, opened=True, opener_id=info.opener_id or ""
-            )
 
 
 async def _enable_session(

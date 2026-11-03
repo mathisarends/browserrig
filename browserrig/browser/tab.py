@@ -82,58 +82,6 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self._current_action = current_action
         self._on_change = on_change
 
-    async def emit(self, event: BrowserEvent | LiveEvent) -> None:
-        if self._emit is not None:
-            await self._emit(
-                replace(event, target_id=self.id, document_id=self.document_id)
-            )
-
-    async def report_change(self, *, settled: bool = False) -> None:
-        """Tell the change listener that url, title or loading may have changed."""
-        if self._on_change is not None:
-            await self._on_change(self, settled)
-
-    async def discard(self) -> None:
-        self.closed = True
-        await self.report_change()
-
-    async def read_strip(self) -> TabStrip:
-        """Read the title and icon URL the document declares for a tab strip."""
-        frame = await self.main_frame()
-        return await frame.run(TAB_STRIP)
-
-    async def load_icon(self, url: str) -> str:
-        """Load an icon through the page's own network stack, as a `data:` URI."""
-        return await load_favicon(self.cdp, self._main_frame_id, url)
-
-    def layout_changed(self) -> None:
-        """Forget cached frame geometry after input, scrolling or navigation moved content."""
-        self._layout_revision += 1
-
-    async def viewport_size(self) -> tuple[float, float]:
-        viewport = (await self.cdp.page.get_layout_metrics()).css_layout_viewport
-        return viewport.client_width, viewport.client_height
-
-    async def frames(self) -> tuple[Frame, ...]:
-        """Return every frame with its viewport transform; `frame_limitations` explains gaps.
-
-        One discovery is reused within an action until input or navigation invalidates it.
-        """
-        if self._discover_frames is None:
-            raise BrowserError("Frame discovery is unavailable for this tab")
-        key = (self.document_id, self._current_action(), self._layout_revision)
-        if key[1] and key == self._frames_key:
-            return self._frames
-        frames, self.frame_limitations = await self._discover_frames(self)
-        if key[1] and key == (
-            self.document_id,
-            self._current_action(),
-            self._layout_revision,
-        ):
-            self._frames_key = key
-            self._frames = frames
-        return frames
-
     async def handle(self, event: object) -> None:
         """Apply a page event that arrived on this tab's own CDP session."""
         match event:
@@ -192,18 +140,29 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
                 self.input.dialog_opened.clear()
                 await self.emit(DialogHandledEvent(accepted=accepted))
 
-    async def main_frame(self) -> Frame:
-        tree = await self.frame_tree()
-        return Frame(
-            tree.frame.id,
-            self.cdp,
-            document_id=tree.frame.loader_id,
-            worlds=self.worlds,
-        )
+    async def emit(self, event: BrowserEvent | LiveEvent) -> None:
+        if self._emit is not None:
+            await self._emit(
+                replace(event, target_id=self.id, document_id=self.document_id)
+            )
 
-    async def frame_tree(self) -> FrameTree:
-        result = await self.cdp.page.get_frame_tree()
-        return result.frame_tree
+    async def discard(self) -> None:
+        self.closed = True
+        await self.report_change()
+
+    async def report_change(self, *, settled: bool = False) -> None:
+        """Tell the change listener that url, title or loading may have changed."""
+        if self._on_change is not None:
+            await self._on_change(self, settled)
+
+    async def read_strip(self) -> TabStrip:
+        """Read the title and icon URL the document declares for a tab strip."""
+        frame = await self.main_frame()
+        return await frame.run(TAB_STRIP)
+
+    async def load_icon(self, url: str) -> str:
+        """Load an icon through the page's own network stack, as a `data:` URI."""
+        return await load_favicon(self.cdp, self._main_frame_id, url)
 
     async def sync_document(self) -> None:
         if self.dialog is not None:
@@ -216,19 +175,6 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self.document_id = tree.frame.loader_id
         self.url = tree.frame.url
         self._main_frame_id = tree.frame.id
-
-    async def go_back(self) -> bool:
-        return await self._history(-1)
-
-    async def go_forward(self) -> bool:
-        return await self._history(1)
-
-    async def can_go_forward(self) -> bool:
-        history = await self.cdp.page.get_navigation_history()
-        return history.current_index + 1 < len(history.entries)
-
-    async def reload(self) -> None:
-        await self.cdp.page.reload()
 
     async def evaluate(self, expression: str, *, timeout: float = 10) -> str:
         """Evaluate once in the main page world and render its completion value."""
@@ -267,6 +213,60 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
             self.layout_changed()
             with suppress(CDPCommandError):
                 await self.cdp.runtime.release_object_group(object_group=group)
+
+    def layout_changed(self) -> None:
+        """Forget cached frame geometry after input, scrolling or navigation moved content."""
+        self._layout_revision += 1
+
+    async def viewport_size(self) -> tuple[float, float]:
+        viewport = (await self.cdp.page.get_layout_metrics()).css_layout_viewport
+        return viewport.client_width, viewport.client_height
+
+    async def frames(self) -> tuple[Frame, ...]:
+        """Return every frame with its viewport transform; `frame_limitations` explains gaps.
+
+        One discovery is reused within an action until input or navigation invalidates it.
+        """
+        if self._discover_frames is None:
+            raise BrowserError("Frame discovery is unavailable for this tab")
+        key = (self.document_id, self._current_action(), self._layout_revision)
+        if key[1] and key == self._frames_key:
+            return self._frames
+        frames, self.frame_limitations = await self._discover_frames(self)
+        if key[1] and key == (
+            self.document_id,
+            self._current_action(),
+            self._layout_revision,
+        ):
+            self._frames_key = key
+            self._frames = frames
+        return frames
+
+    async def main_frame(self) -> Frame:
+        tree = await self.frame_tree()
+        return Frame(
+            tree.frame.id,
+            self.cdp,
+            document_id=tree.frame.loader_id,
+            worlds=self.worlds,
+        )
+
+    async def frame_tree(self) -> FrameTree:
+        result = await self.cdp.page.get_frame_tree()
+        return result.frame_tree
+
+    async def go_back(self) -> bool:
+        return await self._history(-1)
+
+    async def go_forward(self) -> bool:
+        return await self._history(1)
+
+    async def can_go_forward(self) -> bool:
+        history = await self.cdp.page.get_navigation_history()
+        return history.current_index + 1 < len(history.entries)
+
+    async def reload(self) -> None:
+        await self.cdp.page.reload()
 
     async def handle_dialog(self, *, accept: bool, text: str = "") -> None:
         await self.cdp.page.handle_java_script_dialog(accept=accept, prompt_text=text)
