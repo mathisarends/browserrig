@@ -72,6 +72,55 @@ public API outside the checkout. CI runs it on every supported Python/OS pair.
 Before publishing, run the checks above and the Chrome integration suite, review
 `CHANGELOG.md`, and verify the package metadata and license in the built artifacts.
 
+### Automated PyPI releases
+
+`.github/workflows/release.yml` publishes through PyPI Trusted Publishing. It
+reruns the complete CI suite on the selected commit, requires a release tag on
+`main`, checks matching versions and changelog notes, and builds a wheel from the
+source distribution. Twine checks the upload metadata and README, and the clean
+wheel check verifies the actual artifact before a separate job uploads it to PyPI.
+The publish job downloads these artifacts without checking out or rebuilding code.
+
+The PyPI trusted publisher must use these values:
+
+| Setting | Value |
+| --- | --- |
+| PyPI project | `browserrig` |
+| GitHub owner | `mathisarends` |
+| GitHub repository | `browserrig` |
+| Workflow filename | `release.yml` |
+| GitHub environment | `pypi` |
+
+Create the `pypi` environment in the repository settings. Add required reviewers
+there if publication should wait for a separate manual approval after creating the
+tag or GitHub release. No PyPI API token or repository secret is needed. See the
+[PyPI Trusted Publishing guide](https://docs.pypi.org/trusted-publishers/using-a-publisher/).
+
+To check the entire release process without publishing, select **Actions → Release
+package → Run workflow** on `main`. This manual trigger runs CI and uploads the
+verified distributions as a workflow artifact; it always skips the PyPI job.
+
+To publish a version:
+
+1. Prepare and merge a PR with the same version in `pyproject.toml` and
+   `browserrig/__init__.py`. Keep `uv.lock` current (`uv lock`) and add the matching
+   `## <version>` section to `CHANGELOG.md`, replacing any `unreleased` label with
+   the release date. The initial `0.1.0` metadata and notes are already present.
+2. Once `main` is green, manually publish a GitHub release with a matching tag,
+   such as `v0.1.0`, targeting the prepared commit on `main`. Alternatively, push
+   that tag yourself: `git tag v0.1.0 <commit>` and `git push origin v0.1.0`.
+3. Watch **Actions → Release package** and approve the `pypi` environment if required
+   reviewers are configured. Both stable and prerelease tags must exactly match
+   `v` plus the Python package version (for example `v0.2.0rc1`).
+
+Branch pushes, pull requests, draft GitHub releases and manual workflow runs do
+not publish. A version tag push starts publication even if a GitHub release for
+that tag is still a draft. Publishing a GitHub release for an already pushed tag
+may start another run; runs for the same tag are serialized, and existing PyPI
+files are skipped. For a transient failure, rerun the failed workflow rather than
+moving a published tag. PyPI versions cannot be overwritten; changes need a new
+version and tag. This setup PR creates no release or tag itself.
+
 ## Harnessed compatibility
 
 The opt-in `Done` plugin uses native hooks for continuation and tool execution.

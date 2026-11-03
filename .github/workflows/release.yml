@@ -1,0 +1,83 @@
+name: Release package
+
+on:
+  push:
+    tags: ['v*']
+  release:
+    types: [published]
+  # A manual run checks and builds only. Publishing requires a tag or release.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  build:
+    name: Build and verify release artifacts
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.9.2'
+          python-version: '3.14'
+      - name: Validate version, tag and main ancestry
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || (github.ref_type == 'tag' && github.ref_name) || '' }}
+        run: |
+          args=()
+          if [[ -n "$RELEASE_TAG" ]]; then
+            git merge-base --is-ancestor HEAD origin/main || {
+              echo 'Release tags must point to a commit on main.' >&2
+              exit 1
+            }
+            args+=(--tag "$RELEASE_TAG")
+          fi
+          uv run --no-project python tests/check_release.py "${args[@]}"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+      # uv builds the wheel from the sdist, so both upload artifacts are exercised.
+      - run: uv build --out-dir dist/release
+      - name: Check PyPI metadata and README rendering
+        run: uvx twine check --strict dist/release/*
+      - name: Check installed release wheel in a clean environment
+        run: uv run --no-project python tests/check_distribution.py dist/release
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: python-release-distributions
+          path: dist/release/*
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish verified artifacts to PyPI
+    if: github.event_name == 'push' || github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/project/browserrig/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: python-release-distributions
+          path: dist/
+      - name: Publish with PyPI Trusted Publishing
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
+        with:
+          # Tag pushes and published releases can refer to the same version.
+          skip-existing: true
