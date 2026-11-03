@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-11-03)
 
 Initial public release of Browserrig, a Python library for event-driven Chrome
 automation and Harnessed browser agents.
