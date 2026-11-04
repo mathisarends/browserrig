@@ -11,7 +11,7 @@ from harnessed.kernel import PluginLike
 from harnessed.models import Model
 from harnessed.sessions import SessionStore
 
-from .browser import BrowserOptions, Chrome
+from .browser import Chrome
 from .composition import browser_kit
 
 DEFAULT_PROMPT = "Complete the requested browser task using the observed page state."
@@ -37,7 +37,7 @@ class Agent(harnessed.Agent):
         self,
         *,
         model: Model | str | None = None,
-        browser: Chrome | BrowserOptions | None = None,
+        browser: Chrome | None = None,
         plugins: Iterable[PluginLike | Kit | None] = (),
         without: Iterable[type[Plugin]] = (),
         instructions: str | None = DEFAULT_PROMPT,

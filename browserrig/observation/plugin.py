@@ -43,7 +43,7 @@ from .handle import DomElementHandle
 from .models import CapturedImage, Snapshot
 from .references import ElementHandle, References
 from .renderer import DomRenderer, Renderer
-from .state import ObserveState
+from .state import BrowserPerceptionState
 
 # Below the session's default 32,000-character tool output limit, which would cut the
 # middle out of a longer result instead of letting the agent page on with an offset.
@@ -57,9 +57,16 @@ _TRUST = Instructions(
 )
 
 
-class Observe(Plugin, slot="browserrig.observation", provides=True):
+class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
+    """Provide the agent's current view of the browser before each model step.
+
+    Capture and render page structure, element references and optional screenshots.
+    Keep the live reference resolver for browser actions; `ImageContext` separately
+    controls image history. Resources and mutable state belong to each session.
+    """
+
     events = (ObservationCapturedEvent,)
-    _state = PluginState(ObserveState)
+    _state = PluginState(BrowserPerceptionState)
     _browser = dependency(Browser)
     _events = dependency(BrowserEvents)
     _readiness = dependency(Readiness)

@@ -17,7 +17,7 @@ from browserrig import Browser
 from browserrig.browser import BrowserEvents
 from browserrig.core import ReadinessStatus
 from browserrig.input import Input
-from browserrig.observation import DomReferences, Observe
+from browserrig.observation import BrowserPerception, DomReferences
 from browserrig.readiness import Readiness, ReadinessReport
 from browserrig.scripts import DOMProbe
 
@@ -153,7 +153,7 @@ class FakeServices(Plugin, provides=True):
         ctx.provide(Browser, self.browser)
         ctx.provide(BrowserEvents, self.browser.events)
         ctx.provide(Readiness, self.readiness)
-        ctx.provide(Observe, self.observe)
+        ctx.provide(BrowserPerception, self.observe)
 
 
 @asynccontextmanager

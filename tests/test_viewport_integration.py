@@ -11,11 +11,12 @@ from harnessed.testing import CallbackModel
 from browserrig import (
     Actions,
     Agent,
+    Chrome,
     ChromeBrowser,
     DomCapture,
-    Launch,
     wait_for_page,
 )
+from browserrig.browser import Launch
 from browserrig.core import StaleElement
 from browserrig.events import ActionFinishedEvent
 from browserrig.observation import capture, render
@@ -113,7 +114,7 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
 
     agent = Agent(
         model=CallbackModel(respond),
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
     )
     async with agent.session() as session:
@@ -200,7 +201,7 @@ async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
 
     agent = Agent(
         model=CallbackModel(respond),
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
     )
     async with agent.session() as session:
@@ -268,7 +269,7 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(
 
     agent = Agent(
         model=CallbackModel(respond),
-        browser=Launch(url=site + "/frames", arguments=("--site-per-process",)),
+        browser=Chrome.launch(url=site + "/frames", arguments=("--site-per-process",)),
         plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
     )
     async with agent.session() as session:
@@ -315,7 +316,7 @@ async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target
 
     agent = Agent(
         model=CallbackModel(respond),
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
     )
     async with agent.session() as session:

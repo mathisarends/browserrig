@@ -53,7 +53,7 @@ from browserrig.files import (
     FileSystemState,
     FileSystemView,
 )
-from browserrig.observation import Observe
+from browserrig.observation import BrowserPerception
 from browserrig.readiness import Readiness
 
 from .effects import Effect
@@ -99,7 +99,7 @@ class FileTools(Plugin):
     _browser = dependency(Browser)
     _events = dependency(BrowserEvents)
     _readiness = dependency(Readiness)
-    _observe = dependency(Observe)
+    _observe = dependency(BrowserPerception)
 
     _actions = dependency(Actions)
 

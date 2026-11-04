@@ -14,10 +14,10 @@ from harnessed.plugins import Compaction as ContextCompaction
 from harnessed.plugins import ContextState
 
 from .activity import Activity
-from .browser import BrowserOptions, Chrome
+from .browser import Chrome
 from .choreography import InputVisualization, TabStrip
 from .nudges import Nudges
-from .observation import ImageContext, Observe
+from .observation import BrowserPerception, ImageContext
 from .pacing import InputPacing
 from .readiness import DownloadReadiness, Readiness
 from .tools import (
@@ -36,13 +36,13 @@ from .tools import (
 
 def browser_plugins(
     *plugins: PluginLike | Kit | None,
-    browser: Chrome | BrowserOptions | None = None,
+    browser: Chrome | None = None,
     without: Iterable[type[Plugin]] = (),
 ) -> list[PluginLike]:
     """The default browser agent plugins, adjusted by `plugins` and `without`.
 
     A plugin that fills the same slot as a default
-    replaces it in place, such as `Observe(...)`, `Readiness(...)` or
+    replaces it in place, such as `BrowserPerception(...)`, `Readiness(...)` or
     `ContextCompaction(...)`; any other plugin is added. `without` drops defaults by type,
     such as `(FileTools,)` for an agent without local files. `None`
     entries are skipped, so optional plugins can be written inline.
@@ -53,18 +53,22 @@ def browser_plugins(
     return list(composition.resolve(prompt=KitPromptPolicy.OMIT).plugins)
 
 
-def browser_kit(*, browser: Chrome | BrowserOptions | None = None) -> Kit:
+def browser_kit(*, browser: Chrome | None = None) -> Kit:
     """Browser defaults with Markdown instructions in configured plugin-list order.
 
     Pass a configured `Chrome` plugin, such as `Chrome.launch(url=...)` or
-    `Chrome.connect(endpoint=...)`. Legacy `Launch` and `Connect` options also work.
+    `Chrome.connect(endpoint=...)`.
     Resources open only when the kit is mounted in a session.
     """
+    if browser is not None and not isinstance(browser, Chrome):
+        raise TypeError(
+            "browser must be a Chrome plugin; use Chrome.launch(...) or Chrome.connect(...)"
+        )
     return Kit(
         name="browserrig",
         plugins=[
             Activity(),
-            browser if isinstance(browser, Chrome) else Chrome(browser),
+            browser if browser is not None else Chrome(),
             # Types and moves the pointer at a person's pace.
             InputPacing(),
             # Streams input and browser UI for anyone watching the session.
@@ -74,7 +78,7 @@ def browser_kit(*, browser: Chrome | BrowserOptions | None = None) -> Kit:
             Readiness(),
             DownloadReadiness(),
             Nudges(),
-            Observe(),
+            BrowserPerception(),
             ImageContext(),
             # Explain screenshot coordinates before the chains that refer to them.
             # Harnessed resolves setup dependencies independently of prompt order.

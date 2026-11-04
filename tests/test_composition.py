@@ -11,13 +11,12 @@ from harnessed.testing import ScriptedModel
 
 import browserrig
 from browserrig import (
+    BrowserPerception,
     Chrome,
     FileSystemOptions,
     ImageContext,
     InputPacing,
     InputVisualization,
-    Launch,
-    Observe,
     Readiness,
     ReadinessOptions,
     Screenshots,
@@ -29,12 +28,22 @@ from browserrig import (
     browser_plugins,
 )
 from browserrig.input import Instant
+from browserrig.observation import BrowserPerception as PerceptionExport
 from browserrig.tools import (
     FileTools,
     FormTools,
     JavaScriptTools,
     PointerTools,
 )
+
+
+def test_browser_perception_is_exported_without_legacy_top_level_names():
+    assert BrowserPerception is PerceptionExport
+    assert BrowserPerception.__name__ == "BrowserPerception"
+    assert not {"Observe", "Launch", "Connect"}.intersection(browserrig.__all__)
+    assert not any(
+        hasattr(browserrig, name) for name in ("Observe", "Launch", "Connect")
+    )
 
 
 def test_facade_configures_resources_without_opening_them_and_accepts_extra_plugins(
@@ -47,16 +56,20 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
             )
 
     file_system = FileSystemOptions(directory=tmp_path / "files")
-    options = Launch(url="https://example.com", headless=False, files=file_system)
+    browser = Chrome.launch(
+        url="https://example.com", headless=False, files=file_system
+    )
     readiness = ReadinessOptions(quiet_ms=123)
     approvals = Approvals(default=PolicyDecision.DENY)
     extension = Extension()
     agent = browserrig.Agent(
         model=ScriptedModel(["ok"]),
-        browser=options,
+        browser=browser,
         instructions="Custom instructions.",
         plugins=[
-            Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+            BrowserPerception(
+                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
+            ),
             Readiness(options=readiness),
             approvals,
             extension,
@@ -64,10 +77,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
         without=(Compaction,),
     )
     assert isinstance(agent, Agent)
-    assert (
-        next(item for item in agent.plugins if isinstance(item, Chrome)).options
-        == options
-    )
+    assert next(item for item in agent.plugins if isinstance(item, Chrome)) is browser
     assert (
         next(item for item in agent.plugins if isinstance(item, Readiness)).options
         == readiness
@@ -139,7 +149,9 @@ def test_facade_import_and_scripted_model_do_not_require_provider_sdks():
 
 
 def test_plugins_replace_matching_defaults_in_place():
-    observe = Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))
+    observe = BrowserPerception(
+        screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
+    )
     images = ImageContext(skip_unchanged=False)
     compaction = Compaction(trigger=WindowRatio(0.5))
     defaults = browser_plugins()
@@ -148,7 +160,7 @@ def test_plugins_replace_matching_defaults_in_place():
         type(plugin) for plugin in defaults
     ]
     assert observe in composed and images in composed and compaction in composed
-    assert composed.index(observe) == _index(defaults, Observe)
+    assert composed.index(observe) == _index(defaults, BrowserPerception)
     assert composed.index(images) == _index(defaults, ImageContext)
 
 
@@ -161,8 +173,8 @@ def test_plugins_without_a_matching_default_are_added_and_none_is_skipped():
 
 
 def test_two_plugins_for_the_same_default_conflict():
-    with pytest.raises(PluginConflict, match="Observe"):
-        browser_plugins(Observe(), Observe())
+    with pytest.raises(PluginConflict, match="BrowserPerception"):
+        browser_plugins(BrowserPerception(), BrowserPerception())
     with pytest.raises(PluginConflict, match="browserrig.images"):
         browser_plugins(ImageContext(), ImageContext())
 

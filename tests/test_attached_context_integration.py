@@ -1,6 +1,7 @@
 import pytest
 
-from browserrig import ChromeBrowser, Connect
+from browserrig import ChromeBrowser
+from browserrig.browser import Connect
 
 pytestmark = pytest.mark.integration
 

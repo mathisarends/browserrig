@@ -16,7 +16,14 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import AgentLoop, Approvals, FinalStepPolicy
 from harnessed.testing import CallbackModel, ScriptedModel
 
-from browserrig import Agent, Browser, Launch, Observe, Readiness, ReadinessOptions
+from browserrig import (
+    Agent,
+    Browser,
+    BrowserPerception,
+    Chrome,
+    Readiness,
+    ReadinessOptions,
+)
 from browserrig.events import ActionFinishedEvent, ObservationCapturedEvent
 from browserrig.kinds import ActionKind
 from tests.javascript import evaluate
@@ -214,7 +221,7 @@ async def test_tab_actions_keep_their_distinct_kinds_in_durable_receipts(site):
 
     agent = Agent(
         model=CallbackModel(respond),
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[Access(), Approvals(default=PolicyDecision.ALLOW)],
     )
     result = await agent.run("Manage tabs")
@@ -242,7 +249,7 @@ async def test_reserved_final_summary_uses_effective_limit_and_remains_incomplet
     model = ScriptedModel(["Partial browser findings"])
     agent = Agent(
         model=model,
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[
             AgentLoop(max_steps=10, final_step=FinalStepPolicy.SUMMARIZE),
             Progress(),
@@ -258,9 +265,12 @@ async def test_reserved_final_summary_uses_effective_limit_and_remains_incomplet
 async def _run(site, markup, plan):
     holder, observations = {}, []
 
-    class Page(Plugin, needs=(Browser, Observe)):
+    class Page(Plugin, needs=(Browser, BrowserPerception)):
         async def setup(
-            self, _ctx: Context, browser: Inject[Browser], observe: Inject[Observe]
+            self,
+            _ctx: Context,
+            browser: Inject[Browser],
+            observe: Inject[BrowserPerception],
         ):
             holder.update(browser=browser, observe=observe)
             await evaluate(
@@ -287,7 +297,7 @@ async def _run(site, markup, plan):
 
     agent = Agent(
         model=CallbackModel(respond),
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[
             Readiness(options=ReadinessOptions(quiet_ms=30, navigation_min_ms=50)),
             Approvals(default=PolicyDecision.ALLOW),

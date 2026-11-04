@@ -10,7 +10,7 @@ from harnessed.models import ImagePart, ImageReference, ModelRequest, TextPart
 from browserrig.events import ObservationCapturedEvent
 
 from .models import CapturedImage
-from .plugin import Observe
+from .plugin import BrowserPerception
 from .state import ImageState
 
 _INSTRUCTIONS = Instructions(
@@ -78,7 +78,7 @@ class ImageContext(Plugin, slot="browserrig.images"):
     """
 
     _state = PluginState(ImageState)
-    _observe = dependency(Observe)
+    _observe = dependency(BrowserPerception)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)

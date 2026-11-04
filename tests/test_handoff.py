@@ -25,11 +25,11 @@ from harnessed.testing import ScriptedModel, call
 import browserrig
 from browserrig import (
     Activity,
+    BrowserPerception,
     HandoffReceipt,
     HumanHandoff,
     HumanResponse,
     Nudges,
-    Observe,
     Readiness,
     ReadinessOptions,
     Secret,
@@ -100,7 +100,7 @@ def _agent(responses, ask, *, extra=(), **options):
             FakeChrome(holder),
             Readiness(options=ReadinessOptions(navigation_min_ms=0)),
             *extra,
-            Observe(capture=_Capture()),
+            BrowserPerception(capture=_Capture()),
             Nudges(),
             HumanHandoff(ask=ask, **options),
             _Step(),
@@ -208,7 +208,7 @@ async def test_done_without_a_note_or_page_change_does_not_claim_login_success()
 
 async def test_failed_comparison_still_returns_a_typed_receipt_and_refreshes_the_page():
     async def ask(_request):
-        session.ctx[Observe].probe = AsyncMock(
+        session.ctx[BrowserPerception].probe = AsyncMock(
             side_effect=RuntimeError("Capture unavailable")
         )
         holder["browser"].active_tab.title = "Changed by human"
@@ -324,7 +324,7 @@ async def test_running_pause_cannot_lose_a_resume_while_a_probe_is_slow(monkeypa
     )
     async with agent.session() as session:
         browser = _prepare(holder)
-        observe = session.ctx[Observe]
+        observe = session.ctx[BrowserPerception]
         probe = observe.probe
 
         async def slow_probe(tab):

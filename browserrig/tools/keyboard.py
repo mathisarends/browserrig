@@ -5,7 +5,7 @@ from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind
 from browserrig.core import browser_tool as tool
 from browserrig.input import TypedText
-from browserrig.observation import Observe
+from browserrig.observation import BrowserPerception
 from browserrig.secrets import Secrets
 
 from .effects import Effect
@@ -16,7 +16,7 @@ class KeyboardTools(Plugin, needs=(Actions,)):
     """Keyboard input to the current focus, plus typing into a DOM ref when refs exist."""
 
     _browser = dependency(Browser)
-    _observe = dependency(Observe)
+    _observe = dependency(BrowserPerception)
 
     @tool(
         kind=ActionKind.PRESS,

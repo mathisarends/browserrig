@@ -47,7 +47,7 @@ class BrowserEvents:
 
 
 class Browser(Protocol):
-    # Shared by Observe and Actions; it cannot live in either without a dependency cycle.
+    # Shared by BrowserPerception and Actions; it cannot live in either without a dependency cycle.
     action_lock: asyncio.Lock
     files: FileSystem | None
     # The browser's one mouse and keyboard; they act on the active tab.

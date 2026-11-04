@@ -15,7 +15,8 @@ flowchart LR
 Use the browser without an LLM inside an async function:
 
 ```python
-from browserrig import ChromeBrowser, Launch, wait_for_page
+from browserrig import ChromeBrowser, wait_for_page
+from browserrig.browser import Launch
 from browserrig.scripts import PAGE_FACTS
 
 async with ChromeBrowser(Launch(url="https://example.com")) as browser:
@@ -55,10 +56,10 @@ to read the page. The agent can call `screenshot()` to request the current view 
 image in its next iteration. `ImageContext` keeps the latest screenshot by default,
 including during subsequent text-only steps until compaction removes its snapshot.
 `observe()` refreshes page state. Use
-`Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` to enable images
+`BrowserPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` to enable images
 on every step. Pass it in `plugins` of `Agent` or `browser_plugins()`; it replaces
-the default `Observe()`.
-`Observe(capture=DomCapture(max_text_chars=N))` enables a page-text excerpt; its
+the default `BrowserPerception()`.
+`BrowserPerception(capture=DomCapture(max_text_chars=N))` enables a page-text excerpt; its
 default is `0`. When the viewport holds fewer than five named controls, as on error, challenge
 and confirmation pages, observations add up to `sparse_text_chars` (default `1500`)
 characters of visible text anyway. Every observation states where the mouse rests.
@@ -110,7 +111,7 @@ Requested DOM screenshots draw a labeled, colored dashed border around every ele
 in the viewport; each label is the element's ref. Links use blue borders, buttons
 green, text inputs purple, and selection controls pink or orange. Screenshots use
 viewport CSS pixels even on HiDPI displays. Annotations are drawn on the image
-without changing the page. Use `Observe(capture=DomCapture(marks=False))` for plain screenshots.
+without changing the page. Use `BrowserPerception(capture=DomCapture(marks=False))` for plain screenshots.
 
 Extraction follows the composed DOM, including slots, open and closed shadow roots,
 and CDP click-listener metadata. It checks viewport visibility, clipping and

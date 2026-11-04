@@ -8,16 +8,17 @@ from harnessed.testing import ScriptedModel
 from browserrig import (
     Actions,
     Browser,
+    BrowserPerception,
+    Chrome,
     ChromeBrowser,
     FileTools,
-    Launch,
-    Observe,
     Point,
     Readiness,
     ReadinessOptions,
     browser_plugins,
     wait_for_page,
 )
+from browserrig.browser import Launch
 from browserrig.core import ActionKind, ReadinessPhase
 from browserrig.events import ReadinessDegradedEvent
 from browserrig.tools.effects import Effect
@@ -87,12 +88,12 @@ async def test_delayed_click_navigation_settles_the_destination(readiness_site):
         prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["Done"]),
         plugins=browser_plugins(
-            browser=Launch(url=readiness_site),
+            browser=Chrome.launch(url=readiness_site),
             without=(FileTools,),
         ),
     )
     async with agent.session() as session:
-        browser, observe = session.ctx[Browser], session.ctx[Observe]
+        browser, observe = session.ctx[Browser], session.ctx[BrowserPerception]
         await observe.capture()
 
         async def click(_tab):
@@ -140,12 +141,12 @@ async def test_navigation_command_itself_is_bounded_before_the_response_commits(
         model=ScriptedModel(["Done"]),
         plugins=browser_plugins(
             Readiness(options=_options(timeout=0.5, navigation_min_ms=0)),
-            browser=Launch(url=readiness_site),
+            browser=Chrome.launch(url=readiness_site),
             without=(FileTools,),
         ),
     )
     async with agent.session() as session:
-        observe = session.ctx[Observe]
+        observe = session.ctx[BrowserPerception]
         await observe.capture()
 
         async def navigate(tab):
@@ -244,12 +245,12 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
         model=model,
         plugins=browser_plugins(
             Readiness(options=_options(timeout=0.5, action_min_ms=0)),
-            browser=Launch(url=readiness_site),
+            browser=Chrome.launch(url=readiness_site),
             without=(FileTools,),
         ),
     )
     async with agent.session() as session:
-        browser, observe = session.ctx[Browser], session.ctx[Observe]
+        browser, observe = session.ctx[Browser], session.ctx[BrowserPerception]
         await observe.capture()
 
         async def start_ticker(tab):
