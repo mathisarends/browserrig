@@ -32,7 +32,7 @@ async def main() -> None:
         await session.steer(
             "Pay particular attention to the navigation and contact information."
         )
-        await session.context.set("constraints", "Do not submit forms.")
+        await session.add_context("Do not submit forms.")
         await session.resume()
         print((await handle.result()).text)
         # Also available: await session.stop() and await session.abort().

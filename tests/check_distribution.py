@@ -13,8 +13,10 @@ from importlib.resources import files
 from pathlib import Path
 
 import browserrig
+from harnessed import Session
 from browserrig.scripts import CONTENT, ELEMENT, SECRET_FIELD
 
+assert callable(Session.add_context)
 assert browserrig.__version__ == importlib.metadata.version('browserrig')
 distribution = importlib.metadata.distribution('browserrig')
 assert distribution.metadata['License-Expression']

@@ -19,7 +19,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "harnessed==0.11.0",
+    "harnessed @ git+https://github.com/mathisarends/harnessed.git@1f9da5468466cbfec718a30c45348c4fecadec3a",
     "cdpify[websocket]>=0.4.0,<0.5",
     "httpx2>=2.16,<3",
     "pillow>=13,<14",
@@ -44,10 +44,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-openai = ["harnessed[openai]==0.11.0"]
-anthropic = ["harnessed[anthropic]==0.11.0"]
-mcp = ["harnessed[mcp]==0.11.0"]
-otel = ["harnessed[otel]==0.11.0"]
+openai = ["harnessed[openai] @ git+https://github.com/mathisarends/harnessed.git@1f9da5468466cbfec718a30c45348c4fecadec3a"]
+anthropic = ["harnessed[anthropic] @ git+https://github.com/mathisarends/harnessed.git@1f9da5468466cbfec718a30c45348c4fecadec3a"]
+mcp = ["harnessed[mcp] @ git+https://github.com/mathisarends/harnessed.git@1f9da5468466cbfec718a30c45348c4fecadec3a"]
+otel = ["harnessed[otel] @ git+https://github.com/mathisarends/harnessed.git@1f9da5468466cbfec718a30c45348c4fecadec3a"]
 
 [project.urls]
 Homepage = "https://github.com/mathisarends/browserrig"
@@ -70,6 +70,9 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["browserrig"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.sdist]
 include = ["browserrig", "examples", "tests", "README.md", "CHANGELOG.md", "LICENSE",

@@ -70,7 +70,7 @@ needed. Hints are withheld during human control and pending action checks are
 discarded; intermediate effects are reported in the handoff receipt instead.
 
 The latest `history_limit` receipts are stored as a JSON array under
-`session.context.values["browser.handoffs"]`. They survive compaction and a
+`session.snapshot().context["browser.handoffs"]` while the session is idle. They survive compaction and a
 `SessionState` round trip, and are validated against `HandoffReceipt` when the
 history is updated. This saves context about the handoff; it does not save the
 browser's cookies or authenticated session.

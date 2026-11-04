@@ -42,11 +42,14 @@ async def test_facade_reopens_history_context_and_image_assets_with_a_new_store(
 ):
     root = tmp_path / "sessions"
     store = JsonSessionStore(root=root)
-    agent = _agent(ScriptedModel(["First answer"]), store=store)
+    initial_model = ScriptedModel(["First answer"])
+    agent = _agent(initial_model, store=store)
     assert not root.exists()
     async with agent.session(id="conversation") as session:
         image = await session.assets.put(b"screenshot", media_type="image/png")
-        await session.context.set("task", "Remember the page")
+        await session.add_context("Remember the page")
+        assert not initial_model.requests
+        assert not session.inbox.pending
         session.observe(
             Observation(
                 source="browser",
@@ -64,7 +67,7 @@ async def test_facade_reopens_history_context_and_image_assets_with_a_new_store(
     async with reopened.session(id="conversation") as session:
         assert session.id == "conversation"
         assert await session.assets.read(image) == b"screenshot"
-        assert session.context.values["task"] == "Remember the page"
+        assert any(message.text == "Remember the page" for message in session.messages)
         assert (await session.run("Continue")).text == "Continued answer"
     messages = model.requests[-1].messages
     assert any("First answer" in message.text for message in messages)

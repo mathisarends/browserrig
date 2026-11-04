@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+- Pin Harnessed and all provider extras to the same Git commit containing the
+  native session API change. Resolving these unreleased dependencies requires Git.
+- Replace `await session.context.set("constraints", "Include source URLs.")`
+  with `await session.add_context("Include source URLs.")`. The native Harnessed
+  session now has one API for adding background without starting a turn or making
+  a model call. Each call appends a user-role text message, including duplicates;
+  there are no keys, replacement or removal operations and no compatibility alias.
+  Await it before starting dependent work. A configured store commits the write
+  before it returns. Contributions survive turns and restoration as conversation
+  history and follow ordinary compaction, which may summarize older text.
+- Remove public `session.context` access. Inspect retained contributions through
+  `session.messages` or `session.snapshot().history`. Plugin-owned named facts,
+  including human-handoff receipts, remain in `session.snapshot().context`.
+  Use `instructions=` for fixed rules and Harnessed's `ContextValue` plugin for
+  changing named facts. Session storage formats are unchanged.
+
 ## 0.1.0 (2026-11-03)
 
 Initial public release of Browserrig, a Python library for event-driven Chrome

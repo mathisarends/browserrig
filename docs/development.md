@@ -123,6 +123,10 @@ version and tag. This setup PR creates no release or tag itself.
 
 ## Harnessed compatibility
 
+The unreleased context API migration pins Harnessed and its extras to one Git
+commit. Replace that direct reference with a published Harnessed version before
+the next PyPI release; `session.add_context(...)` requires the new native API.
+
 The opt-in `Done` plugin uses native hooks for continuation and tool execution.
 Harnessed 0.11.0 has no output-policy hook, so `browserrig/completion.py` contains
 one reversible, per-session bridge around the step runner's output handler. This

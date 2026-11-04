@@ -342,7 +342,8 @@ with the synchronous method above. Existing state-format 1 conversation snapshot
 and version 3 audit envelopes remain compatible.
 
 Install the optional MCP client with `uv sync --locked --extra openai --extra mcp`.
-All Harnessed extras are pinned to **0.11.0**. Add MCP servers through the native plugin:
+Harnessed and all provider extras use the same pinned Git commit for the unreleased
+`session.add_context(...)` API. Add MCP servers through the native plugin:
 
 ```python
 from harnessed.plugins.mcp import MCP
@@ -482,7 +483,7 @@ Inside an `async with agent.session() as session:` block:
 handle = await session.submit("Inspect this page.")
 await session.pause()
 await session.steer("Focus on the navigation.")
-await session.context.set("constraints", "Do not submit forms.")
+await session.add_context("Do not submit forms.")
 await session.resume()
 result = await handle.result()
 ```
@@ -491,6 +492,21 @@ Pausing waits for a complete step boundary and leaves Chromium running.
 `session.stop()` ends the session gracefully; `session.abort()` interrupts it
 immediately. Resuming observes the current page again. Activity tracking uses
 events rather than an LLM decorator.
+
+`await session.add_context(content: str)` is the session API for contributing
+background without starting a turn, waking an idle agent or invoking the model.
+Each call appends a user-role text message, including repeated text. Requests
+assembled after the write see it; an in-flight request is unchanged. Await it
+before starting work that depends on the contribution. With a configured store,
+the contribution is committed before the method returns.
+
+Contributions remain in conversation history across turns and session restoration,
+subject to ordinary compaction; older contributions may be summarized. Inspect
+retained input through `session.messages` or `session.snapshot().history`.
+The former `session.context.set(name, value)` and `remove(name)` APIs are removed:
+use `add_context(value)` for additive background. There are no keys, replacement,
+removal or deduplication. Use agent `instructions=` for fixed rules, or Harnessed's
+`ContextValue` plugin for changing named facts.
 
 ```powershell
 uv run --env-file .env --extra openai python -m examples.controls
