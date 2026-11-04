@@ -11,7 +11,7 @@ from harnessed.kernel import PluginLike
 from harnessed.models import Model
 from harnessed.sessions import SessionStore
 
-from .browser import BrowserOptions
+from .browser import BrowserOptions, Chrome
 from .composition import browser_kit
 
 DEFAULT_PROMPT = "Complete the requested browser task using the observed page state."
@@ -22,7 +22,9 @@ class Agent(harnessed.Agent):
 
     `plugins` replace the defaults they match and add the rest, and `without`
     drops defaults by type; see `browser_kit`. Explicit provider clients
-    remain caller-owned. Conversations stay in memory by default; pass `store`
+    remain caller-owned. Pass `browser=Chrome.launch(...)` to start Chrome or
+    `browser=Chrome.connect(...)` to use an existing browser when the session opens.
+    Conversations stay in memory by default; pass `store`
     to reopen them by ID, or continue with an explicit `SessionState`. Long runs
     summarize older steps once the request fills 80% of the model's context window,
     or 100k tokens when the model reports none. Pass `without=(ContextCompaction,)`
@@ -35,7 +37,7 @@ class Agent(harnessed.Agent):
         self,
         *,
         model: Model | str | None = None,
-        browser: BrowserOptions | None = None,
+        browser: Chrome | BrowserOptions | None = None,
         plugins: Iterable[PluginLike | Kit | None] = (),
         without: Iterable[type[Plugin]] = (),
         instructions: str | None = DEFAULT_PROMPT,

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add `Chrome.launch(...)` and `Chrome.connect(...)` factories that return configured
+  browser plugins for `Agent(browser=...)`, `browser_kit()`, `browser_plugins()` and
+  explicit Harnessed plugin composition. Configuration is validated immediately;
+  browser resources open per session. Existing `Launch` and `Connect` options remain
+  supported, including direct `ChromeBrowser(...)` use.
+
 ## 0.1.0 (2026-11-03)
 
 Initial public release of Browserrig, a Python library for event-driven Chrome

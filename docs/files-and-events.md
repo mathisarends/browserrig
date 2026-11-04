@@ -20,11 +20,11 @@ browser closes. Choose a reusable workspace explicitly:
 
 ```python
 from pathlib import Path
-from browserrig import Agent, FileSystemOptions, Launch
+from browserrig import Agent, Chrome, FileSystemOptions
 
 agent = Agent(
     model=model,
-    browser=Launch(
+    browser=Chrome.launch(
         url="https://example.com",
         files=FileSystemOptions(directory=Path(".browserrig/research")),
     ),
@@ -160,7 +160,7 @@ The file reader uses a shared `FileExtension` enum and a registry of readers wit
 a common call signature and declared selection capabilities. New formats can be
 registered without extending a central parser dispatch chain.
 
-`Launch(download_directory="ABSOLUTE_PATH_ON_BROWSER_HOST")` overrides the
+`Chrome.launch(download_directory="ABSOLUTE_PATH_ON_BROWSER_HOST")` overrides the
 download location. Downloads first use `.pending/` and then move into a folder
 named by their stable download ID, preserving their filename and extension.
 Duplicate filenames get separate folders. `DownloadState` includes `IN_PROGRESS`,
@@ -168,9 +168,9 @@ Duplicate filenames get separate folders. `DownloadState` includes `IN_PROGRESS`
 `Download.total_bytes` is `None` when the server does not announce a size.
 Canceled downloads emit `DownloadCanceledEvent` instead of `DownloadFailedEvent`.
 
-Connected browsers keep their existing host semantics: `Connect` enables
-workspace tools only when `Connect(files=FileSystemOptions(...))` explicitly identifies
-a directory shared with the browser host at the same absolute path. Without it,
+Connected browsers keep their existing host semantics: `Chrome.connect(...)` enables
+workspace tools only when `files=FileSystemOptions(...)` explicitly identifies a
+directory shared with the browser host at the same absolute path. Without it,
 download tracking still works but local file reads and previews are unavailable.
 Attaching to an existing `target_id` retains its browser-wide download policy.
 The OpenAI example accepts `--workspace .browserrig/research` to reuse a directory.

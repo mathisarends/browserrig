@@ -36,7 +36,7 @@ from .tools import (
 
 def browser_plugins(
     *plugins: PluginLike | Kit | None,
-    browser: BrowserOptions | None = None,
+    browser: Chrome | BrowserOptions | None = None,
     without: Iterable[type[Plugin]] = (),
 ) -> list[PluginLike]:
     """The default browser agent plugins, adjusted by `plugins` and `without`.
@@ -53,13 +53,18 @@ def browser_plugins(
     return list(composition.resolve(prompt=KitPromptPolicy.OMIT).plugins)
 
 
-def browser_kit(*, browser: BrowserOptions | None = None) -> Kit:
-    """Browser defaults with Markdown instructions in configured plugin-list order."""
+def browser_kit(*, browser: Chrome | BrowserOptions | None = None) -> Kit:
+    """Browser defaults with Markdown instructions in configured plugin-list order.
+
+    Pass a configured `Chrome` plugin, such as `Chrome.launch(url=...)` or
+    `Chrome.connect(endpoint=...)`. Legacy `Launch` and `Connect` options also work.
+    Resources open only when the kit is mounted in a session.
+    """
     return Kit(
         name="browserrig",
         plugins=[
             Activity(),
-            Chrome(browser),
+            browser if isinstance(browser, Chrome) else Chrome(browser),
             # Types and moves the pointer at a person's pace.
             InputPacing(),
             # Streams input and browser UI for anyone watching the session.

@@ -6,7 +6,7 @@ to `browser_plugins(...)`, or to a plain Harnessed `Agent`'s plugin list. Withou
 plugin, no handoff tool, prompt section or pause tracking is added.
 
 ```python
-from browserrig import Agent, HumanHandoff, HumanResponse, Launch
+from browserrig import Agent, Chrome, HumanHandoff, HumanResponse
 from browserrig.events import HandoffRequestedEvent
 
 async def ask_human(request: HandoffRequestedEvent) -> HumanResponse:
@@ -23,7 +23,7 @@ handoff = HumanHandoff(
 )
 agent = Agent(
     model=model,
-    browser=Launch(url=url, headless=False),
+    browser=Chrome.launch(url=url, headless=False),
     plugins=[handoff],
 )
 ```

@@ -10,7 +10,7 @@ readiness and action-chain decisions. Browserrig targets Harnessed 0.11.0.
 from harnessed import Agent, PluginOrder, SystemPrompt
 from browserrig import (
     Actions, Activity, Chrome, DomCapture, DomRenderer, FormTools,
-    ImageContext, KeyboardTools, Launch, NavigationTools, Observe,
+    ImageContext, KeyboardTools, NavigationTools, Observe,
     PointerTools, Readiness, Screenshots, ScreenshotTrigger, TabTools,
     TrimInBatches,
 )
@@ -20,7 +20,7 @@ agent = Agent(
     instructions="Complete the browser task.",
     prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
     plugins=[
-        Chrome(Launch(url=url)),
+        Chrome.launch(url=url),
         Readiness(),
         Observe(
             capture=DomCapture(),
@@ -48,6 +48,33 @@ screenshot or viewport coordinates and by ref, `KeyboardTools` sends keys to the
 focus and types into a ref, and `FormTools` sets native form controls. `Actions()` uses `DomActionChains()`;
 `ObserveAfterInput()` requires a fresh observation after each input when selected
 explicitly.
+
+## Browser configuration
+
+`Chrome.launch(...)` and `Chrome.connect(...)` return configured `Chrome` plugins.
+The calls validate settings; resources open only when the agent session opens.
+Each session launches a fresh owned process or opens a fresh connection. Session
+exit stops a launched process and leaves an externally managed process running.
+
+The same plugin works with the Browserrig recipe:
+
+```python
+from browserrig import Agent, Chrome
+
+agent = Agent(
+    model=model,
+    browser=Chrome.connect(endpoint="http://localhost:9222"),
+)
+```
+
+Connecting normally creates a fresh isolated browser context. Pass `target_id=...`
+to select an existing tab; its URL and browser-wide download policy are preserved.
+`endpoint` and `headers` accept strings or Pydantic `SecretStr` values and are
+stored as secrets.
+
+`Launch` and `Connect` remain available for existing code and direct
+`ChromeBrowser(...)` use. `Agent`, `browser_kit()` and `browser_plugins()` accept
+both these options and a configured `Chrome` plugin.
 
 ## Human handoff
 
@@ -136,7 +163,7 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 
 | Contract | Implementation |
 | --- | --- |
-| `SessionSetup` | `async apply(cdp, *, frame) -> None`. Install ordered entries with `Launch(session_setup=(setup, ...))` or `Connect(session_setup=(setup, ...))`. Each new page or out-of-process frame session enables page, lifecycle and runtime first, then the browser applies viewport metrics to pages and runs each entry. `Viewport` only holds configuration data. |
+| `SessionSetup` | `async apply(cdp, *, frame) -> None`. Install ordered entries with `Chrome.launch(session_setup=(setup, ...))` or `Chrome.connect(session_setup=(setup, ...))`. Each new page or out-of-process frame session enables page, lifecycle and runtime first, then the browser applies viewport metrics to pages and runs each entry. `Viewport` only holds configuration data. |
 | `CaptureStrategy` | Implement `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent`. Return `PageContent` and optional per-observation `references`. Honor `screenshots=False`. Set `CaptureContent.fingerprint` to supply a comparison key; `None` keeps the DOM semantic fingerprint. The runner handles dialogs, document coherence and snapshots. |
 | `References` | `async resolve(tab, snapshot, ref) -> ElementHandle`. Resolve an opaque ref from the published observation without input. Supply a fresh resolver with each capture; `None` uses `DomReferences`. |
 | `ElementHandle` | `element: ElementInfo`; `async locate(*, aim=None) -> ElementPoint`. Validate the live target and return a hit-tested point and bounds in viewport CSS pixels. `aim` is a preferred pair of fractions within the visible target. Input runs through `Mouse`, `Keyboard` and their `Motor`. |
