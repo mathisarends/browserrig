@@ -12,17 +12,17 @@ from harnessed.testing import CallbackModel
 from browserrig import (
     Agent,
     Browser,
+    BrowserPerception,
+    Chrome,
     ChromeBrowser,
     FileSystemOptions,
-    Launch,
-    Observe,
     Readiness,
     ReadinessOptions,
     Screenshots,
     ScreenshotTrigger,
     wait_for_page,
 )
-from browserrig.browser import DownloadState, screenshot
+from browserrig.browser import DownloadState, Launch, screenshot
 from browserrig.events import DownloadCompletedEvent, DownloadStartedEvent
 from tests.javascript import evaluate
 from tests.observations import all_states, has_image
@@ -87,7 +87,7 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
 
     agent = Agent(
         model=CallbackModel(respond),
-        browser=Launch(url=site, files=FileSystemOptions(directory=workspace)),
+        browser=Chrome.launch(url=site, files=FileSystemOptions(directory=workspace)),
         plugins=[Approvals(default=PolicyDecision.ALLOW)],
     )
     async with agent.session() as session:
@@ -163,7 +163,7 @@ async def test_agent_reads_selected_workbook_cells_as_context(
 
     result = await Agent(
         model=CallbackModel(respond),
-        browser=Launch(url=site, files=FileSystemOptions(directory=tmp_path)),
+        browser=Chrome.launch(url=site, files=FileSystemOptions(directory=tmp_path)),
         plugins=[Approvals(default=PolicyDecision.ALLOW)],
     ).run("Read the downloaded workbook", max_steps=2)
     assert result.text == "Workbook read as context"
@@ -308,7 +308,7 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(
     model = CallbackModel(respond)
     agent = Agent(
         model=model,
-        browser=Launch(
+        browser=Chrome.launch(
             url=site, files=FileSystemOptions(directory=tmp_path / "workspace")
         ),
         plugins=[Approvals(default=PolicyDecision.ALLOW)],
@@ -354,11 +354,13 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
 
     result = await Agent(
         model=CallbackModel(respond),
-        browser=Launch(
+        browser=Chrome.launch(
             url=site + "/canvas", files=FileSystemOptions(directory=tmp_path)
         ),
         plugins=[
-            Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+            BrowserPerception(
+                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
+            ),
             Readiness(options=ReadinessOptions(timeout=3)),
             Approvals(default=PolicyDecision.ALLOW),
         ],

@@ -59,7 +59,7 @@ from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
-    Agent, Chrome, ContextCompaction, ImageContext, Observe,
+    Agent, BrowserPerception, Chrome, ContextCompaction, ImageContext,
     Screenshots, ScreenshotTrigger, UntilCompaction, WindowRatio,
 )
 
@@ -72,7 +72,9 @@ async def main():
         ),
         plugins=[
             Approvals(default=PolicyDecision.ALLOW),
-            Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+            BrowserPerception(
+                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
+            ),
             ImageContext(UntilCompaction()),
             ContextCompaction(trigger=WindowRatio(0.8)),
         ],

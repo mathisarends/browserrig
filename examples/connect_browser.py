@@ -3,7 +3,8 @@
 import argparse
 import asyncio
 
-from browserrig import ChromeBrowser, Connect, wait_for_page
+from browserrig import ChromeBrowser, wait_for_page
+from browserrig.browser import Connect
 from browserrig.scripts import PAGE_FACTS
 
 

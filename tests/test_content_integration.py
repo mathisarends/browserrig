@@ -3,7 +3,8 @@ import re
 
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, Launch, wait_for_page
+from browserrig import ChromeBrowser, DomCapture, wait_for_page
+from browserrig.browser import Launch
 from browserrig.kinds import ElementOperation
 from browserrig.observation import capture
 from browserrig.observation.content import extract_content

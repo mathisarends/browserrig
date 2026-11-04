@@ -2,7 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from browserrig import ChromeBrowser, Launch, wait_for_page
+from browserrig import ChromeBrowser, wait_for_page
+from browserrig.browser import Launch
 from browserrig.observation import DomCapture, capture
 from browserrig.secrets.redaction import Redactor
 from tests.javascript import evaluate

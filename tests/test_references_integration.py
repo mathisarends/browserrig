@@ -16,15 +16,15 @@ from harnessed.testing import CallbackModel
 
 from browserrig import (
     Browser,
+    BrowserPerception,
     CaptureContent,
     Chrome,
     ElementInfo,
-    Launch,
-    Observe,
     PageContent,
     Readiness,
     wait_for_page,
 )
+from browserrig.browser import Launch
 from browserrig.core import Bounds, ElementPoint
 from browserrig.tools import Actions, KeyboardTools, PointerTools
 from tests.javascript import evaluate
@@ -82,7 +82,7 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
         plugins=[
             Chrome(Launch(url=site)),
             Readiness(),
-            Observe(capture=_CanvasCapture()),
+            BrowserPerception(capture=_CanvasCapture()),
             Actions(),
             PointerTools(),
             KeyboardTools(),

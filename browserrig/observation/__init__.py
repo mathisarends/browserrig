@@ -12,7 +12,7 @@ from .models import (
     PageContent,
     Snapshot,
 )
-from .plugin import Observe
+from .plugin import BrowserPerception
 from .references import ElementHandle, References, ScrollableElement, ScrollStep
 from .render import render
 from .renderer import DomRenderer, Renderer
@@ -31,7 +31,7 @@ __all__ = [
     "DomRenderer",
     "Renderer",
     "capture",
-    "Observe",
+    "BrowserPerception",
     "Element",
     "FindMark",
     "FoundMatch",

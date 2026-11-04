@@ -16,7 +16,8 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
-from browserrig import Browser, ChromeBrowser, Launch, browser_plugins
+from browserrig import Browser, Chrome, ChromeBrowser, browser_plugins
+from browserrig.browser import Launch
 from browserrig.choreography import Stage
 from browserrig.core import Point
 from browserrig.events import CursorStateEvent
@@ -176,7 +177,7 @@ async def _perform(site, name, arguments):
         prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=CallbackModel(respond),
         plugins=[
-            *browser_plugins(browser=Launch(url=site + "/gestures")),
+            *browser_plugins(browser=Chrome.launch(url=site + "/gestures")),
             Access(),
             Approvals(default=PolicyDecision.ALLOW),
         ],

@@ -2,15 +2,23 @@
 
 ## Unreleased
 
-### Added
-
-- Add `Chrome.launch(...)` and `Chrome.connect(...)` factories that return configured
-  browser plugins for `Agent(browser=...)`, `browser_kit()`, `browser_plugins()` and
-  explicit Harnessed plugin composition. Configuration is validated immediately;
-  browser resources open per session. Existing `Launch` and `Connect` options remain
-  supported, including direct `ChromeBrowser(...)` use.
-
 ### Breaking changes
+
+- Rename the browser observation plugin from `Observe` to `BrowserPerception`,
+  describing the page structure, element references and optional screenshots
+  provided before each model step. Update recipes, dependencies, examples and
+  documentation.
+  Replace `Observe(...)`, `Inject[Observe]`, `dependency(Observe)` and type-based
+  plugin exclusions with `BrowserPerception`. The old name is removed without an
+  alias. Plugin descriptions and dependency diagnostics use `BrowserPerception`;
+  observation events and the `browserrig.observation` plugin slot are unchanged.
+
+- Require a `Chrome` plugin for `Agent(browser=...)`, `browser_kit(browser=...)`
+  and `browser_plugins(browser=...)`. Replace `browser=Launch(...)` with
+  `browser=Chrome.launch(...)` and `browser=Connect(...)` with
+  `browser=Chrome.connect(...)`. Remove the top-level `Launch` and `Connect`
+  exports; direct `ChromeBrowser(...)` callers can import these low-level
+  configuration types from `browserrig.browser`.
 
 - Pin Harnessed and all provider extras to the published 0.12.0 release.
 - Replace `await session.context.set("constraints", "Include source URLs.")`
@@ -26,6 +34,13 @@
   including human-handoff receipts, remain in `session.snapshot().context`.
   Use `instructions=` for fixed rules and Harnessed's `ContextValue` plugin for
   changing named facts. Session storage formats are unchanged.
+
+### Added
+
+- Add `Chrome.launch(...)` and `Chrome.connect(...)` factories that return configured
+  browser plugins for `Agent(browser=...)`, `browser_kit()`, `browser_plugins()` and
+  explicit Harnessed plugin composition. Configuration is validated immediately;
+  browser resources open per session.
 
 ## 0.1.0 (2026-11-03)
 

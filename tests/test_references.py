@@ -9,10 +9,10 @@ from harnessed import Agent, Plugin, PluginOrder, SystemPrompt, ToolError
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
+    BrowserPerception,
     CaptureContent,
     ElementInfo,
     ElementRef,
-    Observe,
     PageContent,
     Readiness,
     ScrollStep,
@@ -475,7 +475,7 @@ async def _observed(backend):
         plugins=[
             FakeChrome(holder),
             _Ready(),
-            Observe(capture=backend),
+            BrowserPerception(capture=backend),
             Actions(),
             _Forms(),
             _Keys(),
@@ -499,7 +499,7 @@ async def _observed(backend):
         tab.cancel_drag = AsyncMock()
         tab.cursor_style = AsyncMock(return_value=None)
         tab.emit = AsyncMock(side_effect=events.append)
-        observe = session.ctx[Observe]
+        observe = session.ctx[BrowserPerception]
         await observe.capture()
         yield SimpleNamespace(
             browser=browser,

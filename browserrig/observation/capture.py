@@ -63,7 +63,7 @@ async def capture(
     cursor: Point | None = None,
     redaction: Redaction | None = None,
 ) -> Snapshot:
-    """Capture a serializable snapshot; Observe also retains its reference resolver."""
+    """Capture a serializable snapshot; BrowserPerception also retains its reference resolver."""
     observation = await capture_observation(
         tab,
         strategy,

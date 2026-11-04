@@ -4,12 +4,12 @@
     {
       "code": "SMT420",
       "path": "tests/test_browser_composition.py",
-      "message": "test accesses private production name browserrig.Observe._page_key",
+      "message": "test accesses private production name browserrig.BrowserPerception._page_key",
       "fingerprints": [
-        "a1be727efcd1fb823790a19dde96d4f8",
-        "a1be727efcd1fb823790a19dde96d4f8",
-        "a1be727efcd1fb823790a19dde96d4f8",
-        "a1be727efcd1fb823790a19dde96d4f8"
+        "cba3bcc3b72e19a95ea6c9064ef428b0",
+        "cba3bcc3b72e19a95ea6c9064ef428b0",
+        "cba3bcc3b72e19a95ea6c9064ef428b0",
+        "cba3bcc3b72e19a95ea6c9064ef428b0"
       ]
     },
     {

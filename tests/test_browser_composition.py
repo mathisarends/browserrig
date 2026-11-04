@@ -32,11 +32,11 @@ from harnessed.plugins.compaction import Compaction
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import (
+    BrowserPerception,
     DomRenderer,
     HumanHandoff,
     HumanResponse,
     ImageContext,
-    Observe,
     Readiness,
     ReadinessOptions,
     ReadinessStrategy,
@@ -142,7 +142,7 @@ def _agent(
             *extra,
             FakeChrome(holder),
             Readiness(options=ReadinessOptions(navigation_min_ms=0)),
-            Observe(
+            BrowserPerception(
                 capture=capture,
                 renderer=renderer or CustomRenderer(),
                 screenshots=Screenshots(trigger=trigger),
@@ -178,7 +178,7 @@ async def test_handoff_refreshes_a_previously_delivered_screenshot_before_coordi
     async with agent.session() as session:
         _browser_ready(holder)
         await session.run("Inspect")
-        source = session.ctx[Observe].coordinate_source()
+        source = session.ctx[BrowserPerception].coordinate_source()
     images = _images(model.requests[-1])
     assert sum(capture.captures) == 2
     assert len(images) == 2
@@ -234,7 +234,7 @@ async def test_text_only_observations_and_probes_keep_last_shown_crop_and_no_dup
     async with agent.session() as session:
         browser = _browser_ready(holder)
         await session.run("Inspect", max_steps=3)
-        observe = session.ctx[Observe]
+        observe = session.ctx[BrowserPerception]
         assert observe.snapshot.image is None
         assert _images(model.requests[1])[0].id == _images(model.requests[2])[0].id
         assert _image_point(observe.coordinate_source(), Point(x=20, y=30)) == Point(
@@ -506,7 +506,7 @@ async def test_coordinate_geometry_uses_final_receipts_after_request_image_remov
         # The screenshot was stripped after PrepareRequest; only its note remains.
         included = session.log.last(ObservationsIncludedEvent).observations
         assert [item.source for item in included] == ["browser-image"]
-        observe = session.ctx[Observe]
+        observe = session.ctx[BrowserPerception]
         assert observe.snapshot.geometry is not None
         assert _image_point(observe.coordinate_source(), Point(x=20, y=30)) == Point(
             x=20, y=30
@@ -530,7 +530,7 @@ async def test_compaction_removes_last_screenshot_on_a_text_only_step():
         _browser_ready(holder)
         await session.run("Inspect", max_steps=4)
         assert [len(_images(request)) for request in model.requests] == [0, 1, 1, 0]
-        assert session.ctx[Observe].coordinate_source().geometry is None
+        assert session.ctx[BrowserPerception].coordinate_source().geometry is None
 
 
 async def test_latest_observation_only_is_an_explicit_policy_with_native_image_lifecycle():
@@ -544,7 +544,7 @@ async def test_latest_observation_only_is_an_explicit_policy_with_native_image_l
         included = session.log.last(ObservationsIncludedEvent).observations
         # The screenshot's note left the context with the screenshot.
         assert [item.source for item in included] == ["browser"]
-        assert session.ctx[Observe].coordinate_source().geometry is None
+        assert session.ctx[BrowserPerception].coordinate_source().geometry is None
 
 
 def _recorded(results, source):
@@ -882,7 +882,7 @@ async def test_page_is_resent_with_a_screenshot_and_after_compaction():
 
 
 def test_page_comparison_ignores_new_element_marks():
-    observe = Observe()
+    observe = BrowserPerception()
     button = Element(
         ref="e1", frame_id="f", backend_id=1, role="button", name="Go", tag="button"
     )

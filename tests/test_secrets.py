@@ -22,7 +22,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from PIL import Image
 
-from browserrig import Observe, Readiness, Secret, Secrets, Totp, env
+from browserrig import BrowserPerception, Readiness, Secret, Secrets, Totp, env
 from browserrig.core import ActionKind, Bounds, SecretError
 from browserrig.events import ActionFailedEvent, KeyPressedEvent, SecretEnteredEvent
 from browserrig.input import Input
@@ -449,14 +449,20 @@ async def test_prepare_rejects_unknown_names_before_touching_the_page():
 async def test_observe_redacts_with_secrets_mounted_after_it():
     holder = {}
 
-    class Hold(Plugin, needs=(Observe,)):
-        async def setup(self, _ctx: Context, observe: Inject[Observe]):
+    class Hold(Plugin, needs=(BrowserPerception,)):
+        async def setup(self, _ctx: Context, observe: Inject[BrowserPerception]):
             holder["observe"] = observe
 
     agent = Agent(
         prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["done"]),
-        plugins=[FakeChrome(holder), Readiness(), Observe(), Hold(), _secrets()],
+        plugins=[
+            FakeChrome(holder),
+            Readiness(),
+            BrowserPerception(),
+            Hold(),
+            _secrets(),
+        ],
     )
     snapshot = Snapshot(
         id="s",

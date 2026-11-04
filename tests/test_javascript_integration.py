@@ -7,7 +7,8 @@ from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Browser, ChromeBrowser, Launch, browser_plugins
+from browserrig import Browser, Chrome, ChromeBrowser, browser_plugins
+from browserrig.browser import Launch
 from browserrig.core import BrowserError
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent
 from browserrig.kinds import ActionKind
@@ -42,7 +43,7 @@ async def test_agent_javascript_shell_retains_main_world_state_awaits_and_report
         prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[
-            *browser_plugins(browser=Launch(url=url)),
+            *browser_plugins(browser=Chrome.launch(url=url)),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

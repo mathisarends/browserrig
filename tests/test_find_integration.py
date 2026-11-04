@@ -7,7 +7,8 @@ from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import ChromeBrowser, Launch, browser_plugins
+from browserrig import Chrome, ChromeBrowser, browser_plugins
+from browserrig.browser import Launch
 from browserrig.choreography import BarTypedEvent, FindBarEvent, FindResultsEvent
 from browserrig.events import KeyPressedEvent, NavigationStartedEvent
 from browserrig.kinds import BrowserBar
@@ -114,7 +115,7 @@ async def test_find_tool_types_into_the_find_bar_and_reports_matches(site):
         prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[
-            *browser_plugins(browser=Launch(url=site)),
+            *browser_plugins(browser=Chrome.launch(url=site)),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

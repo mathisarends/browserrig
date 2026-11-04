@@ -18,8 +18,8 @@ from harnessed.testing import CallbackModel
 
 from browserrig import (
     Browser,
-    Launch,
-    Observe,
+    BrowserPerception,
+    Chrome,
     Screenshots,
     ScreenshotTrigger,
     Secret,
@@ -82,7 +82,7 @@ def _agent(site, model, domains, holder, *, path="/", screenshots=False, live=No
     secrets = Secrets({"pw": Secret(PASSWORD, domains=domains)})
     plugins = [
         *browser_plugins(
-            Observe(
+            BrowserPerception(
                 screenshots=Screenshots(
                     trigger=ScreenshotTrigger.EACH_STEP
                     if screenshots
@@ -90,7 +90,7 @@ def _agent(site, model, domains, holder, *, path="/", screenshots=False, live=No
                 )
             ),
             secrets,
-            browser=Launch(url=site + path, arguments=("--site-per-process",)),
+            browser=Chrome.launch(url=site + path, arguments=("--site-per-process",)),
         ),
         _Hold(holder),
         Approvals(default=PolicyDecision.ALLOW),

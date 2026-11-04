@@ -4,8 +4,6 @@ from .browser import (
     Browser,
     Chrome,
     ChromeBrowser,
-    Connect,
-    Launch,
     SessionSetup,
     Viewport,
 )
@@ -23,6 +21,7 @@ from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanRespons
 from .kinds import MouseEventKind
 from .nudges import Nudges
 from .observation import (
+    BrowserPerception,
     CaptureContent,
     CaptureStrategy,
     DomCapture,
@@ -34,7 +33,6 @@ from .observation import (
     ElementRef,
     ImageContext,
     ImageRetention,
-    Observe,
     PageContent,
     References,
     Renderer,
@@ -134,13 +132,11 @@ __all__ = [
     "Browser",
     "Chrome",
     "ChromeBrowser",
-    "Connect",
     "FileSystem",
     "FileSystemOptions",
-    "Launch",
     "SessionSetup",
     "Nudges",
-    "Observe",
+    "BrowserPerception",
     "InputPacing",
     "Readiness",
     "ReadinessOptions",

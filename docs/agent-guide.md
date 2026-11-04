@@ -57,7 +57,7 @@ above allows actions automatically. The constructor does not open Chrome or file
 `Agent` and `browser_plugins()` share one rule:
 
 - A plugin that fills the same slot as a default
-  replaces it in place, such as `Observe(...)`, `Readiness(...)`, `ImageContext(...)`
+  replaces it in place, such as `BrowserPerception(...)`, `Readiness(...)`, `ImageContext(...)`
   or `ContextCompaction(...)`. Two plugins for the same default raise `PluginConflict`.
 - Any other plugin is added after the defaults.
 - `without=(...)` drops defaults by type; a type that is not a default raises
@@ -69,7 +69,7 @@ from browserrig import (
     Agent,
     InputVisualization,
     FileTools,
-    Observe,
+    BrowserPerception,
     InputPacing,
     Screenshots,
     ScreenshotTrigger,
@@ -78,7 +78,7 @@ from browserrig import (
 agent = Agent(
     model=model,
     plugins=[
-        Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+        BrowserPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
         handoff if interactive else None,
     ],
     without=(InputPacing, InputVisualization, FileTools),
@@ -108,7 +108,7 @@ exclusions without opening Chrome. `browser_plugins(*plugins, browser=..., witho
 remains available when a resolved flat list is needed. With that API, pass
 `prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED)` explicitly;
 import `PluginOrder` and `SystemPrompt` from `harnessed`.
-Individual capabilities such as `Chrome`, `Readiness`, `Observe`, `Actions`, tool
+Individual capabilities such as `Chrome`, `Readiness`, `BrowserPerception`, `Actions`, tool
 plugins, `Nudges`, `Activity`, and `TerminalEvents` are also available directly.
 `browser_plugins()` uses Harnessed's public `Kit.resolve()` with
 `KitPromptPolicy.OMIT`, omitting kit prompt strategies recursively while retaining
@@ -127,7 +127,7 @@ replacements and removals; passing the original kit to `Agent` preserves those
 scopes in the agent's own description.
 
 See [composing browser agents](browser-composition.md) for the explicit plugin API:
-`Readiness(initial=..., ongoing=...)`, `Observe(capture=..., renderer=...,
+`Readiness(initial=..., ongoing=...)`, `BrowserPerception(capture=..., renderer=...,
 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` and
 `ImageContext(TrimInBatches(max_images=6, min_images=3))` or
 `ImageContext(UntilCompaction())`. Capture, rendering, image retention and
@@ -308,7 +308,7 @@ print(agent.prompt)
 ```
 
 Each plugin provides one synchronous `instructions(self) -> SystemPrompt` method.
-`Observe.instructions()` combines configuration-dependent page-state and element-ref
+`BrowserPerception.instructions()` combines configuration-dependent page-state and element-ref
 guidance with the page-content trust rules. `PointerTools`, `ImageContext`,
 `Actions`, `FileTools`, `Secrets`, `HumanHandoff` and `Done` return complete blocks
 too. Single-tool guidance remains in tool descriptions. Override the method to
@@ -324,9 +324,9 @@ overrides `instructions()`, including an override returning an empty document.
 Fixed content passed to `from_plugins(...)` follows caller text and precedes all
 plugin blocks. `None` content parts and plugin entries are skipped. The outer
 document's format controls all nested content.
-For manual compositions, configure `Observe` independently of `Readiness` and add
+For manual compositions, configure `BrowserPerception` independently of `Readiness` and add
 `ImageContext()` to deliver captured images. Configure DOM observation settings
-through `Observe(capture=DomCapture(...))`; readiness is configured separately.
+through `BrowserPerception(capture=DomCapture(...))`; readiness is configured separately.
 Use `await session.prompt.render()` to inspect the exact session system text.
 
 Plugins mounted through `session.use()` require an explicit choice when they declare

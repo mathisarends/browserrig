@@ -2,7 +2,7 @@ from harnessed import Context
 
 from browserrig.browser import Browser, Tab
 from browserrig.core import Bounds, ElementPoint
-from browserrig.observation import Observe
+from browserrig.observation import BrowserPerception
 
 from .intents import TargetLocated
 from .scrolling import prepare_element
@@ -11,7 +11,9 @@ from .scrolling import prepare_element
 class Targeting:
     """Reveal refs and keep the motor's aim stable throughout one action."""
 
-    def __init__(self, browser: Browser, observe: Observe, context: Context) -> None:
+    def __init__(
+        self, browser: Browser, observe: BrowserPerception, context: Context
+    ) -> None:
         self.browser = browser
         self.observe = observe
         self._context = context

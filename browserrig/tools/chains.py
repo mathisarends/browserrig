@@ -5,28 +5,33 @@ from harnessed import ToolInfo, ToolResult, ToolStatus
 
 from browserrig.browser import Tab
 from browserrig.core import BrowserToolMetadata, ReadinessStatus
-from browserrig.observation import DomReferences, Observe, Snapshot, decision_change
+from browserrig.observation import (
+    BrowserPerception,
+    DomReferences,
+    Snapshot,
+    decision_change,
+)
 
 
 class ActionChainPolicy(Protocol):
-    async def check(self, observe: Observe, tab: Tab) -> str:
+    async def check(self, observe: BrowserPerception, tab: Tab) -> str:
         """Empty means continue; otherwise explain why a new observation is needed."""
         ...
 
 
 class ObserveAfterInput:
-    async def check(self, _observe: Observe, _tab: Tab) -> str:
+    async def check(self, _observe: BrowserPerception, _tab: Tab) -> str:
         return "A fresh observation is required after this input."
 
 
 class DomActionChains:
-    async def check(self, observe: Observe, tab: Tab) -> str:
+    async def check(self, observe: BrowserPerception, tab: Tab) -> str:
         if not isinstance(observe.references, DomReferences):
             return "A fresh observation is required after this input."
         return await probe_change(observe, tab)
 
 
-async def probe_change(observe: Observe, tab: Tab) -> str:
+async def probe_change(observe: BrowserPerception, tab: Tab) -> str:
     before = observe.snapshot
     if before is None:
         return "A fresh observation is required after this input."
