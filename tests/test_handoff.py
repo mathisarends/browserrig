@@ -13,6 +13,7 @@ from harnessed import (
     ToolStatus,
     tool,
 )
+from harnessed.core.prompt.context import DynamicContext
 from harnessed.events import (
     CompactionAppliedEvent,
     EventRegistry,
@@ -162,7 +163,7 @@ async def test_handoff_reports_navigation_transient_popup_and_human_note():
     async with agent.session() as session:
         _prepare(holder)
         result = await session.run("Open my dashboard")
-        history = json.loads(session.context.values["browser.handoffs"])
+        history = json.loads(session.ctx[DynamicContext].values["browser.handoffs"])
         intervals = session.ctx[Activity].intervals()
     receipt = _receipt(model.requests[-1])
     assert receipt == history[-1]
@@ -217,9 +218,11 @@ async def test_failed_comparison_still_returns_a_typed_receipt_and_refreshes_the
     agent, model, holder = _agent([_request(), "Done"], ask)
     async with agent.session() as session:
         _prepare(holder)
-        await session.context.set("browser.handoffs", '[{"status":"invalid"}]')
+        await session.ctx[DynamicContext].set(
+            "browser.handoffs", '[{"status":"invalid"}]'
+        )
         await session.run("Log in")
-        history = json.loads(session.context.values["browser.handoffs"])
+        history = json.loads(session.ctx[DynamicContext].values["browser.handoffs"])
     receipt = HandoffReceipt.model_validate(_receipt(model.requests[-1]))
     assert receipt.status == "done" and receipt.current_url is None
     assert "could not be captured" in receipt.changes[0]
@@ -295,7 +298,9 @@ async def test_pause_resume_explains_external_changes_without_steering(track_pau
         browser.active_tab.title = "Changed by human"
         await session.resume()
         result = await session.run("Continue")
-        history = json.loads(session.context.values.get("browser.handoffs", "[]"))
+        history = json.loads(
+            session.ctx[DynamicContext].values.get("browser.handoffs", "[]")
+        )
     callback.assert_not_called()
     assert latest(model.requests[-1].messages)["page"]["title"] == "Changed by human"
     if track_pauses:
@@ -342,7 +347,7 @@ async def test_running_pause_cannot_lose_a_resume_while_a_probe_is_slow(monkeypa
             browser.active_tab.title = "Changed after pause"
             await session.resume()
             await handle.result()
-        history = json.loads(session.context.values["browser.handoffs"])
+        history = json.loads(session.ctx[DynamicContext].values["browser.handoffs"])
         assert history[-1]["status"] == "resumed"
         assert any("Changed after pause" in change for change in history[-1]["changes"])
 
@@ -370,7 +375,7 @@ async def test_handoff_context_survives_compaction_and_session_restore():
         _prepare(holder)
         result = await session.run("Log in")
         saved = session.snapshot().to_json()
-        history = session.context.values["browser.handoffs"]
+        history = session.ctx[DynamicContext].values["browser.handoffs"]
     assert any(isinstance(event, CompactionAppliedEvent) for event in result.events)
     assert "2FA completed" in "\n".join(
         message.text for message in model.requests[-1].messages
@@ -382,7 +387,7 @@ async def test_handoff_context_survives_compaction_and_session_restore():
     async with agent.session(state=SessionState.from_json(saved)) as restored:
         _prepare(holder)
         await restored.run("Continue")
-        assert restored.context.values["browser.handoffs"] == history
+        assert restored.ctx[DynamicContext].values["browser.handoffs"] == history
     assert callback.await_count == 1
 
 
@@ -399,7 +404,7 @@ async def test_handoff_history_is_bounded_and_known_secrets_are_redacted():
     async with agent.session() as session:
         _prepare(holder)
         result = await session.run("Log in")
-        history = session.context.values["browser.handoffs"]
+        history = session.ctx[DynamicContext].values["browser.handoffs"]
     assert len(json.loads(history)) == 2
     assert password not in history and "{{secret:pw}}" in history
     assert all(
@@ -431,7 +436,9 @@ async def test_abort_cancels_the_callback_and_releases_the_handoff():
         finished = session.log.last(HandoffFinishedEvent)
         assert finished.status == "cancelled"
         assert (
-            json.loads(session.context.values["browser.handoffs"])[-1]["status"]
+            json.loads(session.ctx[DynamicContext].values["browser.handoffs"])[-1][
+                "status"
+            ]
             == "cancelled"
         )
         await session.ctx[Nudges].queue("After abort", key="after", cause_id="after")

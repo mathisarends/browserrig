@@ -123,8 +123,12 @@ version and tag. This setup PR creates no release or tag itself.
 
 ## Harnessed compatibility
 
+Harnessed and all provider extras are pinned to the published 0.12.0 release.
+The native `session.add_context(...)` API appends background to conversation
+history without starting a turn. Existing snapshots and stores remain compatible.
+
 The opt-in `Done` plugin uses native hooks for continuation and tool execution.
-Harnessed 0.11.0 has no output-policy hook, so `browserrig/completion.py` contains
+Harnessed 0.12.0 has no output-policy hook, so `browserrig/completion.py` contains
 one reversible, per-session bridge around the step runner's output handler. This
 defers the declared output contract until finalization without changing the model
 or session APIs. When upgrading Harnessed, verify that bridge with

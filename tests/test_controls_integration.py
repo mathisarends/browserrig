@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Context, Inject, Plugin, PolicyDecision, tool
+from harnessed.core.prompt.context import DynamicContext
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
@@ -51,6 +52,8 @@ async def test_pause_steer_resume_observes_external_page_change(site, handoff_en
             release.set()
             await pause
             assert len(model.requests) == 1
+            await session.add_context("Do not submit forms.")
+            assert len(model.requests) == 1
             if not handoff_enabled:
                 await session.steer("Look for the changed title")
             await evaluate(
@@ -59,10 +62,13 @@ async def test_pause_steer_resume_observes_external_page_change(site, handoff_en
             await session.resume()
             result = await handle.result()
         assert result.text == "Resumed"
+        assert any(
+            msg.text == "Do not submit forms." for msg in model.requests[-1].messages
+        )
         state = latest(model.requests[-1].messages)
         assert state["page"]["title"] == "Changed during pause"
         if handoff_enabled:
-            history = json.loads(session.context.values["browser.handoffs"])
+            history = json.loads(session.ctx[DynamicContext].values["browser.handoffs"])
             assert history[-1]["status"] == "resumed"
             assert any(
                 "Changed during pause" in change for change in history[-1]["changes"]
@@ -107,7 +113,7 @@ async def test_handoff_observes_human_navigation_and_a_short_lived_popup(site):
     )
     async with agent.session() as session:
         result = await session.run("Continue after login")
-        history = json.loads(session.context.values["browser.handoffs"])
+        history = json.loads(session.ctx[DynamicContext].values["browser.handoffs"])
     assert result.text == "Continued"
     assert latest(model.requests[-1].messages)["page"]["title"] == "Other"
     receipt = history[-1]
