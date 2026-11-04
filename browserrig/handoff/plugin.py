@@ -38,7 +38,8 @@ from .changes import page_changes, page_url
 from .models import HandoffCallback, HandoffReceipt, HumanResponse
 from .state import HandoffState, Transfer
 
-_HISTORY = TypeAdapter(list[HandoffReceipt])
+_HISTORY_KEY = "browser.handoffs"
+_HISTORY = TypeAdapter(tuple[HandoffReceipt, ...])
 
 
 _INSTRUCTIONS = Instructions(
@@ -100,10 +101,20 @@ class HumanHandoff(
         self.track_pauses = track_pauses
         self.history_limit = history_limit
 
+    @property
+    def history(self) -> tuple[HandoffReceipt, ...]:
+        """An immutable snapshot of this session's latest, redacted receipts.
+
+        Resolve the mounted plugin with ``session.ctx[HumanHandoff]``. History
+        is restored when the session opens and bounded by ``history_limit``.
+        """
+        return self._state.history
+
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
 
     async def setup(self, ctx: Context, tools: Inject[ToolRegistry]) -> None:
+        self._state.history = self._read_history()
         # Override the loop's ordinary 30s tool timeout for this mount's human wait.
         tools.register(
             self.request_human,
@@ -243,18 +254,28 @@ class HumanHandoff(
             current_url=page_url(after.url) if after else None,
         )
         receipt = secrets.redact(receipt) if secrets else receipt
-        previous = self._context.values.get("browser.handoffs", "[]")
-        try:
-            history = _HISTORY.validate_json(previous)
-        except ValidationError:
-            history = []
-        history = [*history, receipt][-self.history_limit :]
-        await self._context.set(
-            "browser.handoffs", _HISTORY.dump_json(history).decode()
-        )
+        await self._record(receipt)
         self._observe.invalidate()
         self._release()
         return receipt.model_dump_json()
+
+    async def _record(self, receipt: HandoffReceipt) -> None:
+        # Harnessed 0.12 stores named facts as text. Keep that wire format at
+        # this boundary; callers and handoff logic work with typed receipts.
+        history = (*self.history, receipt)[-self.history_limit :]
+        try:
+            await self._context.set(_HISTORY_KEY, _HISTORY.dump_json(history).decode())
+        finally:
+            # A cancelled write may already have committed. Reflect the actual
+            # context state rather than publishing an uncommitted local value.
+            self._state.history = self._read_history()
+
+    def _read_history(self) -> tuple[HandoffReceipt, ...]:
+        previous = self._context.values.get(_HISTORY_KEY, "[]")
+        try:
+            return _HISTORY.validate_json(previous)[-self.history_limit :]
+        except ValidationError:
+            return ()
 
     @hook(AgentControlChangedEvent)
     async def _control(

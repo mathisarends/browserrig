@@ -15,7 +15,7 @@ class HumanResponse(Options):
 
 
 class HandoffReceipt(Options):
-    """Shared schema for tool results and the durable browser.handoffs history."""
+    """Immutable handoff record shared by tool results and HumanHandoff.history."""
 
     handoff_id: str
     source: Literal["tool", "pause"]

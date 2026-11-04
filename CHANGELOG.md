@@ -37,6 +37,9 @@
 
 ### Added
 
+- Add `session.ctx[HumanHandoff].history` as an immutable tuple of typed,
+  redacted `HandoffReceipt` records. Restore history before the first turn and
+  keep JSON serialization and Harnessed's context storage inside the plugin.
 - Add `Chrome.launch(...)` and `Chrome.connect(...)` factories that return configured
   browser plugins for `Agent(browser=...)`, `browser_kit()`, `browser_plugins()` and
   explicit Harnessed plugin composition. Configuration is validated immediately;

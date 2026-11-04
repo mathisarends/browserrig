@@ -69,11 +69,29 @@ If a comparison capture fails, the receipt explicitly says inspection is still
 needed. Hints are withheld during human control and pending action checks are
 discarded; intermediate effects are reported in the handoff receipt instead.
 
-The latest `history_limit` receipts are stored as a JSON array under
-`session.snapshot().context["browser.handoffs"]` while the session is idle. They
-survive compaction and a `SessionState` round trip, and are validated against
-`HandoffReceipt` when the history is updated. This saves context about the handoff;
-it does not save the browser's cookies or authenticated session.
+Applications inspect typed records through the mounted plugin:
+
+```python
+async with agent.session() as session:
+    await session.run("Continue after login")
+    handoff = session.ctx[HumanHandoff]
+    history = handoff.history  # tuple[HandoffReceipt, ...]
+    if history:
+        print(history[-1].status, history[-1].human_note)
+```
+
+`history` is an immutable snapshot of the latest `history_limit` redacted receipts,
+ordered oldest first. A new session starts with an empty tuple. Restoring a
+`SessionState` or reopening a stored session restores its receipts before the
+first turn; retaining a tuple does not change it when new handoffs finish.
+
+The plugin serializes these records at the Harnessed storage and model-input
+boundary. The tool returns one JSON receipt, and changes to recent history are
+delivered as additional model-input messages. The latest history survives
+compaction independently of its summary. The fixed system prompt is unchanged.
+Application code does not need a context key, JSON parsing or a `DynamicContext`
+service. This retains handoff reports; it does not restore browser cookies or an
+authenticated browser session.
 
 ## Host-initiated pause
 
