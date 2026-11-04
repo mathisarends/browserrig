@@ -10,7 +10,7 @@ from harnessed.events import (
     ToolCallFinishedEvent,
 )
 from harnessed.integrations.json import JsonSessionStore
-from harnessed.models import ImageReference, ModelChunk, TextPart
+from harnessed.models import ImageReference, ModelChunk, TextPart, UserMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel, call
 from pydantic import BaseModel
@@ -37,16 +37,88 @@ def _agent(model, *, store=None, plugins=()):
     )
 
 
+@pytest.mark.parametrize("persistent", [False, True])
+async def test_facade_adds_context_without_a_turn_and_restores_duplicate_messages(
+    tmp_path, persistent
+):
+    store = JsonSessionStore(root=tmp_path / "sessions") if persistent else None
+    model = ScriptedModel(["Continued"])
+    agent = _agent(model, store=store)
+    async with agent.session(id="context" if persistent else None) as session:
+        for text in ("Include source URLs.", "Keep it brief.", "Include source URLs."):
+            await session.add_context(text)
+        messages = list(session.messages)
+        assert all(isinstance(message, UserMessage) for message in messages)
+        assert [message.text for message in messages] == [
+            "Include source URLs.",
+            "Keep it brief.",
+            "Include source URLs.",
+        ]
+        assert len({message.id for message in messages}) == 3
+        assert not model.requests and not session.inbox.pending
+        assert session.log.open_turn is None
+        state = session.snapshot()
+        if store is not None:
+            saved = await store.load_session("context")
+            assert saved is not None
+            assert saved.checkpoint.state.history == state.history
+
+    async with agent.session(
+        id="context" if persistent else None,
+        state=None if persistent else state,
+    ) as session:
+        assert list(session.messages) == messages
+        assert (await session.run("Continue")).text == "Continued"
+    assert len(model.requests) == 1
+    assert [
+        message
+        for message in model.requests[0].messages
+        if isinstance(message, UserMessage)
+    ][:3] == messages
+
+
+async def test_context_added_during_a_request_is_used_by_the_next_turn():
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def respond(_request):
+        entered.set()
+        await asyncio.wait_for(release.wait(), 5)
+        yield ModelChunk(text="Answer")
+
+    model = CallbackModel(respond)
+    agent = _agent(model)
+    async with agent.session() as session:
+        handle = await session.submit("Inspect")
+        await asyncio.wait_for(entered.wait(), 5)
+        try:
+            await session.add_context("Use metric units.")
+            assert all(
+                message.text != "Use metric units."
+                for message in model.requests[0].messages
+            )
+        finally:
+            release.set()
+        assert (await handle.result()).text == "Answer"
+        assert (await session.run("Continue")).text == "Answer"
+    assert len(model.requests) == 2
+    assert any(
+        message.text == "Use metric units." for message in model.requests[1].messages
+    )
+
+
 async def test_facade_reopens_history_context_and_image_assets_with_a_new_store(
     tmp_path,
 ):
     root = tmp_path / "sessions"
     store = JsonSessionStore(root=root)
-    agent = _agent(ScriptedModel(["First answer"]), store=store)
+    initial_model = ScriptedModel(["First answer"])
+    agent = _agent(initial_model, store=store)
     assert not root.exists()
     async with agent.session(id="conversation") as session:
         image = await session.assets.put(b"screenshot", media_type="image/png")
-        await session.context.set("task", "Remember the page")
+        await session.add_context("Remember the page")
+        assert not initial_model.requests
+        assert not session.inbox.pending
         session.observe(
             Observation(
                 source="browser",
@@ -64,7 +136,7 @@ async def test_facade_reopens_history_context_and_image_assets_with_a_new_store(
     async with reopened.session(id="conversation") as session:
         assert session.id == "conversation"
         assert await session.assets.read(image) == b"screenshot"
-        assert session.context.values["task"] == "Remember the page"
+        assert any(message.text == "Remember the page" for message in session.messages)
         assert (await session.run("Continue")).text == "Continued answer"
     messages = model.requests[-1].messages
     assert any("First answer" in message.text for message in messages)

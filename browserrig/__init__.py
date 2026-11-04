@@ -15,7 +15,7 @@ from .composition import (  # smelt: ignore[SMT106] -- public facade
     browser_kit,
     browser_plugins,
 )
-from .core import Point
+from .core import HandoffStatus, Point
 from .files import FileSystem, FileSystemOptions
 from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanResponse
 from .kinds import MouseEventKind
@@ -86,6 +86,7 @@ __all__ = [
     "Done",
     "HandoffCallback",
     "HandoffReceipt",
+    "HandoffStatus",
     "HumanHandoff",
     "HumanResponse",
     "CaptureContent",

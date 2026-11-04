@@ -1,6 +1,6 @@
 # Browserrig
 
-Browserrig is an event-driven Chrome automation library for AI agents and Python applications. It combines direct browser access with a composable [Harnessed](https://github.com/mathisarends/harnessed/releases/tag/v0.11.0) agent, structured page observations, browser actions, and typed events.
+Browserrig is an event-driven Chrome automation library for AI agents and Python applications. It combines direct browser access with a composable [Harnessed](https://github.com/mathisarends/harnessed/releases/tag/v0.12.0) agent, structured page observations, browser actions, and typed events.
 
 Agents can navigate tabs, interact with DOM elements or screenshot coordinates, download and read files, and be paused or steered during a session. Chrome can be launched locally or connected through CDP.
 
@@ -33,6 +33,9 @@ ONNX Runtime and OpenCV. These native dependencies make the installation larger
 than the wheel for Browserrig itself.
 
 To run the examples from a source checkout instead (uv required):
+
+Harnessed and all provider extras are pinned to the published `0.12.0` release,
+which includes the native `session.add_context(...)` API.
 
 ```powershell
 uv sync --locked --extra openai
@@ -77,7 +80,7 @@ async def main():
         ],
     )
     async with agent.session() as session:
-        await session.context.set("constraints", "Include source URLs.")
+        await session.add_context("Include source URLs.")
         result = await session.run("Compare the Voyager missions.", max_steps=20)
         print(result.text)
 
@@ -85,7 +88,12 @@ async def main():
 asyncio.run(main())
 ```
 
-Install the `openai` extra and set `OPENAI_API_KEY` as in the quick start. The example captures a screenshot at each model step, keeps images until their steps are compacted, and summarizes older context when the model window reaches 80% (or at 100,000 tokens when its size is unknown). The session also carries application context across the task.
+Install the `openai` extra and set `OPENAI_API_KEY` as in the quick start. The example captures a screenshot at each model step, keeps images until their steps are compacted, and summarizes older context when the model window reaches 80% (or at 100,000 tokens when its size is unknown).
+
+`await session.add_context(text)` appends background for subsequent model requests
+without starting a turn or calling the model. Each call adds a separate message;
+contributions follow normal conversation retention and compaction. Await it before
+starting work that must see the contribution.
 
 This example explicitly permits tool actions with `Approvals(default=PolicyDecision.ALLOW)`.
 By default, actions with side effects require approval. Configure an approval

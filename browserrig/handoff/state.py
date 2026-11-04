@@ -4,6 +4,8 @@ from browserrig.events import HandoffRequestedEvent
 from browserrig.nudges import Nudges
 from browserrig.observation import Snapshot
 
+from .models import HandoffReceipt
+
 
 @dataclass
 class Transfer:
@@ -17,5 +19,6 @@ class Transfer:
 
 @dataclass
 class HandoffState:
+    history: tuple[HandoffReceipt, ...] = ()
     current: Transfer | None = None
     resume_pending: bool = False

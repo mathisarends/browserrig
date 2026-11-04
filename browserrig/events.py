@@ -11,6 +11,7 @@ from .core import (
     ActivityOutcome,
     CursorStyle,
     FileSource,
+    HandoffStatus,
     ReadinessPhase,
     ReadinessStage,
     ReadinessStatus,
@@ -565,11 +566,6 @@ class HandoffRequestedEvent(BrowserEvent):
     )
 
 
-type HandoffStatus = Literal[
-    "done", "declined", "timeout", "cancelled", "failed", "resumed"
-]
-
-
 @dataclass(frozen=True, slots=True)
 class HandoffFinishedEvent(BrowserEvent):
     handoff_id: str
@@ -581,6 +577,9 @@ class HandoffFinishedEvent(BrowserEvent):
     type: Literal[EventKind.HANDOFF_FINISHED] = field(
         default=EventKind.HANDOFF_FINISHED, kw_only=True
     )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "status", HandoffStatus(self.status))
 
 
 @dataclass(frozen=True, slots=True)
