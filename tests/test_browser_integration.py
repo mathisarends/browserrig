@@ -2,7 +2,8 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from browserrig import ChromeBrowser, Connect, Launch, Viewport, wait_for_page
+from browserrig import ChromeBrowser, Viewport, wait_for_page
+from browserrig.browser import Connect, Launch
 from browserrig.choreography import CursorEnteredEvent, Stage, TabPressedEvent
 from browserrig.core import Point
 from browserrig.events import CursorStateEvent, TabOpenedEvent

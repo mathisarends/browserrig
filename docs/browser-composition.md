@@ -9,8 +9,8 @@ readiness and action-chain decisions. Browserrig targets Harnessed 0.11.0.
 ```python
 from harnessed import Agent, PluginOrder, SystemPrompt
 from browserrig import (
-    Actions, Activity, Chrome, DomCapture, DomRenderer, FormTools,
-    ImageContext, KeyboardTools, NavigationTools, Observe,
+    Actions, Activity, BrowserPerception, Chrome, DomCapture, DomRenderer,
+    FormTools, ImageContext, KeyboardTools, NavigationTools,
     PointerTools, Readiness, Screenshots, ScreenshotTrigger, TabTools,
     TrimInBatches,
 )
@@ -22,7 +22,7 @@ agent = Agent(
     plugins=[
         Chrome.launch(url=url),
         Readiness(),
-        Observe(
+        BrowserPerception(
             capture=DomCapture(),
             renderer=DomRenderer(),
             screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
@@ -49,6 +49,19 @@ focus and types into a ref, and `FormTools` sets native form controls. `Actions(
 `ObserveAfterInput()` requires a fresh observation after each input when selected
 explicitly.
 
+## Browser perception
+
+`BrowserPerception` provides the agent's current view of the browser before each
+model step: page structure, actionable element references and optional screenshots.
+Configure capture and rendering here; `Readiness` controls when the page is ready
+to inspect, and `ImageContext` separately controls image history.
+
+The default recipe includes `BrowserPerception()`. Pass a configured instance in
+`plugins=[...]` to replace it, or include it directly in a manual composition.
+Replace existing `Observe` imports and uses with `BrowserPerception`; the old
+name has been removed. Plugin descriptions and dependency diagnostics also use
+`BrowserPerception`.
+
 ## Browser configuration
 
 `Chrome.launch(...)` and `Chrome.connect(...)` return configured `Chrome` plugins.
@@ -72,9 +85,9 @@ to select an existing tab; its URL and browser-wide download policy are preserve
 `endpoint` and `headers` accept strings or Pydantic `SecretStr` values and are
 stored as secrets.
 
-`Launch` and `Connect` remain available for existing code and direct
-`ChromeBrowser(...)` use. `Agent`, `browser_kit()` and `browser_plugins()` accept
-both these options and a configured `Chrome` plugin.
+`Agent`, `browser_kit()` and `browser_plugins()` accept a configured `Chrome`
+plugin through `browser=`. For direct `ChromeBrowser(...)` use, import the
+low-level `Launch` and `Connect` configuration types from `browserrig.browser`.
 
 ## Human handoff
 
@@ -201,16 +214,16 @@ alone does not establish that the target is still actionable.
 
 Refs are opaque and must be unique within an observation, including offscreen refs.
 Keep them stable for the same object and never reuse one for another object in the
-same tab/document. The runner rejects duplicates. `Observe.element(tab, ref)` checks
+same tab/document. The runner rejects duplicates. `BrowserPerception.element(tab, ref)` checks
 the published membership and tab/document before resolving, then checks that the
 observation and document did not change while awaiting resolution. A comparison
 probe keeps its own resolver and never replaces the published snapshot or bindings.
-`Observe.invalidate()` discards both together. Snapshots contain data only; runtime
+`BrowserPerception.invalidate()` discards both together. Snapshots contain data only; runtime
 resolvers stay in session state.
 
 `DomElementHandle` supplies the additional DOM operations used by native form
 tools: focus, select, value setting, upload and scripts. Those tools call
-`Observe.dom_element(tab, ref)` and reject other handles before input, including in
+`BrowserPerception.dom_element(tab, ref)` and reject other handles before input, including in
 mixed captures. Existing native select/date/upload behavior is preserved.
 `KeyboardTools.type_text(ref, ...)` likewise requires a DOM handle; another backend
 can use pointer tools to activate its target and `send_keys` to type through the
@@ -367,7 +380,7 @@ custom-event support does not imply every persisted SDK event appears in a turn 
 ## Existing applications
 
 `Agent` and `browser_plugins()` remain convenience recipes. A configured default
-replaces the built-in one: `plugins=[Observe(capture=DomCapture(...),
+replaces the built-in one: `plugins=[BrowserPerception(capture=DomCapture(...),
 screenshots=Screenshots(...)), Readiness(...), ImageContext(...), Actions(...),
 InputPacing(motor)]`.
 Pass `without=(FileTools,)` when local file tools should be omitted.
@@ -377,7 +390,7 @@ captures without refs. Transient availability (for example a missing workspace) 
 tool gates, including execution-time rechecks. Existing upload path validation is retained.
 Keep file readers as ordinary functions/strategies, not one plugin per file format.
 
-For manual compositions, add `ImageContext()` explicitly: `Observe` no longer
-injects images itself. Configure `Readiness` and `Observe` independently.
+For manual compositions, add `ImageContext()` explicitly: `BrowserPerception` no longer
+injects images itself. Configure `Readiness` and `BrowserPerception` independently.
 Harnessed filesystem tools can replace local file tools by passing
 `without=(FileTools,)`; browser download paths are not automatically sandbox paths.

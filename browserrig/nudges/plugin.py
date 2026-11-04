@@ -47,7 +47,7 @@ _CHALLENGE_HINT = (
 )
 
 if TYPE_CHECKING:
-    # Type-only edge: Observe injects Nudges at runtime.
+    # Type-only edge: BrowserPerception injects Nudges at runtime.
     from browserrig.observation import Snapshot
 
 

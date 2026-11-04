@@ -14,15 +14,16 @@ from PIL import Image
 from browserrig import (
     Agent,
     Browser,
+    BrowserPerception,
+    Chrome,
     ChromeBrowser,
     DomCapture,
-    Launch,
-    Observe,
     Screenshots,
     ScreenshotTrigger,
     Viewport,
     wait_for_page,
 )
+from browserrig.browser import Launch
 from browserrig.core import Bounds, BrowserError, Geometry, Point, Region
 from browserrig.kinds import ElementOperation
 from browserrig.observation import capture, render
@@ -209,9 +210,11 @@ async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site)
 
     agent = Agent(
         model=CallbackModel(respond),
-        browser=Launch(url=site + "/canvas", viewport=Viewport(scale=2)),
+        browser=Chrome.launch(url=site + "/canvas", viewport=Viewport(scale=2)),
         plugins=[
-            Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+            BrowserPerception(
+                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
+            ),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )
@@ -401,7 +404,7 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
 
     agent = Agent(
         model=CallbackModel(respond),
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[Approvals(default=PolicyDecision.ALLOW), Access()],
     )
     async with agent.session() as session:

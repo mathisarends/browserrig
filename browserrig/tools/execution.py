@@ -32,7 +32,7 @@ from browserrig.events import (
     ActionStartedEvent,
     PageState,
 )
-from browserrig.observation import Observe
+from browserrig.observation import BrowserPerception
 from browserrig.readiness import Readiness
 
 from .chains import (
@@ -110,7 +110,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     browser = dependency(Browser)
     _events = dependency(BrowserEvents)
     readiness = dependency(Readiness)
-    observe = dependency(Observe)
+    observe = dependency(BrowserPerception)
 
     def __init__(self, *, chain_policy: ActionChainPolicy | None = None) -> None:
         super().__init__()

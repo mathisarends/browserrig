@@ -16,10 +16,9 @@ from harnessed.testing import CallbackModel, ScriptedModel, call
 
 from browserrig import (
     Browser,
+    BrowserPerception,
     Chrome,
     ImageContext,
-    Launch,
-    Observe,
     Readiness,
     ReadinessOptions,
     Screenshots,
@@ -68,7 +67,7 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
         prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[
-            *browser_plugins(browser=Launch(url=site)),
+            *browser_plugins(browser=Chrome.launch(url=site)),
             CountScreenshots(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
@@ -203,7 +202,9 @@ async def test_dom_screenshots_are_native_images(site):
             Chrome(),
             Start(),
             Readiness(),
-            Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+            BrowserPerception(
+                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
+            ),
             ImageContext(),
             Approvals(default=PolicyDecision.ALLOW),
         ],

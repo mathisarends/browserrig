@@ -31,7 +31,7 @@ from browserrig.events import (
     HandoffStatus,
 )
 from browserrig.nudges import Nudges
-from browserrig.observation import Observe, Snapshot
+from browserrig.observation import BrowserPerception, Snapshot
 from browserrig.secrets import Secrets
 
 from .changes import page_changes, page_url
@@ -71,7 +71,7 @@ class HumanHandoff(
     _state = PluginState(HandoffState)
     _browser = dependency(Browser)
     _events = dependency(BrowserEvents)
-    _observe = dependency(Observe)
+    _observe = dependency(BrowserPerception)
     _context = dependency(DynamicContext)
 
     def __init__(

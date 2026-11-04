@@ -3,7 +3,8 @@
 import argparse
 import asyncio
 
-from browserrig import ChromeBrowser, Launch, wait_for_page
+from browserrig import ChromeBrowser, wait_for_page
+from browserrig.browser import Launch
 from browserrig.observation import DomCapture, capture, render
 
 

@@ -22,6 +22,7 @@ from browserrig.choreography import (
     InputVisualization,
     TabPressedEvent,
     WaitingEvent,
+    scenes,
 )
 from browserrig.core import Bounds, ElementPoint, Point, TabGesture
 from browserrig.events import (
@@ -113,15 +114,20 @@ class _Tab:
 def _timeline(monkeypatch):
     timeline = []
     pause = asyncio.sleep
+    clock = SimpleNamespace(now=0.0)
 
     async def sleep(seconds, result=None):
         caller = inspect.currentframe().f_back
         if caller.f_globals.get("__name__", "").startswith("browserrig"):
             timeline.append(f"sleep {seconds:.2f}")
+        clock.now += seconds
         await pause(0)
         return result
 
     monkeypatch.setattr(asyncio, "sleep", sleep)
+    # Fake pauses and elapsed-time accounting must use the same clock, so runner
+    # scheduling cannot shorten the remaining key interval in timeline assertions.
+    monkeypatch.setattr(scenes, "monotonic", lambda: clock.now)
     return timeline
 
 

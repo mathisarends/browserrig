@@ -20,12 +20,13 @@ from harnessed.testing import CallbackModel
 from browserrig import (
     Actions,
     Browser,
+    Chrome,
     ChromeBrowser,
     DomCapture,
-    Launch,
     browser_plugins,
     wait_for_page,
 )
+from browserrig.browser import Launch
 from browserrig.core import BrowserError
 from browserrig.kinds import ElementOperation
 from browserrig.observation import capture
@@ -144,7 +145,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(
-                browser=Launch(
+                browser=Chrome.launch(
                     url=site + "/frame-host", arguments=("--site-per-process",)
                 )
             ),

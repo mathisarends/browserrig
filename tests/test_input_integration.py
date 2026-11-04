@@ -14,7 +14,7 @@ from browserrig import (
     Actions,
     Agent,
     Browser,
-    Launch,
+    Chrome,
     TerminalEvents,
 )
 from browserrig.events import CursorMovedEvent, CursorStateEvent, InputEvent
@@ -35,7 +35,7 @@ async def test_typing_shortcuts_stream_and_storage(site, coordinates):
 
     agent = Agent(
         model=_typing_model(holder, coordinates),
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[
             Approvals(default=PolicyDecision.ALLOW),
             TerminalEvents(output),
@@ -78,7 +78,7 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
 
     agent = Agent(
         model=ScriptedModel(["First", "Second"]),
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[TerminalEvents(output), Access()],
     )
     async with agent.session() as session:
@@ -171,7 +171,7 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
     )
     agent = Agent(
         model=ScriptedModel(requests),
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[Approvals(default=PolicyDecision.ALLOW), Panels()],
     )
     async with agent.session() as session:
@@ -207,7 +207,7 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
 
     agent = Agent(
         model=ScriptedModel(["Observed"]),
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[TerminalEvents(output), Access()],
     )
     async with agent.session() as session:

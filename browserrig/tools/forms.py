@@ -4,14 +4,14 @@ from harnessed.kernel import dependency
 from browserrig.browser import Tab
 from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
-from browserrig.observation import Observe
+from browserrig.observation import BrowserPerception
 
 from .effects import Effect
 from .execution import Actions
 
 
 class FormTools(Plugin, needs=(Actions,)):
-    _observe = dependency(Observe)
+    _observe = dependency(BrowserPerception)
 
     @tool(
         kind=ActionKind.SELECT,

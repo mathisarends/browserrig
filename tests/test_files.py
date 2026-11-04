@@ -16,12 +16,10 @@ from pypdf import PdfReader, PdfWriter
 
 from browserrig import (
     ChromeBrowser,
-    Connect,
     FileSystem,
     FileSystemOptions,
-    Launch,
 )
-from browserrig.browser import Tab
+from browserrig.browser import Connect, Launch, Tab
 from browserrig.browser import downloads as downloads_module
 from browserrig.browser.downloads import Downloads
 from browserrig.events import (

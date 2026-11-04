@@ -3,7 +3,13 @@ from pydantic import ValidationError
 
 from browserrig.browser import Connect, Launch
 from browserrig.core import Bounds, Geometry, Point, Region, StaleElement
-from browserrig.observation import DomCapture, Element, Observe, Snapshot, render
+from browserrig.observation import (
+    BrowserPerception,
+    DomCapture,
+    Element,
+    Snapshot,
+    render,
+)
 from browserrig.observation.models import (
     Canvas,
     ElementFingerprint,
@@ -219,7 +225,7 @@ def test_capture_rejects_invalid_limits(settings):
 
 
 def test_default_observation_explains_sparse_text_without_enabling_screenshots():
-    observe = Observe()
+    observe = BrowserPerception()
     instructions = observe.renderer.instructions(observe.screenshots)
     assert "When the viewport holds few controls" in instructions
     assert "Screenshots are included only when requested" in instructions

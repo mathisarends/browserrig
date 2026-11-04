@@ -12,8 +12,8 @@ from cdpify.domains.browser import DownloadWillBeginEvent
 from cdpify.domains.page import JavascriptDialogOpeningEvent
 from pydantic import ValidationError
 
-from browserrig import ChromeBrowser, Connect, Launch, SessionSetup, Viewport
-from browserrig.browser import Tab
+from browserrig import ChromeBrowser, SessionSetup, Viewport
+from browserrig.browser import Connect, Launch, Tab
 from browserrig.browser import tabs as tabs_module
 from browserrig.events import (
     DialogOpenedEvent,

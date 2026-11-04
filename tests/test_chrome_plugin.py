@@ -10,13 +10,12 @@ from pydantic import SecretStr, ValidationError
 from browserrig import (
     Agent,
     Chrome,
-    Connect,
     FileSystemOptions,
-    Launch,
     Viewport,
     browser_kit,
     browser_plugins,
 )
+from browserrig.browser import Connect, Launch
 from browserrig.browser import plugin as chrome_plugin
 
 
@@ -109,6 +108,23 @@ def test_factory_defaults_and_secret_inputs_preserve_existing_options():
     assert "credential" not in repr(connected.options)
     assert connected.options.files is None
     assert connected.options.viewport is None
+
+
+@pytest.mark.parametrize("composition", ["facade", "kit", "flat"])
+@pytest.mark.parametrize(
+    "options", [Launch(), Connect(endpoint=SecretStr("http://localhost:9222"))]
+)
+def test_browser_recipe_rejects_low_level_options_with_migration_guidance(
+    composition, options
+):
+    with pytest.raises(TypeError, match=r"use Chrome\.launch.*Chrome\.connect"):
+        match composition:
+            case "facade":
+                Agent(model=ScriptedModel([]), browser=options)
+            case "kit":
+                browser_kit(browser=options)
+            case "flat":
+                browser_plugins(browser=options)
 
 
 @pytest.mark.parametrize(

@@ -10,7 +10,7 @@ from .models import CapturedImage
 
 
 @dataclass
-class ObserveState:
+class BrowserPerceptionState:
     observation: CapturedObservation | None = None
     delivered_image: CapturedImage | None = None
     screenshot_requested: bool = False

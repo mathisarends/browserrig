@@ -7,7 +7,7 @@ from pydantic import Field
 from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind, BrowserError, Point
 from browserrig.core import browser_tool as tool
-from browserrig.observation import CapturedImage, Observe, Snapshot
+from browserrig.observation import BrowserPerception, CapturedImage, Snapshot
 
 from .effects import Effect
 from .execution import Actions
@@ -40,7 +40,7 @@ class PointerTools(Plugin, needs=(Actions,)):
     """
 
     _browser = dependency(Browser)
-    _observe = dependency(Observe)
+    _observe = dependency(BrowserPerception)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
