@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from harnessed import Agent as HarnessedAgent
 from harnessed import Context, Inject, Plugin, PolicyDecision, SessionState
 from harnessed.events import TextDeltaEvent, ToolCallFinishedEvent, TurnFinishedEvent
 from harnessed.integrations.json import JsonSessionStore
@@ -9,11 +10,47 @@ from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel
 
-from browserrig import Agent, Browser, Done, Launch
+from browserrig import Agent, Browser, Chrome, ChromeBrowser, Done
 from browserrig.events import ActionStartedEvent, ActivityStartedEvent
 from browserrig.kinds import ActivityKind
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.mark.parametrize("manual", [False, True])
+@pytest.mark.parametrize("existing_tab", [False, True])
+async def test_connect_plugin_disconnects_without_stopping_external_browser(
+    manual, existing_tab
+):
+    connections = []
+
+    class Access(Plugin, needs=(Browser,)):
+        async def setup(self, _ctx: Context, browser: Inject[Browser]):
+            connections.append(browser)
+
+    async with ChromeBrowser() as owner:
+        original = owner.active_tab
+        plugin = Chrome.connect(
+            endpoint=owner.client.transport.url,
+            target_id=original.id if existing_tab else None,
+        )
+        model = ScriptedModel([])
+        agent = (
+            HarnessedAgent(model=model, plugins=[plugin, Access()])
+            if manual
+            else Agent(model=model, browser=plugin, plugins=[Access()])
+        )
+        async with agent.session():
+            connected = connections[0]
+            target = connected.active_tab.id
+            assert connected.client.is_connected
+            assert (target == original.id) is existing_tab
+        assert not connected.client.is_connected
+        assert owner.client.is_connected
+        assert await original.cdp.runtime.evaluate(expression="1 + 1")
+        targets = {tab.id for tab in await owner.tabs.list()}
+        assert original.id in targets
+        assert (target in targets) is existing_tab
 
 
 @pytest.mark.parametrize("persistent", [False, True])
@@ -29,7 +66,7 @@ async def test_facade_restores_saved_state_and_owns_a_fresh_browser_per_session(
     model = ScriptedModel(["First answer", "Restored answer"])
     agent = Agent(
         model=model,
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[Access()],
         store=JsonSessionStore(root=tmp_path / "sessions") if persistent else None,
     )
@@ -61,7 +98,7 @@ async def test_facade_honors_explicit_tool_policy(site):
     model = ScriptedModel([call("navigate", url=site + "/other"), "Denied"])
     agent = Agent(
         model=model,
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[Approvals(default=PolicyDecision.ALLOW, deny=["navigate"])],
     )
     result = await agent.run("Try navigation")
@@ -80,7 +117,7 @@ async def test_facade_manages_wrapped_native_model_context_on_reuse(site, monkey
     enter, leave = AsyncMock(return_value=model), AsyncMock()
     monkeypatch.setattr(native.TestModel, "__aenter__", enter)
     monkeypatch.setattr(native.TestModel, "__aexit__", leave)
-    agent = Agent(model=PydanticAIModel(model), browser=Launch(url=site))
+    agent = Agent(model=PydanticAIModel(model), browser=Chrome.launch(url=site))
     result = await agent.run("Inspect the page")
     assert result.text == "Native model adapted"
     assert model.last_model_request_parameters is not None
@@ -106,7 +143,7 @@ async def test_facade_streams_commentary_and_returns_a_typed_answer_after_done(s
     )
     agent = Agent(
         model=model,
-        browser=Launch(url=site),
+        browser=Chrome.launch(url=site),
         plugins=[Approvals(default=PolicyDecision.ALLOW), Done()],
     )
     async with agent.session() as session:

@@ -60,7 +60,7 @@ same lint, formatting, and type checks. To format code, run
 `uv run ruff format browserrig examples tests` and `pnpm.cmd run format`.
 
 Integration tests require Chrome or Chromium. Set `BROWSERRIG_CHROME` or
-`Launch(executable=...)` to select the executable. Media validation also
+`Chrome.launch(executable=...)` to select the executable. Media validation also
 uses ffprobe when available.
 
 ## Distribution and release checks

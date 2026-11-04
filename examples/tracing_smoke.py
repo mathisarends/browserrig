@@ -13,7 +13,7 @@ from harnessed.events import ToolCallFinishedEvent
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Agent, Launch
+from browserrig import Agent, Chrome
 from examples.telemetry import add_tracing_arguments, tracing_plugins
 
 
@@ -58,7 +58,7 @@ async def main() -> None:
             model=ScriptedModel(
                 [call("navigate", url=page), "Browserrig tracing smoke test completed."]
             ),
-            browser=Launch(url="about:blank"),
+            browser=Chrome.launch(url="about:blank"),
             plugins=[Approvals(default=PolicyDecision.ALLOW), *telemetry],
         )
         async with agent.session() as session:

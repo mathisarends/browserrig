@@ -56,7 +56,7 @@ from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
-    Agent, ContextCompaction, ImageContext, Launch, Observe,
+    Agent, Chrome, ContextCompaction, ImageContext, Observe,
     Screenshots, ScreenshotTrigger, UntilCompaction, WindowRatio,
 )
 
@@ -64,7 +64,9 @@ from browserrig import (
 async def main():
     agent = Agent(
         model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
-        browser=Launch(url="https://en.wikipedia.org/wiki/Voyager_program", headless=False),
+        browser=Chrome.launch(
+            url="https://en.wikipedia.org/wiki/Voyager_program", headless=False,
+        ),
         plugins=[
             Approvals(default=PolicyDecision.ALLOW),
             Observe(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
@@ -101,7 +103,13 @@ ordinary text responses retain Harnessed's default completion behavior.
 Browserrig is an early 0.x release; public APIs may change between minor versions.
 CI covers Python 3.12–3.14 on Windows and Linux, with real Chrome integration tests
 on Linux. macOS is not covered by CI; select Chrome explicitly with
-`Launch(executable=...)` or `BROWSERRIG_CHROME` there.
+`Chrome.launch(executable=...)` or `BROWSERRIG_CHROME` there.
+
+`Chrome.launch(...)` configures a Chrome plugin without starting a process. Chrome
+starts when the agent session opens and stops when it closes. To use an existing
+CDP browser, pass `browser=Chrome.connect(endpoint="http://localhost:9222")`;
+closing the session leaves that browser running. Both factories return plugins
+that also work directly in a Harnessed agent's `plugins=[...]` list.
 
 Perspective-transformed frames and recovery from browser process crashes remain
 limitations. See the [changelog](https://github.com/mathisarends/browserrig/blob/main/CHANGELOG.md)

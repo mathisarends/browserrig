@@ -22,11 +22,11 @@ from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
-from browserrig import Agent, Launch, TerminalEvents
+from browserrig import Agent, Chrome, TerminalEvents
 
 agent = Agent(
     model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
-    browser=Launch(url="https://en.wikipedia.org/wiki/Voyager_program"),
+    browser=Chrome.launch(url="https://en.wikipedia.org/wiki/Voyager_program"),
     plugins=[Approvals(default=PolicyDecision.ALLOW), TerminalEvents()],
 )
 result = await agent.run("Compare Voyager 1 and 2 and cite the source URLs.", max_steps=20)
@@ -398,12 +398,14 @@ reopen them by application-owned ID, configure Harnessed 0.11.0's native store:
 ```python
 from pathlib import Path
 from harnessed.integrations.json import JsonSessionStore
-from browserrig import Agent, FileSystemOptions, Launch
+from browserrig import Agent, Chrome, FileSystemOptions
 
 agent = Agent(
     model=model,
     store=JsonSessionStore(root=Path(".browserrig/sessions")),
-    browser=Launch(files=FileSystemOptions(directory=Path(".browserrig/workspace"))),
+    browser=Chrome.launch(
+        files=FileSystemOptions(directory=Path(".browserrig/workspace")),
+    ),
 )
 async with agent.session(id="voyager") as session:
     await session.run("Find the Voyager launch dates.", max_steps=20)

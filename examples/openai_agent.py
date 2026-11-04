@@ -13,10 +13,10 @@ from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
     Agent,
+    Chrome,
     Done,
     FileSystemOptions,
     ImageContext,
-    Launch,
     TerminalEvents,
     UntilCompaction,
 )
@@ -70,7 +70,7 @@ async def main() -> None:
             model=PydanticAIModel(
                 OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra"))
             ),
-            browser=Launch(
+            browser=Chrome.launch(
                 url=args.url,
                 headless=not args.headed,
                 files=FileSystemOptions(directory=args.workspace),

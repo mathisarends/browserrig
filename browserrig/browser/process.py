@@ -125,7 +125,7 @@ def _chrome_executable(explicit: Path | None = None) -> str:
         if candidate and Path(candidate).is_file():
             return str(Path(candidate).resolve())
     raise BrowserError(
-        "Chrome was not found; set Launch(executable=...) or BROWSERRIG_CHROME"
+        "Chrome was not found; set Chrome.launch(executable=...) or BROWSERRIG_CHROME"
     )
 
 
