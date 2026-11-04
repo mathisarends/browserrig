@@ -22,13 +22,13 @@ from harnessed.kernel import dependency
 from pydantic import Field, TypeAdapter, ValidationError
 
 from browserrig.browser import Browser, BrowserEvents
+from browserrig.core import HandoffStatus
 from browserrig.events import (
     HANDOFF_EVENTS,
     BrowserEvent,
     EventKind,
     HandoffFinishedEvent,
     HandoffRequestedEvent,
-    HandoffStatus,
 )
 from browserrig.nudges import Nudges
 from browserrig.observation import BrowserPerception, Snapshot
@@ -190,10 +190,10 @@ class HumanHandoff(
                     if not isinstance(response, HumanResponse):
                         raise TypeError("Handoff callbacks must return HumanResponse")
                 except TimeoutError:
-                    return await self._finish("timeout", secrets=secrets)
+                    return await self._finish(HandoffStatus.TIMEOUT, secrets=secrets)
                 except Exception:  # pylint: disable=broad-exception-caught
                     return await self._finish(
-                        "failed",
+                        HandoffStatus.FAILED,
                         note="The host callback failed; completion is unknown.",
                         secrets=secrets,
                     )
@@ -202,7 +202,9 @@ class HumanHandoff(
                 )
             except asyncio.CancelledError:
                 if self._state.current is not None:
-                    await self._finish("cancelled", secrets=secrets, capture=False)
+                    await self._finish(
+                        HandoffStatus.CANCELLED, secrets=secrets, capture=False
+                    )
                 raise
             finally:
                 self._release()
@@ -309,7 +311,7 @@ class HumanHandoff(
         secrets: Inject[Secrets | None],
     ) -> StepDecision:
         if self._state.resume_pending:
-            await self._finish("resumed", secrets=secrets)
+            await self._finish(HandoffStatus.RESUMED, secrets=secrets)
         return await next_()
 
     @hook(BrowserEvent)

@@ -6,7 +6,14 @@ from harnessed import Context, Inject, Plugin, PolicyDecision, tool
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Agent, Browser, Chrome, HumanHandoff, HumanResponse
+from browserrig import (
+    Agent,
+    Browser,
+    Chrome,
+    HandoffStatus,
+    HumanHandoff,
+    HumanResponse,
+)
 from browserrig.events import ActivityFinishedEvent, HandoffFinishedEvent
 from tests.javascript import evaluate
 from tests.observations import latest
@@ -67,7 +74,7 @@ async def test_pause_steer_resume_observes_external_page_change(site, handoff_en
         assert state["page"]["title"] == "Changed during pause"
         if handoff_enabled:
             history = session.ctx[HumanHandoff].history
-            assert history[-1].status == "resumed"
+            assert history[-1].status is HandoffStatus.RESUMED
             assert any(
                 "Changed during pause" in change for change in history[-1].changes
             )
@@ -115,7 +122,7 @@ async def test_handoff_observes_human_navigation_and_a_short_lived_popup(site):
     assert result.text == "Continued"
     assert latest(model.requests[-1].messages)["page"]["title"] == "Other"
     receipt = history[-1]
-    assert receipt.status == "done" and receipt.human_note == ""
+    assert receipt.status is HandoffStatus.DONE and receipt.human_note == ""
     assert any("tab.opened" in change for change in receipt.changes)
     assert any("tab.closed" in change for change in receipt.changes)
     assert any(isinstance(event, HandoffFinishedEvent) for event in result.events)

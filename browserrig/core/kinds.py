@@ -30,6 +30,17 @@ class ActivityOutcome(StrEnum):
     TIMEOUT = "timeout"
 
 
+class HandoffStatus(StrEnum):
+    """Human handoff outcomes with stable serialized values."""
+
+    DONE = "done"
+    DECLINED = "declined"
+    TIMEOUT = "timeout"
+    CANCELLED = "cancelled"
+    FAILED = "failed"
+    RESUMED = "resumed"
+
+
 class ActionKind(StrEnum):
     """Stable tool identities, independent of Python callback names and signatures."""
 

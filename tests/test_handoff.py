@@ -21,12 +21,14 @@ from harnessed.integrations.json import JsonSessionStore
 from harnessed.models import ModelChunk, ToolMessage
 from harnessed.plugins import AgentLoop, Approvals, Compaction
 from harnessed.testing import ScriptedModel, call
+from pydantic import ValidationError
 
 import browserrig
 from browserrig import (
     Activity,
     BrowserPerception,
     HandoffReceipt,
+    HandoffStatus,
     HumanHandoff,
     HumanResponse,
     Nudges,
@@ -169,7 +171,7 @@ async def test_handoff_reports_navigation_transient_popup_and_human_note():
         intervals = session.ctx[Activity].intervals()
     receipt = _receipt(model.requests[-1])
     assert receipt == history[-1]
-    assert receipt.status == "done"
+    assert receipt.status is HandoffStatus.DONE
     assert receipt.human_note == "Logged in and confirmed 2FA"
     assert receipt.current_url == "https://example.org/dashboard"
     assert any("tab.opened" in change for change in receipt.changes)
@@ -194,7 +196,7 @@ async def test_done_without_a_note_or_page_change_does_not_claim_login_success()
         _prepare(holder)
         await session.run("Log in")
     receipt = _receipt(model.requests[-1])
-    assert receipt.status == "done" and receipt.human_note == ""
+    assert receipt.status is HandoffStatus.DONE and receipt.human_note == ""
     assert any(
         "password field is still visible" in change for change in receipt.changes
     )
@@ -228,7 +230,7 @@ async def test_failed_comparison_still_returns_a_typed_receipt_and_refreshes_the
         await session.run("Log in")
         history = session.ctx[HumanHandoff].history
     receipt = _receipt(model.requests[-1])
-    assert receipt.status == "done" and receipt.current_url is None
+    assert receipt.status is HandoffStatus.DONE and receipt.current_url is None
     assert "could not be captured" in receipt.changes[0]
     assert len(history) == 1
     assert latest(model.requests[-1].messages)["page"]["title"] == "Changed by human"
@@ -245,7 +247,7 @@ async def test_unsuccessful_handoffs_release_browser_and_hint_state(outcome):
             raise RuntimeError("private host error")
         if outcome == "invalid_response":
             return None
-        return HumanResponse(status="declined")
+        return HumanResponse(status=HandoffStatus.DECLINED)
 
     agent, model, holder = _agent([_request(), "Done"], ask, timeout=0.02)
     async with agent.session() as session:
@@ -254,10 +256,14 @@ async def test_unsuccessful_handoffs_release_browser_and_hint_state(outcome):
         assert not browser.action_lock.locked()
         await session.ctx[Nudges].queue("After handoff", key="after", cause_id="after")
         assert session.log.last(NudgeQueuedEvent).text == "After handoff"
-    expected = "failed" if outcome == "invalid_response" else outcome
-    assert _receipt(model.requests[-1]).status == expected
+    expected = (
+        HandoffStatus.FAILED
+        if outcome == "invalid_response"
+        else HandoffStatus(outcome)
+    )
+    assert _receipt(model.requests[-1]).status is expected
     assert any(
-        isinstance(event, HandoffFinishedEvent) and event.status == expected
+        isinstance(event, HandoffFinishedEvent) and event.status is expected
         for event in result.events
     )
     assert "private host error" not in str(model.requests)
@@ -283,7 +289,7 @@ async def test_handoff_has_its_own_timeout_and_stops_trailing_tool_calls():
     async with agent.session() as session:
         _prepare(holder)
         result = await session.run("Log in")
-    assert _receipt(model.requests[-1]).status == "done"
+    assert _receipt(model.requests[-1]).status is HandoffStatus.DONE
     replies = [
         event.result
         for event in result.events
@@ -306,7 +312,10 @@ async def test_pause_resume_explains_external_changes_without_steering(track_pau
     callback.assert_not_called()
     assert latest(model.requests[-1].messages)["page"]["title"] == "Changed by human"
     if track_pauses:
-        assert history[-1].status == "resumed" and history[-1].source == "pause"
+        assert (
+            history[-1].status is HandoffStatus.RESUMED
+            and history[-1].source == "pause"
+        )
         assert any("Changed by human" in change for change in history[-1].changes)
         assert any(isinstance(event, HandoffFinishedEvent) for event in result.events)
     else:
@@ -350,7 +359,7 @@ async def test_running_pause_cannot_lose_a_resume_while_a_probe_is_slow(monkeypa
             await session.resume()
             await handle.result()
         history = session.ctx[HumanHandoff].history
-        assert history[-1].status == "resumed"
+        assert history[-1].status is HandoffStatus.RESUMED
         assert any("Changed after pause" in change for change in history[-1].changes)
 
 
@@ -477,13 +486,15 @@ async def test_abort_cancels_the_callback_and_releases_the_handoff(
             await handle.result()
         assert cancelled.is_set() and not browser.action_lock.locked()
         finished = session.log.last(HandoffFinishedEvent)
-        assert finished.status == "cancelled"
-        assert session.ctx[HumanHandoff].history[-1].status == "cancelled"
+        assert finished.status is HandoffStatus.CANCELLED
+        assert session.ctx[HumanHandoff].history[-1].status is HandoffStatus.CANCELLED
         await session.ctx[Nudges].queue("After abort", key="after", cause_id="after")
         assert session.log.last(NudgeQueuedEvent).text == "After abort"
     if persistent:
         async with agent.session(id="abort") as restored:
-            assert restored.ctx[HumanHandoff].history[-1].status == "cancelled"
+            assert (
+                restored.ctx[HumanHandoff].history[-1].status is HandoffStatus.CANCELLED
+            )
 
 
 async def test_handoff_is_opt_in_for_the_facade_and_explicit_composition():
@@ -508,7 +519,50 @@ def test_handoff_events_roundtrip_with_typed_receipts():
     for event in (
         HandoffRequestedEvent(handoff_id="id", reason="Log in"),
         HandoffFinishedEvent(
-            handoff_id="id", status="done", changes=("Document changed",)
+            handoff_id="id", status=HandoffStatus.DONE, changes=("Document changed",)
         ),
     ):
         assert registry.decode(registry.encode(event)) == event
+
+
+@pytest.mark.parametrize(
+    "status,wire",
+    [
+        (HandoffStatus.DONE, "done"),
+        (HandoffStatus.DECLINED, "declined"),
+        (HandoffStatus.TIMEOUT, "timeout"),
+        (HandoffStatus.CANCELLED, "cancelled"),
+        (HandoffStatus.FAILED, "failed"),
+        (HandoffStatus.RESUMED, "resumed"),
+    ],
+)
+def test_handoff_status_restores_enum_members_from_existing_wire_values(status, wire):
+    receipt = HandoffReceipt.model_validate(
+        {"handoff_id": "id", "source": "tool", "status": wire, "reason": "Log in"}
+    )
+    assert receipt.status is status
+    assert receipt.model_dump(mode="json")["status"] == wire
+    assert (
+        HandoffReceipt.model_validate_json(receipt.model_dump_json()).status is status
+    )
+
+    event = HandoffFinishedEvent(handoff_id="id", status=wire)
+    assert event.status is status
+    registry = EventRegistry(HANDOFF_EVENTS)
+    encoded = registry.encode(event)
+    legacy = {**encoded, "data": {**encoded["data"], "status": wire}}
+    assert registry.decode(legacy).status is status
+
+
+@pytest.mark.parametrize("wire", ["done", "declined"])
+def test_human_response_converts_accepted_wire_values_to_enum_members(wire):
+    assert HumanResponse.model_validate({"status": wire}).status is HandoffStatus(wire)
+    assert HumanResponse().status is HandoffStatus.DONE
+
+
+@pytest.mark.parametrize(
+    "wire", ["timeout", "cancelled", "failed", "resumed", "invalid"]
+)
+def test_human_response_rejects_statuses_owned_by_the_runtime(wire):
+    with pytest.raises(ValidationError):
+        HumanResponse.model_validate({"status": wire})

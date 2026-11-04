@@ -6,7 +6,7 @@ to `browser_plugins(...)`, or to a plain Harnessed `Agent`'s plugin list. Withou
 plugin, no handoff tool, prompt section or pause tracking is added.
 
 ```python
-from browserrig import Agent, Chrome, HumanHandoff, HumanResponse
+from browserrig import Agent, Chrome, HandoffStatus, HumanHandoff, HumanResponse
 from browserrig.events import HandoffRequestedEvent
 
 async def ask_human(request: HandoffRequestedEvent) -> HumanResponse:
@@ -30,7 +30,7 @@ agent = Agent(
 
 `ui`, `model` and `url` above are supplied by your application. The callback owns
 the UI and returns `HumanResponse()` when the person selects Done, or
-`HumanResponse(status="declined")` when they decline. A note is optional:
+`HumanResponse(status=HandoffStatus.DECLINED)` when they decline. A note is optional:
 `HumanResponse(note="Signed in and confirmed 2FA")`. No text entry is required.
 Keep credentials out of notes. A remote browser viewer can be used instead of
 launching a headed browser.
@@ -51,9 +51,12 @@ handoff belong to the human and are not dispatched through agent action tools.
 
 The JSON tool result follows the exported Pydantic `HandoffReceipt` model. It
 contains the request, status, optional human note, measured changes and current
-URL. Status distinguishes `done`, `declined`, `timeout`, `cancelled`, `failed`
-and host-pause `resumed`. Completion reports are historical claims; they do not
-prove that login succeeded or that the same session is still authenticated.
+URL. `HandoffStatus` is a `StrEnum` with `DONE`, `DECLINED`, `TIMEOUT`, `CANCELLED`,
+`FAILED` and host-pause `RESUMED` members. Their JSON values remain `"done"`,
+`"declined"`, `"timeout"`, `"cancelled"`, `"failed"` and `"resumed"`. Human callbacks
+can report only `DONE` or `DECLINED`; the runtime determines the other outcomes.
+Completion reports are historical claims; they do not prove that login succeeded
+or that the same session is still authenticated.
 
 Before and after snapshots compare the active tab, URL, document, title, open
 tabs and page content. Intermediate tab-open, tab-close, dialog and download
@@ -76,8 +79,8 @@ async with agent.session() as session:
     await session.run("Continue after login")
     handoff = session.ctx[HumanHandoff]
     history = handoff.history  # tuple[HandoffReceipt, ...]
-    if history:
-        print(history[-1].status, history[-1].human_note)
+    if history and history[-1].status is HandoffStatus.CANCELLED:
+        print("Handoff cancelled", history[-1].human_note)
 ```
 
 `history` is an immutable snapshot of the latest `history_limit` redacted receipts,
@@ -99,8 +102,8 @@ With `track_pauses=True`, the same plugin remembers the last delivered agent
 observation when the host pauses the session. The receipt labels that baseline;
 it can predate the last completed action. Before any agent observation, it reports
 that no baseline is available. After resume, it records a receipt before the next model
-step, with `source="pause"` and `status="resumed"`. The callback is not called,
-and no manual `steer()` is needed to explain external browser changes.
+step, with `source="pause"` and `status=HandoffStatus.RESUMED`. The callback is not
+called, and no manual `steer()` is needed to explain external browser changes.
 Set `track_pauses=False` to keep only the model-requested handoff tool.
 
 `HandoffRequestedEvent` and `HandoffFinishedEvent` are available from
