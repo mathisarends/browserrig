@@ -14,7 +14,7 @@ from pathlib import Path
 
 import browserrig
 from harnessed import Session
-from browserrig.scripts import CONTENT, ELEMENT, SECRET_FIELD
+from browserrig.scripts import CHOREOGRAPHY, CONTENT, ELEMENT, OVERLAY, SECRET_FIELD
 
 assert callable(Session.add_context)
 assert browserrig.__version__ == importlib.metadata.version('browserrig')
@@ -24,7 +24,9 @@ assert any(str(path).endswith('.dist-info/licenses/LICENSE') for path in distrib
 assert set(browserrig.__all__) <= set(dir(browserrig))
 assert Path(browserrig.__file__).is_relative_to(Path.cwd())
 assert files('browserrig').joinpath('py.typed').is_file()
-assert all(script.declaration for script in (CONTENT, ELEMENT, SECRET_FIELD))
+assert all(script.declaration for script in (CHOREOGRAPHY, CONTENT, ELEMENT, OVERLAY, SECRET_FIELD))
+assert files('browserrig.choreography').joinpath('view.html').is_file()
+assert files('browserrig.choreography').joinpath('view.css').is_file()
 print('Installed wheel: public API, version, typing data and scripts OK')
 """
 
@@ -39,7 +41,9 @@ def main() -> None:
     wheel = wheels[0].resolve()
     package = Path(__file__).resolve().parents[1] / "browserrig"
     assets = {
-        path.relative_to(package.parent).as_posix() for path in package.rglob("*.js")
+        path.relative_to(package.parent).as_posix()
+        for path in package.rglob("*")
+        if path.suffix in {".js", ".html", ".css"}
     }
     assets.add("browserrig/py.typed")
     with ZipFile(wheel) as archive:

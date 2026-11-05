@@ -89,6 +89,58 @@ stored as secrets.
 plugin through `browser=`. For direct `ChromeBrowser(...)` use, import the
 low-level `Launch` and `Connect` configuration types from `browserrig.browser`.
 
+## Browser-owned presentation
+
+`InputVisualization()` streams input events and renders them in the active tab
+through `IframeRenderer()`. Its transparent iframe shows the named pointer,
+clicks, a full keyboard, target corners, a directional scroll wheel, address/find
+previews and transfer/wait indicators. Native CDP input owns interaction with the
+inspected page. Download and upload cards finish only on completion receipts;
+elapsed animation time never implies successful transfer.
+Use `InputVisualization(renderer=None)` for an external event-only viewer.
+
+```python
+from browserrig import IframeRenderer, InputVisualization
+
+InputVisualization(renderer=IframeRenderer(
+    name="Research", keyboard_layout="de", theme="dark",
+))
+```
+
+Layouts are `en` and `de`; themes are `dark`, `light` and `auto`. Layout controls
+the visual key map independently of native input. Secret typing shows a protected
+input caption without highlighting the secret's physical keys. The renderer
+respects reduced motion and fits narrow viewports. Activity receipts can add a
+thinking, compaction or pause label beside the pointer.
+See the [capture gallery and recording](browser-choreography.md).
+
+The browser owns the general surface API; perception and recording do not import
+choreography. Applications can use it without either plugin:
+
+```python
+overlay = await tab.overlays.mount(html="<style>body{color:blue}</style>Viewer text")
+await overlay.send({"type": "application.status", "text": "Ready"})
+await overlay.close()
+```
+
+An optional `script=Script(...)` initializes trusted application JavaScript in
+the iframe's isolated world. Messages arrive through the iframe's `message`
+listener. The handle remounts after navigation on its next `send`; close is
+idempotent. Close application-owned handles before leaving an attached browser.
+
+Surfaces are inert and pointer-transparent. Frame/content extraction and page
+search omit them; readiness ignores registered surface DOM activity. Ordinary
+`browserrig.browser.screenshot(tab)` temporarily hides them, restores them on
+failure/cancellation, and emits paired `PageCaptureStartedEvent` and
+`PageCaptureFinishedEvent` receipts. `VideoRecording` stops before hiding and
+resumes after restoration, so the edited video contains no screenshot-related
+gaps. The live page briefly hides its surfaces during a clean screenshot.
+Use `screenshot(tab, overlays=True)` to capture a viewer image explicitly.
+
+DOM screenshot reference marks remain independently configurable with
+`DomCapture(marks=False)`. The optional post-capture pointer marker is controlled
+by `DomCapture(cursor=True)` and is off by default.
+
 ## Human handoff
 
 For optional human login and takeover, add `HumanHandoff(ask=...)` to the plugin

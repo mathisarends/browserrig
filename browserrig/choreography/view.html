@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      {{styles}}
+    </style>
+  </head>
+  <body>
+    <svg id="trail" aria-hidden="true"><path /></svg>
+    <div id="matches"></div>
+    <div id="highlight"><i></i><i></i><i></i><i></i></div>
+    <div id="cursor" data-style="default">
+      <div id="cursor-icon"></div>
+      <div id="cursor-name">Browserrig</div>
+      <div id="scroll-feedback">
+        <span id="scroll-chevron">⌄</span><span id="scroll-label"></span>
+      </div>
+    </div>
+    <div id="keyboard" class="panel" aria-hidden="true">
+      <div id="keyboard-keys"></div>
+      <div id="keyboard-caption"></div>
+    </div>
+    <div id="address" class="panel">
+      <span class="symbol">↗</span><span id="address-text"></span
+      ><span id="address-enter">↵</span>
+    </div>
+    <div id="find" class="panel">
+      <span class="symbol">⌕</span><span id="find-text"></span
+      ><span id="find-count"></span>
+    </div>
+    <div id="navigation" class="panel">
+      <span id="navigation-icon"></span><span id="navigation-text"></span>
+    </div>
+    <div id="status" class="panel">
+      <span class="spinner"></span><span id="status-text"></span>
+    </div>
+    <div id="download" class="transfer panel">
+      <div class="file-icon"></div>
+      <div class="file-copy"><b></b><span></span></div>
+      <div class="transfer-state"></div>
+    </div>
+    <div id="upload" class="transfer panel">
+      <div class="file-icon"></div>
+      <div class="file-copy"><b></b><span></span></div>
+      <div class="transfer-state"></div>
+    </div>
+    <div id="flying-file" class="file-icon"></div>
+  </body>
+</html>

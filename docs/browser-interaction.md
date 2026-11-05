@@ -215,10 +215,9 @@ inspect the result before continuing.
 browser, tab, and document IDs for live UI display.
 The newest image shown to the model determines how crop coordinates map to the viewport;
 subsequent text-only observations retain that image's geometry.
-Screenshots include a red cursor arrow where the browser's mouse
-rests in the captured tab, with its tip at the exact input coordinate. The marker follows
-crop and zoom coordinates and is omitted when the pointer is outside the image.
-It is drawn with Pillow after capture.
+Model screenshots omit application overlays and the presentation cursor.
+Set `DomCapture(cursor=True)` to add a red cursor arrow after capture, with its tip
+at the exact input coordinate. This optional marker follows crop and zoom coordinates.
 All gestures use real CDP input and release mouse buttons even when interrupted.
 Workspace tools are hidden when a connected browser has no shared local file
 system; `list_downloads` remains available.
@@ -348,6 +347,7 @@ alongside its durable browser events:
 | `BarTypedEvent` | Browser bar (`address` or `find`), key, bar text after the key, duration |
 | `FindBarEvent` | Find bar opened or closed |
 | `FindResultsEvent` | Find bar text, match count, current match (0 for none), viewport rects of visible matches |
+| `ScrollStartedEvent` | Wheel origin, planned deltas and duration, emitted before native wheel dispatch |
 | `ScrolledEvent` | Wheel origin, dispatched deltas, duration |
 | `HighlightElementEvent` | DOM reference and viewport bounds |
 | `WaitingEvent` | Requested wait duration |
@@ -361,6 +361,8 @@ carry its `action_id`. `CursorMovedEvent` describes the path before execution;
 `CursorStateEvent` reports the actual endpoint, including after cancellation.
 Key and pointer receipts follow successful dispatch. Action failure events close
 interrupted sequences. Key events contain the dispatched key and modifiers.
+`ScrollStartedEvent` starts wheel feedback during native scrolling;
+`ScrolledEvent` reports the dispatched totals after it finishes or is interrupted.
 
 `InputVisualization` paces what it shows: events with a `duration` describe an
 animation the browser waits through before continuing. `open_file` and

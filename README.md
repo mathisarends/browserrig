@@ -129,7 +129,11 @@ The existing `Activity` plugin supplies the cut times: model requests, context
 compaction and pauses are removed, with a short margin around each cut. Concurrent
 tool execution, page readiness and human handoffs remain visible. Original native
 captures and `timeline.json` are retained beside the edited video. The recording
-captures page content; browser chrome and event-based input overlays are not included.
+captures page content, including the iframe rendered by `InputVisualization()`.
+Cursor motion, clicks, keyboard shortcuts, highlights and find results are visible
+in Chrome and in the video. Native browser chrome is outside the capture.
+Ordinary page screenshots omit application overlays; the recorder saves its segment
+before they are hidden and resumes after restoration, keeping those phases out of the film.
 The recording follows `browser.active_tab` when you open or activate a tab through
 Browserrig, or close the active tab. Each switch saves a native capture; the captures
 are joined in order into one `video.mp4`. Reactivating the current tab keeps its
@@ -142,6 +146,12 @@ The OpenAI example supports `--video .browserrig/recordings`. Hold
 `session.ctx[VideoRecording]` to read its `result` after session exit, or call
 `await session.ctx[VideoRecording].finish()` to stop and edit earlier. Each session
 creates a separate output directory, including when the same agent is reused.
+
+Run `uv run python -m examples.visualization --headed` for a local demonstration
+without a model or API key. It saves a viewer screenshot, a clean observation
+screenshot and a video under `.browserrig/visualization`.
+See the [choreography gallery](docs/browser-choreography.md) for full captures,
+the recording and renderer configuration.
 
 ## Release status
 

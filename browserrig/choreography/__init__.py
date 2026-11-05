@@ -12,6 +12,7 @@ from .events import (
     WaitingEvent,
 )
 from .plugin import InputVisualization
+from .renderer import IframeRenderer
 from .stage import Stage
 from .tabstrip import TabStrip
 
@@ -19,6 +20,7 @@ __all__ = [
     "SCENE_EVENTS",
     "BarTypedEvent",
     "InputVisualization",
+    "IframeRenderer",
     "CursorEnteredEvent",
     "FileTransferEvent",
     "FindBarEvent",

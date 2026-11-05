@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import ConfigDict
 from pydantic.alias_generators import to_camel
 
@@ -6,6 +8,13 @@ from browserrig.core import Bounds, ElementOperation, Options, Point
 
 class ScriptArgs(Options):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+class OverlayArgs(ScriptArgs):
+    operation: str
+    id: str = ""
+    data: Any = None
+    visible: bool = True
 
 
 class ElementArgs(ScriptArgs):

@@ -10,6 +10,11 @@ import pytest
 from cdpify import ReceivedEvent
 from cdpify.domains.browser import DownloadWillBeginEvent
 from cdpify.domains.page import JavascriptDialogOpeningEvent
+from cdpify.domains.target import (
+    TargetDestroyedEvent,
+    TargetInfo,
+    TargetInfoChangedEvent,
+)
 from pydantic import ValidationError
 
 from browserrig import ChromeBrowser, SessionSetup, Viewport
@@ -39,6 +44,33 @@ def test_session_setup_options_validate_entries_and_freeze_the_sequence(options)
         options(session_setup=[object()])
     with pytest.raises(ValidationError, match="frozen"):
         configured.session_setup = ()
+
+
+async def test_late_target_metadata_does_not_reattach_a_destroyed_tab():
+    browser, _ = _browser(Launch())
+    target = browser.client.target
+    target.create_browser_context = AsyncMock(
+        return_value=SimpleNamespace(browser_context_id="context")
+    )
+    target.dispose_browser_context = AsyncMock()
+    async with AsyncExitStack() as stack:
+        await browser.tabs.start(browser.client, stack)
+        await browser.tabs.handle(TargetDestroyedEvent(target_id="gone"), None)
+        info = TargetInfo(
+            target_id="gone",
+            type="page",
+            title="Gone",
+            url="about:blank",
+            attached=False,
+            can_access_opener=False,
+            browser_context_id="context",
+        )
+        await browser.tabs.handle(TargetInfoChangedEvent(target_info=info), None)
+    target.attach_to_target.assert_not_awaited()
+    assert browser.tabs.focused() is None
+    target.dispose_browser_context.assert_awaited_once_with(
+        browser_context_id="context"
+    )
 
 
 @pytest.mark.parametrize("options", [Launch, Connect])

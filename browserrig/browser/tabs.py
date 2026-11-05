@@ -223,6 +223,8 @@ class Tabs:
         )
 
     async def _on_target_info(self, info: TargetInfo) -> None:
+        if info.target_id in self._closed_targets:
+            return
         if known := self._tabs.get(info.target_id):
             known.url, known.title = info.url, info.title
             await known.report_change()

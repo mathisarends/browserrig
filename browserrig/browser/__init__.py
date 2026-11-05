@@ -6,6 +6,7 @@ from .config import BrowserOptions, Connect, Launch, Viewport
 from .frame import Frame
 from .images import screenshot
 from .models import TabInfo
+from .overlays import Overlay, Overlays
 from .plugin import Chrome, TabChanged
 from .setup import SessionSetup
 from .tab import Tab, validated_url
@@ -22,6 +23,8 @@ __all__ = [
     "Download",
     "DownloadState",
     "Launch",
+    "Overlay",
+    "Overlays",
     "SessionSetup",
     "Tab",
     "TabChanged",

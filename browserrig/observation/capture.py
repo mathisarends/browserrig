@@ -236,6 +236,7 @@ class DomCapture(Options):
     # Show visible text on pages with fewer than five named controls.
     sparse_text_chars: int = Field(default=1500, ge=0, le=100000)
     marks: bool = True
+    cursor: bool = False
 
     async def collect(  # pylint: disable=unused-argument
         self,
@@ -286,7 +287,7 @@ class DomCapture(Options):
             marked,
             area,
             scale,
-            cursor=cursor,
+            cursor=cursor if self.cursor else None,
         )
         return CaptureContent(
             page=page, image=image, geometry=geometry, area=area, scale=scale
