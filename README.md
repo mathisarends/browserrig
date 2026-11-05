@@ -130,6 +130,12 @@ compaction and pauses are removed, with a short margin around each cut. Concurre
 tool execution, page readiness and human handoffs remain visible. Original native
 captures and `timeline.json` are retained beside the edited video. The recording
 captures page content; browser chrome and event-based input overlays are not included.
+The recording follows `browser.active_tab` when you open or activate a tab through
+Browserrig, or close the active tab. Each switch saves a native capture; the captures
+are joined in order into one `video.mp4`. Reactivating the current tab keeps its
+capture running.
+Manual tab selection in Chrome's UI is not tracked; use `browser.tabs.activate(...)`
+to select the tab that Browserrig controls and records.
 Close tabs through Browserrig so their recordings can be saved before destruction.
 
 The OpenAI example supports `--video .browserrig/recordings`. Hold

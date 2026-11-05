@@ -96,33 +96,60 @@ async def test_native_recording_cuts_model_waits_across_tabs_and_closure(
         640,
         480,
     )
-    decoded = await asyncio.to_thread(
-        subprocess.run,
-        [
-            "ffmpeg",
-            "-v",
-            "error",
-            "-i",
-            str(result.path),
-            "-vf",
-            "crop=100:100:500:300,scale=1:1",
-            "-pix_fmt",
-            "rgb24",
-            "-f",
-            "rawvideo",
-            "-",
-        ],
-        capture_output=True,
-        check=True,
-        timeout=30,
-    )
-    colors = list(zip(*[iter(decoded.stdout)] * 3, strict=True))
+    colors = await _video_colors(result.path)
     assert any(green > 180 and red < 60 and blue < 60 for red, green, blue in colors)
     assert any(blue > 180 and red < 60 and green < 60 for red, green, blue in colors)
     # At most a few transition frames survive either edge of the cut.
     assert (
         sum(red > 180 and green < 60 and blue < 60 for red, green, blue in colors) <= 3
     )
+
+
+async def test_recording_follows_repeated_activation_of_existing_tabs(tmp_path, site):
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            Activity(),
+            Chrome.launch(url=site),
+            VideoRecording(tmp_path, width=640, height=480, frame_rate=15, padding=0),
+        ],
+    )
+    async with agent.session() as session:
+        browser = session.ctx[Browser]
+        recording = session.ctx[VideoRecording]
+        first = browser.active_tab
+        await evaluate(first, "document.body.style.background='lime'")
+        await asyncio.sleep(0.5)
+        second = await browser.tabs.open(site + "/other")
+        await evaluate(second, "document.body.style.background='blue'")
+        await asyncio.sleep(0.5)
+        await browser.tabs.activate(first.id)
+        await asyncio.sleep(0.5)
+        # Reactivating the current tab must not split its ongoing capture.
+        await browser.tabs.activate(first.id)
+        await browser.tabs.activate(second.id)
+        await asyncio.sleep(0.5)
+        await browser.tabs.close(second.id)
+        assert browser.active_tab.id == first.id
+        await asyncio.sleep(0.5)
+    result = recording.result
+    assert result is not None
+    assert len(result.sources) == 5
+    expected = [first.id, second.id, first.id, second.id, first.id]
+    manifest = json.loads((result.path.parent / "timeline.json").read_text())
+    assert [s["target_id"] for s in manifest] == expected
+    # Decode the final video to verify the visible tab order independently of
+    # the manifest. Ignore unpainted frames at initial page load.
+    visible_tabs = []
+    for red, green, blue in await _video_colors(result.path):
+        tab = None
+        if green > 180 and red < 60 and blue < 60:
+            tab = first.id
+        elif blue > 180 and red < 60 and green < 60:
+            tab = second.id
+        if tab is not None and (not visible_tabs or visible_tabs[-1] != tab):
+            visible_tabs.append(tab)
+    assert visible_tabs == expected
 
 
 @pytest.mark.parametrize("same_tick", [False, True])
@@ -164,3 +191,27 @@ async def test_immediate_session_exit_still_produces_a_video(
         timeout=30,
     )
     assert int(probe.stdout) >= 1
+
+
+async def _video_colors(path):
+    decoded = await asyncio.to_thread(
+        subprocess.run,
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-i",
+            str(path),
+            "-vf",
+            "crop=100:100:500:300,scale=1:1",
+            "-pix_fmt",
+            "rgb24",
+            "-f",
+            "rawvideo",
+            "-",
+        ],
+        capture_output=True,
+        check=True,
+        timeout=30,
+    )
+    return list(zip(*[iter(decoded.stdout)] * 3, strict=True))
