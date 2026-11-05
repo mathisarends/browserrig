@@ -13,8 +13,9 @@ the walkthrough makes no model requests.
 ![All presentation states](media/choreography/overview.png)
 
 [Play the native Chrome recording](media/choreography/demo.mp4).
-The MP4 contains the presentation in the browser's captured pixels. Model-wait
-intervals are cut by the recording plugin, including the scripted thinking phase.
+The MP4 contains the presentation in the browser's captured pixels. Real model-wait
+intervals are cut by the recording plugin. The scripted thinking receipt in this
+walkthrough demonstrates the appearance without making a model request.
 Native browser toolbars are outside the recording; address and tab gestures use
 temporary in-page indicators.
 
