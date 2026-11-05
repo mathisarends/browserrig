@@ -19,6 +19,7 @@ from browserrig import (
     ImageContext,
     TerminalEvents,
     UntilCompaction,
+    VideoRecording,
 )
 from examples.telemetry import add_tracing_arguments, tracing_plugins
 
@@ -45,6 +46,11 @@ async def main() -> None:
         "--task", default=DEFAULT_TASK, help="Override the Voyager research mission"
     )
     parser.add_argument("--headed", action="store_true")
+    parser.add_argument(
+        "--video",
+        type=Path,
+        help="Record into this directory and cut model waits at session exit (FFmpeg required)",
+    )
     parser.add_argument(
         "--done",
         action="store_true",
@@ -77,6 +83,7 @@ async def main() -> None:
             ),
             plugins=[
                 ImageContext(UntilCompaction()),
+                VideoRecording(args.video) if args.video is not None else None,
                 Approvals(default=PolicyDecision.ALLOW),
                 *telemetry,
                 Done() if args.done else None,
@@ -84,8 +91,11 @@ async def main() -> None:
             ],
         )
         async with agent.session() as session:
+            recording = session.ctx[VideoRecording] if args.video is not None else None
             result = await session.run(args.task, max_steps=20, token_budget=80000)
             print(result.text)
+        if recording is not None and recording.result is not None:
+            print(f"Video: {recording.result.path}")
 
 
 if __name__ == "__main__":

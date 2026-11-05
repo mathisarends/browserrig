@@ -108,6 +108,35 @@ Mount `plugins=[Done()]` to opt into [explicit completion and structured final
 answers](https://github.com/mathisarends/browserrig/blob/main/docs/agent-guide.md#explicit-completion-and-output-formats). Without it,
 ordinary text responses retain Harnessed's default completion behavior.
 
+## Session videos
+
+Add `VideoRecording()` to `Agent(plugins=[...])` to start recording when the
+session opens. It uses cdpify's native `page.start_screen_recording()` and
+`stop_screen_recording()` commands, follows the active tab, and creates
+`.browserrig/recordings/<unique-id>/video.mp4` when the session closes. FFmpeg
+must be on `PATH`; Chrome must support `Page.startScreenRecording`.
+
+```python
+from pathlib import Path
+from browserrig import VideoRecording
+
+# Include this plugin alongside your model and browser configuration:
+recording = VideoRecording(Path(".browserrig/recordings"), padding=0.15)
+# agent = Agent(model=..., plugins=[recording])
+```
+
+The existing `Activity` plugin supplies the cut times: model requests, context
+compaction and pauses are removed, with a short margin around each cut. Concurrent
+tool execution, page readiness and human handoffs remain visible. Original native
+captures and `timeline.json` are retained beside the edited video. The recording
+captures page content; browser chrome and event-based input overlays are not included.
+Close tabs through Browserrig so their recordings can be saved before destruction.
+
+The OpenAI example supports `--video .browserrig/recordings`. Hold
+`session.ctx[VideoRecording]` to read its `result` after session exit, or call
+`await session.ctx[VideoRecording].finish()` to stop and edit earlier. Each session
+creates a separate output directory, including when the same agent is reused.
+
 ## Release status
 
 Browserrig is an early 0.x release; public APIs may change between minor versions.

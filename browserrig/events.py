@@ -25,6 +25,7 @@ class EventKind(StrEnum):
     DISCONNECTED = "browser.disconnected"
     TAB_OPENED = "browser.tab.opened"
     TAB_ACTIVATED = "browser.tab.activated"
+    TAB_CLOSING = "browser.tab.closing"
     TAB_CLOSED = "browser.tab.closed"
     TAB_UPDATED = "browser.tab.updated"
     NAVIGATION_STARTED = "browser.navigation.started"
@@ -241,6 +242,15 @@ class TabOpenedEvent(BrowserEvent):
 class TabActivatedEvent(BrowserEvent):
     type: Literal[EventKind.TAB_ACTIVATED] = field(
         default=EventKind.TAB_ACTIVATED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class TabClosingEvent(BrowserEvent):
+    """A controlled tab is about to close; consumers can flush its resources."""
+
+    type: Literal[EventKind.TAB_CLOSING] = field(
+        default=EventKind.TAB_CLOSING, kw_only=True
     )
 
 
@@ -619,6 +629,7 @@ BROWSER_EVENTS = (
     DisconnectedEvent,
     TabOpenedEvent,
     TabActivatedEvent,
+    TabClosingEvent,
     TabClosedEvent,
     NavigationStartedEvent,
     NavigationCommittedEvent,
