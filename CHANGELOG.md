@@ -37,6 +37,12 @@
 
 ### Added
 
+- Add opt-in `VideoRecording` using cdpify's native Page screen recording commands.
+  Follow active tabs, finalize before controlled tab closure, and use Activity
+  intervals to cut model, compaction and pause waits at session exit. Retain raw
+  captures and a cut manifest, export MP4 through FFmpeg, and expose `--video`
+  in the OpenAI example.
+
 - Add `session.ctx[HumanHandoff].history` as an immutable tuple of typed,
   redacted `HandoffReceipt` records. Restore history before the first turn and
   keep JSON serialization and Harnessed's context storage inside the plugin.

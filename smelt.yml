@@ -62,6 +62,7 @@ architecture:
       may_depend_on: [core, scripts, files, input, browser, readiness, observation, secrets]
       third_party: {deny: [cdpify]}
     activity: {path: activity, may_depend_on: [core]}
+    recording: {path: recording, may_depend_on: [core, browser, activity]}
     handoff:
       path: handoff
       may_depend_on: [core, browser, nudges, observation, secrets]

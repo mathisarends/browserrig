@@ -57,6 +57,7 @@ from .readiness import (
     SelectReadiness,
     wait_for_page,
 )
+from .recording import RecordingResult, VideoRecording
 from .secrets import Secret, Secrets, SecretValue, Totp, env
 from .terminal import TerminalEvents
 from .tools import (
@@ -127,6 +128,8 @@ __all__ = [
     "ObserveAfterInput",
     "DomActionChains",
     "Activity",
+    "RecordingResult",
+    "VideoRecording",
     "Actions",
     "Point",
     "MouseEventKind",

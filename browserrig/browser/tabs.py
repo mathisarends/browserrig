@@ -19,7 +19,12 @@ from cdpify.domains.target import (
 )
 
 from browserrig.core import BrowserError, TabGesture, TargetId
-from browserrig.events import TabActivatedEvent, TabClosedEvent, TabOpenedEvent
+from browserrig.events import (
+    TabActivatedEvent,
+    TabClosedEvent,
+    TabClosingEvent,
+    TabOpenedEvent,
+)
 from browserrig.input import Input
 
 from .config import BrowserOptions
@@ -155,6 +160,7 @@ class Tabs:
             raise BrowserError("Target is outside this browser's controlled scope")
 
         async def close() -> None:
+            await self._emit(TabClosingEvent(target_id=target_id))
             await self.client.target.close_target(target_id=target_id)
             await self._forget(target_id)
             if self.focused() is not None:
