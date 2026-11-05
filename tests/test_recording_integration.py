@@ -10,6 +10,7 @@ from harnessed.models import AssistantMessage, ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
 from browserrig import Activity, Browser, Chrome, VideoRecording
+from browserrig.recording import capture as capture_module
 from tests.javascript import evaluate
 
 pytestmark = [
@@ -124,7 +125,12 @@ async def test_native_recording_cuts_model_waits_across_tabs_and_closure(
     )
 
 
-async def test_immediate_session_exit_still_produces_a_video(tmp_path):
+@pytest.mark.parametrize("same_tick", [False, True])
+async def test_immediate_session_exit_still_produces_a_video(
+    tmp_path, monkeypatch, same_tick
+):
+    if same_tick:
+        monkeypatch.setattr(capture_module, "monotonic", lambda: 100.0)
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
@@ -138,3 +144,23 @@ async def test_immediate_session_exit_still_produces_a_video(tmp_path):
     assert recording.result is not None
     assert recording.result.path.stat().st_size > 0
     assert recording.result.duration >= 1 / 15
+    if same_tick:
+        assert recording.result.original_duration == 0
+    probe = await asyncio.to_thread(
+        subprocess.run,
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-count_frames",
+            "-show_entries",
+            "stream=nb_read_frames",
+            "-of",
+            "csv=p=0",
+            str(recording.result.path),
+        ],
+        capture_output=True,
+        check=True,
+        timeout=30,
+    )
+    assert int(probe.stdout) >= 1

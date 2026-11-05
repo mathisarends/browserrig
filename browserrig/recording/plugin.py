@@ -124,9 +124,15 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
         if not any(spans):
             # A session containing only waits still gets a brief view of its final page.
             duration = self._segments[-1].ended_at - self._segments[-1].started_at
+            frame_duration = 1 / self.frame_rate
             spans = (
                 *spans[:-1],
-                (Span(max(0, duration - 1 / self.frame_rate), duration),),
+                # Native capture can finish within one monotonic clock tick.
+                (
+                    Span(
+                        max(0, duration - frame_duration), max(duration, frame_duration)
+                    ),
+                ),
             )
         self.result = await edit_video(
             tuple(self._segments),

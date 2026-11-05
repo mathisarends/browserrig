@@ -22,7 +22,6 @@ class Capture:
         self._stream: str | None = None
 
     async def start(self, *, width: int, height: int, frame_rate: int) -> None:
-        self.started_at = monotonic()
         try:
             result = await self.tab.cdp.page.start_screen_recording(
                 audio=False,
@@ -36,6 +35,9 @@ class Capture:
                 "Page.startScreenRecording requires a Chrome version "
                 "that supports this experimental command."
             ) from error
+        # Chrome acknowledges startup after its initial frame is captured. The
+        # downloaded video starts there, excluding CDP/encoder startup latency.
+        self.started_at = monotonic()
         self._stream = result.stream
 
     async def stop(self) -> Segment:

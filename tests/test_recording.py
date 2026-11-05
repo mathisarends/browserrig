@@ -10,13 +10,16 @@ from harnessed.models import ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
 from browserrig import Activity, Browser, RecordingResult, VideoRecording
+from browserrig.activity import plugin as activity_module
 from browserrig.core import ActivityKind, ActivityOutcome, BrowserError
 from browserrig.events import (
     BROWSER_EVENTS,
     ActivityFinishedEvent,
+    ActivityStartedEvent,
     TabActivatedEvent,
     TabClosingEvent,
 )
+from browserrig.recording import capture as capture_module
 from browserrig.recording import plugin as recording_module
 from browserrig.recording.capture import Capture
 from browserrig.recording.models import Span
@@ -93,6 +96,23 @@ async def test_native_capture_downloads_chunks_and_closes_stream(tmp_path):
     tab.cdp.page.stop_screen_recording.assert_awaited_once_with()
     tab.cdp.io.close.assert_awaited_once_with(handle="stream-first")
     assert tab.cdp.io.read.await_count == 2
+
+
+async def test_capture_timeline_starts_after_native_startup(tmp_path, recording_clock):
+    tab = _tab("first", [])
+
+    async def start(**_options):
+        recording_clock.now = 105.0
+        return SimpleNamespace(stream="stream-first")
+
+    tab.cdp.page.start_screen_recording.side_effect = start
+    capture = Capture(tab, tmp_path / "capture.mp4")
+    await capture.start(width=640, height=480, frame_rate=15)
+    recording_clock.now = 110.0
+    segment = await capture.stop()
+    assert (segment.started_at, segment.ended_at) == (105, 110)
+    tab.cdp.page.start_screen_recording.assert_awaited_once()
+    tab.cdp.page.stop_screen_recording.assert_awaited_once()
 
 
 async def test_download_failure_still_closes_native_stream(tmp_path):
@@ -189,7 +209,9 @@ async def test_finish_is_idempotent_and_reusing_agent_isolated(tmp_path, monkeyp
     assert tab.cdp.page.stop_screen_recording.await_count == 2
 
 
-async def test_session_exception_finalizes_open_activity(tmp_path, monkeypatch):
+async def test_session_exception_finalizes_open_activity(
+    tmp_path, monkeypatch, recording_clock
+):
     edits = []
     _install_editor(monkeypatch, edits)
     tab = _tab("first", [])
@@ -204,6 +226,7 @@ async def test_session_exception_finalizes_open_activity(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="application failed"):
         async with agent.session() as session:
             recording = session.ctx[VideoRecording]
+            recording_clock.now = 101.0
             await session.emit(
                 ModelRequestedEvent(
                     request=ModelRequest(messages=()),
@@ -211,18 +234,21 @@ async def test_session_exception_finalizes_open_activity(tmp_path, monkeypatch):
                     request_id="pending",
                 )
             )
+            recording_clock.now = 110.0
             raise ValueError("application failed")
     assert recording.result.path.exists()
     assert len(edits) == 1
     # An unfinished LLM interval is projected through the end of the capture.
-    assert (
-        sum(w.end - w.start for w in edits[0][1][0])
-        < recording.result.original_duration
-    )
+    assert edits[0][1] == ((Span(0, 1),),)
+    assert recording.result.original_duration == 10
+    assert recording.result.duration == 1
     tab.cdp.page.stop_screen_recording.assert_awaited_once()
 
 
-async def test_session_with_only_waits_retains_a_final_view(tmp_path, monkeypatch):
+@pytest.mark.parametrize("elapsed", [0.0, 0.016, 2.0])
+async def test_session_with_only_waits_retains_a_final_view(
+    tmp_path, monkeypatch, recording_clock, elapsed
+):
     edits = []
     _install_editor(monkeypatch, edits)
     monkeypatch.setattr(recording_module, "kept_spans", lambda *_args, **_kwargs: ())
@@ -237,9 +263,12 @@ async def test_session_with_only_waits_retains_a_final_view(tmp_path, monkeypatc
     )
     async with agent.session() as session:
         recording = session.ctx[VideoRecording]
-    assert recording.result.duration > 0
-    assert len(edits[0][1][0]) == 1
-    assert edits[0][1][0][0].end == recording.result.original_duration
+        recording_clock.now += elapsed
+    assert recording.result.original_duration == pytest.approx(elapsed)
+    assert recording.result.duration == pytest.approx(1 / 30)
+    (window,) = edits[0][1][0]
+    assert window.start == pytest.approx(max(0, elapsed - 1 / 30))
+    assert window.end == pytest.approx(max(elapsed, 1 / 30))
     tab.cdp.page.stop_screen_recording.assert_awaited_once()
 
 
@@ -274,6 +303,19 @@ class _BrowserService(Plugin):
     async def setup(self, ctx: Context):
         ctx.provide(Browser, self.browser)
         ctx.effect(lambda: self.calls.append("browser-close"))
+
+
+@pytest.fixture(name="recording_clock")
+def _recording_clock(monkeypatch):
+    clock = SimpleNamespace(now=100.0)
+
+    def started(**fields):
+        return ActivityStartedEvent(**fields, at=clock.now)
+
+    # Keep native captures and Activity receipts on the same explicit timeline.
+    monkeypatch.setattr(capture_module, "monotonic", lambda: clock.now)
+    monkeypatch.setattr(activity_module, "ActivityStartedEvent", started)
+    return clock
 
 
 def _interval(kind, start, end):
