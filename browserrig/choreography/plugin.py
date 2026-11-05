@@ -1,5 +1,7 @@
 import asyncio
 import logging
+from collections import deque
+from contextlib import suppress
 from typing import Any
 
 from harnessed import Context, Plugin, hook
@@ -59,6 +61,8 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
         super().__init__()
         self.renderer = renderer
         self._view: IframeView | None = None
+        self._activities: deque[BrowserEvent] = deque()
+        self._activity_task: asyncio.Task[None] | None = None
 
     async def setup(self, ctx: Context) -> None:
         inputs = self._browser.input
@@ -68,6 +72,7 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             ctx.effect(self._view.close)
             ctx.on(LiveEvent, self._render)
             ctx.on(BrowserEvent, self._browser_event)
+            ctx.effect(self._stop_activities)
 
         async def publish_cursor(_event: TurnStartedEvent) -> None:
             # Live subscribers often attach late, so seed their cursor at turn start.
@@ -92,19 +97,20 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             await self._present(event)
 
     async def _browser_event(self, event: BrowserEvent) -> None:
-        if isinstance(
-            event, (ActivityStartedEvent, ActivityFinishedEvent)
-        ) and event.kind not in {
-            ActivityKind.LLM,
-            ActivityKind.COMPACTION,
-            ActivityKind.PAUSED,
-        }:
+        if isinstance(event, (ActivityStartedEvent, ActivityFinishedEvent)):
+            if event.kind in {
+                ActivityKind.LLM,
+                ActivityKind.COMPACTION,
+                ActivityKind.PAUSED,
+            }:
+                # Status rendering must never hold up model/control hooks.
+                self._activities.append(event)
+                if self._activity_task is None:
+                    self._activity_task = asyncio.create_task(self._show_activities())
             return
         if isinstance(
             event,
             (
-                ActivityStartedEvent,
-                ActivityFinishedEvent,
                 DownloadStartedEvent,
                 DownloadCompletedEvent,
                 DownloadFailedEvent,
@@ -114,18 +120,33 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
         ):
             await self._present(event)
 
+    async def _show_activities(self) -> None:
+        try:
+            while self._activities:
+                await self._present(self._activities.popleft())
+        finally:
+            self._activity_task = None
+
+    async def _stop_activities(self) -> None:
+        task = self._activity_task
+        if task is not None:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+        self._activities.clear()
+
     async def _present(self, event: LiveEvent | BrowserEvent) -> None:
         if self._view is None:
             return
-        tab = self._browser.active_tab
-        if (
-            (event.target_id and tab.id != event.target_id)
-            or tab.closed
-            or tab.navigation_pending
-            or tab.dialog is not None
-        ):
-            return
         try:
+            tab = self._browser.active_tab
+            if (
+                (event.target_id and tab.id != event.target_id)
+                or tab.closed
+                or tab.navigation_pending
+                or tab.dialog is not None
+            ):
+                return
             async with asyncio.timeout(2.5):
                 await self._view.show(tab, event)
         except (BrowserError, TimeoutError):

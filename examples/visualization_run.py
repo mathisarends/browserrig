@@ -236,6 +236,14 @@ class VisualWalkthrough:
                 cause_id="scripted-demo",
             )
         )
+        async with asyncio.timeout(3):
+            while not json.loads(
+                await self.tab.evaluate(
+                    "document.querySelector('iframe')?.contentDocument"
+                    "?.querySelector('#cursor')?.dataset.thinking === 'true'"
+                )
+            ):
+                await asyncio.sleep(0.01)
         await self.capture("thinking", "Thinking · scripted model-activity receipt")
         await asyncio.sleep(0.6)
         await self.tab.emit(

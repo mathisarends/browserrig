@@ -155,6 +155,9 @@ OVERLAY: Script[OverlayArgs, bool | None] = Script.load(
 OVERLAY_STYLES: Script[ScriptArgs, None] = Script.load(
     "overlay_styles", ScriptArgs, type(None)
 )
+OVERLAY_MESSAGE: Script[OverlayArgs, None] = Script.load(
+    "overlay_message", OverlayArgs, type(None)
+)
 CHOREOGRAPHY: Script[ScriptArgs, None] = Script.load(
     "choreography",
     ScriptArgs,

@@ -14,7 +14,14 @@ from cdpify.exceptions import CDPCommandError
 
 from browserrig.core import BrowserError
 from browserrig.events import PageCaptureFinishedEvent, PageCaptureStartedEvent
-from browserrig.scripts import OVERLAY, OVERLAY_STYLES, OverlayArgs, Script, ScriptArgs
+from browserrig.scripts import (
+    OVERLAY,
+    OVERLAY_MESSAGE,
+    OVERLAY_STYLES,
+    OverlayArgs,
+    Script,
+    ScriptArgs,
+)
 
 from .frame import Frame
 
@@ -135,10 +142,12 @@ class Overlays:
             if overlay.script is not None:
                 await surface.run(overlay.script)
             overlay.document_id = frame.document_id
+            overlay.frame = surface
         if operation == "mount":
             return
-        await frame.run(
-            OVERLAY,
+        assert overlay.frame is not None
+        await overlay.frame.run(
+            OVERLAY_MESSAGE,
             OverlayArgs(
                 operation=operation,
                 id=overlay.id,
@@ -181,3 +190,4 @@ class _Surface:
     html: str
     script: Script[ScriptArgs, None] | None
     document_id: str = ""
+    frame: Frame | None = None

@@ -1,4 +1,4 @@
-function browserrigOverlay({operation, id, data, visible}) {
+function browserrigOverlay({operation, id, visible}) {
   const state = (globalThis.__browserrig ||= {});
   const overlays = (state.overlays ||= new Map());
   state.overlayNodes ||= new WeakSet();
@@ -52,10 +52,5 @@ function browserrigOverlay({operation, id, data, visible}) {
     document.documentElement.append(node);
     return ready;
   };
-  return mount().then((mounted) => {
-    if (operation === 'send') {
-      overlays.get(id).node.contentWindow.postMessage(data, '*');
-    }
-    return mounted;
-  });
+  return mount();
 }

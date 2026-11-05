@@ -127,6 +127,9 @@ An optional `script=Script(...)` initializes trusted application JavaScript in
 the iframe's isolated world. Messages arrive through the iframe's `message`
 listener. The handle remounts after navigation on its next `send`; close is
 idempotent. Close application-owned handles before leaving an attached browser.
+`send` acknowledges delivery to the iframe's synchronous message handlers.
+Activity status rendering runs in an owned queue, so it cannot hold up pause,
+resume or model-control hooks. Native input presentation retains its event order.
 
 Surfaces are inert and pointer-transparent. Frame/content extraction and page
 search omit them; readiness ignores registered surface DOM activity. Ordinary
