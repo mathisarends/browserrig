@@ -72,11 +72,14 @@ class EventKind(StrEnum):
     KEY_PRESSED = "browser.key.pressed"
     KEYBOARD_VISIBILITY = "browser.keyboard.visibility"
     SCROLLED = "browser.scrolled"
+    SCROLL_STARTED = "browser.scroll.started"
     HIGHLIGHT_ELEMENT = "browser.element.highlight"
     WAITING = "browser.waiting"
     BAR_TYPED = "browser.bar.typed"
     FIND_BAR = "browser.find.bar"
     FIND_RESULTS = "browser.find.results"
+    PAGE_CAPTURE_STARTED = "browser.page.capture.started"
+    PAGE_CAPTURE_FINISHED = "browser.page.capture.finished"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -100,6 +103,26 @@ class LiveEvent(TransientEvent):
 @dataclass(frozen=True, slots=True, kw_only=True)
 class InputEvent(LiveEvent):
     action_id: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class PageCaptureStartedEvent(BrowserEvent):
+    """Before application overlays are hidden; subscribers finish before capture."""
+
+    capture_id: str
+    type: Literal[EventKind.PAGE_CAPTURE_STARTED] = field(
+        default=EventKind.PAGE_CAPTURE_STARTED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class PageCaptureFinishedEvent(BrowserEvent):
+    """After application overlays are restored, including when capture failed."""
+
+    capture_id: str
+    type: Literal[EventKind.PAGE_CAPTURE_FINISHED] = field(
+        default=EventKind.PAGE_CAPTURE_FINISHED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,6 +195,20 @@ class KeyboardVisibilityEvent(InputEvent):
     visible: bool
     type: Literal[EventKind.KEYBOARD_VISIBILITY] = field(
         default=EventKind.KEYBOARD_VISIBILITY, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ScrollStartedEvent(InputEvent):
+    """The native wheel gesture is about to run for its planned duration."""
+
+    x: float
+    y: float
+    delta_x: float
+    delta_y: float
+    duration: float
+    type: Literal[EventKind.SCROLL_STARTED] = field(
+        default=EventKind.SCROLL_STARTED, kw_only=True
     )
 
 
@@ -625,6 +662,8 @@ class ActivityFinishedEvent(BrowserEvent):
 
 
 BROWSER_EVENTS = (
+    PageCaptureStartedEvent,
+    PageCaptureFinishedEvent,
     ConnectedEvent,
     DisconnectedEvent,
     TabOpenedEvent,
@@ -672,4 +711,5 @@ INPUT_EVENTS = (
     KeyPressedEvent,
     KeyboardVisibilityEvent,
     ScrolledEvent,
+    ScrollStartedEvent,
 )

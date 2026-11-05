@@ -5,7 +5,13 @@ from browserrig.core import Geometry
 from .tab import Tab
 
 
-async def screenshot(tab: Tab, geometry: Geometry | None = None) -> str:
+async def screenshot(
+    tab: Tab, geometry: Geometry | None = None, *, overlays: bool = False
+) -> str:
+    """Capture page pixels; application overlays are excluded unless requested."""
+    if not overlays:
+        async with tab.overlays.hidden():
+            return await screenshot(tab, geometry, overlays=True)
     clip = (
         None
         if geometry is None

@@ -37,6 +37,7 @@ from browserrig.scripts import (
 from .favicon import load_favicon
 from .frame import Frame
 from .input import CdpInput
+from .overlays import Overlays
 from .worlds import Worlds
 
 type FrameDiscovery = Callable[
@@ -65,6 +66,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self.title = ""
         self.dialog: tuple[str, str] | None = None
         self.input = CdpInput(self)
+        self.overlays = Overlays(self)
         self.closed = False
         self.loading = False
         self.navigation_pending = False

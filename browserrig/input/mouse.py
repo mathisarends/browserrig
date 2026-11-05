@@ -15,6 +15,7 @@ from browserrig.events import (
     PointerPressedEvent,
     PointerReleasedEvent,
     ScrolledEvent,
+    ScrollStartedEvent,
 )
 
 from .motor import Motor
@@ -195,6 +196,16 @@ class Mouse:
         point = point or self._rest(target).position
         await self._move(target, point)
         duration = wheel_duration(math.hypot(delta_x, delta_y))
+        await self._emit(
+            target,
+            ScrollStartedEvent(
+                x=point.x,
+                y=point.y,
+                delta_x=delta_x,
+                delta_y=delta_y,
+                duration=duration,
+            ),
+        )
         clock = asyncio.get_running_loop()
         started = clock.time()
         sent = 0.0

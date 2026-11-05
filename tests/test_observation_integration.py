@@ -143,7 +143,7 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
         await browser.mouse.move_to(Point(x=700, y=200))
         state = await capture(
             tab,
-            DomCapture(marks=marks),
+            DomCapture(marks=marks, cursor=True),
             report,
             cursor=browser.mouse.position,
             screenshots=True,
@@ -159,7 +159,11 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
         assert all(f"[{element.ref}]" in rendered for element in state.elements)
         assert "never-echo-this" not in rendered
         fresh = await capture(
-            tab, DomCapture(marks=marks), report, previous=state, screenshots=True
+            tab,
+            DomCapture(marks=marks, cursor=True),
+            report,
+            previous=state,
+            screenshots=True,
         )
         assert fresh.fingerprint == state.fingerprint
         assert [element.ref for element in fresh.elements] == refs
@@ -175,7 +179,10 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
             )
 
 
-async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site):
+@pytest.mark.parametrize("show_cursor", [False, True])
+async def test_model_cursor_marker_is_optional_after_movement_and_click(
+    site, show_cursor
+):
     step = 0
 
     async def respond(request):
@@ -195,11 +202,8 @@ async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site)
             ]
             encoded = image_part.url.split(",", 1)[1]
             with Image.open(BytesIO(base64.b64decode(encoded))) as image:
-                assert image.getpixel((60, 80) if step == 1 else (180, 120)) == (
-                    30,
-                    30,
-                    30,
-                )
+                expected = (30, 30, 30) if show_cursor else (255, 0, 0)
+                assert image.getpixel((60, 80) if step == 1 else (180, 120)) == expected
         if step == 0:
             yield ModelChunk(tool_call=ToolCall("move_mouse", {"x": 60, "y": 80}))
         elif step == 1:
@@ -213,7 +217,8 @@ async def test_each_model_screenshot_shows_cursor_after_movement_and_click(site)
         browser=Chrome.launch(url=site + "/canvas", viewport=Viewport(scale=2)),
         plugins=[
             BrowserPerception(
-                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
+                capture=DomCapture(cursor=show_cursor),
+                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             ),
             Approvals(default=PolicyDecision.ALLOW),
         ],
@@ -334,7 +339,7 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
         await browser.mouse.move_to(Point(x=150, y=180))
         state = await capture(
             tab,
-            DomCapture(),
+            DomCapture(cursor=True),
             report,
             region=Region(x=100, y=150, width=400, height=200),
             zoom=2,

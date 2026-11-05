@@ -10,7 +10,12 @@ from harnessed.kernel import dependency
 from browserrig.activity import Activity
 from browserrig.browser import Browser
 from browserrig.core import BrowserError
-from browserrig.events import TabActivatedEvent, TabClosingEvent
+from browserrig.events import (
+    PageCaptureFinishedEvent,
+    PageCaptureStartedEvent,
+    TabActivatedEvent,
+    TabClosingEvent,
+)
 
 from .capture import Capture
 from .editing import edit_video
@@ -58,6 +63,7 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
         self._lock = asyncio.Lock()
         self._finish_task: asyncio.Task[RecordingResult] | None = None
         self._binary = ""
+        self._captures: dict[str, str] = {}
 
     async def setup(self, ctx: Context) -> None:
         binary = shutil.which(self.ffmpeg)
@@ -88,11 +94,28 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
             if self._capture is not None and self._capture.tab.id == event.target_id:
                 await self._stop_capture()
 
+    @hook(PageCaptureStartedEvent)
+    async def _before_capture(self, event: PageCaptureStartedEvent) -> None:
+        async with self._lock:
+            if self._finish_task is not None:
+                return
+            self._captures[event.capture_id] = event.target_id
+            if self._capture is not None and self._capture.tab.id == event.target_id:
+                await self._stop_capture()
+
+    @hook(PageCaptureFinishedEvent)
+    async def _after_capture(self, event: PageCaptureFinishedEvent) -> None:
+        async with self._lock:
+            self._captures.pop(event.capture_id, None)
+        await self._activate()
+
     async def _activate(self) -> None:
         async with self._lock:
             if self._finish_task is not None:
                 return
             tab = self._browser.active_tab
+            if tab.id in self._captures.values():
+                return
             if self._capture is not None and self._capture.tab.id == tab.id:
                 return
             await self._stop_capture()

@@ -4,6 +4,9 @@
 
 ### Breaking changes
 
+- Model screenshots omit the pointer marker by default. Use
+  `DomCapture(cursor=True)` to opt into the existing post-capture marker.
+
 - Rename the browser observation plugin from `Observe` to `BrowserPerception`,
   describing the page structure, element references and optional screenshots
   provided before each model step. Update recipes, dependencies, examples and
@@ -36,6 +39,21 @@
   changing named facts. Session storage formats are unchanged.
 
 ### Added
+
+- Render input choreography directly in the active tab with `IframeRenderer`,
+  enabled by default in `InputVisualization`. Named cursors, precise target
+  corners, full DE/EN keyboards, scroll wheels, file cards and find/address
+  previews are captured in native session videos. Configure dark/light/auto
+  themes; reduced motion, narrow viewports and protected input are supported.
+  `InputVisualization(renderer=None)` retains event-only presentation.
+- Add independent, browser-owned `tab.overlays.mount(...)` surfaces. Their inert
+  iframes stay out of page extraction, search and readiness. Ordinary screenshots
+  hide them temporarily; paired browser capture receipts let video recording
+  stop and resume around those windows without blank overlay frames.
+- Add `examples.visualization`, a local demo producing viewer and observation
+  screenshot galleries and a recording without a model or API key.
+- Add `ScrollStartedEvent` before native wheel dispatch so viewers can show
+  scrolling while it happens; `ScrolledEvent` retains the final dispatched totals.
 
 - Add opt-in `VideoRecording` using cdpify's native Page screen recording commands.
   Follow active tabs, finalize before controlled tab closure, and use Activity

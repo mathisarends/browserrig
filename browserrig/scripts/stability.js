@@ -9,11 +9,32 @@ function browserrigStability(_args) {
   let limited = false;
   let unobservedFrames = 0;
   const animations = new Set();
-  const notify = () => {
+  const owned = (node) => {
+    for (let current = node; current; current = current.parentNode || current.host) {
+      if (globalThis.__browserrig.overlayNodes?.has(current)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const internal = (record) => {
+    if (owned(record.target)) {
+      return true;
+    }
+    const changed = [...record.addedNodes, ...record.removedNodes];
+    return record.type === 'childList' && changed.length > 0 && changed.every(owned);
+  };
+  const notify = (records) => {
+    if (Array.isArray(records) && records.every(internal)) {
+      return;
+    }
+    if (records?.target && owned(records.target)) {
+      return;
+    }
     state.last = performance.now();
   };
   const visible = (node) => {
-    if (!node?.getBoundingClientRect) {
+    if (!node?.getBoundingClientRect || owned(node)) {
       return false;
     }
     const rect = node.getBoundingClientRect();
@@ -67,6 +88,9 @@ function browserrigStability(_args) {
     notify();
   };
   const inspect = (node) => {
+    if (owned(node)) {
+      return;
+    }
     observe(node.shadowRoot);
     if (node.localName !== 'iframe' || !visible(node)) {
       return;

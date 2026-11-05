@@ -16,6 +16,8 @@ from browserrig.events import (
     BROWSER_EVENTS,
     ActivityFinishedEvent,
     ActivityStartedEvent,
+    PageCaptureFinishedEvent,
+    PageCaptureStartedEvent,
     TabActivatedEvent,
     TabClosingEvent,
 )
@@ -207,6 +209,31 @@ async def test_finish_is_idempotent_and_reusing_agent_isolated(tmp_path, monkeyp
     assert len(edits) == 2
     assert tab.cdp.page.start_screen_recording.await_count == 2
     assert tab.cdp.page.stop_screen_recording.await_count == 2
+
+
+async def test_clean_capture_pauses_until_all_capture_receipts_are_finished(
+    tmp_path, monkeypatch
+):
+    calls = []
+    edits = []
+    _install_editor(monkeypatch, edits)
+    tab = _tab("first", calls)
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            Activity(),
+            _BrowserService(SimpleNamespace(active_tab=tab), calls),
+            VideoRecording(tmp_path),
+        ],
+    )
+    async with agent.session() as session:
+        await session.emit(PageCaptureStartedEvent(capture_id="a", target_id=tab.id))
+        await session.emit(PageCaptureStartedEvent(capture_id="b", target_id=tab.id))
+        await session.emit(PageCaptureFinishedEvent(capture_id="a", target_id=tab.id))
+        assert calls == ["start-first", "stop-first"]
+        await session.emit(PageCaptureFinishedEvent(capture_id="b", target_id=tab.id))
+        assert calls == ["start-first", "stop-first", "start-first"]
+    assert len(edits[0][0]) == 2
 
 
 async def test_session_exception_finalizes_open_activity(

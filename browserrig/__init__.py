@@ -4,10 +4,12 @@ from .browser import (
     Browser,
     Chrome,
     ChromeBrowser,
+    Overlay,
+    Overlays,
     SessionSetup,
     Viewport,
 )
-from .choreography import InputVisualization, TabStrip
+from .choreography import IframeRenderer, InputVisualization, TabStrip
 from .completion import Done
 from .composition import (  # smelt: ignore[SMT106] -- public facade
     ContextCompaction,
@@ -119,6 +121,9 @@ __all__ = [
     "FileTools",
     "JavaScriptTools",
     "InputVisualization",
+    "IframeRenderer",
+    "Overlay",
+    "Overlays",
     "TabStrip",
     "FormTools",
     "PointerTools",

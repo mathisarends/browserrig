@@ -21,6 +21,7 @@ from .models import (
     FindArgs,
     FindResult,
     FoundText,
+    OverlayArgs,
     OwnerHitsArgs,
     OwnerScrollArgs,
     PageFacts,
@@ -36,12 +37,15 @@ from .models import (
 )
 
 __all__ = [
+    "CHOREOGRAPHY",
     "CONTENT",
     "CURSOR",
     "ELEMENT",
     "FIND",
     "FOCUSED",
     "OWNER_HITS",
+    "OVERLAY",
+    "OVERLAY_STYLES",
     "OWNER_SIZE",
     "PAGE_FACTS",
     "RESET",
@@ -63,6 +67,7 @@ __all__ = [
     "FoundText",
     "OwnerHitsArgs",
     "OwnerScrollArgs",
+    "OverlayArgs",
     "PageFacts",
     "Script",
     "ScriptArgs",
@@ -144,6 +149,27 @@ FIND: Script[FindArgs, FindResult] = Script.load(
     "find", FindArgs, FindResult, uses=("composed",)
 )
 STABILITY: Script[ScriptArgs, DOMProbe] = Script.load("stability", ScriptArgs, DOMProbe)
+OVERLAY: Script[OverlayArgs, bool | None] = Script.load(
+    "overlay", OverlayArgs, bool | None
+)
+OVERLAY_STYLES: Script[ScriptArgs, None] = Script.load(
+    "overlay_styles", ScriptArgs, type(None)
+)
+OVERLAY_MESSAGE: Script[OverlayArgs, None] = Script.load(
+    "overlay_message", OverlayArgs, type(None)
+)
+CHOREOGRAPHY: Script[ScriptArgs, None] = Script.load(
+    "choreography",
+    ScriptArgs,
+    type(None),
+    uses=(
+        "choreography/surface",
+        "choreography/cursor",
+        "choreography/keyboard",
+        "choreography/panels",
+        "choreography/transfers",
+    ),
+)
 SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))
 RESET: Script[ScriptArgs, None] = Script.load("reset", ScriptArgs, type(None))
 FOCUSED: Script[ScriptArgs, Any] = Script.load("focused", ScriptArgs, Any)
