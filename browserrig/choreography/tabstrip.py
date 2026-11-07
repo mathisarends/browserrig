@@ -2,7 +2,7 @@ import asyncio
 from contextlib import suppress
 from dataclasses import dataclass
 
-from harnessed import Plugin, hook
+from harnessed import Plugin, PluginState, hook
 from harnessed.kernel import Scope, needs
 
 from browserrig.browser import Browser, Tab, TabChanged
@@ -22,11 +22,9 @@ class TabStrip(Plugin):
     """
 
     events = TAB_STRIP_EVENTS
+    # Each open tab's strip in this session.
+    _strips = PluginState[dict[str, "_Strip"]](dict)
     _browser = needs(Browser)
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._strips: dict[str, _Strip] = {}
 
     async def setup(self, ctx: Scope) -> None:
         ctx.effect(self._stop)

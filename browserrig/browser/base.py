@@ -50,7 +50,8 @@ class Browser(Protocol):
     # Shared by BrowserPerception and Actions; it cannot live in either without a dependency cycle.
     action_lock: asyncio.Lock
     files: FileSystem | None
-    # The browser's one mouse and keyboard; they act on the active tab.
+    # How the browser's input is paced, presented and correlated with actions.
+    # Operate the devices through `mouse` and `keyboard`.
     input: Input
     tabs: Tabs
 
@@ -58,10 +59,14 @@ class Browser(Protocol):
     def active_tab(self) -> Tab: ...
 
     @property
-    def mouse(self) -> Mouse: ...
+    def mouse(self) -> Mouse:
+        """The browser's one mouse; it acts on the active tab."""
+        ...
 
     @property
-    def keyboard(self) -> Keyboard: ...
+    def keyboard(self) -> Keyboard:
+        """The browser's one keyboard; it acts on the active tab."""
+        ...
 
     async def downloads(self) -> tuple[Download, ...]: ...
 

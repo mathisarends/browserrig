@@ -53,11 +53,13 @@ class Mouse:
         emit: Emit,
         motor: Callable[[], Motor],
         presenter: Callable[[], Presenter],
+        action_id: Callable[[], str],
     ) -> None:
         self._focus = focus
         self._emit = emit
         self._motor = motor
         self._presenter = presenter
+        self._action_id = action_id
         self._rests: dict[str, _Rest] = {}
 
     @property
@@ -83,8 +85,15 @@ class Mouse:
         """
         source = self._focus()
         presenter = self._presenter()
+        action_id = self._action_id()
         if source is not None:
-            await presenter.leave(source, gesture, tab_id, self._rest(source).position)
+            await presenter.leave(
+                source,
+                gesture,
+                tab_id,
+                self._rest(source).position,
+                action_id=action_id,
+            )
         await switch()
         target = focused(self._focus)
         rest = self._rest(target)
@@ -93,7 +102,7 @@ class Mouse:
             width, height = await target.viewport_size()
             rest.position = motor.landing(width, height)
         if source is not None:
-            await presenter.enter(target, rest.position)
+            await presenter.enter(target, rest.position, action_id=action_id)
         # The renderer learns where the pointer is, so hover state matches the viewer.
         await self._dispatch(target, MouseEventKind.MOVED, rest.position)
         rest.placed = True

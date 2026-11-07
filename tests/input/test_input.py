@@ -376,7 +376,7 @@ def _devices(focus: Callable[[], Tab | None]) -> Input:
     """Input paced like a person and watched by people, so it is reported."""
     devices = Input(lambda: None if (tab := focus()) is None else tab.input)
     devices.pace(HumanMotor())
-    devices.present(Stage(lambda: devices.action_id))
+    devices.present(Stage())
     return devices
 
 
@@ -574,7 +574,7 @@ async def test_unwatched_input_reports_nothing_and_never_pauses(monkeypatch):
 
 def test_restoring_a_presenter_brings_back_the_previous_one():
     devices = Input(lambda: None)
-    watched = Stage(lambda: devices.action_id)
+    watched = Stage()
     restore = devices.present(watched)
     assert devices.presenter() is watched
     restore()

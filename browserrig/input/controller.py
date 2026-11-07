@@ -23,7 +23,11 @@ class Input:
         self._motor: Motor = Instant()
         self._presenter: Presenter = Unseen()
         self.mouse = Mouse(
-            focus, emit=self._emit, motor=self.motor, presenter=self.presenter
+            focus,
+            emit=self._emit,
+            motor=self.motor,
+            presenter=self.presenter,
+            action_id=lambda: self._action_id,
         )
         self.keyboard = Keyboard(focus, emit=self._emit, motor=self.motor)
 

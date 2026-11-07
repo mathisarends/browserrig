@@ -83,6 +83,9 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
 
     events = SECRET_EVENTS
     _state = PluginState(SecretsState)
+    # Resolved values and their redaction live only as long as one session.
+    _values = PluginState[dict[str, str]](dict)
+    _redactor = PluginState(Redactor)
     _events = needs(BrowserEvents)
 
     def __init__(self, secrets: Mapping[str, Secret]) -> None:
@@ -95,8 +98,6 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
             if not isinstance(secret, Secret):
                 raise TypeError(f"Secret {name} must be a Secret")
         self._secrets = dict(secrets)
-        self._values: dict[str, str] = {}
-        self._redactor = Redactor()
 
     def __repr__(self) -> str:
         return f"Secrets({', '.join(self._secrets)})"

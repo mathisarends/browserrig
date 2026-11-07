@@ -1,5 +1,4 @@
 import asyncio
-from collections.abc import Callable
 
 from browserrig.core import Point, TabGesture
 from browserrig.events import InputEvent
@@ -15,18 +14,21 @@ _TAB_ENTER_SECONDS = 0.35
 class Stage:
     """Input as people watching see it: cursor shapes and visible tab presses.
 
-    Every event goes to the tab it happened in. `action_id` names the current action
-    for the events this presenter raises itself. How fast input runs is up to the motor.
+    Every event goes to the tab it happened in, correlated with the action that `Input`
+    reports. How fast input runs is up to the motor.
     """
-
-    def __init__(self, action_id: Callable[[], str]) -> None:
-        self._action_id = action_id
 
     def shows_cursor_style(self) -> bool:
         return True
 
     async def leave(
-        self, source: InputTarget, gesture: TabGesture, tab_id: str, position: Point
+        self,
+        source: InputTarget,
+        gesture: TabGesture,
+        tab_id: str,
+        position: Point,
+        *,
+        action_id: str,
     ) -> None:
         await source.emit(
             TabPressedEvent(
@@ -34,17 +36,19 @@ class Stage:
                 tab_id=tab_id,
                 from_position=(position.x, position.y),
                 duration=_TAB_PRESS_SECONDS,
-                action_id=self._action_id(),
+                action_id=action_id,
             )
         )
         await asyncio.sleep(_TAB_PRESS_SECONDS)
 
-    async def enter(self, target: InputTarget, position: Point) -> None:
+    async def enter(
+        self, target: InputTarget, position: Point, *, action_id: str
+    ) -> None:
         await target.emit(
             CursorEnteredEvent(
                 to_position=(position.x, position.y),
                 duration=_TAB_ENTER_SECONDS,
-                action_id=self._action_id(),
+                action_id=action_id,
             )
         )
         await asyncio.sleep(_TAB_ENTER_SECONDS)

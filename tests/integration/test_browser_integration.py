@@ -50,7 +50,7 @@ async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site
         width, height = await first.viewport_size()
         assert browser.mouse.position == Point(x=width / 2, y=height / 2)
         browser.input.pace(HumanMotor())
-        browser.input.present(Stage(lambda: browser.input.action_id))
+        browser.input.present(Stage())
         await browser.mouse.move_to(Point(x=100, y=120))
         second = await browser.tabs.open(site)
         assert (

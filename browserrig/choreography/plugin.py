@@ -2,9 +2,10 @@ import asyncio
 import logging
 from collections import deque
 from contextlib import suppress
+from dataclasses import dataclass, field
 from typing import Any
 
-from harnessed import Plugin, hook
+from harnessed import Plugin, PluginState, hook
 from harnessed.events import TurnStartedEvent
 from harnessed.hooks import Next
 from harnessed.kernel import Scope, needs
@@ -45,6 +46,15 @@ logger = logging.getLogger(__name__)
 _DEFAULT_RENDERER = IframeRenderer()
 
 
+@dataclass
+class _Presentation:
+    """One session's view and the status events still waiting to be shown."""
+
+    view: IframeView | None = None
+    activities: deque[BrowserEvent] = field(default_factory=deque)
+    activity_task: asyncio.Task[None] | None = None
+
+
 class InputVisualization(Plugin, slot="browserrig.choreography"):
     """Stage the browser for people watching: visible input and browser UI.
 
@@ -55,34 +65,32 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
     """
 
     events = INPUT_EVENTS + SCENE_EVENTS
+    _state = PluginState(_Presentation)
     _browser = needs(Browser)
 
     def __init__(self, *, renderer: IframeRenderer | None = _DEFAULT_RENDERER) -> None:
         super().__init__()
         self.renderer = renderer
-        self._view: IframeView | None = None
-        self._activities: deque[BrowserEvent] = deque()
-        self._activity_task: asyncio.Task[None] | None = None
 
     async def setup(self, ctx: Scope) -> None:
-        inputs = self._browser.input
-        ctx.effect(inputs.present(Stage(lambda: inputs.action_id)))
+        # Each call installs now and registers its undo for teardown.
+        ctx.effect(self._browser.input.present(Stage()))
         if self.renderer is not None:
-            self._view = self.renderer.create()
-            ctx.effect(self._view.close)
+            view = self._state.view = self.renderer.create()
+            ctx.effect(view.close)
             ctx.on(LiveEvent, self._render)
             ctx.on(BrowserEvent, self._browser_event)
             ctx.effect(self._stop_activities)
 
         async def publish_cursor(_event: TurnStartedEvent) -> None:
             # Live subscribers often attach late, so seed their cursor at turn start.
-            await inputs.mouse.publish_cursor()
+            await self._browser.mouse.publish_cursor()
 
         ctx.on(TurnStartedEvent, publish_cursor)
 
     @hook(TabChanged)
     async def _refresh(self, event: TabChanged) -> None:
-        if not event.settled or event.tab.closed or self._view is None:
+        if not event.settled or event.tab.closed or self._state.view is None:
             return
         if event.tab.id != self._browser.active_tab.id:
             return
@@ -104,9 +112,10 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
                 ActivityKind.PAUSED,
             }:
                 # Status rendering must never hold up model/control hooks.
-                self._activities.append(event)
-                if self._activity_task is None:
-                    self._activity_task = asyncio.create_task(self._show_activities())
+                state = self._state
+                state.activities.append(event)
+                if state.activity_task is None:
+                    state.activity_task = asyncio.create_task(self._show_activities())
             return
         if isinstance(
             event,
@@ -121,22 +130,25 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             await self._present(event)
 
     async def _show_activities(self) -> None:
+        state = self._state
         try:
-            while self._activities:
-                await self._present(self._activities.popleft())
+            while state.activities:
+                await self._present(state.activities.popleft())
         finally:
-            self._activity_task = None
+            state.activity_task = None
 
     async def _stop_activities(self) -> None:
-        task = self._activity_task
+        state = self._state
+        task = state.activity_task
         if task is not None:
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
-        self._activities.clear()
+        state.activities.clear()
 
     async def _present(self, event: LiveEvent | BrowserEvent) -> None:
-        if self._view is None:
+        view = self._state.view
+        if view is None:
             return
         try:
             tab = self._browser.active_tab
@@ -148,7 +160,7 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             ):
                 return
             async with asyncio.timeout(2.5):
-                await self._view.show(tab, event)
+                await view.show(tab, event)
         except (BrowserError, TimeoutError):
             # Presentation cannot turn successful native input into failed input.
             logger.debug("Input presentation unavailable for the current document")

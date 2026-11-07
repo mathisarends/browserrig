@@ -4,6 +4,12 @@
 
 ### Breaking changes
 
+- `Presenter.leave(...)` and `Presenter.enter(...)` receive the current action as a
+  keyword argument, `action_id`, the same way `show(...)` receives events that
+  already carry it. `Stage()` takes no arguments; replace
+  `Stage(lambda: browser.input.action_id)` with `Stage()`. Custom presenters add
+  `*, action_id: str` to both methods.
+
 - Model screenshots omit the pointer marker by default. Use
   `DomCapture(cursor=True)` to opt into the existing post-capture marker.
 
