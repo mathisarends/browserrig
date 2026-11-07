@@ -14,7 +14,7 @@ from browserrig.core import BrowserError
 from browserrig.scripts import OWNER_SIZE, RESET, ScriptError, failure
 from tests.fakes import FakeTab
 
-_ROOT = Path(__file__).resolve().parents[1] / "browserrig"
+_ROOT = Path(__file__).resolve().parents[2] / "browserrig"
 _SCRIPTS = _ROOT / "scripts"
 _JS_HINT = re.compile(
     r"\bfunction\s*\(|=>|globalThis\.|(?<![\\/])\bdocument\.\w|innerWidth"

@@ -3,45 +3,45 @@
   "violations": [
     {
       "code": "SMT420",
-      "path": "tests/test_browser_composition.py",
-      "message": "test accesses private production name browserrig.BrowserPerception._page_key",
-      "fingerprints": [
-        "cba3bcc3b72e19a95ea6c9064ef428b0",
-        "cba3bcc3b72e19a95ea6c9064ef428b0",
-        "cba3bcc3b72e19a95ea6c9064ef428b0",
-        "cba3bcc3b72e19a95ea6c9064ef428b0"
-      ]
-    },
-    {
-      "code": "SMT420",
-      "path": "tests/test_browser_composition.py",
-      "message": "test accesses private production name browserrig.tools.mouse._image_point",
-      "fingerprints": [
-        "57c4c77eee7729fb96b74d1b3216eecb"
-      ]
-    },
-    {
-      "code": "SMT420",
-      "path": "tests/test_process.py",
+      "path": "tests/browser/test_process.py",
       "message": "test accesses private production name browserrig.browser.process._active_endpoint",
       "fingerprints": [
-        "dfa52a2d2d3e26242ede3e4d0b8cfa66"
+        "63f3046b8dcdc4e52cb3603d1ef7b876"
       ]
     },
     {
       "code": "SMT420",
-      "path": "tests/test_secrets.py",
-      "message": "test accesses private production name browserrig.observation.capture._redact",
-      "fingerprints": [
-        "ed566f1f220074b0fd456472fa517c5c"
-      ]
-    },
-    {
-      "code": "SMT420",
-      "path": "tests/test_tab_state.py",
+      "path": "tests/browser/test_tab_state.py",
       "message": "test accesses private production name browserrig.browser.favicon._media_type",
       "fingerprints": [
-        "4778f806842fe755f1da42cf078eaa06"
+        "3003562f2c3b47c95776d8f473a8fdcb"
+      ]
+    },
+    {
+      "code": "SMT420",
+      "path": "tests/secrets/test_secrets.py",
+      "message": "test accesses private production name browserrig.observation.capture._redact",
+      "fingerprints": [
+        "b6fef658713f053ea470b42bc62e8151"
+      ]
+    },
+    {
+      "code": "SMT420",
+      "path": "tests/test_composition_browser.py",
+      "message": "test accesses private production name browserrig.BrowserPerception._page_key",
+      "fingerprints": [
+        "3d72ebed504c57bc0a22fc4e882a3902",
+        "3d72ebed504c57bc0a22fc4e882a3902",
+        "3d72ebed504c57bc0a22fc4e882a3902",
+        "3d72ebed504c57bc0a22fc4e882a3902"
+      ]
+    },
+    {
+      "code": "SMT420",
+      "path": "tests/test_composition_browser.py",
+      "message": "test accesses private production name browserrig.tools.mouse._image_point",
+      "fingerprints": [
+        "8a6148a0e2a2cb6fc838671963c25345"
       ]
     },
     {

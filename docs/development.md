@@ -133,7 +133,7 @@ The plugin uses Harnessed's internal `PluginInstructions` only at its persistenc
 boundary. Its own `PrepareRequest` hook delivers current receipts as request-only
 user messages. Keep this internal dependency inside the plugin; application code
 uses `session.scope[HumanHandoff].history`. Verify restoration and model delivery
-in `tests/test_handoff.py`, including after compaction.
+in `tests/handoff/test_handoff.py`, including after compaction.
 
 The opt-in `Done` plugin uses native hooks for continuation and tool execution.
 Harnessed 0.13.0 has no output-policy hook or injectable output handler, so
@@ -143,7 +143,7 @@ handling; other sessions use the original methods. The last activation's cleanup
 restores them. Plugins use the restricted `SessionContext`, without recovering
 the application `Session`. Verify native/tool structured output, retries, limits,
 streaming, overlapping sessions and runtime removal in `tests/test_completion.py`.
-`tests/test_session_store.py` also checks reopening a paused `Done` turn with
+`tests/test_agent_session_store.py` also checks reopening a paused `Done` turn with
 `restore_outputs`, retained image assets and Browserrig's custom durable events.
 
 ## Project status

@@ -76,7 +76,13 @@ architecture:
     completion: {path: completion}
 
 tests:
-  layout: none  # tests are flat (tests/test_<topic>.py), not mirrored
+  # tests/<package>/test_<module>.py mirrors browserrig/<package>/<module>.py; a topic
+  # of one module may be split off as test_<module>_<topic>.py.
+  layout: mirror
+  mirror_suffixes: true
+  unmirrored:
+    - "tests/integration/**"  # real Chrome, spans several modules (pytest -m integration)
+    - "tests/project/**"      # repository-wide checks: architecture, release, telemetry
   max_patches_per_test: 3
 
 # error: deterministic patterns without false positives in this codebase.

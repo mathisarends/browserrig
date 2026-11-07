@@ -37,7 +37,7 @@ first time.
 
 ## Evidence and scope
 
-`tests/test_telemetry.py` exercises an actual local OTLP/HTTP protobuf receiver.
+`tests/project/test_telemetry.py` exercises an actual local OTLP/HTTP protobuf receiver.
 It checks turn/step/model/tool parenting, session correlation, metadata-only
 capture, model and tool inputs/outputs, per-field truncation and batch delivery
 when the application exits through an exception. A subprocess test confirms

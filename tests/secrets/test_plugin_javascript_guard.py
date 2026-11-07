@@ -3,7 +3,7 @@ from harnessed.testing import ScriptedModel, call
 
 from browserrig import Secrets
 from browserrig.core import ActionKind, BrowserToolMetadata
-from tests.test_secrets import Leaky, _agent, _secrets
+from tests.secrets.test_secrets import Leaky, _agent, _secrets
 
 
 class _AliasedJavaScript(Plugin):

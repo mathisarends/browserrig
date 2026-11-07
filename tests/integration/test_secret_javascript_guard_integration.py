@@ -1,7 +1,13 @@
 import pytest
 from harnessed import ToolCall
 
-from tests.test_secrets_integration import PASSWORD, _agent, _model, _ref, _replies
+from tests.integration.test_secrets_integration import (
+    PASSWORD,
+    _agent,
+    _model,
+    _ref,
+    _replies,
+)
 
 pytestmark = pytest.mark.integration
 
