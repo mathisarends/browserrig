@@ -14,6 +14,8 @@ from browserrig.core import (
     ReadinessPhase,
     ReadinessStage,
     ReadinessStatus,
+    record,
+    traced,
 )
 from browserrig.events import (
     BrowserEvent,
@@ -36,6 +38,7 @@ type ReadinessMiddleware = Callable[
 ]
 
 
+@traced
 async def wait_for_page(
     tab: Tab,
     *,
@@ -67,6 +70,7 @@ async def wait_for_page(
             stage=stage,
         )
     )
+    record(phase=phase, stage=stage, budget=options.timeout)
     runner = _Runner(tab, options, phase, stage, policy, select, check)
     timed_out = False
     try:
@@ -126,6 +130,13 @@ async def wait_for_page(
         reason=runner.reason if status != ReadinessStatus.READY else "",
         timed_out=timed_out,
     )
+    record(
+        status=status,
+        timed_out=timed_out,
+        reason=report.reason,
+        polls=runner.polls,
+        probe_ms=round(runner.probe_seconds * 1000, 1),
+    )
     match status:
         case ReadinessStatus.READY:
             event_type = ReadyEvent
@@ -161,6 +172,8 @@ class _Runner:
     middleware: ReadinessMiddleware | None
     strategy: ReadinessStrategy | None = None
     reason: str = "The document could not be inspected yet"
+    polls: int = 0
+    probe_seconds: float = 0
 
     async def run(self, timeout: asyncio.Timeout, document: str) -> ReadinessStatus:
         context: ReadinessContext | None = None
@@ -192,11 +205,14 @@ class _Runner:
                 self.reason = "A navigation is still in progress"
                 await asyncio.sleep(self.strategy.delay)
                 continue
+            probed = monotonic()
             result = (
                 await self.middleware(context, self._probe)
                 if self.middleware
                 else await self._probe()
             )
+            self.polls += 1
+            self.probe_seconds += monotonic() - probed
             self.reason = result.reason or self.strategy.reason
             await self.tab.sync_document()
             if self.tab.document_id != document:

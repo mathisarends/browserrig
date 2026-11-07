@@ -25,6 +25,7 @@ from browserrig.core import (
     ReadinessStatus,
     Region,
     StaleElement,
+    traced,
 )
 from browserrig.core import browser_tool as tool
 from browserrig.events import (
@@ -125,6 +126,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         state.bases.clear()
         state.included = frozenset()
 
+    @traced
     async def probe(self, tab: Tab) -> Snapshot:
         """Compare current controls without publishing or replacing the delivered observation."""
         async with self._state.lock:
@@ -140,6 +142,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             )
             return observation.snapshot
 
+    @traced
     async def capture(
         self,
         tab: Tab | None = None,

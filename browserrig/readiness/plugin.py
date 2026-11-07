@@ -13,6 +13,7 @@ from browserrig.core import (
     ReadinessPhase,
     ReadinessStage,
     ReadinessStatus,
+    traced,
 )
 from browserrig.events import (
     READINESS_EVENTS,
@@ -47,6 +48,7 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         self._state.context = ctx
         ctx.effect(self._cancel)
 
+    @traced
     async def wait(
         self,
         tab: Tab,

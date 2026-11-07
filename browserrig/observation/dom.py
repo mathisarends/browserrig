@@ -5,9 +5,11 @@ from cdpify import CDPCommandError
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 
 from browserrig.browser import Frame
+from browserrig.core import traced
 from browserrig.scripts import RESET, SEED, SeedArgs
 
 
+@traced
 async def seed_frame(
     frame: Frame,
     metadata: dict[str, CaptureSnapshotResult | None],

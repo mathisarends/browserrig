@@ -17,6 +17,8 @@ from browserrig.core import (
     Point,
     ReadinessStatus,
     Region,
+    record,
+    traced,
 )
 from browserrig.readiness import ReadinessReport
 
@@ -79,6 +81,7 @@ async def capture(
     return observation.snapshot
 
 
+@traced
 async def capture_observation(
     tab: Tab,
     strategy: CaptureStrategy,
@@ -238,6 +241,7 @@ class DomCapture(Options):
     marks: bool = True
     cursor: bool = False
 
+    @traced
     async def collect(  # pylint: disable=unused-argument
         self,
         tab: Tab,
@@ -248,6 +252,7 @@ class DomCapture(Options):
         zoom: float = 1,
         cursor: Point | None = None,
     ) -> CaptureContent:
+        record(screenshots=screenshots)
         frames = await tab.frames()
         page = await extract(
             frames,

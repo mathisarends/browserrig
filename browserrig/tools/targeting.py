@@ -1,7 +1,7 @@
 from harnessed.kernel import Scope
 
 from browserrig.browser import Browser, Tab
-from browserrig.core import Bounds, ElementPoint
+from browserrig.core import Bounds, ElementPoint, traced
 from browserrig.observation import BrowserPerception
 
 from .intents import TargetLocated
@@ -20,6 +20,7 @@ class Targeting:
         self._aim_action = ""
         self._aims: dict[str, tuple[float, float]] = {}
 
+    @traced
     async def locate(self, *, tab: Tab, ref: str, scroll: bool = True) -> ElementPoint:
         """Reveal a ref with wheel input, then return a hit-tested point.
 

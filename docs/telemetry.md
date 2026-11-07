@@ -87,8 +87,41 @@ Select a **model** or **tool** span to inspect its input/output. In Harnessed
 0.7.0, the root turn span has no input/output summary of its own. Each turn is a
 separate trace; use `session.id` to follow turns in the same conversation.
 
-These are agent-level traces. Individual CDP commands, browser network requests,
-provider HTTP requests and provider-internal retries do not get separate spans.
+### Browser time
+
+Below each step and tool span, browserrig adds spans for its own methods, named after
+the method. Each carries `harnessed.code.filepath` and `harnessed.code.lineno`, so
+`browserrig/tools/execution.py:285` leads straight to the code:
+
+```text
+harnessed.step
+  harnessed.BrowserPerception.capture        observation before the model call
+    harnessed.wait_for_page                  phase, status, polls, probe_ms, reason
+    harnessed.capture_observation
+      harnessed.Tab.frames                   cached
+      harnessed.extract
+        harnessed._snapshot / _focused       one per CDP session, in parallel
+        harnessed._Assembler.run
+        harnessed.chrome_names               elements
+      harnessed.screenshot / annotate        only with an image
+  harnessed.tool
+    harnessed.Actions.run                    kind
+      harnessed.Actions._prepare             readiness before input
+      harnessed.operation                    the input itself
+        harnessed.Targeting.locate
+        harnessed.Mouse.move_to / click      pointer pacing
+        harnessed.Keyboard.type_text         typing pacing
+      harnessed.Actions._settle              readiness after input
+      harnessed.Actions.page_change          comparison probe of a chain
+```
+
+A span's own time is its duration minus its children's. Readiness spans report how
+many probes ran (`polls`) and how long they took in total (`probe_ms`); the rest of
+their duration was spent waiting between probes. Hook handlers have no spans of
+their own: a slow `PreStep` handler shows up as step time outside these spans.
+
+Individual CDP commands, browser network requests, provider HTTP requests and
+provider-internal retries do not get separate spans.
 Browser observations are visible inside model inputs when content capture is
 enabled. Terminal events and durable session logs remain available separately.
 Tool schemas and arbitrary provider settings are not included in the captured

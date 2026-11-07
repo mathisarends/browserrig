@@ -20,7 +20,7 @@ from cdpify.domains.page import (
 )
 from cdpify.domains.runtime import RemoteObject
 
-from browserrig.core import BrowserError
+from browserrig.core import BrowserError, record, traced
 from browserrig.events import (
     BrowserEvent,
     DialogHandledEvent,
@@ -223,6 +223,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         viewport = (await self.cdp.page.get_layout_metrics()).css_layout_viewport
         return viewport.client_width, viewport.client_height
 
+    @traced
     async def frames(self) -> tuple[Frame, ...]:
         """Return every frame with its viewport transform; `frame_limitations` explains gaps.
 
@@ -231,7 +232,9 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         if self._discover_frames is None:
             raise BrowserError("Frame discovery is unavailable for this tab")
         key = (self.document_id, self._current_action(), self._layout_revision)
-        if key[1] and key == self._frames_key:
+        cached = bool(key[1]) and key == self._frames_key
+        record(cached=cached)
+        if cached:
             return self._frames
         frames, self.frame_limitations = await self._discover_frames(self)
         if key[1] and key == (

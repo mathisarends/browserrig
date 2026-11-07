@@ -23,6 +23,9 @@ from browserrig.core import (
     ElementPoint,
     ReadinessPhase,
     ReadinessStatus,
+    record,
+    span,
+    traced,
 )
 from browserrig.events import (
     ACTION_EVENTS,
@@ -124,6 +127,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
 
+    @traced
     async def run(
         self,
         *,
@@ -134,6 +138,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         settle: bool = True,
     ) -> ToolResult:
         """Run one mutation once. Its addressed tab cannot change with global focus."""
+        record(kind=kind)
         async with self.browser.action_lock:
             tab = self.browser.active_tab
             action_id = uuid4().hex
@@ -154,7 +159,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
                 if settle and kind in _NAVIGATION_KINDS:
                     effect, note = await self._navigate(tab, action_id, operation)
                 else:
-                    with self.browser.input.action(action_id):
+                    with self.browser.input.action(action_id), span("operation"):
                         effect = await operation(tab)
                     note = (
                         await self._settle(tab, kind)
@@ -207,15 +212,18 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
                 )
                 raise ToolError(reason + hint) from error
 
+    @traced
     async def stage[R](
         self, intent: Intent, tab: Tab, step: Callable[[], Awaitable[R]]
     ) -> R:
         """Run `step`, which does what `intent` describes, letting plugins stage it."""
+        record(intent=type(intent).__name__)
         context = self._mount.context
         assert context is not None
         performed = Perform(intent, tab, self.browser.input.action_id)
         return cast(R, await context.dispatch(performed, default=step))
 
+    @traced
     async def page_change(self, tab: Tab, *, after_input: bool = True) -> str:
         """A comparison probe must never replace the refs or image the model acted on."""
         if tab.closed or self.browser.active_tab.id != tab.id:
@@ -243,6 +251,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         # Set the signal before the execution receipt is persisted, including on errors.
         return stop_on_failure(await next_(), event.tool)
 
+    @traced
     async def _prepare(self, tab: Tab, kind: ActionKind) -> PageState:
         """Return the pre-action baseline once the page accepts input."""
         if kind in _NAVIGATION_KINDS and tab.dialog:
@@ -273,6 +282,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
             scroll_y=before.scroll_y,
         )
 
+    @traced
     async def _settle(self, tab: Tab, kind: ActionKind) -> str:
         phase = (
             ReadinessPhase.NAVIGATION
@@ -290,6 +300,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
             return f" Action executed; readiness is {report.status}: {report.reason}."
         return ""
 
+    @traced
     async def _navigate(
         self,
         tab: Tab,
@@ -299,7 +310,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         effects: list[Effect] = []
 
         async def dispatch() -> None:
-            with self.browser.input.action(action_id):
+            with self.browser.input.action(action_id), span("operation"):
                 effects.append(await operation(tab))
 
         report = await self.readiness.wait(

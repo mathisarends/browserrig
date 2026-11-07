@@ -5,7 +5,7 @@ from cdpify import CDPCommandError
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 
 from browserrig.browser import Tab
-from browserrig.core import BrowserError, Options
+from browserrig.core import BrowserError, Options, traced
 from browserrig.scripts import CONTENT, ContentArgs, ContentExtraction
 
 from .dom import seed_frame
@@ -35,6 +35,7 @@ class PageContent(Options):
         return text
 
 
+@traced
 async def extract_content(
     tab: Tab, *, max_chars: int = 50000, full_page: bool = False, offset: int = 0
 ) -> PageContent:

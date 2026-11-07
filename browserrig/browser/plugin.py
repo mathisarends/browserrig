@@ -3,11 +3,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
-from harnessed import Plugin, SessionLog
+from harnessed import Inject, Plugin, SessionLog, ToolResult, hook
+from harnessed.core.tracing import Tracer
+from harnessed.hooks import ExecuteTool, Next, PreStep, StepDecision
 from harnessed.kernel import Event, Scope, needs
 from pydantic import SecretStr
 
-from browserrig.core import TargetId
+from browserrig.core import TargetId, use_tracer
 from browserrig.events import BROWSER_EVENTS
 from browserrig.files import FileSystemOptions
 
@@ -111,6 +113,27 @@ class Chrome(Plugin, slot="browserrig.browser"):
         )
         ctx.provide(Browser, browser)
         ctx.provide(BrowserEvents, browser.events)
+
+    # Outermost, so browser work in every other plugin's hooks is traced too.
+    @hook(ExecuteTool, priority=-1000)
+    async def _trace_tool(
+        self,
+        _event: ExecuteTool,
+        next_: Next[ToolResult],
+        tracer: Inject[Tracer | None],
+    ) -> ToolResult:
+        with use_tracer(tracer):
+            return await next_()
+
+    @hook(PreStep, priority=-1000)
+    async def _trace_step(
+        self,
+        _event: PreStep,
+        next_: Next[StepDecision],
+        tracer: Inject[Tracer | None],
+    ) -> StepDecision:
+        with use_tracer(tracer):
+            return await next_()
 
 
 @dataclass(frozen=True)

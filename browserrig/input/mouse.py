@@ -7,7 +7,14 @@ from typing import Literal
 
 from cdpify.domains.input import MouseButton
 
-from browserrig.core import BrowserError, CursorStyle, MouseEventKind, Point, TabGesture
+from browserrig.core import (
+    BrowserError,
+    CursorStyle,
+    MouseEventKind,
+    Point,
+    TabGesture,
+    traced,
+)
 from browserrig.events import (
     CursorMovedEvent,
     CursorStateEvent,
@@ -114,9 +121,11 @@ class Mouse:
         if target is not None:
             await self._publish(target)
 
+    @traced
     async def move_to(self, point: Point) -> None:
         await self._move(focused(self._focus), point)
 
+    @traced
     async def click(
         self,
         point: Point,
@@ -152,6 +161,7 @@ class Mouse:
                     click_count=click_count,
                 )
 
+    @traced
     async def drag(
         self,
         *,
@@ -192,6 +202,7 @@ class Mouse:
                 target, MouseEventKind.RELEASED, current, buttons=0, click_count=1
             )
 
+    @traced
     async def scroll(
         self, *, delta_y: float, delta_x: float = 0, point: Point | None = None
     ) -> None:

@@ -6,7 +6,7 @@ from cdpify import CDPCommandError, CdpSession
 from cdpify.domains.page import FrameTree
 from cdpify.domains.target import TargetInfo
 
-from browserrig.core import Bounds, BrowserError, FrameTransform
+from browserrig.core import Bounds, BrowserError, FrameTransform, record, traced
 from browserrig.scripts import OWNER_SIZE, VIEWPORT
 
 from .frame import Frame
@@ -19,6 +19,7 @@ _FRAME_TIMEOUT = 2.0
 type _FrameSession = Callable[[str], Awaitable[CdpSession]]
 
 
+@traced
 async def discover_frames(
     tab: Tab, targets: tuple[TargetInfo, ...], session_for: _FrameSession
 ) -> tuple[tuple[Frame, ...], tuple[str, ...]]:
@@ -112,4 +113,5 @@ async def discover_frames(
         limitations.append(
             "Frame discovery timed out; some frames could not be inspected"
         )
+    record(frames=len(result))
     return tuple(result), tuple(dict.fromkeys(limitations))

@@ -13,7 +13,7 @@ from cdpify import CDPCommandError, CdpSession
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 
 from browserrig.browser import Frame
-from browserrig.core import BrowserError
+from browserrig.core import BrowserError, record, traced
 from browserrig.observation.models import (
     Canvas,
     Element,
@@ -34,6 +34,7 @@ _TIMEOUT = 5
 SPARSE_CONTROLS = 5
 
 
+@traced
 async def extract(
     frames: tuple[Frame, ...],
     *,
@@ -48,6 +49,7 @@ async def extract(
     """
     main = frames[0]
     sessions = _sessions(frames)
+    record(frames=len(frames), sessions=len(sessions))
     snapshots, focused = await asyncio.gather(
         asyncio.gather(
             *(_snapshot(cdp) for cdp in sessions.values()), return_exceptions=True
@@ -114,6 +116,7 @@ class _Assembler:
         self._keys: dict[str, tuple[int, ...]] = {}
         self._covered: set[str] = set()
 
+    @traced
     def run(
         self, max_elements: int | None, max_text: int, sparse_text: int
     ) -> Extraction:
@@ -304,6 +307,7 @@ def _session_roots(frames: tuple[Frame, ...]) -> list[Frame]:
     return list(roots.values())
 
 
+@traced
 async def _snapshot(cdp: CdpSession) -> CaptureSnapshotResult:
     async with asyncio.timeout(_TIMEOUT):
         return await cdp.dom_snapshot.capture_snapshot(
@@ -311,6 +315,7 @@ async def _snapshot(cdp: CdpSession) -> CaptureSnapshotResult:
         )
 
 
+@traced
 async def _focused(frame: Frame) -> int | None:
     """Backend id of the deepest focused element in this frame's session."""
     result = await frame.run(FOCUSED, by_value=False)

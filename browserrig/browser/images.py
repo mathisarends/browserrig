@@ -1,10 +1,11 @@
 from cdpify.domains.page import Viewport
 
-from browserrig.core import Geometry
+from browserrig.core import Geometry, traced
 
 from .tab import Tab
 
 
+@traced
 async def screenshot(
     tab: Tab, geometry: Geometry | None = None, *, overlays: bool = False
 ) -> str:

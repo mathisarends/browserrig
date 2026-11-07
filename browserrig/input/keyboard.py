@@ -6,7 +6,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from typing import TypedDict
 
-from browserrig.core import BrowserError
+from browserrig.core import BrowserError, traced
 from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
 
 from .motor import KeyStroke, Motor
@@ -83,6 +83,7 @@ class Keyboard:
         self._emit = emit
         self._motor = motor
 
+    @traced
     async def press_key(
         self,
         key: str,
@@ -103,6 +104,7 @@ class Keyboard:
         finally:
             await self._emit(target, KeyboardVisibilityEvent(visible=False))
 
+    @traced
     async def type_text(
         self,
         text: str,

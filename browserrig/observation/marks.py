@@ -5,7 +5,7 @@ from io import BytesIO
 
 from PIL import Image, ImageDraw, ImageFont
 
-from browserrig.core import Bounds, Point
+from browserrig.core import Bounds, Point, traced
 
 from .models import ElementInfo
 
@@ -36,6 +36,7 @@ _COLORS = {
 }
 
 
+@traced
 def annotate(
     image: str,
     elements: tuple[ElementInfo, ...],
@@ -94,6 +95,7 @@ def annotate(
     return base64.b64encode(output.getvalue()).decode("ascii")
 
 
+@traced
 def blackout(
     image: str, regions: tuple[Bounds, ...], area: Bounds, scale: float = 1
 ) -> str:

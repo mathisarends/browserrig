@@ -18,7 +18,7 @@ from cdpify.domains.target import (
     TargetInfoChangedEvent,
 )
 
-from browserrig.core import BrowserError, TabGesture, TargetId
+from browserrig.core import BrowserError, TabGesture, TargetId, traced
 from browserrig.events import (
     TabActivatedEvent,
     TabClosedEvent,
@@ -93,6 +93,7 @@ class Tabs:
         for tab in tuple(self._tabs.values()):
             await tab.discard()
 
+    @traced
     async def list(self) -> tuple[TabInfo, ...]:
         self._check()
         targets = await self._targets()

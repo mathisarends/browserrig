@@ -11,6 +11,7 @@ from collections.abc import Iterable
 
 from cdpify import CdpSession
 
+from browserrig.core import record, traced
 from browserrig.observation.models import Element
 
 from .document import clean
@@ -19,11 +20,13 @@ _TIMEOUT = 2
 _NON_WORD = re.compile(r"\W+")
 
 
+@traced
 async def chrome_names(
     sessions: dict[str, CdpSession], elements: Iterable[Element]
 ) -> dict[str, str]:
     """Chrome's accessible name per element ref; elements Chrome leaves unnamed are omitted."""
     queried = [element for element in elements if element.frame_id in sessions]
+    record(elements=len(queried))
     try:
         async with asyncio.timeout(_TIMEOUT):
             names = await asyncio.gather(
@@ -34,6 +37,7 @@ async def chrome_names(
                 return_exceptions=True,
             )
     except TimeoutError:
+        record(timed_out=True)
         return {}
     return {
         element.ref: name

@@ -1,11 +1,12 @@
 import asyncio
 
 from browserrig.browser import Tab
-from browserrig.core import BrowserError, StaleElement
+from browserrig.core import BrowserError, StaleElement, traced
 from browserrig.input import Mouse
 from browserrig.observation import ElementHandle, ScrollableElement
 
 
+@traced
 async def prepare_element(
     tab: Tab, handle: ElementHandle, mouse: Mouse, *, document_id: str
 ) -> bool:

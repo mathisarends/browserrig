@@ -1,6 +1,6 @@
 # Harnessed API proposals from browserrig
 
-Two places where browserrig works around a missing Harnessed extension point. Both
+Three places where browserrig works around a missing Harnessed extension point. All
 workarounds behave correctly today, but they depend on Harnessed internals or bypass
 the declarative plugin API. Found while reviewing browserrig against **Harnessed 0.13.0**,
 2026-11-07. No upstream issue has been filed yet.
@@ -136,6 +136,62 @@ Starting with `timeout` is enough for browserrig. `enabled` already accepts a ca
 A smaller alternative: a `configure_tools(self) -> Mapping[str, ToolOverrides]` method
 on `PluginBase` that Harnessed applies at activation. It keeps the decorator unchanged
 but splits a tool's options across two places, so the callable form is preferable.
+
+## 3. Tracing hook handlers and library methods
+
+### Problem
+
+`OpenTelemetryTracer` exports `turn`, `step`, `model` and `tool` spans. Everything
+between them is one opaque block:
+
+- **Hook handlers have no spans.** `EventBus.dispatch` (`harnessed/kernel/events.py`,
+  `invoke`) calls each listener directly. A slow `PreStep` handler, such as
+  `BrowserPerception._before_step` capturing the page, shows up only as step time that is
+  not model time. Nothing says which plugin's handler it was.
+- **Libraries cannot add spans without internals.** `Tracer`, `Span` and `span()` live in
+  `harnessed.core.tracing` and are not exported from a public module.
+- **Library code has no tracer in reach.** `span()` needs the `Scope`, but most of the
+  measured work is in free functions and services several calls below a plugin
+  (page extraction, readiness polling, frame discovery).
+- **Every name and attribute gets a `harnessed.` prefix.** Spans come out as
+  `harnessed.Actions.run`, and source locations as `harnessed.code.filepath`, so tools
+  that understand OpenTelemetry's `code.*` conventions cannot link a span to its source.
+
+### Current workaround (`browserrig/core/tracing.py`)
+
+`Chrome` hooks `ExecuteTool` and `PreStep` with `priority=-1000`, injects
+`Tracer | None` and binds it in a `ContextVar` around `next_()`. `@traced` methods read
+that variable and open `tracer.span(fn.__qualname__, **{"code.filepath": ...,
+"code.lineno": ...})`. Spans nest correctly because `OpenTelemetryTracer` uses
+`start_as_current_span`, and asyncio tasks copy the context.
+
+Costs: it imports `harnessed.core.tracing`, depends on hook priorities to be outermost,
+and misses browser work done outside a tool call or `PreStep`, for example in a
+`TurnStopping` handler.
+
+### Proposal
+
+1. **A span per hook handler**, opt-in, around `invoke` in `EventBus.dispatch`:
+
+   ```python
+   with span(scope, "hook", event=type(event).__name__, plugin=owner_name,
+             **code_location(listener.callback)):
+       return await resolve(listener.callback(*bound.args, **bound.kwargs))
+   ```
+
+   For a `Waterfall`, `next_()` runs inside the handler's span, so the rest of the chain
+   nests below it and each handler's own time is its span minus its children. `Emit`
+   events fire often, so this should be off by default:
+   `OpenTelemetryTracer(trace_hooks=True)`, or a minimum duration below which hook spans
+   are dropped.
+2. **A public tracing module**, e.g. `harnessed.tracing`, exporting `Tracer`, `Span` and
+   `span`.
+3. **An ambient tracer.** The runtime binds the session's tracer in a `ContextVar`
+   for the turn, and `harnessed.tracing.current()` (or `span(name)` without a scope)
+   reads it. browserrig's `ExecuteTool`/`PreStep` binding hooks would go away.
+4. **Instrumentation names and source locations.** Leave names that already carry a
+   namespace (`browserrig.Actions.run`) unprefixed, and export
+   `code.function.name`, `code.file.path` and `code.line.number` as given.
 
 ## Also worth considering: dispatch without keeping the Scope
 
