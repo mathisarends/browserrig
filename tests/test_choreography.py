@@ -38,6 +38,7 @@ from browserrig.events import (
     NavigationStartedEvent,
 )
 from browserrig.files import FileSystem, FileSystemOptions
+from browserrig.input import mouse as mouse_module
 from browserrig.pacing import InputPacing
 from browserrig.scripts import FindResult
 from browserrig.tools import Actions, FileTools, FindTools, NavigationTools
@@ -128,6 +129,7 @@ def _timeline(monkeypatch):
     # Fake pauses and elapsed-time accounting must use the same clock, so runner
     # scheduling cannot shorten the remaining key interval in timeline assertions.
     monkeypatch.setattr(scenes, "monotonic", lambda: clock.now)
+    monkeypatch.setattr(mouse_module, "monotonic", lambda: clock.now)
     return timeline
 
 

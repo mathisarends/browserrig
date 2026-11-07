@@ -613,9 +613,66 @@ class _SlowMotor:
         return Point(x=width - 1, y=height - 1)
 
 
-async def test_a_motor_paces_input_that_nobody_watches(monkeypatch):
-    sleep = AsyncMock()
+class _Clock:
+    """Time that moves only while input waits or the browser is busy."""
+
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def time(self) -> float:
+        return self.now
+
+    async def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+def _clocked(monkeypatch) -> tuple[_Clock, AsyncMock]:
+    clock = _Clock()
+    sleep = AsyncMock(side_effect=clock.sleep)
+    monkeypatch.setattr(mouse_module, "monotonic", clock.time)
     monkeypatch.setattr(mouse_module.asyncio, "sleep", sleep)
+    return clock, sleep
+
+
+class _Steady(Instant):
+    """One straight stroke of 0.3 seconds, 18 frames at 60 Hz."""
+
+    def pointer_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
+        return (CursorPath.curved(start, destination, 0.3, bend=(0, 0)),)
+
+
+async def test_a_slow_browser_skips_frames_instead_of_stretching_the_stroke(
+    monkeypatch,
+):
+    clock, _sleep = _clocked(monkeypatch)
+
+    async def slow(_arguments):
+        clock.now += 0.02
+
+    devices, _tab, events, commands = _rig(dispatch=slow)
+    devices.pace(_Steady())
+    await devices.mouse.move_to(Point(x=300, y=0))
+    stroke = next(event for event in events if isinstance(event, CursorMovedEvent))
+    assert stroke.duration == 0.3
+    xs = [c["x"] for c in commands if c["type"] == "mouseMoved"]
+    # Late frames are skipped, the rest still follow the path to its end.
+    assert len(xs) < 18 and xs == sorted(xs) and xs[-1] == 300
+    # Viewers finish the stroke after 0.3 seconds; the pointer at most one dispatch later.
+    assert clock.now <= 0.3 + 0.02 + 1e-9
+
+
+async def test_a_fast_browser_moves_the_pointer_on_every_frame(monkeypatch):
+    clock, _sleep = _clocked(monkeypatch)
+    devices, _tab, _events, commands = _rig()
+    devices.pace(_Steady())
+    await devices.mouse.move_to(Point(x=300, y=0))
+    moves = [c for c in commands if c["type"] == "mouseMoved"]
+    assert len(moves) == 18 and moves[-1]["x"] == 300
+    assert clock.now == pytest.approx(0.3)
+
+
+async def test_a_motor_paces_input_that_nobody_watches(monkeypatch):
+    _clock, sleep = _clocked(monkeypatch)
     tab, events, commands = _tab()
     focus: dict[str, Tab | None] = {"tab": None}
     devices = Input(lambda: None if (tab := focus["tab"]) is None else tab.input)
@@ -632,12 +689,9 @@ async def test_a_motor_paces_input_that_nobody_watches(monkeypatch):
     moves = [(c["x"], c["y"]) for c in commands if c["type"] == "mouseMoved"]
     assert moves[0] == (999, 599) and len(moves) == 3
     # Two frames along the path, then one pause after each key.
-    assert [call.args for call in sleep.await_args_list] == [
-        (1 / 60,),
-        (1 / 60,),
-        (0.2,),
-        (0.2,),
-    ]
+    assert [call.args[0] for call in sleep.await_args_list] == pytest.approx(
+        [1 / 60, 1 / 60, 0.2, 0.2]
+    )
 
 
 class _Detour(Instant):

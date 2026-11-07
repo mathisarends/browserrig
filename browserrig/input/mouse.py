@@ -2,6 +2,7 @@ import asyncio
 import math
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
+from time import monotonic
 from typing import Literal
 
 from cdpify.domains.input import MouseButton
@@ -264,12 +265,22 @@ class Mouse:
                 duration=path.duration,
             ),
         )
-        for step in range(1, path.steps + 1):
-            await self._dispatch(
-                target, MouseEventKind.MOVED, path.point(step / path.steps)
+        # Viewers animate the stroke on their own clock, so follow the clock too: when a
+        # dispatch or a timer runs late, skip frames instead of stretching the stroke.
+        started = monotonic()
+        steps = path.steps
+        step = 0
+        while step < steps:
+            step += 1
+            await self._dispatch(target, MouseEventKind.MOVED, path.point(step / steps))
+            if not path.duration:
+                continue
+            await asyncio.sleep(
+                max(0.0, started + path.duration * step / steps - monotonic())
             )
-            if path.duration:
-                await asyncio.sleep(path.duration / path.steps)
+            # The last frame always lands on the destination.
+            due = math.floor((monotonic() - started) / path.duration * steps)
+            step = max(step, min(steps - 1, due))
 
     async def _publish(self, target: InputTarget) -> None:
         await self._publish_position(target)
