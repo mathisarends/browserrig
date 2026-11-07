@@ -19,7 +19,7 @@ from harnessed.events import (
 )
 from harnessed.kernel import Scope, needs
 
-from browserrig.core import ActivityKind, ActivityOutcome
+from browserrig.core import ActivityKind, ActivityOutcome, HandoffStatus
 from browserrig.events import (
     ACTIVITY_EVENTS,
     ActivityFinishedEvent,
@@ -184,18 +184,23 @@ class Activity(Plugin, slot="browserrig.activity", provides=True):
     @hook(HandoffFinishedEvent)
     async def _on_handoff_finished(self, event: HandoffFinishedEvent) -> None:
         if event.call_id:
-            outcome = {
-                "done": ActivityOutcome.COMPLETED,
-                "declined": ActivityOutcome.REJECTED,
-                "timeout": ActivityOutcome.TIMEOUT,
-                "cancelled": ActivityOutcome.CANCELLED,
-                "failed": ActivityOutcome.FAILED,
-                "resumed": ActivityOutcome.COMPLETED,
-            }[event.status]
+            match event.status:
+                case HandoffStatus.DONE | HandoffStatus.RESUMED:
+                    outcome = ActivityOutcome.COMPLETED
+                case HandoffStatus.DECLINED:
+                    outcome = ActivityOutcome.REJECTED
+                case HandoffStatus.TIMEOUT:
+                    outcome = ActivityOutcome.TIMEOUT
+                case HandoffStatus.CANCELLED:
+                    outcome = ActivityOutcome.CANCELLED
+                case HandoffStatus.FAILED:
+                    outcome = ActivityOutcome.FAILED
+                case _:
+                    assert_never(event.status)
             await self._finish(
                 ActivityKey(ActivityKind.HANDOFF, event.handoff_id),
                 outcome,
-                reason=event.status,
+                reason=event.status.value,
             )
             await self._start(
                 ActivityKey(ActivityKind.TOOL, event.call_id), cause_id=event.call_id
