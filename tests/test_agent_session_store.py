@@ -208,4 +208,5 @@ async def test_paused_done_restores_browser_events_and_structured_finalization(
         await asyncio.wait_for(session.wait_until_idle(), 5)
         assert session.last(OutputValidatedEvent).data == {"title": "Restored title"}
     assert len(model.requests) == 1
-    assert [tool.name for tool in model.requests[0].tools] == ["final_answer"]
+    # Working tools stay declared after done; only the output tool joins them.
+    assert [tool.name for tool in model.requests[0].tools] == ["done", "final_answer"]

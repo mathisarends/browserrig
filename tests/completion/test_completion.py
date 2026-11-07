@@ -101,7 +101,7 @@ async def test_commentary_and_tools_stream_before_done_and_a_separate_final_answ
     assert isinstance(events[-1], TurnResultEvent)
     assert result.completed and result.text == "title,count\nItem,1"
     assert len(model.requests) == 5
-    assert model.requests[-1].tools == ()
+    assert model.requests[-1].tools == model.requests[0].tools
     assert "Return the result as CSV." in "\n".join(
         message.text for message in model.requests[-1].messages
     )
@@ -145,7 +145,9 @@ async def test_structured_output_applies_only_to_the_final_response(native):
     final = model.requests[-1]
     assert final.output_schema is not None
     assert final.output_schema.mode == ("native" if native else "tool")
-    assert [tool.name for tool in final.tools] == ([] if native else ["final_answer"])
+    assert [tool.name for tool in final.tools] == [
+        tool.name for tool in model.requests[0].tools
+    ] + ([] if native else ["final_answer"])
     assert any(
         '"count"' in message.text and "JSON Schema" in message.text
         for message in model.requests[0].messages
@@ -170,8 +172,9 @@ async def test_invalid_final_output_uses_native_validation_and_correction(native
     ).run("Task", output=_Answer)
     assert result.completed and result.output.count == 1
     assert len(model.requests) == 4
+    working = {tool.name for tool in model.requests[0].tools}
     assert all(
-        {tool.name for tool in request.tools} <= {"final_answer"}
+        {tool.name for tool in request.tools} - {"final_answer"} == working
         for request in model.requests[-2:]
     )
 
@@ -247,7 +250,8 @@ async def test_application_tools_cannot_execute_after_done_even_if_model_calls_t
     ).run("Task")
     assert result.completed and result.text == "Final"
     assert not performed
-    assert all(request.tools == () for request in model.requests[1:])
+    # Blocked by policy, not withdrawn: the tool list keeps the cached prefix stable.
+    assert all(request.tools == model.requests[0].tools for request in model.requests)
     assert result.tool_calls[-1][1].status is ToolStatus.DENIED
 
 
@@ -276,6 +280,49 @@ async def test_step_limits_do_not_claim_completion_or_invent_structured_output(
     with pytest.raises(OutputUnavailable):
         _ = result.output
     assert len(model.requests) == 1
+
+
+def _texts(request):
+    return "\n".join(message.text for message in request.messages)
+
+
+async def test_the_last_step_with_room_for_an_answer_asks_for_done():
+    performed = []
+    model = ScriptedModel(
+        [call("inspect"), call("inspect"), call("done", success=True), "Final"]
+    )
+    result = await Agent(
+        model=model,
+        plugins=[Done(), _Work(performed)],
+    ).run("Task", max_steps=4)
+    assert result.completed and result.text == "Final"
+    assert performed == ["inspect", "inspect"]
+    assert not any("Step" in _texts(request) for request in model.requests[:2])
+    assert "Step 3 of 4" in _texts(model.requests[2])
+    assert all(request.tools == model.requests[0].tools for request in model.requests)
+
+
+async def test_closing_step_blocks_every_tool_but_done_without_asking_for_approval():
+    performed = []
+    model = ScriptedModel([call("inspect"), call("mutate"), "Still working."])
+    result = await Agent(
+        model=model,
+        plugins=[Done(), _Work(performed)],
+    ).run("Task", max_steps=3)
+    assert performed == ["inspect"]
+    assert result.tool_calls[-1][1].status is ToolStatus.DENIED
+    assert not any(isinstance(event, ApprovalRequestedEvent) for event in result.events)
+    assert not result.completed and result.stop_reason is StopReason.MAX_STEPS
+
+
+async def test_a_reserved_summary_moves_the_closing_step_one_earlier():
+    model = ScriptedModel([call("inspect"), call("done", success=True), "Final"])
+    result = await Agent(
+        model=model,
+        plugins=[Done(), _Work([]), AgentLoop(final_step=FinalStepPolicy.SUMMARIZE)],
+    ).run("Task", max_steps=4)
+    assert result.completed and result.text == "Final"
+    assert "Step 2 of 4" in _texts(model.requests[1])
 
 
 async def test_token_budget_remains_authoritative():
@@ -327,7 +374,7 @@ async def test_each_turn_uses_its_own_completion_and_output_contract():
     assert second.completed and second.text == "Second answer"
     assert "done" in {tool.name for tool in model.requests[2].tools}
     assert model.requests[2].output_schema is None
-    assert model.requests[-1].tools == ()
+    assert model.requests[-1].tools == model.requests[2].tools
 
 
 async def test_runtime_mount_and_removal_restore_native_completion_and_output():

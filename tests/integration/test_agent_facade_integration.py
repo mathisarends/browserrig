@@ -171,4 +171,8 @@ async def test_facade_streams_commentary_and_returns_a_typed_answer_after_done(s
     assert result.completed
     assert result.output == PageAnswer(title="Other", url=site + "/other")
     assert any(isinstance(event, ActionStartedEvent) for event in result.events)
-    assert [tool.name for tool in model.requests[-1].tools] == ["final_answer"]
+    # Browser tools stay declared after done; only the output tool joins them.
+    assert [tool.name for tool in model.requests[-1].tools] == [
+        *(tool.name for tool in model.requests[0].tools),
+        "final_answer",
+    ]

@@ -207,6 +207,14 @@ result = await agent.run("Compare the two products. Return a Markdown table.")
 print(result.text)
 ```
 
+With a step limit, `Done` also plans for the finish. On the last step that still
+leaves room for a final answer (`max_steps - 1`, or `max_steps - 2` with
+`FinalStepPolicy.SUMMARIZE`), the agent is told to call `done` now, and every other
+tool is denied without approval prompts. After `done`, every tool is denied. Tool
+definitions are never removed between these phases, so the prompt-cache prefix
+stays valid. A structured `output=` contract in tool mode still adds the
+`final_answer` tool after `done`.
+
 Omit `Done()` to retain Harnessed's native behavior, where a text response without
 tool calls ends the turn. `browser_plugins()` does not include it by default.
 It also works with a plain Harnessed `Agent` or a runtime mount through

@@ -61,6 +61,10 @@
 
 ### Added
 
+- `Done` now prepares for the step limit. On the last step that still leaves room
+  for a final answer, the agent is told to call `done`, and other tools are denied.
+  After `done`, tools stay declared but are denied instead of being removed from the
+  request, which keeps the prompt cache valid for the final answer.
 - Render input choreography directly in the active tab with `IframeRenderer`,
   enabled by default in `InputVisualization`. Named cursors, precise target
   corners, full DE/EN keyboards, scroll wheels, file cards and find/address

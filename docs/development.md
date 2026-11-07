@@ -137,12 +137,15 @@ in `tests/handoff/test_handoff.py`, including after compaction.
 
 The opt-in `Done` plugin uses native hooks for continuation and tool execution.
 Harnessed 0.13.0 has no output-policy hook or injectable output handler, so
-`browserrig/completion.py` bridges internal `OutputHandler` methods through a
+`browserrig/completion/output.py` bridges internal `OutputHandler` methods through a
 registry keyed by session log identity. Only active `Done` sessions alter output
 handling; other sessions use the original methods. The last activation's cleanup
 restores them. Plugins use the restricted `SessionContext`, without recovering
 the application `Session`. Verify native/tool structured output, retries, limits,
-streaming, overlapping sessions and runtime removal in `tests/test_completion.py`.
+streaming, overlapping sessions and runtime removal in
+`tests/completion/test_completion.py`. `browserrig/completion/models.py` holds the
+single table of tools each completion phase permits; the plugin enforces it through
+`ToolPolicy` and `ExecuteTool` instead of withdrawing tool definitions.
 `tests/test_agent_session_store.py` also checks reopening a paused `Done` turn with
 `restore_outputs`, retained image assets and Browserrig's custom durable events.
 
