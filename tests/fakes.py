@@ -4,13 +4,10 @@ from types import SimpleNamespace
 
 from harnessed import (
     Agent,
-    Context,
-    Inject,
     Plugin,
-    PluginOrder,
     SessionLog,
-    SystemPrompt,
 )
+from harnessed.kernel import Scope, needs
 from harnessed.testing import ScriptedModel
 
 from browserrig import Browser
@@ -86,7 +83,10 @@ class FakeChrome(Plugin, needs=(SessionLog,)):
         super().__init__()
         self.holder = holder
 
-    async def setup(self, ctx: Context, log: Inject[SessionLog]):
+    _setup_log = needs(SessionLog)
+
+    async def setup(self, ctx: Scope):
+        log = self._setup_log
         browser = FakeBrowser(log)
         self.holder["browser"] = browser
         ctx.provide(Browser, browser)
@@ -149,7 +149,7 @@ class FakeServices(Plugin, provides=True):
     async def record(self, event):
         self.events.append(event)
 
-    async def setup(self, ctx: Context):
+    async def setup(self, ctx: Scope):
         ctx.provide(Browser, self.browser)
         ctx.provide(BrowserEvents, self.browser.events)
         ctx.provide(Readiness, self.readiness)
@@ -161,9 +161,8 @@ async def mounted(*plugins):
     """Start a session with `plugins` on fake services; yield the services and context."""
     services = FakeServices()
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["Done"]),
         plugins=[services, *plugins],
     )
     async with agent.session() as session:
-        yield session.ctx[FakeServices], session.ctx
+        yield session.scope[FakeServices], session.scope

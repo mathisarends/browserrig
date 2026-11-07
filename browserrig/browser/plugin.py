@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
-from harnessed import Context, Inject, Plugin, SessionLog
-from harnessed.kernel import Event
+from harnessed import Plugin, SessionLog
+from harnessed.kernel import Event, Scope, needs
 from pydantic import SecretStr
 
 from browserrig.core import TargetId
@@ -18,10 +18,11 @@ from .setup import SessionSetup
 from .tab import Tab
 
 
-class Chrome(Plugin, slot="browserrig.browser", needs=(SessionLog,)):
+class Chrome(Plugin, slot="browserrig.browser"):
     """Configure Chrome; each session opens and closes its own browser connection."""
 
     events = BROWSER_EVENTS
+    _log = needs(SessionLog)
 
     def __init__(self, options: BrowserOptions | None = None) -> None:
         super().__init__()
@@ -97,14 +98,14 @@ class Chrome(Plugin, slot="browserrig.browser", needs=(SessionLog,)):
             )
         )
 
-    async def setup(self, ctx: Context, log: Inject[SessionLog]) -> None:
+    async def setup(self, ctx: Scope) -> None:
         async def tab_changed(tab: Tab, settled: bool) -> None:
             await ctx.dispatch(TabChanged(tab, settled))
 
         browser = await ctx.enter(
             ChromeBrowser(
                 self.options,
-                emit=log.emit,
+                emit=self._log.emit,
                 on_tab_change=tab_changed,
             )
         )

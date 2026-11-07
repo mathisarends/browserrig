@@ -123,24 +123,26 @@ version and tag. This setup PR creates no release or tag itself.
 
 ## Harnessed compatibility
 
-Harnessed and all provider extras are pinned to the published 0.12.0 release.
-The native `session.add_context(...)` API appends background to conversation
-history without starting a turn. Existing snapshots and stores remain compatible.
+Harnessed and all provider extras are pinned to the published 0.13.0 release.
+`session.append_message(UserMessage(...))` adds durable background without starting
+a turn. State format 2, checkpoint/store format 3 and audit envelope 5 reject older
+data; back up old application data and start fresh stores.
 
 `HumanHandoff.history` exposes typed, immutable receipts from session-owned state.
-The plugin currently uses Harnessed's internal `DynamicContext` only at its
-serialization boundary to commit and deliver durable named facts. Harnessed 0.12.0
-has no public typed plugin-state persistence API. Keep this dependency inside the
-plugin; application code uses `session.ctx[HumanHandoff].history`. Verify both
-typed state restoration and actual model delivery in `tests/test_handoff.py`.
+The plugin uses Harnessed's internal `PluginInstructions` only at its persistence
+boundary. Its own `PrepareRequest` hook delivers current receipts as request-only
+user messages. Keep this internal dependency inside the plugin; application code
+uses `session.scope[HumanHandoff].history`. Verify restoration and model delivery
+in `tests/test_handoff.py`, including after compaction.
 
 The opt-in `Done` plugin uses native hooks for continuation and tool execution.
-Harnessed 0.12.0 has no output-policy hook, so `browserrig/completion.py` contains
-one reversible, per-session bridge around the step runner's output handler. This
-defers the declared output contract until finalization without changing the model
-or session APIs. When upgrading Harnessed, verify that bridge with
-`tests/test_completion.py`, including native/tool structured output, retries,
-limits, streaming, and runtime removal.
+Harnessed 0.13.0 has no output-policy hook or injectable output handler, so
+`browserrig/completion.py` bridges internal `OutputHandler` methods through a
+registry keyed by session log identity. Only active `Done` sessions alter output
+handling; other sessions use the original methods. The last activation's cleanup
+restores them. Plugins use the restricted `SessionContext`, without recovering
+the application `Session`. Verify native/tool structured output, retries, limits,
+streaming, overlapping sessions and runtime removal in `tests/test_completion.py`.
 `tests/test_session_store.py` also checks reopening a paused `Done` turn with
 `restore_outputs`, retained image assets and Browserrig's custom durable events.
 

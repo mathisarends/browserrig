@@ -40,7 +40,7 @@ async def test_file_cards_wait_for_explicit_completion_receipts(site):
         plugins=[Chrome.launch(url=site), InputVisualization(), _UploadReceipts()],
     )
     async with agent.session() as session:
-        tab = session.ctx[Browser].active_tab
+        tab = session.scope[Browser].active_tab
         await tab.emit(
             DownloadStartedEvent(download_id="file", filename="report.pdf", url=site)
         )
@@ -82,7 +82,7 @@ async def test_scroll_feedback_is_visible_during_native_wheel_input(site):
         model=ScriptedModel([]), plugins=[Chrome.launch(url=site), InputVisualization()]
     )
     async with agent.session() as session:
-        browser = session.ctx[Browser]
+        browser = session.scope[Browser]
         tab = browser.active_tab
         observed = []
 
@@ -95,7 +95,7 @@ async def test_scroll_feedback_is_visible_during_native_wheel_input(site):
                 == "true"
             )
 
-        session.ctx.on(ScrollStartedEvent, started, priority=10)
+        session.scope.on(ScrollStartedEvent, started, priority=10)
         await browser.mouse.scroll(delta_y=500, point=Point(x=500, y=400))
         assert observed == [0]
         assert await evaluate(tab, "scrollY") > 450
@@ -110,7 +110,7 @@ async def test_keyboard_fits_a_compact_viewport_and_keeps_secret_keys_private(si
         ],
     )
     async with agent.session() as session:
-        browser = session.ctx[Browser]
+        browser = session.scope[Browser]
         tab = browser.active_tab
         await browser.mouse.move_to(Point(x=300, y=600))
         await tab.emit(KeyPressedEvent(key="•", duration=2))
@@ -137,7 +137,7 @@ async def test_long_cursor_badge_stays_inside_a_compact_viewport(site):
         ],
     )
     async with agent.session() as session:
-        tab = session.ctx[Browser].active_tab
+        tab = session.scope[Browser].active_tab
         for x, y in ((3, 3), (357, 637)):
             await tab.emit(CursorStateEvent(x=x, y=y))
             bounds = await _surface(

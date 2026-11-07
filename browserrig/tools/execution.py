@@ -5,7 +5,6 @@ from typing import cast
 from uuid import uuid4
 
 from harnessed import (
-    Context,
     Instructions,
     Plugin,
     PluginState,
@@ -15,7 +14,7 @@ from harnessed import (
     hook,
 )
 from harnessed.hooks import ExecuteTool, Next, ReviewToolResult
-from harnessed.kernel import dependency
+from harnessed.kernel import Scope, needs
 
 from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
@@ -98,7 +97,7 @@ _INSTRUCTIONS = Instructions(
 
 @dataclass
 class _Mount:
-    context: Context | None = None
+    context: Scope | None = None
     targeting: Targeting | None = None
 
 
@@ -107,10 +106,10 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
 
     events = ACTION_EVENTS
     _mount = PluginState(_Mount)
-    browser = dependency(Browser)
-    _events = dependency(BrowserEvents)
-    readiness = dependency(Readiness)
-    observe = dependency(BrowserPerception)
+    browser = needs(Browser)
+    _events = needs(BrowserEvents)
+    readiness = needs(Readiness)
+    observe = needs(BrowserPerception)
 
     def __init__(self, *, chain_policy: ActionChainPolicy | None = None) -> None:
         super().__init__()
@@ -118,7 +117,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
             chain_policy if chain_policy is not None else DomActionChains()
         )
 
-    async def setup(self, ctx: Context) -> None:
+    async def setup(self, ctx: Scope) -> None:
         self._mount.context = ctx
         self._mount.targeting = Targeting(self.browser, self.observe, ctx)
 

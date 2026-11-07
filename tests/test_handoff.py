@@ -5,10 +5,8 @@ import pytest
 from harnessed import (
     Agent,
     Plugin,
-    PluginOrder,
     PolicyDecision,
     SessionState,
-    SystemPrompt,
     ToolStatus,
     tool,
 )
@@ -95,7 +93,6 @@ def _agent(responses, ask, *, extra=(), store=None, **options):
     holder = {}
     model = ScriptedModel(responses)
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         store=store,
         plugins=[
@@ -152,7 +149,7 @@ async def test_handoff_reports_navigation_transient_popup_and_human_note():
             TabOpenedEvent(target_id="oauth", url="https://id.example/")
         )
         await browser.events.emit(TabClosedEvent(target_id="oauth"))
-        await session.ctx[Nudges].queue(
+        await session.scope[Nudges].queue(
             "stale no progress", key="no_progress", cause_id="old"
         )
         browser.active_tab.url = "https://example.org/dashboard?token=sensitive#secret"
@@ -167,8 +164,8 @@ async def test_handoff_reports_navigation_transient_popup_and_human_note():
         fixed_prompt = await session.prompt.render()
         result = await session.run("Open my dashboard")
         assert await session.prompt.render() == fixed_prompt
-        history = session.ctx[HumanHandoff].history
-        intervals = session.ctx[Activity].intervals()
+        history = session.scope[HumanHandoff].history
+        intervals = session.scope[Activity].intervals()
     receipt = _receipt(model.requests[-1])
     assert receipt == history[-1]
     assert receipt.status is HandoffStatus.DONE
@@ -216,19 +213,19 @@ async def test_failed_comparison_still_returns_a_typed_receipt_and_refreshes_the
     stored,
 ):
     async def ask(_request):
-        session.ctx[BrowserPerception].probe = AsyncMock(
+        session.scope[BrowserPerception].probe = AsyncMock(
             side_effect=RuntimeError("Capture unavailable")
         )
         holder["browser"].active_tab.title = "Changed by human"
         return HumanResponse()
 
     agent, model, holder = _agent([_request(), "Done"], ask)
-    state = SessionState(context={"browser.handoffs": stored})
+    state = SessionState(plugin_instructions={"browser.handoffs": stored})
     async with agent.session(state=state) as session:
         _prepare(holder)
-        assert session.ctx[HumanHandoff].history == ()
+        assert session.scope[HumanHandoff].history == ()
         await session.run("Log in")
-        history = session.ctx[HumanHandoff].history
+        history = session.scope[HumanHandoff].history
     receipt = _receipt(model.requests[-1])
     assert receipt.status is HandoffStatus.DONE and receipt.current_url is None
     assert "could not be captured" in receipt.changes[0]
@@ -254,7 +251,9 @@ async def test_unsuccessful_handoffs_release_browser_and_hint_state(outcome):
         browser = _prepare(holder)
         result = await session.run("Log in")
         assert not browser.action_lock.locked()
-        await session.ctx[Nudges].queue("After handoff", key="after", cause_id="after")
+        await session.scope[Nudges].queue(
+            "After handoff", key="after", cause_id="after"
+        )
         assert session.log.last(NudgeQueuedEvent).text == "After handoff"
     expected = (
         HandoffStatus.FAILED
@@ -308,7 +307,7 @@ async def test_pause_resume_explains_external_changes_without_steering(track_pau
         browser.active_tab.title = "Changed by human"
         await session.resume()
         result = await session.run("Continue")
-        history = session.ctx[HumanHandoff].history
+        history = session.scope[HumanHandoff].history
     callback.assert_not_called()
     assert latest(model.requests[-1].messages)["page"]["title"] == "Changed by human"
     if track_pauses:
@@ -340,7 +339,7 @@ async def test_running_pause_cannot_lose_a_resume_while_a_probe_is_slow(monkeypa
     )
     async with agent.session() as session:
         browser = _prepare(holder)
-        observe = session.ctx[BrowserPerception]
+        observe = session.scope[BrowserPerception]
         probe = observe.probe
 
         async def slow_probe(tab):
@@ -358,7 +357,7 @@ async def test_running_pause_cannot_lose_a_resume_while_a_probe_is_slow(monkeypa
             browser.active_tab.title = "Changed after pause"
             await session.resume()
             await handle.result()
-        history = session.ctx[HumanHandoff].history
+        history = session.scope[HumanHandoff].history
         assert history[-1].status is HandoffStatus.RESUMED
         assert any("Changed after pause" in change for change in history[-1].changes)
 
@@ -386,7 +385,7 @@ async def test_handoff_context_survives_compaction_and_session_restore():
         _prepare(holder)
         result = await session.run("Log in")
         saved = session.snapshot().to_json()
-        history = session.ctx[HumanHandoff].history
+        history = session.scope[HumanHandoff].history
     assert any(isinstance(event, CompactionAppliedEvent) for event in result.events)
     assert "2FA completed" in "\n".join(
         message.text for message in model.requests[-1].messages
@@ -397,11 +396,11 @@ async def test_handoff_context_survives_compaction_and_session_restore():
     )
     async with agent.session(state=SessionState.from_json(saved)) as restored:
         _prepare(holder)
-        assert restored.ctx[HumanHandoff].history == history
+        assert restored.scope[HumanHandoff].history == history
         await restored.run("Continue")
-        assert restored.ctx[HumanHandoff].history == history
+        assert restored.scope[HumanHandoff].history == history
     async with agent.session() as fresh:
-        assert fresh.ctx[HumanHandoff].history == ()
+        assert fresh.scope[HumanHandoff].history == ()
     assert callback.await_count == 1
 
 
@@ -414,14 +413,14 @@ async def test_handoff_history_is_restored_from_a_new_session_store(tmp_path):
     async with agent.session(id="login") as session:
         _prepare(holder)
         await session.run("Log in")
-        history = session.ctx[HumanHandoff].history
+        history = session.scope[HumanHandoff].history
 
     reopened, model, holder = _agent(
         ["Continued"], callback, store=JsonSessionStore(root=root)
     )
     async with reopened.session(id="login") as session:
         _prepare(holder)
-        assert session.ctx[HumanHandoff].history == history
+        assert session.scope[HumanHandoff].history == history
         assert history[-1].human_note == "2FA confirmed"
         await session.run("Continue")
     assert any(
@@ -435,7 +434,7 @@ async def test_handoff_history_is_bounded_and_known_secrets_are_redacted():
     snapshots = []
 
     async def ask(_request):
-        snapshots.append(session.ctx[HumanHandoff].history)
+        snapshots.append(session.scope[HumanHandoff].history)
         return HumanResponse(note=f"Done {password}")
 
     secrets = Secrets({"pw": Secret(password, domains="example.org")})
@@ -448,7 +447,7 @@ async def test_handoff_history_is_bounded_and_known_secrets_are_redacted():
     async with agent.session() as session:
         _prepare(holder)
         result = await session.run("Log in")
-        history = session.ctx[HumanHandoff].history
+        history = session.scope[HumanHandoff].history
     assert len(history) == 2
     assert isinstance(history, tuple)
     assert [len(snapshot) for snapshot in snapshots] == [0, 1, 2]
@@ -487,13 +486,14 @@ async def test_abort_cancels_the_callback_and_releases_the_handoff(
         assert cancelled.is_set() and not browser.action_lock.locked()
         finished = session.log.last(HandoffFinishedEvent)
         assert finished.status is HandoffStatus.CANCELLED
-        assert session.ctx[HumanHandoff].history[-1].status is HandoffStatus.CANCELLED
-        await session.ctx[Nudges].queue("After abort", key="after", cause_id="after")
+        assert session.scope[HumanHandoff].history[-1].status is HandoffStatus.CANCELLED
+        await session.scope[Nudges].queue("After abort", key="after", cause_id="after")
         assert session.log.last(NudgeQueuedEvent).text == "After abort"
     if persistent:
         async with agent.session(id="abort") as restored:
             assert (
-                restored.ctx[HumanHandoff].history[-1].status is HandoffStatus.CANCELLED
+                restored.scope[HumanHandoff].history[-1].status
+                is HandoffStatus.CANCELLED
             )
 
 

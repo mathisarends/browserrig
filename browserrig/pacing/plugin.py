@@ -1,5 +1,5 @@
-from harnessed import Context, Plugin
-from harnessed.kernel import dependency
+from harnessed import Plugin
+from harnessed.kernel import Scope, needs
 
 from browserrig.browser import Browser
 from browserrig.input import HumanMotor, Motor
@@ -12,11 +12,11 @@ class InputPacing(Plugin, slot="browserrig.pacing"):
     motor to change how input is performed; without this plugin it runs at full speed.
     """
 
-    _browser = dependency(Browser)
+    _browser = needs(Browser)
 
     def __init__(self, motor: Motor | None = None) -> None:
         super().__init__()
         self._motor = motor if motor is not None else HumanMotor()
 
-    async def setup(self, ctx: Context) -> None:
+    async def setup(self, ctx: Scope) -> None:
         ctx.effect(self._browser.input.pace(self._motor))

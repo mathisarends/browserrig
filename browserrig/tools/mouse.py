@@ -1,7 +1,7 @@
 from typing import Annotated, Literal
 
 from harnessed import Inject, Instructions, Plugin, SystemPrompt, ToolResult
-from harnessed.kernel import dependency
+from harnessed.kernel import needs
 from pydantic import Field
 
 from browserrig.browser import Browser, Tab
@@ -39,8 +39,8 @@ class PointerTools(Plugin, needs=(Actions,)):
     Coordinates also reach unreferenced regions, so text-only agents keep them too.
     """
 
-    _browser = dependency(Browser)
-    _observe = dependency(BrowserPerception)
+    _browser = needs(Browser)
+    _observe = needs(BrowserPerception)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)

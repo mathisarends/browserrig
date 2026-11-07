@@ -207,10 +207,12 @@ request. Live model attempts and compaction notifications are transient and are
 not part of run results. Applied compactions remain durable events of their turn.
 `session.stream()` forwards native model request/failure, attempt/retry and
 compaction activity. A request, attempt or compaction finishing does not finish
-the turn; use `TurnFinishedEvent.result` on normal stream exhaustion and release
+the turn; use `TurnResultEvent.result` on normal stream exhaustion and release
 live UI activity in `finally` on cancellation or stream failure.
 
-Browser observations carry their snapshot ID in `Observation.refs`. Hints carry
+Browser observations supply their snapshot ID through `observe(message, source="browser",
+refs=(snapshot.id,))`. `ObservationRecordedEvent` carries `message`, `source` and
+`refs` separately. Hints carry
 their nudge IDs and are acknowledged only by `ObservationsIncludedEvent` for the
 `browser.nudges` source. IDs appearing in ordinary text leave hints queued.
 Receipts carry `refs`, `turn_id`, `step` and `message_id`; observations removed or

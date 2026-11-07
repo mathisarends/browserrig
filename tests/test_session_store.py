@@ -1,12 +1,12 @@
 import asyncio
 
 import pytest
-from harnessed import Observation, PolicyDecision
+from harnessed import PolicyDecision
 from harnessed.errors import ConfigError
 from harnessed.events import (
-    AgentControlChangedEvent,
     ControlState,
     OutputValidatedEvent,
+    SessionControlChangedEvent,
     ToolCallFinishedEvent,
 )
 from harnessed.integrations.json import JsonSessionStore
@@ -46,7 +46,7 @@ async def test_facade_adds_context_without_a_turn_and_restores_duplicate_message
     agent = _agent(model, store=store)
     async with agent.session(id="context" if persistent else None) as session:
         for text in ("Include source URLs.", "Keep it brief.", "Include source URLs."):
-            await session.add_context(text)
+            await session.append_message(UserMessage(text))
         messages = list(session.messages)
         assert all(isinstance(message, UserMessage) for message in messages)
         assert [message.text for message in messages] == [
@@ -91,7 +91,7 @@ async def test_context_added_during_a_request_is_used_by_the_next_turn():
         handle = await session.submit("Inspect")
         await asyncio.wait_for(entered.wait(), 5)
         try:
-            await session.add_context("Use metric units.")
+            await session.append_message(UserMessage("Use metric units."))
             assert all(
                 message.text != "Use metric units."
                 for message in model.requests[0].messages
@@ -116,20 +116,20 @@ async def test_facade_reopens_history_context_and_image_assets_with_a_new_store(
     assert not root.exists()
     async with agent.session(id="conversation") as session:
         image = await session.assets.put(b"screenshot", media_type="image/png")
-        await session.add_context("Remember the page")
+        await session.append_message(UserMessage("Remember the page"))
         assert not initial_model.requests
         assert not session.inbox.pending
         session.observe(
-            Observation(
-                source="browser",
+            UserMessage(
                 content=(TextPart("Page content"), ImageReference(image)),
-            )
+            ),
+            source="browser",
         )
         assert (await session.run("Inspect")).text == "First answer"
         await session.flush()
     saved = await store.load_session("conversation")
     assert saved is not None and saved.revision > 0
-    assert saved.checkpoint.version == 2
+    assert saved.checkpoint.version == 3
 
     model = ScriptedModel(["Continued answer"])
     reopened = _agent(model, store=JsonSessionStore(root=root))
@@ -182,7 +182,7 @@ async def test_paused_done_restores_browser_events_and_structured_finalization(
         plugins=[Done(), Approvals(default=PolicyDecision.ALLOW)],
     )
     async with agent.session(id="paused") as session:
-        session.on(AgentControlChangedEvent, control_changed)
+        session.on(SessionControlChangedEvent, control_changed)
         await session.submit("Return the title", output=Answer, max_steps=3)
         await asyncio.wait_for(entered.wait(), 5)
         pause = asyncio.create_task(session.pause())

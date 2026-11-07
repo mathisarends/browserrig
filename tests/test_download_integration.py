@@ -91,7 +91,7 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
         plugins=[Approvals(default=PolicyDecision.ALLOW)],
     )
     async with agent.session() as session:
-        browser = session.ctx[Browser]
+        browser = session.scope[Browser]
         await evaluate(
             browser.active_tab,
             "(() => {const input=document.createElement('input');input.type='file';"

@@ -34,8 +34,8 @@ async def test_native_recording_cuts_model_waits_across_tabs_and_closure(
         ],
     )
     async with agent.session() as session:
-        browser = session.ctx[Browser]
-        recording = session.ctx[VideoRecording]
+        browser = session.scope[Browser]
+        recording = session.scope[VideoRecording]
         first = browser.active_tab
         await evaluate(first, "document.body.style.background='lime'")
         await asyncio.sleep(0.5)
@@ -115,8 +115,8 @@ async def test_recording_follows_repeated_activation_of_existing_tabs(tmp_path, 
         ],
     )
     async with agent.session() as session:
-        browser = session.ctx[Browser]
-        recording = session.ctx[VideoRecording]
+        browser = session.scope[Browser]
+        recording = session.scope[VideoRecording]
         first = browser.active_tab
         await evaluate(first, "document.body.style.background='lime'")
         await asyncio.sleep(0.5)
@@ -167,7 +167,7 @@ async def test_immediate_session_exit_still_produces_a_video(
         ],
     )
     async with agent.session() as session:
-        recording = session.ctx[VideoRecording]
+        recording = session.scope[VideoRecording]
     assert recording.result is not None
     assert recording.result.path.stat().st_size > 0
     assert recording.result.duration >= 1 / 15

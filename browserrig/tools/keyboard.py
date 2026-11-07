@@ -1,5 +1,5 @@
 from harnessed import Inject, Plugin, ToolError, ToolResult
-from harnessed.kernel import dependency
+from harnessed.kernel import needs
 
 from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind
@@ -15,8 +15,8 @@ from .execution import Actions
 class KeyboardTools(Plugin, needs=(Actions,)):
     """Keyboard input to the current focus, plus typing into a DOM ref when refs exist."""
 
-    _browser = dependency(Browser)
-    _observe = dependency(BrowserPerception)
+    _browser = needs(Browser)
+    _observe = needs(BrowserPerception)
 
     @tool(
         kind=ActionKind.PRESS,

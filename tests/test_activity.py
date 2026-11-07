@@ -1,10 +1,9 @@
 from dataclasses import replace
 
 import pytest
-from harnessed import Agent, Context, Inject, Plugin, ToolResult, ToolStatus
+from harnessed import Agent, Plugin, ToolResult, ToolStatus
 from harnessed.core.errors import SessionFormatError
 from harnessed.events import (
-    AgentControlChangedEvent,
     AssistantMessageEvent,
     CompactionFinishedEvent,
     CompactionStartedEvent,
@@ -13,6 +12,7 @@ from harnessed.events import (
     ModelRequestedEvent,
     ModelRequestFailedEvent,
     ModelRequestOutcome,
+    SessionControlChangedEvent,
     StepEndedEvent,
     StepOutcome,
     StepStartedEvent,
@@ -22,6 +22,7 @@ from harnessed.events import (
     TurnOutcome,
     TurnStartedEvent,
 )
+from harnessed.kernel import Scope, needs
 from harnessed.models import AssistantMessage, ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
@@ -51,7 +52,7 @@ async def test_readiness_ids_cannot_close_model_pause_or_tool_intervals(
     await session.emit(
         AssistantMessageEvent(AssistantMessage("ok"), request_id="request")
     )
-    await session.emit(AgentControlChangedEvent(state=ControlState.PAUSED))
+    await session.emit(SessionControlChangedEvent(state=ControlState.PAUSED))
     await session.emit(_readiness_started("paused"))
     await session.emit(ToolExecutionStartedEvent(call_id="shared"))
     await session.emit(_readiness_started("tool:shared"))
@@ -183,7 +184,7 @@ async def test_turn_end_closes_correlated_activities_but_keeps_pause_open(
     await session.emit(TurnStartedEvent(turn_id="turn"))
     await session.emit(ToolExecutionStartedEvent(call_id="pending"))
     await session.emit(_readiness_started("probe"))
-    await session.emit(AgentControlChangedEvent(state=ControlState.PAUSED))
+    await session.emit(SessionControlChangedEvent(state=ControlState.PAUSED))
     await session.emit(TurnEndedEvent(turn_id="turn", reason=reason))
     intervals = activity.intervals()
     closed = [item for item in intervals if item.kind is not ActivityKind.PAUSED]
@@ -192,7 +193,7 @@ async def test_turn_end_closes_correlated_activities_but_keeps_pause_open(
     assert all(item.outcome.value == reason.value for item in closed)
     pause = next(item for item in intervals if item.kind is ActivityKind.PAUSED)
     assert pause.outcome is ActivityOutcome.RUNNING
-    await session.emit(AgentControlChangedEvent(state=ControlState.ACTIVE))
+    await session.emit(SessionControlChangedEvent(state=ControlState.ACTIVE))
     assert all(
         item.outcome is not ActivityOutcome.RUNNING for item in activity.intervals()
     )
@@ -353,7 +354,10 @@ class _Access(Plugin, needs=(Activity,)):
         super().__init__()
         self.holder = holder
 
-    async def setup(self, _ctx: Context, activity: Inject[Activity]):
+    _setup_activity = needs(Activity)
+
+    async def setup(self, _ctx: Scope):
+        activity = self._setup_activity
         self.holder["activity"] = activity
 
 

@@ -3,7 +3,6 @@ from unittest.mock import Mock
 
 import pytest
 from harnessed import Agent as HarnessedAgent
-from harnessed import PluginOrder, SystemPrompt
 from harnessed.testing import ScriptedModel
 from pydantic import SecretStr, ValidationError
 
@@ -12,7 +11,7 @@ from browserrig import (
     Chrome,
     FileSystemOptions,
     Viewport,
-    browser_kit,
+    browser_pack,
     browser_plugins,
 )
 from browserrig.browser import Connect, Launch
@@ -83,13 +82,12 @@ def test_configured_plugin_is_used_once_across_composition_apis(mode, compositio
             agent = Agent(model=ScriptedModel([]), browser=browser)
         case "kit":
             agent = HarnessedAgent(
-                model=ScriptedModel([]), plugins=[browser_kit(browser=browser)]
+                model=ScriptedModel([]), plugins=[browser_pack(browser=browser)]
             )
         case "flat":
             agent = HarnessedAgent(
                 model=ScriptedModel([]),
                 plugins=browser_plugins(browser=browser),
-                prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
             )
         case "manual":
             agent = HarnessedAgent(model=ScriptedModel([]), plugins=[browser])
@@ -122,7 +120,7 @@ def test_browser_recipe_rejects_low_level_options_with_migration_guidance(
             case "facade":
                 Agent(model=ScriptedModel([]), browser=options)
             case "kit":
-                browser_kit(browser=options)
+                browser_pack(browser=options)
             case "flat":
                 browser_plugins(browser=options)
 

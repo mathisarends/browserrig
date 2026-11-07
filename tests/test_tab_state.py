@@ -281,8 +281,8 @@ class _Watched:
             plugins=[services, TabStripPlugin()],
         )
         async with agent.session() as session:
-            session.ctx[FakeServices].browser.active_tab = self.tab
-            self._ctx = session.ctx
+            session.scope[FakeServices].browser.active_tab = self.tab
+            self._ctx = session.scope
             yield
 
 

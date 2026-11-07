@@ -11,32 +11,47 @@
   describing the page structure, element references and optional screenshots
   provided before each model step. Update recipes, dependencies, examples and
   documentation.
-  Replace `Observe(...)`, `Inject[Observe]`, `dependency(Observe)` and type-based
+  Replace `Observe(...)`, `Inject[Observe]`, `needs(Observe)` and type-based
   plugin exclusions with `BrowserPerception`. The old name is removed without an
   alias. Plugin descriptions and dependency diagnostics use `BrowserPerception`;
   observation events and the `browserrig.observation` plugin slot are unchanged.
 
-- Require a `Chrome` plugin for `Agent(browser=...)`, `browser_kit(browser=...)`
+- Require a `Chrome` plugin for `Agent(browser=...)`, `browser_pack(browser=...)`
   and `browser_plugins(browser=...)`. Replace `browser=Launch(...)` with
   `browser=Chrome.launch(...)` and `browser=Connect(...)` with
   `browser=Chrome.connect(...)`. Remove the top-level `Launch` and `Connect`
   exports; direct `ChromeBrowser(...)` callers can import these low-level
   configuration types from `browserrig.browser`.
 
-- Pin Harnessed and all provider extras to the published 0.12.0 release.
-- Replace `await session.context.set("constraints", "Include source URLs.")`
-  with `await session.add_context("Include source URLs.")`. The native Harnessed
-  session now has one API for adding background without starting a turn or making
-  a model call. Each call appends a user-role text message, including duplicates;
-  there are no keys, replacement or removal operations and no compatibility alias.
-  Await it before starting dependent work. A configured store commits the write
-  before it returns. Contributions survive turns and restoration as conversation
-  history and follow ordinary compaction, which may summarize older text.
-- Remove public `session.context` access. Inspect retained contributions through
-  `session.messages` or `session.snapshot().history`. Plugin-owned named facts,
-  including human-handoff receipts, remain in `session.snapshot().context`.
-  Use `instructions=` for fixed rules and Harnessed's `ContextValue` plugin for
-  changing named facts. Session storage formats are unchanged.
+- Upgrade Harnessed and all provider extras to 0.13.0. Rename `browser_kit()`
+  to `browser_pack()`; it returns native `PluginPack`. Use `PluginPackPromptPolicy`
+  and `pack_path` for resolution and provenance.
+- Replace `session.add_context(text)` and former named context writes with
+  `await session.append_message(UserMessage(text))` (`harnessed.models`). Input is
+  additive and durable, follows normal compaction, and starts no turn. Use
+  `PrepareRequest` hooks for changing, request-only facts.
+- Resolve application services through `session.scope`; import `Scope` from
+  `harnessed.kernel`. Plugin lifetime fields use `needs(T)` / `observes(T)`;
+  setup/teardown injection moves into fields. Tool contexts use `Inject[ToolContext]`.
+  Plugins and runtime hooks receive restricted `SessionContext`.
+- Open event streams with `async with session.stream(...) as run`; iterate `run`
+  and await `run.result()`. Completion-only handles from `submit()` are not streams.
+  Use `session.use(...)` for temporary capabilities and `await session.mount(...)`
+  for manually managed lifetimes. Terminal events are `TurnResultEvent`; control
+  events are `SessionControlChangedEvent`. Observations pass ordinary `UserMessage`
+  values with separate `source=` and `refs=` arguments.
+- Native agents collect plugin instructions by default. Remove `PluginOrder`;
+  preserve `SystemPrompt.from_plugins(format=...)` to choose a format.
+  `SystemPrompt(...)` explicitly omits plugin blocks, with omissions listed by
+  `print(agent.prompt)`.
+- **Storage reset required:** conversation state uses format 2, execution
+  checkpoints and JSON stores format 3, audit envelopes version 5. Older formats
+  are rejected without automatic migration. Back up application-owned data and
+  start new snapshots, stores and audit logs.
+- Human-handoff history persists through feature instruction state and is delivered
+  by its own `PrepareRequest` hook. The removed `DynamicContext` service is no
+  longer used. The `Done` output bridge dispatches by session log identity and
+  restores native output methods after its last activation closes.
 
 ### Added
 
@@ -61,14 +76,14 @@
   captures and a cut manifest, export MP4 through FFmpeg, and expose `--video`
   in the OpenAI example.
 
-- Add `session.ctx[HumanHandoff].history` as an immutable tuple of typed,
+- Add `session.scope[HumanHandoff].history` as an immutable tuple of typed,
   redacted `HandoffReceipt` records. Restore history before the first turn and
   keep JSON serialization and Harnessed's context storage inside the plugin.
 - Expose `HandoffStatus` as a `StrEnum` for receipts, events and human responses.
   Use members such as `HandoffStatus.CANCELLED`; serialized status strings remain
   unchanged. Human responses still accept only `DONE` or `DECLINED`.
 - Add `Chrome.launch(...)` and `Chrome.connect(...)` factories that return configured
-  browser plugins for `Agent(browser=...)`, `browser_kit()`, `browser_plugins()` and
+  browser plugins for `Agent(browser=...)`, `browser_pack()`, `browser_plugins()` and
   explicit Harnessed plugin composition. Configuration is validated immediately;
   browser resources open per session.
 

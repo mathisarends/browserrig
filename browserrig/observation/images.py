@@ -1,11 +1,17 @@
 from dataclasses import dataclass, replace
 from typing import Protocol
 
-from harnessed import Instructions, Observation, Plugin, PluginState, SystemPrompt, hook
+from harnessed import Instructions, Plugin, PluginState, SystemPrompt, hook
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
-from harnessed.kernel import dependency
-from harnessed.models import ImagePart, ImageReference, ModelRequest, TextPart
+from harnessed.kernel import needs
+from harnessed.models import (
+    ImagePart,
+    ImageReference,
+    ModelRequest,
+    TextPart,
+    UserMessage,
+)
 
 from browserrig.events import ObservationCapturedEvent
 
@@ -78,7 +84,7 @@ class ImageContext(Plugin, slot="browserrig.images"):
     """
 
     _state = PluginState(ImageState)
-    _observe = dependency(BrowserPerception)
+    _observe = needs(BrowserPerception)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
@@ -135,11 +141,13 @@ class ImageContext(Plugin, slot="browserrig.images"):
                 replace(
                     observation,
                     content=(
-                        TextPart(str(observation.content)),
+                        TextPart(observation.text),
                         TextPart(_caption(image)),
                         ImagePart(f"data:image/png;base64,{image.image}"),
                     ),
-                )
+                ),
+                source="browser",
+                refs=(snapshot.id,),
             )
         self._note(event)
         return decision
@@ -203,7 +211,7 @@ class ImageContext(Plugin, slot="browserrig.images"):
         text = self._latest_note(images[-1]) if images else ""
         if text and text != self._state.note:
             event.session.observe(
-                Observation(source=_NOTE_SOURCE, content=text, refs=(images[-1].id,))
+                UserMessage(text), source=_NOTE_SOURCE, refs=(images[-1].id,)
             )
         self._state.note = text
 

@@ -4,10 +4,10 @@ from collections import deque
 from contextlib import suppress
 from typing import Any
 
-from harnessed import Context, Plugin, hook
+from harnessed import Plugin, hook
 from harnessed.events import TurnStartedEvent
 from harnessed.hooks import Next
-from harnessed.kernel import dependency
+from harnessed.kernel import Scope, needs
 
 from browserrig.browser import Browser, TabChanged
 from browserrig.core import ActivityKind, BrowserError
@@ -55,7 +55,7 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
     """
 
     events = INPUT_EVENTS + SCENE_EVENTS
-    _browser = dependency(Browser)
+    _browser = needs(Browser)
 
     def __init__(self, *, renderer: IframeRenderer | None = _DEFAULT_RENDERER) -> None:
         super().__init__()
@@ -64,7 +64,7 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
         self._activities: deque[BrowserEvent] = deque()
         self._activity_task: asyncio.Task[None] | None = None
 
-    async def setup(self, ctx: Context) -> None:
+    async def setup(self, ctx: Scope) -> None:
         inputs = self._browser.input
         ctx.effect(inputs.present(Stage(lambda: inputs.action_id)))
         if self.renderer is not None:

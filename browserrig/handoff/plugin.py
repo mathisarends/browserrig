@@ -4,7 +4,6 @@ from typing import Annotated
 from uuid import uuid4
 
 from harnessed import (
-    Context,
     Inject,
     Instructions,
     Plugin,
@@ -14,11 +13,12 @@ from harnessed import (
     ToolContext,
     hook,
 )
-from harnessed.core.prompt.context import DynamicContext
-from harnessed.core.tools import ToolRegistry
-from harnessed.events import AgentControlChangedEvent, ControlState
-from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.kernel import dependency
+from harnessed.core.prompt.plugin_instructions import PluginInstructions
+from harnessed.events import ControlState, SessionControlChangedEvent
+from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
+from harnessed.kernel import Scope, needs
+from harnessed.models import ModelRequest, UserMessage
+from harnessed.services import ToolRegistry
 from pydantic import Field, TypeAdapter, ValidationError
 
 from browserrig.browser import Browser, BrowserEvents
@@ -57,11 +57,7 @@ _INSTRUCTIONS = Instructions(
 )
 
 
-class HumanHandoff(
-    Plugin,
-    provides=True,
-    needs=(ToolRegistry,),
-):
+class HumanHandoff(Plugin, provides=True):
     """Opt-in human control with measured receipts and durable, bounded context.
 
     The async callback owns the host UI and returns only after the human finishes.
@@ -70,10 +66,11 @@ class HumanHandoff(
 
     events = HANDOFF_EVENTS
     _state = PluginState(HandoffState)
-    _browser = dependency(Browser)
-    _events = dependency(BrowserEvents)
-    _observe = dependency(BrowserPerception)
-    _context = dependency(DynamicContext)
+    _tools = needs(ToolRegistry)
+    _browser = needs(Browser)
+    _events = needs(BrowserEvents)
+    _observe = needs(BrowserPerception)
+    _context = needs(PluginInstructions)
 
     def __init__(
         self,
@@ -105,7 +102,7 @@ class HumanHandoff(
     def history(self) -> tuple[HandoffReceipt, ...]:
         """An immutable snapshot of this session's latest, redacted receipts.
 
-        Resolve the mounted plugin with ``session.ctx[HumanHandoff]``. History
+        Resolve the mounted plugin with ``session.scope[HumanHandoff]``. History
         is restored when the session opens and bounded by ``history_limit``.
         """
         return self._state.history
@@ -113,10 +110,10 @@ class HumanHandoff(
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
 
-    async def setup(self, ctx: Context, tools: Inject[ToolRegistry]) -> None:
+    async def setup(self, ctx: Scope) -> None:
         self._state.history = self._read_history()
         # Override the loop's ordinary 30s tool timeout for this mount's human wait.
-        tools.register(
+        self._tools.register(
             self.request_human,
             owner=ctx,
             description=(
@@ -166,7 +163,7 @@ class HumanHandoff(
         reason: Annotated[str, Field(min_length=1, max_length=2000)],
         expected_state: Annotated[str, Field(max_length=1000)] = "",
         *,
-        context: ToolContext,
+        context: Inject[ToolContext],
         nudges: Inject[Nudges | None],
         secrets: Inject[Secrets | None],
     ) -> str:
@@ -262,7 +259,7 @@ class HumanHandoff(
         return receipt.model_dump_json()
 
     async def _record(self, receipt: HandoffReceipt) -> None:
-        # Harnessed 0.12 stores named facts as text. Keep that wire format at
+        # Harnessed 0.13 stores feature instruction state as text. Keep that wire format at
         # this boundary; callers and handoff logic work with typed receipts.
         history = (*self.history, receipt)[-self.history_limit :]
         try:
@@ -279,10 +276,24 @@ class HumanHandoff(
         except ValidationError:
             return ()
 
-    @hook(AgentControlChangedEvent)
+    @hook(PrepareRequest)
+    async def _prepare(
+        self, _event: PrepareRequest, next_: Next[ModelRequest]
+    ) -> ModelRequest:
+        request = await next_()
+        if not self.history:
+            return request
+        return request.append_message(
+            UserMessage(
+                "Recent human handoffs (historical reports; current page observations take "
+                "precedence):\n" + _HISTORY.dump_json(self.history).decode()
+            )
+        )
+
+    @hook(SessionControlChangedEvent)
     async def _control(
         self,
-        event: AgentControlChangedEvent,
+        event: SessionControlChangedEvent,
         nudges: Inject[Nudges | None],
     ) -> None:
         if not self.track_pauses:

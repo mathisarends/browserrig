@@ -5,9 +5,10 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import yaml
-from harnessed import Observation, Plugin, PluginState, SessionLog, hook
+from harnessed import Plugin, PluginState, SessionLog, hook
 from harnessed.events import ObservationsIncludedEvent
-from harnessed.kernel import dependency
+from harnessed.kernel import needs
+from harnessed.models import UserMessage
 
 from browserrig.browser import BrowserEvents
 from browserrig.core import ActionKind, ReadinessStatus
@@ -54,7 +55,7 @@ if TYPE_CHECKING:
 class Nudges(Plugin, slot="browserrig.nudges", provides=True, needs=(SessionLog,)):
     events = NUDGE_EVENTS
     _state = PluginState(NudgeState)
-    _events = dependency(BrowserEvents)
+    _events = needs(BrowserEvents)
 
     def __init__(self, *, max_hints: int = 5, max_chars: int = 2000) -> None:
         super().__init__()
@@ -106,7 +107,7 @@ class Nudges(Plugin, slot="browserrig.nudges", provides=True, needs=(SessionLog,
         self._state.human_control = max(0, self._state.human_control - 1)
         self._state.tabs.clear()
 
-    async def project(self, snapshot: Snapshot) -> Observation:
+    async def project(self, snapshot: Snapshot) -> tuple[UserMessage, tuple[str, ...]]:
         selected, size = [], 0
         for key, event in tuple(self._state.queued.items()):
             expired = (
@@ -124,15 +125,15 @@ class Nudges(Plugin, slot="browserrig.nudges", provides=True, needs=(SessionLog,
             ):
                 selected.append({"id": event.nudge_id, "text": event.text})
                 size += len(event.text)
-        return Observation(
-            source=_SOURCE,
+        return UserMessage(
             content=yaml.safe_dump(
                 {"nudges": selected}, sort_keys=False, allow_unicode=True
             ),
-            refs=tuple(item["id"] for item in selected),
-        )
+        ), tuple(item["id"] for item in selected)
 
-    async def observation(self, snapshot: Snapshot) -> Observation | None:
+    async def observation(
+        self, snapshot: Snapshot
+    ) -> tuple[UserMessage, tuple[str, ...]] | None:
         """Hints for the next step; None while there are none and none were shown last."""
         if snapshot.document_id not in self._state.challenges and _challenge(snapshot):
             self._state.challenges.add(snapshot.document_id)
@@ -144,9 +145,9 @@ class Nudges(Plugin, slot="browserrig.nudges", provides=True, needs=(SessionLog,
                 document_id=snapshot.document_id,
             )
         observation = await self.project(snapshot)
-        shown, self._state.shown = self._state.shown, bool(observation.refs)
+        shown, self._state.shown = self._state.shown, bool(observation[1])
         # One empty list after shown hints marks them as handled; later empty lists add nothing.
-        return observation if observation.refs or shown else None
+        return observation if observation[1] or shown else None
 
     def _remove(self, ids: tuple[str, ...]) -> None:
         self._state.queued = {

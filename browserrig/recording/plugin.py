@@ -4,8 +4,8 @@ import shutil
 from pathlib import Path
 from uuid import uuid4
 
-from harnessed import Context, Plugin, hook
-from harnessed.kernel import dependency
+from harnessed import Plugin, hook
+from harnessed.kernel import Scope, needs
 
 from browserrig.activity import Activity
 from browserrig.browser import Browser
@@ -30,8 +30,8 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
     retained alongside video.mp4. FFmpeg must be available when the session opens.
     """
 
-    _browser = dependency(Browser)
-    _activity = dependency(Activity)
+    _browser = needs(Browser)
+    _activity = needs(Activity)
 
     def __init__(
         self,
@@ -65,7 +65,7 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
         self._binary = ""
         self._captures: dict[str, str] = {}
 
-    async def setup(self, ctx: Context) -> None:
+    async def setup(self, ctx: Scope) -> None:
         binary = shutil.which(self.ffmpeg)
         if binary is None:
             raise BrowserError("VideoRecording requires FFmpeg on PATH or ffmpeg=...")

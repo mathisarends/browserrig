@@ -2,9 +2,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Agent as HarnessedAgent
-from harnessed import Context, Inject, Plugin, PolicyDecision, SessionState
-from harnessed.events import TextDeltaEvent, ToolCallFinishedEvent, TurnFinishedEvent
+from harnessed import Plugin, PolicyDecision, SessionState
+from harnessed.events import TextDeltaEvent, ToolCallFinishedEvent, TurnResultEvent
 from harnessed.integrations.json import JsonSessionStore
+from harnessed.kernel import Scope, needs
 from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
@@ -25,7 +26,10 @@ async def test_connect_plugin_disconnects_without_stopping_external_browser(
     connections = []
 
     class Access(Plugin, needs=(Browser,)):
-        async def setup(self, _ctx: Context, browser: Inject[Browser]):
+        _setup_browser = needs(Browser)
+
+        async def setup(self, _ctx: Scope):
+            browser = self._setup_browser
             connections.append(browser)
 
     async with ChromeBrowser() as owner:
@@ -60,7 +64,10 @@ async def test_facade_restores_saved_state_and_owns_a_fresh_browser_per_session(
     browsers = []
 
     class Access(Plugin, needs=(Browser,)):
-        async def setup(self, _ctx: Context, browser: Inject[Browser]):
+        _setup_browser = needs(Browser)
+
+        async def setup(self, _ctx: Scope):
+            browser = self._setup_browser
             browsers.append(browser)
 
     model = ScriptedModel(["First answer", "Restored answer"])
@@ -146,20 +153,20 @@ async def test_facade_streams_commentary_and_returns_a_typed_answer_after_done(s
         browser=Chrome.launch(url=site),
         plugins=[Approvals(default=PolicyDecision.ALLOW), Done()],
     )
-    async with agent.session() as session:
-        events = [
-            event
-            async for event in session.stream(
-                "Open the other page and report its title and URL.",
-                output=PageAnswer,
-                max_steps=5,
-            )
-        ]
+    async with (
+        agent.session() as session,
+        session.stream(
+            "Open the other page and report its title and URL.",
+            output=PageAnswer,
+            max_steps=5,
+        ) as run,
+    ):
+        events = [event async for event in run]
     assert [event.text for event in events if isinstance(event, TextDeltaEvent)] == [
         "I will open the other page.",
         "The other page is open.",
     ]
-    assert isinstance(events[-1], TurnFinishedEvent)
+    assert isinstance(events[-1], TurnResultEvent)
     result = events[-1].result
     assert result.completed
     assert result.output == PageAnswer(title="Other", url=site + "/other")

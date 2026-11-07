@@ -3,15 +3,12 @@ import asyncio
 import pytest
 from harnessed import (
     Agent,
-    Context,
-    Inject,
     Plugin,
-    PluginOrder,
     PolicyDecision,
-    SystemPrompt,
     ToolCall,
 )
 from harnessed.events import ToolExecutionFinishedEvent
+from harnessed.kernel import Scope, needs
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
@@ -160,7 +157,10 @@ async def _perform(site, name, arguments):
     count = 0
 
     class Access(Plugin, needs=(Browser,)):
-        async def setup(self, _ctx: Context, browser: Inject[Browser]):
+        _setup_browser = needs(Browser)
+
+        async def setup(self, _ctx: Scope):
+            browser = self._setup_browser
             holder["browser"] = browser
 
     async def respond(request):
@@ -174,7 +174,6 @@ async def _perform(site, name, arguments):
             yield ModelChunk(text="Gesture completed")
 
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(browser=Chrome.launch(url=site + "/gestures")),

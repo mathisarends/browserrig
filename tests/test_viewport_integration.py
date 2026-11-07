@@ -2,8 +2,9 @@ import json
 import re
 
 import pytest
-from harnessed import Inject, Plugin, PolicyDecision, ToolCall
+from harnessed import Plugin, PolicyDecision, ToolCall
 from harnessed.events import ToolCallFinishedEvent
+from harnessed.kernel import needs
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
@@ -73,7 +74,10 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
         <button id=pinned>Pinned</button>"""
 
     class Prepare(Plugin, needs=(Actions,)):
-        async def setup(self, actions: Inject[Actions]):
+        _setup_actions = needs(Actions)
+
+        async def setup(self):
+            actions = self._setup_actions
             holder["actions"] = actions
             tab = actions.browser.active_tab
             await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
@@ -161,7 +165,10 @@ async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
         Nested target</button></div></div>"""
 
     class Prepare(Plugin, needs=(Actions,)):
-        async def setup(self, actions: Inject[Actions]):
+        _setup_actions = needs(Actions)
+
+        async def setup(self):
+            actions = self._setup_actions
             holder["actions"] = actions
             await evaluate(
                 actions.browser.active_tab,
@@ -227,7 +234,10 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(
     holder = {}
 
     class Prepare(Plugin, needs=(Actions,)):
-        async def setup(self, actions: Inject[Actions]):
+        _setup_actions = needs(Actions)
+
+        async def setup(self):
+            actions = self._setup_actions
             holder["actions"] = actions
             origin = site.replace("127.0.0.1", "localhost") if cross_origin else site
             await evaluate(
@@ -290,7 +300,10 @@ async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target
     holder = {}
 
     class Prepare(Plugin, needs=(Actions,)):
-        async def setup(self, actions: Inject[Actions]):
+        _setup_actions = needs(Actions)
+
+        async def setup(self):
+            actions = self._setup_actions
             holder["actions"] = actions
             await evaluate(
                 actions.browser.active_tab,

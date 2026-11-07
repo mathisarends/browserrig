@@ -1,9 +1,8 @@
 from typing import assert_never
 from uuid import uuid4
 
-from harnessed import Context, Plugin, PluginState, SessionLog, ToolStatus, hook
+from harnessed import Plugin, PluginState, SessionLog, ToolStatus, hook
 from harnessed.events import (
-    AgentControlChangedEvent,
     AssistantMessageEvent,
     CompactionFinishedEvent,
     CompactionOutcome,
@@ -12,12 +11,13 @@ from harnessed.events import (
     ModelRequestedEvent,
     ModelRequestFailedEvent,
     ModelRequestOutcome,
+    SessionControlChangedEvent,
     StepEndedEvent,
     ToolExecutionFinishedEvent,
     ToolExecutionStartedEvent,
     TurnEndedEvent,
 )
-from harnessed.kernel import dependency
+from harnessed.kernel import Scope, needs
 
 from browserrig.core import ActivityKind, ActivityOutcome
 from browserrig.events import (
@@ -43,9 +43,9 @@ _PAUSE = ActivityKey(ActivityKind.PAUSED)
 class Activity(Plugin, slot="browserrig.activity", provides=True):
     events = ACTIVITY_EVENTS
     _state = PluginState(ActivityState)
-    _log = dependency(SessionLog)
+    _log = needs(SessionLog)
 
-    async def setup(self, ctx: Context) -> None:
+    async def setup(self, ctx: Scope) -> None:
         ctx.effect(self._close_all)
 
     def intervals(
@@ -227,8 +227,8 @@ class Activity(Plugin, slot="browserrig.activity", provides=True):
             reason=event.reason,
         )
 
-    @hook(AgentControlChangedEvent)
-    async def _on_control(self, event: AgentControlChangedEvent) -> None:
+    @hook(SessionControlChangedEvent)
+    async def _on_control(self, event: SessionControlChangedEvent) -> None:
         if event.state == ControlState.PAUSED:
             await self._start(_PAUSE, cause_id=self._state.epoch)
         elif event.state == ControlState.ACTIVE:

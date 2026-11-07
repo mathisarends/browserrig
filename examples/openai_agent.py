@@ -91,7 +91,9 @@ async def main() -> None:
             ],
         )
         async with agent.session() as session:
-            recording = session.ctx[VideoRecording] if args.video is not None else None
+            recording = (
+                session.scope[VideoRecording] if args.video is not None else None
+            )
             result = await session.run(args.task, max_steps=20, token_budget=80000)
             print(result.text)
         if recording is not None and recording.result is not None:

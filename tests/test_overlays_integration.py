@@ -127,7 +127,7 @@ async def test_input_visualization_renders_native_events_and_restores_after_navi
         plugins=[Chrome.launch(url=site), InputVisualization()],
     )
     async with agent.session() as session:
-        browser = session.ctx[Browser]
+        browser = session.scope[Browser]
         tab = browser.active_tab
         await wait_for_page(tab)
         await browser.mouse.move_to(Point(x=300, y=200))
@@ -180,7 +180,7 @@ async def test_event_only_visualization_has_no_iframe_or_observation_dependency(
         plugins=[Chrome.launch(url=site), InputVisualization(renderer=None)],
     )
     async with agent.session() as session:
-        browser = session.ctx[Browser]
+        browser = session.scope[Browser]
         await browser.mouse.move_to(Point(x=100, y=100))
         assert not (await browser.active_tab.frame_tree()).child_frames
 
@@ -201,7 +201,7 @@ async def test_renderer_layout_remains_transparent_and_highlights_german_keys(
         ],
     )
     async with agent.session() as session:
-        browser = session.ctx[Browser]
+        browser = session.scope[Browser]
         tab = browser.active_tab
         await wait_for_page(tab)
         await browser.mouse.move_to(Point(x=200, y=200))
@@ -239,8 +239,8 @@ async def test_video_records_overlay_without_clean_screenshot_gaps(tmp_path, sit
         ],
     )
     async with agent.session() as session:
-        tab = session.ctx[Browser].active_tab
-        recording = session.ctx[VideoRecording]
+        tab = session.scope[Browser].active_tab
+        recording = session.scope[VideoRecording]
         await tab.overlays.mount(html="<style>body{margin:0;background:red}</style>")
         await asyncio.sleep(0.25)
         assert _pixel(await screenshot(tab)) != (255, 0, 0)

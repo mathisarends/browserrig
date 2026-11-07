@@ -2,10 +2,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from harnessed import (
-    Kit,
-    KitPromptPolicy,
     Plugin,
-    PluginOrder,
+    PluginPack,
+    PluginPackPromptPolicy,
     PromptFormat,
     SystemPrompt,
 )
@@ -35,7 +34,7 @@ from .tools import (
 
 
 def browser_plugins(
-    *plugins: PluginLike | Kit | None,
+    *plugins: PluginLike | PluginPack | None,
     browser: Chrome | None = None,
     without: Iterable[type[Plugin]] = (),
 ) -> list[PluginLike]:
@@ -47,24 +46,24 @@ def browser_plugins(
     such as `(FileTools,)` for an agent without local files. `None`
     entries are skipped, so optional plugins can be written inline.
     """
-    kit = browser_kit(browser=browser).without(*without)
+    pack = browser_pack(browser=browser).without(*without)
     # The flat API leaves prompt configuration to its caller.
-    composition = Kit("browserrig.application", plugins=[kit, *plugins])
-    return list(composition.resolve(prompt=KitPromptPolicy.OMIT).plugins)
+    composition = PluginPack("browserrig.application", plugins=[pack, *plugins])
+    return list(composition.resolve(prompt=PluginPackPromptPolicy.OMIT).plugins)
 
 
-def browser_kit(*, browser: Chrome | None = None) -> Kit:
+def browser_pack(*, browser: Chrome | None = None) -> PluginPack:
     """Browser defaults with Markdown instructions in configured plugin-list order.
 
     Pass a configured `Chrome` plugin, such as `Chrome.launch(url=...)` or
     `Chrome.connect(endpoint=...)`.
-    Resources open only when the kit is mounted in a session.
+    Resources open only when the pack is mounted in a session.
     """
     if browser is not None and not isinstance(browser, Chrome):
         raise TypeError(
             "browser must be a Chrome plugin; use Chrome.launch(...) or Chrome.connect(...)"
         )
-    return Kit(
+    return PluginPack(
         name="browserrig",
         plugins=[
             Activity(),
@@ -95,7 +94,6 @@ def browser_kit(*, browser: Chrome | None = None) -> Kit:
             ContextCompaction(trigger=WindowRatio()),
         ],
         prompt=SystemPrompt.from_plugins(
-            order=PluginOrder.AS_LISTED,
             format=PromptFormat.MARKDOWN,
         ),
     )

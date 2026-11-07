@@ -1,5 +1,5 @@
 from harnessed import Inject, Plugin, ToolResult
-from harnessed.kernel import dependency
+from harnessed.kernel import needs
 
 from browserrig.browser import Tab
 from browserrig.core import ActionKind, BrowserError
@@ -11,7 +11,7 @@ from .execution import Actions
 
 
 class FormTools(Plugin, needs=(Actions,)):
-    _observe = dependency(BrowserPerception)
+    _observe = needs(BrowserPerception)
 
     @tool(
         kind=ActionKind.SELECT,
