@@ -85,15 +85,15 @@ agent = Agent(
 )
 ```
 
-`browser_kit()` publishes the defaults as a native Harnessed `Kit`, including
+`browser_pack()` publishes the defaults as a native Harnessed `PluginPack`, including
 its Markdown prompt strategy. It collects complete instruction blocks in the
 final plugin-list order, including additional application plugins:
 
 ```python
 from harnessed import Agent
-from browserrig import FileTools, browser_kit
+from browserrig import FileTools, browser_pack
 
-browser = browser_kit().without(FileTools)
+browser = browser_pack().without(FileTools)
 agent = Agent(
     model=model,
     instructions="Complete the task.",
@@ -102,28 +102,28 @@ agent = Agent(
 print(agent.describe())
 ```
 
-Direct plugins override kit defaults by slot; sibling kits with conflicting slots
+Direct plugins override pack defaults by slot; sibling packs with conflicting slots
 need an explicit override. `agent.describe()` reports origins, replacements and
 exclusions without opening Chrome. `browser_plugins(*plugins, browser=..., without=...)`
-remains available when a resolved flat list is needed. With that API, pass
-`prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED)` explicitly;
-import `PluginOrder` and `SystemPrompt` from `harnessed`.
+remains available when a resolved flat list is needed. Native Harnessed agents
+collect plugin instructions by default. Pass `SystemPrompt.from_plugins(format=...)`
+only when adding fixed content or choosing a format.
 Individual capabilities such as `Chrome`, `Readiness`, `BrowserPerception`, `Actions`, tool
 plugins, `Nudges`, `Activity`, and `TerminalEvents` are also available directly.
-`browser_plugins()` uses Harnessed's public `Kit.resolve()` with
-`KitPromptPolicy.OMIT`, omitting kit prompt strategies recursively while retaining
+`browser_plugins()` uses Harnessed's public `PluginPack.resolve()` with
+`PluginPackPromptPolicy.OMIT`, omitting pack prompt strategies recursively while retaining
 selected plugins' instructions and explicit `PromptRenderer` recipes. To inspect
-the original kit's provenance before flattening:
+the original pack's provenance before flattening:
 
 ```python
-from harnessed import KitPromptPolicy
+from harnessed import PluginPackPromptPolicy
 
-resolved = browser.resolve(prompt=KitPromptPolicy.INCLUDE)
+resolved = browser.resolve(prompt=PluginPackPromptPolicy.INCLUDE)
 print(resolved.description)
 ```
 
-`resolved.plugins` is a flat tuple. Its separate `description` retains kit paths,
-replacements and removals; passing the original kit to `Agent` preserves those
+`resolved.plugins` is a flat tuple. Its separate `description` retains pack paths,
+replacements and removals; passing the original pack to `Agent` preserves those
 scopes in the agent's own description.
 
 See [composing browser agents](browser-composition.md) for the explicit plugin API:
@@ -133,16 +133,18 @@ screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` and
 `ImageContext(UntilCompaction())`. Capture, rendering, image retention and
 tool capabilities can be selected independently. `ScreenshotTrigger.ON_REQUEST`
 captures only after a screenshot tool call. Configure extraction through `DomCapture(...)`.
-Shared plugin services use `dependency(T)` from `harnessed.kernel` and `provides=True`; explicit
-`needs=(...)` declarations control waiting, teardown, and restart when a provider changes.
-Dependency fields bind values and declare lifetime requirements. Call-scoped
-`Inject[T]` parameters still require explicit `needs` for lifetime requirements. Optional services resolve
-on each hook invocation and remain optional unless explicitly listed in `needs`.
+Shared plugin services use `needs(T)` for required lifetime bindings and
+`observes(T)` for optional bindings from `harnessed.kernel`. Both bind before setup
+and restart the activation when their provider changes. Move setup/teardown
+injection into these fields. Tool and hook `Inject[T]` parameters stay call-scoped;
+tool context parameters must explicitly use `Inject[ToolContext]`. Plugins and
+runtime hooks use `SessionContext` from `harnessed.services`; application code
+resolves services through `session.scope`.
 Tool decorators declare model-facing descriptions independently of developer docstrings.
 
 Plugin recipes replay their explicit constructor arguments for every activation.
 Constructors validate configuration; acquire resources in `setup` and register
-cleanup with `ctx.effect(...)`. Keep mount-owned mutable data in `PluginState`.
+cleanup with `scope.effect(...)`. Keep mount-owned mutable data in `PluginState`.
 Direct tool calls need an active instance. In isolated tests, use
 `harnessed.testing.mount_plugin(recipe, services=...)` to obtain one.
 
@@ -208,8 +210,8 @@ print(result.text)
 Omit `Done()` to retain Harnessed's native behavior, where a text response without
 tool calls ends the turn. `browser_plugins()` does not include it by default.
 It also works with a plain Harnessed `Agent` or a runtime mount through
-`session.use(Done(), section_delivery=SectionDelivery.CONTEXT)`; closing the mount
-restores the native completion and output behavior.
+`async with session.use(Done(), section_delivery=SectionDelivery.CONTEXT): ...`.
+Exiting the block restores the native completion and output behavior.
 
 For a validated final format, pass the native `output=` contract when starting the
 task. The schema is shown to the agent during work, but progress text remains
@@ -240,14 +242,16 @@ all generated text, including the final answer; structured answers are available
 on the terminal event's `result.output`.
 
 ```python
-from harnessed.events import TextDeltaEvent, TurnFinishedEvent
+from harnessed.events import TextDeltaEvent, TurnResultEvent
 
 async with agent.session() as session:
-    async for event in session.stream("Compare the products. Return a Markdown table."):
-        if isinstance(event, TextDeltaEvent):
-            print(event.text, end="", flush=True)
-        elif isinstance(event, TurnFinishedEvent):
-            result = event.result
+    async with session.stream("Compare the products. Return a Markdown table.") as run:
+        async for event in run:
+            if isinstance(event, TextDeltaEvent):
+                print(event.text, end="", flush=True)
+            elif isinstance(event, TurnResultEvent):
+                result = event.result
+        result = await run.result()
 ```
 
 The work phase, the `done` call, the final response, and any correction attempts all
@@ -277,13 +281,15 @@ This reserves the last available step for a text summary: a limit of 20 permits
 at most 19 tool steps. Per-run `max_steps=` overrides determine the effective
 limit. Summaries remain opt-in because they consume that allowance. A reserved
 summary returns `completed=False` and `StopReason.MAX_STEPS`, and cannot execute
-tools. For structured output, read `.text` on incomplete results; `.output` raises
-`OutputUnavailable`. Native `PreStep` hooks expose `max_steps`, `remaining_steps`,
+tools. For structured output, read `.text` on incomplete results;
+`require_output()` raises `OutputUnavailable` unless the turn completed. `.output`
+remains available for inspecting an already validated value. Native `PreStep` hooks
+expose `max_steps`, `remaining_steps`,
 `is_last_step` and `is_final_step`; manually constructed events require `max_steps=`.
 
 ## System prompts and optional MCP tools
 
-`browserrig.Agent(instructions="...")` prepends caller text to the browser kit's
+`browserrig.Agent(instructions="...")` prepends caller text to the browser pack's
 Markdown prompt. Use `instructions=None` to omit caller text. Complete plugin
 blocks follow the final configured plugin-list order: observations, element refs,
 page-content trust and screenshots; then coordinates and action chains; then files
@@ -294,13 +300,12 @@ Put policy plugins and `Done()` at their intended positions in the list; put
 resolved content and origins. To choose another format, pass an explicit strategy:
 
 ```python
-from harnessed import PluginOrder, PromptFormat, SystemPrompt
+from harnessed import PromptFormat, SystemPrompt
 from browserrig import Agent
 
 agent = Agent(
     instructions="Complete the requested browser task using the observed page state.",
     prompt=SystemPrompt.from_plugins(
-        order=PluginOrder.AS_LISTED,
         format=PromptFormat.XML,
     ),
 )
@@ -318,9 +323,9 @@ runs once per selected plugin when constructing the agent, before sessions open.
 Use `Instructions.from_file(...)` or `Instructions.from_factory(...)` inside the
 returned document for session-owned content and effects.
 
-`prompt=` overrides the kit's strategy; an explicit document must use
-`SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED)` whenever a selected plugin
-overrides `instructions()`, including an override returning an empty document.
+`prompt=` overrides the pack's strategy. `SystemPrompt.from_plugins(...)` collects
+selected plugin instructions; a document constructed with `SystemPrompt(...)`
+omits them. `print(agent.prompt)` reports omitted plugins.
 Fixed content passed to `from_plugins(...)` follows caller text and precedes all
 plugin blocks. `None` content parts and plugin entries are skipped. The outer
 document's format controls all nested content.
@@ -334,17 +339,15 @@ sections: `section_delivery=SectionDelivery.CONTEXT` delivers guidance until the
 mount closes or suspends; `SectionDelivery.IGNORE` skips it. Import `SectionDelivery`
 from `harnessed`. The fixed system prompt stays unchanged.
 
-When upgrading from 0.9.0, replace `system_prompt="..."` with `instructions="..."`
-and document configuration with `prompt=SystemPrompt.from_plugins(...)`.
-The kit's own prompt strategy replaces `browser_instructions()`, kit fragments
-and instruction references. Replace descriptor attributes and decorated providers
-with the synchronous method above. Existing state-format 1 conversation snapshots
-and version 3 audit envelopes remain compatible.
+Harnessed 0.13 uses state format 2, checkpoint/JSON-store format 3 and audit
+envelope version 5. Earlier data is rejected without automatic migration. Back
+up older application data and start new snapshots, stores and audit logs. See
+[upgrade notes](../CHANGELOG.md) for all Browserrig API changes.
 
 Install the optional MCP client with `uv sync --locked --extra openai --extra mcp`.
-Harnessed and all provider extras are pinned to the published 0.12.0 release,
-including the native `session.add_context(...)` API. Add MCP servers through the
-native plugin:
+Harnessed and all provider extras are pinned to the published 0.13.0 release,
+including `session.append_message(UserMessage(...))`. Add MCP servers through
+the native plugin:
 
 ```python
 from harnessed.plugins.mcp import MCP
@@ -357,7 +360,7 @@ agent = Agent(
 `MCP.stdio("catalog", command=..., args=[...])` starts a local server instead.
 Connections belong to each session, tool names are prefixed (for example
 `catalog__search`), and existing approval policies apply. See the
-[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.12.0/docs/guides/mcp.md).
+[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.13.0/docs/guides/mcp.md).
 
 Harnessed closes failed MCP transports, hides their tools, wakes pending
 calls and drains owned tasks. Failed operations are not retried automatically;
@@ -371,12 +374,12 @@ used only by tool or hook parameters. Custom plugins must do the same:
 
 ```python
 from harnessed import Plugin
-from harnessed.kernel import dependency
+from harnessed.kernel import needs
 from browserrig import Browser
 
 
 class Extension(Plugin):
-    browser = dependency(Browser)
+    browser = needs(Browser)
 ```
 
 `Agent` keeps Harnessed's strict startup validation by default. Missing
@@ -388,14 +391,15 @@ For plugins deliberately waiting for services added later, pass
 `plugin_validation=PluginValidation.WARN` to `Agent`, importing
 `PluginValidation` from `harnessed`. This emits `PluginDependencyWarning` with the
 same structured issues and retains waiting plugins for later activation; setup
-failures still propagate. Add services through native `session.use()` as usual.
+failures still propagate. Use `async with session.use(...)` for scoped services or
+`await session.mount(...)` when managing the handle manually.
 For standalone kernel compositions, call `await ctx.settle()` followed by
 `ctx.plugin_diagnostics()` to inspect waiting plugins, including blocked dependents.
 
 ## Saving and restoring sessions
 
 Sessions stay in memory by default. To save conversations automatically and
-reopen them by application-owned ID, configure Harnessed 0.12.0's native store:
+reopen them by application-owned ID, configure Harnessed 0.13.0's native store:
 
 ```python
 from pathlib import Path
@@ -464,11 +468,12 @@ references; `session.assets.read(ref)` retrieves them. It holds no browser, plug
 state or event log: a restored session launches a fresh browser, and queued hints
 and activity intervals start empty. JavaScript tools remain blocked whenever
 the restored agent is configured with secrets.
-Conversation snapshots retain format **1**; execution checkpoints and JSON store
-envelopes use format **2**. Old JSONL stores, raw `SessionState` JSON and unreleased
-format-1 checkpoints cannot be opened as new store files. Keep legacy data separate;
+Conversation snapshots use format **2**; execution checkpoints and JSON store
+envelopes use format **3**, and audit envelopes use version **5**. Earlier formats,
+old JSONL stores and raw `SessionState` JSON cannot be opened as new store files.
+Keep legacy data separate;
 there is no automatic migration. See the
-[Harnessed sessions guide](https://github.com/mathisarends/harnessed/blob/v0.12.0/docs/guides/sessions.md)
+[Harnessed sessions guide](https://github.com/mathisarends/harnessed/blob/v0.13.0/docs/guides/sessions.md)
 for atomic repository adapters, recovery and storage details.
 
 Custom models expose immutable `GenerationSettings` from `harnessed.models`.
@@ -483,10 +488,12 @@ on `ModelRequestedEvent.model`. See the
 Inside an `async with agent.session() as session:` block:
 
 ```python
+from harnessed.models import UserMessage
+
 handle = await session.submit("Inspect this page.")
 await session.pause()
-await session.steer("Focus on the navigation.")
-await session.add_context("Do not submit forms.")
+await session.inbox.steer("Focus on the navigation.")
+await session.append_message(UserMessage("Do not submit forms."))
 await session.resume()
 result = await handle.result()
 ```
@@ -496,7 +503,7 @@ Pausing waits for a complete step boundary and leaves Chromium running.
 immediately. Resuming observes the current page again. Activity tracking uses
 events rather than an LLM decorator.
 
-`await session.add_context(content: str)` is the session API for contributing
+`await session.append_message(UserMessage(content))` is the session API for contributing
 background without starting a turn, waking an idle agent or invoking the model.
 Each call appends a user-role text message, including repeated text. Requests
 assembled after the write see it; an in-flight request is unchanged. Await it
@@ -506,10 +513,11 @@ the contribution is committed before the method returns.
 Contributions remain in conversation history across turns and session restoration,
 subject to ordinary compaction; older contributions may be summarized. Inspect
 retained input through `session.messages` or `session.snapshot().history`.
-The former `session.context.set(name, value)` and `remove(name)` APIs are removed:
-use `add_context(value)` for additive background. There are no keys, replacement,
-removal or deduplication. Use agent `instructions=` for fixed rules, or Harnessed's
-`ContextValue` plugin for changing named facts.
+The former `session.context.set(name, value)`, `add_context(text)` and
+`remove(name)` APIs are removed. Use `append_message(UserMessage(value))` for
+additive background and `instructions=` for fixed rules. For changing facts,
+write a `PrepareRequest` hook that returns `request.append_message(UserMessage(...))`;
+these messages affect only the current request and are not durable conversation input.
 
 ```powershell
 uv run --env-file .env --extra openai python -m examples.controls

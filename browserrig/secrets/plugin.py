@@ -7,9 +7,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 from harnessed import (
-    Context,
     Instructions,
-    Observation,
     Plugin,
     PluginState,
     SessionLog,
@@ -25,8 +23,8 @@ from harnessed.hooks import (
     Priority,
     ReviewToolResult,
 )
-from harnessed.kernel import dependency
-from harnessed.models import TextPart
+from harnessed.kernel import Scope, needs
+from harnessed.models import TextPart, UserMessage
 
 from browserrig.browser import Browser, BrowserEvents
 from browserrig.core import ActionKind, BrowserToolMetadata, SecretError
@@ -49,7 +47,6 @@ if TYPE_CHECKING:
 
 # Only these tools resolve placeholders, and only in their `text` argument.
 _TYPING_TOOLS = frozenset({"type_text", "send_keys"})
-_SOURCE = "browser.secrets"
 
 
 _INSTRUCTIONS = Instructions(
@@ -86,7 +83,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
 
     events = SECRET_EVENTS
     _state = PluginState(SecretsState)
-    _events = dependency(BrowserEvents)
+    _events = needs(BrowserEvents)
 
     def __init__(self, secrets: Mapping[str, Secret]) -> None:
         super().__init__()
@@ -107,7 +104,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
 
-    async def setup(self, ctx: Context) -> None:
+    async def setup(self, ctx: Scope) -> None:
         for name, secret in self._secrets.items():
             if not secret.rotating:
                 self._learn(name, await resolve(name, secret.value))
@@ -126,7 +123,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
             name for name, secret in self._secrets.items() if secret.allows(origin)
         )
 
-    def project(self, snapshot: Snapshot) -> Observation | None:
+    def project(self, snapshot: Snapshot) -> UserMessage | None:
         """List the secrets usable on the observed page; values are never part of it."""
         names = self.available(snapshot.url)
         if not names and not self._state.listed:
@@ -139,8 +136,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
             if names
             else "No secrets are available for this page."
         )
-        return Observation(
-            source=_SOURCE,
+        return UserMessage(
             content=content,
         )
 

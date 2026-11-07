@@ -14,7 +14,7 @@ from .completion import Done
 from .composition import (  # smelt: ignore[SMT106] -- public facade
     ContextCompaction,
     WindowRatio,
-    browser_kit,
+    browser_pack,
     browser_plugins,
 )
 from .core import HandoffStatus, Point
@@ -158,6 +158,6 @@ __all__ = [
     "WindowRatio",
     "TerminalEvents",
     "browser_plugins",
-    "browser_kit",
+    "browser_pack",
     "wait_for_page",
 ]

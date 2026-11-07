@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass, field
 
-from harnessed import Context
+from harnessed.kernel import Scope
 
 from browserrig.core import DocumentId, Region, TargetId
 
@@ -17,7 +17,7 @@ class BrowserPerceptionState:
     screenshot_region: Region | None = None
     screenshot_zoom: float = 1
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-    context: Context | None = None
+    context: Scope | None = None
     # The last page state handed to the session, and whether the last request still showed it.
     sent_key: str | None = None
     sent_ref: str | None = None

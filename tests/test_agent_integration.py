@@ -1,15 +1,12 @@
 import pytest
 from harnessed import (
     Agent,
-    Context,
-    Inject,
     Plugin,
-    PluginOrder,
     PolicyDecision,
-    SystemPrompt,
     ToolCall,
 )
 from harnessed.events import ModelRequestedEvent, ObservationsIncludedEvent
+from harnessed.kernel import Scope, needs
 from harnessed.models import ImagePart, ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel, call
@@ -43,7 +40,10 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
     captures = 0
 
     class CountScreenshots(Plugin, needs=(Browser,)):
-        async def setup(self, _ctx: Context, browser: Inject[Browser]):
+        _setup_browser = needs(Browser)
+
+        async def setup(self, _ctx: Scope):
+            browser = self._setup_browser
             page_type = type(browser.active_tab.cdp.page)
             original = page_type.capture_screenshot
 
@@ -64,7 +64,6 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
         ]
     )
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[
             *browser_plugins(browser=Chrome.launch(url=site)),
@@ -141,7 +140,6 @@ async def test_model_tools_yaml_and_activity(site):
 
     model = CallbackModel(respond)
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[*browser_plugins(), Approvals(default=PolicyDecision.ALLOW)],
     )
@@ -192,11 +190,13 @@ async def test_dom_screenshots_are_native_images(site):
 
     # Observe a real canvas page using ordinary DOM observations and screenshots.
     class Start(Plugin, needs=(Browser,)):
-        async def setup(self, _ctx: Context, browser: Inject[Browser]):
+        _setup_browser = needs(Browser)
+
+        async def setup(self, _ctx: Scope):
+            browser = self._setup_browser
             await browser.active_tab.navigate(site + "/canvas")
 
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[
             Chrome(),
@@ -241,7 +241,6 @@ async def test_no_progress_hint_is_derived_from_events(site):
         yield ModelChunk(tool_call=result)
 
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(

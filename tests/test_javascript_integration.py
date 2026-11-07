@@ -2,7 +2,7 @@ import json
 
 import pytest
 from cdpify.exceptions import CDPCommandError
-from harnessed import Agent, PluginOrder, PolicyDecision, SystemPrompt
+from harnessed import Agent, PolicyDecision
 from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
@@ -40,7 +40,6 @@ async def test_agent_javascript_shell_retains_main_world_state_awaits_and_report
         ]
     )
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[
             *browser_plugins(browser=Chrome.launch(url=url)),
@@ -61,7 +60,7 @@ async def test_agent_javascript_shell_retains_main_world_state_awaits_and_report
         }
         assert "Error: shell failure" in replies[2].text
         assert replies[3].text == "JavaScript result:\n1"
-        tab = session.ctx[Browser].active_tab
+        tab = session.scope[Browser].active_tab
         assert await evaluate(tab, "document.title") == "From JavaScript"
         assert await evaluate(tab, "typeof window.shellMarker") == "undefined"
         finished = [

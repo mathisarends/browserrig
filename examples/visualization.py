@@ -55,10 +55,10 @@ async def main() -> None:
         )
         async with agent.session() as session:
             walkthrough = VisualWalkthrough(
-                session.ctx[Browser], session.ctx, directory, url
+                session.scope[Browser], session.scope, directory, url
             )
             await walkthrough.run()
-            result = await session.ctx[VideoRecording].finish()
+            result = await session.scope[VideoRecording].finish()
         shutil.copyfile(result.path, directory / "demo.mp4")
         compact = Agent(
             model=ScriptedModel([]),
@@ -70,7 +70,9 @@ async def main() -> None:
             plugins=[InputVisualization(renderer=renderer)],
         )
         async with compact.session() as session:
-            small = VisualWalkthrough(session.ctx[Browser], session.ctx, directory, url)
+            small = VisualWalkthrough(
+                session.scope[Browser], session.scope, directory, url
+            )
             await small.compact()
         shots = walkthrough.shots + small.shots
         (directory / "manifest.json").write_text(

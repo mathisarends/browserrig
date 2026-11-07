@@ -3,8 +3,9 @@ import io
 import json
 
 import pytest
-from harnessed import Inject, Plugin, PolicyDecision, ToolCall
+from harnessed import Plugin, PolicyDecision, ToolCall
 from harnessed.events import ModelRequestedEvent, ToolExecutionFinishedEvent
+from harnessed.kernel import needs
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel
@@ -30,7 +31,10 @@ async def test_typing_shortcuts_stream_and_storage(site, coordinates):
     output = io.StringIO()
 
     class Access(Plugin, needs=(Browser,)):
-        async def setup(self, browser: Inject[Browser]):
+        _setup_browser = needs(Browser)
+
+        async def setup(self):
+            browser = self._setup_browser
             holder["browser"] = browser
 
     agent = Agent(
@@ -73,7 +77,10 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
     output = io.StringIO()
 
     class Access(Plugin, needs=(Browser,)):
-        async def setup(self, browser: Inject[Browser]):
+        _setup_browser = needs(Browser)
+
+        async def setup(self):
+            browser = self._setup_browser
             holder["browser"] = browser
 
     agent = Agent(
@@ -128,7 +135,10 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
     holder = {}
 
     class Panels(Plugin, needs=(Browser,)):
-        async def setup(self, browser: Inject[Browser]):
+        _setup_browser = needs(Browser)
+
+        async def setup(self):
+            browser = self._setup_browser
             holder["browser"] = browser
             tab = holder["tab"] = browser.active_tab
             await evaluate(
@@ -202,7 +212,10 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
     output = io.StringIO()
 
     class Access(Plugin, needs=(Actions,)):
-        async def setup(self, actions: Inject[Actions]):
+        _setup_actions = needs(Actions)
+
+        async def setup(self):
+            actions = self._setup_actions
             holder["actions"] = actions
 
     agent = Agent(

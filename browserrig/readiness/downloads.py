@@ -1,6 +1,6 @@
 from harnessed import Plugin, hook
 from harnessed.hooks import Next
-from harnessed.kernel import dependency
+from harnessed.kernel import needs
 
 from browserrig.browser import Browser
 from browserrig.files import DownloadState
@@ -12,7 +12,7 @@ from .plugin import Readiness
 class DownloadReadiness(Plugin, needs=(Readiness,)):
     """Include active downloads in the same readiness budget as page activity."""
 
-    _browser = dependency(Browser)
+    _browser = needs(Browser)
 
     @hook(CheckReadiness)
     async def _check(

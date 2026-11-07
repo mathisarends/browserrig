@@ -4,15 +4,12 @@ import pytest
 from cdpify.exceptions import CDPCommandError
 from harnessed import (
     Agent,
-    Context,
-    Inject,
     Plugin,
-    PluginOrder,
     PolicyDecision,
-    SystemPrompt,
     ToolCall,
 )
 from harnessed.events import ToolExecutionFinishedEvent
+from harnessed.kernel import Scope, needs
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
@@ -93,9 +90,12 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
     count = 0
 
     class Prepare(Plugin, needs=(Browser, Actions)):
-        async def setup(
-            self, _ctx: Context, browser: Inject[Browser], actions: Inject[Actions]
-        ):
+        _setup_browser = needs(Browser)
+        _setup_actions = needs(Actions)
+
+        async def setup(self, _ctx: Scope):
+            browser = self._setup_browser
+            actions = self._setup_actions
             holder.update(browser=browser, actions=actions)
             await wait_for_page(browser.active_tab)
             origin = site.replace("127.0.0.1", "localhost") if cross else site
@@ -141,7 +141,6 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
             yield ModelChunk(text="Done")
 
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(

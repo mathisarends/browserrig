@@ -4,8 +4,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 from cdpify.exceptions import CDPCommandError
-from harnessed import Agent, Context, Plugin
+from harnessed import Agent, Plugin
 from harnessed.events import ModelRequestedEvent
+from harnessed.kernel import Scope
 from harnessed.models import ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
@@ -157,7 +158,7 @@ async def test_session_records_tabs_and_edits_before_browser_cleanup(
     )
     assert not list(tmp_path.iterdir())
     async with agent.session() as session:
-        recording = session.ctx[VideoRecording]
+        recording = session.scope[VideoRecording]
         await session.emit(TabActivatedEvent(target_id="first"))
         browser.active_tab = second
         await session.emit(TabActivatedEvent(target_id="second"))
@@ -200,11 +201,11 @@ async def test_finish_is_idempotent_and_reusing_agent_isolated(tmp_path, monkeyp
         ],
     )
     async with agent.session() as session:
-        first = await session.ctx[VideoRecording].finish()
-        assert await session.ctx[VideoRecording].finish() is first
+        first = await session.scope[VideoRecording].finish()
+        assert await session.scope[VideoRecording].finish() is first
         await session.emit(TabActivatedEvent(target_id="first"))
     async with agent.session() as session:
-        second = await session.ctx[VideoRecording].finish()
+        second = await session.scope[VideoRecording].finish()
     assert first.path != second.path
     assert len(edits) == 2
     assert tab.cdp.page.start_screen_recording.await_count == 2
@@ -252,7 +253,7 @@ async def test_session_exception_finalizes_open_activity(
     )
     with pytest.raises(ValueError, match="application failed"):
         async with agent.session() as session:
-            recording = session.ctx[VideoRecording]
+            recording = session.scope[VideoRecording]
             recording_clock.now = 101.0
             await session.emit(
                 ModelRequestedEvent(
@@ -289,7 +290,7 @@ async def test_session_with_only_waits_retains_a_final_view(
         ],
     )
     async with agent.session() as session:
-        recording = session.ctx[VideoRecording]
+        recording = session.scope[VideoRecording]
         recording_clock.now += elapsed
     assert recording.result.original_duration == pytest.approx(elapsed)
     assert recording.result.duration == pytest.approx(1 / 30)
@@ -327,7 +328,7 @@ class _BrowserService(Plugin):
         self.browser = browser
         self.calls = calls
 
-    async def setup(self, ctx: Context):
+    async def setup(self, ctx: Scope):
         ctx.provide(Browser, self.browser)
         ctx.effect(lambda: self.calls.append("browser-close"))
 

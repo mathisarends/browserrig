@@ -6,8 +6,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent, Context, Inject, Plugin, hook
+from harnessed import Agent, Plugin, hook
 from harnessed.hooks import Next
+from harnessed.kernel import Scope, needs
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
@@ -35,7 +36,10 @@ class Access(Plugin, needs=(Readiness,)):
         super().__init__()
         self.holder = holder
 
-    async def setup(self, _ctx: Context, readiness: Inject[Readiness]):
+    _setup_readiness = needs(Readiness)
+
+    async def setup(self, _ctx: Scope):
+        readiness = self._setup_readiness
         self.holder["readiness"] = readiness
 
 
@@ -194,7 +198,7 @@ async def test_document_discovered_during_sync_or_dispatch_uses_initial_policy_a
         plugins=[FakeChrome(holder), Readiness(options=_fast_options()), Selection()],
     )
     async with agent.session() as session:
-        readiness, tab = session.ctx[Readiness], holder["browser"].active_tab
+        readiness, tab = session.scope[Readiness], holder["browser"].active_tab
         await readiness.wait(tab)
 
         async def sync():
@@ -216,7 +220,7 @@ async def test_navigation_dispatches_execute_once_each_and_do_not_share_a_readon
         plugins=[FakeChrome(holder), Readiness(options=_fast_options(timeout=0.2))],
     )
     async with agent.session() as session:
-        readiness, tab = session.ctx[Readiness], holder["browser"].active_tab
+        readiness, tab = session.scope[Readiness], holder["browser"].active_tab
         commands = [AsyncMock(), AsyncMock()]
         reports = await asyncio.gather(
             *(
@@ -245,7 +249,9 @@ async def test_cancelling_a_dispatch_cancels_its_owned_work():
     )
     async with agent.session() as session:
         task = asyncio.create_task(
-            session.ctx[Readiness].wait(holder["browser"].active_tab, dispatch=dispatch)
+            session.scope[Readiness].wait(
+                holder["browser"].active_tab, dispatch=dispatch
+            )
         )
         await asyncio.wait_for(entered.wait(), 5)
         task.cancel()
@@ -285,8 +291,8 @@ async def test_native_policy_selection_and_waterfall_are_removed_with_the_plugin
         plugins=[FakeChrome(holder), Readiness(options=options)],
     )
     async with agent.session() as session:
-        extension = await session.use(ApplicationReadiness())
-        readiness, tab = session.ctx[Readiness], holder["browser"].active_tab
+        extension = await session.mount(ApplicationReadiness())
+        readiness, tab = session.scope[Readiness], holder["browser"].active_tab
         report = await readiness.wait(tab)
         assert report.timed_out and "Application data" in report.reason
         assert chosen == ["initial"]
@@ -312,7 +318,7 @@ async def test_download_timeout_is_delivered_to_observation_without_another_wait
                 Download(id="download", filename="test.pdf", url="https://example.org"),
             )
         )
-        readiness, tab = session.ctx[Readiness], browser.active_tab
+        readiness, tab = session.scope[Readiness], browser.active_tab
         report = await readiness.wait(tab, phase=ReadinessPhase.AFTER_ACTION)
         assert report.timed_out and "download" in report.reason
         command = AsyncMock()
@@ -347,7 +353,7 @@ async def test_active_downloads_can_finish_during_the_shared_wait():
                 (),
             ]
         )
-        report = await session.ctx[Readiness].wait(browser.active_tab)
+        report = await session.scope[Readiness].wait(browser.active_tab)
         assert report.status == "ready" and browser.downloads.await_count == 2
 
 
@@ -383,7 +389,7 @@ async def test_successive_checks_share_the_remaining_budget_until_observation(
         ],
     )
     async with agent.session() as session:
-        readiness, tab = session.ctx[Readiness], holder["browser"].active_tab
+        readiness, tab = session.scope[Readiness], holder["browser"].active_tab
         first = await readiness.wait(tab, phase=ReadinessPhase.ACTION)
         second = await readiness.wait(tab, phase=ReadinessPhase.AFTER_ACTION)
         assert first.status == second.status == "ready"

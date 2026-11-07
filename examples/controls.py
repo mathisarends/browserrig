@@ -5,6 +5,7 @@ import asyncio
 import os
 
 from harnessed import PolicyDecision
+from harnessed.models import UserMessage
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
@@ -29,10 +30,10 @@ async def main() -> None:
         handle = await session.submit(args.task)
         await session.pause()  # Wait for the current complete step, if already running.
         print("Paused:", session.status)
-        await session.steer(
+        await session.inbox.steer(
             "Pay particular attention to the navigation and contact information."
         )
-        await session.add_context("Do not submit forms.")
+        await session.append_message(UserMessage("Do not submit forms."))
         await session.resume()
         print((await handle.result()).text)
         # Also available: await session.stop() and await session.abort().

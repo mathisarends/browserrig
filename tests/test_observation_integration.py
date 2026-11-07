@@ -4,8 +4,9 @@ import re
 from io import BytesIO
 
 import pytest
-from harnessed import Inject, Plugin, PolicyDecision, ToolCall
+from harnessed import Plugin, PolicyDecision, ToolCall
 from harnessed.events import ToolExecutionFinishedEvent
+from harnessed.kernel import needs
 from harnessed.models import ImagePart, ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
@@ -379,7 +380,10 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
     holder = {}
 
     class Access(Plugin, needs=(Browser,)):
-        async def setup(self, browser: Inject[Browser]):
+        _setup_browser = needs(Browser)
+
+        async def setup(self):
+            browser = self._setup_browser
             holder["browser"] = browser
 
     step = 0

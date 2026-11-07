@@ -1,3 +1,4 @@
+import asyncio
 import json
 from dataclasses import replace
 
@@ -5,24 +6,25 @@ import pytest
 from harnessed import (
     Agent,
     Plugin,
-    PluginOrder,
     PolicyDecision,
     SectionDelivery,
     StopReason,
-    SystemPrompt,
     ToolStatus,
     tool,
 )
+from harnessed.core.runtime.output import OutputHandler
 from harnessed.errors import OutputUnavailable, OutputValidationError
 from harnessed.events import (
     ApprovalRequestedEvent,
     AssistantMessageEvent,
     OutputValidatedEvent,
     TextDeltaEvent,
-    TurnFinishedEvent,
+    TurnResultEvent,
 )
+from harnessed.kernel import needs
 from harnessed.models import ModelChunk, ModelInfo, ModelUsage
 from harnessed.plugins import AgentLoop, Approvals, FinalStepPolicy
+from harnessed.services import SessionContext
 from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel, Field
 
@@ -80,15 +82,14 @@ async def test_commentary_and_tools_stream_before_done_and_a_separate_final_answ
         ]
     )
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Done(), _Work(performed)],
     )
-    async with agent.session() as session:
-        events = [
-            event
-            async for event in session.stream("Return the result as CSV.", max_steps=5)
-        ]
+    async with (
+        agent.session() as session,
+        session.stream("Return the result as CSV.", max_steps=5) as run,
+    ):
+        events = [event async for event in run]
     assert performed == ["inspect"]
     assert [event.text for event in events if isinstance(event, TextDeltaEvent)] == [
         "I will start with the page.",
@@ -97,7 +98,7 @@ async def test_commentary_and_tools_stream_before_done_and_a_separate_final_answ
         "title,count\nItem,1",
     ]
     result = events[-1].result
-    assert isinstance(events[-1], TurnFinishedEvent)
+    assert isinstance(events[-1], TurnResultEvent)
     assert result.completed and result.text == "title,count\nItem,1"
     assert len(model.requests) == 5
     assert model.requests[-1].tools == ()
@@ -130,7 +131,6 @@ async def test_structured_output_applies_only_to_the_final_response(native):
         info=ModelInfo("test", supports_structured_output=native),
     )
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Done(), _Work([])],
     )
@@ -165,7 +165,6 @@ async def test_invalid_final_output_uses_native_validation_and_correction(native
         info=ModelInfo("test", supports_structured_output=native),
     )
     result = await Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Done()],
     ).run("Task", output=_Answer)
@@ -182,7 +181,6 @@ async def test_invalid_final_output_still_obeys_the_native_retry_limit():
         [call("done", success=False), call("final_answer", title="Item", count=0)]
     )
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Done(), AgentLoop(output_retries=0)],
     )
@@ -194,7 +192,6 @@ async def test_invalid_final_output_still_obeys_the_native_retry_limit():
 @pytest.mark.parametrize("success", [False, True])
 async def test_reported_task_success_is_independent_of_turn_completion(success):
     result = await Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel([call("done", success=success), "Final report"]),
         plugins=[Done()],
     ).run("Task")
@@ -208,7 +205,6 @@ async def test_reported_task_success_is_independent_of_turn_completion(success):
 async def test_denied_done_does_not_enter_finalization():
     model = ScriptedModel([call("done", success=True), "Still working."])
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Done(), Approvals(deny=["done"], default=PolicyDecision.ALLOW)],
     )
@@ -230,7 +226,6 @@ async def test_done_must_be_alone_and_mixed_batches_do_not_execute_work(first):
     )
     model = ScriptedModel([mixed, call("done", success=True), "Final"])
     result = await Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Done(), _Work(performed)],
     ).run("Task")
@@ -247,7 +242,6 @@ async def test_application_tools_cannot_execute_after_done_even_if_model_calls_t
     performed = []
     model = ScriptedModel([call("done", success=True), call("inspect"), "Final"])
     result = await Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Done(), _Work(performed)],
     ).run("Task")
@@ -261,7 +255,6 @@ async def test_finalization_does_not_request_approval_for_hallucinated_actions()
     performed = []
     model = ScriptedModel([call("done", success=True), call("mutate"), "Final"])
     result = await Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Done(), _Work(performed)],
     ).run("Task")
@@ -276,7 +269,6 @@ async def test_step_limits_do_not_claim_completion_or_invent_structured_output(
 ):
     model = ScriptedModel([call("done", success=True) if with_done else "Working."])
     result = await Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Done()],
     ).run("Task", output=_Answer, max_steps=1)
@@ -291,7 +283,6 @@ async def test_token_budget_remains_authoritative():
         [[ModelChunk(text="Working."), ModelChunk(usage=ModelUsage(10, 5))]]
     )
     result = await Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Done()],
     ).run("Task", token_budget=10)
@@ -305,7 +296,6 @@ async def test_optional_limit_summary_remains_incomplete_and_unstructured(with_d
         [call("done", success=True) if with_done else "Working.", "Partial summary"]
     )
     result = await Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Done(), AgentLoop(final_step=FinalStepPolicy.SUMMARIZE)],
     ).run("Task", output=_Answer, max_steps=2)
@@ -328,7 +318,6 @@ async def test_each_turn_uses_its_own_completion_and_output_contract():
         ]
     )
     async with Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Done()],
     ).session() as session:
@@ -351,13 +340,57 @@ async def test_runtime_mount_and_removal_restore_native_completion_and_output():
         ]
     )
     async with Agent(model=model).session() as session:
-        handle = await session.use(Done(), section_delivery=SectionDelivery.CONTEXT)
+        handle = await session.mount(Done(), section_delivery=SectionDelivery.CONTEXT)
         first = await session.run("Plugin task")
         await handle.aclose()
         second = await session.run("Native task", output=_Answer)
     assert first.completed and first.text == "Plugin answer"
     assert second.completed and second.output.title == "Native answer"
     assert [tool.name for tool in model.requests[-1].tools] == ["final_answer"]
+
+
+async def test_overlapping_done_sessions_isolate_native_output_and_cleanup():
+
+    native_prepare, native_validate = OutputHandler.prepare, OutputHandler.validate
+    first_model = ScriptedModel(["Progress", call("done", success=True), "First"])
+    second_model = ScriptedModel(["Progress", call("done", success=True), "Second"])
+    plain_model = ScriptedModel([call("final_answer", title="Native", count=1)])
+    async with (
+        Agent(model=first_model).session() as first,
+        Agent(model=second_model).session() as second,
+        Agent(model=plain_model).session() as plain,
+    ):
+        first_mount = await first.mount(Done(), section_delivery=SectionDelivery.IGNORE)
+        async with second.use(Done(), section_delivery=SectionDelivery.IGNORE):
+            first_result, plain_result = await asyncio.gather(
+                first.run("First task"), plain.run("Plain task", output=_Answer)
+            )
+            assert first_result.text == "First" and first_result.completed
+            assert plain_result.require_output() == _Answer(title="Native", count=1)
+            await first_mount.aclose()
+            second_result = await second.run("Second task")
+            assert second_result.text == "Second" and second_result.completed
+            assert len(second_model.requests) == 3
+        assert OutputHandler.prepare is native_prepare
+        assert OutputHandler.validate is native_validate
+
+
+async def test_done_bridge_is_released_after_session_startup_failure():
+
+    class Broken(Plugin):
+        context = needs(SessionContext)
+
+        async def setup(self):
+            raise RuntimeError("Startup failed")
+
+    native_prepare, native_validate = OutputHandler.prepare, OutputHandler.validate
+    agent = Agent(model=ScriptedModel([]), plugins=[Done(), Broken()])
+    with pytest.raises(ExceptionGroup) as caught:
+        async with agent.session():
+            pytest.fail("Startup should fail")
+    assert "Startup failed" in repr(caught.value)
+    assert OutputHandler.prepare is native_prepare
+    assert OutputHandler.validate is native_validate
 
 
 def test_browser_facade_accepts_the_opt_in_plugin_without_changing_defaults():

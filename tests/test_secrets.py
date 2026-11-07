@@ -8,16 +8,14 @@ from unittest.mock import AsyncMock
 import pytest
 from harnessed import (
     Agent,
-    Context,
     Inject,
     Plugin,
-    PluginOrder,
     PolicyDecision,
-    SystemPrompt,
     ToolResult,
     tool,
 )
 from harnessed.events import InboxAddedEvent, UserMessageEvent
+from harnessed.kernel import Scope, needs
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from PIL import Image
@@ -285,7 +283,10 @@ def _agent(secrets, *, model, plugins=()):
     holder = {}
 
     class Capture(Plugin, needs=(Secrets,)):
-        async def setup(self, _ctx: Context, mounted: Inject[Secrets]):
+        _setup_mounted = needs(Secrets)
+
+        async def setup(self, _ctx: Scope):
+            mounted = self._setup_mounted
             holder["secrets"] = mounted
 
     # The fake browser also produces events that tests emit through it.
@@ -294,7 +295,6 @@ def _agent(secrets, *, model, plugins=()):
 
     allow = Approvals(default=PolicyDecision.ALLOW)
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=[Chrome(holder), secrets, Capture(), allow, *plugins],
     )
@@ -427,7 +427,7 @@ async def test_project_lists_names_for_allowed_origins_only():
         secrets = holder["secrets"]
         assert secrets.project(snapshot("https://other.example/")) is None
         listed = secrets.project(snapshot("https://example.org/login"))
-        assert listed is not None and listed.source == "browser.secrets"
+        assert listed is not None
         assert "Secrets for example.org: pw, otp" in listed.content
         assert PASSWORD not in listed.content
         assert secrets.project(snapshot("http://example.org/")).content == (
@@ -450,11 +450,13 @@ async def test_observe_redacts_with_secrets_mounted_after_it():
     holder = {}
 
     class Hold(Plugin, needs=(BrowserPerception,)):
-        async def setup(self, _ctx: Context, observe: Inject[BrowserPerception]):
+        _setup_observe = needs(BrowserPerception)
+
+        async def setup(self, _ctx: Scope):
+            observe = self._setup_observe
             holder["observe"] = observe
 
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["done"]),
         plugins=[
             FakeChrome(holder),

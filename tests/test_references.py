@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from harnessed import Agent, Plugin, PluginOrder, SystemPrompt, ToolError
+from harnessed import Agent, Plugin, ToolError
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
@@ -252,17 +252,17 @@ async def test_dom_tools_reject_backend_refs_before_any_input(tool):
     async with _observed(_Backend()) as env:
         with pytest.raises(ToolError, match="requires a DOM element"):
             if tool == "select":
-                await env.ctx[_Forms].select_option(
+                await env.scope[_Forms].select_option(
                     "shape/a", "Choice", actions=env.actions
                 )
             elif tool == "date":
-                await env.ctx[_Forms].set_date(
+                await env.scope[_Forms].set_date(
                     "shape/a", "2026-11-01", actions=env.actions
                 )
             elif tool == "type":
-                await env.ctx[_Keys].type_text("shape/a", "Text", actions=env.actions)
+                await env.scope[_Keys].type_text("shape/a", "Text", actions=env.actions)
             else:
-                await env.ctx[_Uploads].upload_files(
+                await env.scope[_Uploads].upload_files(
                     "shape/a", ["file.txt"], actions=env.actions
                 )
         env.tab.dispatch_mouse.assert_not_awaited()
@@ -277,8 +277,8 @@ async def test_dom_tools_reject_backend_refs_before_any_input(tool):
 async def test_backend_refs_use_normal_mouse_and_keyboard_and_end_action_chains():
     async with _observed(_Backend()) as env:
         original = env.observe.snapshot
-        click = await env.ctx[_Pointer].click("shape/a", actions=env.actions)
-        typed = await env.ctx[_Keys].send_keys(text="Hi", actions=env.actions)
+        click = await env.scope[_Pointer].click("shape/a", actions=env.actions)
+        typed = await env.scope[_Keys].send_keys(text="Hi", actions=env.actions)
         events = env.tab.dispatch_mouse.await_args_list
         assert [
             call.args[0] for call in events if call.args[0] != MouseEventKind.MOVED
@@ -310,7 +310,7 @@ async def test_hover_change_uses_backend_fingerprint_and_prevents_the_click():
                 backend.revision += 1
 
         env.tab.dispatch_mouse.side_effect = moved
-        result = await env.ctx[_Pointer].click("shape/a", actions=env.actions)
+        result = await env.scope[_Pointer].click("shape/a", actions=env.actions)
         assert result.break_chain and "Hover changed" in result.content
         assert env.tab.dispatch_mouse.await_count > 0
         assert all(
@@ -470,7 +470,6 @@ class _Handle:
 async def _observed(backend):
     holder, events = {}, []
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["Done"]),
         plugins=[
             FakeChrome(holder),
@@ -499,13 +498,13 @@ async def _observed(backend):
         tab.cancel_drag = AsyncMock()
         tab.cursor_style = AsyncMock(return_value=None)
         tab.emit = AsyncMock(side_effect=events.append)
-        observe = session.ctx[BrowserPerception]
+        observe = session.scope[BrowserPerception]
         await observe.capture()
         yield SimpleNamespace(
             browser=browser,
             tab=tab,
             observe=observe,
-            ctx=session.ctx,
-            actions=session.ctx[Actions],
+            scope=session.scope,
+            actions=session.scope[Actions],
             events=events,
         )

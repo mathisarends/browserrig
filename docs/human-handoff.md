@@ -77,7 +77,7 @@ Applications inspect typed records through the mounted plugin:
 ```python
 async with agent.session() as session:
     await session.run("Continue after login")
-    handoff = session.ctx[HumanHandoff]
+    handoff = session.scope[HumanHandoff]
     history = handoff.history  # tuple[HandoffReceipt, ...]
     if history and history[-1].status is HandoffStatus.CANCELLED:
         print("Handoff cancelled", history[-1].human_note)
@@ -90,9 +90,9 @@ first turn; retaining a tuple does not change it when new handoffs finish.
 
 The plugin serializes these records at the Harnessed storage and model-input
 boundary. The tool returns one JSON receipt, and changes to recent history are
-delivered as additional model-input messages. The latest history survives
+delivered by a `PrepareRequest` hook as request-only user messages. The latest history survives
 compaction independently of its summary. The fixed system prompt is unchanged.
-Application code does not need a context key, JSON parsing or a `DynamicContext`
+Application code does not need a context key, JSON parsing or an SDK persistence
 service. This retains handoff reports; it does not restore browser cookies or an
 authenticated browser session.
 

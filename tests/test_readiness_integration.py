@@ -2,7 +2,7 @@ import asyncio
 from contextlib import suppress
 
 import pytest
-from harnessed import Agent, PluginOrder, SystemPrompt
+from harnessed import Agent
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
@@ -85,7 +85,6 @@ async def readiness_server():
 
 async def test_delayed_click_navigation_settles_the_destination(readiness_site):
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["Done"]),
         plugins=browser_plugins(
             browser=Chrome.launch(url=readiness_site),
@@ -93,14 +92,14 @@ async def test_delayed_click_navigation_settles_the_destination(readiness_site):
         ),
     )
     async with agent.session() as session:
-        browser, observe = session.ctx[Browser], session.ctx[BrowserPerception]
+        browser, observe = session.scope[Browser], session.scope[BrowserPerception]
         await observe.capture()
 
         async def click(_tab):
             await browser.mouse.click(Point(x=60, y=30))
             return Effect("Clicked.")
 
-        await session.ctx[Actions].run(kind=ActionKind.CLICK, operation=click)
+        await session.scope[Actions].run(kind=ActionKind.CLICK, operation=click)
         snapshot = await observe.capture()
         assert snapshot.url == readiness_site + "/slow"
         assert snapshot.text == "Destination ready"
@@ -137,7 +136,6 @@ async def test_navigation_command_itself_is_bounded_before_the_response_commits(
     readiness_site,
 ):
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=ScriptedModel(["Done"]),
         plugins=browser_plugins(
             Readiness(options=_options(timeout=0.5, navigation_min_ms=0)),
@@ -146,7 +144,7 @@ async def test_navigation_command_itself_is_bounded_before_the_response_commits(
         ),
     )
     async with agent.session() as session:
-        observe = session.ctx[BrowserPerception]
+        observe = session.scope[BrowserPerception]
         await observe.capture()
 
         async def navigate(tab):
@@ -154,7 +152,7 @@ async def test_navigation_command_itself_is_bounded_before_the_response_commits(
             return Effect("Navigated.")
 
         async with asyncio.timeout(2):
-            result = await session.ctx[Actions].run(
+            result = await session.scope[Actions].run(
                 kind=ActionKind.NAVIGATE, operation=navigate
             )
             snapshot = await observe.capture()
@@ -241,7 +239,6 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
 ):
     model = ScriptedModel(["Done"])
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=model,
         plugins=browser_plugins(
             Readiness(options=_options(timeout=0.5, action_min_ms=0)),
@@ -250,7 +247,7 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
         ),
     )
     async with agent.session() as session:
-        browser, observe = session.ctx[Browser], session.ctx[BrowserPerception]
+        browser, observe = session.scope[Browser], session.scope[BrowserPerception]
         await observe.capture()
 
         async def start_ticker(tab):
@@ -259,7 +256,7 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
             )
             return Effect("Ticker started.")
 
-        result = await session.ctx[Actions].run(
+        result = await session.scope[Actions].run(
             kind=ActionKind.CLICK, operation=start_ticker
         )
         assert result.break_chain and "degraded" in result.text
@@ -283,7 +280,7 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
 
         # Continuous activity must not permanently prevent deliberate input on
         # controls delivered in the degraded observation.
-        result = await session.ctx[Actions].run(
+        result = await session.scope[Actions].run(
             kind=ActionKind.CLICK, operation=interact
         )
         assert result.break_chain

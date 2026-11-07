@@ -2,12 +2,12 @@
 
 Harnessed `Agent` is the composition root. Browserrig plugins own session state,
 tools and hooks; ordinary Python strategies implement capture, rendering,
-readiness and action-chain decisions. Browserrig targets Harnessed 0.12.0.
+readiness and action-chain decisions. Browserrig targets Harnessed 0.13.0.
 
 ## A browser agent with screenshots
 
 ```python
-from harnessed import Agent, PluginOrder, SystemPrompt
+from harnessed import Agent
 from browserrig import (
     Actions, Activity, BrowserPerception, Chrome, DomCapture, DomRenderer,
     FormTools, ImageContext, KeyboardTools, NavigationTools,
@@ -18,7 +18,6 @@ from browserrig import (
 agent = Agent(
     model=model,
     instructions="Complete the browser task.",
-    prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
     plugins=[
         Chrome.launch(url=url),
         Readiness(),
@@ -85,7 +84,7 @@ to select an existing tab; its URL and browser-wide download policy are preserve
 `endpoint` and `headers` accept strings or Pydantic `SecretStr` values and are
 stored as secrets.
 
-`Agent`, `browser_kit()` and `browser_plugins()` accept a configured `Chrome`
+`Agent`, `browser_pack()` and `browser_plugins()` accept a configured `Chrome`
 plugin through `browser=`. For direct `ChromeBrowser(...)` use, import the
 low-level `Launch` and `Connect` configuration types from `browserrig.browser`.
 
@@ -401,7 +400,7 @@ flood the durable log with probe events.
 
 ## Native stream events
 
-Consume `session.stream(...)` inside `agent.session()`. There is no Browserrig
+Open `async with session.stream(...) as run` inside `agent.session()`. There is no Browserrig
 projection layer or output-profile switch. Own events use the existing SDK:
 
 ```python

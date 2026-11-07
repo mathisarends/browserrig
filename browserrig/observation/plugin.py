@@ -2,10 +2,8 @@ import hashlib
 from typing import Annotated
 
 from harnessed import (
-    Context,
     Inject,
     Instructions,
-    Observation,
     Plugin,
     PluginState,
     SystemPrompt,
@@ -15,7 +13,8 @@ from harnessed import (
 )
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.kernel import dependency
+from harnessed.kernel import Scope, needs
+from harnessed.models import UserMessage
 from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab
@@ -67,9 +66,9 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
 
     events = (ObservationCapturedEvent,)
     _state = PluginState(BrowserPerceptionState)
-    _browser = dependency(Browser)
-    _events = dependency(BrowserEvents)
-    _readiness = dependency(Readiness)
+    _browser = needs(Browser)
+    _events = needs(BrowserEvents)
+    _readiness = needs(Readiness)
 
     def __init__(
         self,
@@ -92,7 +91,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         self.renderer = renderer
         self.screenshots = screenshots if screenshots is not None else Screenshots()
 
-    async def setup(self, ctx: Context) -> None:
+    async def setup(self, ctx: Scope) -> None:
         # Secrets is looked up per capture, so it redacts wherever it sits in the plugins.
         self._state.context = ctx
 
@@ -300,11 +299,9 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             )
             return ToolResult(content.render())
 
-    def project(self, snapshot: Snapshot) -> Observation:
+    def project(self, snapshot: Snapshot) -> UserMessage:
         """Build the redacted text snapshot shared by text and image delivery."""
-        observation = Observation(
-            source="browser", content=self._render(snapshot), refs=(snapshot.id,)
-        )
+        observation = UserMessage(content=self._render(snapshot))
         secrets = self._secrets()
         return secrets.redact(observation) if secrets else observation
 
@@ -349,26 +346,30 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         key = self._page_key(snapshot)
         # Text-only pages the model still sees are not repeated; images are always delivered.
         if snapshot.image is not None or not (state.visible and state.sent_key == key):
-            observations.append(self._observation(snapshot))
+            observations.append(
+                (self._observation(snapshot), "browser", (snapshot.id,))
+            )
             state.sent_key, state.sent_ref, state.visible = key, snapshot.id, False
         if (
             nudges is not None
             and (hints := await nudges.observation(snapshot)) is not None
         ):
-            observations.append(hints)
+            observations.append((hints[0], "browser.nudges", hints[1]))
         secrets = self._secrets()
         if secrets is not None:
             listed = secrets.project(snapshot)
             if listed is not None:
-                observations.append(listed)
-        for observation in observations:
+                observations.append((listed, "browser.secrets", ()))
+        for observation, source, refs in observations:
             # Nudges quote page text too; nothing reaches the session unredacted.
             event.session.observe(
-                secrets.redact(observation) if secrets else observation
+                secrets.redact(observation) if secrets else observation,
+                source=source,
+                refs=refs,
             )
         return await next_()
 
-    def _observation(self, snapshot: Snapshot) -> Observation:
+    def _observation(self, snapshot: Snapshot) -> UserMessage:
         """The snapshot, or only its changes while the last complete one is still in context."""
         state = self._state
         text = self._render(snapshot)
@@ -380,9 +381,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             changes = delta(base[0], plain)
             # Many changes read better as a complete observation, which becomes the new base.
             if len(changes) <= len(text) // 2:
-                observation = Observation(
-                    source="browser", content=changes, refs=(snapshot.id,)
-                )
+                observation = UserMessage(content=changes)
                 secrets = self._secrets()
                 return secrets.redact(observation) if secrets else observation
         state.bases[page] = (plain, snapshot.id)

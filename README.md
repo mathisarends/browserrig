@@ -1,6 +1,6 @@
 # Browserrig
 
-Browserrig is an event-driven Chrome automation library for AI agents and Python applications. It combines direct browser access with a composable [Harnessed](https://github.com/mathisarends/harnessed/releases/tag/v0.12.0) agent, structured page observations, browser actions, and typed events.
+Browserrig is an event-driven Chrome automation library for AI agents and Python applications. It combines direct browser access with a composable [Harnessed](https://github.com/mathisarends/harnessed/releases/tag/v0.13.0) agent, structured page observations, browser actions, and typed events.
 
 Agents can navigate tabs, interact with DOM elements or screenshot coordinates, download and read files, and be paused or steered during a session. Chrome can be launched locally or connected through CDP.
 
@@ -34,8 +34,10 @@ than the wheel for Browserrig itself.
 
 To run the examples from a source checkout instead (uv required):
 
-Harnessed and all provider extras are pinned to the published `0.12.0` release,
-which includes the native `session.add_context(...)` API.
+Harnessed and all provider extras are pinned to the published `0.13.0` release,
+with native ordinary-message input and explicit stream contexts.
+Existing Harnessed 0.12 snapshots, stores and audit logs are incompatible; back up
+old application data and start new stores. See the [upgrade notes](CHANGELOG.md).
 
 ```powershell
 uv sync --locked --extra openai
@@ -48,12 +50,13 @@ The example explores the Voyager missions. Use `--url` and `--task` to change th
 
 ## Compose an agent
 
-`Agent` is a browser-ready [Harnessed](https://github.com/mathisarends/harnessed) agent. Its plugins bring together page observations, tools, context management and the choreography of browser input. Configure the pieces you need while keeping the rest of the default kit:
+`Agent` is a browser-ready [Harnessed](https://github.com/mathisarends/harnessed) agent. Its plugins bring together page observations, tools, context management and the choreography of browser input. Configure the pieces you need while keeping the rest of the default pack:
 
 ```python
 import asyncio
 
 from harnessed import PolicyDecision
+from harnessed.models import UserMessage
 from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
@@ -80,7 +83,7 @@ async def main():
         ],
     )
     async with agent.session() as session:
-        await session.add_context("Include source URLs.")
+        await session.append_message(UserMessage("Include source URLs."))
         result = await session.run("Compare the Voyager missions.", max_steps=20)
         print(result.text)
 
@@ -90,7 +93,7 @@ asyncio.run(main())
 
 Install the `openai` extra and set `OPENAI_API_KEY` as in the quick start. The example captures a screenshot at each model step, keeps images until their steps are compacted, and summarizes older context when the model window reaches 80% (or at 100,000 tokens when its size is unknown).
 
-`await session.add_context(text)` appends background for subsequent model requests
+`await session.append_message(UserMessage(text))` appends background for subsequent model requests
 without starting a turn or calling the model. Each call adds a separate message;
 contributions follow normal conversation retention and compaction. Await it before
 starting work that must see the contribution.
@@ -143,8 +146,8 @@ to select the tab that Browserrig controls and records.
 Close tabs through Browserrig so their recordings can be saved before destruction.
 
 The OpenAI example supports `--video .browserrig/recordings`. Hold
-`session.ctx[VideoRecording]` to read its `result` after session exit, or call
-`await session.ctx[VideoRecording].finish()` to stop and edit earlier. Each session
+`session.scope[VideoRecording]` to read its `result` after session exit, or call
+`await session.scope[VideoRecording].finish()` to stop and edit earlier. Each session
 creates a separate output directory, including when the same agent is reused.
 
 Run `uv run python -m examples.visualization --headed` for a local demonstration

@@ -7,7 +7,7 @@ from pathlib import Path
 from time import monotonic
 from urllib.parse import urlsplit
 
-from harnessed import Context
+from harnessed.kernel import Scope
 
 from browserrig import Browser, Point, wait_for_page
 from browserrig.browser import Tab, screenshot
@@ -24,9 +24,9 @@ from browserrig.tools import FindIntent, NavigateIntent, UploadIntent
 
 
 class VisualWalkthrough:
-    def __init__(self, browser: Browser, ctx: Context, directory: Path, url: str):
+    def __init__(self, browser: Browser, ctx: Scope, directory: Path, url: str):
         self.browser = browser
-        self.ctx = ctx
+        self.scope = ctx
         self.directory = directory
         self.url = url
         self.shots: list[dict[str, str | float]] = []
@@ -153,7 +153,7 @@ class VisualWalkthrough:
             if not completed.done():
                 completed.set_result(event.filename)
 
-        remove = self.ctx.on(DownloadCompletedEvent, received)
+        remove = self.scope.on(DownloadCompletedEvent, received)
         try:
             download, _ = await self._target("#download")
             await self.browser.mouse.click(download)
@@ -206,7 +206,7 @@ class VisualWalkthrough:
             if event.browser_bar == BrowserBar.ADDRESS and event.key == "Enter":
                 await self.capture("navigation", "Navigation · address entry")
 
-        remove = self.ctx.on(BarTypedEvent, submitted, priority=10)
+        remove = self.scope.on(BarTypedEvent, submitted, priority=10)
         try:
             await scenes.navigate(
                 scenes.Scene(self.tab, "proof-navigation"), intent, step

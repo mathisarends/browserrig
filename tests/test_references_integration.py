@@ -3,13 +3,11 @@ from dataclasses import dataclass
 import pytest
 from harnessed import (
     Agent,
-    Inject,
     Plugin,
-    PluginOrder,
     PolicyDecision,
-    SystemPrompt,
     ToolCall,
 )
+from harnessed.kernel import needs
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
@@ -37,7 +35,10 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
     step = 0
 
     class Prepare(Plugin, needs=(Browser,)):
-        async def setup(self, _ctx, browser: Inject[Browser]):
+        _setup_browser = needs(Browser)
+
+        async def setup(self, _ctx):
+            browser = self._setup_browser
             holder["browser"] = browser
             await wait_for_page(browser.active_tab)
             await evaluate(
@@ -77,7 +78,6 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
             yield ModelChunk(text="Done")
 
     agent = Agent(
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         model=CallbackModel(respond),
         plugins=[
             Chrome(Launch(url=site)),

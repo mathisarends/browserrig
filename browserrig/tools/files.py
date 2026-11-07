@@ -11,7 +11,6 @@ import yaml
 from harnessed import (
     Inject,
     Instructions,
-    Observation,
     Plugin,
     PluginState,
     SystemPrompt,
@@ -21,7 +20,8 @@ from harnessed import (
 )
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.kernel import dependency
+from harnessed.kernel import needs
+from harnessed.models import UserMessage
 from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab
@@ -96,12 +96,12 @@ class FileTools(Plugin):
     events = FILE_EVENTS + UPLOAD_EVENTS
     _delivery = PluginState(_Delivery)
 
-    _browser = dependency(Browser)
-    _events = dependency(BrowserEvents)
-    _readiness = dependency(Readiness)
-    _observe = dependency(BrowserPerception)
+    _browser = needs(Browser)
+    _events = needs(BrowserEvents)
+    _readiness = needs(Readiness)
+    _observe = needs(BrowserPerception)
 
-    _actions = dependency(Actions)
+    _actions = needs(Actions)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
@@ -365,9 +365,7 @@ class FileTools(Plugin):
         delivery = self._delivery
         # Resend only changes, or when the model no longer sees the last copy (e.g. compaction).
         if not (delivery.visible and delivery.sent == ref):
-            event.session.observe(
-                Observation(source=_SOURCE, content=content, refs=(ref,))
-            )
+            event.session.observe(UserMessage(content), source=_SOURCE, refs=(ref,))
             delivery.sent, delivery.visible = ref, False
         return await next_()
 

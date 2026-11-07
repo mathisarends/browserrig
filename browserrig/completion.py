@@ -4,11 +4,10 @@ import json
 from dataclasses import replace
 
 from harnessed import (
-    Context,
     Instructions,
     Plugin,
     PolicyDecision,
-    Session,
+    SessionLog,
     SystemPrompt,
     ToolChain,
     ToolResult,
@@ -21,7 +20,7 @@ from harnessed.core.model import OutputSchema
 from harnessed.core.runtime.output import OutputHandler
 from harnessed.events import AssistantMessageEvent, ToolCallFinishedEvent
 from harnessed.hooks import ExecuteTool, Next, ToolPolicy, TurnStopping
-from harnessed.kernel import dependency
+from harnessed.kernel import Scope, needs
 from harnessed.models import (
     AssistantMessage,
     Model,
@@ -29,6 +28,7 @@ from harnessed.models import (
     StopReason,
     SystemMessage,
 )
+from harnessed.services import SessionContext
 
 _FINAL_INSTRUCTION = (
     "Browser work has ended. Write the final answer now, using the results already "
@@ -59,23 +59,26 @@ class Done(Plugin, slot="completion"):
     contract, if any. Both phases count toward the existing step/token budgets.
     """
 
-    _session = dependency(Session)
+    _session = needs(SessionContext)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
 
-    async def setup(self, ctx: Context) -> None:
-        # Harnessed 0.12.0 has no output-policy hook. Isolate the per-session bridge
-        # here; requests, validation, retries, streaming and limits remain native.
-        # pylint: disable=protected-access
-        steps = self._session._steps
-        previous = steps.outputs
-        current = _CompletionOutput(previous, self)
-        steps.outputs = current
+    async def setup(self, ctx: Scope) -> None:
+        # Harnessed 0.13 has no output-policy hook or injectable output handler.
+        # Dispatch the internal bridge by log identity so runtime mounts work too.
+        # Other sessions keep their native handler, including concurrent sessions.
+        _COMPLETIONS[self._session.log] = self
+        OutputHandler.prepare = _prepare_output
+        OutputHandler.validate = _validate_output
 
         def restore() -> None:
-            if steps.outputs is current:
-                steps.outputs = previous
+            _COMPLETIONS.pop(self._session.log, None)
+            if not _COMPLETIONS:
+                if OutputHandler.prepare is _prepare_output:
+                    OutputHandler.prepare = _NATIVE_PREPARE
+                if OutputHandler.validate is _validate_output:
+                    OutputHandler.validate = _NATIVE_VALIDATE
 
         ctx.effect(restore)
 
@@ -97,7 +100,7 @@ class Done(Plugin, slot="completion"):
 
     @hook(TurnStopping)
     def _continue(self, event: TurnStopping) -> bool | None:
-        if event.session is not self._session or self._finished():
+        if event.session.log is not self._session.log or self._finished():
             return None
         answer = event.session.log.last(AssistantMessageEvent)
         if answer is not None and answer.stop_reason in (
@@ -114,13 +117,13 @@ class Done(Plugin, slot="completion"):
     ) -> PolicyDecision:
         # Refuse hallucinated application calls before ordinary approval hooks
         # can ask the host to authorize work that is no longer permitted.
-        if event.session is self._session and self._finished():
+        if event.session.log is self._session.log and self._finished():
             return PolicyDecision.DENY
         return await next_()
 
     @hook(ExecuteTool, priority=-100)
     async def _guard(self, event: ExecuteTool, next_: Next[ToolResult]) -> ToolResult:
-        if event.session is not self._session:
+        if event.session.log is not self._session.log:
             return await next_()
         if self._finished():
             return ToolResult(
@@ -148,9 +151,9 @@ class Done(Plugin, slot="completion"):
         )
 
 
-class _CompletionOutput(OutputHandler):
+class _CompletionOutput:
     def __init__(self, original: OutputHandler, completion: Done) -> None:
-        super().__init__(original.ctx, original.log, original.options, original.values)
+        self.original = original
         self.completion = completion
 
     def prepare(
@@ -163,7 +166,7 @@ class _CompletionOutput(OutputHandler):
                 tools=(),
                 messages=(*request.messages, SystemMessage(_FINAL_INSTRUCTION)),
             )
-            return super().prepare(request, schema, model=model)
+            return _NATIVE_PREPARE(self.original, request, schema, model=model)
         if schema is not None:
             instruction = (
                 "After done, the final answer must match this JSON Schema. "
@@ -181,4 +184,32 @@ class _CompletionOutput(OutputHandler):
         # pylint: disable=protected-access
         if not self.completion._finished():
             return {}, None
-        return await super().validate(response, schema)
+        return await _NATIVE_VALIDATE(self.original, response, schema)
+
+
+# Retain native methods once; each activation owns exactly one registry entry.
+_NATIVE_PREPARE = OutputHandler.prepare
+_NATIVE_VALIDATE = OutputHandler.validate
+_COMPLETIONS: dict[SessionLog, Done] = {}
+
+
+def _prepare_output(
+    self: OutputHandler,
+    request: ModelRequest,
+    schema: OutputSchema | None,
+    *,
+    model: Model,
+) -> ModelRequest:
+    completion = _COMPLETIONS.get(self.log)
+    if completion is None:
+        return _NATIVE_PREPARE(self, request, schema, model=model)
+    return _CompletionOutput(self, completion).prepare(request, schema, model=model)
+
+
+async def _validate_output(
+    self: OutputHandler, response: AssistantMessage, schema: OutputSchema | None
+) -> tuple[dict[str, ToolResult], str | None]:
+    completion = _COMPLETIONS.get(self.log)
+    if completion is None:
+        return await _NATIVE_VALIDATE(self, response, schema)
+    return await _CompletionOutput(self, completion).validate(response, schema)

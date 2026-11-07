@@ -16,7 +16,7 @@ import browserrig
 from harnessed import Session
 from browserrig.scripts import CHOREOGRAPHY, CONTENT, ELEMENT, OVERLAY, SECRET_FIELD
 
-assert callable(Session.add_context)
+assert callable(Session.append_message)
 assert browserrig.__version__ == importlib.metadata.version('browserrig')
 distribution = importlib.metadata.distribution('browserrig')
 assert distribution.metadata['License-Expression']

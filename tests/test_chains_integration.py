@@ -2,8 +2,6 @@ import json
 
 import pytest
 from harnessed import (
-    Context,
-    Inject,
     Plugin,
     PolicyDecision,
     ToolCall,
@@ -12,6 +10,7 @@ from harnessed import (
 )
 from harnessed.events import ToolCallFinishedEvent, ToolExecutionFinishedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
+from harnessed.kernel import Scope, needs
 from harnessed.models import ModelChunk
 from harnessed.plugins import AgentLoop, Approvals, FinalStepPolicy
 from harnessed.testing import CallbackModel, ScriptedModel
@@ -197,7 +196,10 @@ async def test_tab_actions_keep_their_distinct_kinds_in_durable_receipts(site):
     holder = {}
 
     class Access(Plugin, needs=(Browser,)):
-        async def setup(self, _ctx: Context, browser: Inject[Browser]):
+        _setup_browser = needs(Browser)
+
+        async def setup(self, _ctx: Scope):
+            browser = self._setup_browser
             holder.update(browser=browser, first=browser.active_tab.id)
 
     step = 0
@@ -266,12 +268,13 @@ async def _run(site, markup, plan):
     holder, observations = {}, []
 
     class Page(Plugin, needs=(Browser, BrowserPerception)):
-        async def setup(
-            self,
-            _ctx: Context,
-            browser: Inject[Browser],
-            observe: Inject[BrowserPerception],
-        ):
+        _setup_browser = needs(Browser)
+
+        _setup_observe = needs(BrowserPerception)
+
+        async def setup(self, _ctx: Scope):
+            browser = self._setup_browser
+            observe = self._setup_observe
             holder.update(browser=browser, observe=observe)
             await evaluate(
                 browser.active_tab, f"document.body.innerHTML={json.dumps(markup)}"

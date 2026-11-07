@@ -3,7 +3,7 @@ from typing import Annotated
 from urllib.parse import quote_plus, urljoin, urlsplit
 
 from harnessed import Inject, Plugin, ToolResult
-from harnessed.kernel import dependency
+from harnessed.kernel import needs
 from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab, validated_url
@@ -21,9 +21,9 @@ NEW_TAB_URL = "https://duckduckgo.com/"
 
 
 class NavigationTools(Plugin, needs=(Actions,)):
-    _browser = dependency(Browser)
-    _events = dependency(BrowserEvents)
-    _readiness = dependency(Readiness)
+    _browser = needs(Browser)
+    _events = needs(BrowserEvents)
+    _readiness = needs(Readiness)
 
     @tool(
         kind=ActionKind.NAVIGATE,

@@ -3,7 +3,7 @@ import base64
 from collections.abc import AsyncIterator
 
 import pytest
-from harnessed import Agent, PluginOrder, PolicyDecision, SystemPrompt
+from harnessed import Agent, PolicyDecision
 from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
@@ -81,7 +81,7 @@ async def test_tab_updates_carry_loading_title_and_icons(icon_site):
 
         collector = asyncio.create_task(collect())
         await asyncio.sleep(0)
-        tab = session.ctx[Browser].active_tab
+        tab = session.scope[Browser].active_tab
         try:
             for path, prefix in (
                 ("/", "data:image/png;base64,"),
@@ -108,7 +108,6 @@ async def test_navigate_can_open_the_url_in_a_new_tab(icon_site):
     )
     agent = Agent(
         model=model,
-        prompt=SystemPrompt.from_plugins(order=PluginOrder.AS_LISTED),
         plugins=[
             *browser_plugins(browser=Chrome.launch(url=icon_site + "/inline")),
             Approvals(default=PolicyDecision.ALLOW),

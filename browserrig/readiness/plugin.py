@@ -2,10 +2,10 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from uuid import uuid4
 
-from harnessed import Context, Plugin, PluginState, hook
-from harnessed.events import AgentControlChangedEvent, ControlState
+from harnessed import Plugin, PluginState, hook
+from harnessed.events import ControlState, SessionControlChangedEvent
 from harnessed.hooks import Next
-from harnessed.kernel import dependency
+from harnessed.kernel import Scope, needs
 
 from browserrig.browser import BrowserEvents, Tab
 from browserrig.core import (
@@ -29,7 +29,7 @@ from .wait import wait_for_page
 class Readiness(Plugin, slot="browserrig.readiness", provides=True):
     events = READINESS_EVENTS
     _state = PluginState(ReadinessState)
-    _events = dependency(BrowserEvents)
+    _events = needs(BrowserEvents)
 
     def __init__(
         self,
@@ -43,7 +43,7 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         self.initial = initial if initial is not None else DomReady()
         self.ongoing = ongoing if ongoing is not None else DomReady()
 
-    async def setup(self, ctx: Context) -> None:
+    async def setup(self, ctx: Scope) -> None:
         self._state.context = ctx
         ctx.effect(self._cancel)
 
@@ -113,8 +113,8 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         self._state.deferred.clear()
         self._state.spent.clear()
 
-    @hook(AgentControlChangedEvent)
-    async def _on_control(self, event: AgentControlChangedEvent) -> None:
+    @hook(SessionControlChangedEvent)
+    async def _on_control(self, event: SessionControlChangedEvent) -> None:
         if event.state in (ControlState.ABORTING, ControlState.STOPPED):
             await self._cancel()
 
