@@ -6,8 +6,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from cdpify import CDPCommandError
 from cdpify.domains.runtime import RemoteObject
-from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser import Frame
 from browserrig.core import BrowserError
@@ -116,6 +116,14 @@ def test_unexpected_page_exception_does_not_expose_its_message():
 async def test_fake_tab_rejects_unknown_scripts():
     with pytest.raises(AssertionError, match="Unexpected fake script"):
         await FakeTab().run(RESET)
+
+
+@pytest.mark.parametrize("by_value", [True, False])
+async def test_script_undefined_result_is_none_or_preserves_handle(by_value):
+    value = RemoteObject(type="undefined")
+    frame, _ = _node_call(value)
+    result = await frame.run(RESET, by_value=by_value)
+    assert result is None if by_value else result is value
 
 
 @pytest.mark.parametrize("by_value", [True, False])

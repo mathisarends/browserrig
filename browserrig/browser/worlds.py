@@ -1,8 +1,7 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 
-from cdpify import CdpSession
-from cdpify.exceptions import CDPCommandError
+from cdpify import CDPCommandError, CdpSession
 
 
 class Worlds:

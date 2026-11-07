@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from cdpify.exceptions import CDPCommandError
+from cdpify import CDPCommandError
 
 from browserrig.browser import Frame, Tab
 from browserrig.core import Bounds, BrowserError

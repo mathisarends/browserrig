@@ -1,8 +1,8 @@
 import asyncio
 from contextlib import suppress
 
+from cdpify import CDPCommandError
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
-from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser import Frame
 from browserrig.scripts import RESET, SEED, SeedArgs

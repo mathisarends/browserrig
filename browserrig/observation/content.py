@@ -1,8 +1,8 @@
 import re
 from urllib.parse import urljoin, urlsplit
 
+from cdpify import CDPCommandError
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
-from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser import Tab
 from browserrig.core import BrowserError, Options

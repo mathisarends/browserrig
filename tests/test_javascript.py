@@ -3,8 +3,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from cdpify import CDPCommandError
 from cdpify.domains.runtime import EvaluateResult, ExceptionDetails, RemoteObject
-from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser import Tab
 from browserrig.core import BrowserError
@@ -19,6 +19,7 @@ from browserrig.core import BrowserError
         ),
         (RemoteObject(type="boolean", value=False), "false"),
         (RemoteObject(type="object", subtype="null"), "null"),
+        (RemoteObject(type="object", subtype="null", value=None), "null"),
         (RemoteObject(type="undefined"), "undefined"),
         (RemoteObject(type="number", unserializable_value="NaN"), "NaN"),
         (RemoteObject(type="number", unserializable_value="-0"), "-0"),
