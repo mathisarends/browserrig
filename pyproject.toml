@@ -20,7 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "harnessed==0.13.0",
-    "cdpify[websocket]>=0.4.0,<0.5",
+    "cdpify[websocket]==0.5.0",
     "httpx2>=2.16,<3",
     "pillow>=13,<14",
     "pydantic>=2.12,<3",

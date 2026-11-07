@@ -5,7 +5,7 @@ from dataclasses import dataclass, replace
 from typing import Protocol
 from uuid import uuid4
 
-from cdpify.exceptions import CDPCommandError
+from cdpify import CDPCommandError
 from pydantic import Field
 
 from browserrig.browser import Tab, TabInfo, screenshot

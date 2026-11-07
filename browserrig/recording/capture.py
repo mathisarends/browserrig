@@ -3,8 +3,7 @@ from base64 import b64decode
 from pathlib import Path
 from time import monotonic
 
-from cdpify import CdpSession
-from cdpify.exceptions import CDPCommandError
+from cdpify import CDPCommandError, CdpSession
 
 from browserrig.browser import Tab
 from browserrig.core import BrowserError

@@ -2,10 +2,9 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 
-from cdpify import CdpSession
+from cdpify import CDPCommandError, CdpSession
 from cdpify.domains.page import FrameTree
 from cdpify.domains.target import TargetInfo
-from cdpify.exceptions import CDPCommandError
 
 from browserrig.core import Bounds, BrowserError, FrameTransform
 from browserrig.scripts import OWNER_SIZE, VIEWPORT

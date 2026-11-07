@@ -9,9 +9,8 @@ tree then supplies the names of the listed controls.
 import asyncio
 from contextlib import suppress
 
-from cdpify import CdpSession
+from cdpify import CDPCommandError, CdpSession
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
-from cdpify.exceptions import CDPCommandError
 
 from browserrig.browser import Frame
 from browserrig.core import BrowserError

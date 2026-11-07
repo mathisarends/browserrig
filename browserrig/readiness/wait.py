@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from time import monotonic
 from uuid import uuid4
 
-from cdpify.exceptions import CDPCommandError
+from cdpify import CDPCommandError
 from harnessed.hooks import Next
 
 from browserrig.browser import BrowserEvents, Tab

@@ -5,10 +5,9 @@ from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from typing import Literal, overload
 
-from cdpify import CdpSession
+from cdpify import UNSET, CDPCommandError, CdpSession
 from cdpify.domains.page import FrameTree
 from cdpify.domains.runtime import CallArgument, RemoteObject
-from cdpify.exceptions import CDPCommandError
 from pydantic import BaseModel
 
 from browserrig.core import Bounds, BrowserError, FrameTransform
@@ -200,7 +199,9 @@ class Frame:
         result = await self.worlds.run(
             self.cdp, self.id, self.document_id, call, retry=not objects
         )
-        return script.parse(result.value) if by_value else result
+        if not by_value:
+            return result
+        return script.parse(None if result.value is UNSET else result.value)
 
 
 @asynccontextmanager

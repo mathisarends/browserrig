@@ -172,7 +172,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.14,<5" },
-    { name = "cdpify", extras = ["websocket"], specifier = ">=0.4.0,<0.5" },
+    { name = "cdpify", extras = ["websocket"], specifier = "==0.5.0" },
     { name = "charset-normalizer", specifier = ">=3.4,<4" },
     { name = "defusedxml", specifier = ">=0.7.1,<0.8" },
     { name = "harnessed", specifier = "==0.13.0" },
@@ -263,11 +263,11 @@ wheels = [
 
 [[package]]
 name = "cdpify"
-version = "0.4.0"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/3c/00/210a25998468ef70f574c4efc272532f2638f3386c9c184a61ae92d4705f/cdpify-0.4.0.tar.gz", hash = "sha256:703fc8990b684668a1a0c2bd3540d3931b0ff0f97bcbc89c1af1849e03ff4d33", size = 293738, upload-time = "2026-10-25T20:19:53.624Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/87/d93490d890defa2faebfbece9837e9023012a218d4b50371327920335006/cdpify-0.5.0.tar.gz", hash = "sha256:de61307fb5bc3f9d2a43bd8c1fbfb684351d6c72385b0a154e056f573412d41a", size = 392194, upload-time = "2026-11-07T11:36:48.031Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/53/8c/78dc13debf1b2c01bb1df88a736aa428560dbf0d842d67d6d698e10d16ab/cdpify-0.4.0-py3-none-any.whl", hash = "sha256:8c9920b725242655f2f9626a8ac8b8ce9bceaba6b7d97bf826c60b7a4fd45f2a", size = 432817, upload-time = "2026-10-25T20:19:52.206Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/7d/d272e63933e9cfd4d1dfb53fd3949c48d3109b34977eb4322fc391fe90d1/cdpify-0.5.0-py3-none-any.whl", hash = "sha256:785298a9160a3410f463b8905e0a5ca6daba3e1b570370d478845416226ca142", size = 531205, upload-time = "2026-11-07T11:36:46.332Z" },
 ]
 
 [package.optional-dependencies]

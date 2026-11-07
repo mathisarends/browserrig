@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from cdpify.exceptions import CDPCommandError
+from cdpify import CDPCommandError
 from harnessed import Agent, PolicyDecision
 from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals

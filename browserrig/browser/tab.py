@@ -6,7 +6,7 @@ from dataclasses import replace
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-from cdpify import CdpSession
+from cdpify import UNSET, CDPCommandError, CdpSession
 from cdpify.domains.page import (
     FrameNavigatedEvent,
     FrameStartedLoadingEvent,
@@ -19,7 +19,6 @@ from cdpify.domains.page import (
     NavigatedWithinDocumentEvent,
 )
 from cdpify.domains.runtime import RemoteObject
-from cdpify.exceptions import CDPCommandError
 
 from browserrig.core import BrowserError
 from browserrig.events import (
@@ -304,10 +303,6 @@ def _javascript_value(value: RemoteObject) -> str:
         return value.unserializable_value
     if value.type == "undefined":
         return "undefined"
-    if (
-        value.value is None
-        and value.subtype != "null"
-        and value.description is not None
-    ):
-        return value.description
+    if value.value is UNSET:
+        return value.description if value.description is not None else "null"
     return json.dumps(value.value, ensure_ascii=False)

@@ -4,9 +4,8 @@ import re
 from contextlib import suppress
 from urllib.parse import unquote_to_bytes, urlsplit
 
-from cdpify import CdpSession
+from cdpify import CDPError, CdpSession
 from cdpify.domains.network import LoadNetworkResourceOptions
-from cdpify.exceptions import CDPError
 
 # Icons travel inside live events, so oversized ones are dropped instead of streamed.
 _MAX_BYTES = 64 * 1024

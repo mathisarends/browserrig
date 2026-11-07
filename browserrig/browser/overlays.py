@@ -10,7 +10,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from cdpify.exceptions import CDPCommandError
+from cdpify import CDPCommandError
 
 from browserrig.core import BrowserError
 from browserrig.events import PageCaptureFinishedEvent, PageCaptureStartedEvent
