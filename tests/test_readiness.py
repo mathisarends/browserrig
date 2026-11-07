@@ -151,17 +151,28 @@ async def test_redirect_chain_restarts_probes_without_extending_the_deadline(
     monkeypatch,
 ):
     tab = FakeTab()
+    checked, selected = [], []
 
-    async def redirect(_strategy):
-        await asyncio.sleep(0.005)
+    async def redirect(strategy):
+        checked.append(strategy)
+        if len(checked) == 3:
+            # Yield only after two redirects; timer granularity must not decide
+            # how many documents this test exercises.
+            await asyncio.Event().wait()
         tab.document_id += "x"
         return True
 
+    async def select(context):
+        selected.append((context.tab.document_id, context.deadline))
+        return DomReady()
+
     monkeypatch.setattr(wait_module, "_check", redirect)
-    async with asyncio.timeout(0.5):
-        report = await wait_for_page(tab, options=_fast_options())
+    async with asyncio.timeout(5):
+        report = await wait_for_page(tab, options=_fast_options(), select=select)
     assert report.timed_out and report.status == "degraded"
-    assert len(tab.document_id) > len("doc-1x")
+    assert [document for document, _ in selected] == ["doc-1", "doc-1x", "doc-1xx"]
+    assert len({id(strategy) for strategy in checked}) == 3
+    assert len({deadline for _, deadline in selected}) == 1
 
 
 async def test_after_action_requires_fresh_observation_time_even_when_dom_was_quiet():
