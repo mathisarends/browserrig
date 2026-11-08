@@ -332,7 +332,6 @@ async def test_open_file_moves_the_file_out_before_the_new_tab_opens(
     timeline, tmp_path
 ):
     files = FileSystem(LocalWorkspace(tmp_path))
-    await files.initialize()
     await files.write_file("report.txt", "report")
     async with _staged(timeline, _FileTools(), files=files) as (_, ctx):
         await ctx[_FileTools].open_file("report.txt")
@@ -355,7 +354,6 @@ async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
     timeline, tmp_path, monkeypatch
 ):
     files = FileSystem(LocalWorkspace(tmp_path))
-    await files.initialize()
     await files.write_file("report.txt", "report")
 
     async def upload(paths):

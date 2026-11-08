@@ -25,6 +25,8 @@
   `await transfer.stage(paths)`, whose `browser_paths` `tabs.open(...)` accepts;
   direct `ChromeBrowser` users call `await browser.receive_downloads(transfer)` to
   save downloads into the workspace.
+  A custom `Workspace` implements only `stat`, `list`, `read_bytes` and
+  `write_bytes`; `MountedWorkspace` needs a `LocalWorkspace`.
   `FileSystemState` reports `workspace: bool` and a relative
   `download_directory`, and `FileContent.extracted_path` is relative to the
   workspace, or `None` for a remote workspace.

@@ -1,6 +1,7 @@
+import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import PurePath, PurePosixPath, PureWindowsPath
+from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 from typing import Protocol, runtime_checkable
 
 from .workspace import LocalWorkspace, Workspace
@@ -56,11 +57,12 @@ class FileBridge(Protocol):
 
 
 class MountedWorkspace:
-    """Chrome sees the workspace directory at `browser_path`: no file is copied.
+    """Chrome sees a `LocalWorkspace`'s directory at `browser_path`: no file is copied.
 
     Use it when Chrome runs on the agent's machine, or shares a volume with the
-    workspace, as on one pod. Without `browser_path`, Chrome must see a
-    `LocalWorkspace` at its own path. `browser_path` is absolute on the browser host.
+    workspace, as on one pod. Without `browser_path`, Chrome sees the directory at
+    the agent's path. `browser_path` is absolute on the browser host. A workspace
+    the agent reaches only through an API needs its own `FileBridge`.
     """
 
     _PENDING = PurePosixPath("downloads/.pending")
@@ -81,7 +83,8 @@ class MountedWorkspace:
         return hash(self.browser_path)
 
     async def download_directory(self, workspace: Workspace) -> PurePath:
-        await workspace.create_directory(self._PENDING)
+        pending = _local(workspace).host_path(self._PENDING)
+        await asyncio.to_thread(pending.mkdir, parents=True, exist_ok=True)
         return self._mounted(workspace, self._PENDING)
 
     async def receive(
@@ -90,25 +93,35 @@ class MountedWorkspace:
         download: BrowserDownload,
         destination: PurePosixPath,
     ) -> None:
+        local = _local(workspace)
         # Chrome names the file by its ID in the pending directory it was given.
-        await workspace.move(self._PENDING / download.id, destination)
+        source = local.host_path(self._PENDING / download.id)
+        await asyncio.to_thread(_move, source, local.host_path(destination))
 
     async def send(
         self, workspace: Workspace, paths: Sequence[PurePosixPath]
     ) -> list[PurePath]:
         return [self._mounted(workspace, path) for path in paths]
 
-    def _root(self, workspace: Workspace) -> PurePath:
-        if self.browser_path is not None:
-            return self.browser_path
-        if isinstance(workspace, LocalWorkspace):
-            return workspace.directory
-        raise ValueError(
-            "MountedWorkspace needs browser_path for a workspace that is not local"
-        )
-
     def _mounted(self, workspace: Workspace, path: PurePosixPath) -> PurePath:
-        return self._root(workspace).joinpath(*path.parts)
+        root = self.browser_path or _local(workspace).directory
+        return root.joinpath(*path.parts)
+
+
+def _local(workspace: Workspace) -> LocalWorkspace:
+    if not isinstance(workspace, LocalWorkspace):
+        raise ValueError(
+            "MountedWorkspace needs a LocalWorkspace; "
+            "implement a FileBridge for a remote workspace"
+        )
+    return workspace
+
+
+def _move(source: Path, destination: Path) -> None:
+    if destination.exists():
+        raise FileExistsError(f"File exists: {destination}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    source.rename(destination)
 
 
 def _host_path(path: str | PurePath) -> PurePath:

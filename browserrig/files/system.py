@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import tempfile
+from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from pathlib import Path
 from types import TracebackType
 from typing import Self
@@ -18,8 +19,8 @@ class FileSystem:
 
     Paths are relative to the workspace, such as `notes/summary.md`. The file system
     knows nothing about browsers; `FileTransfer` brings downloads in and hands files
-    to Chrome. Construction creates nothing; entering the context initializes the
-    workspace and leaving it removes temporary copies.
+    to Chrome. Construction creates nothing; entering the context enters a workspace
+    that is an async context manager, and leaving it removes temporary copies.
     """
 
     def __init__(
@@ -34,9 +35,11 @@ class FileSystem:
             if isinstance(workspace, LocalWorkspace)
             else None
         )
+        self._exits = AsyncExitStack()
 
     async def __aenter__(self) -> Self:
-        await self.initialize()
+        if isinstance(self.workspace, AbstractAsyncContextManager):
+            await self._exits.enter_async_context(self.workspace)
         return self
 
     async def __aexit__(
@@ -47,16 +50,16 @@ class FileSystem:
     ) -> None:
         await self.aclose()
 
-    async def initialize(self) -> None:
-        await self.workspace.initialize()
-
     async def aclose(self) -> None:
         """Remove local copies of remote files; the workspace itself is kept."""
-        if self._cache is not None:
-            cache = self._cache
-            self._cache = None
-            self._reader = None
-            await asyncio.to_thread(cache.cleanup)
+        try:
+            if self._cache is not None:
+                cache = self._cache
+                self._cache = None
+                self._reader = None
+                await asyncio.to_thread(cache.cleanup)
+        finally:
+            await self._exits.aclose()
 
     async def exists(self, path: str) -> bool:
         return await self.workspace.stat(workspace_path(path)) is not None
@@ -124,7 +127,9 @@ class FileSystem:
         data = content.encode("utf-8")
         if len(data) > self.options.max_file_bytes:
             raise ValueError("Content exceeds max_file_bytes")
-        await self.workspace.write_bytes(target, data, overwrite=overwrite)
+        if not overwrite and await self.workspace.stat(target) is not None:
+            raise FileExistsError(f"File exists: {target}; pass overwrite=true")
+        await self.workspace.write_bytes(target, data)
         return FileEntry(
             path=str(target), name=target.name, is_directory=False, size=len(data)
         )

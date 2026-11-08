@@ -485,6 +485,5 @@ async def test_derived_cache_cannot_follow_a_directory_symlink_outside_workspace
 
 @pytest.fixture(name="files")
 async def _files(tmp_path):
-    result = FileSystem(LocalWorkspace(tmp_path / "workspace"))
-    await result.initialize()
-    return result
+    (tmp_path / "workspace").mkdir()
+    return FileSystem(LocalWorkspace(tmp_path / "workspace"))

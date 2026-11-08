@@ -40,7 +40,7 @@ agent = Agent(
 The workspace belongs to the agent, not to the browser: `Files` opens it as the
 session's `FileSystem` service. The browser only decides, through its `bridge`,
 whether Chrome can save downloads into it and read from it. Constructors create
-no files or directories; the session creates them.
+no files or directories; the workspace directory appears with the first file.
 File tools only accept workspace-relative paths; absolute paths, `..` traversal
 and symlinks leaving the workspace are rejected.
 
@@ -157,13 +157,14 @@ them*:
 
 | Interface | Responsibility | Built in |
 | --- | --- | --- |
-| `Workspace` | Stores the agent's files: `stat`, `list`, `read_bytes`, `write_bytes`, `create_directory`, `move`. Paths are workspace-relative `PurePosixPath`s. | `LocalWorkspace(directory)` |
+| `Workspace` | Stores the agent's files: `stat`, `list`, `read_bytes`, `write_bytes`. Paths are workspace-relative `PurePosixPath`s. | `LocalWorkspace(directory)` |
 | `FileBridge` | Moves files between the workspace and the machine that runs Chrome: `download_directory`, `receive`, `send`. | `MountedWorkspace(browser_path=None)` |
 
-`MountedWorkspace` is for a browser that sees the workspace directory on its own
-file system: on the same machine, or on a pod that mounts the same volume.
+`MountedWorkspace` is for a browser that sees a `LocalWorkspace` directory on its
+own file system: on the same machine, or on a pod that mounts the same volume.
 Nothing is copied. Pass `browser_path` when Chrome sees the directory at another
 absolute path, for example `MountedWorkspace("/workspace")` for a container mount.
+A workspace the agent reaches only through an API needs its own `FileBridge`.
 
 | Setup | Configuration |
 | --- | --- |
@@ -236,7 +237,10 @@ agent = Agent(
 ```
 
 The workspace can be remote too, such as a bucket or a pod's file API: implement
-`Workspace` and pass it to `Files(...)`. Reading from a remote workspace parses a
+`Workspace` and pass it to `Files(...)`. `write_bytes` replaces existing files;
+`FileSystem` checks for them before writing without `overwrite`. A workspace
+that needs setup, such as opening a client, can also be an async context
+manager: the session enters it while the workspace is in use. Reading from a remote workspace parses a
 local temporary copy, so `extracted_path` is `None` there; the text is still
 returned and paginated. `LocalWorkspace` keeps the extraction under `.content/`.
 

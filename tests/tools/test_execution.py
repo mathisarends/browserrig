@@ -58,7 +58,6 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(
     tmp_path, selection
 ):
     files = FileSystem(LocalWorkspace(tmp_path / "workspace"))
-    await files.initialize()
     saved = await files.write_file("report.txt", "report")
     secret = tmp_path / "secret.txt"
     secret.write_text("private")
@@ -75,7 +74,6 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(
 
 async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path):
     files = FileSystem(LocalWorkspace(tmp_path / "workspace"))
-    await files.initialize()
     saved = await files.write_file("report.txt", "report")
     async with _uploads(files) as upload:
         result = await upload.tools.upload_files(

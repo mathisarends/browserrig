@@ -78,6 +78,8 @@ def test_workspace_paths_reject_absolute_and_escaping_paths(path):
 
 async def test_workspace_text_round_trip_pagination_and_explicit_overwrite(files):
     content = "Grüße aus dem Weltall 🌍\n" * 10
+    # The workspace directory appears with the first file.
+    assert not (await files.list_files()).entries
     assert not await files.exists("notes/research.md")
     saved = await files.write_file("notes/research.md", content)
     assert saved.path == "notes/research.md"
@@ -259,7 +261,6 @@ async def test_mounted_workspace_tells_chrome_the_pending_directory(files, trans
 async def test_mounted_workspace_maps_paths_onto_another_host(tmp_path):
     files = FileSystem(LocalWorkspace(tmp_path))
     transfer = FileTransfer(files, MountedWorkspace("/workspace"))
-    await files.initialize()
     await files.write_file("downloads/id/report.txt", "report")
     staged = await transfer.stage(["downloads/id/report.txt"])
     assert staged.paths == ("downloads/id/report.txt",)
@@ -345,34 +346,36 @@ async def test_remote_workspace_and_cloud_bridge_handle_reads_downloads_and_uplo
     workspace = _MemoryWorkspace()
     bridge = _CloudBridge()
     assert isinstance(workspace, Workspace) and isinstance(bridge, FileBridge)
-    files = FileSystem(workspace)
-    transfer = FileTransfer(files, bridge)
-    await files.initialize()
+    async with FileSystem(workspace) as files:
+        assert workspace.open
+        transfer = FileTransfer(files, bridge)
+        assert await transfer.download_directory() == PurePosixPath("/cloud/downloads")
+        bridge.remote["dl-1"] = pdf_document
+        path = await transfer.receive(
+            "dl-1", "report.pdf", "https://example.org/report.pdf", None
+        )
+        assert path == "downloads/dl-1/report.pdf"
+        assert workspace.files[PurePosixPath(path)] == pdf_document
+        assert bridge.received[0].url == "https://example.org/report.pdf"
 
-    assert await transfer.download_directory() == PurePosixPath("/cloud/downloads")
-    bridge.remote["dl-1"] = pdf_document
-    path = await transfer.receive(
-        "dl-1", "report.pdf", "https://example.org/report.pdf", None
-    )
-    assert path == "downloads/dl-1/report.pdf"
-    assert workspace.files[PurePosixPath(path)] == pdf_document
-    assert bridge.received[0].url == "https://example.org/report.pdf"
+        # Remote files are parsed from a local copy; the extraction stays local.
+        document = await files.read_file(path, page_number=2)
+        assert "Second page: Voyager 2" in document.text
+        assert document.path == path and document.extracted_path is None
+        assert len(workspace.reads) == 1
+        await files.read_file(path, page_number=1)
+        assert len(workspace.reads) == 1
 
-    # Remote files are parsed from a local copy; the extraction stays local.
-    document = await files.read_file(path, page_number=2)
-    assert "Second page: Voyager 2" in document.text
-    assert document.path == path and document.extracted_path is None
-    assert len(workspace.reads) == 1
-    await files.read_file(path, page_number=1)
-    assert len(workspace.reads) == 1
+        staged = await transfer.stage([path])
+        assert staged.browser_paths == (PurePosixPath("/cloud/uploads/report.pdf"),)
+        assert bridge.uploaded == {"report.pdf": pdf_document}
 
-    staged = await transfer.stage([path])
-    assert staged.browser_paths == (PurePosixPath("/cloud/uploads/report.pdf"),)
-    assert bridge.uploaded == {"report.pdf": pdf_document}
-
-    listing = await files.list_files("downloads/dl-1")
-    assert [entry.path for entry in listing.entries] == [path]
-    await files.aclose()
+        listing = await files.list_files("downloads/dl-1")
+        assert [entry.path for entry in listing.entries] == [path]
+        # Only a workspace on this machine can be mounted for Chrome.
+        with pytest.raises(ValueError, match="LocalWorkspace"):
+            await FileTransfer(files, MountedWorkspace("/w")).download_directory()
+    assert not workspace.open
 
 
 async def test_remote_reads_respect_the_size_limit_before_copying():
@@ -569,7 +572,8 @@ async def test_cancelled_read_reports_failure_and_propagates_cancellation(
 async def _files(tmp_path):
     files = FileSystem(LocalWorkspace(tmp_path / "workspace"))
     assert not files.workspace.directory.exists()
-    await files.initialize()
+    # Applications put files here directly, as well as through the tools.
+    files.workspace.directory.mkdir()
     return files
 
 
@@ -586,9 +590,14 @@ class _MemoryWorkspace:
     def __init__(self) -> None:
         self.files: dict[PurePosixPath, bytes] = {}
         self.reads: list[PurePosixPath] = []
+        self.open = False
 
-    async def initialize(self) -> None:
-        pass
+    async def __aenter__(self) -> "_MemoryWorkspace":
+        self.open = True
+        return self
+
+    async def __aexit__(self, *_exception) -> None:
+        self.open = False
 
     async def stat(self, path: PurePosixPath) -> FileStat | None:
         if path in self.files:
@@ -609,18 +618,8 @@ class _MemoryWorkspace:
         self.reads.append(path)
         return self.files[path]
 
-    async def write_bytes(
-        self, path: PurePosixPath, data: bytes, *, overwrite: bool = False
-    ) -> None:
-        if path in self.files and not overwrite:
-            raise FileExistsError(path)
+    async def write_bytes(self, path: PurePosixPath, data: bytes) -> None:
         self.files[path] = data
-
-    async def create_directory(self, path: PurePosixPath) -> None:
-        pass
-
-    async def move(self, source: PurePosixPath, destination: PurePosixPath) -> None:
-        self.files[destination] = self.files.pop(source)
 
 
 class _CloudBridge:
@@ -684,7 +683,6 @@ def _first(events, kind):
 
 async def _started_download(tmp_path, bridge=_MOUNTED):
     files = FileSystem(LocalWorkspace(tmp_path))
-    await files.initialize()
     transfer = FileTransfer(files, bridge) if bridge is not None else None
     emit = AsyncMock()
     downloads = Downloads(emit=emit)

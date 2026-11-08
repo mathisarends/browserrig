@@ -45,11 +45,10 @@ class Workspace(Protocol):
     relative to the workspace root and already normalized by `workspace_path`;
     `PurePosixPath(".")` is the root. Implementations must keep each path inside
     the workspace, including through links. Missing paths raise `FileNotFoundError`.
-    """
 
-    async def initialize(self) -> None:
-        """Create the workspace if needed; runs when the browser starts."""
-        ...
+    A workspace that needs setup, such as opening a client, can also be an async
+    context manager; the session enters it while the workspace is in use.
+    """
 
     async def stat(self, path: PurePosixPath) -> FileStat | None:
         """Metadata for `path`, or `None` when nothing exists there."""
@@ -61,24 +60,8 @@ class Workspace(Protocol):
 
     async def read_bytes(self, path: PurePosixPath) -> bytes: ...
 
-    async def write_bytes(
-        self, path: PurePosixPath, data: bytes, *, overwrite: bool = False
-    ) -> None:
-        """Create parent directories as needed.
-
-        Raise `FileExistsError` when a file exists and `overwrite` is false.
-        """
-        ...
-
-    async def create_directory(self, path: PurePosixPath) -> None:
-        """Create the directory and its parents; an existing directory is fine."""
-        ...
-
-    async def move(self, source: PurePosixPath, destination: PurePosixPath) -> None:
-        """Rename within the workspace, creating parent directories.
-
-        Raise `FileExistsError` instead of replacing an existing destination.
-        """
+    async def write_bytes(self, path: PurePosixPath, data: bytes) -> None:
+        """Create or replace the file, creating parent directories as needed."""
         ...
 
 
@@ -86,7 +69,7 @@ class LocalWorkspace:
     """A directory on the machine that runs the agent.
 
     Without `directory`, each instance uses a new directory under `default_root`.
-    Construction creates nothing; files outlive the session.
+    The directory is created with the first file; files outlive the session.
     """
 
     default_root: ClassVar[Path] = Path(".browserrig/files")
@@ -109,9 +92,6 @@ class LocalWorkspace:
             raise ValueError(_OUTSIDE)
         return resolved
 
-    async def initialize(self) -> None:
-        await asyncio.to_thread(self.directory.mkdir, parents=True, exist_ok=True)
-
     async def stat(self, path: PurePosixPath) -> FileStat | None:
         return await asyncio.to_thread(self._stat, path)
 
@@ -121,16 +101,8 @@ class LocalWorkspace:
     async def read_bytes(self, path: PurePosixPath) -> bytes:
         return await asyncio.to_thread(self.host_path(path).read_bytes)
 
-    async def write_bytes(
-        self, path: PurePosixPath, data: bytes, *, overwrite: bool = False
-    ) -> None:
-        await asyncio.to_thread(self._write, path, data, overwrite)
-
-    async def create_directory(self, path: PurePosixPath) -> None:
-        await asyncio.to_thread(self.host_path(path).mkdir, parents=True, exist_ok=True)
-
-    async def move(self, source: PurePosixPath, destination: PurePosixPath) -> None:
-        await asyncio.to_thread(self._move, source, destination)
+    async def write_bytes(self, path: PurePosixPath, data: bytes) -> None:
+        await asyncio.to_thread(self._write, path, data)
 
     def _stat(self, path: PurePosixPath) -> FileStat | None:
         resolved = self.host_path(path)
@@ -146,6 +118,8 @@ class LocalWorkspace:
         )
 
     def _list(self, path: PurePosixPath) -> Sequence[FileStat]:
+        if not path.parts and not self.directory.exists():
+            return []  # Nothing has been written yet.
         entries = []
         for child in self.host_path(path).iterdir():
             # Links that leave the workspace are not listed, not even their metadata.
@@ -157,16 +131,7 @@ class LocalWorkspace:
                 entries.append(stat)
         return entries
 
-    def _write(self, path: PurePosixPath, data: bytes, overwrite: bool) -> None:
+    def _write(self, path: PurePosixPath, data: bytes) -> None:
         resolved = self.host_path(path)
         resolved.parent.mkdir(parents=True, exist_ok=True)
-        with resolved.open("wb" if overwrite else "xb") as stream:
-            stream.write(data)
-
-    def _move(self, source: PurePosixPath, destination: PurePosixPath) -> None:
-        origin = self.host_path(source)
-        target = self.host_path(destination)
-        if target.exists():
-            raise FileExistsError(f"File exists: {destination}")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        origin.rename(target)
+        resolved.write_bytes(data)
