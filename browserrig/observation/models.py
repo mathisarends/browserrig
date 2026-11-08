@@ -1,9 +1,7 @@
-from __future__ import annotations
-
 import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import Field
 
@@ -187,7 +185,7 @@ class CapturedImage:
     geometry: Geometry | None
 
     @classmethod
-    def from_snapshot(cls, snapshot: Snapshot, browser_id: str) -> CapturedImage:
+    def from_snapshot(cls, snapshot: Snapshot, browser_id: str) -> Self:
         if snapshot.image is None:
             raise ValueError("Snapshot has no image")
         return cls(

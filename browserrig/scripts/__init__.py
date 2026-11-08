@@ -1,14 +1,12 @@
 """Load and validate the standalone scripts sent to the isolated CDP world."""
 
-from __future__ import annotations
-
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cache
 from importlib.resources import files
-from typing import Any
+from typing import Any, Self
 
 from pydantic import BaseModel, TypeAdapter
 
@@ -104,7 +102,7 @@ class Script[A: BaseModel, R]:
     @classmethod
     def load(
         cls, name: str, arguments: type[A], result: Any, *, uses: tuple[str, ...] = ()
-    ) -> Script[A, R]:
+    ) -> Self:
         main = cls._source(f"{name}.js")
         if uses:
             helpers = "\n".join(cls._source(f"lib/{helper}.js") for helper in uses)

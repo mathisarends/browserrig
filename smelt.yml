@@ -33,6 +33,14 @@ structure:
       ordering:
         constants_exempt: true
         fix: safe-only
+    # These reviewed areas need no postponed annotations, including decorated code
+    # for which when-needed deliberately emits no SMT311 finding.
+    input-annotations:
+      match: browserrig.input
+      future_annotations: forbid
+    script-annotations:
+      match: browserrig.scripts
+      future_annotations: forbid
     # Packages depend on each other only through their __init__ facade
     # (SMT107 error); tests may still import implementation modules.
     # SMT108 hints when one file reaches into several modules of a package.
