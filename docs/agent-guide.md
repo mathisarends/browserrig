@@ -143,8 +143,17 @@ tool context parameters must explicitly use `Inject[ToolContext]`. Plugins and
 runtime hooks use `SessionContext` from `harnessed.services`; application code
 resolves services through `session.scope`.
 Tool decorators declare model-facing descriptions independently of developer docstrings.
+Use `timeout_seconds=` for tool declarations/registrations; a synchronous resolver
+can select a deadline from the mounted plugin once per activation. `None` inherits
+`AgentLoop(tool_timeout=...)`. Shell and approval timeouts keep their existing names.
 
 Plugin recipes replay their explicit constructor arguments for every activation.
+Higher-level plugins implement `async def setup(self, scope: PluginScope)` and
+`async def teardown(self, scope: PluginScope)`, importing `PluginScope` from
+`harnessed.kernel`. Deferred instruction factories receive this view too. It owns
+resources and registrations; application composition uses full `session.scope`.
+Plugins compose through the application or a `PluginPack`, rather than installing
+other plugins during setup.
 Constructors validate configuration; acquire resources in `setup` and register
 cleanup with `scope.effect(...)`. Keep mount-owned mutable data in `PluginState`.
 Direct tool calls need an active instance. In isolated tests, use
@@ -349,13 +358,13 @@ sections: `section_delivery=SectionDelivery.CONTEXT` delivers guidance until the
 mount closes or suspends; `SectionDelivery.IGNORE` skips it. Import `SectionDelivery`
 from `harnessed`. The fixed system prompt stays unchanged.
 
-Harnessed 0.13 uses state format 2, checkpoint/JSON-store format 3 and audit
-envelope version 5. Earlier data is rejected without automatic migration. Back
-up older application data and start new snapshots, stores and audit logs. See
+Harnessed 0.14 uses state format 2, checkpoint/JSON-store format 3 and audit
+envelope version 5, unchanged from 0.13. Existing 0.13 data needs no migration.
+Older, incompatible formats are rejected without automatic migration. See
 [upgrade notes](../CHANGELOG.md) for all Browserrig API changes.
 
 Install the optional MCP client with `uv sync --locked --extra openai --extra mcp`.
-Harnessed and all provider extras are pinned to the published 0.13.0 release,
+Harnessed and all provider extras are pinned to the published 0.14.0 release,
 including `session.append_message(UserMessage(...))`. Add MCP servers through
 the native plugin:
 
@@ -369,10 +378,16 @@ agent = Agent(
 )
 ```
 
+The MCP extra now uses SDK 2.3+ and FastMCP 4.1.2+. Custom auth uses
+`httpx2.Auth`; custom transports forward `transport_options`, OAuth callbacks
+return `AuthorizationCodeResult`, and machine credentials bind with `issuer=`.
+Multi-round input does not automatically repeat an approved tool call. See the
+linked MCP guide for migration details.
+
 `MCP.stdio("catalog", command=..., args=[...])` starts a local server instead.
 Connections belong to each session, tool names are prefixed (for example
 `catalog__search`), and existing approval policies apply. See the
-[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.13.0/docs/guides/mcp.md).
+[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.14.0/docs/guides/mcp.md).
 
 Harnessed closes failed MCP transports, hides their tools, wakes pending
 calls and drains owned tasks. Failed operations are not retried automatically;
@@ -411,7 +426,7 @@ For standalone kernel compositions, call `await ctx.settle()` followed by
 ## Saving and restoring sessions
 
 Sessions stay in memory by default. To save conversations automatically and
-reopen them by application-owned ID, configure Harnessed 0.13.0's native store:
+reopen them by application-owned ID, configure Harnessed 0.14.0's native store:
 
 ```python
 from pathlib import Path
@@ -483,7 +498,7 @@ envelopes use format **3**, and audit envelopes use version **5**. Earlier forma
 old JSONL stores and raw `SessionState` JSON cannot be opened as new store files.
 Keep legacy data separate;
 there is no automatic migration. See the
-[Harnessed sessions guide](https://github.com/mathisarends/harnessed/blob/v0.13.0/docs/guides/sessions.md)
+[Harnessed sessions guide](https://github.com/mathisarends/harnessed/blob/v0.14.0/docs/guides/sessions.md)
 for atomic repository adapters, recovery and storage details.
 
 Custom models expose immutable `GenerationSettings` from `harnessed.models`.

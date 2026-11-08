@@ -1,5 +1,13 @@
 # Harnessed telemetry integration feedback
 
+> Historical findings from the initial integration. With Harnessed 0.14.0,
+> Browserrig now uses the public library instrumentation API and optional hook
+> spans, captures turn summaries and model request details, and preserves JSON
+> during truncation. See [the current tracing guide](telemetry.md) for setup and
+> performance diagnosis. Individual CDP/network/provider-retry spans remain outside
+> this integration.
+
+
 Collected while integrating **Harnessed 0.6.0** with Browserrig and **Phoenix
 21.0.0** on Windows/Docker Desktop, 2026-10-30. These are local integration notes
 for upstream discussion; no issue has been submitted.

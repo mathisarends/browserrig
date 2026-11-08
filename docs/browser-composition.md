@@ -249,11 +249,14 @@ extraction, waits and human handoff acquire `coordination.exclusive()` at their
 operation boundaries. Direct device calls use `browser.input.mouse` and
 `browser.input.keyboard`.
 
-`Chrome` also installs `browserrig.files.FileTransfers(bridge)` when a bridge is
-configured. This provider binds the optional `FileSystem` to a session
-`FileTransfer` service; replacing the workspace replaces only that service.
-`FileTools` consumes it without depending on browser-host configuration.
-Other browser providers can install the same provider or provide `FileTransfer`
+`Chrome` publishes its configured `FileBridge`. The browser pack includes
+`browserrig.files.FileTransfers()`, which observes that bridge and the optional
+`FileSystem`, providing `FileTransfer` when both are available. Replacing the
+workspace replaces only that service. Explicit compositions using Chrome, Files
+and FileTools must also include `FileTransfers()`; plugin setup no longer installs
+nested plugins. `FileTools` consumes the transfer without depending on host
+configuration. Other browser providers can publish `FileBridge`, configure
+`FileTransfers(bridge)` in their application composition or provide `FileTransfer`
 directly. Without it, workspace tools still read and write agent files, while
 browser previews and uploads are unavailable.
 

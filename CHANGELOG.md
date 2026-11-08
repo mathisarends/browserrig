@@ -4,14 +4,22 @@
 
 ### Breaking changes
 
+- Pin Harnessed and all provider/MCP/OTel extras to 0.14.0. Migrate plugin lifecycle
+  methods to `PluginScope`, and compose `FileTransfers()` explicitly in the browser
+  pack. Manual Chrome/Files/FileTools compositions must add `FileTransfers()`.
+  Human handoff uses a per-activation `timeout_seconds` resolver. Replace local
+  tracing helpers with `harnessed.tracing`; library spans use full `browserrig.*`
+  names and standard source attributes. Truncated captured content remains JSON.
+
 - Group browser devices under `browser.input.mouse` and `browser.input.keyboard`;
   the direct `browser.mouse` and `browser.keyboard` aliases are removed.
   Move `action_lock` off `Browser`: inject the session's `BrowserCoordination`
   service and use `async with coordination.exclusive():` for operations that
   share control with actions, observations and human handoff.
-  `Browser.bridge` is removed. `Chrome` binds its configured bridge to the
-  optional workspace and provides `FileTransfer` for `FileTools` and other
-  consumers. Direct callers construct `FileTransfer(files, bridge)` explicitly.
+  `Browser.bridge` is removed. `Chrome` publishes its configured `FileBridge`;
+  `FileTransfers()` binds it to the optional workspace and provides `FileTransfer`
+  for `FileTools` and other consumers. Direct callers construct
+  `FileTransfer(files, bridge)` explicitly.
 
 - Split the agent's files into a `Workspace` (where files live) and a
   `FileBridge` (how Chrome reaches them), so downloads and uploads also work with
@@ -65,9 +73,8 @@
   exports; direct `ChromeBrowser(...)` callers can import these low-level
   configuration types from `browserrig.browser`.
 
-- Upgrade Harnessed and all provider extras to 0.13.0. Rename `browser_kit()`
-  to `browser_pack()`; it returns native `PluginPack`. Use `PluginPackPromptPolicy`
-  and `pack_path` for resolution and provenance.
+- Rename `browser_kit()` to `browser_pack()`; it returns native `PluginPack`.
+  Use `PluginPackPromptPolicy` and `pack_path` for resolution and provenance.
 - Replace `session.add_context(text)` and former named context writes with
   `await session.append_message(UserMessage(text))` (`harnessed.models`). Input is
   additive and durable, follows normal compaction, and starts no turn. Use
@@ -97,6 +104,10 @@
 
 ### Added
 
+- Add lock-wait, file/transfer/worker, navigation/JavaScript and presentation spans.
+  Examples accept `--trace-hooks` for Harnessed hook timing independently of content
+  capture. Turn summaries and model definitions/settings/schemas are captured when
+  requested. See the telemetry guide for diagnosing harness and browser bottlenecks.
 - `click` and `click_at` take `new_tab=True` to Ctrl+click (Cmd on macOS) a link
   into a new tab; the keyboard visualization shows the held key. Page input that
   opens a tab, including `target=_blank` links and `window.open`, now switches

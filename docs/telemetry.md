@@ -1,6 +1,6 @@
 # Telemetry: local agent traces with Docker
 
-Browserrig uses Harnessed 0.13.0's native `OpenTelemetryTracer`. Phoenix displays
+Browserrig uses Harnessed 0.14.0's native `OpenTelemetryTracer`. Phoenix displays
 the agent's turns, model requests, tool calls, timing, outcomes and available
 usage counters. Enable content capture to inspect what each model and tool
 receives and returns.
@@ -31,7 +31,7 @@ examples applies. Optionally set `BROWSERRIG_CHROME` in `.env`.
 
 ```powershell
 uv sync --locked --extra otel
-uv run --extra otel python -m examples.tracing_smoke --trace-content
+uv run --extra otel python -m examples.tracing_smoke --trace-content --trace-hooks
 ```
 
 The smoke test starts a temporary HTTP server on loopback, launches headless
@@ -46,7 +46,7 @@ Set `OPENAI_API_KEY` in `.env` as described in the repository's quick start:
 
 ```powershell
 uv sync --locked --extra openai --extra otel
-uv run --extra openai --extra otel python -m examples.openai_agent --headed --trace-content
+uv run --extra openai --extra otel python -m examples.openai_agent --headed --trace-content --trace-hooks
 ```
 
 The example loads `.env` automatically. For a shorter task:
@@ -59,16 +59,18 @@ uv run --extra openai --extra otel python -m examples.openai_agent --trace-conte
 | --- | --- |
 | No trace flag | No tracing provider, exporter or OTel imports. |
 | `--trace` | IDs, hierarchy, durations, outcomes, model/tool names and reported usage. |
-| `--trace-content` | Also model messages/responses and tool arguments/results; implies `--trace`. |
+| `--trace-content` | Also turn summaries, model messages/responses, tool arguments/results and request definitions/settings/schemas; implies `--trace`. |
+| `--trace-hooks` | Add invocation spans for every dispatched hook to diagnose harness/plugin overhead; implies `--trace`, without capturing content. |
 | `--trace-max-content-length 65536` | Increase the per-field capture limit from 16,384 characters. |
 | `--quiet` | Disable terminal JSON events; tracing continues independently. |
 
 Content capture does not automatically redact arbitrary secrets. Prompts,
 page content, form values, file contents and exception messages may be stored
 in the Docker volume. Enable it for data you intend to keep in local traces.
-Truncated input/output fields have `harnessed.input.truncated` or
-`harnessed.output.truncated` attributes and a `text/plain` MIME type; complete
-fields use JSON. Increase the limit when large DOM observations are cut off.
+All content fields, including truncated fields, contain valid `application/json`.
+Truncation sets `harnessed.<field>.truncated`, `.original_length` and `.omitted_items`
+attributes. Parse the JSON and inspect those markers; very small limits may retain
+only a placeholder. Each field has its own character budget.
 
 ## Read a trace
 
@@ -83,49 +85,84 @@ harnessed.turn                 session.id, turn ID, outcome
     harnessed.model            updated observations and final response
 ```
 
-Select a **model** or **tool** span to inspect its input/output. In Harnessed
-0.7.0, the root turn span has no input/output summary of its own. Each turn is a
-separate trace; use `session.id` to follow turns in the same conversation.
+The root **turn** span shows accepted user input and the final or partial answer,
+including accepted structured output. `harnessed.outcome` and
+`harnessed.output.partial` distinguish incomplete results. Each turn is a separate
+trace; use `session.id` to follow turns in the same conversation.
+
+**Model** spans also expose independently bounded `request.tools.value`,
+`request.settings.value` and `request.output_schema.value` fields when content
+capture is enabled. These describe the portable resolved request; provider-internal
+HTTP bodies, retries and defaults remain inside the model span.
 
 ### Browser time
 
-Below each step and tool span, browserrig adds spans for its own methods, named after
-the method. Each carries `harnessed.code.filepath` and `harnessed.code.lineno`, so
-`browserrig/tools/execution.py:285` leads straight to the code:
+Browserrig uses `traced`, `span` and `record` from the public `harnessed.tracing`
+API. Library spans use their full Python name, beginning with `browserrig.`;
+Harnessed runtime spans retain `harnessed.`. Decorated functions carry
+`code.function.name`, `code.file.path` and `code.line.number`, pointing at the
+installed source. Arguments and return values are not captured by decorators.
 
 ```text
 harnessed.step
-  harnessed.BrowserPerception.capture        observation before the model call
-    harnessed.wait_for_page                  phase, status, polls, probe_ms, reason
-    harnessed.capture_observation
-      harnessed.Tab.frames                   cached
-      harnessed.extract
-        harnessed._snapshot / _focused       one per CDP session, in parallel
-        harnessed._Assembler.run
-        harnessed.chrome_names               elements
-      harnessed.screenshot / annotate        only with an image
+  harnessed.hook                              with --trace-hooks
+    browserrig.observation.plugin.BrowserPerception.capture
+      browserrig.core.BrowserCoordination.acquire
+      browserrig.readiness.wait.wait_for_page
+      browserrig.observation.capture.capture_observation
+        browserrig.browser.tab.Tab.frames
+        browserrig.observation.extraction.extract
+          browserrig.observation.extraction._snapshot / _focused
+          browserrig.observation.extraction._Assembler.run
+          browserrig.observation.extraction.accessibility.chrome_names
+        browserrig.browser.images.screenshot
+  harnessed.model
   harnessed.tool
-    harnessed.Actions.run                    kind
-      harnessed.Actions._prepare             readiness before input
-      harnessed.operation                    the input itself
-        harnessed.Targeting.locate
-        harnessed.Mouse.move_to / click      pointer pacing
-        harnessed.Keyboard.type_text         typing pacing
-      harnessed.Actions._settle              readiness after input
-      harnessed.Actions.page_change          comparison probe of a chain
+    harnessed.hook                            ExecuteTool middleware
+      browserrig.tools.execution.Actions.run
+        browserrig.core.BrowserCoordination.acquire
+        browserrig.tools.execution.Actions._prepare
+        browserrig.operation
+          browserrig.tools.targeting.Targeting.locate
+          browserrig.input.mouse.Mouse.click
+        browserrig.tools.execution.Actions._settle
 ```
 
-A span's own time is its duration minus its children's. Readiness spans report how
-many probes ran (`polls`) and how long they took in total (`probe_ms`); the rest of
-their duration was spent waiting between probes. Hook handlers have no spans of
-their own: a slow `PreStep` handler shows up as step time outside these spans.
+File tools add `browserrig.files.system.FileSystem.*` and
+`browserrig.files.transfer.FileTransfer.*` spans. `FileReader.read` runs below
+`FileSystem.read_file` even across its worker thread, with format and extraction
+cache-hit metadata. JavaScript evaluation, navigation, reload and iframe
+presentation also have their own spans. Readiness records `polls`, `probe_ms`,
+status and phase; lock acquisition records `contended` separately from work while
+holding the lock.
 
-Individual CDP commands, browser network requests, provider HTTP requests and
-provider-internal retries do not get separate spans.
-Browser observations are visible inside model inputs when content capture is
-enabled. Terminal events and durable session logs remain available separately.
-Tool schemas and arbitrary provider settings are not included in the captured
-model input; it is a portable conversation snapshot, not a raw HTTP request.
+### Find a bottleneck
+
+Run the smoke test with `--trace-hooks`, then repeat the real task with the same
+flag. In Phoenix, expand the waterfall and compare:
+
+- `harnessed.model`: model/provider time, including provider retries.
+- `harnessed.hook`: invoked handler time. Inspect `code.function.name`,
+  `harnessed.hook.event`, `.owner` and `.priority` to identify the plugin.
+- `browserrig.*`: readiness, extraction, browser input, presentation and file work.
+- `BrowserCoordination.acquire`: time waiting for another operation to release control.
+
+A Waterfall hook includes the downstream continuation it awaits. Nested hook,
+tool and browser durations therefore overlap; do not add them as independent
+costs. To estimate a span's own time, subtract the union of its child intervals,
+counting overlapping intervals once. Large remaining hook time points to work in
+that handler; large remaining step/turn time is a place to investigate further,
+not proof of CPU overhead. It can include scheduling, serialization or work not
+covered by child spans. Readiness duration beyond `probe_ms` includes deliberate
+polling waits, and pointer/keyboard spans include configured input pacing.
+
+Hook spans are opt-in because high-volume events add export and instrumentation
+cost. Compare representative runs with and without `--trace-hooks`; use
+`--trace-content` separately when diagnosing request content, since capture and
+serialization also add work. Individual CDP commands, network requests and
+provider HTTP retries have no separate spans. Browser startup before an active
+tracer and independently created background tasks are not automatically attached
+to a turn.
 
 ## Configure the exporter
 
@@ -192,6 +229,7 @@ async def run_traced(model):
                         os.environ["OPENAI_API_KEY"]
                     ),
                     max_content_length=16_384,
+                    trace_hooks=True,
                 )
             ],
         )
@@ -211,7 +249,7 @@ does not install a global provider or add a second tracer abstraction.
 
 `ContentCapture.redacted(*secrets)` accepts literal strings and wrappers such as
 Pydantic `SecretStr`. Registered values are masked in model inputs/outputs, tool
-arguments/results and subsequent history before truncation. Execution and session
+arguments/results, turn summaries and request definitions/settings/schemas before truncation. Execution and session
 history retain their original values. Exception messages remain disabled unless
 `include_exception_messages=True`; `capture_content=True` retains the existing plain
 opt-in, including exception text. CLI `--trace-content` uses that boolean behavior.
@@ -249,8 +287,12 @@ async with tracing_plugins(
 
 Filters receive detached `TraceContent` values and may return a replacement or
 `None` to omit the field. Registered literals are masked in replacements too.
-Tool results can also appear in model history, so apply corresponding model-input
-rules when omitting a value everywhere. Failed filters omit content with a marker
+The filter kinds now include `TURN_INPUT`, `TURN_OUTPUT`, `MODEL_TOOLS`,
+`MODEL_SETTINGS` and `MODEL_OUTPUT_SCHEMA`. Tool results can also appear in model
+history and turn output, while tool arguments can appear in model output. Apply
+rules to every kind that can carry a copy when omitting a value everywhere.
+Explicit `record(...)` attributes are metadata outside content filtering; record
+only diagnostic counters and flags. Failed filters omit content with a marker
 and preserve the agent outcome. Optional OTel imports remain lazy when tracing is off.
 
 ## Stop, retain data and troubleshoot
@@ -271,13 +313,13 @@ the trace database.**
 | No `browserrig` project or spans | Run the smoke test with `--trace-content`; check stderr and the endpoint. The project is created on first ingestion. |
 | `401 Unauthorized` from local Phoenix | Reapply this `compose.yml`; it explicitly disables auth for local use. Remote authenticated endpoints need OTLP auth headers. |
 | Agent succeeds but no trace arrives | OTel export failures are logged to stderr and do not fail the agent. Verify ingestion in Phoenix; process exit alone is not proof. |
-| Empty input/output | Enable `--trace-content` and select a model/tool span rather than the root turn. |
-| Capture ends partway through a field | Raise `--trace-max-content-length`; inspect the truncation attributes. |
+| Empty input/output | Enable `--trace-content`; turn, model and tool content is opt-in. |
+| Capture ends partway through a field | Parse the JSON and inspect truncation markers; raise `--trace-max-content-length`. |
 | Missing optional dependency | Include `--extra otel` when syncing and running; include `--extra openai` for the OpenAI example. |
 
 ## References
 
-- [Harnessed 0.13.0 tracing guide](https://github.com/mathisarends/harnessed/blob/v0.13.0/docs/guides/tracing.md)
+- [Harnessed 0.14.0 tracing guide](https://github.com/mathisarends/harnessed/blob/v0.14.0/docs/guides/tracing.md)
 - [Phoenix Docker and persistent SQLite setup](https://arize.com/docs/phoenix/self-hosting/deployment-options/docker)
 - [Phoenix 21 release notes](https://github.com/Arize-ai/phoenix/releases/tag/arize-phoenix-v21.0.0)
 - [Integration feedback collected for Harnessed](harnessed-telemetry-feedback.md)
