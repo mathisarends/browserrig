@@ -88,7 +88,7 @@
       () => {
         scan.dataset.state = 'hidden';
       },
-      event.region ? 1500 : 0,
+      event.region ? 3000 : 0,
     );
   };
   const capture = (region) => {

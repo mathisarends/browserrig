@@ -673,7 +673,7 @@ body:has(#keyboard[data-visible='true']) #caption {
     color-mix(in srgb, var(--violet) 55%, transparent) 99%,
     transparent
   );
-  animation: read 1300ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation: read 2600ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 #scan[data-state='focus'] {
   background: color-mix(in srgb, var(--violet) 4%, transparent);
@@ -682,7 +682,7 @@ body:has(#keyboard[data-visible='true']) #caption {
   box-shadow: 0 0 0 100vmax #1818182e;
 }
 #scan[data-state='focus']::before {
-  animation: read 900ms cubic-bezier(0.45, 0, 0.55, 1) forwards;
+  animation: read 1800ms cubic-bezier(0.45, 0, 0.55, 1) forwards;
 }
 #scan[data-partial='true']::after {
   content: '';
