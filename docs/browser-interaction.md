@@ -207,6 +207,10 @@ and native HTML5 drag and drop, including `DataTransfer`, automatically.
 `scroll` sends wheel input at the current cursor position: move over a sidebar,
 panel, or other scrollable area first to scroll that area. `delta_x` scrolls
 sideways, for example through a carousel or a wide table.
+Both also take an observed `ref` instead of coordinates: `move_mouse(ref=...)`
+hovers that element, and `scroll(ref=..., delta_y=...)` turns the wheel over it,
+so a list inside a modal or sidebar scrolls without a screenshot. The ref is
+revealed first, like a click target.
 Both `click` and `click_at` accept `button="right"` for a native right click;
 the default is `button="left"`. Both tools automatically move the cursor to the
 target before clicking. Right clicks end the action chain so the agent can

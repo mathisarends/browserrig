@@ -251,6 +251,73 @@ async def test_scroll_moves_a_carousel_horizontally(site):
         assert state["page"] == 0
 
 
+async def test_scroll_and_hover_by_ref_target_the_element_not_the_cursor(site):
+    holder = {}
+
+    class Panels(Plugin, needs=(Browser,)):
+        _setup_browser = needs(Browser)
+
+        async def setup(self):
+            tab = holder["tab"] = self._setup_browser.active_tab
+            await evaluate(
+                tab,
+                """document.body.innerHTML = `<style>
+                    body{margin:0;height:2200px}
+                    .panel{position:absolute;top:80px;width:200px;height:240px;overflow:auto}
+                    #first{left:20px}#second{left:320px}
+                    .content{height:1600px}
+                    </style>
+                    <div id=first class=panel><div class=content>
+                        <button>First item</button></div></div>
+                    <div id=second class=panel><div class=content>
+                        <button>Second item</button></div></div>`;
+                    window.clicks=0;window.hovered=[];
+                    document.addEventListener('click',()=>window.clicks++);
+                    document.querySelectorAll('button').forEach(button=>{
+                        button.addEventListener('mouseenter',
+                            ()=>window.hovered.push(button.textContent))
+                    });""",
+            )
+
+    step = 0
+
+    async def respond(request):
+        nonlocal step
+        step += 1
+        if step == 1:
+            ref = _ref(request, "Second item")
+            yield ModelChunk(tool_call=ToolCall("scroll", {"ref": ref, "delta_y": 180}))
+        elif step == 2:
+            ref = _ref(request, "First item")
+            yield ModelChunk(tool_call=ToolCall("move_mouse", {"ref": ref}))
+        else:
+            yield ModelChunk(text="Done")
+
+    agent = Agent(
+        model=CallbackModel(respond),
+        browser=Chrome.launch(url=site),
+        plugins=[Approvals(default=PolicyDecision.ALLOW), Panels()],
+    )
+    async with agent.session() as session:
+        result = await session.run("Scroll one panel and hover the other", max_steps=5)
+        assert result.text == "Done"
+        receipts = [
+            e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)
+        ]
+        assert len(receipts) == 2
+        assert all(not receipt.result.is_error for receipt in receipts)
+        state = await evaluate(
+            holder["tab"],
+            "({first:document.querySelector('#first').scrollTop,"
+            "second:document.querySelector('#second').scrollTop,page:scrollY,"
+            "clicks:window.clicks,hovered:window.hovered})",
+        )
+        assert state["second"] == pytest.approx(180, abs=1)
+        assert state["first"] == 0 and state["page"] == 0
+        assert state["clicks"] == 0
+        assert state["hovered"][-1] == "First item"
+
+
 async def test_element_highlight_uses_live_bounds_after_scroll(site):
     holder = {}
     output = io.StringIO()

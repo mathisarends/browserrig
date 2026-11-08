@@ -56,18 +56,32 @@ class PointerTools(Plugin, needs=(Actions,)):
     @tool(
         kind=ActionKind.MOVE_MOUSE,
         description=(
-            "Move the cursor to image or viewport coordinates without clicking. "
-            "Use before scroll to target a particular scrollable area, or to hover."
+            "Move the cursor without clicking, to hover menus or tooltips or to target "
+            "scroll. Give an observed ref, or x and y in image or viewport coordinates."
         ),
     )
     async def move_mouse(
         self,
-        x: Annotated[float, Field(ge=0)],
-        y: Annotated[float, Field(ge=0)],
+        x: Annotated[float | None, Field(ge=0)] = None,
+        y: Annotated[float | None, Field(ge=0)] = None,
+        ref: str | None = None,
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
-        async def move(_tab: Tab) -> Effect:
+        if ref is not None and (x is not None or y is not None):
+            raise ToolError("Provide either ref or coordinates, not both")
+        if ref is None and (x is None or y is None):
+            raise ToolError("Provide ref, or both x and y")
+
+        async def move(tab: Tab) -> Effect:
+            if ref is not None:
+                point = await actions.element_point(tab=tab, ref=ref)
+                await self._browser.input.mouse.move_to(point)
+                return Effect(
+                    "Cursor moved onto the ref without clicking.",
+                    prepared_scroll=point.scrolled,
+                )
+            assert x is not None and y is not None
             point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
             await self._browser.input.mouse.move_to(point)
             return Effect("Cursor moved without clicking.")
@@ -102,24 +116,34 @@ class PointerTools(Plugin, needs=(Actions,)):
     @tool(
         kind=ActionKind.SCROLL,
         description=(
-            "Scroll by CSS pixels at the current cursor position: delta_y down (negative up), "
-            "delta_x right (negative left), e.g. for carousels or wide tables. "
-            "Use move_mouse first to target a particular scrollable area."
+            "Scroll by CSS pixels: delta_y down (negative up), delta_x right (negative left), "
+            "e.g. for carousels or wide tables. With ref, the wheel turns over that observed "
+            "element, so a list, panel or modal scrolls instead of the page; without ref, "
+            "it turns at the current cursor position."
         ),
     )
     async def scroll(
         self,
         delta_y: _ScrollDelta = 0,
         delta_x: _ScrollDelta = 0,
+        ref: str | None = None,
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
         if delta_y == 0 and delta_x == 0:
             raise ToolError("Provide a non-zero delta_y or delta_x")
 
-        async def scroll(_tab: Tab) -> Effect:
-            await self._browser.input.mouse.scroll(delta_y=delta_y, delta_x=delta_x)
-            return Effect("Scroll dispatched.")
+        async def scroll(tab: Tab) -> Effect:
+            point = None
+            if ref is not None:
+                point = await actions.element_point(tab=tab, ref=ref)
+            await self._browser.input.mouse.scroll(
+                delta_y=delta_y, delta_x=delta_x, point=point
+            )
+            return Effect(
+                "Scroll dispatched.",
+                prepared_scroll=point is not None and point.scrolled,
+            )
 
         return await actions.run(
             kind=ActionKind.SCROLL,
