@@ -80,6 +80,7 @@ class EventKind(StrEnum):
     FIND_RESULTS = "browser.find.results"
     PAGE_CAPTURE_STARTED = "browser.page.capture.started"
     PAGE_CAPTURE_FINISHED = "browser.page.capture.finished"
+    WORK_PRESENTED = "browser.work.presented"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -425,6 +426,7 @@ class FileReadFailedEvent(BrowserEvent):
     read_id: str
     path: str
     reason: str
+    cancelled: bool = field(default=False, kw_only=True)
     type: Literal[EventKind.FILE_READ_FAILED] = field(
         default=EventKind.FILE_READ_FAILED, kw_only=True
     )
@@ -497,6 +499,7 @@ class ActionFailedEvent(BrowserEvent):
     kind: ActionKind
     dispatched: bool
     reason: str
+    cancelled: bool = field(default=False, kw_only=True)
     type: Literal[EventKind.ACTION_FAILED] = field(
         default=EventKind.ACTION_FAILED, kw_only=True
     )

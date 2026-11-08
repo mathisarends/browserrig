@@ -37,6 +37,7 @@ from browserrig.secrets import Secrets
 
 from .capture import CaptureStrategy, DomCapture, capture_observation
 from .config import Screenshots, ScreenshotTrigger
+from .content import PageContent as ExtractedContent
 from .content import extract_content
 from .delta import delta, unmarked
 from .handle import DomElementHandle
@@ -95,6 +96,11 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     async def setup(self, ctx: Scope) -> None:
         # Secrets is looked up per capture, so it redacts wherever it sits in the plugins.
         self._state.context = ctx
+
+    @property
+    def extracted_content(self) -> ExtractedContent | None:
+        """The latest successful extraction, retained separately from observations."""
+        return self._state.extracted_content
 
     def instructions(self) -> SystemPrompt:
         refs = self.renderer.refs()
@@ -300,6 +306,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             content = await extract_content(
                 tab, max_chars=max_chars, full_page=full_page, offset=offset
             )
+            self._state.extracted_content = content
             return ToolResult(content.render())
 
     def project(self, snapshot: Snapshot) -> UserMessage:

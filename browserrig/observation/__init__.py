@@ -1,6 +1,7 @@
 from .capture import CaptureContent, CaptureStrategy, DomCapture, capture
 from .changes import decision_change
 from .config import Screenshots, ScreenshotTrigger
+from .content import PageContent as ExtractedContent
 from .find import FindMark, FoundMatch, PageMatches, close_find, find_text
 from .handle import DomElementHandle, DomReferences
 from .images import ImageContext, ImageRetention, TrimInBatches, UntilCompaction
@@ -28,6 +29,7 @@ __all__ = [
     "TrimInBatches",
     "UntilCompaction",
     "CapturedImage",
+    "ExtractedContent",
     "DomRenderer",
     "Renderer",
     "capture",

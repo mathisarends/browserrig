@@ -1,19 +1,27 @@
 import asyncio
+import base64
 
 import pytest
-from harnessed import Agent, Plugin
+from harnessed import Agent, Plugin, PolicyDecision, ToolCall
+from harnessed.models import ModelChunk
+from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel
 
+from browserrig import Agent as BrowserAgent
 from browserrig import (
     Browser,
     Chrome,
+    Files,
     IframeRenderer,
+    InputPacing,
     InputVisualization,
+    LocalWorkspace,
     Point,
     Viewport,
+    wait_for_page,
 )
-from browserrig.browser import Frame
-from browserrig.choreography import FileTransferEvent
+from browserrig.browser import Frame, screenshot
+from browserrig.choreography import FileTransferEvent, WorkPhase, WorkPresentedEvent
 from browserrig.core import FileTransferDirection
 from browserrig.events import (
     CursorStateEvent,
@@ -23,6 +31,7 @@ from browserrig.events import (
     KeyPressedEvent,
     ScrollStartedEvent,
 )
+from browserrig.observation.content import extract_content
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
@@ -149,6 +158,222 @@ async def test_long_cursor_badge_stays_inside_a_compact_viewport(site):
             )
             assert 0 <= bounds["left"] < bounds["right"] <= 360
             assert 0 <= bounds["top"] < bounds["bottom"] <= 640
+
+
+@pytest.mark.parametrize("local_renderer", [False, True])
+async def test_work_stream_is_complete_with_and_without_local_rendering(
+    site, tmp_path, local_renderer
+):
+    calls = [
+        ToolCall("write_file", {"path": "notes.md", "content": "Research notes"}),
+        ToolCall("read_file", {"path": "notes.md"}),
+        ToolCall("list_files", {}),
+        ToolCall("extract_content", {}),
+        ToolCall("execute_javascript", {"code": "({answer: 42})"}),
+        ToolCall("screenshot", {}),
+    ]
+    agent = BrowserAgent(
+        model=ScriptedModel(
+            [*([ModelChunk(tool_call=call)] for call in calls), "Done"]
+        ),
+        browser=Chrome.launch(url=site),
+        plugins=[
+            Files(LocalWorkspace(tmp_path)),
+            InputVisualization(renderer=IframeRenderer() if local_renderer else None),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
+        without=(InputPacing,),
+    )
+    receipts = []
+    async with agent.session() as session:
+        session.scope.on(WorkPresentedEvent, receipts.append)
+        result = await session.run("Read and extract the research material")
+        assert result.text == "Done"
+        assert not any(isinstance(event, WorkPresentedEvent) for event in result.events)
+        for call in calls:
+            updates = [receipt for receipt in receipts if receipt.call_id == call.id]
+            assert updates[0].phase is WorkPhase.RUNNING
+            assert updates[-1].phase is WorkPhase.COMPLETED
+            assert updates[-1].browser_id and updates[-1].target_id
+        read = [receipt for receipt in receipts if receipt.call_id == calls[1].id][-1]
+        assert read.preview == "Research notes"
+        extraction = [
+            receipt for receipt in receipts if receipt.call_id == calls[3].id
+        ][-1]
+        assert "Download PDF" in extraction.preview and not extraction.artifact_path
+        capture = [receipt for receipt in receipts if receipt.call_id == calls[-1].id][
+            -1
+        ]
+        assert capture.image_url.startswith("data:image/jpeg;base64,")
+        assert capture.region.width > 0
+        tab = session.scope[Browser].active_tab
+        tree = await tab.frame_tree()
+        assert bool(tree.child_frames) is local_renderer
+        if local_renderer:
+            assert (
+                await _surface(
+                    tab, "document.querySelector('.work-thumbnail').naturalWidth"
+                )
+                <= 320
+            )
+
+
+async def test_work_preview_is_inert_text_and_is_excluded_from_extraction(site):
+    agent = BrowserAgent(model=ScriptedModel([]), browser=Chrome.launch(url=site))
+    async with agent.session() as session:
+        tab = session.scope[Browser].active_tab
+        markup = '<img src=x onerror="parent.injected=true">'
+        await tab.emit(
+            WorkPresentedEvent(
+                work_id="preview",
+                kind="read_file",
+                title="Read file",
+                phase=WorkPhase.COMPLETED,
+                preview=markup,
+            )
+        )
+        assert (
+            await _surface(tab, "document.querySelector('.work-preview').textContent")
+            == markup
+        )
+        assert await _surface(
+            tab, "document.querySelector('.work-preview img') === null"
+        )
+
+        content = await extract_content(tab)
+        assert (
+            markup not in content.markdown
+            and "Preview · first lines" not in content.markdown
+        )
+
+
+async def test_simultaneous_downloads_keep_independent_progress_and_outcomes(site):
+    agent = Agent(
+        model=ScriptedModel([]), plugins=[Chrome.launch(url=site), InputVisualization()]
+    )
+    async with agent.session() as session:
+        tab = session.scope[Browser].active_tab
+        await tab.emit(
+            DownloadStartedEvent(download_id="a", filename="a.pdf", url=site)
+        )
+        await tab.emit(
+            DownloadStartedEvent(download_id="b", filename="b.pdf", url=site)
+        )
+        await tab.emit(
+            DownloadCompletedEvent(download_id="a", filename="a.pdf", size=10)
+        )
+        state = await _surface(
+            tab,
+            "[...document.querySelectorAll('#downloads [data-download-id]')]"
+            ".map(node => [node.dataset.downloadId, node.dataset.state])",
+        )
+        assert state == [["a", "completed"], ["b", "active"]]
+        await tab.emit(
+            FileTransferEvent(
+                direction=FileTransferDirection.OPEN, paths=("notes.md",), duration=0.01
+            )
+        )
+        await asyncio.sleep(1.9)
+        assert (
+            await _surface(tab, "document.querySelector('#opening').dataset.visible")
+            == "false"
+        )
+        assert (
+            await _surface(
+                tab, "document.querySelector('[data-download-id=b]').dataset.visible"
+            )
+            == "true"
+        )
+
+
+@pytest.mark.parametrize("theme,width", [("dark", 1280), ("light", 360)])
+async def test_work_and_transfers_fit_the_viewport(site, tmp_path, theme, width):
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            Chrome.launch(url=site, viewport=Viewport(width=width, height=740)),
+            InputVisualization(renderer=IframeRenderer(theme=theme)),
+        ],
+    )
+    async with agent.session() as session:
+        tab = session.scope[Browser].active_tab
+        await tab.emit(
+            WorkPresentedEvent(
+                work_id="report",
+                kind="read_file",
+                phase=WorkPhase.COMPLETED,
+                title="Read research report",
+                detail="report.pdf · page 2 / 18 · 8,420 characters",
+                preview=(
+                    "# Research findings\n\nThe report contains the selected page.\n"
+                    "The full extraction remains in the workspace."
+                ),
+                artifact_path=".content/report-page-2.md",
+            )
+        )
+        await tab.emit(
+            DownloadStartedEvent(
+                download_id="a", filename="Annual report.pdf", url=site
+            )
+        )
+        boxes = await _surface(
+            tab,
+            "['#work', '#downloads'].map(selector => {"
+            " const r=document.querySelector(selector).getBoundingClientRect();"
+            " return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}; })",
+        )
+        work, download = boxes
+        assert all(0 <= box["left"] < box["right"] <= width for box in boxes)
+        assert work["right"] <= download["left"] or download["bottom"] <= work["top"]
+        await asyncio.sleep(0.2)
+        image = await screenshot(tab, overlays=True)
+        (tmp_path / f"work-proof-{theme}-{width}.png").write_bytes(
+            base64.b64decode(image)
+        )
+
+
+async def test_running_work_restores_after_navigation_without_pointer_input(site):
+    agent = Agent(
+        model=ScriptedModel([]), plugins=[Chrome.launch(url=site), InputVisualization()]
+    )
+    async with agent.session() as session:
+        tab = session.scope[Browser].active_tab
+        await tab.emit(
+            WorkPresentedEvent(
+                work_id="read",
+                kind="read_file",
+                title="Reading report",
+                phase=WorkPhase.RUNNING,
+            )
+        )
+        await tab.navigate(site + "/other")
+        await wait_for_page(tab)
+        assert (
+            await _surface(
+                tab, "document.querySelector('[data-work-id=read]').dataset.phase"
+            )
+            == "running"
+        )
+        await tab.emit(
+            WorkPresentedEvent(
+                work_id="read",
+                kind="read_file",
+                title="Read report",
+                phase=WorkPhase.COMPLETED,
+            )
+        )
+        assert (
+            await _surface(
+                tab, "document.querySelectorAll('[data-work-id=read]').length"
+            )
+            == 1
+        )
+        assert (
+            await _surface(
+                tab, "document.querySelector('[data-work-id=read]').dataset.phase"
+            )
+            == "completed"
+        )
 
 
 async def _surface(tab, expression):

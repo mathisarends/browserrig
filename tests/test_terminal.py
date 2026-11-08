@@ -24,7 +24,12 @@ from harnessed.events import (
 from harnessed.testing import ScriptedModel
 
 from browserrig import TerminalEvents
-from browserrig.choreography import SCENE_EVENTS, WaitingEvent
+from browserrig.choreography import (
+    SCENE_EVENTS,
+    WaitingEvent,
+    WorkPhase,
+    WorkPresentedEvent,
+)
 from browserrig.events import INPUT_EVENTS, BrowserEvent, KeyPressedEvent
 from browserrig.terminal import _event_record
 
@@ -74,6 +79,25 @@ def test_terminal_omits_arbitrary_page_and_form_value_fields():
         FormEvent(value="private form", message="page dialog", text="page text")
     )
     assert not {"text", "message", "value"} & record.keys()
+
+
+def test_terminal_omits_rich_work_preview_content():
+    record = _event_record(
+        WorkPresentedEvent(
+            work_id="read",
+            kind="read_file",
+            phase=WorkPhase.COMPLETED,
+            title="Page title",
+            detail="A form value",
+            preview="Private document text",
+            limitations=("Document content",),
+            image_url="data:image/png;base64,private",
+        )
+    )
+    assert (
+        not {"preview", "image_url", "title", "detail", "limitations"} & record.keys()
+    )
+    assert record["work_id"] == "read" and record["phase"] == WorkPhase.COMPLETED
 
 
 async def test_terminal_reports_correlated_compaction_and_attempts_without_inventing_counters():

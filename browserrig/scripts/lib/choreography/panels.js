@@ -47,11 +47,12 @@ function createChoreographyPanels(ui) {
     ui.hide('navigation', event.duration * 1000 + 700);
   };
   const show = (event) => {
+    const kinds = ui.options().events;
     switch (event.type) {
-      case 'browser.element.highlight':
+      case kinds.HIGHLIGHT_ELEMENT:
         highlight(event);
         break;
-      case 'browser.bar.typed':
+      case kinds.BAR_TYPED:
         if (event.browser_bar === 'address') {
           ui.node('address-text').textContent = event.text;
           ui.panel('address', true);
@@ -67,19 +68,19 @@ function createChoreographyPanels(ui) {
           ui.node('find-text').textContent = event.text;
         }
         break;
-      case 'browser.find.bar':
+      case kinds.FIND_BAR:
         ui.panel('find', event.visible);
         if (!event.visible) {
           ui.node('matches').replaceChildren();
         }
         break;
-      case 'browser.find.results':
+      case kinds.FIND_RESULTS:
         matches(event);
         break;
-      case 'browser.tab.pressed':
+      case kinds.TAB_PRESSED:
         tab(event);
         break;
-      case 'browser.waiting':
+      case kinds.WAITING:
         ui.node('status-text').textContent = `Waiting · ${event.duration.toFixed(1)} s`;
         ui.panel('status', true);
         ui.hide('status', event.duration * 1000);

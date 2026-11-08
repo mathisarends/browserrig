@@ -112,8 +112,9 @@ function createChoreographyKeyboard(ui) {
     }
   };
   const show = (event) => {
+    const kinds = ui.options().events;
     switch (event.type) {
-      case 'browser.keyboard.visibility':
+      case kinds.KEYBOARD_VISIBILITY:
         typing = event.visible;
         ensure();
         if (typing) {
@@ -122,8 +123,8 @@ function createChoreographyKeyboard(ui) {
           ui.hide('keyboard');
         }
         break;
-      case 'browser.key.pressed':
-      case 'browser.bar.typed':
+      case kinds.KEY_PRESSED:
+      case kinds.BAR_TYPED:
         press(event);
         break;
       default:

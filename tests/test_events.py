@@ -3,9 +3,16 @@ from typing import get_args, get_type_hints
 
 import pytest
 from harnessed.events import EventRegistry
+from pydantic import TypeAdapter
 
 from browserrig import events
-from browserrig.choreography import SCENE_EVENTS
+from browserrig.choreography import (
+    SCENE_EVENTS,
+    CaptureRegion,
+    WorkPhase,
+    WorkPresentedEvent,
+)
+from browserrig.core import ActionKind
 
 
 def test_enum_tags_and_registry_roundtrip():
@@ -41,6 +48,26 @@ def test_action_page_state_roundtrips_as_a_typed_nested_value():
     restored = registry.decode(registry.encode(event))
     assert restored == event
     assert isinstance(restored.before, events.PageState)
+
+
+def test_canvas_work_contract_roundtrips_with_typed_geometry_and_phase():
+    adapter = TypeAdapter(WorkPresentedEvent)
+    event = WorkPresentedEvent(
+        work_id="capture",
+        call_id="call",
+        kind=ActionKind.SCREENSHOT,
+        title="Screenshot",
+        phase=WorkPhase.COMPLETED,
+        region=CaptureRegion(x=10, y=20, width=100, height=80),
+        target_id="tab",
+        document_id="document",
+    )
+    restored = adapter.validate_json(adapter.dump_json(event))
+    EventRegistry(SCENE_EVENTS).validate(restored)
+    assert restored == event
+    assert restored.phase is WorkPhase.COMPLETED and isinstance(
+        restored.region, CaptureRegion
+    )
 
 
 @pytest.mark.parametrize(

@@ -88,6 +88,13 @@
 
 ### Added
 
+- Visualize file reads/writes, content extraction, listings, JavaScript, screenshots,
+  history navigation, form changes, readiness, handoff and failures through shared
+  typed `WorkPresentedEvent` receipts. The same transient stream supports the local
+  inert overlay and external Canvas viewers, including previews, source geometry,
+  result metadata and explicit terminal states. Restore fresh receipts after
+  navigation and keep concurrent downloads independent.
+
 - Readiness waits for the requests a click, input or navigation started
   (`NetworkQuiet`, now the default policy), so observations no longer miss
   results that arrive after the DOM was briefly quiet. Sockets, streams, polling

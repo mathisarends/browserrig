@@ -163,13 +163,14 @@ function createChoreographyCursor(ui) {
     ]);
   };
   const show = (event) => {
+    const kinds = ui.options().events;
     label();
     switch (event.type) {
-      case 'browser.cursor.moved':
-      case 'browser.cursor.entered':
+      case kinds.CURSOR_MOVED:
+      case kinds.CURSOR_ENTERED:
         move(event);
         break;
-      case 'browser.cursor.state':
+      case kinds.CURSOR_STATE:
         route++;
         trail.setAttribute('d', '');
         if (browserControl) {
@@ -179,22 +180,22 @@ function createChoreographyCursor(ui) {
         }
         place([event.x, event.y]);
         break;
-      case 'browser.cursor.style':
+      case kinds.CURSOR_STYLE:
         nativeStyle = event.style;
         style = browserControl ? style : nativeStyle;
         shape();
         place(point);
         break;
-      case 'browser.pointer.pressed':
+      case kinds.POINTER_PRESSED:
         click(event);
         break;
-      case 'browser.scroll.started':
+      case kinds.SCROLL_STARTED:
         startScroll(event);
         break;
-      case 'browser.scrolled':
+      case kinds.SCROLLED:
         ui.later('scroll-end', endScroll, 180);
         break;
-      case 'browser.tab.pressed': {
+      case kinds.TAB_PRESSED: {
         browserControl = true;
         style = 'pointer';
         shape();
@@ -202,14 +203,14 @@ function createChoreographyCursor(ui) {
         move({...event, to_position: [target.left + 25, target.top + 20]});
         break;
       }
-      case 'browser.bar.typed':
+      case kinds.BAR_TYPED:
         address(event);
         break;
-      case 'browser.activity.started':
+      case kinds.ACTIVITY_STARTED:
         activities.set(event.interval_id, event.kind);
         label();
         break;
-      case 'browser.activity.finished':
+      case kinds.ACTIVITY_FINISHED:
         activities.delete(event.interval_id);
         label();
         break;
@@ -218,5 +219,9 @@ function createChoreographyCursor(ui) {
     }
   };
   shape();
-  return {show, point: () => point};
+  const reset = () => {
+    activities.clear();
+    label();
+  };
+  return {show, reset, point: () => point};
 }

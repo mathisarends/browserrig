@@ -10,8 +10,11 @@ from pydantic import Field
 
 from browserrig.browser import Overlay, Tab
 from browserrig.core import Options
-from browserrig.events import BrowserEvent, LiveEvent
+from browserrig.events import BrowserEvent, EventKind, LiveEvent
 from browserrig.scripts import CHOREOGRAPHY
+
+from .events import WorkPhase
+from .receipts import Receipts
 
 
 class IframeRenderer(Options):
@@ -29,11 +32,37 @@ class IframeRenderer(Options):
 class IframeView:
     def __init__(self, options: IframeRenderer) -> None:
         self._presentation = options.model_dump(mode="json")
+        self._presentation["events"] = {kind.name: kind.value for kind in EventKind}
+        self._presentation["phases"] = {phase.name: phase.value for phase in WorkPhase}
         self._overlays: dict[str, Overlay] = {}
         self._lock = asyncio.Lock()
         self._closed = False
+        self._receipts = Receipts()
+        self._shown: tuple[str, str] | None = None
+
+    def remember(self, event: LiveEvent | BrowserEvent) -> None:
+        """Retain receipts even when the document cannot currently render them."""
+        self._receipts.remember(event)
+
+    def suspend(self) -> None:
+        """Request state restoration after a dialog or unavailable document."""
+        self._shown = None
+
+    async def restore(self, tab: Tab) -> None:
+        """Restore state without inventing a browser input event."""
+        await self._show(tab, None)
 
     async def show(self, tab: Tab, event: LiveEvent | BrowserEvent) -> None:
+        self.remember(event)
+        await self._show(tab, event)
+
+    async def close(self) -> None:
+        async with self._lock:
+            self._closed = True
+            overlays, self._overlays = self._overlays, {}
+            await asyncio.gather(*(overlay.close() for overlay in overlays.values()))
+
+    async def _show(self, tab: Tab, event: LiveEvent | BrowserEvent | None) -> None:
         async with self._lock:
             if self._closed:
                 return
@@ -43,13 +72,19 @@ class IframeView:
                     html=_document(), script=CHOREOGRAPHY
                 )
                 self._overlays[tab.id] = overlay
-            await overlay.send({**asdict(event), "presentation": self._presentation})
-
-    async def close(self) -> None:
-        async with self._lock:
-            self._closed = True
-            overlays, self._overlays = self._overlays, {}
-            await asyncio.gather(*(overlay.close() for overlay in overlays.values()))
+            identity = (tab.id, tab.document_id)
+            data = asdict(event) if event is not None else {}
+            data["presentation"] = {
+                **self._presentation,
+                "target_id": tab.id,
+                "document_id": tab.document_id,
+            }
+            if identity != self._shown:
+                data["restore"] = [
+                    asdict(receipt) for receipt in self._receipts.snapshot()
+                ]
+            await overlay.send(data)
+            self._shown = identity
 
 
 @cache

@@ -6,12 +6,14 @@ from harnessed.kernel import Scope
 from browserrig.core import DocumentId, Region, TargetId
 
 from .capture import CapturedObservation
+from .content import PageContent as ExtractedContent
 from .models import CapturedImage
 
 
 @dataclass
 class BrowserPerceptionState:
     observation: CapturedObservation | None = None
+    extracted_content: ExtractedContent | None = None
     delivered_image: CapturedImage | None = None
     screenshot_requested: bool = False
     screenshot_region: Region | None = None

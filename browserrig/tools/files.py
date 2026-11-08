@@ -234,7 +234,12 @@ class FileTools(Plugin):
                 else str(error)
             )
             await self._events.emit(
-                FileReadFailedEvent(read_id=read_id, path=path, reason=reason)
+                FileReadFailedEvent(
+                    read_id=read_id,
+                    path=path,
+                    reason=reason,
+                    cancelled=isinstance(error, asyncio.CancelledError),
+                )
             )
             raise
         await self._events.emit(

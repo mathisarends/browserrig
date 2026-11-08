@@ -4,10 +4,17 @@ They are only emitted while the `InputVisualization` plugin is mounted.
 """
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Literal
 
-from browserrig.core import BrowserBar, FileTransferDirection, TabGesture
-from browserrig.events import EventKind, InputEvent
+from browserrig.core import (
+    ActionKind,
+    BrowserBar,
+    FileTransferDirection,
+    TabGesture,
+)
+from browserrig.events import EventKind, InputEvent, LiveEvent
+from browserrig.files import FileReadStatus
 from browserrig.observation import FindMark
 
 
@@ -121,6 +128,65 @@ class CursorEnteredEvent(InputEvent):
     )
 
 
+class WorkPhase(StrEnum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    WARNING = "warning"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+@dataclass(frozen=True, slots=True)
+class CaptureRegion:
+    """An immutable rectangle in the source tab's viewport CSS pixels."""
+
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+@dataclass(frozen=True, slots=True)
+class WorkPresentedEvent(LiveEvent):
+    """Bounded, redacted work receipt for inert overlays and external viewers.
+
+    Preview text is data, never HTML. A screenshot receipt is completed only after
+    the requested observation has actually captured an image.
+    """
+
+    work_id: str
+    kind: ActionKind | None
+    title: str
+    phase: WorkPhase
+    call_id: str = ""
+    tool_name: str = ""
+    action_id: str = ""
+    detail: str = ""
+    source_url: str = ""
+    source_path: str = ""
+    characters: int | None = None
+    offset: int = 0
+    next_offset: int | None = None
+    page_number: int | None = None
+    page_count: int | None = None
+    content_status: FileReadStatus | None = None
+    preview: str = ""
+    limitations: tuple[str, ...] = ()
+    artifact_path: str = ""
+    image_url: str = field(default="", repr=False)
+    region: CaptureRegion | None = None
+    elapsed: float = 0
+    retention: float = 8
+    type: Literal[EventKind.WORK_PRESENTED] = field(
+        default=EventKind.WORK_PRESENTED, kw_only=True
+    )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "phase", WorkPhase(self.phase))
+        if self.kind is not None:
+            object.__setattr__(self, "kind", ActionKind(self.kind))
+
+
 SCENE_EVENTS = (
     HighlightElementEvent,
     WaitingEvent,
@@ -130,4 +196,5 @@ SCENE_EVENTS = (
     FileTransferEvent,
     TabPressedEvent,
     CursorEnteredEvent,
+    WorkPresentedEvent,
 )

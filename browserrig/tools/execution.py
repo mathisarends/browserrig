@@ -198,7 +198,9 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
                     if dispatched
                     else "cancelled"
                 )
-                await self._fail(tab, action_id, kind, dispatched, reason)
+                await self._fail(
+                    tab, action_id, kind, dispatched, reason, cancelled=True
+                )
                 raise
             except Exception as error:
                 reason = (
@@ -331,7 +333,14 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         return effect, note
 
     async def _fail(
-        self, tab: Tab, action_id: str, kind: ActionKind, dispatched: bool, reason: str
+        self,
+        tab: Tab,
+        action_id: str,
+        kind: ActionKind,
+        dispatched: bool,
+        reason: str,
+        *,
+        cancelled: bool = False,
     ) -> None:
         await self._events.emit(
             ActionFailedEvent(
@@ -341,5 +350,6 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
                 document_id=tab.document_id,
                 dispatched=dispatched,
                 reason=reason,
+                cancelled=cancelled,
             )
         )

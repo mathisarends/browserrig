@@ -353,6 +353,7 @@ alongside its durable browser events:
 | `HighlightElementEvent` | DOM reference and viewport bounds |
 | `WaitingEvent` | Requested wait duration |
 | `FileTransferEvent` | `open` or `upload`, file paths, duration and the upload target point |
+| `WorkPresentedEvent` | Shared browser/Canvas work receipt: identity, typed phase, preview, result metadata, saved path and source capture geometry |
 | `DownloadProgressedEvent` | Download ID, received bytes and total bytes when known |
 | `TabUpdatedEvent` | URL, document title, `loading` flag and favicon as a `data:` URI |
 

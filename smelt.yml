@@ -71,7 +71,7 @@ architecture:
     # Staging for viewers is optional: it builds on the rest, nothing builds on it.
     choreography:
       path: choreography
-      may_depend_on: [core, scripts, input, browser, observation, tools]
+      may_depend_on: [core, scripts, input, browser, observation, tools, files, secrets]
     terminal: {path: terminal, may_depend_on: [core]}
     completion: {path: completion}
 

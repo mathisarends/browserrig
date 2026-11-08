@@ -32,6 +32,7 @@ from browserrig import (
     Files,
     FileSystem,
     FileTools,
+    InputVisualization,
     LocalWorkspace,
     MountedWorkspace,
     Readiness,
@@ -351,7 +352,8 @@ async def test_file_tools_follow_the_workspace_and_the_browser_bridge(
 
     workspace = LocalWorkspace(tmp_path / "workspace")
     agent = browserrig.Agent(
-        model=ScriptedModel(["unused"]), plugins=[Files(workspace)]
+        model=ScriptedModel(["unused"]),
+        plugins=[Files(workspace), InputVisualization(renderer=None)],
     )
     async with agent.session() as session:
         tools = session.scope[ToolRegistry]

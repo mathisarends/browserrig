@@ -35,11 +35,25 @@
     <div id="status" class="panel">
       <span class="spinner"></span><span id="status-text"></span>
     </div>
-    <div id="download" class="transfer panel">
-      <div class="file-icon"></div>
-      <div class="file-copy"><b></b><span></span></div>
-      <div class="transfer-state"></div>
+    <div id="activity" class="panel" role="status">
+      <span class="spinner"></span><span id="activity-text"></span>
     </div>
+    <div id="receipts">
+      <div id="work" aria-live="polite"></div>
+      <div id="downloads">
+        <div id="opening" class="transfer panel">
+          <div class="file-icon"></div>
+          <div class="file-copy"><b></b><span></span></div>
+          <div class="transfer-state"></div>
+        </div>
+        <div id="download" class="transfer panel">
+          <div class="file-icon"></div>
+          <div class="file-copy"><b></b><span></span></div>
+          <div class="transfer-state"></div>
+        </div>
+      </div>
+    </div>
+    <div id="capture-frame"></div>
     <div id="upload" class="transfer panel">
       <div class="file-icon"></div>
       <div class="file-copy"><b></b><span></span></div>

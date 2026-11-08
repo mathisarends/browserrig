@@ -19,7 +19,7 @@ from harnessed.events import (
 )
 from harnessed.hooks import SessionAppended
 
-from .events import BrowserEvent, LiveEvent
+from .events import BrowserEvent, EventKind, LiveEvent
 
 _METADATA = {
     "request_id",
@@ -92,8 +92,11 @@ def _event_record(event: _TerminalEvent) -> dict[str, object]:
     if isinstance(event, BrowserEvent | LiveEvent):
         record = asdict(event)
         # Omit page/form contents. URLs and key names remain diagnostic metadata.
-        for name in ("text", "message", "value"):
+        for name in ("text", "message", "value", "preview", "image_url"):
             record.pop(name, None)
+        if event.type is EventKind.WORK_PRESENTED:
+            for name in ("title", "detail", "limitations"):
+                record.pop(name, None)
         return record
     record: dict[str, object] = {"type": str(event.type)}
     for item in fields(event) if is_dataclass(event) else ():

@@ -3,6 +3,7 @@
 from .events import (
     SCENE_EVENTS,
     BarTypedEvent,
+    CaptureRegion,
     CursorEnteredEvent,
     FileTransferEvent,
     FindBarEvent,
@@ -10,6 +11,8 @@ from .events import (
     HighlightElementEvent,
     TabPressedEvent,
     WaitingEvent,
+    WorkPhase,
+    WorkPresentedEvent,
 )
 from .plugin import InputVisualization
 from .renderer import IframeRenderer
@@ -19,6 +22,7 @@ from .tabstrip import TabStrip
 __all__ = [
     "SCENE_EVENTS",
     "BarTypedEvent",
+    "CaptureRegion",
     "InputVisualization",
     "IframeRenderer",
     "CursorEnteredEvent",
@@ -30,4 +34,6 @@ __all__ = [
     "TabPressedEvent",
     "TabStrip",
     "WaitingEvent",
+    "WorkPresentedEvent",
+    "WorkPhase",
 ]

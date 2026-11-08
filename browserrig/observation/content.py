@@ -21,6 +21,8 @@ class PageContent(Options):
     markdown: str
     limitations: tuple[str, ...] = ()
     offset: int = 0
+    next_offset: int | None = None
+    partial: bool = False
 
     def render(self) -> str:
         text = f"# {_heading(self.title) or 'Page content'}\n\nSource: <{_source(self.url)}>"
@@ -61,6 +63,7 @@ async def extract_content(
 
     frames = await tab.frames()
     limitations = list(tab.frame_limitations)
+    partial = bool(limitations)
     metadata: dict[str, CaptureSnapshotResult | None] = {}
     main: ContentExtraction | None = None
     parts: list[str] = []
@@ -85,6 +88,7 @@ async def extract_content(
                 more or len(body) > available or (state.truncated and not state.limited)
             )
             if state.limited:
+                partial = True
                 limitations.append("Page content was truncated by DOM traversal limits")
             if len(body) > available:
                 # Let the script close code fences using the actual body budget.
@@ -99,30 +103,59 @@ async def extract_content(
             if frame.parent is None:
                 raise
             limitations.append(f"Frame {frame.id} changed or could not be inspected")
+            partial = True
     if embedded > len(frames) - 1:
+        partial = True
         limitations.append(
             "Some embedded frames are unavailable or could not be inspected"
         )
-    await tab.sync_document()
-    if tab.document_id != document_id:
-        raise BrowserError(
-            "Document changed during extraction; extract the current page again"
-        )
+    await _verify_document(tab, document_id)
     assert main is not None
+    return _content(
+        main,
+        "".join(parts).strip(),
+        offset=offset,
+        max_chars=max_chars,
+        more=more,
+        limitations=limitations,
+        partial=partial,
+    )
+
+
+def _content(
+    main: ContentExtraction,
+    markdown: str,
+    *,
+    offset: int,
+    max_chars: int,
+    more: bool,
+    limitations: list[str],
+    partial: bool,
+) -> PageContent:
     if main.main or main.chrome:
         limitations.insert(
             0,
             ("Only the main region is included; s" if main.main else "S")
             + "ite header, navigation and footer were omitted (full_page=true includes them)",
         )
-    page = _page("".join(parts).strip(), offset, max_chars, more, limitations)
+    page, next_offset = _page(markdown, offset, max_chars, more, limitations)
     return PageContent(
         url=main.url,
         title=main.title,
         markdown=page,
         limitations=tuple(dict.fromkeys(limitations)),
         offset=offset,
+        next_offset=next_offset,
+        partial=partial or next_offset is not None,
     )
+
+
+async def _verify_document(tab: Tab, document_id: str) -> None:
+    await tab.sync_document()
+    if tab.document_id != document_id:
+        raise BrowserError(
+            "Document changed during extraction; extract the current page again"
+        )
 
 
 def _frame_heading(state: ContentExtraction) -> str:
@@ -134,11 +167,12 @@ def _frame_heading(state: ContentExtraction) -> str:
 
 def _page(
     markdown: str, offset: int, max_chars: int, more: bool, limitations: list[str]
-) -> str:
+) -> tuple[str, int | None]:
     """Cut one part of the Markdown and name the offset that reads the next part."""
     if offset and offset >= len(markdown):
         limitations.append(f"offset {offset} is past the end of the page content")
     page = markdown[offset : offset + max_chars]
+    following = None
     if more or len(markdown) > offset + len(page):
         # The part ends mid-line; the next one starts with that whole line again.
         line = page.rfind("\n", len(page) // 2) + 1
@@ -146,7 +180,7 @@ def _page(
         limitations.append(
             f"Page content continues; extract_content with offset={following} reads the next part"
         )
-    return page.strip()
+    return page.strip(), following
 
 
 def _heading(text: str) -> str:

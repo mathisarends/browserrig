@@ -7,6 +7,7 @@ from .models import (
     FileContent,
     FileEntry,
     FileListing,
+    FileReadStatus,
     FileSystemState,
     FileSystemView,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "FileEntry",
     "FileExtension",
     "FileListing",
+    "FileReadStatus",
     "FileOptions",
     "Files",
     "FileStat",
