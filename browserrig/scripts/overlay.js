@@ -35,7 +35,7 @@ function browserrigOverlay({operation, id, visible}) {
       'all:initial!important;position:fixed!important;inset:0!important;' +
       'width:100%!important;height:100%!important;border:0!important;' +
       'background:transparent!important;pointer-events:none!important;' +
-      'z-index:2147483647!important;color-scheme:normal!important;';
+      'z-index:2147483647!important;color-scheme:light!important;';
     state.overlayNodes.add(node);
     const ready = new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Overlay did not load')), 2000);
