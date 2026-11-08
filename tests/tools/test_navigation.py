@@ -3,11 +3,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from browserrig import BrowserCoordination
 from browserrig.browser import Tab
-from browserrig.tools import NavigationTools
+from browserrig.tools import Actions, NavigationTools
 from browserrig.tools import navigation as navigation_module
 from browserrig.tools.intents import WaitIntent
+from tests.fakes import mounted
 
 
 @pytest.mark.parametrize(
@@ -35,9 +35,6 @@ async def test_forward_history_checks_bounds_and_only_dispatches_an_available_en
 
 
 async def test_wait_stages_its_pause_under_exclusive_control(monkeypatch):
-    tab = SimpleNamespace(id="tab-1")
-    browser = SimpleNamespace(active_tab=tab)
-    coordination = BrowserCoordination()
     staged = []
 
     async def stage(intent, staged_tab, step):
@@ -49,14 +46,18 @@ async def test_wait_stages_its_pause_under_exclusive_control(monkeypatch):
 
     pause = AsyncMock(side_effect=sleep)
     monkeypatch.setattr(navigation_module.asyncio, "sleep", pause)
-    assert (
-        await NavigationTools.wait(
-            SimpleNamespace(_browser=browser, _coordination=coordination),
-            seconds=2,
-            actions=SimpleNamespace(stage=stage),
+    async with mounted(Actions(), _NavigationTools()) as (services, scope):
+        coordination = services.coordination
+        tab = services.browser.active_tab
+        scope[Actions].stage = stage
+        assert (
+            await scope[_NavigationTools].wait(seconds=2)
+            == "Wait completed; the next observation shows the current state."
         )
-        == "Wait completed; the next observation shows the current state."
-    )
     assert staged == [(WaitIntent(2), tab)]
     pause.assert_awaited_once_with(2)
     assert not coordination.busy
+
+
+class _NavigationTools(NavigationTools, provides=True):
+    """Expose the mounted tool for direct-call coverage."""

@@ -1,15 +1,15 @@
 import asyncio
+from functools import partial
 from typing import Annotated
 from urllib.parse import quote_plus, urljoin, urlsplit
 
-from harnessed import Inject, Plugin, ToolResult
+from harnessed import Plugin
 from harnessed.kernel import needs
 from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab, validated_url
 from browserrig.core import (
     ActionKind,
-    BrowserCoordination,
     BrowserError,
     ReadinessPhase,
 )
@@ -25,9 +25,9 @@ from .intents import NavigateIntent, WaitIntent
 NEW_TAB_URL = "https://duckduckgo.com/"
 
 
-class NavigationTools(Plugin, needs=(Actions,)):
+class NavigationTools(Plugin):
     _browser = needs(Browser)
-    _coordination = needs(BrowserCoordination)
+    _actions = needs(Actions)
     _events = needs(BrowserEvents)
     _readiness = needs(Readiness)
 
@@ -42,13 +42,9 @@ class NavigationTools(Plugin, needs=(Actions,)):
         self,
         url: str,
         new_tab: bool = False,
-        *,
-        actions: Inject[Actions],
-    ) -> ToolResult:
+    ) -> Effect:
         url = site_url(url, self._browser.active_tab.url)
-        return await self._navigate(
-            url, actions, ActionKind.NAVIGATE, typed=typed_address(url), new_tab=new_tab
-        )
+        return await self._navigate(url, typed=typed_address(url), new_tab=new_tab)
 
     @tool(
         kind=ActionKind.SEARCH,
@@ -57,29 +53,19 @@ class NavigationTools(Plugin, needs=(Actions,)):
     async def search(
         self,
         query: str,
-        *,
-        actions: Inject[Actions],
-    ) -> ToolResult:
+    ) -> Effect:
         return await self._navigate(
             f"https://duckduckgo.com/?q={quote_plus(query)}",
-            actions,
-            ActionKind.SEARCH,
             typed=query,
         )
 
     @tool(
         kind=ActionKind.GO_BACK, description="Go to the previous browser history entry."
     )
-    async def go_back(self, *, actions: Inject[Actions]) -> ToolResult:
-        async def back(tab: Tab) -> Effect:
-            if not await tab.go_back():
-                raise BrowserError("No previous history entry")
-            return Effect("Navigated back.")
-
-        return await actions.run(
-            kind=ActionKind.GO_BACK,
-            operation=back,
-        )
+    async def go_back(self) -> Effect:
+        if not await self._actions.tab.go_back():
+            raise BrowserError("No previous history entry")
+        return Effect("Navigated back.")
 
     @tool(
         kind=ActionKind.GO_FORWARD,
@@ -88,32 +74,18 @@ class NavigationTools(Plugin, needs=(Actions,)):
             "is unavailable."
         ),
     )
-    async def go_forward(self, *, actions: Inject[Actions]) -> ToolResult:
-        async def check(tab: Tab) -> None:
-            if not await tab.can_go_forward():
-                raise BrowserError("Cannot go forward: no next history entry")
-
-        async def forward(tab: Tab) -> Effect:
-            if not await tab.go_forward():
-                raise BrowserError("Cannot go forward: no next history entry")
-            return Effect("Navigated forward.")
-
-        return await actions.run(
-            kind=ActionKind.GO_FORWARD,
-            operation=forward,
-            check=check,
-        )
+    async def go_forward(self) -> Effect:
+        tab = self._actions.tab
+        if not await tab.can_go_forward():
+            raise BrowserError("Cannot go forward: no next history entry")
+        if not await tab.go_forward():
+            raise BrowserError("Cannot go forward: no next history entry")
+        return Effect("Navigated forward.")
 
     @tool(kind=ActionKind.RELOAD, description="Reload the active tab.")
-    async def reload(self, *, actions: Inject[Actions]) -> ToolResult:
-        async def reload(tab: Tab) -> Effect:
-            await tab.reload()
-            return Effect("Reload executed.")
-
-        return await actions.run(
-            kind=ActionKind.RELOAD,
-            operation=reload,
-        )
+    async def reload(self) -> Effect:
+        await self._actions.tab.reload()
+        return Effect("Reload executed.")
 
     @tool(
         kind=ActionKind.WAIT,
@@ -125,53 +97,50 @@ class NavigationTools(Plugin, needs=(Actions,)):
     async def wait(
         self,
         seconds: Annotated[float, Field(ge=0, le=10)] = 1,
-        *,
-        actions: Inject[Actions],
     ) -> str:
-        async with self._coordination.exclusive():
-
-            async def pause() -> None:
-                await asyncio.sleep(seconds)
-
-            await actions.stage(WaitIntent(seconds), self._browser.active_tab, pause)
+        await self._actions.stage(
+            WaitIntent(seconds),
+            self._browser.active_tab,
+            partial(self._pause, seconds),
+        )
         return "Wait completed; the next observation shows the current state."
+
+    async def _pause(self, seconds: float) -> None:
+        await asyncio.sleep(seconds)
 
     async def _navigate(
         self,
         url: str,
-        actions: Actions,
-        kind: ActionKind,
         *,
         typed: str,
         new_tab: bool = False,
-    ) -> ToolResult:
+    ) -> Effect:
         validated_url(url)
-
-        async def navigate(tab: Tab) -> Effect:
-            async def load() -> None:
-                await self._events.emit(
-                    NavigationStartedEvent(target_id=tab.id, url=url, typed=typed)
-                )
-                await tab.navigate(url)
-
-            await actions.stage(NavigateIntent(url, typed), tab, load)
-            return Effect("Navigation executed.")
-
-        async def navigate_new(_tab: Tab) -> Effect:
-            # An empty tab first, so the address can be entered in a fresh tab.
-            opened = await self._browser.tabs.open()
-
-            async def dispatch() -> None:
-                await navigate(opened)
-
-            await self._readiness.wait(
-                opened, phase=ReadinessPhase.NAVIGATION, dispatch=dispatch
-            )
-            return Effect(f"Opened tab {opened.id} and navigated.")
-
+        tab = self._actions.tab
         if new_tab:
-            return await actions.run(kind=kind, operation=navigate_new, settle=False)
-        return await actions.run(kind=kind, operation=navigate)
+            # An empty tab first, so the address can be entered in a fresh tab.
+            tab = await self._browser.tabs.open()
+            await self._readiness.wait(
+                tab,
+                phase=ReadinessPhase.NAVIGATION,
+                dispatch=partial(self._load, tab, url, typed),
+            )
+            return Effect(f"Opened tab {tab.id} and navigated.")
+        await self._load(tab, url, typed)
+        return Effect("Navigation executed.")
+
+    async def _load(self, tab: Tab, url: str, typed: str) -> None:
+        await self._actions.stage(
+            NavigateIntent(url, typed),
+            tab,
+            partial(self._dispatch_navigation, tab, url, typed),
+        )
+
+    async def _dispatch_navigation(self, tab: Tab, url: str, typed: str) -> None:
+        await self._events.emit(
+            NavigationStartedEvent(target_id=tab.id, url=url, typed=typed)
+        )
+        await tab.navigate(url)
 
 
 def site_url(  # smelt: ignore[SMT429] -- pure, table-tested

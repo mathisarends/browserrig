@@ -24,6 +24,7 @@ from browserrig import (
     browser_pack,
     browser_plugins,
 )
+from browserrig.tools import FormTools
 from tests.fakes import FakeChrome
 
 
@@ -181,6 +182,7 @@ async def test_facade_renders_complete_blocks_in_plugin_list_order(completion_la
         "## Browser image history",
         "## Screenshot coordinates",
         "## Browser action chains",
+        "## Form filling",
         "## Workspace and downloads",
         *(
             ["## Extension", "## Explicit task completion"]
@@ -191,7 +193,7 @@ async def test_facade_renders_complete_blocks_in_plugin_list_order(completion_la
 
 
 async def test_pack_prompt_follows_removals_and_replacements():
-    browser = browser_pack().without(Chrome, FileTools)
+    browser = browser_pack().without(Chrome, FileTools, FormTools)
     observe = BrowserPerception(capture=DomCapture(marks=False))
     agent = Agent(
         model=ScriptedModel([]),
@@ -203,10 +205,11 @@ async def test_pack_prompt_follows_removals_and_replacements():
     assert rendered.count("Each observation starts") == 1
     assert "labeled with its ref" not in rendered
     assert "The file system observation identifies" not in rendered
+    assert "Form filling" not in rendered
     assert (
         rendered.index("Screenshots belong to")
         < rendered.index("Coordinates are pixels")
-        < rendered.index("Combine actions only")
+        < rendered.index("Browser action chains")
     )
 
 

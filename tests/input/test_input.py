@@ -271,27 +271,21 @@ async def test_send_keys_rejects_ambiguous_arguments_before_dispatch(arguments):
         KeyboardTools(), services=[FakeServices(), Service(Actions, actions)]
     ) as tools:
         with pytest.raises(ToolError):
-            await tools.send_keys(**arguments, actions=actions)
+            await tools.send_keys(**arguments)
     actions.run.assert_not_awaited()
 
 
 async def test_send_keys_distinguishes_literal_text_from_named_keys(monkeypatch):
     monkeypatch.setattr(keyboard_module.asyncio, "sleep", AsyncMock())
-    devices, tab, events, commands = _rig()
-
-    async def run(*, kind, operation):
-        assert kind in {"type", "press"}
-        return (await operation(tab)).text
-
-    actions = SimpleNamespace(run=run)
-    tools = SimpleNamespace(_browser=SimpleNamespace(input=devices))
-    await KeyboardTools.send_keys(tools, text="Escape", actions=actions)
+    devices, _tab, events, commands = _rig()
+    tools = SimpleNamespace(_browser=SimpleNamespace(input=devices), _secrets=None)
+    await KeyboardTools.send_keys(tools, text="Escape")
     assert [
         command["text"] for command in commands if command["type"] == "char"
     ] == list("Escape")
     commands.clear()
     events.clear()
-    await KeyboardTools.send_keys(tools, key="Escape", actions=actions)
+    await KeyboardTools.send_keys(tools, key="Escape")
     assert [command["type"] for command in commands] == ["rawKeyDown", "keyUp"]
     assert [event.key for event in events if isinstance(event, KeyPressedEvent)] == [
         "Escape"
@@ -814,18 +808,12 @@ async def test_a_corrected_slip_enters_the_text_asked_for():
 
 
 async def test_send_keys_reports_a_slip_that_stayed():
-    devices, tab, _events, _commands = _rig()
+    devices, _tab, _events, _commands = _rig()
     devices.pace(_Slipping("h", "e", "l", "o"))
 
-    async def run(*, kind, operation):
-        assert kind == "press"
-        return (await operation(tab)).text
-
-    tools = SimpleNamespace(_browser=SimpleNamespace(input=devices))
-    reply = await KeyboardTools.send_keys(
-        tools, text="hello", actions=SimpleNamespace(run=run)
-    )
-    assert "typed 'helo' instead of 'hello'" in reply
+    tools = SimpleNamespace(_browser=SimpleNamespace(input=devices), _secrets=None)
+    reply = await KeyboardTools.send_keys(tools, text="hello")
+    assert "typed 'helo' instead of 'hello'" in reply.text
 
 
 @pytest.mark.parametrize(

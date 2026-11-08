@@ -119,13 +119,13 @@ harnessed.step
   harnessed.model
   harnessed.tool
     harnessed.hook                            ExecuteTool middleware
-      browserrig.tools.execution.Actions.run
+      browserrig.tools.execution.transaction.ActionRunner.run
         browserrig.core.BrowserCoordination.acquire
-        browserrig.tools.execution.Actions._prepare
+        browserrig.tools.execution.transaction.ActionRunner._prepare
         browserrig.operation
           browserrig.tools.targeting.Targeting.locate
           browserrig.input.mouse.Mouse.click
-        browserrig.tools.execution.Actions._settle
+        browserrig.tools.execution.completion.Completion._settle
 ```
 
 File tools add `browserrig.files.system.FileSystem.*` and

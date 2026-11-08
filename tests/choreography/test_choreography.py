@@ -230,7 +230,7 @@ class _FileTools(FileTools, provides=True):
 
 async def test_find_in_page_shows_ctrl_f_typing_results_and_escape(timeline):
     async with _staged(timeline, _FindTools()) as (_, ctx):
-        await ctx[_FindTools].find_in_page("ab", ("c",), actions=ctx[Actions])
+        await ctx[_FindTools].find_in_page("ab", ("c",))
     assert _shown(timeline) == [
         "find_in_page started",
         "shows key Control+f 0.00",
@@ -273,7 +273,7 @@ async def test_find_in_page_shows_ctrl_f_typing_results_and_escape(timeline):
 
 async def test_navigate_types_the_address_before_the_page_loads(timeline):
     async with _staged(timeline, _NavigationTools()) as (_, ctx):
-        await ctx[_NavigationTools].navigate("https://ab.cd/", actions=ctx[Actions])
+        await ctx[_NavigationTools].navigate("https://ab.cd/")
     assert _shown(timeline) == [
         "navigate started",
         "keyboard shown",
@@ -298,9 +298,7 @@ async def test_navigate_types_the_address_before_the_page_loads(timeline):
 
 async def test_navigate_in_a_new_tab_opens_it_before_typing_there(timeline):
     async with _staged(timeline, _NavigationTools()) as (_, ctx):
-        await ctx[_NavigationTools].navigate(
-            "https://a.b/", new_tab=True, actions=ctx[Actions]
-        )
+        await ctx[_NavigationTools].navigate("https://a.b/", new_tab=True)
     assert _shown(timeline) == [
         "navigate started",
         "tab open '' from tab-1 0.45",
@@ -327,7 +325,7 @@ async def test_navigate_in_a_new_tab_opens_it_before_typing_there(timeline):
 
 async def test_wait_announces_its_duration_then_pauses(timeline):
     async with _staged(timeline, _NavigationTools()) as (_, ctx):
-        await ctx[_NavigationTools].wait(2, actions=ctx[Actions])
+        await ctx[_NavigationTools].wait(2)
     assert _shown(timeline) == ["waiting 2", "sleep 2.00"]
 
 
@@ -384,9 +382,7 @@ async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
         # Already resting on the input, so the pointer does not travel.
         await services.browser.input.mouse.move_to(Point(x=40, y=30))
         timeline.clear()
-        await ctx[_FileTools].upload_files(
-            "input", ["report.txt"], actions=ctx[Actions]
-        )
+        await ctx[_FileTools].upload_files("input", ["report.txt"])
     assert _shown(timeline) == [
         "upload started",
         "highlight input",
@@ -460,7 +456,7 @@ async def test_pointer_travels_along_an_eased_path(timeline):
 
 async def test_unstaged_find_only_searches_and_closes(timeline):
     async with _staged(timeline, _FindTools(), staging=()) as (_, ctx):
-        await ctx[_FindTools].find_in_page("ab", ("c",), actions=ctx[Actions])
+        await ctx[_FindTools].find_in_page("ab", ("c",))
     assert _shown(timeline) == [
         "find_in_page started",
         "find ab|c active=0 reveal=True",
@@ -471,9 +467,7 @@ async def test_unstaged_find_only_searches_and_closes(timeline):
 
 async def test_unstaged_navigate_loads_right_away(timeline):
     async with _staged(timeline, _NavigationTools(), staging=()) as (_, ctx):
-        await ctx[_NavigationTools].navigate(
-            "https://a.b/", new_tab=True, actions=ctx[Actions]
-        )
+        await ctx[_NavigationTools].navigate("https://a.b/", new_tab=True)
     assert _shown(timeline) == [
         "navigate started",
         "mouse mouseMoved 500,400",
@@ -485,7 +479,7 @@ async def test_unstaged_navigate_loads_right_away(timeline):
 
 async def test_unstaged_wait_only_waits(timeline):
     async with _staged(timeline, _NavigationTools(), staging=()) as (_, ctx):
-        await ctx[_NavigationTools].wait(2, actions=ctx[Actions])
+        await ctx[_NavigationTools].wait(2)
     assert _shown(timeline) == ["sleep 2.00"]
 
 

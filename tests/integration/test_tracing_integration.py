@@ -62,7 +62,7 @@ async def test_browser_methods_nest_below_harnessed_spans(site, trace_hooks):
     assert captures and all("harnessed.step" in ancestors(s) for s in captures)
     (click,) = [
         span
-        for span in named("browserrig.tools.execution.Actions.run")
+        for span in named("browserrig.tools.execution.transaction.ActionRunner.run")
         if span.attributes["harnessed.kind"] == "click"
     ]
     assert "harnessed.tool" in ancestors(click)
@@ -71,11 +71,11 @@ async def test_browser_methods_nest_below_harnessed_spans(site, trace_hooks):
         "harnessed.status" in span.attributes and "harnessed.polls" in span.attributes
         for span in waits
     )
-    settle = named("browserrig.tools.execution.Actions._settle")[0]
+    settle = named("browserrig.tools.execution.completion.Completion._settle")[0]
     assert (
         settle.attributes["code.file.path"]
         .replace("\\", "/")
-        .endswith("browserrig/tools/execution.py")
+        .endswith("browserrig/tools/execution/completion.py")
     )
     assert isinstance(settle.attributes["code.line.number"], int)
     for name in (

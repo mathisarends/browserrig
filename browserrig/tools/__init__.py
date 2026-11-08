@@ -1,4 +1,4 @@
-from browserrig.core import BrowserToolMetadata, browser_tool
+from browserrig.core import BrowserToolCall, BrowserToolMetadata, browser_tool
 
 from .chains import ActionChainPolicy, DomActionChains, ObserveAfterInput
 from .dialogs import DialogTools
@@ -29,6 +29,7 @@ __all__ = [
     "DomActionChains",
     "ObserveAfterInput",
     "BrowserToolMetadata",
+    "BrowserToolCall",
     "browser_tool",
     "Actions",
     "Effect",

@@ -1,10 +1,11 @@
+from functools import partial
 from typing import Annotated
 from uuid import uuid4
 
-from harnessed import Inject, Plugin, ToolError, ToolResult
+from harnessed import Plugin, ToolError
+from harnessed.kernel import needs
 from pydantic import Field
 
-from browserrig.browser import Tab
 from browserrig.core import ActionKind
 from browserrig.core import browser_tool as tool
 from browserrig.observation import FoundMatch, PageMatches, close_find, find_text
@@ -16,8 +17,10 @@ from .intents import FindIntent
 type _Query = Annotated[str, Field(min_length=1, max_length=200)]
 
 
-class FindTools(Plugin, needs=(Actions,)):
+class FindTools(Plugin):
     """Search the page's text the way a person uses the browser's find bar."""
+
+    _actions = needs(Actions)
 
     @tool(
         kind=ActionKind.FIND_IN_PAGE,
@@ -41,20 +44,21 @@ class FindTools(Plugin, needs=(Actions,)):
         ] = (),
         match: Annotated[int, Field(ge=1)] = 1,
         max_results: Annotated[int, Field(ge=1, le=50)] = 10,
-        *,
-        actions: Inject[Actions],
-    ) -> ToolResult:
+    ) -> Effect:
         queries = tuple(
             dict.fromkeys(" ".join(text.split()) for text in (query, *alternatives))
         )
         if not all(queries):
             raise ToolError("query and alternatives must contain visible text")
 
-        async def find(tab: Tab) -> Effect:
-            session = uuid4().hex
-
-            async def search() -> PageMatches:
-                return await find_text(
+        tab = self._actions.tab
+        session = uuid4().hex
+        try:
+            found = await self._actions.stage(
+                FindIntent(queries, match, session),
+                tab,
+                partial(
+                    find_text,
                     tab,
                     queries,
                     session=session,
@@ -62,17 +66,11 @@ class FindTools(Plugin, needs=(Actions,)):
                     start=match - 1,
                     count=max_results,
                     reveal=True,
-                )
-
-            try:
-                found = await actions.stage(
-                    FindIntent(queries, match, session), tab, search
-                )
-                return Effect(_report(queries, match, found), prepared_scroll=True)
-            finally:
-                await close_find(tab)
-
-        return await actions.run(kind=ActionKind.FIND_IN_PAGE, operation=find)
+                ),
+            )
+            return Effect(_report(queries, match, found), prepared_scroll=True)
+        finally:
+            await close_find(tab)
 
 
 def _report(queries: tuple[str, ...], match: int, found: PageMatches) -> str:

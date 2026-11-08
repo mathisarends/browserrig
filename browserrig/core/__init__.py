@@ -27,7 +27,7 @@ from .kinds import (
     TabGesture,
 )
 from .options import Options
-from .tools import BrowserToolMetadata, browser_tool
+from .tools import BrowserToolCall, BrowserToolMetadata, browser_tool
 
 __all__ = [
     "BrowserCoordination",
@@ -40,6 +40,7 @@ __all__ = [
     "BrowserClosed",
     "BrowserError",
     "BrowserToolMetadata",
+    "BrowserToolCall",
     "CursorStyle",
     "DocumentId",
     "ElementOperation",

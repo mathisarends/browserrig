@@ -1,5 +1,3 @@
-from contextlib import nullcontext
-from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -19,13 +17,13 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig.core import ActionKind, BrowserCoordination
-from browserrig.events import ActionFailedEvent, ActionFinishedEvent, PageState
-from browserrig.observation import DomReferences, Element, Snapshot, decision_change
+from browserrig.core import ActionKind
+from browserrig.events import ActionFailedEvent, ActionFinishedEvent
+from browserrig.observation import Element, Snapshot, decision_change
 from browserrig.observation.models import Offscreen
-from browserrig.tools import Actions, BrowserToolMetadata, DomActionChains, browser_tool
+from browserrig.tools import Actions, BrowserToolMetadata, browser_tool
 from browserrig.tools.effects import Effect
-from tests.fakes import FakeServices
+from tests.fakes import FakeServices, mounted
 
 
 def _element(**values):
@@ -119,7 +117,14 @@ class _Tools(Plugin):
 
 def _browser():
     # Browserrig's result review runs inside the native executor without starting Chrome.
-    return FakeServices(), Actions()
+    return FakeServices(), Actions(chain_policy=_UnchangedPage())
+
+
+class _UnchangedPage:
+    """Synthetic chain tools have no DOM to compare; only explicit boundaries apply."""
+
+    async def check(self, _observe, _tab):
+        return ""
 
 
 @pytest.mark.parametrize(
@@ -212,47 +217,19 @@ async def test_browser_metadata_is_captured_for_review_without_reaching_the_mode
 
 
 async def test_failed_comparison_keeps_input_successful_and_breaks_the_chain():
-    before = _snapshot()
-    events = []
-    tab = SimpleNamespace(
-        id="tab",
-        document_id="doc",
-        url=before.url,
-        closed=False,
-        check_navigation=lambda: None,
-    )
-    actions = SimpleNamespace(
-        observe=SimpleNamespace(
-            snapshot=before,
-            references=DomReferences(),
-            probe=AsyncMock(side_effect=RuntimeError("lost")),
-        ),
-        chain_policy=DomActionChains(),
-        browser=SimpleNamespace(
-            active_tab=tab,
-            input=SimpleNamespace(action=lambda _: nullcontext()),
-        ),
-        _coordination=BrowserCoordination(),
-        _prepare=AsyncMock(
-            return_value=PageState(
-                url=before.url,
-                document_id=before.document_id,
-            )
-        ),
-        # The input itself succeeds, opening no tab and leaving no readiness note.
-        _dispatch=AsyncMock(return_value=(Effect("Entered once."), "", "")),
-        _events=SimpleNamespace(emit=AsyncMock(side_effect=events.append)),
-    )
-    actions.page_change = lambda selected: Actions.page_change(actions, selected)
-    result = await Actions.run(
-        actions,
-        kind=ActionKind.TYPE,
-        operation=AsyncMock(),
-    )
+    operation = AsyncMock(return_value=Effect("Entered once."))
+    async with mounted(Actions()) as (services, scope):
+        tab = services.browser.active_tab
+        services.observe.snapshot = _snapshot(
+            tab_id=tab.id, document_id=tab.document_id
+        )
+        services.observe.probe = AsyncMock(side_effect=RuntimeError("lost"))
+        result = await scope[Actions].run(kind=ActionKind.TYPE, operation=operation)
+    operation.assert_awaited_once_with(tab)
     assert result.status is ToolStatus.OK and result.break_chain
     assert "Entered once" in result.text and "could not be checked" in result.text
-    assert any(isinstance(event, ActionFinishedEvent) for event in events)
-    assert not any(isinstance(event, ActionFailedEvent) for event in events)
+    assert any(isinstance(event, ActionFinishedEvent) for event in services.events)
+    assert not any(isinstance(event, ActionFailedEvent) for event in services.events)
 
 
 def _snapshot(**values):

@@ -252,19 +252,13 @@ async def test_dom_tools_reject_backend_refs_before_any_input(tool):
     async with _observed(_Backend()) as env:
         with pytest.raises(ToolError, match="requires a DOM element"):
             if tool == "select":
-                await env.scope[_Forms].select_option(
-                    "shape/a", "Choice", actions=env.actions
-                )
+                await env.scope[_Forms].select_option("shape/a", "Choice")
             elif tool == "date":
-                await env.scope[_Forms].set_date(
-                    "shape/a", "2026-11-01", actions=env.actions
-                )
+                await env.scope[_Forms].set_date("shape/a", "2026-11-01")
             elif tool == "type":
-                await env.scope[_Keys].type_text("shape/a", "Text", actions=env.actions)
+                await env.scope[_Keys].type_text("shape/a", "Text")
             else:
-                await env.scope[_Uploads].upload_files(
-                    "shape/a", ["file.txt"], actions=env.actions
-                )
+                await env.scope[_Uploads].upload_files("shape/a", ["file.txt"])
         env.tab.dispatch_mouse.assert_not_awaited()
         env.tab.dispatch_key.assert_not_awaited()
         env.tab.dispatch_wheel.assert_not_awaited()
@@ -277,8 +271,8 @@ async def test_dom_tools_reject_backend_refs_before_any_input(tool):
 async def test_backend_refs_use_normal_mouse_and_keyboard_and_end_action_chains():
     async with _observed(_Backend()) as env:
         original = env.observe.snapshot
-        click = await env.scope[_Pointer].click("shape/a", actions=env.actions)
-        typed = await env.scope[_Keys].send_keys(text="Hi", actions=env.actions)
+        click = await env.scope[_Pointer].click("shape/a")
+        typed = await env.scope[_Keys].send_keys(text="Hi")
         events = env.tab.dispatch_mouse.await_args_list
         assert [
             call.args[0] for call in events if call.args[0] != MouseEventKind.MOVED
@@ -310,7 +304,7 @@ async def test_hover_change_uses_backend_fingerprint_and_prevents_the_click():
                 backend.revision += 1
 
         env.tab.dispatch_mouse.side_effect = moved
-        result = await env.scope[_Pointer].click("shape/a", actions=env.actions)
+        result = await env.scope[_Pointer].click("shape/a")
         assert result.break_chain and "Hover changed" in result.content
         assert env.tab.dispatch_mouse.await_count > 0
         assert all(

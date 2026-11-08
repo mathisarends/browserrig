@@ -292,6 +292,52 @@ extraction, waits and human handoff acquire `coordination.exclusive()` at their
 operation boundaries. Direct device calls use `browser.input.mouse` and
 `browser.input.keyboard`.
 
+Async methods declared with `browser_tool` automatically enter the browser tool
+execution pipeline. `Actions` selects the lifecycle from `ActionKind`: page input
+gets serialization, preparation, action events and readiness; tab/navigation tools
+use their navigation handling. Listing, workspace I/O, screenshot requests and
+dialog handling pass through without input preparation. Dialog handling must stay
+available while another action holds browser control. Content extraction retains
+its own read coordination.
+
+Declare services once with `needs`, and write the operation directly in the tool:
+
+```python
+from harnessed import Plugin
+from harnessed.kernel import needs
+
+from browserrig import ActionKind, Browser
+from browserrig.tools import Actions, Effect, browser_tool
+
+
+class HoverTools(Plugin):
+    _actions = needs(Actions)
+    _browser = needs(Browser)
+
+    @browser_tool(
+        kind=ActionKind.MOVE_MOUSE,
+        description="Hover an observed element without clicking.",
+    )
+    async def hover_ref(self, ref: str) -> Effect:
+        point = await self._actions.element_point(ref=ref)
+        await self._browser.input.mouse.move_to(point)
+        return Effect("Hovered.", prepared_scroll=point.scrolled)
+```
+
+`Actions.tab` is the tab fixed at the start of that input operation;
+`element_point(ref=...)` and `page_change()` use it implicitly. Explicit `tab=`
+arguments remain available. Input tool bodies do not call `Actions.run` or acquire
+the coordination lock themselves. Return `Effect` for input details such as
+prepared scrolling or a requested new tab. Text and `ToolResult` are also supported;
+existing images and error statuses are retained. Passive tools may keep returning
+structured values, including values handled by a Harnessed result converter.
+
+The pipeline also applies to direct calls on mounted tool instances and remains
+bound to the owning session. `BrowserToolCall` is the internal waterfall before
+result conversion; normal Harnessed tool policy and approval checks still precede
+model-requested execution. Direct device calls and `Actions.run` remain available
+for application code that explicitly owns an operation.
+
 `Chrome` publishes its configured `FileBridge`. The browser pack includes
 `browserrig.files.FileTransfers()`, which observes that bridge and the optional
 `FileSystem`, providing `FileTransfer` when both are available. Replacing the

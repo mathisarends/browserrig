@@ -1,7 +1,7 @@
-from harnessed import Inject, Plugin, ToolError, ToolResult
-from harnessed.kernel import needs
+from harnessed import Plugin, ToolError
+from harnessed.kernel import needs, observes
 
-from browserrig.browser import Browser, Tab
+from browserrig.browser import Browser
 from browserrig.core import ActionKind
 from browserrig.core import browser_tool as tool
 from browserrig.input import TypedText
@@ -12,11 +12,13 @@ from .effects import Effect
 from .execution import Actions
 
 
-class KeyboardTools(Plugin, needs=(Actions,)):
+class KeyboardTools(Plugin):
     """Keyboard input to the current focus, plus typing into a DOM ref when refs exist."""
 
+    _actions = needs(Actions)
     _browser = needs(Browser)
     _observe = needs(BrowserPerception)
+    _secrets = observes(Secrets)
 
     @tool(
         kind=ActionKind.PRESS,
@@ -37,34 +39,30 @@ class KeyboardTools(Plugin, needs=(Actions,)):
         hold_shift: bool = False,
         hold_alt: bool = False,
         hold_meta: bool = False,
-        actions: Inject[Actions],
-        secrets: Inject[Secrets | None] = None,
-    ) -> ToolResult:
+    ) -> Effect:
         if (text is None) == (key is None):
             raise ToolError("Provide exactly one of text or key")
         if text is not None and any((hold_control, hold_shift, hold_alt, hold_meta)):
             raise ToolError("Modifier flags require key")
 
-        async def send(_tab: Tab) -> Effect:
-            if key is not None:
-                await self._browser.input.keyboard.press_key(
-                    key,
-                    hold_control=hold_control,
-                    hold_shift=hold_shift,
-                    hold_alt=hold_alt,
-                    hold_meta=hold_meta,
+        if key is not None:
+            await self._browser.input.keyboard.press_key(
+                key,
+                hold_control=hold_control,
+                hold_shift=hold_shift,
+                hold_alt=hold_alt,
+                hold_meta=hold_meta,
+            )
+            return Effect("Key dispatched.")
+        assert text is not None
+        secrets = self._secrets
+        if secrets is not None:
+            entry = await secrets.prepare(text, browser=self._browser)
+            if entry is not None:
+                return _secret_entered(
+                    await secrets.enter(entry, self._browser.input.keyboard)
                 )
-                return Effect("Key dispatched.")
-            assert text is not None
-            if secrets is not None:
-                entry = await secrets.prepare(text, browser=self._browser)
-                if entry is not None:
-                    return _secret_entered(
-                        await secrets.enter(entry, self._browser.input.keyboard)
-                    )
-            return _entered(await self._browser.input.keyboard.type_text(text))
-
-        return await actions.run(kind=ActionKind.PRESS, operation=send)
+        return _entered(await self._browser.input.keyboard.type_text(text))
 
     @tool(
         kind=ActionKind.TYPE,
@@ -76,35 +74,29 @@ class KeyboardTools(Plugin, needs=(Actions,)):
         ref: str,
         text: str,
         clear: bool = True,
-        *,
-        actions: Inject[Actions],
-        secrets: Inject[Secrets | None] = None,
-    ) -> ToolResult:
-        async def check(tab: Tab) -> None:
-            await self._observe.dom_element(tab, ref)
-
-        async def type_text(tab: Tab) -> Effect:
-            point = await actions.element_point(tab=tab, ref=ref)
-            await self._browser.input.mouse.move_to(point)
-            # Hover may reveal an overlay over the field; hit-test before focusing it.
-            await actions.element_point(tab=tab, ref=ref, scroll=False)
-            field = await self._observe.dom_element(tab, ref)
-            # Check the secrets' domains before the field is touched.
-            entry = (
-                await secrets.prepare(text, browser=self._browser, field=field)
-                if secrets is not None
-                else None
+    ) -> Effect:
+        tab = self._actions.tab
+        await self._observe.dom_element(tab, ref)
+        point = await self._actions.element_point(ref=ref)
+        await self._browser.input.mouse.move_to(point)
+        # Hover may reveal an overlay over the field; hit-test before focusing it.
+        await self._actions.element_point(ref=ref, scroll=False)
+        field = await self._observe.dom_element(tab, ref)
+        secrets = self._secrets
+        # Check the secrets' domains before the field is touched.
+        entry = (
+            await secrets.prepare(text, browser=self._browser, field=field)
+            if secrets is not None
+            else None
+        )
+        await field.focus(select_all=clear)
+        if clear:
+            await self._browser.input.keyboard.press_key("Backspace")
+        if entry is not None and secrets is not None:
+            return _secret_entered(
+                await secrets.enter(entry, self._browser.input.keyboard)
             )
-            await field.focus(select_all=clear)
-            if clear:
-                await self._browser.input.keyboard.press_key("Backspace")
-            if entry is not None and secrets is not None:
-                return _secret_entered(
-                    await secrets.enter(entry, self._browser.input.keyboard)
-                )
-            return _entered(await self._browser.input.keyboard.type_text(text))
-
-        return await actions.run(kind=ActionKind.TYPE, operation=type_text, check=check)
+        return _entered(await self._browser.input.keyboard.type_text(text))
 
 
 def _entered(typed: TypedText) -> Effect:

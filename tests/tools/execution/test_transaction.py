@@ -65,7 +65,7 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(
     paths = [saved.path, invalid.get(selection, saved.path)]
     async with _uploads(None if selection == "no_workspace" else files) as upload:
         with pytest.raises(ToolError):
-            await upload.tools.upload_files("input", paths, actions=upload.actions)
+            await upload.tools.upload_files("input", paths)
     upload.actions.element_point.assert_not_awaited()
     upload.handle.upload_files.assert_not_awaited()
     assert len(upload.services.events) == 1
@@ -76,9 +76,7 @@ async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path):
     files = FileSystem(LocalWorkspace(tmp_path / "workspace"))
     saved = await files.write_file("report.txt", "report")
     async with _uploads(files) as upload:
-        result = await upload.tools.upload_files(
-            "input", ["report.txt"], actions=upload.actions
-        )
+        result = await upload.tools.upload_files("input", ["report.txt"])
     assert result.text == "Files assigned to input."
     # Chrome reads the file on its own host; events keep the workspace path.
     upload.handle.upload_files.assert_awaited_once_with(

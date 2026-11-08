@@ -15,7 +15,6 @@ from harnessed import (
     PluginState,
     SystemPrompt,
     ToolError,
-    ToolResult,
     hook,
 )
 from harnessed.events import ObservationsIncludedEvent
@@ -282,17 +281,17 @@ class FileTools(Plugin):
         enabled=_reaches_chrome,
         description="Open a workspace file in a new active browser tab, including PDFs.",
     )
-    async def open_file(self, path: str) -> ToolResult:
+    async def open_file(self, path: str) -> Effect:
         with _file_errors():
             staged = await self._staging().stage([path])
-        return await self._open(staged, ActionKind.OPEN_FILE, FileSource.WORKSPACE)
+        return await self._open(staged, FileSource.WORKSPACE)
 
     @tool(
         kind=ActionKind.OPEN_DOWNLOADED_FILE,
         enabled=_reaches_chrome,
         description="Open a completed download in a new active tab using its list_downloads ID.",
     )
-    async def open_downloaded_file(self, download_id: str) -> ToolResult:
+    async def open_downloaded_file(self, download_id: str) -> Effect:
         downloads = await self._browser.downloads()
         download = next((item for item in downloads if item.id == download_id), None)
         if download is None:
@@ -312,9 +311,7 @@ class FileTools(Plugin):
                 staged = await self._staging().stage([download.path])
             except FileNotFoundError as error:
                 raise ToolError("Downloaded file is no longer available") from error
-        return await self._open(
-            staged, ActionKind.OPEN_DOWNLOADED_FILE, FileSource.DOWNLOAD, download.id
-        )
+        return await self._open(staged, FileSource.DOWNLOAD, download.id)
 
     @tool(
         kind=ActionKind.UPLOAD,
@@ -328,45 +325,31 @@ class FileTools(Plugin):
         self,
         ref: str,
         paths: Annotated[list[str], Field(min_length=1)],
-        *,
-        actions: Inject[Actions],
-    ) -> ToolResult:
-        selected: list[StagedFiles] = []
+    ) -> Effect:
+        tab = self._actions.tab
+        handle = await self._observe.dom_element(tab, ref)
+        if handle.element.input_type != "file":
+            raise BrowserError("Target is not a file input")
+        transfer = self._staging()
+        with _file_errors():
+            staged = await transfer.stage(paths)
+        point = await self._actions.element_point(ref=ref)
+        await self._browser.input.mouse.move_to(point)
 
-        async def check(tab: Tab) -> None:
+        async def assign() -> None:
             handle = await self._observe.dom_element(tab, ref)
-            if handle.element.input_type != "file":
-                raise BrowserError("Target is not a file input")
-            transfer = self._staging()
-            with _file_errors():
-                selected.append(await transfer.stage(paths))
-
-        async def upload(tab: Tab) -> Effect:
-            point = await actions.element_point(tab=tab, ref=ref)
-            await self._browser.input.mouse.move_to(point)
-
-            staged = selected[0]
-
-            async def assign() -> None:
-                handle = await self._observe.dom_element(tab, ref)
-                await handle.upload_files([str(path) for path in staged.browser_paths])
-                await self._events.emit(
-                    FilesUploadedEvent(
-                        target_id=tab.id,
-                        document_id=tab.document_id,
-                        paths=staged.paths,
-                        ref=ref,
-                    )
+            await handle.upload_files([str(path) for path in staged.browser_paths])
+            await self._events.emit(
+                FilesUploadedEvent(
+                    target_id=tab.id,
+                    document_id=tab.document_id,
+                    paths=staged.paths,
+                    ref=ref,
                 )
+            )
 
-            await actions.stage(UploadIntent(staged.paths, point), tab, assign)
-            return Effect("Files assigned to input.")
-
-        return await actions.run(
-            kind=ActionKind.UPLOAD,
-            operation=upload,
-            check=check,
-        )
+        await self._actions.stage(UploadIntent(staged.paths, point), tab, assign)
+        return Effect("Files assigned to input.")
 
     def _files(self) -> FileSystem:
         if self._workspace is None:
@@ -416,32 +399,30 @@ class FileTools(Plugin):
     async def _open(
         self,
         staged: StagedFiles,
-        kind: ActionKind,
         source: FileSource,
         download_id: str = "",
-    ) -> ToolResult:
+    ) -> Effect:
         (path,) = staged.paths
         browser_path: PurePath = staged.browser_paths[0]
 
-        async def open_file(tab: Tab) -> Effect:
-            async def show() -> Tab:
-                opened = await self._browser.tabs.open(browser_path)
-                await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
-                await self._events.emit(
-                    FileOpenedEvent(
-                        target_id=opened.id,
-                        document_id=opened.document_id,
-                        path=path,
-                        source=source,
-                        download_id=download_id,
-                    )
+        async def show() -> Tab:
+            opened = await self._browser.tabs.open(browser_path)
+            await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
+            await self._events.emit(
+                FileOpenedEvent(
+                    target_id=opened.id,
+                    document_id=opened.document_id,
+                    path=path,
+                    source=source,
+                    download_id=download_id,
                 )
-                return opened
+            )
+            return opened
 
-            opened = await self._actions.stage(OpenFileIntent(path), tab, show)
-            return Effect(f"Opened file in tab {opened.id}: {path}")
-
-        return await self._actions.run(kind=kind, operation=open_file, settle=False)
+        opened = await self._actions.stage(
+            OpenFileIntent(path), self._actions.tab, show
+        )
+        return Effect(f"Opened file in tab {opened.id}: {path}")
 
 
 @contextmanager

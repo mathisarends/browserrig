@@ -1,7 +1,7 @@
-from harnessed import Inject, Plugin, ToolResult
+from harnessed import Plugin
 from harnessed.kernel import needs
 
-from browserrig.browser import Browser, Tab, TabInfo
+from browserrig.browser import Browser, TabInfo
 from browserrig.core import ActionKind, ReadinessPhase
 from browserrig.core import browser_tool as tool
 from browserrig.readiness import Readiness
@@ -31,17 +31,10 @@ class TabTools(Plugin, needs=(Actions,)):
     async def open_tab(
         self,
         url: str = NEW_TAB_URL,
-        *,
-        actions: Inject[Actions],
-    ) -> ToolResult:
-        async def open_tab(_tab: Tab) -> Effect:
-            opened = await self._browser.tabs.open(url)
-            await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
-            return Effect(f"Opened tab {opened.id}.")
-
-        return await actions.run(
-            kind=ActionKind.OPEN_TAB, operation=open_tab, settle=False
-        )
+    ) -> Effect:
+        opened = await self._browser.tabs.open(url)
+        await self._readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
+        return Effect(f"Opened tab {opened.id}.")
 
     @tool(
         kind=ActionKind.SWITCH_TAB,
@@ -50,17 +43,10 @@ class TabTools(Plugin, needs=(Actions,)):
     async def switch_tab(
         self,
         target_id: str,
-        *,
-        actions: Inject[Actions],
-    ) -> ToolResult:
-        async def switch(_tab: Tab) -> Effect:
-            selected = await self._browser.tabs.activate(target_id)
-            await self._readiness.wait(selected)
-            return Effect(f"Activated tab {selected.id}.")
-
-        return await actions.run(
-            kind=ActionKind.SWITCH_TAB, operation=switch, settle=False
-        )
+    ) -> Effect:
+        selected = await self._browser.tabs.activate(target_id)
+        await self._readiness.wait(selected)
+        return Effect(f"Activated tab {selected.id}.")
 
     @tool(
         kind=ActionKind.CLOSE_TAB,
@@ -69,13 +55,6 @@ class TabTools(Plugin, needs=(Actions,)):
     async def close_tab(
         self,
         target_id: str,
-        *,
-        actions: Inject[Actions],
-    ) -> ToolResult:
-        async def close(_tab: Tab) -> Effect:
-            selected = await self._browser.tabs.close(target_id)
-            return Effect(f"Tab closed. Active tab: {selected.id}.")
-
-        return await actions.run(
-            kind=ActionKind.CLOSE_TAB, operation=close, settle=False
-        )
+    ) -> Effect:
+        selected = await self._browser.tabs.close(target_id)
+        return Effect(f"Tab closed. Active tab: {selected.id}.")

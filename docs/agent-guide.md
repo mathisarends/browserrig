@@ -161,9 +161,12 @@ Direct tool calls need an active instance. In isolated tests, use
 
 ## Action chains and stable tool kinds
 
-Browserrig uses Harnessed's native scheduler for action chains. Deterministic
-form filling can combine `type_text`, `select_option`, `set_date`, and a final
-`click` in one model response. `send_keys` can also continue the chain. File
+Browserrig uses Harnessed's native scheduler for action chains. For forms, the
+default instructions favor combining `type_text`, `select_option`, `set_date`,
+and a final `click` in one model response when field refs and values are known.
+The form instructions reserve intermediate observations for dependent choices,
+such as new suggestions, options or validation results. `send_keys` can also
+continue the chain. File
 reads/writes, listings and content extraction can be chained. Browser tools run
 sequentially against explicitly addressed tabs.
 
