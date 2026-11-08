@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Plugin, PolicyDecision, tool
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import UserMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
@@ -31,7 +31,7 @@ async def test_pause_steer_resume_observes_external_page_change(site, handoff_en
     class Gate(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             browser = self._setup_browser
             holder["browser"] = browser
 
@@ -100,7 +100,7 @@ async def test_handoff_observes_human_navigation_and_a_short_lived_popup(site):
     class BrowserHandle(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             browser = self._setup_browser
             holder["browser"] = browser
 

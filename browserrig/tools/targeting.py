@@ -1,7 +1,8 @@
-from harnessed.kernel import Scope
+from harnessed.kernel import PluginScope
+from harnessed.tracing import traced
 
 from browserrig.browser import Browser, Tab
-from browserrig.core import Bounds, ElementPoint, traced
+from browserrig.core import Bounds, ElementPoint
 from browserrig.observation import BrowserPerception
 
 from .intents import TargetLocated
@@ -12,7 +13,7 @@ class Targeting:
     """Reveal refs and keep the motor's aim stable throughout one action."""
 
     def __init__(
-        self, browser: Browser, observe: BrowserPerception, context: Scope
+        self, browser: Browser, observe: BrowserPerception, context: PluginScope
     ) -> None:
         self.browser = browser
         self.observe = observe

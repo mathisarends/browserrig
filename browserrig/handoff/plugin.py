@@ -12,13 +12,13 @@ from harnessed import (
     ToolChain,
     ToolContext,
     hook,
+    tool,
 )
 from harnessed.core.prompt.plugin_instructions import PluginInstructions
 from harnessed.events import ControlState, SessionControlChangedEvent
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import ModelRequest, UserMessage
-from harnessed.services import ToolRegistry
 from pydantic import Field, TypeAdapter, ValidationError
 
 from browserrig.browser import Browser, BrowserEvents
@@ -66,7 +66,6 @@ class HumanHandoff(Plugin, provides=True):
 
     events = HANDOFF_EVENTS
     _state = PluginState(HandoffState)
-    _tools = needs(ToolRegistry)
     _browser = needs(Browser)
     _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
@@ -111,22 +110,9 @@ class HumanHandoff(Plugin, provides=True):
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
 
-    async def setup(self, ctx: Scope) -> None:
+    async def setup(self, scope: PluginScope) -> None:
         self._state.history = self._read_history()
-        # Override the loop's ordinary 30s tool timeout for this mount's human wait.
-        self._tools.register(
-            self.request_human,
-            owner=ctx,
-            description=(
-                "Hand browser control to a human and wait for completion, decline or timeout. "
-                "Describe what they should do and the expected visible result. Then inspect "
-                "the receipt and the next browser observation before continuing."
-            ),
-            timeout=self.timeout + 60,
-            readonly=True,
-            chain=ToolChain.STOP_AFTER,
-        )
-        ctx.effect(self._release)
+        scope.effect(self._release)
 
     def _release(self) -> None:
         transfer, self._state.current = self._state.current, None
@@ -159,6 +145,16 @@ class HumanHandoff(Plugin, provides=True):
         if probe:
             transfer.before = await self._capture()
 
+    @tool(
+        description=(
+            "Hand browser control to a human and wait for completion, decline or timeout. "
+            "Describe what they should do and the expected visible result. Then inspect "
+            "the receipt and the next browser observation before continuing."
+        ),
+        timeout_seconds=lambda plugin: plugin.timeout + 60,
+        readonly=True,
+        chain=ToolChain.STOP_AFTER,
+    )
     async def request_human(
         self,
         reason: Annotated[str, Field(min_length=1, max_length=2000)],

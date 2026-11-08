@@ -13,7 +13,7 @@ from harnessed.events import (
     ObservationsIncludedEvent,
 )
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import ModelInfo, ModelRequest, UserMessage
 from harnessed.testing import ScriptedModel
 
@@ -316,7 +316,7 @@ class _Access(Plugin, needs=(Nudges,)):
         super().__init__()
         self.holder = holder
 
-    async def setup(self, _ctx: Scope):
+    async def setup(self, _ctx: PluginScope):
         self.holder["nudges"] = self.nudges
 
 

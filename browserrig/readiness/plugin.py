@@ -5,7 +5,8 @@ from uuid import uuid4
 from harnessed import Plugin, PluginState, hook
 from harnessed.events import ControlState, SessionControlChangedEvent
 from harnessed.hooks import Next
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
+from harnessed.tracing import traced
 
 from browserrig.browser import BrowserEvents, Tab
 from browserrig.core import (
@@ -13,7 +14,6 @@ from browserrig.core import (
     ReadinessPhase,
     ReadinessStage,
     ReadinessStatus,
-    traced,
 )
 from browserrig.events import (
     READINESS_EVENTS,
@@ -45,9 +45,9 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         self._initial = initial if initial is not None else NetworkQuiet()
         self._ongoing = ongoing if ongoing is not None else NetworkQuiet()
 
-    async def setup(self, ctx: Scope) -> None:
-        self._state.context = ctx
-        ctx.effect(self._cancel)
+    async def setup(self, scope: PluginScope) -> None:
+        self._state.context = scope
+        scope.effect(self._cancel)
 
     @traced
     async def wait(

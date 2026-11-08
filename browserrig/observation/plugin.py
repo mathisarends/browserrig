@@ -13,8 +13,9 @@ from harnessed import (
 )
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import UserMessage
+from harnessed.tracing import traced
 from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab
@@ -26,7 +27,6 @@ from browserrig.core import (
     ReadinessStatus,
     Region,
     StaleElement,
-    traced,
 )
 from browserrig.core import browser_tool as tool
 from browserrig.events import (
@@ -95,9 +95,9 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         self.renderer = renderer
         self.screenshots = screenshots if screenshots is not None else Screenshots()
 
-    async def setup(self, ctx: Scope) -> None:
+    async def setup(self, scope: PluginScope) -> None:
         # Secrets is looked up per capture, so it redacts wherever it sits in the plugins.
-        self._state.context = ctx
+        self._state.context = scope
 
     @property
     def extracted_content(self) -> ExtractedContent | None:

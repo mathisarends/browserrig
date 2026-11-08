@@ -22,7 +22,7 @@ from harnessed.events import (
     TurnOutcome,
     TurnStartedEvent,
 )
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import AssistantMessage, ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
@@ -356,7 +356,7 @@ class _Access(Plugin, needs=(Activity,)):
 
     _setup_activity = needs(Activity)
 
-    async def setup(self, _ctx: Scope):
+    async def setup(self, _ctx: PluginScope):
         activity = self._setup_activity
         self.holder["activity"] = activity
 

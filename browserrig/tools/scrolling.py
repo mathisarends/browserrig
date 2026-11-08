@@ -1,7 +1,9 @@
 import asyncio
 
+from harnessed.tracing import traced
+
 from browserrig.browser import Tab
-from browserrig.core import BrowserError, StaleElement, traced
+from browserrig.core import BrowserError, StaleElement
 from browserrig.input import Mouse
 from browserrig.observation import ElementHandle, ScrollableElement
 

@@ -57,7 +57,7 @@ async def test_browser_perception_dependency_resolves_the_configured_plugin(
     class Consumer(Plugin, needs=(BrowserPerception,)):
         _setup_perception = needs(BrowserPerception)
 
-        async def setup(self):
+        async def setup(self, _scope):
             perception = self._setup_perception
             received.append(perception)
 
@@ -226,7 +226,7 @@ async def test_facade_warning_policy_keeps_deferred_plugin_until_service_is_adde
     mounted = []
 
     class Deferred(Plugin, needs=(_DeferredService,)):
-        async def setup(self):
+        async def setup(self, _scope):
             mounted.append(self)
 
     agent = browserrig.Agent(
@@ -493,8 +493,8 @@ async def test_facade_owns_a_fresh_mcp_stdio_server_per_session(fake_chrome, tmp
     mcp = pytest.importorskip("harnessed.plugins.mcp")
     server = tmp_path / "catalog_server.py"
     server.write_text(
-        "from mcp.server.fastmcp import FastMCP\n"
-        "server = FastMCP('catalog')\n"
+        "from mcp.server.mcpserver import MCPServer\n"
+        "server = MCPServer('catalog')\n"
         "calls = 0\n"
         "@server.tool()\n"
         "def search(query: str) -> str:\n"

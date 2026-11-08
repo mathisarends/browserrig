@@ -1,5 +1,5 @@
 from harnessed import Plugin
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 
 from browserrig.browser import Browser
 from browserrig.input import HumanMotor, Motor
@@ -18,5 +18,5 @@ class InputPacing(Plugin, slot="browserrig.pacing"):
         super().__init__()
         self._motor = motor if motor is not None else HumanMotor()
 
-    async def setup(self, ctx: Scope) -> None:
-        ctx.effect(self._browser.input.pace(self._motor))
+    async def setup(self, scope: PluginScope) -> None:
+        scope.effect(self._browser.input.pace(self._motor))

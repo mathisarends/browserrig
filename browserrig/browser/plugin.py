@@ -3,15 +3,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
-from harnessed import Inject, Plugin, SessionLog, ToolResult, hook
-from harnessed.core.tracing import Tracer
-from harnessed.hooks import ExecuteTool, Next, PreStep, StepDecision
-from harnessed.kernel import Event, Scope, needs
+from harnessed import Plugin, SessionLog
+from harnessed.kernel import Event, PluginScope, needs
 from pydantic import SecretStr
 
-from browserrig.core import BrowserCoordination, TargetId, use_tracer
+from browserrig.core import BrowserCoordination, TargetId
 from browserrig.events import BROWSER_EVENTS
-from browserrig.files import FileBridge, FileTransfers, MountedWorkspace
+from browserrig.files import FileBridge, MountedWorkspace
 
 from .base import Browser, BrowserEvents
 from .chrome import ChromeBrowser
@@ -101,43 +99,22 @@ class Chrome(Plugin, slot="browserrig.browser"):
             )
         )
 
-    async def setup(self, ctx: Scope) -> None:
+    async def setup(self, scope: PluginScope) -> None:
         async def tab_changed(tab: Tab, settled: bool) -> None:
-            await ctx.dispatch(TabChanged(tab, settled))
+            await scope.dispatch(TabChanged(tab, settled))
 
-        browser = await ctx.enter(
+        browser = await scope.enter(
             ChromeBrowser(
                 self.options,
                 emit=self._log.emit,
                 on_tab_change=tab_changed,
             )
         )
-        ctx.provide(Browser, browser)
-        ctx.provide(BrowserEvents, browser.events)
-        ctx.provide(BrowserCoordination, BrowserCoordination())
+        scope.provide(Browser, browser)
+        scope.provide(BrowserEvents, browser.events)
+        scope.provide(BrowserCoordination, BrowserCoordination())
         if self.options.bridge is not None:
-            await ctx.install([FileTransfers(self.options.bridge)])
-
-    # Outermost, so browser work in every other plugin's hooks is traced too.
-    @hook(ExecuteTool, priority=-1000)
-    async def _trace_tool(
-        self,
-        _event: ExecuteTool,
-        next_: Next[ToolResult],
-        tracer: Inject[Tracer | None],
-    ) -> ToolResult:
-        with use_tracer(tracer):
-            return await next_()
-
-    @hook(PreStep, priority=-1000)
-    async def _trace_step(
-        self,
-        _event: PreStep,
-        next_: Next[StepDecision],
-        tracer: Inject[Tracer | None],
-    ) -> StepDecision:
-        with use_tracer(tracer):
-            return await next_()
+            scope.provide(FileBridge, self.options.bridge)
 
 
 @dataclass(frozen=True)

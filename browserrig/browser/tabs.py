@@ -18,8 +18,9 @@ from cdpify.domains.target import (
     TargetInfo,
     TargetInfoChangedEvent,
 )
+from harnessed.tracing import traced
 
-from browserrig.core import BrowserError, TabGesture, TargetId, traced
+from browserrig.core import BrowserError, TabGesture, TargetId
 from browserrig.events import (
     TabActivatedEvent,
     TabClosedEvent,

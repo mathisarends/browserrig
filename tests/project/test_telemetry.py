@@ -1,4 +1,5 @@
 import asyncio
+import json
 import subprocess
 import sys
 from dataclasses import replace
@@ -139,6 +140,13 @@ async def test_otlp_export_contains_correlated_model_and_tool_spans(
     for content in ("MODEL INPUT", "MODEL OUTPUT", "TOOL INPUT"):
         assert (content in contents) is capture_content
     if capture_content:
+        turn_attributes = _attributes(turn.attributes)
+        assert "MODEL INPUT" in turn_attributes["input.value"]
+        assert "MODEL OUTPUT" in turn_attributes["output.value"]
+        for model in models:
+            attributes = _attributes(model.attributes)
+            assert "echo" in attributes["request.tools.value"]
+            assert isinstance(json.loads(attributes["request.settings.value"]), dict)
         assert "TOOL INPUT" in _attributes(tool_span.attributes)["input.value"]
         assert "TOOL INPUT" in _attributes(tool_span.attributes)["output.value"]
 
@@ -166,9 +174,10 @@ async def test_content_is_bounded_and_batches_flush_when_host_fails(
     model = _attributes(
         next(span for span in spans if span.name == "harnessed.model").attributes
     )
-    assert len(model[f"{direction}.value"]) == 20
+    assert len(model[f"{direction}.value"]) <= 20
+    json.loads(model[f"{direction}.value"])
     assert model[f"harnessed.{direction}.truncated"] is True
-    assert model[f"{direction}.mime_type"] == "text/plain"
+    assert model[f"{direction}.mime_type"] == "application/json"
 
 
 async def test_redaction_and_application_filter_leave_live_history_intact(collector):
@@ -216,3 +225,8 @@ async def test_redaction_and_application_filter_leave_live_history_intact(collec
     assert "output.value" not in tool_attributes
     assert TraceContentKind.MODEL_INPUT in seen
     assert TraceContentKind.MODEL_OUTPUT in seen
+
+    assert TraceContentKind.TURN_INPUT in seen
+    assert TraceContentKind.TURN_OUTPUT in seen
+    assert TraceContentKind.MODEL_TOOLS in seen
+    assert TraceContentKind.MODEL_SETTINGS in seen

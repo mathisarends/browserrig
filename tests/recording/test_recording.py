@@ -6,7 +6,7 @@ import pytest
 from cdpify import CDPCommandError
 from harnessed import Agent, Plugin
 from harnessed.events import ModelRequestedEvent
-from harnessed.kernel import Scope
+from harnessed.kernel import PluginScope
 from harnessed.models import ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
@@ -328,7 +328,7 @@ class _BrowserService(Plugin):
         self.browser = browser
         self.calls = calls
 
-    async def setup(self, ctx: Scope):
+    async def setup(self, ctx: PluginScope):
         ctx.provide(Browser, self.browser)
         ctx.effect(lambda: self.calls.append("browser-close"))
 

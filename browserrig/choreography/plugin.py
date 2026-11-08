@@ -9,7 +9,7 @@ from typing import Any
 from harnessed import Plugin, PluginState, ToolResult, ToolStatus, hook
 from harnessed.events import ToolCallFinishedEvent, TurnEndedEvent, TurnStartedEvent
 from harnessed.hooks import ExecuteTool, Next
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 
 from browserrig.browser import Browser, BrowserEvents, TabChanged
 from browserrig.core import ActionKind, BrowserError, BrowserToolMetadata
@@ -65,7 +65,7 @@ class _Presentation:
     view: IframeView | None = None
     activities: deque[BrowserEvent] = field(default_factory=deque)
     activity_task: asyncio.Task[None] | None = None
-    context: Scope | None = None
+    context: PluginScope | None = None
     screenshot: WorkPresentedEvent | None = None
     running: dict[str, WorkPresentedEvent] = field(default_factory=dict)
     handled: set[str] = field(default_factory=set)
@@ -89,22 +89,22 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
         super().__init__()
         self.renderer = renderer
 
-    async def setup(self, ctx: Scope) -> None:
-        self._state.context = ctx
-        ctx.on(BrowserEvent, self._browser_event)
+    async def setup(self, scope: PluginScope) -> None:
+        self._state.context = scope
+        scope.on(BrowserEvent, self._browser_event)
         # Each call installs now and registers its undo for teardown.
-        ctx.effect(self._browser.input.present(Stage()))
+        scope.effect(self._browser.input.present(Stage()))
         if self.renderer is not None:
             view = self._state.view = self.renderer.create()
-            ctx.effect(view.close)
-            ctx.on(LiveEvent, self._render)
-            ctx.effect(self._stop_activities)
+            scope.effect(view.close)
+            scope.on(LiveEvent, self._render)
+            scope.effect(self._stop_activities)
 
         async def publish_cursor(_event: TurnStartedEvent) -> None:
             # Live subscribers often attach late, so seed their cursor at turn start.
             await self._browser.input.mouse.publish_cursor()
 
-        ctx.on(TurnStartedEvent, publish_cursor)
+        scope.on(TurnStartedEvent, publish_cursor)
 
     @hook(TabChanged)
     async def _refresh(self, event: TabChanged) -> None:

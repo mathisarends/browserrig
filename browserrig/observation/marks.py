@@ -3,9 +3,10 @@ import math
 from enum import StrEnum
 from io import BytesIO
 
+from harnessed.tracing import traced
 from PIL import Image, ImageDraw, ImageFont
 
-from browserrig.core import Bounds, Point, traced
+from browserrig.core import Bounds, Point
 
 from .models import ElementInfo
 

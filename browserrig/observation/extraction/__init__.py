@@ -11,9 +11,10 @@ from contextlib import suppress
 
 from cdpify import CDPCommandError, CdpSession
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
+from harnessed.tracing import record, traced
 
 from browserrig.browser import Frame
-from browserrig.core import BrowserError, record, traced
+from browserrig.core import BrowserError
 from browserrig.observation.models import (
     Canvas,
     Element,

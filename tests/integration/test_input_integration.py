@@ -33,7 +33,7 @@ async def test_typing_shortcuts_stream_and_storage(site, coordinates):
     class Access(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self):
+        async def setup(self, _scope):
             browser = self._setup_browser
             holder["browser"] = browser
 
@@ -79,7 +79,7 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
     class Access(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self):
+        async def setup(self, _scope):
             browser = self._setup_browser
             holder["browser"] = browser
 
@@ -137,7 +137,7 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
     class Panels(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self):
+        async def setup(self, _scope):
             browser = self._setup_browser
             holder["browser"] = browser
             tab = holder["tab"] = browser.active_tab
@@ -213,7 +213,7 @@ async def test_scroll_moves_a_carousel_horizontally(site):
     class Carousel(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self):
+        async def setup(self, _scope):
             tab = holder["tab"] = self._setup_browser.active_tab
             await evaluate(
                 tab,
@@ -257,7 +257,7 @@ async def test_scroll_and_hover_by_ref_target_the_element_not_the_cursor(site):
     class Panels(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self):
+        async def setup(self, _scope):
             tab = holder["tab"] = self._setup_browser.active_tab
             await evaluate(
                 tab,
@@ -325,7 +325,7 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
     class Access(Plugin, needs=(Actions,)):
         _setup_actions = needs(Actions)
 
-        async def setup(self):
+        async def setup(self, _scope):
             actions = self._setup_actions
             holder["actions"] = actions
 

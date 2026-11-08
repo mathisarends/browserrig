@@ -24,7 +24,8 @@ async def _click(site, name, **arguments):
         replies = [m for m in request.messages if isinstance(m, ToolMessage)]
         if not replies:
             seen["first_tab"] = state["page"]["tab"]
-            element = next(e for e in state["elements"] if e["name"] == name)
+            element = next((e for e in state["elements"] if e["name"] == name), None)
+            assert element is not None, f"Missing link: {name}"
             yield ModelChunk(
                 tool_call=ToolCall("click", {"ref": element["ref"], **arguments})
             )

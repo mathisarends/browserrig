@@ -15,7 +15,7 @@ from harnessed.plugins import ContextState
 from .activity import Activity
 from .browser import Chrome
 from .choreography import InputVisualization, TabStrip
-from .files import Files
+from .files import Files, FileTransfers
 from .nudges import Nudges
 from .observation import BrowserPerception, ImageContext
 from .pacing import InputPacing
@@ -93,6 +93,7 @@ def browser_pack(*, browser: Chrome | None = None) -> PluginPack:
             FindTools(),
             # The agent's workspace, independent of the browser.
             Files(),
+            FileTransfers(),
             FileTools(),
             ContextCompaction(trigger=WindowRatio()),
         ],

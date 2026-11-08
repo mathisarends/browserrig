@@ -28,7 +28,6 @@ from .kinds import (
 )
 from .options import Options
 from .tools import BrowserToolMetadata, browser_tool
-from .tracing import record, span, traced, use_tracer
 
 __all__ = [
     "BrowserCoordination",
@@ -63,8 +62,4 @@ __all__ = [
     "TabGesture",
     "TargetId",
     "browser_tool",
-    "record",
-    "span",
-    "traced",
-    "use_tracer",
 ]

@@ -15,7 +15,8 @@ from harnessed import (
     hook,
 )
 from harnessed.hooks import ExecuteTool, Next, ReviewToolResult
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
+from harnessed.tracing import record, span, traced
 
 from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
@@ -25,9 +26,6 @@ from browserrig.core import (
     ElementPoint,
     ReadinessPhase,
     ReadinessStatus,
-    record,
-    span,
-    traced,
 )
 from browserrig.events import (
     ACTION_EVENTS,
@@ -106,7 +104,7 @@ _INSTRUCTIONS = Instructions(
 
 @dataclass
 class _Mount:
-    context: Scope | None = None
+    context: PluginScope | None = None
     targeting: Targeting | None = None
 
 
@@ -127,9 +125,9 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
             chain_policy if chain_policy is not None else DomActionChains()
         )
 
-    async def setup(self, ctx: Scope) -> None:
-        self._mount.context = ctx
-        self._mount.targeting = Targeting(self.browser, self.observe, ctx)
+    async def setup(self, scope: PluginScope) -> None:
+        self._mount.context = scope
+        self._mount.targeting = Targeting(self.browser, self.observe, scope)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
@@ -329,7 +327,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         """
         started = monotonic()
         mark = self.browser.tabs.openings
-        with self.browser.input.action(action_id), span("operation"):
+        with self.browser.input.action(action_id), span("browserrig.operation"):
             effect = await operation(tab)
         settled = settle and not tab.closed
         note = (
@@ -380,7 +378,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         effects: list[Effect] = []
 
         async def dispatch() -> None:
-            with self.browser.input.action(action_id), span("operation"):
+            with self.browser.input.action(action_id), span("browserrig.operation"):
                 effects.append(await operation(tab))
 
         report = await self.readiness.wait(

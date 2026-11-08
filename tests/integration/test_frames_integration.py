@@ -9,7 +9,7 @@ from harnessed import (
     ToolCall,
 )
 from harnessed.events import ToolExecutionFinishedEvent
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
@@ -93,7 +93,7 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
         _setup_browser = needs(Browser)
         _setup_actions = needs(Actions)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             browser = self._setup_browser
             actions = self._setup_actions
             holder.update(browser=browser, actions=actions)

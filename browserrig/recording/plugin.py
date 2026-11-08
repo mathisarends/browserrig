@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from harnessed import Plugin, hook
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 
 from browserrig.activity import Activity
 from browserrig.browser import Browser
@@ -65,7 +65,7 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
         self._binary = ""
         self._captures: dict[str, str] = {}
 
-    async def setup(self, ctx: Scope) -> None:
+    async def setup(self, scope: PluginScope) -> None:
         binary = shutil.which(self.ffmpeg)
         if binary is None:
             raise BrowserError("VideoRecording requires FFmpeg on PATH or ffmpeg=...")
@@ -73,7 +73,7 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
         self.output_directory = self.directory.resolve() / uuid4().hex
         await asyncio.to_thread(self.output_directory.mkdir, parents=True)
         await self._activate()
-        ctx.effect(self.finish)
+        scope.effect(self.finish)
 
     async def finish(self) -> RecordingResult:
         """Stop and edit once; also called automatically before Chrome shuts down."""

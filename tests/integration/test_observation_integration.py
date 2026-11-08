@@ -382,7 +382,7 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
     class Access(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self):
+        async def setup(self, _scope):
             browser = self._setup_browser
             holder["browser"] = browser
 

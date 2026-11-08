@@ -17,7 +17,7 @@ from harnessed.events import (
     ToolExecutionStartedEvent,
     TurnEndedEvent,
 )
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 
 from browserrig.core import ActivityKind, ActivityOutcome, HandoffStatus
 from browserrig.events import (
@@ -45,8 +45,8 @@ class Activity(Plugin, slot="browserrig.activity", provides=True):
     _state = PluginState(ActivityState)
     _log = needs(SessionLog)
 
-    async def setup(self, ctx: Scope) -> None:
-        ctx.effect(self._close_all)
+    async def setup(self, scope: PluginScope) -> None:
+        scope.effect(self._close_all)
 
     def intervals(
         self, *, now: float | None = None

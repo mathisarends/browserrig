@@ -19,8 +19,9 @@ from cdpify.domains.page import (
     NavigatedWithinDocumentEvent,
 )
 from cdpify.domains.runtime import RemoteObject
+from harnessed.tracing import record, traced
 
-from browserrig.core import BrowserError, record, traced
+from browserrig.core import BrowserError
 from browserrig.events import (
     BrowserEvent,
     DialogHandledEvent,

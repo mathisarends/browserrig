@@ -10,7 +10,7 @@ from harnessed import (
 )
 from harnessed.events import ToolCallFinishedEvent, ToolExecutionFinishedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import ModelChunk
 from harnessed.plugins import AgentLoop, Approvals, FinalStepPolicy
 from harnessed.testing import CallbackModel, ScriptedModel
@@ -198,7 +198,7 @@ async def test_tab_actions_keep_their_distinct_kinds_in_durable_receipts(site):
     class Access(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             browser = self._setup_browser
             holder.update(browser=browser, first=browser.active_tab.id)
 
@@ -272,7 +272,7 @@ async def _run(site, markup, plan):
 
         _setup_observe = needs(BrowserPerception)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             browser = self._setup_browser
             observe = self._setup_observe
             holder.update(browser=browser, observe=observe)

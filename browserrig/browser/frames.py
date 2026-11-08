@@ -5,8 +5,9 @@ from dataclasses import replace
 from cdpify import CDPCommandError, CdpSession
 from cdpify.domains.page import FrameTree
 from cdpify.domains.target import TargetInfo
+from harnessed.tracing import record, traced
 
-from browserrig.core import Bounds, BrowserError, FrameTransform, record, traced
+from browserrig.core import Bounds, BrowserError, FrameTransform
 from browserrig.scripts import OWNER_SIZE, VIEWPORT
 
 from .frame import Frame

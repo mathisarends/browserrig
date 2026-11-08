@@ -1,6 +1,7 @@
 from cdpify.domains.page import Viewport
+from harnessed.tracing import traced
 
-from browserrig.core import Geometry, traced
+from browserrig.core import Geometry
 
 from .tab import Tab
 

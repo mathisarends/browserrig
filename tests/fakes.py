@@ -7,14 +7,14 @@ from harnessed import (
     Plugin,
     SessionLog,
 )
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.testing import ScriptedModel
 
 from browserrig import Browser, BrowserCoordination, FileSystem
 from browserrig.browser import BrowserEvents
 from browserrig.browser.network import NetworkActivity
 from browserrig.core import ReadinessStatus
-from browserrig.files import FileTransfers
+from browserrig.files import FileBridge, FileTransfers
 from browserrig.input import Input
 from browserrig.observation import BrowserPerception, DomReferences
 from browserrig.readiness import Readiness, ReadinessReport
@@ -96,7 +96,7 @@ class FakeChrome(Plugin, needs=(SessionLog,)):
 
     _setup_log = needs(SessionLog)
 
-    async def setup(self, ctx: Scope):
+    async def setup(self, ctx: PluginScope):
         log = self._setup_log
         browser = FakeBrowser(log)
         self.holder["browser"] = browser
@@ -165,14 +165,14 @@ class FakeServices(Plugin, provides=True):
     async def record(self, event):
         self.events.append(event)
 
-    async def setup(self, ctx: Scope):
+    async def setup(self, ctx: PluginScope):
         ctx.provide(Browser, self.browser)
         ctx.provide(BrowserEvents, self.browser.events)
         ctx.provide(BrowserCoordination, self.coordination)
         ctx.provide(Readiness, self.readiness)
         ctx.provide(BrowserPerception, self.observe)
         if self.bridge is not None:
-            await ctx.install([FileTransfers(self.bridge)])
+            ctx.provide(FileBridge, self.bridge)
 
 
 class OpenFiles(Plugin):
@@ -182,7 +182,7 @@ class OpenFiles(Plugin):
         super().__init__()
         self.files = files
 
-    async def setup(self, ctx: Scope) -> None:
+    async def setup(self, ctx: PluginScope) -> None:
         ctx.provide(FileSystem, self.files)
 
 
@@ -196,7 +196,7 @@ async def mounted(*plugins, bridge=None, files=None):
     workspace = () if files is None else (OpenFiles(files),)
     agent = Agent(
         model=ScriptedModel(["Done"]),
-        plugins=[services, *workspace, *plugins],
+        plugins=[services, *workspace, FileTransfers(), *plugins],
     )
     async with agent.session() as session:
         yield session.scope[FakeServices], session.scope

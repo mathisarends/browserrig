@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from cdpify import CDPCommandError
 from harnessed.hooks import Next
+from harnessed.tracing import record, traced
 
 from browserrig.browser import BrowserEvents, Tab
 from browserrig.core import (
@@ -14,8 +15,6 @@ from browserrig.core import (
     ReadinessPhase,
     ReadinessStage,
     ReadinessStatus,
-    record,
-    traced,
 )
 from browserrig.events import (
     BrowserEvent,

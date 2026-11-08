@@ -6,15 +6,9 @@ from time import monotonic
 from typing import Literal
 
 from cdpify.domains.input import MouseButton
+from harnessed.tracing import traced
 
-from browserrig.core import (
-    BrowserError,
-    CursorStyle,
-    MouseEventKind,
-    Point,
-    TabGesture,
-    traced,
-)
+from browserrig.core import BrowserError, CursorStyle, MouseEventKind, Point, TabGesture
 from browserrig.events import (
     CursorMovedEvent,
     CursorStateEvent,

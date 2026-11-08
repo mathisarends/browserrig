@@ -8,7 +8,7 @@ from harnessed import (
     ToolCall,
 )
 from harnessed.events import ToolExecutionFinishedEvent
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
@@ -73,7 +73,7 @@ class _Hold(Plugin, needs=(Browser,)):
 
     _setup_browser = needs(Browser)
 
-    async def setup(self, _ctx: Scope):
+    async def setup(self, _ctx: PluginScope):
         browser = self._setup_browser
         self.holder["browser"] = browser
 
@@ -204,7 +204,7 @@ async def test_secret_is_refused_inside_a_cross_origin_frame_of_an_allowed_page(
     class CrossFrame(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             browser = self._setup_browser
             await wait_for_page(browser.active_tab)
             leaf = site.replace("127.0.0.1", "localhost") + "/frame-leaf"

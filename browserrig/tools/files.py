@@ -20,7 +20,7 @@ from harnessed import (
 )
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.kernel import Scope, needs, observes
+from harnessed.kernel import PluginScope, needs, observes
 from harnessed.models import UserMessage
 from pydantic import Field
 
@@ -124,13 +124,13 @@ class FileTools(Plugin):
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
 
-    async def setup(self, _ctx: Scope) -> None:
+    async def setup(self, scope: PluginScope) -> None:  # pylint: disable=unused-argument
         if self._file_transfer is not None:
             self._transfer.receiving = await self._browser.receive_downloads(
                 self._file_transfer
             )
 
-    async def teardown(self) -> None:
+    async def teardown(self, scope: PluginScope) -> None:  # pylint: disable=unused-argument
         if self._transfer.receiving:
             # The browser may already be closing with the session.
             with suppress(Exception):

@@ -10,8 +10,8 @@ import re
 from collections.abc import Iterable
 
 from cdpify import CdpSession
+from harnessed.tracing import record, traced
 
-from browserrig.core import record, traced
 from browserrig.observation.models import Element
 
 from .document import clean

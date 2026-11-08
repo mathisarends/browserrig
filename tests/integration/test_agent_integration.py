@@ -6,7 +6,7 @@ from harnessed import (
     ToolCall,
 )
 from harnessed.events import ModelRequestedEvent, ObservationsIncludedEvent
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import ImagePart, ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel, call
@@ -42,7 +42,7 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
     class CountScreenshots(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             browser = self._setup_browser
             page_type = type(browser.active_tab.cdp.page)
             original = page_type.capture_screenshot
@@ -192,7 +192,7 @@ async def test_dom_screenshots_are_native_images(site):
     class Start(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             browser = self._setup_browser
             await browser.active_tab.navigate(site + "/canvas")
 

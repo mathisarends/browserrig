@@ -8,7 +8,7 @@ from harnessed import (
     ToolCall,
 )
 from harnessed.events import ToolExecutionFinishedEvent
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
@@ -159,7 +159,7 @@ async def _perform(site, name, arguments):
     class Access(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             browser = self._setup_browser
             holder["browser"] = browser
 

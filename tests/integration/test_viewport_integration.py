@@ -76,7 +76,7 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
     class Prepare(Plugin, needs=(Actions,)):
         _setup_actions = needs(Actions)
 
-        async def setup(self):
+        async def setup(self, _scope):
             actions = self._setup_actions
             holder["actions"] = actions
             tab = actions.browser.active_tab
@@ -167,7 +167,7 @@ async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
     class Prepare(Plugin, needs=(Actions,)):
         _setup_actions = needs(Actions)
 
-        async def setup(self):
+        async def setup(self, _scope):
             actions = self._setup_actions
             holder["actions"] = actions
             await evaluate(
@@ -236,7 +236,7 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(
     class Prepare(Plugin, needs=(Actions,)):
         _setup_actions = needs(Actions)
 
-        async def setup(self):
+        async def setup(self, _scope):
             actions = self._setup_actions
             holder["actions"] = actions
             origin = site.replace("127.0.0.1", "localhost") if cross_origin else site
@@ -302,7 +302,7 @@ async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target
     class Prepare(Plugin, needs=(Actions,)):
         _setup_actions = needs(Actions)
 
-        async def setup(self):
+        async def setup(self, _scope):
             actions = self._setup_actions
             holder["actions"] = actions
             await evaluate(

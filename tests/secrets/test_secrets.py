@@ -15,7 +15,7 @@ from harnessed import (
     tool,
 )
 from harnessed.events import InboxAddedEvent, UserMessageEvent
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from PIL import Image
@@ -285,7 +285,7 @@ def _agent(secrets, *, model, plugins=()):
     class Capture(Plugin, needs=(Secrets,)):
         _setup_mounted = needs(Secrets)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             mounted = self._setup_mounted
             holder["secrets"] = mounted
 
@@ -452,7 +452,7 @@ async def test_observe_redacts_with_secrets_mounted_after_it():
     class Hold(Plugin, needs=(BrowserPerception,)):
         _setup_observe = needs(BrowserPerception)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             observe = self._setup_observe
             holder["observe"] = observe
 

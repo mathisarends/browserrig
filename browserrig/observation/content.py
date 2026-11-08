@@ -3,9 +3,10 @@ from urllib.parse import urljoin, urlsplit
 
 from cdpify import CDPCommandError
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
+from harnessed.tracing import traced
 
 from browserrig.browser import Tab
-from browserrig.core import Bounds, BrowserError, Options, traced
+from browserrig.core import Bounds, BrowserError, Options
 from browserrig.scripts import CONTENT, ContentArgs, ContentExtraction
 
 from .dom import seed_frame

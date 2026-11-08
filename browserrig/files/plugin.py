@@ -1,5 +1,5 @@
 from harnessed import Plugin
-from harnessed.kernel import Scope, observes
+from harnessed.kernel import PluginScope, observes
 
 from .bridge import FileBridge
 from .config import FileOptions
@@ -23,25 +23,28 @@ class Files(Plugin, slot="browserrig.files"):
         self.workspace = workspace
         self.options = options if options is not None else FileOptions()
 
-    async def setup(self, ctx: Scope) -> None:
+    async def setup(self, scope: PluginScope) -> None:
         workspace = self.workspace if self.workspace is not None else LocalWorkspace()
-        files = await ctx.enter(FileSystem(workspace, self.options))
-        ctx.provide(FileSystem, files)
+        files = await scope.enter(FileSystem(workspace, self.options))
+        scope.provide(FileSystem, files)
 
 
 class FileTransfers(Plugin):
     """Bind a browser host's bridge to the session's optional workspace.
 
     Workspace changes replace the transfer service without reopening the browser.
-    Chrome installs this provider from its bridge configuration.
+    The browser pack includes this provider; Chrome publishes its configured bridge.
+    Explicit compositions add this plugin alongside Chrome and Files.
     """
 
     _workspace = observes(FileSystem)
+    _bridge = observes(FileBridge)
 
-    def __init__(self, bridge: FileBridge) -> None:
+    def __init__(self, bridge: FileBridge | None = None) -> None:
         super().__init__()
         self.bridge = bridge
 
-    async def setup(self, ctx: Scope) -> None:
-        if self._workspace is not None:
-            ctx.provide(FileTransfer, FileTransfer(self._workspace, self.bridge))
+    async def setup(self, scope: PluginScope) -> None:
+        bridge = self.bridge if self.bridge is not None else self._bridge
+        if self._workspace is not None and bridge is not None:
+            scope.provide(FileTransfer, FileTransfer(self._workspace, bridge))

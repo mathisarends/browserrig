@@ -6,6 +6,7 @@ from typing import Protocol
 from uuid import uuid4
 
 from cdpify import CDPCommandError
+from harnessed.tracing import record, traced
 from pydantic import Field
 
 from browserrig.browser import Tab, TabInfo, screenshot
@@ -18,8 +19,6 @@ from browserrig.core import (
     ReadinessPhase,
     ReadinessStatus,
     Region,
-    record,
-    traced,
 )
 from browserrig.readiness import ReadinessReport
 

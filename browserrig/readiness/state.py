@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass, field
 
-from harnessed.kernel import Scope
+from harnessed.kernel import PluginScope
 
 from browserrig.core import TargetId
 
@@ -17,4 +17,4 @@ class ReadinessState:
     initialized: set[tuple[str, str]] = field(default_factory=set)
     deferred: dict[TargetId, ReadinessReport] = field(default_factory=dict)
     spent: dict[TargetId, float] = field(default_factory=dict)
-    context: Scope | None = None
+    context: PluginScope | None = None

@@ -427,7 +427,7 @@ async def test_done_bridge_is_released_after_session_startup_failure():
     class Broken(Plugin):
         context = needs(SessionContext)
 
-        async def setup(self):
+        async def setup(self, _scope):
             raise RuntimeError("Startup failed")
 
     native_prepare, native_validate = OutputHandler.prepare, OutputHandler.validate

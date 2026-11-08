@@ -3,7 +3,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 
 from harnessed import Plugin, PluginState, hook
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 
 from browserrig.browser import Browser, Tab, TabChanged
 from browserrig.core import BrowserError
@@ -26,8 +26,8 @@ class TabStrip(Plugin):
     _strips = PluginState[dict[str, "_Strip"]](dict)
     _browser = needs(Browser)
 
-    async def setup(self, ctx: Scope) -> None:
-        ctx.effect(self._stop)
+    async def setup(self, scope: PluginScope) -> None:
+        scope.effect(self._stop)
         # Tabs opened before this plugin started show up once, with what they show now.
         with suppress(BrowserError):
             tab = self._browser.active_tab

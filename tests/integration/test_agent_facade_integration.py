@@ -5,7 +5,7 @@ from harnessed import Agent as HarnessedAgent
 from harnessed import Plugin, PolicyDecision, SessionState
 from harnessed.events import TextDeltaEvent, ToolCallFinishedEvent, TurnResultEvent
 from harnessed.integrations.json import JsonSessionStore
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
@@ -28,7 +28,7 @@ async def test_connect_plugin_disconnects_without_stopping_external_browser(
     class Access(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             browser = self._setup_browser
             connections.append(browser)
 
@@ -66,7 +66,7 @@ async def test_facade_restores_saved_state_and_owns_a_fresh_browser_per_session(
     class Access(Plugin, needs=(Browser,)):
         _setup_browser = needs(Browser)
 
-        async def setup(self, _ctx: Scope):
+        async def setup(self, _ctx: PluginScope):
             browser = self._setup_browser
             browsers.append(browser)
 

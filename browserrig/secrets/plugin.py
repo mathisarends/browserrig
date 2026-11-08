@@ -23,7 +23,7 @@ from harnessed.hooks import (
     Priority,
     ReviewToolResult,
 )
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import TextPart, UserMessage
 
 from browserrig.browser import Browser, BrowserEvents
@@ -105,11 +105,11 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
 
-    async def setup(self, ctx: Scope) -> None:
+    async def setup(self, scope: PluginScope) -> None:
         for name, secret in self._secrets.items():
             if not secret.rotating:
                 self._learn(name, await resolve(name, secret.value))
-        ctx.effect(self._events.add_filter(self._filter_event))
+        scope.effect(self._events.add_filter(self._filter_event))
 
     def redact[T](self, value: T) -> T:
         """Replace every known secret value in `value` with its placeholder."""

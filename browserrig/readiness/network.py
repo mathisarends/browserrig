@@ -12,7 +12,9 @@ the moment the inner policy alone was ready.
 from dataclasses import dataclass, field
 from time import monotonic
 
-from browserrig.core import ReadinessPhase, ReadinessStatus, record
+from harnessed.tracing import record
+
+from browserrig.core import ReadinessPhase, ReadinessStatus
 
 from .policies import DomReady, ReadinessContext, ReadinessPolicy
 from .strategy import ReadinessStrategy

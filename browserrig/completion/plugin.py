@@ -20,7 +20,7 @@ from harnessed.hooks import (
     ToolPolicy,
     TurnStopping,
 )
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import StopReason, UserMessage
 from harnessed.services import SessionContext
 
@@ -71,8 +71,8 @@ class Done(Plugin, slot="completion"):
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
 
-    async def setup(self, ctx: Scope) -> None:
-        ctx.effect(activate(self._session.log, self._finished))
+    async def setup(self, scope: PluginScope) -> None:
+        scope.effect(activate(self._session.log, self._finished))
 
     @tool(
         description=(

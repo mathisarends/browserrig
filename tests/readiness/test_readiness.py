@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 from harnessed import Agent, Plugin, hook
 from harnessed.hooks import Next
-from harnessed.kernel import Scope, needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
@@ -38,7 +38,7 @@ class Access(Plugin, needs=(Readiness,)):
 
     _setup_readiness = needs(Readiness)
 
-    async def setup(self, _ctx: Scope):
+    async def setup(self, _ctx: PluginScope):
         readiness = self._setup_readiness
         self.holder["readiness"] = readiness
 

@@ -6,7 +6,9 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from typing import TypedDict
 
-from browserrig.core import BrowserError, traced
+from harnessed.tracing import traced
+
+from browserrig.core import BrowserError
 from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
 
 from .motor import KeyStroke, Motor
