@@ -7,6 +7,9 @@
     </style>
   </head>
   <body>
+    <div id="edge" aria-hidden="true"></div>
+    <div id="scan" aria-hidden="true"></div>
+    <div id="viewfinder" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     <svg id="trail" aria-hidden="true"><path /></svg>
     <div id="matches"></div>
     <div id="highlight"><i></i><i></i><i></i><i></i></div>
@@ -22,8 +25,12 @@
       <div id="keyboard-caption"></div>
     </div>
     <div id="address" class="panel">
-      <span class="symbol">↗</span><span id="address-text"></span
-      ><span id="address-enter">↵</span>
+      <span id="address-icon"></span><span id="address-text"></span
+      ><span id="address-caret"></span>
+    </div>
+    <div id="history" class="panel">
+      <div id="history-icon"></div>
+      <div id="history-copy"><b id="history-title"></b><span id="history-detail"></span></div>
     </div>
     <div id="find" class="panel">
       <span class="symbol">⌕</span><span id="find-text"></span
@@ -32,28 +39,25 @@
     <div id="navigation" class="panel">
       <span id="navigation-icon"></span><span id="navigation-text"></span>
     </div>
-    <div id="status" class="panel">
-      <span class="spinner"></span><span id="status-text"></span>
+    <div id="caption" class="panel" role="status" aria-live="polite">
+      <div id="caption-icon"></div>
+      <div id="caption-copy">
+        <b id="caption-title"></b><span id="caption-detail"></span>
+      </div>
+      <div id="caption-state"></div>
     </div>
-    <div id="activity" class="panel" role="status">
-      <span class="spinner"></span><span id="activity-text"></span>
-    </div>
-    <div id="receipts">
-      <div id="work" aria-live="polite"></div>
-      <div id="downloads">
-        <div id="opening" class="transfer panel">
-          <div class="file-icon"></div>
-          <div class="file-copy"><b></b><span></span></div>
-          <div class="transfer-state"></div>
-        </div>
-        <div id="download" class="transfer panel">
-          <div class="file-icon"></div>
-          <div class="file-copy"><b></b><span></span></div>
-          <div class="transfer-state"></div>
-        </div>
+    <div id="downloads">
+      <div id="opening" class="transfer panel">
+        <div class="file-icon"></div>
+        <div class="file-copy"><b></b><span></span></div>
+        <div class="transfer-state"></div>
+      </div>
+      <div id="download" class="transfer panel">
+        <div class="file-icon"></div>
+        <div class="file-copy"><b></b><span></span></div>
+        <div class="transfer-state"></div>
       </div>
     </div>
-    <div id="capture-frame"></div>
     <div id="upload" class="transfer panel">
       <div class="file-icon"></div>
       <div class="file-copy"><b></b><span></span></div>

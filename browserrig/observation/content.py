@@ -5,7 +5,7 @@ from cdpify import CDPCommandError
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 
 from browserrig.browser import Tab
-from browserrig.core import BrowserError, Options, traced
+from browserrig.core import Bounds, BrowserError, Options, traced
 from browserrig.scripts import CONTENT, ContentArgs, ContentExtraction
 
 from .dom import seed_frame
@@ -23,6 +23,8 @@ class PageContent(Options):
     offset: int = 0
     next_offset: int | None = None
     partial: bool = False
+    # The visible part of the page that was read, in viewport CSS pixels.
+    region: Bounds | None = None
 
     def render(self) -> str:
         text = f"# {_heading(self.title) or 'Page content'}\n\nSource: <{_source(self.url)}>"
@@ -147,6 +149,7 @@ def _content(
         offset=offset,
         next_offset=next_offset,
         partial=partial or next_offset is not None,
+        region=main.region,
     )
 
 

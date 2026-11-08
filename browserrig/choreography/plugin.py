@@ -225,6 +225,9 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             ActionKind.EXTRACT_CONTENT,
             ActionKind.JAVASCRIPT,
             ActionKind.SCREENSHOT,
+            ActionKind.GO_BACK,
+            ActionKind.GO_FORWARD,
+            ActionKind.RELOAD,
         }:
             receipt = replace(receipt, source_url=tab.url)
         self._state.running[event.call.id] = receipt

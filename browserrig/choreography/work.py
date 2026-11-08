@@ -8,7 +8,7 @@ from harnessed import ToolCall, ToolResult, ToolStatus
 from pydantic import TypeAdapter, ValidationError
 
 from browserrig.browser import TabInfo
-from browserrig.core import ActionKind, Region
+from browserrig.core import ActionKind, Bounds, Region
 from browserrig.files import Download, FileContent, FileEntry, FileListing
 from browserrig.observation import ExtractedContent
 
@@ -75,7 +75,8 @@ def started(call: ToolCall, kind: ActionKind) -> WorkPresentedEvent:
             if args.get("zoom", 1) != 1:
                 detail += f" · {args['zoom']}× zoom"
         case ActionKind.SELECT | ActionKind.SET_DATE:
-            detail = f"{args.get('ref', '')} · {args.get('value', '')}"
+            # The element highlight shows where; the caption names the value.
+            detail = str(args.get("value", ""))
         case ActionKind.HANDLE_DIALOG:
             detail = "Accepting dialog" if args.get("accept") else "Dismissing dialog"
     return WorkPresentedEvent(
@@ -149,6 +150,7 @@ def _result(
                 offset=extraction.offset,
                 next_offset=extraction.next_offset,
                 content_status="partial" if extraction.partial else "complete",
+                region=_area(extraction.region),
             )
         case ActionKind.SCREENSHOT:
             return replace(
@@ -229,6 +231,12 @@ def _file(event: WorkPresentedEvent, content: FileContent) -> WorkPresentedEvent
         page_count=content.page_count,
         content_status=content.status,
     )
+
+
+def _area(bounds: Bounds | None) -> CaptureRegion | None:
+    if bounds is None or bounds.width <= 0 or bounds.height <= 0:
+        return None
+    return CaptureRegion(bounds.x, bounds.y, bounds.width, bounds.height)
 
 
 def _limitations(items: tuple[str, ...]) -> tuple[str, ...]:

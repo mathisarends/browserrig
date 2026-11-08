@@ -168,6 +168,7 @@ CHOREOGRAPHY: Script[ScriptArgs, None] = Script.load(
         "choreography/keyboard",
         "choreography/panels",
         "choreography/transfers",
+        "choreography/caption",
         "choreography/work",
     ),
 )

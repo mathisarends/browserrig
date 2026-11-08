@@ -51,9 +51,13 @@ only the demonstration page, its download and the generated gallery.
 ```python
 from browserrig import IframeRenderer, InputVisualization
 
-InputVisualization(renderer=IframeRenderer(
-    name="Browserrig", keyboard_layout="de", theme="dark",
-))
+InputVisualization(
+    renderer=IframeRenderer(
+        name="Browserrig",
+        keyboard_layout="de",
+        theme="dark",
+    )
+)
 ```
 
 `InputVisualization(renderer=None)` keeps the transient events for an external
@@ -64,18 +68,29 @@ for clean screenshots, cancellation handling and custom surfaces.
 
 ## Reading, results and activity
 
-The overlay also shows file reads and writes, directory/download/tab listings,
-page extraction, JavaScript, screenshot requests and captures, history navigation,
-reloads, native selection/date changes, dialogs, page readiness and human handoff.
-Failures, cancellation and calls denied or skipped before execution get terminal
-receipts. Multiple downloads retain independent progress and completion cards.
+Work the pointer and keyboard cannot show plays where it happens on the page. A
+single caption at the bottom names it in one line: an icon, a title, a short
+detail and a state ring that turns into a check, warning or cross.
 
-Work cards show a bounded text preview, selection/page counts, continuation offsets,
-extraction limitations and an actual saved path when one exists. Screenshot requests
-remain pending until perception captures the next observation; completion carries
-a small inline JPEG and its source viewport region. Preview text never becomes HTML.
-The overlay remains inert: previews show their first lines without taking pointer
-or keyboard focus. An interactive client can use the same payload for a detail view.
+- **Reading a page** sweeps a soft beam over the viewport, then narrows to the area
+  that was actually read and dims the rest. Without `full_page` that is the main
+  landmark, so a viewer sees that header and navigation were left out. A partial
+  read ends with an amber edge where reading stops.
+- **Screenshots** snap viewfinder corners onto the captured region with a brief
+  flash; the caption icon becomes the thumbnail.
+- **Files** fly from the caption into the cursor when read and from the cursor into
+  the caption when written.
+- **Back, forward and reload** show a short card in the middle of the page with the
+  direction and the host being left.
+- **Failures** shake the cursor and show the reason in the caption.
+- **Human handoff** outlines the viewport edge until control returns, and the
+  cursor badge says the agent is waiting.
+
+Page readiness is not shown; it is an implementation detail of every action.
+Multiple downloads keep independent progress and completion cards. Preview text,
+offsets, limitations and saved paths remain in the receipt for a Canvas detail
+view; the inert overlay never renders them as HTML or takes pointer or keyboard
+focus.
 
 `extract_content` still returns Markdown without writing a workspace file. Its latest
 successful typed result is available as `BrowserPerception.extracted_content`, with
@@ -107,20 +122,21 @@ and browser execution; `kind` is `ActionKind`, or `None` for an unexecuted call 
 browser metadata was unavailable. `tool_name` identifies the original call.
 `phase` is `WorkPhase`: `RUNNING`, `COMPLETED`, `WARNING`, `FAILED` or `CANCELLED`.
 Running work remains until updated. A terminal receipt expires after `retention`
-seconds; zero removes it immediately, as with successful readiness checks.
+seconds; zero removes it immediately.
 
 `title` and `detail` are ready to draw, while `source_path`, `source_url`,
 `characters`, `offset`, `next_offset`, `page_number`, `page_count`, `content_status`,
 `preview`, `limitations` and `artifact_path` provide structured result data.
 `region` is a frozen `CaptureRegion(x, y, width, height)` in **source viewport CSS
-pixels**. Use `target_id` and `document_id` to choose the correct Canvas surface
+pixels**: the captured area of a screenshot, or the visible area a page extraction read. Use `target_id` and `document_id` to choose the correct Canvas surface
 and transform those coordinates into its displayed bounds. `image_url` contains
 only the bounded screenshot thumbnail. Native download progress remains keyed by
 `download_id`; show percentages only when total bytes are known.
 
 Use the enum tags rather than parsing event-name prefixes. Python dispatch uses
-event classes and enums; the iframe receives its tag table from `EventKind` rather
-than maintaining a second list of wire names. A JSON schema for a frontend can be
+event classes and enums; the iframe receives its tag tables from `EventKind`,
+`WorkPhase`, `ActionKind` and `ActivityKind` rather than maintaining a second list of
+wire names. A JSON schema for a frontend can be
 generated with `TypeAdapter(WorkPresentedEvent).json_schema()` from Pydantic.
 
 All new presentation receipts are transient: they stay out of model context, saved

@@ -21,12 +21,15 @@ def test_file_read_presentation_preserves_source_and_selectors():
     assert receipt.target_id == "tab-1" and receipt.document_id == "doc-1"
 
 
-def test_ready_receipt_closes_wait_without_lingering_as_a_result():
-    receipt = project(
-        ReadyEvent(readiness_id="ready-1", phase=ReadinessPhase.ACTION, duration=0.05)
+def test_page_readiness_is_not_presented():
+    assert (
+        project(
+            ReadyEvent(
+                readiness_id="ready-1", phase=ReadinessPhase.ACTION, duration=0.05
+            )
+        )
+        is None
     )
-    assert receipt is not None and receipt.phase is WorkPhase.COMPLETED
-    assert receipt.retention == 0
 
 
 def test_read_cancellation_uses_typed_outcome_not_reason_text():

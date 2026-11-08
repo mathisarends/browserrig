@@ -101,6 +101,8 @@ class ContentExtraction(Options):
     # Whether site header, navigation and footer were left out of a page without a main one.
     chrome: bool = False
     limited: bool = False
+    # The visible part of what was read, in viewport CSS pixels.
+    region: Bounds | None = None
 
 
 class FoundText(Options):

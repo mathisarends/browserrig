@@ -18,12 +18,6 @@ from browserrig.events import (
     FileWrittenEvent,
     HandoffFinishedEvent,
     HandoffRequestedEvent,
-    ReadinessCancelledEvent,
-    ReadinessDegradedEvent,
-    ReadinessEndedEvent,
-    ReadinessFailedEvent,
-    ReadinessStartedEvent,
-    ReadyEvent,
 )
 
 from .events import WorkPhase, WorkPresentedEvent
@@ -48,8 +42,6 @@ def _project(event: BrowserEvent) -> WorkPresentedEvent | None:
             receipt = _files(event)
         case ActionStartedEvent() | ActionFinishedEvent() | ActionFailedEvent():
             receipt = _action(event)
-        case ReadinessStartedEvent() | ReadinessEndedEvent():
-            receipt = _page_readiness(event)
         case DialogOpenedEvent() | DialogHandledEvent():
             receipt = _dialog(event)
         case HandoffRequestedEvent() | HandoffFinishedEvent():
@@ -152,22 +144,6 @@ def _files(
             )
 
 
-def _page_readiness(
-    event: ReadinessStartedEvent | ReadinessEndedEvent,
-) -> WorkPresentedEvent | None:
-    match event:
-        case ReadinessStartedEvent():
-            return WorkPresentedEvent(
-                work_id=f"ready:{event.readiness_id}",
-                kind=ActionKind.WAIT,
-                title="Waiting for page readiness",
-                phase=WorkPhase.RUNNING,
-                detail=event.phase.value,
-            )
-        case ReadinessEndedEvent():
-            return _readiness(event)
-
-
 def _dialog(event: DialogOpenedEvent | DialogHandledEvent) -> WorkPresentedEvent | None:
     match event:
         case DialogOpenedEvent():
@@ -235,27 +211,4 @@ def _action(
         ),
         phase=phase,
         preview=preview,
-    )
-
-
-def _readiness(event: ReadinessEndedEvent) -> WorkPresentedEvent:
-    match event:
-        case ReadyEvent():
-            phase = WorkPhase.COMPLETED
-        case ReadinessDegradedEvent():
-            phase = WorkPhase.WARNING
-        case ReadinessCancelledEvent():
-            phase = WorkPhase.CANCELLED
-        case ReadinessFailedEvent():
-            phase = WorkPhase.FAILED
-        case _:
-            raise TypeError(f"Unsupported readiness event: {type(event).__name__}")
-    return WorkPresentedEvent(
-        work_id=f"ready:{event.readiness_id}",
-        kind=ActionKind.WAIT,
-        title="Page readiness",
-        phase=phase,
-        detail=clipped(event.reason, 300),
-        elapsed=event.duration,
-        retention=0 if phase is WorkPhase.COMPLETED else 8,
     )

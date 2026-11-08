@@ -201,6 +201,7 @@ async def test_work_stream_is_complete_with_and_without_local_rendering(
             receipt for receipt in receipts if receipt.call_id == calls[3].id
         ][-1]
         assert "Download PDF" in extraction.preview and not extraction.artifact_path
+        assert extraction.region is not None and extraction.region.width > 0
         capture = [receipt for receipt in receipts if receipt.call_id == calls[-1].id][
             -1
         ]
@@ -212,13 +213,13 @@ async def test_work_stream_is_complete_with_and_without_local_rendering(
         if local_renderer:
             assert (
                 await _surface(
-                    tab, "document.querySelector('.work-thumbnail').naturalWidth"
+                    tab, "document.querySelector('#caption-icon img').naturalWidth"
                 )
                 <= 320
             )
 
 
-async def test_work_preview_is_inert_text_and_is_excluded_from_extraction(site):
+async def test_work_caption_is_inert_text_and_is_excluded_from_extraction(site):
     agent = BrowserAgent(model=ScriptedModel([]), browser=Chrome.launch(url=site))
     async with agent.session() as session:
         tab = session.scope[Browser].active_tab
@@ -227,24 +228,21 @@ async def test_work_preview_is_inert_text_and_is_excluded_from_extraction(site):
             WorkPresentedEvent(
                 work_id="preview",
                 kind="read_file",
-                title="Read file",
+                title=markup,
                 phase=WorkPhase.COMPLETED,
                 preview=markup,
             )
         )
         assert (
-            await _surface(tab, "document.querySelector('.work-preview').textContent")
+            await _surface(tab, "document.querySelector('#caption-title').textContent")
             == markup
         )
         assert await _surface(
-            tab, "document.querySelector('.work-preview img') === null"
+            tab, "document.querySelector('#caption-copy img') === null"
         )
 
         content = await extract_content(tab)
-        assert (
-            markup not in content.markdown
-            and "Preview · first lines" not in content.markdown
-        )
+        assert markup not in content.markdown
 
 
 async def test_simultaneous_downloads_keep_independent_progress_and_outcomes(site):
@@ -318,13 +316,15 @@ async def test_work_and_transfers_fit_the_viewport(site, tmp_path, theme, width)
         )
         boxes = await _surface(
             tab,
-            "['#work', '#downloads'].map(selector => {"
+            "['#caption', '#downloads'].map(selector => {"
             " const r=document.querySelector(selector).getBoundingClientRect();"
             " return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}; })",
         )
-        work, download = boxes
+        caption, download = boxes
         assert all(0 <= box["left"] < box["right"] <= width for box in boxes)
-        assert work["right"] <= download["left"] or download["bottom"] <= work["top"]
+        assert (
+            caption["right"] <= download["left"] or download["bottom"] <= caption["top"]
+        )
         await asyncio.sleep(0.2)
         image = await screenshot(tab, overlays=True)
         (tmp_path / f"work-proof-{theme}-{width}.png").write_bytes(
@@ -350,7 +350,8 @@ async def test_running_work_restores_after_navigation_without_pointer_input(site
         await wait_for_page(tab)
         assert (
             await _surface(
-                tab, "document.querySelector('[data-work-id=read]').dataset.phase"
+                tab,
+                "document.querySelector('#caption[data-work-id=read]').dataset.phase",
             )
             == "running"
         )
@@ -370,7 +371,8 @@ async def test_running_work_restores_after_navigation_without_pointer_input(site
         )
         assert (
             await _surface(
-                tab, "document.querySelector('[data-work-id=read]').dataset.phase"
+                tab,
+                "document.querySelector('#caption[data-work-id=read]').dataset.phase",
             )
             == "completed"
         )

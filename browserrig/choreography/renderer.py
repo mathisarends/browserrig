@@ -9,7 +9,7 @@ from typing import Literal
 from pydantic import Field
 
 from browserrig.browser import Overlay, Tab
-from browserrig.core import Options
+from browserrig.core import ActionKind, ActivityKind, Options
 from browserrig.events import BrowserEvent, EventKind, LiveEvent
 from browserrig.scripts import CHOREOGRAPHY
 
@@ -34,6 +34,10 @@ class IframeView:
         self._presentation = options.model_dump(mode="json")
         self._presentation["events"] = {kind.name: kind.value for kind in EventKind}
         self._presentation["phases"] = {phase.name: phase.value for phase in WorkPhase}
+        self._presentation["actions"] = {kind.name: kind.value for kind in ActionKind}
+        self._presentation["activities"] = {
+            kind.name: kind.value for kind in ActivityKind
+        }
         self._overlays: dict[str, Overlay] = {}
         self._lock = asyncio.Lock()
         self._closed = False

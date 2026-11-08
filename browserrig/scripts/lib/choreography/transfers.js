@@ -4,7 +4,6 @@ function createChoreographyTransfers(ui, cursor) {
   );
   const downloads = new Map();
   let downloadSequence = 0;
-  let flight = 0;
   for (const id of ['download', 'opening', 'upload', 'flying-file']) {
     const element =
       id === 'flying-file' ? ui.node(id) : ui.node(id).querySelector('.file-icon');
@@ -23,40 +22,9 @@ function createChoreographyTransfers(ui, cursor) {
     ui.panel(id, true);
   };
   const fly = (id, point, uploading, seconds = 0.45) => {
-    if (ui.reduced()) {
-      return;
-    }
-    const generation = ++flight;
     const target = ui.node(id).getBoundingClientRect();
     const cardPoint = [target.left + 34, target.top + 36];
-    const from = uploading ? cardPoint : point;
-    const to = uploading ? point : cardPoint;
-    const control = [
-      from[0] + (to[0] - from[0]) * 0.75,
-      Math.max(8, Math.min(from[1], to[1]) - 48),
-    ];
-    const element = ui.node('flying-file');
-    const started = performance.now();
-    element.style.display = 'grid';
-    const animate = (now) => {
-      if (generation !== flight) {
-        return;
-      }
-      const fraction = Math.min(1, (now - started) / Math.max(1, seconds * 1000));
-      const t = fraction * fraction * (3 - 2 * fraction);
-      const p = from.map(
-        (value, axis) =>
-          (1 - t) ** 2 * value + 2 * (1 - t) * t * control[axis] + t ** 2 * to[axis],
-      );
-      element.style.transform = `translate(${p[0] - 20}px, ${p[1] - 20}px) rotate(${Math.sin(t * Math.PI) * 0.25}rad)`;
-      element.style.opacity = Math.min(1, fraction * 10, (1 - fraction) * 10);
-      if (fraction < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        element.style.display = 'none';
-      }
-    };
-    requestAnimationFrame(animate);
+    ui.fly(uploading ? cardPoint : point, uploading ? point : cardPoint, seconds);
   };
   const filename = (path) => path.split(/[\\/]/).pop();
   const downloadCard = (downloadId, name = 'Download') => {

@@ -51,6 +51,7 @@ function createChoreographyKeyboard(ui) {
       const button = document.createElement('span');
       button.className = 'keyboard-key';
       button.dataset.key = item.code;
+      button.dataset.modifier = String(item.label.length > 1);
       button.textContent = item.label;
       button.style.setProperty('--units', item.units);
       const zone = Math.min(

@@ -1,11 +1,12 @@
-/* global createChoreographySurface, createChoreographyCursor, createChoreographyKeyboard, createChoreographyPanels, createChoreographyTransfers, createChoreographyWork */
+/* global createChoreographySurface, createChoreographyCursor, createChoreographyKeyboard, createChoreographyPanels, createChoreographyTransfers, createChoreographyCaption, createChoreographyWork */
 function browserrigChoreography(_args) {
   const ui = createChoreographySurface();
   const cursor = createChoreographyCursor(ui);
   const keyboard = createChoreographyKeyboard(ui);
-  const panels = createChoreographyPanels(ui);
+  const caption = createChoreographyCaption(ui);
+  const panels = createChoreographyPanels(ui, caption);
   const transfers = createChoreographyTransfers(ui, cursor);
-  const work = createChoreographyWork(ui);
+  const work = createChoreographyWork(ui, cursor, caption, panels);
   const show = (data) => {
     panels.show(data);
     cursor.show(data);

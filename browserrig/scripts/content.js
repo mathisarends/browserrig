@@ -507,7 +507,14 @@ function browserrigContent({maxChars, mainOnly, origin}) {
   }
 
   const main = mainRegion();
-  const markdown = render(main || document.body || document.documentElement, 0)
+  const root = main || document.body || document.documentElement;
+  // The part of the viewport this read covers, for viewers that show what was read.
+  const box = root.getBoundingClientRect();
+  const left = Math.max(0, box.left);
+  const top = Math.max(0, box.top);
+  const right = Math.min(innerWidth, box.right);
+  const bottom = Math.min(innerHeight, box.bottom);
+  const markdown = render(root, 0)
     .replace(/(\S) {2,}/g, '$1 ')
     .replace(/[ \t]+$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
@@ -522,5 +529,9 @@ function browserrigContent({maxChars, mainOnly, origin}) {
     frames,
     main: main !== null,
     chrome: skipChrome,
+    region:
+      right > left && bottom > top
+        ? {x: left, y: top, width: right - left, height: bottom - top}
+        : null,
   };
 }

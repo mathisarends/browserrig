@@ -13,8 +13,9 @@ function createChoreographyCursor(ui) {
   let scrolling = false;
   const paths = {
     default: 'M0 0 L1 22 L6.5 16.5 L11 26 L14.5 24 L10 14.5 L18 13 Z',
+    // Hotspot at the index fingertip; rounded caps mark the folded fingers.
     pointer:
-      'M0 13 V0 C0 -3.5 4 -3.5 4 0 V10 C4 6 8 6 8 10 V11 C8 8 12 8 12 12 C12 9 17 10 17 14 V21 C17 27 14 29 9 29 H6 C3 29 1 26 -1 23 L-6 17 C-8 14 -5 12 -3 14 Z',
+      'M-2.6 0A2.6 2.6 0 0 1 2.6 0V8.5A2.3 2.3 0 0 1 7.2 8.5V10A2.2 2.2 0 0 1 11.6 10V12A1.9 1.9 0 0 1 15.4 12V18C15.4 21.8 12.8 24 9 24H4.5C1.8 24 .2 22.8-1.2 21L-6.4 14.6A2 2 0 0 1-3.3 12.2L-2.6 13Z',
     text: 'M-5 -11 H-1 V11 H-5 V12.5 H5 V11 H1 V-11 H5 V-12.5 H-5 Z',
     crosshair: 'M0 -10 V10 M-10 0 H10',
   };
@@ -30,21 +31,24 @@ function createChoreographyCursor(ui) {
     }
     const path = paths[style] || paths.default;
     icon.innerHTML = ui.svg(
-      `<path d="${path}" fill="currentColor" stroke="var(--foreground)" stroke-width="1.25" stroke-linejoin="round"/>`,
+      `<path d="${path}" fill="currentColor" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`,
     );
   };
   const label = () => {
     const values = [...activities.values()];
+    const activity = ui.options().activities || {};
     let value = ui.options().name;
-    if (values.includes('llm')) {
-      value += ' is thinking';
-    } else if (values.includes('compaction')) {
+    if (values.includes(activity.LLM)) {
+      value = 'Thinking';
+    } else if (values.includes(activity.COMPACTION)) {
       value += ' is organizing context';
-    } else if (values.includes('paused')) {
+    } else if (values.includes(activity.PAUSED)) {
       value += ' is paused';
+    } else if (values.includes(activity.HANDOFF)) {
+      value += ' is waiting for you';
     }
     badge.textContent = value;
-    cursor.dataset.thinking = String(values.includes('llm'));
+    cursor.dataset.thinking = String(values.includes(activity.LLM));
     const width = badge.getBoundingClientRect().width;
     const left = point[0] + width + 25 > innerWidth;
     const preferred = left ? -width - 12 : 17;
@@ -223,5 +227,21 @@ function createChoreographyCursor(ui) {
     activities.clear();
     label();
   };
-  return {show, reset, point: () => point};
+  const visible = () => cursor.style.display === 'block';
+  const shake = () => {
+    if (!visible() || ui.reduced()) {
+      return;
+    }
+    icon.animate(
+      [
+        {translate: '0 0'},
+        {translate: '-3px 0'},
+        {translate: '3px 0'},
+        {translate: '-2px 0'},
+        {translate: '0 0'},
+      ],
+      {duration: 320, easing: 'ease-in-out'},
+    );
+  };
+  return {show, reset, shake, visible, point: () => point};
 }

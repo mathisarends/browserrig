@@ -89,8 +89,11 @@
 ### Added
 
 - Visualize file reads/writes, content extraction, listings, JavaScript, screenshots,
-  history navigation, form changes, readiness, handoff and failures through shared
-  typed `WorkPresentedEvent` receipts. The same transient stream supports the local
+  history navigation, form changes, handoff and failures through shared
+  typed `WorkPresentedEvent` receipts. The local overlay shows them on the page
+  (a reading sweep over the extracted area, screenshot viewfinder, file flights,
+  history cards, a handoff edge) with one caption instead of a card stack.
+  Extraction results carry the visible area they read as `region`. The same transient stream supports the local
   inert overlay and external Canvas viewers, including previews, source geometry,
   result metadata and explicit terminal states. Restore fresh receipts after
   navigation and keep concurrent downloads independent.
