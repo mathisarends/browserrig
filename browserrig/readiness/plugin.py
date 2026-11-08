@@ -42,8 +42,8 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
     ) -> None:
         super().__init__()
         self.options = options if options is not None else ReadinessOptions()
-        self.initial = initial if initial is not None else NetworkQuiet()
-        self.ongoing = ongoing if ongoing is not None else NetworkQuiet()
+        self._initial = initial if initial is not None else NetworkQuiet()
+        self._ongoing = ongoing if ongoing is not None else NetworkQuiet()
 
     async def setup(self, ctx: Scope) -> None:
         self._state.context = ctx
@@ -167,7 +167,9 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         selected = await self._state.context.dispatch(SelectReadiness(context))
         if selected is not None:
             return selected
-        return self.initial if context.stage == ReadinessStage.INITIAL else self.ongoing
+        return (
+            self._initial if context.stage == ReadinessStage.INITIAL else self._ongoing
+        )
 
     async def _check(
         self, context: ReadinessContext, next_: Next[ReadinessCheck]
