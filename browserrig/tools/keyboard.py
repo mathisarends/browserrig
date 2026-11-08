@@ -90,13 +90,29 @@ class KeyboardTools(Plugin):
             else None
         )
         await field.focus(select_all=clear)
+        before = await field.text_state() if not clear and entry is None else None
         if clear:
             await self._browser.input.keyboard.press_key("Backspace")
         if entry is not None and secrets is not None:
             return _secret_entered(
                 await secrets.enter(entry, self._browser.input.keyboard)
             )
-        return _entered(await self._browser.input.keyboard.type_text(text))
+        typed = await self._browser.input.keyboard.type_text(text)
+        after = await field.text_state()
+        expected = typed.entered if clear else None
+        if before is not None and before.start is not None and before.end is not None:
+            expected = (
+                before.value[: before.start]
+                + typed.entered
+                + before.value[before.end :]
+            )
+        if after is not None and expected is not None and after.value != expected:
+            return Effect(
+                "Text dispatched, but the field value differs. The page may have "
+                "reformatted or rejected the input. Observe the field before continuing.",
+                break_chain=True,
+            )
+        return _entered(typed)
 
 
 def _entered(typed: TypedText) -> Effect:
@@ -104,7 +120,8 @@ def _entered(typed: TypedText) -> Effect:
         return Effect("Text entered.")
     return Effect(
         f"Text entered with a slip: typed {typed.entered!r} instead of "
-        f"{typed.intended!r}. Check the field before continuing."
+        f"{typed.intended!r}. Check the field before continuing.",
+        break_chain=True,
     )
 
 
@@ -114,5 +131,6 @@ def _secret_entered(exact: bool) -> Effect:
     # Never echo text that surrounds a secret.
     return Effect(
         "Text entered with a slip in the text around the secret. "
-        "Check the field before continuing."
+        "Check the field before continuing.",
+        break_chain=True,
     )

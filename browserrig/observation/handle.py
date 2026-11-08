@@ -21,6 +21,7 @@ from browserrig.scripts import (
     Script,
     ScrollArgs,
     ScrollPlan,
+    TextState,
 )
 
 from .models import Element, Snapshot
@@ -99,6 +100,11 @@ class DomElementHandle:
 
     async def set_value(self, value: str) -> None:
         await self._run(ElementOperation.SET_VALUE, value)
+
+    async def text_state(self) -> TextState | None:
+        """Read a native text field and selection; never read password values."""
+        state = await self._run(ElementOperation.TEXT_STATE)
+        return None if state is None else TextState.model_validate(state)
 
     async def upload_files(self, paths: list[str]) -> None:
         await self.frame.upload_files(self.element.backend_id, paths)

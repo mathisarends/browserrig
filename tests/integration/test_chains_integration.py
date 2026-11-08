@@ -86,6 +86,47 @@ async def test_typing_reveals_existing_suggestions_and_skips_submit(site):
     )
 
 
+@pytest.mark.parametrize(
+    ("handler", "expected"),
+    [("this.value=this.value.toUpperCase()", "PERSON"), ("this.value=''", "")],
+)
+async def test_changed_field_value_stops_submit_without_retyping(
+    site, handler, expected
+):
+    markup = _FORM.replace("<input id=email>", f'<input id=email oninput="{handler}">')
+    values, replies, _, _ = await _run(
+        site,
+        markup,
+        lambda refs: [
+            ("type_text", {"ref": refs["Email"], "text": "person"}),
+            ("click", {"ref": refs["Submit"]}),
+        ],
+    )
+    assert values["email"] == expected and values["clicked"] is None
+    assert replies[0].status is ToolStatus.OK and replies[0].break_chain
+    assert "field value differs" in replies[0].text
+    assert replies[1].status is ToolStatus.SKIPPED
+
+
+async def test_typing_without_clear_verifies_insertion_at_the_current_selection(site):
+    markup = _FORM.replace(
+        "<input id=email>",
+        '<input id=email value=before-after onfocus="this.setSelectionRange(7,7)">',
+    )
+    values, replies, _, _ = await _run(
+        site,
+        markup,
+        lambda refs: [
+            ("type_text", {"ref": refs["Email"], "text": "middle-", "clear": False}),
+            ("click", {"ref": refs["Submit"]}),
+        ],
+    )
+    assert values["email"] == "before-middle-after" and values["clicked"] == "yes"
+    assert all(
+        reply.status is ToolStatus.OK and not reply.break_chain for reply in replies
+    )
+
+
 async def test_hover_reveals_menu_without_dispatching_click(site):
     markup = (
         _FORM

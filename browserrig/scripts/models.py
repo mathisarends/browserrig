@@ -33,6 +33,12 @@ class UploadArgs(ScriptArgs):
     count: int
 
 
+class TextState(Options):
+    value: str
+    start: int | None = None
+    end: int | None = None
+
+
 class OwnerScrollArgs(ScriptArgs):
     clip: Bounds | None = None
     target_bounds: Bounds

@@ -87,6 +87,7 @@ class ElementOperation(StrEnum):
     FOCUS = "focus"
     SELECT = "select"
     SET_VALUE = "set_value"
+    TEXT_STATE = "text_state"
 
 
 class MouseEventKind(StrEnum):

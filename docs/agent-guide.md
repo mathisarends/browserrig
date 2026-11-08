@@ -186,6 +186,12 @@ delivered observation, its element references and its new-element markers.
 An incomplete or failed comparison stops the chain; it does not report successful
 input as failed. Coordinate inputs require another observation after each input.
 
+After `type_text`, native text inputs and textareas are read back. Unexpected
+values, including formatting or rejected input, stop the chain before later calls
+such as submission. The tool does not overwrite the page's result or retry typing.
+Insertion with `clear=false` accounts for the field's selection when available.
+Password and secret entry values are not read back by this check.
+
 Each built-in tool declares its own stable `ActionKind` through immutable
 `BrowserToolMetadata`. Use `event.tool.metadata.get(BrowserToolMetadata)` in native
 policy, execution or result-review hooks; the registration is captured when the

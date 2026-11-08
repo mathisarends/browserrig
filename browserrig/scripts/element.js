@@ -68,6 +68,19 @@ function browserrigElement({operation, value, clip = null, aim = null}) {
   if (operation === 'focus') {
     return focus();
   }
+  if (operation === 'text_state') {
+    // Passwords, editors and non-text controls need their own value semantics.
+    if (
+      el.localName !== 'textarea' &&
+      !(
+        el.localName === 'input' &&
+        ['text', 'search', 'url', 'email', 'tel'].includes(el.type)
+      )
+    ) {
+      return null;
+    }
+    return {value: el.value, start: el.selectionStart, end: el.selectionEnd};
+  }
   const point = pointFor(el, clip, getComputedStyle, aim);
   if (!point) {
     throw new Error('ELEMENT_BLOCKED');

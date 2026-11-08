@@ -32,6 +32,7 @@ from .models import (
     SecretFocusArgs,
     SeedArgs,
     TabStrip,
+    TextState,
     UploadArgs,
 )
 
@@ -80,6 +81,7 @@ __all__ = [
     "SecretFocusArgs",
     "SeedArgs",
     "TabStrip",
+    "TextState",
     "UploadArgs",
     "failure",
 ]
