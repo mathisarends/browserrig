@@ -36,6 +36,7 @@ from browserrig.scripts import (
 
 from .favicon import load_favicon
 from .frame import Frame
+from .guard import NavigationGuard
 from .input import CdpInput
 from .network import NetworkActivity
 from .overlays import Overlays
@@ -59,6 +60,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         discover_frames: FrameDiscovery | None = None,
         current_action: Callable[[], str] = lambda: "",
         on_change: TabListener | None = None,
+        guard: NavigationGuard | None = None,
     ) -> None:
         self.id = target_id
         self.cdp = cdp
@@ -85,6 +87,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self._frames: tuple[Frame, ...] = ()
         self._current_action = current_action
         self._on_change = on_change
+        self._guard = guard
 
     async def handle(self, event: object) -> None:
         """Apply a page event that arrived on this tab's own CDP session."""
@@ -286,15 +289,25 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
 
     @traced
     async def navigate(self, url: str) -> None:
+        if self._guard is not None:
+            await self._guard.check(url, self.id)
         result = await self.cdp.page.navigate(url=validated_url(url))
+        self.check_navigation()
         if result.error_text:
             raise BrowserError(f"Navigation failed: {result.error_text}")
+
+    def check_navigation(self) -> None:
+        """Report an intercepted navigation once, before an action reports success."""
+        if self._guard is not None:
+            self._guard.raise_if_blocked(self.id)
 
     async def _history(self, offset: int) -> bool:
         history = await self.cdp.page.get_navigation_history()
         index = history.current_index + offset
         if not 0 <= index < len(history.entries):
             return False
+        if self._guard is not None:
+            await self._guard.check(history.entries[index].url, self.id)
         await self.cdp.page.navigate_to_history_entry(
             entry_id=history.entries[index].id
         )

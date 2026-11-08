@@ -4,6 +4,7 @@ from .browser import (
     Browser,
     Chrome,
     ChromeBrowser,
+    DomainNotAllowed,
     Overlay,
     Overlays,
     SessionSetup,
@@ -29,6 +30,7 @@ from .files import (
     MountedWorkspace,
     Workspace,
 )
+from .guardrails import AllowedDomains
 from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanResponse
 from .kinds import MouseEventKind
 from .nudges import Nudges
@@ -91,6 +93,8 @@ from .tools import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "AllowedDomains",
+    "DomainNotAllowed",
     "Agent",
     "ContextCompaction",
     "CheckReadiness",

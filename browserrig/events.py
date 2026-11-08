@@ -30,6 +30,7 @@ class EventKind(StrEnum):
     TAB_UPDATED = "browser.tab.updated"
     NAVIGATION_STARTED = "browser.navigation.started"
     NAVIGATION_COMMITTED = "browser.navigation.committed"
+    NAVIGATION_BLOCKED = "browser.navigation.blocked"
     DIALOG_OPENED = "browser.dialog.opened"
     DIALOG_HANDLED = "browser.dialog.handled"
     DOWNLOAD_COMPLETED = "browser.download.completed"
@@ -318,6 +319,16 @@ class NavigationCommittedEvent(BrowserEvent):
     url: str
     type: Literal[EventKind.NAVIGATION_COMMITTED] = field(
         default=EventKind.NAVIGATION_COMMITTED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class NavigationBlockedEvent(BrowserEvent):
+    """A document destination rejected by the session's navigation policy."""
+
+    url: str
+    type: Literal[EventKind.NAVIGATION_BLOCKED] = field(
+        default=EventKind.NAVIGATION_BLOCKED, kw_only=True
     )
 
 
@@ -675,6 +686,7 @@ BROWSER_EVENTS = (
     TabClosedEvent,
     NavigationStartedEvent,
     NavigationCommittedEvent,
+    NavigationBlockedEvent,
     DialogOpenedEvent,
     DialogHandledEvent,
     DownloadCompletedEvent,

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Self
 
 from harnessed import Plugin, SessionLog
-from harnessed.kernel import Event, PluginScope, needs
+from harnessed.kernel import Event, PluginScope, needs, observes
 from pydantic import SecretStr
 
 from browserrig.core import BrowserCoordination, TargetId
@@ -14,6 +14,7 @@ from browserrig.files import FileBridge, MountedWorkspace
 from .base import Browser, BrowserEvents
 from .chrome import ChromeBrowser
 from .config import BrowserOptions, Connect, Launch, Viewport
+from .policy import NavigationPolicy
 from .setup import SessionSetup
 from .tab import Tab
 
@@ -23,6 +24,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
 
     events = BROWSER_EVENTS
     _log = needs(SessionLog)
+    _navigation = observes(NavigationPolicy)
 
     def __init__(self, options: BrowserOptions | None = None) -> None:
         super().__init__()
@@ -108,6 +110,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
                 self.options,
                 emit=self._log.emit,
                 on_tab_change=tab_changed,
+                navigation_policy=self._navigation,
             )
         )
         scope.provide(Browser, browser)

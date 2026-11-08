@@ -32,6 +32,7 @@ from browserrig.input import Input
 from .config import BrowserOptions
 from .frame import Frame
 from .frames import discover_frames
+from .guard import NavigationGuard
 from .models import TabInfo
 from .tab import Tab, TabListener, validated_url
 from .worlds import Worlds
@@ -51,8 +52,10 @@ class Tabs:
         check: Callable[[], None],
         emit: EventSink,
         on_change: TabListener | None = None,
+        guard: NavigationGuard | None = None,
     ) -> None:
         self._options = options
+        self._guard = guard
         self._input = devices
         self._check = check
         self._emit = emit
@@ -137,6 +140,8 @@ class Tabs:
         else:
             url = validated_url(target)
         self._check()
+        if self._guard is not None:
+            await self._guard.check(url)
         opened: list[Tab] = []
 
         async def open_new() -> None:
@@ -249,9 +254,13 @@ class Tabs:
 
     async def _create(self, url: str) -> Tab:
         result = await self.client.target.create_target(
-            url=url, browser_context_id=self._context or self._target_context
+            url="about:blank" if self._guard is not None else url,
+            browser_context_id=self._context or self._target_context,
         )
-        return await self._attach(result.target_id, opened=True)
+        tab = await self._attach(result.target_id, opened=True)
+        if self._guard is not None and url != "about:blank":
+            await tab.navigate(url)
+        return tab
 
     async def _focus(self, tab: Tab, *, front: bool = True) -> None:
         if front:
@@ -298,8 +307,12 @@ class Tabs:
                     discover_frames=self._discover_frames,
                     current_action=lambda: self._input.action_id,
                     on_change=self._on_tab_change,
+                    guard=self._guard,
                 )
                 await tab.sync_document()
+                if self._guard is not None:
+                    await self._guard.check(tab.url, tab.id)
+                    await self._guard.watch(tab.id)
                 if target_id in self._closed_targets:
                     raise BrowserError("Target closed while attaching")
                 self._tabs[target_id] = tab

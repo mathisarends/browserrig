@@ -100,6 +100,49 @@ stored as secrets.
 plugin through `browser=`. For direct `ChromeBrowser(...)` use, import the
 low-level `Launch` and `Connect` configuration types from `browserrig.browser`.
 
+## Optional domain guard
+
+`AllowedDomains` is absent from the default recipe. Add it when composing an
+agent; `None` entries are skipped, so callers can turn the guard on per run:
+
+```python
+from browserrig import Agent, AllowedDomains
+
+allowed_domains = ["example.com", "*.example.com"]  # or None for unrestricted navigation
+agent = Agent(
+    model=model,
+    plugins=[AllowedDomains(allowed_domains) if allowed_domains is not None else None],
+)
+```
+
+The same plugin works with `browser_plugins(...)` and a Harnessed `Agent` using
+`plugins=[browser_pack(), AllowedDomains(...)]`. Chrome consumes the policy before
+opening its initial page, independent of plugin-list order. Custom browser providers
+can consume the optional `browserrig.browser.NavigationPolicy` service too.
+
+Entries are host names without schemes, ports or paths. Exact hosts allow HTTP
+and HTTPS on any port. `*.example.com` allows strict subdomains; add `example.com`
+separately for the apex. Names are case-insensitive and support IDN and IP addresses.
+An empty list denies every web site; omitting the plugin disables the guard.
+`about:blank` remains available for empty tabs. Local file documents are blocked.
+
+Denied destinations raise `DomainNotAllowed` (a `BrowserError`) for explicit
+navigation and produce a durable `browser.navigation.blocked` event with the URL
+and target ID. The model receives a failed tool result containing
+`Navigation blocked: domain is not allowed for https://blocked.example/...` and
+can choose another action on its next step. Browser-initiated document requests are intercepted before sending,
+including redirects, links, popups and frames. Failed tool actions report the error
+to the agent. This controls navigation, not all network traffic: images, scripts,
+fetch/XHR and other subresources are unaffected. An already-loaded attached tab is
+checked when attaching; its earlier traffic cannot be undone.
+
+While this plugin is present, `execute_javascript` and tools marked with
+`ActionKind.JAVASCRIPT` return an error without executing. This prevents the model
+from using arbitrary JavaScript to retrieve a blocked site's content via fetch/XHR.
+Browser-side document interception also covers page scripts navigating with
+`location`, forms and `window.open`. Arbitrary custom host tools remain the
+application's responsibility; this plugin is not an execution or network sandbox.
+
 ## Browser-owned presentation
 
 `InputVisualization()` streams input events and renders them in the active tab

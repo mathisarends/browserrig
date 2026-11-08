@@ -8,6 +8,7 @@ from .images import screenshot
 from .models import TabInfo
 from .overlays import Overlay, Overlays
 from .plugin import Chrome, TabChanged
+from .policy import DomainNotAllowed, NavigationPolicy
 from .setup import SessionSetup
 from .tab import Tab, validated_url
 from .tabs import Tabs
@@ -19,6 +20,8 @@ __all__ = [
     "Chrome",
     "ChromeBrowser",
     "Connect",
+    "DomainNotAllowed",
+    "NavigationPolicy",
     "Frame",
     "Download",
     "DownloadState",

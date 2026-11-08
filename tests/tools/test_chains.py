@@ -219,6 +219,7 @@ async def test_failed_comparison_keeps_input_successful_and_breaks_the_chain():
         document_id="doc",
         url=before.url,
         closed=False,
+        check_navigation=lambda: None,
     )
     actions = SimpleNamespace(
         observe=SimpleNamespace(

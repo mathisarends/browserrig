@@ -168,6 +168,9 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
                     effect, note, followed = await self._dispatch(
                         tab, kind, action_id, operation, settle=settle
                     )
+                tab.check_navigation()
+                if self.browser.active_tab is not tab:
+                    self.browser.active_tab.check_navigation()
                 await self._events.emit(
                     ActionFinishedEvent(
                         action_id=action_id,

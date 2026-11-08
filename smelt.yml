@@ -66,6 +66,7 @@ architecture:
     files: {path: files, may_depend_on: [core]}
     input: {path: input, may_depend_on: [core]}
     browser: {path: browser, may_depend_on: [core, scripts, files, input]}
+    guardrails: {path: guardrails, may_depend_on: [core, browser]}
     readiness: {path: readiness, may_depend_on: [core, scripts, files, browser]}
     observation:
       path: observation

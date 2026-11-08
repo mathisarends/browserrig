@@ -42,6 +42,8 @@ from browserrig.input import Input, InputTarget
 from .base import BrowserEvents, EventSink, _discard
 from .config import BrowserOptions, CdpEndpoint, Launch
 from .downloads import Downloads
+from .guard import NavigationGuard
+from .policy import NavigationPolicy
 from .tab import Tab, TabListener
 from .tabs import Tabs
 
@@ -76,10 +78,16 @@ class ChromeBrowser:
         *,
         emit: EventSink = _discard,
         on_tab_change: TabListener | None = None,
+        navigation_policy: NavigationPolicy | None = None,
     ) -> None:
         self._options = options if options is not None else Launch()
         self.id = uuid4().hex
         self.events = BrowserEvents(self.id, emit)
+        self._guard = (
+            NavigationGuard(navigation_policy, self.events.emit)
+            if navigation_policy is not None
+            else None
+        )
         self._stack: AsyncExitStack | None = None
         self._downloads = Downloads(emit=self.events.emit)
         self._context: str | None = None
@@ -94,6 +102,7 @@ class ChromeBrowser:
             check=self._check,
             emit=self.events.emit,
             on_change=on_tab_change,
+            guard=self._guard,
         )
         self._close_task: asyncio.Task[None] | None = None
         self.client: CdpClient
@@ -114,6 +123,13 @@ class ChromeBrowser:
                     )
                 )
                 self._context = await self.tabs.start(self.client, self._stack)
+                if self._guard is not None:
+                    await self._guard.start(
+                        self.client,
+                        self._stack,
+                        context=self._context,
+                        target_id=options.target_id,
+                    )
                 self._start_listeners()
                 self._stack.push_async_callback(self._stop_listeners)
                 await self.client.target.set_discover_targets(discover=True)
@@ -173,6 +189,8 @@ class ChromeBrowser:
         return CdpEndpoint(url=url, headers=endpoint.headers)
 
     def _check(self) -> None:
+        if self._guard is not None:
+            self._guard.raise_if_blocked()
         if self._stack is None or not self.client.is_connected:
             raise BrowserClosed("Browser connection is closed")
         if self._failure is not None:

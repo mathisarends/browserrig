@@ -87,6 +87,9 @@ class _Tab:
     async def frames(self):
         return (self._frame,)
 
+    def check_navigation(self):
+        pass
+
     async def emit(self, event):
         self._timeline.append(
             replace(event, target_id=self.id, document_id=self.document_id)
