@@ -29,7 +29,9 @@ agent = Agent(
     browser=Chrome.launch(url="https://en.wikipedia.org/wiki/Voyager_program"),
     plugins=[Approvals(default=PolicyDecision.ALLOW), TerminalEvents()],
 )
-result = await agent.run("Compare Voyager 1 and 2 and cite the source URLs.", max_steps=20)
+result = await agent.run(
+    "Compare Voyager 1 and 2 and cite the source URLs.", max_steps=20
+)
 print(result.text)
 ```
 
@@ -361,7 +363,9 @@ the native plugin:
 from harnessed.plugins.mcp import MCP
 
 agent = Agent(
-    plugins=[MCP.http("catalog", url="http://localhost:8000/mcp", include_tools=["search"])],
+    plugins=[
+        MCP.http("catalog", url="http://localhost:8000/mcp", include_tools=["search"])
+    ],
 )
 ```
 

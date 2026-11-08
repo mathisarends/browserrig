@@ -62,8 +62,15 @@ from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
-    Agent, BrowserPerception, Chrome, ContextCompaction, ImageContext,
-    Screenshots, ScreenshotTrigger, UntilCompaction, WindowRatio,
+    Agent,
+    BrowserPerception,
+    Chrome,
+    ContextCompaction,
+    ImageContext,
+    Screenshots,
+    ScreenshotTrigger,
+    UntilCompaction,
+    WindowRatio,
 )
 
 
@@ -71,7 +78,8 @@ async def main():
     agent = Agent(
         model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
         browser=Chrome.launch(
-            url="https://en.wikipedia.org/wiki/Voyager_program", headless=False,
+            url="https://en.wikipedia.org/wiki/Voyager_program",
+            headless=False,
         ),
         plugins=[
             Approvals(default=PolicyDecision.ALLOW),

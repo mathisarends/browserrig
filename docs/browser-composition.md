@@ -9,9 +9,21 @@ readiness and action-chain decisions. Browserrig targets Harnessed 0.13.0.
 ```python
 from harnessed import Agent
 from browserrig import (
-    Actions, Activity, BrowserPerception, Chrome, DomCapture, DomRenderer,
-    FormTools, ImageContext, KeyboardTools, NavigationTools,
-    PointerTools, Readiness, Screenshots, ScreenshotTrigger, TabTools,
+    Actions,
+    Activity,
+    BrowserPerception,
+    Chrome,
+    DomCapture,
+    DomRenderer,
+    FormTools,
+    ImageContext,
+    KeyboardTools,
+    NavigationTools,
+    PointerTools,
+    Readiness,
+    Screenshots,
+    ScreenshotTrigger,
+    TabTools,
     TrimInBatches,
 )
 
@@ -101,9 +113,13 @@ Use `InputVisualization(renderer=None)` for an external event-only viewer.
 ```python
 from browserrig import IframeRenderer, InputVisualization
 
-InputVisualization(renderer=IframeRenderer(
-    name="Research", keyboard_layout="de", theme="dark",
-))
+InputVisualization(
+    renderer=IframeRenderer(
+        name="Research",
+        keyboard_layout="de",
+        theme="dark",
+    )
+)
 ```
 
 Layouts are `en` and `de`; themes are `dark`, `light` and `auto`. Layout controls
@@ -194,10 +210,13 @@ from browserrig import Agent, ImageContext, UntilCompaction
 
 agent = Agent(
     model=model,
-    plugins=[ImageContext(UntilCompaction()), ContextCompaction(
-        trigger=lambda state: state.input_tokens >= 32000,
-        keep_steps=4,
-    )],
+    plugins=[
+        ImageContext(UntilCompaction()),
+        ContextCompaction(
+            trigger=lambda state: state.input_tokens >= 32000,
+            keep_steps=4,
+        ),
+    ],
 )
 ```
 
@@ -413,6 +432,7 @@ from harnessed import Plugin, hook
 from harnessed.hooks import Next
 from browserrig import CheckReadiness, ReadinessCheck, SelectReadiness
 
+
 class ApplicationReadiness(Plugin):
     def __init__(self, application, policy):
         super().__init__()
@@ -452,15 +472,19 @@ from harnessed import Inject, Plugin, SessionLog, hook
 from harnessed.events import DurableEvent
 from harnessed.hooks import Next, PreStep, StepDecision
 
+
 @dataclass(frozen=True)
 class AppReady(DurableEvent):
     type: Literal["myapp.ready"] = "myapp.ready"
+
 
 class AppEvents(Plugin):
     events = (AppReady,)
 
     @hook(PreStep)
-    async def report(self, event: PreStep, next_: Next[StepDecision], log: Inject[SessionLog]):
+    async def report(
+        self, event: PreStep, next_: Next[StepDecision], log: Inject[SessionLog]
+    ):
         await log.emit(AppReady())
         return await next_()
 ```

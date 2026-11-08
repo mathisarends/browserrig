@@ -168,20 +168,33 @@ from browserrig import Agent
 
 async def run_traced(model):
     provider = TracerProvider(
-        resource=Resource.create({
-            "service.name": "browserrig",
-            "openinference.project.name": "browserrig",
-        })
+        resource=Resource.create(
+            {
+                "service.name": "browserrig",
+                "openinference.project.name": "browserrig",
+            }
+        )
     )
     try:
-        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(
-            endpoint="http://127.0.0.1:6006/v1/traces",
-        )))
-        agent = Agent(model=model, plugins=[OpenTelemetryTracer(
-            tracer_provider=provider,
-            capture_content=ContentCapture.redacted(os.environ["OPENAI_API_KEY"]),
-            max_content_length=16_384,
-        )])
+        provider.add_span_processor(
+            BatchSpanProcessor(
+                OTLPSpanExporter(
+                    endpoint="http://127.0.0.1:6006/v1/traces",
+                )
+            )
+        )
+        agent = Agent(
+            model=model,
+            plugins=[
+                OpenTelemetryTracer(
+                    tracer_provider=provider,
+                    capture_content=ContentCapture.redacted(
+                        os.environ["OPENAI_API_KEY"]
+                    ),
+                    max_content_length=16_384,
+                )
+            ],
+        )
         async with agent.session() as session:
             return await session.run("Describe the current page.")
     finally:
@@ -211,14 +224,20 @@ The shared example helper also accepts the native policy and a synchronous
 
 ```python
 from harnessed.integrations.opentelemetry import (
-    ContentCapture, TraceContentKind,
+    ContentCapture,
+    TraceContentKind,
 )
 from examples.telemetry import tracing_plugins
 
+
 def filter_content(content):
-    if content.kind is TraceContentKind.TOOL_RESULT and content.tool_name == "read_file":
+    if (
+        content.kind is TraceContentKind.TOOL_RESULT
+        and content.tool_name == "read_file"
+    ):
         return None
     return content
+
 
 async with tracing_plugins(
     capture_content=ContentCapture.redacted(token),

@@ -9,11 +9,13 @@ plugin, no handoff tool, prompt section or pause tracking is added.
 from browserrig import Agent, Chrome, HandoffStatus, HumanHandoff, HumanResponse
 from browserrig.events import HandoffRequestedEvent
 
+
 async def ask_human(request: HandoffRequestedEvent) -> HumanResponse:
     # Your host UI shows request.reason and request.expected_state, then waits
     # for its Done / Decline controls. It can use request.handoff_id to correlate
     # the response with this request.
     return await ui.request_browser_control(request)
+
 
 handoff = HumanHandoff(
     ask=ask_human,
