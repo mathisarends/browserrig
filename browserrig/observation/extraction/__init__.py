@@ -41,11 +41,13 @@ async def extract(
     max_elements: int | None,
     max_text: int,
     sparse_text: int = 0,
+    names: bool = True,
 ) -> Extraction:
     """Extract all frames; `frames[0]` must be the main frame.
 
     `sparse_text` raises the visible-text limit when the viewport shows fewer than
     `SPARSE_CONTROLS` named controls, so pages that are mostly text still read as text.
+    `names=False` keeps the DOM's approximate names and skips asking Chrome for its own.
     """
     main = frames[0]
     sessions = _sessions(frames)
@@ -81,16 +83,18 @@ async def extract(
     extraction = _Assembler(frames, documents, focus, limitations).run(
         max_elements, max_text, sparse_text
     )
-    names = await chrome_names(
+    if not names:
+        return extraction
+    chrome = await chrome_names(
         {frame.id: frame.cdp for frame in frames},
         (element for element in extraction.elements if isinstance(element, Element)),
     )
-    if names:
+    if chrome:
         extraction.elements = tuple(
             element.model_copy(
-                update={"name": preferred(element.name, names[element.ref])}
+                update={"name": preferred(element.name, chrome[element.ref])}
             )
-            if element.ref in names
+            if element.ref in chrome
             else element
             for element in extraction.elements
         )

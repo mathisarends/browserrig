@@ -15,6 +15,7 @@ from browserrig.core import (
     Geometry,
     Options,
     Point,
+    ReadinessPhase,
     ReadinessStatus,
     Region,
     record,
@@ -242,7 +243,7 @@ class DomCapture(Options):
     cursor: bool = False
 
     @traced
-    async def collect(  # pylint: disable=unused-argument
+    async def collect(
         self,
         tab: Tab,
         report: ReadinessReport,
@@ -254,26 +255,24 @@ class DomCapture(Options):
     ) -> CaptureContent:
         record(screenshots=screenshots)
         frames = await tab.frames()
-        page = await extract(
+        extraction = extract(
             frames,
             max_elements=self.max_elements,
             max_text=self.max_text_chars,
             sparse_text=self.sparse_text_chars,
-        )
-        page.limitations = tuple(
-            dict.fromkeys((*tab.frame_limitations, *page.limitations))
+            # Comparison probes match controls by identity, not by their names.
+            names=report.phase != ReadinessPhase.ACTION,
         )
         if not screenshots:
-            return CaptureContent(page=page)
+            return CaptureContent(page=_limited(await extraction, tab))
         viewport = frames[0].visible
         assert viewport is not None
-        marked = page.elements if self.marks else ()
         geometry = None
+        notes: tuple[str, ...] = ()
         if region is not None:
             geometry = region.capture(viewport, zoom, _MAX_REGION_SIDE)
             if geometry is None:
-                page.limitations = (
-                    *page.limitations,
+                notes = (
                     "Screenshot region is outside the viewport; showing the full viewport",
                 )
         if geometry is None:
@@ -286,10 +285,19 @@ class DomCapture(Options):
                 x=geometry.x, y=geometry.y, width=geometry.width, height=geometry.height
             )
             scale = geometry.scale
+        # The screenshot does not depend on the extraction; only its marks do.
+        shot = asyncio.create_task(screenshot(tab, geometry))
+        try:
+            page = _limited(await extraction, tab)
+        except BaseException:
+            shot.cancel()
+            await asyncio.gather(shot, return_exceptions=True)
+            raise
+        page.limitations = (*page.limitations, *notes)
         image = await asyncio.to_thread(
             annotate,
-            await screenshot(tab, geometry),
-            marked,
+            await shot,
+            page.elements if self.marks else (),
             area,
             scale,
             cursor=cursor if self.cursor else None,
@@ -297,6 +305,11 @@ class DomCapture(Options):
         return CaptureContent(
             page=page, image=image, geometry=geometry, area=area, scale=scale
         )
+
+
+def _limited(page: PageContent, tab: Tab) -> PageContent:
+    page.limitations = tuple(dict.fromkeys((*tab.frame_limitations, *page.limitations)))
+    return page
 
 
 async def _redact(
