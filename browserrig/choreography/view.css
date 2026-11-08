@@ -122,6 +122,14 @@ body {
 #cursor[data-thinking='true'] #cursor-icon {
   animation: breathe 1100ms ease-in-out infinite;
 }
+/* The braces bob vertically against each other. */
+#cursor[data-code='true'] .brace {
+  animation: bob 760ms ease-in-out infinite;
+}
+#cursor[data-code='true'] .brace[data-side='right'] {
+  animation-delay: -380ms;
+}
+#cursor[data-code='true'] #cursor-name::after,
 #cursor[data-thinking='true'] #cursor-name::after {
   content: ' ···';
   letter-spacing: 1px;
@@ -792,6 +800,15 @@ body:has(#keyboard[data-visible='true']) #caption {
 @keyframes spin {
   to {
     rotate: 360deg;
+  }
+}
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(-1.5px);
+  }
+  50% {
+    transform: translateY(1.5px);
   }
 }
 @keyframes breathe {

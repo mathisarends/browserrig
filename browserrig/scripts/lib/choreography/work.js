@@ -21,7 +21,8 @@
       return firstLine(item.preview) || item.detail;
     }
     if (item.kind === action.JAVASCRIPT) {
-      return firstLine(item.preview) || item.detail;
+      // A status, not the code: finished receipts carry the returned value.
+      return item.detail;
     }
     if (item.kind === action.WRITE_FILE) {
       return name(item.artifact_path || item.source_path || item.detail);
@@ -154,10 +155,38 @@
     !ui.reduced() &&
     event.target_id === ui.options().target_id &&
     event.document_id === ui.options().document_id;
+  // While JavaScript runs the cursor itself says so; the caption is left for problems
+  // and for runs it already started to show, such as before the cursor appeared.
+  const captioned = new Set();
+  const scripted = (event) => {
+    const {phases: phase, actions: action} = ui.options();
+    if (
+      event.kind !== action.JAVASCRIPT ||
+      event.target_id !== ui.options().target_id
+    ) {
+      return false;
+    }
+    cursor.work(event.work_id, event.phase === phase.RUNNING);
+    const quiet =
+      !captioned.has(event.work_id) &&
+      cursor.visible() &&
+      event.phase !== phase.FAILED &&
+      event.phase !== phase.CANCELLED;
+    if (!quiet) {
+      if (captioned.size > 64) {
+        captioned.clear();
+      }
+      captioned.add(event.work_id);
+    }
+    return quiet;
+  };
   const show = (event) => {
     const kinds = ui.options().events;
     switch (event.type) {
       case kinds.WORK_PRESENTED:
+        if (scripted(event)) {
+          break;
+        }
         caption.put(
           {
             id: event.work_id,

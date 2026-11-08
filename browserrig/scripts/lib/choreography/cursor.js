@@ -4,6 +4,8 @@ function createChoreographyCursor(ui) {
   const badge = ui.node('cursor-name');
   const trail = ui.node('trail').querySelector('path');
   const activities = new Map();
+  // Running JavaScript by work id, with the time it started.
+  const scripts = new Map();
   let point = [0, 0];
   let style = 'default';
   let nativeStyle = 'default';
@@ -23,10 +25,31 @@ function createChoreographyCursor(ui) {
     ui.svg(
       '<circle cx="8" cy="10" r="10" fill="var(--surface)" stroke="currentColor" stroke-width="1.5"/><g id="wheel-spokes" stroke="currentColor" stroke-width="1.5"><path d="M12 10h3M6 13l-1.5 2.5M6 7 4.5 4.5"/></g><circle cx="8" cy="10" r="2" fill="var(--foreground)"/>',
     );
+  // Curly braces around the hotspot, outlined like the arrow.
+  const braces = () => {
+    const sides = {
+      left: 'M-5 -11C-9 -11-9 -8.5-9 -5V-2.5C-9 -.8-10.2 0-12.5 0C-10.2 0-9 .8-9 2.5V5C-9 8.5-9 11-5 11',
+      right:
+        'M5 -11C9 -11 9 -8.5 9 -5V-2.5C9 -.8 10.2 0 12.5 0C10.2 0 9 .8 9 2.5V5C9 8.5 9 11 5 11',
+    };
+    return ui.svg(
+      Object.entries(sides)
+        .map(
+          ([side, d]) =>
+            `<g class="brace" data-side="${side}" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="${d}" stroke="#fff" stroke-width="4.5"/><path d="${d}" stroke="currentColor" stroke-width="2.4"/></g>`,
+        )
+        .join(''),
+    );
+  };
   const shape = () => {
     cursor.dataset.style = style;
+    cursor.dataset.code = String(scripts.size > 0 && !scrolling);
     if (scrolling) {
       icon.innerHTML = wheel();
+      return;
+    }
+    if (scripts.size) {
+      icon.innerHTML = braces();
       return;
     }
     const path = paths[style] || paths.default;
@@ -38,7 +61,9 @@ function createChoreographyCursor(ui) {
     const values = [...activities.values()];
     const activity = ui.options().activities || {};
     let value = ui.options().name;
-    if (values.includes(activity.LLM)) {
+    if (scripts.size) {
+      value = 'Executing JavaScript';
+    } else if (values.includes(activity.LLM)) {
       value = 'Thinking';
     } else if (values.includes(activity.COMPACTION)) {
       value += ' is organizing context';
@@ -223,8 +248,38 @@ function createChoreographyCursor(ui) {
     }
   };
   shape();
+  // JavaScript finishes in milliseconds; the braces stay long enough to be seen.
+  const work = (id, active) => {
+    if (active) {
+      ui.cancel(`script:${id}`);
+      if (!scripts.has(id)) {
+        scripts.set(id, performance.now());
+        shape();
+        label();
+      }
+      return;
+    }
+    const started = scripts.get(id);
+    if (started === undefined) {
+      return;
+    }
+    ui.later(
+      `script:${id}`,
+      () => {
+        scripts.delete(id);
+        shape();
+        label();
+      },
+      Math.max(0, 1400 - (performance.now() - started)),
+    );
+  };
   const reset = () => {
     activities.clear();
+    for (const id of scripts.keys()) {
+      ui.cancel(`script:${id}`);
+    }
+    scripts.clear();
+    shape();
     label();
   };
   const visible = () => cursor.style.display === 'block';
@@ -243,5 +298,5 @@ function createChoreographyCursor(ui) {
       {duration: 320, easing: 'ease-in-out'},
     );
   };
-  return {show, reset, shake, visible, point: () => point};
+  return {show, reset, shake, work, visible, point: () => point};
 }

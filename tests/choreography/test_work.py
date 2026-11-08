@@ -80,6 +80,20 @@ def test_tool_cancellation_keeps_identity_and_closes_the_receipt():
     assert stopped.phase is WorkPhase.CANCELLED and stopped.preview == "Cancelled"
 
 
+def test_javascript_receipt_shows_code_then_returned_value():
+    receipt = started(
+        ToolCall("execute_javascript", {"code": "({answer: 42})"}),
+        ActionKind.JAVASCRIPT,
+    )
+    assert receipt.preview == "({answer: 42})" and not receipt.detail
+    done = finished(
+        receipt, ToolResult('JavaScript result:\n{"answer": 42}'), elapsed=0.01
+    )
+    assert done.phase is WorkPhase.COMPLETED
+    assert done.detail == '{"answer": 42}'
+    assert done.preview == 'JavaScript result:\n{"answer": 42}'
+
+
 def test_custom_result_does_not_break_successful_file_tool():
     receipt = finished(
         started(ToolCall("list_files", {}), ActionKind.LIST_FILES),

@@ -22,7 +22,7 @@ SILENT_WORK = {
     ActionKind.LIST_FILES: "Listing files",
     ActionKind.LIST_DOWNLOADS: "Listing downloads",
     ActionKind.LIST_TABS: "Listing tabs",
-    ActionKind.JAVASCRIPT: "Running JavaScript",
+    ActionKind.JAVASCRIPT: "Executing JavaScript",
     ActionKind.SCREENSHOT: "Capturing screenshot",
     ActionKind.GO_BACK: "Going back",
     ActionKind.GO_FORWARD: "Going forward",
@@ -157,6 +157,12 @@ def _result(
                 event,
                 phase=WorkPhase.RUNNING,
                 detail="Requested · waiting for the next observation",
+            )
+        case ActionKind.JAVASCRIPT:
+            # The overlay shows the returned value; the preview keeps the full result.
+            value = result.text.removeprefix("JavaScript result:\n")
+            return replace(
+                event, detail=clipped(value, 300), preview=clipped(result.text)
             )
     return replace(event, preview=clipped(result.text))
 
