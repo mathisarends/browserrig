@@ -377,6 +377,18 @@ async def _enable_session(
         cdp.page.enable(),
         cdp.page.set_lifecycle_events_enabled(enabled=True),
         cdp.runtime.enable(),
+        # Readiness only needs request timing; Chrome keeps no bodies for us.
+        *(
+            ()
+            if frame
+            else (
+                cdp.network.enable(
+                    max_total_buffer_size=0,
+                    max_resource_buffer_size=0,
+                    max_post_data_size=0,
+                ),
+            )
+        ),
     )
     viewport = options.viewport
     if viewport is not None and not frame:

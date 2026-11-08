@@ -50,7 +50,9 @@ async def wait_for_page(
     select: PolicySelector | None = None,
     check: ReadinessMiddleware | None = None,
     dispatch: Callable[[], Awaitable[None]] | None = None,
+    since: float | None = None,
 ) -> ReadinessReport:
+    """Wait until `tab` is ready. `since` is when its cause began, before this wait."""
     emit = events.emit if events is not None else _discard
     options = options or ReadinessOptions()
     started_document = tab.document_id
@@ -71,7 +73,16 @@ async def wait_for_page(
         )
     )
     record(phase=phase, stage=stage, budget=options.timeout)
-    runner = _Runner(tab, options, phase, stage, policy, select, check)
+    runner = _Runner(
+        tab,
+        options,
+        phase,
+        stage,
+        policy,
+        select,
+        check,
+        started if since is None else since,
+    )
     timed_out = False
     try:
         timeout = asyncio.timeout(options.timeout)
@@ -170,6 +181,7 @@ class _Runner:
     policy: ReadinessPolicy | None
     select: PolicySelector | None
     middleware: ReadinessMiddleware | None
+    since: float
     strategy: ReadinessStrategy | None = None
     reason: str = "The document could not be inspected yet"
     polls: int = 0
@@ -189,7 +201,12 @@ class _Runner:
                 deadline = timeout.when()
                 assert deadline is not None
                 context = ReadinessContext(
-                    self.tab, self.phase, self.stage, self.options, deadline
+                    self.tab,
+                    self.phase,
+                    self.stage,
+                    self.options,
+                    deadline,
+                    self.since,
                 )
                 policy = self.policy if self.policy is not None else DomReady()
                 if self.select:

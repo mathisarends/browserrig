@@ -88,6 +88,11 @@
 
 ### Added
 
+- Readiness waits for the requests a click, input or navigation started
+  (`NetworkQuiet`, now the default policy), so observations no longer miss
+  results that arrive after the DOM was briefly quiet. Sockets, streams, polling
+  that was not caused by the action and other background traffic never count, and
+  the network adds at most 2 s to any wait.
 - `Done` now prepares for the step limit. On the last step that still leaves room
   for a final answer, the agent is told to call `done`, and other tools are denied.
   After `done`, tools stay declared but are denied instead of being removed from the

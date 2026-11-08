@@ -36,6 +36,7 @@ from browserrig.scripts import (
 from .favicon import load_favicon
 from .frame import Frame
 from .input import CdpInput
+from .network import NetworkActivity
 from .overlays import Overlays
 from .worlds import Worlds
 
@@ -66,6 +67,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self.dialog: tuple[str, str] | None = None
         self.input = CdpInput(self)
         self.overlays = Overlays(self)
+        self.network = NetworkActivity()
         self.closed = False
         self.loading = False
         self.navigation_pending = False
@@ -85,6 +87,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
 
     async def handle(self, event: object) -> None:
         """Apply a page event that arrived on this tab's own CDP session."""
+        self.network.handle(event)
         match event:
             case FrameNavigatedEvent(frame=frame) if not frame.parent_id:
                 self.document_id = frame.loader_id

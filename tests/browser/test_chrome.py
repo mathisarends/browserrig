@@ -103,6 +103,8 @@ async def test_setups_run_in_order_on_new_page_and_frame_sessions(options):
     ]
     assert cdp.page.enable.await_count == 2
     assert cdp.runtime.enable.await_count == 2
+    # Only the page session reports requests; frames reuse its readiness.
+    assert cdp.network.enable.await_count == 1
     assert cdp.page.set_lifecycle_events_enabled.await_args_list == [
         call(enabled=True),
         call(enabled=True),
@@ -323,6 +325,7 @@ def _browser(options=None):
             ),
         ),
         runtime=SimpleNamespace(enable=AsyncMock()),
+        network=SimpleNamespace(enable=AsyncMock()),
         emulation=SimpleNamespace(set_device_metrics_override=AsyncMock()),
     )
     browser.client = SimpleNamespace(

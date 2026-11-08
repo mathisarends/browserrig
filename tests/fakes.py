@@ -12,6 +12,7 @@ from harnessed.testing import ScriptedModel
 
 from browserrig import Browser, FileSystem
 from browserrig.browser import BrowserEvents
+from browserrig.browser.network import NetworkActivity
 from browserrig.core import ReadinessStatus
 from browserrig.input import Input
 from browserrig.observation import BrowserPerception, DomReferences
@@ -32,6 +33,7 @@ class FakeTab:
         self.closed = False
         self.quiet_ms = 1000
         self.probes = 0
+        self.network = NetworkActivity()
 
     async def sync_document(self):
         pass
@@ -105,7 +107,7 @@ class FakeReadiness:
     def __init__(self):
         self.phases = []
 
-    async def wait(self, tab, *, phase, dispatch=None):
+    async def wait(self, tab, *, phase, dispatch=None, since=None):  # pylint: disable=unused-argument
         self.phases.append(phase)
         if dispatch is not None:
             await dispatch()

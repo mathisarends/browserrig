@@ -339,6 +339,34 @@ animations do not hold readiness indefinitely. Root/frame discovery is bounded;
 incomplete inspection degrades rather than claiming readiness. DOM readiness does
 not wait for every image, font or background network request.
 
+### Network-aware readiness
+
+The default policy for both stages is `NetworkQuiet()`, which wraps `DomReady()`.
+After input, a navigation or the first load it also waits for the requests the
+page started in response, plus `settle_ms` (150 ms) for the page to apply the last
+response. A DOM that is briefly quiet while a search request is still running
+therefore no longer counts as ready.
+
+Only requests we caused count, so busy pages do not slow it down:
+
+- Request types: documents, scripts, stylesheets, XHR and fetch. WebSockets,
+  EventSource, beacons, images, media and fonts are never recorded.
+- Causality: a request counts when it starts during the action, within
+  `reaction_ms` (500 ms) after it, or within `chain_ms` (250 ms) after another
+  counted request finished. Long polls and streams that were already open, and
+  background polling outside that window, never count.
+- Bound: whatever the page does, the network delays readiness by at most
+  `extra_ms` (2 s) past the moment `DomReady` alone was ready. Spans record
+  `network_ms`, and `network_capped=True` when that bound was reached.
+- Phases: plain observations and the check before an action ignore the network.
+
+A request can only be seen once it has started. The `action_min_ms` floor gives a
+debounced handler time to send it. Requests from cross-origin frames are not
+tracked yet; their DOM changes still are. Use `Readiness(initial=DomReady(),
+ongoing=DomReady())` for DOM-only readiness, or tune the bounds with
+`NetworkQuiet(extra_ms=...)`. `Readiness.wait(..., since=...)` tells it when the
+cause of a wait began; `Actions` passes the start of the input.
+
 `browser_plugins()` also mounts `DownloadReadiness()`. This separate plugin uses
 `CheckReadiness`, so active downloads share the page's budget. Include it explicitly
 in manual compositions when desired.

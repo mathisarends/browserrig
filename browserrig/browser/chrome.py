@@ -7,6 +7,11 @@ from uuid import uuid4
 import httpx2
 from cdpify import CdpClient, EventSubscription, ReceivedEvent
 from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
+from cdpify.domains.network import (
+    LoadingFailedEvent,
+    LoadingFinishedEvent,
+    RequestWillBeSentEvent,
+)
 from cdpify.domains.page import (
     FrameNavigatedEvent,
     FrameStartedLoadingEvent,
@@ -58,6 +63,9 @@ _EVENTS = (
     TargetDestroyedEvent,
     DownloadWillBeginEvent,
     DownloadProgressEvent,
+    RequestWillBeSentEvent,
+    LoadingFinishedEvent,
+    LoadingFailedEvent,
 )
 
 

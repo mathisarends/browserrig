@@ -22,7 +22,8 @@ from browserrig.events import (
 from .config import ReadinessOptions
 from .hooks import CheckReadiness, ReadinessCheck, SelectReadiness
 from .models import ReadinessReport
-from .policies import DomReady, ReadinessContext, ReadinessPolicy
+from .network import NetworkQuiet
+from .policies import ReadinessContext, ReadinessPolicy
 from .state import ReadinessState
 from .wait import wait_for_page
 
@@ -41,8 +42,8 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
     ) -> None:
         super().__init__()
         self.options = options if options is not None else ReadinessOptions()
-        self.initial = initial if initial is not None else DomReady()
-        self.ongoing = ongoing if ongoing is not None else DomReady()
+        self.initial = initial if initial is not None else NetworkQuiet()
+        self.ongoing = ongoing if ongoing is not None else NetworkQuiet()
 
     async def setup(self, ctx: Scope) -> None:
         self._state.context = ctx
@@ -55,7 +56,9 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         *,
         phase: ReadinessPhase = ReadinessPhase.OBSERVATION,
         dispatch: Callable[[], Awaitable[None]] | None = None,
+        since: float | None = None,
     ) -> ReadinessReport:
+        """`since` is when the cause of this wait began, such as the action's input."""
         phase = ReadinessPhase(phase)
         if report := self._state.deferred.get(tab.id):
             if dispatch is not None:
@@ -79,7 +82,8 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         key = (*document, phase, stage, uuid4().hex if dispatch is not None else "")
         if key not in self._state.pending:
             task = asyncio.create_task(
-                self._wait(tab, phase, stage, dispatch), name="browserrig:readiness"
+                self._wait(tab, phase, stage, dispatch, since),
+                name="browserrig:readiness",
             )
             self._state.pending[key] = task
 
@@ -126,6 +130,7 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         phase: ReadinessPhase,
         stage: ReadinessStage,
         dispatch: Callable[[], Awaitable[None]] | None,
+        since: float | None,
     ) -> ReadinessReport:
         remaining = max(0, self.options.timeout - self._state.spent.get(tab.id, 0))
         report = await wait_for_page(
@@ -137,6 +142,7 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
             select=self._select,
             check=self._check,
             dispatch=dispatch,
+            since=since,
         )
         self._state.spent[tab.id] = self._state.spent.get(tab.id, 0) + report.duration
         if phase == ReadinessPhase.OBSERVATION:

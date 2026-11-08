@@ -3,6 +3,7 @@ from .dom import probe_dom
 from .downloads import DownloadReadiness
 from .hooks import CheckReadiness, ReadinessCheck, SelectReadiness
 from .models import ReadinessReport
+from .network import NetworkQuiet, NetworkReadiness
 from .plugin import Readiness
 from .policies import DomReady, ReadinessContext, ReadinessPolicy
 from .strategy import ReadinessStrategy
@@ -14,6 +15,8 @@ __all__ = [
     "ReadinessCheck",
     "SelectReadiness",
     "DomReady",
+    "NetworkQuiet",
+    "NetworkReadiness",
     "ReadinessContext",
     "ReadinessPolicy",
     "ReadinessStrategy",

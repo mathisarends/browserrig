@@ -17,6 +17,8 @@ class ReadinessContext:
     stage: ReadinessStage
     options: ReadinessOptions
     deadline: float = float("inf")
+    # When the cause of this wait began, such as an action's input; None is the wait itself.
+    since: float | None = None
 
     @property
     def remaining(self) -> float:

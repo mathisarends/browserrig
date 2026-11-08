@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from time import monotonic
 from typing import cast
 from uuid import uuid4
 
@@ -159,10 +160,11 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
                 if settle and kind in _NAVIGATION_KINDS:
                     effect, note = await self._navigate(tab, action_id, operation)
                 else:
+                    started = monotonic()
                     with self.browser.input.action(action_id), span("operation"):
                         effect = await operation(tab)
                     note = (
-                        await self._settle(tab, kind)
+                        await self._settle(tab, kind, started)
                         if settle and not tab.closed
                         else ""
                     )
@@ -283,14 +285,14 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         )
 
     @traced
-    async def _settle(self, tab: Tab, kind: ActionKind) -> str:
+    async def _settle(self, tab: Tab, kind: ActionKind, started: float) -> str:
         phase = (
             ReadinessPhase.NAVIGATION
             if kind in _NAVIGATION_KINDS
             else ReadinessPhase.AFTER_ACTION
         )
         try:
-            report = await self.readiness.wait(tab, phase=phase)
+            report = await self.readiness.wait(tab, phase=phase, since=started)
         except BrowserError as error:
             return (
                 f" Action executed; follow-up observation is unavailable: {error}. "
