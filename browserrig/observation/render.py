@@ -27,7 +27,7 @@ _FOOTNOTE = re.compile(r"\[\w[\w ]{0,7}\]")
 
 
 def render(snapshot: Snapshot) -> str:
-    """Lists only what the viewport shows; the agent scrolls to see the rest."""
+    """List the viewport, nearby previews and explicit targets for inner scrolling."""
     lines = _header(snapshot)
     if snapshot.elements or snapshot.headings or snapshot.cookie_banners:
         lines.extend(_body(snapshot))
@@ -119,10 +119,28 @@ def _body(snapshot: Snapshot) -> list[str]:
     covered = [element for element in snapshot.elements if element.covered]
     if covered:
         lines.extend(("", f"covered by an overlay: {_summary(covered)}"))
+    for position in ("above", "below"):
+        preview: list[ElementInfo | Heading] = [
+            item
+            for item in (*snapshot.elements, *snapshot.headings)
+            if not item.in_viewport
+            and item.outside_viewport == position
+            and (not isinstance(item, ElementInfo) or not item.covered)
+        ]
+        if preview:
+            lines.extend(
+                (
+                    "",
+                    f"{position} viewport (preview; refs scroll into view before acting):",
+                )
+            )
+            lines.extend(_blocks(preview, snapshot.url))
     uploads: list[ElementInfo | Heading] = [
         element
         for element in snapshot.elements
-        if element.input_type == "file" and not element.in_viewport
+        if element.input_type == "file"
+        and not element.in_viewport
+        and element.outside_viewport is None
     ]
     if uploads:
         lines.extend(
@@ -226,6 +244,13 @@ def _element(element: ElementInfo, url: str) -> str:
         parts[0] += f"[type={element.input_type}]"
     if element.name:
         parts.append(_quote(element.name, _MAX_NAME))
+    if element.scroll is not None:
+        directions = [
+            f"{direction}={distance:.0f}px"
+            for direction in ("up", "down", "left", "right")
+            if (distance := getattr(element.scroll, direction)) > 1
+        ]
+        parts.append(f"scroll({', '.join(directions)})")
     parts.extend(_states(element))
     if element.value is not None and element.value != element.name:
         parts.append(f"value={_quote(element.value, 100)}")
@@ -244,6 +269,8 @@ def _element(element: ElementInfo, url: str) -> str:
         if len(element.options) > _MAX_OPTIONS:
             shown.append(f"…+{len(element.options) - _MAX_OPTIONS}")
         parts.append(f"options=[{', '.join(shown)}]")
+    if element.description and element.description != element.name:
+        parts.append(f"description={_quote(element.description, 250)}")
     link = _link(element.href, url, element.name)
     if link:
         parts.append(f"-> {link}")

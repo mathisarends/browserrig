@@ -236,8 +236,11 @@ class CaptureStrategy(Protocol):
 
 
 class DomCapture(Options):
+    """Observe the viewport plus a vertical context buffer; only real visibility permits input."""
+
     max_elements: int | None = Field(default=None, ge=1, le=50000)
-    max_text_chars: int = Field(default=0, ge=0, le=100000)
+    max_text_chars: int = Field(default=3000, ge=0, le=100000)
+    viewport_expansion: int = Field(default=1000, ge=0, le=10000)
     # Show visible text on pages with fewer than five named controls.
     sparse_text_chars: int = Field(default=1500, ge=0, le=100000)
     marks: bool = True
@@ -259,8 +262,13 @@ class DomCapture(Options):
         extraction = extract(
             frames,
             max_elements=self.max_elements,
-            max_text=self.max_text_chars,
-            sparse_text=self.sparse_text_chars,
+            max_text=0
+            if report.phase == ReadinessPhase.ACTION
+            else self.max_text_chars,
+            sparse_text=0
+            if report.phase == ReadinessPhase.ACTION
+            else self.sparse_text_chars,
+            viewport_expansion=self.viewport_expansion,
             # Comparison probes match controls by identity, not by their names.
             names=report.phase != ReadinessPhase.ACTION,
         )
@@ -444,6 +452,8 @@ def _fingerprint(page: PageContent, document_id: str) -> str:
                 name=element.name,
                 in_viewport=element.in_viewport,
                 value=element.value,
+                description=element.description,
+                scroll=element.scroll,
                 disabled=element.disabled,
                 checked=element.checked,
                 expanded=element.expanded,

@@ -12,6 +12,7 @@ from .models import (
     ElementInfo,
     ElementRef,
     PageContent,
+    ScrollInfo,
     Snapshot,
 )
 from .plugin import BrowserPerception
@@ -20,6 +21,7 @@ from .render import render
 from .renderer import DomRenderer, Renderer
 
 __all__ = [
+    "ScrollInfo",
     "CaptureContent",
     "CaptureStrategy",
     "DomCapture",

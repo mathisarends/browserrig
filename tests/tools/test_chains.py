@@ -70,6 +70,7 @@ def test_new_or_newly_available_controls_interrupt(previous):
         {"modal": {"role": "dialog", "name": "Choose"}},
         {"alerts": ("Invalid entry",)},
         {"elements": (_element(expanded=True),)},
+        {"elements": (_element(invalid=True),)},
     ],
 )
 def test_new_decisions_interrupt(changes):

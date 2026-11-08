@@ -255,7 +255,9 @@ async def test_limits_are_reported_and_checkbox_state_changes_fingerprint(site):
         assert any("truncated" in limitation for limitation in limited.limitations)
 
 
-async def test_visible_text_is_shown_only_when_the_viewport_holds_few_controls(site):
+async def test_default_text_preserves_dense_page_guidance_with_an_explicit_opt_out(
+    site,
+):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
@@ -276,7 +278,10 @@ async def test_visible_text_is_shown_only_when_the_viewport_holds_few_controls(s
             "document.body.insertAdjacentHTML('beforeend', '<button>Go</button>'.repeat(5))",
         )
         busy = await capture(tab, DomCapture(), report, previous=sparse)
-        assert busy.text == "" and busy.fingerprint != sparse.fingerprint
+        assert "Your request was blocked." in busy.text
+        assert busy.fingerprint != sparse.fingerprint
+        controls_only = await capture(tab, DomCapture(max_text_chars=0), report)
+        assert controls_only.text == ""
 
 
 async def test_challenge_overlay_reads_its_text_but_not_the_page_beneath(site):

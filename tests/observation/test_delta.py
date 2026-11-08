@@ -21,11 +21,32 @@ def test_changed_lines_keep_their_section_and_group_lines():
         *HEADER.split("\n"),
         "",
         INTRO,
+        "in viewport:",
         "  [MAIN]",
         '    <form "Order">',
         '-     [3] textbox "Email"',
         '+     [3] textbox "Email" value="a@b.c" focused',
     ]
+
+
+def test_changed_preview_lines_keep_their_location_context():
+    section = "below viewport (preview; refs scroll into view before acting):"
+    before = BASE + f'\n\n{section}\n  [8] textbox "Address"'
+    after = before.replace('textbox "Address"', 'textbox "Address" required')
+    changed = delta(before, after)
+    assert section in changed
+    assert changed.index(section) < changed.index('+ [8] textbox "Address" required')
+    assert '[1] link "Home"' not in changed
+
+
+def test_changed_page_text_does_not_inherit_the_last_preview_location():
+    section = "below viewport (preview; refs scroll into view before acting):"
+    before = (
+        BASE + f'\n\n{section}\n  [8] textbox "Address"\n\npage text:\nOld guidance'
+    )
+    changed = delta(before, before.replace("Old guidance", "New guidance"))
+    assert "page text:" in changed and "+ New guidance" in changed
+    assert section not in changed
 
 
 def test_element_after_a_group_is_not_placed_inside_it():

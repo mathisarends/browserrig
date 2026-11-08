@@ -10,6 +10,8 @@ from functools import cached_property
 
 from cdpify.domains.domsnapshot import DocumentSnapshot, RareBooleanData, RareStringData
 
+from browserrig.observation.models import ScrollInfo
+
 from .styles import Style
 
 type Rect = tuple[float, float, float, float]
@@ -89,6 +91,8 @@ class Document:  # pylint: disable=too-many-public-methods
         self._bounds = layout.bounds
         self._styles = layout.styles
         self._paint = layout.paint_orders or []
+        self._client_rects = layout.client_rects or []
+        self._scroll_rects = layout.scroll_rects or []
         self._end = self._subtree_ends()
         self._inherit()
 
@@ -267,6 +271,40 @@ class Document:  # pylint: disable=too-many-public-methods
     def scroll_clip(self, index: int) -> Rect | None:
         """Visible area of `overflow: auto|scroll` ancestors; content beyond needs scrolling."""
         return self._scroll_clip[index]
+
+    def scroll_info(self, index: int) -> ScrollInfo | None:
+        """Describe actual overflow; hidden/clip and the page root are not wheel targets."""
+        layout = self._layout.get(index)
+        if (
+            self.tag(index) in {"html", "body"}
+            or layout is None
+            or layout >= len(self._client_rects)
+            or layout >= len(self._scroll_rects)
+        ):
+            return None
+        _, _, width, height = self._client_rects[layout]
+        x, y, scroll_width, scroll_height = self._scroll_rects[layout]
+        vertical = self.style(index, Style.OVERFLOW_Y) in {"auto", "scroll", "overlay"}
+        horizontal = self.style(index, Style.OVERFLOW_X) in {
+            "auto",
+            "scroll",
+            "overlay",
+        }
+        if not (
+            vertical
+            and height > 0
+            and scroll_height > height + 1
+            or horizontal
+            and width > 0
+            and scroll_width > width + 1
+        ):
+            return None
+        return ScrollInfo(
+            up=max(0, y) if vertical else 0,
+            down=max(0, scroll_height - height - y) if vertical else 0,
+            left=max(0, x) if horizontal else 0,
+            right=max(0, scroll_width - width - x) if horizontal else 0,
+        )
 
     # Text
 

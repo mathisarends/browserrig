@@ -254,6 +254,8 @@ def test_browser_options_hide_credentials_and_reject_owned_flags():
         {"max_text_chars": 100001},
         {"sparse_text_chars": -1},
         {"sparse_text_chars": 100001},
+        {"viewport_expansion": -1},
+        {"viewport_expansion": 10001},
     ],
 )
 def test_capture_rejects_invalid_limits(settings):
@@ -261,10 +263,11 @@ def test_capture_rejects_invalid_limits(settings):
         DomCapture(**settings)
 
 
-def test_default_observation_explains_sparse_text_without_enabling_screenshots():
+def test_default_observation_explains_context_without_enabling_screenshots():
     observe = BrowserPerception()
     instructions = observe.renderer.instructions(observe.screenshots)
-    assert "When the viewport holds few controls" in instructions
+    assert "bounded page-text excerpt" in instructions
+    assert "marked as previews" in instructions and "scroll(up=" in instructions
     assert "Screenshots are included only when requested" in instructions
 
 

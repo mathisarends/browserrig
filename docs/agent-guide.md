@@ -135,6 +135,23 @@ screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` and
 `ImageContext(UntilCompaction())`. Capture, rendering, image retention and
 tool capabilities can be selected independently. `ScreenshotTrigger.ON_REQUEST`
 captures only after a screenshot tool call. Configure extraction through `DomCapture(...)`.
+
+`DomCapture()` describes visible controls plus a 1,000 CSS-pixel vertical buffer
+above and below each visible document viewport. Previews are labelled separately;
+their refs use normal scrolling and hit-testing before input. Screenshots and
+their ref marks continue to cover the real viewport only. Set
+`viewport_expansion=0` for a strict viewport observation. Hidden/inert content,
+hard clipping and the current clip of inner scroll containers remain excluded.
+Scroll containers are explicit targets with remaining wheel distances in each
+direction, so an agent can scroll a list or carousel by ref.
+
+Observations include up to 3,000 characters of page text by default, prioritizing
+the visible text before nearby context. Associated field descriptions are also
+shown on their controls. `max_text_chars=0` restores controls-only output on dense
+pages; `sparse_text_chars` still provides the small-page fallback unless set to
+zero too. Comparison probes omit text excerpts so truncation does not interrupt
+ordinary form filling. A newly invalid field stops an action chain before later
+calls such as submission.
 Shared plugin services use `needs(T)` for required lifetime bindings and
 `observes(T)` for optional bindings from `harnessed.kernel`. Both bind before setup
 and restart the activation when their provider changes. Move setup/teardown

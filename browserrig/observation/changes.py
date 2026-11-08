@@ -51,6 +51,8 @@ def _dom_change(before: Snapshot, after: Snapshot) -> str:
         if identity not in known:
             return "New interactive elements became available."
         previous = known[identity]
+        if element.invalid and previous is not None and not previous.invalid:
+            return "A field reported invalid input."
         if (
             element.expanded is True
             and previous is not None

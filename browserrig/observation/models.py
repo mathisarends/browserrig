@@ -27,6 +27,15 @@ class Option(Options):
     disabled: bool = False
 
 
+class ScrollInfo(Options):
+    """Remaining wheel-scroll distances inside a control, in CSS pixels."""
+
+    up: float = 0
+    down: float = 0
+    left: float = 0
+    right: float = 0
+
+
 class ElementRef(Options):
     """An opaque reference owned by a capture backend within one tab and document."""
 
@@ -43,11 +52,14 @@ class ElementInfo(ElementRef):
     input_type: str = ""
     value: str | None = None
     placeholder: str = ""
+    description: str = ""
     href: str = ""
     options: tuple[Option, ...] = ()
     section: str = ""
     group: str = ""
     in_viewport: bool = True
+    outside_viewport: Literal["above", "below"] | None = None
+    scroll: ScrollInfo | None = None
     covered: bool = False
     pinned: bool = False
     new: bool = False
@@ -87,6 +99,7 @@ class Heading(Options):
     frame_id: str
     order: int = 0
     in_viewport: bool = True
+    outside_viewport: Literal["above", "below"] | None = None
     section: str = ""
 
 
@@ -154,7 +167,7 @@ class Snapshot(Options):
     fingerprint: str
     tabs: tuple[TabInfo, ...] = ()
     text: str = ""
-    # Only controls the viewport shows are described; the rest are known by identity.
+    # Visible controls and nearby previews are described; distant controls keep identities.
     elements: tuple[Element | ElementInfo, ...] = ()
     offscreen: tuple[Offscreen | ElementRef, ...] = Field(default=(), repr=False)
     headings: tuple[Heading, ...] = ()
@@ -215,6 +228,8 @@ class CapturedImage:
 class ElementFingerprint(Options):
     role: str
     name: str
+    description: str = ""
+    scroll: ScrollInfo | None = None
     in_viewport: bool = True
     value: str | None
     disabled: bool

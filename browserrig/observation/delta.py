@@ -10,7 +10,11 @@ import re
 from difflib import SequenceMatcher
 
 _NEW_MARK = re.compile(r"^(\s*(?:#+ )?)\*\[")
-_CONTEXT = re.compile(r"^\s*(?:\[[A-Z][A-Z_ ]*(?:: .*)?\]|<.*>)$")
+_CONTEXT = re.compile(
+    r"^(?:\s*(?:\[[A-Z][A-Z_ ]*(?:: .*)?\]|<.*>)|"
+    r"(?:in viewport|(?:above|below) viewport.*|file inputs outside view.*|"
+    r"page text|canvases in viewport.*):)$"
+)
 
 INTRO = (
     "changes since the last complete observation of this page "
@@ -57,7 +61,7 @@ def _mark(sign: str, line: str) -> str:
 def _context(lines: list[str], index: int) -> list[str]:
     """The section and group lines enclosing ``lines[index]``, outermost first."""
     found: list[str] = []
-    depth = _indent(lines[index]) if index < len(lines) else 1 << 30
+    depth = max(1, _indent(lines[index])) if index < len(lines) else 1 << 30
     for line in reversed(lines[:index]):
         if _CONTEXT.match(line) and _indent(line) < depth:
             found.insert(0, line)

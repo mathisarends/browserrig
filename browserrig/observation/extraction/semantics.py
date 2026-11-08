@@ -108,6 +108,18 @@ def input_type(document: Document, index: int) -> str:
     return document.attributes(index).get("type", "text").strip().lower() or "text"
 
 
+def description(document: Document, index: int) -> str:
+    """Explicit field guidance, kept separate from its accessible name."""
+    attributes = document.attributes(index)
+    described = attributes.get("aria-describedby", "").split()
+    text = " ".join(
+        document.text(target, 250)
+        for element_id in described
+        if (target := document.element_by_id(element_id)) is not None
+    )
+    return clean(text or attributes.get("aria-description", ""), 250)
+
+
 def value(document: Document, index: int, element_role: str, kind: str) -> str | None:
     attributes = document.attributes(index)
     if element_role in _RANGE_ROLES:

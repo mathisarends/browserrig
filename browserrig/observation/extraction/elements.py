@@ -3,6 +3,7 @@
 from bisect import bisect_right
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Literal
 from urllib.parse import urljoin
 
 from browserrig.core import Bounds, FrameTransform
@@ -14,6 +15,7 @@ from browserrig.observation.models import (
     Heading,
     Modal,
     Offscreen,
+    ScrollInfo,
 )
 
 from . import semantics
@@ -145,6 +147,7 @@ def extract_frame(
     fallback_section: str,
     text_limit: int,
     embedded: bool = False,
+    viewport_expansion: int = 1000,
 ) -> FrameExtraction:
     extractor = _FrameExtractor(
         document,
@@ -154,6 +157,7 @@ def extract_frame(
         ref_prefix=ref_prefix,
         focused=focused,
         fallback_section=fallback_section,
+        viewport_expansion=viewport_expansion,
     )
     return extractor.run(text_limit, embedded=embedded)
 
@@ -169,6 +173,7 @@ class _FrameExtractor:
         ref_prefix: str,
         focused: int | None,
         fallback_section: str,
+        viewport_expansion: int,
     ) -> None:
         self._document = document
         self._frame_id = frame_id
@@ -179,6 +184,20 @@ class _FrameExtractor:
             else None
         )
         self._viewport = self._document_viewport()
+        self._preview = (
+            (
+                self._viewport[0],
+                max(0, self._viewport[1] - viewport_expansion),
+                self._viewport[2],
+                min(
+                    self._viewport[3] + viewport_expansion,
+                    document.content_height or self._viewport[3] + viewport_expansion,
+                ),
+            )
+            if self._viewport is not None
+            else None
+        )
+        self._scrolls: dict[int, ScrollInfo] = {}
         self._prefix = ref_prefix
         self._focused = focused
         self._fallback = fallback_section
@@ -242,6 +261,9 @@ class _FrameExtractor:
                 continue
             if tag in _SKIPPED_TAGS:
                 continue
+            scroll = document.scroll_info(index)
+            if scroll is not None:
+                self._scrolls[index] = scroll
             semantic = self._candidate(index, tag)
             if semantic is None:
                 continue
@@ -258,9 +280,20 @@ class _FrameExtractor:
         offscreen: list[Offscreen] = []
         for index in hidden_uploads:
             element = self._element(index, ((0, 0, 0, 0), None, False), None)
-            built.append((index, element.model_copy(update={"bounds": None})))
+            built.append(
+                (
+                    index,
+                    element.model_copy(
+                        update={"bounds": None, "outside_viewport": None}
+                    ),
+                )
+            )
         for index, control in kept:
-            if placements[index][1] is not None:
+            rect = placements[index][0]
+            if (
+                placements[index][1] is not None
+                or visible_area(document, index, rect, self._preview) is not None
+            ):
                 built.append((index, self._element(index, placements[index], control)))
                 continue
             backend_id = document.backend_ids[index]
@@ -282,8 +315,8 @@ class _FrameExtractor:
         )
         if listed_option or self._decorative(index):
             return None
-        if tag in _NATIVE_TAGS:
-            return self._native(index, tag)
+        if index in self._scrolls or tag in _NATIVE_TAGS:
+            return True if index in self._scrolls else self._native(index, tag)
         if index in self._marked:
             if semantics.role(document, index) in semantics.INTERACTIVE_ROLES:
                 return True
@@ -438,7 +471,12 @@ class _FrameExtractor:
                 document.attributes(index).get("aria-label", "")
             ) or document.text(index, 120)
             area = visible_area(document, index, rect, self._viewport)
-            if text and area is not None and not self._occluded(index, area):
+            preview = visible_area(document, index, rect, self._preview)
+            if (
+                text
+                and preview is not None
+                and not (area is not None and self._occluded(index, area))
+            ):
                 headings.append(
                     (
                         index,
@@ -447,6 +485,10 @@ class _FrameExtractor:
                             text=text,
                             frame_id=self._frame_id,
                             section=self._context(index)[0],
+                            in_viewport=area is not None,
+                            outside_viewport=self._outside(rect)
+                            if area is None
+                            else None,
                         ),
                     )
                 )
@@ -454,20 +496,26 @@ class _FrameExtractor:
 
     def _text(self, limit: int) -> str:
         document = self._document
-        parts: list[str] = []
-        length = 0
+        parts: dict[str, list[str]] = {"visible": [], "above": [], "below": []}
+        lengths = dict.fromkeys(parts, 0)
         for node, value, rect in document.text_runs():
             parent = document.parent(node)
             area = visible_area(document, parent, rect, self._viewport)
             # Text under an overlay is not what the page shows.
-            if area is None or self._occluded(parent, area):
+            preview = visible_area(document, parent, rect, self._preview)
+            if preview is None or area is not None and self._occluded(parent, area):
                 continue
-            parts.append(value)
-            length += len(value) + 1
-            if length > limit:
-                break
+            position = "visible" if area is not None else self._outside(rect)
+            if position is None or lengths[position] > limit:
+                continue
+            parts[position].append(value)
+            lengths[position] += len(value) + 1
+        text = " ".join(parts["visible"])
+        for position in ("above", "below"):
+            if parts[position]:
+                text += f"\n[{position} viewport] " + " ".join(parts[position])
         # One extra character lets the caller detect truncation.
-        return " ".join(parts)[: limit + 1]
+        return text.strip()[: limit + 1]
 
     def _occluded(self, index: int, area: Rect) -> bool:
         if self._occlusion is None:
@@ -496,7 +544,8 @@ class _FrameExtractor:
             if open_controls and not candidates[index]:
                 continue
             kept.append(index)
-            open_controls.append(index)
+            if index not in self._scrolls:
+                open_controls.append(index)
         return kept
 
     def _element(
@@ -506,6 +555,9 @@ class _FrameExtractor:
         source = index if control is None else control
         attributes = document.attributes(index)
         role = semantics.role(document, source)
+        scroll = self._scrolls.get(index)
+        if scroll is not None and role in {"", "generic"}:
+            role = "region"
         kind = semantics.input_type(document, source)
         rect, area, covered = placement
         section, group = self._context(index)
@@ -523,6 +575,8 @@ class _FrameExtractor:
             else semantics.name(document, index, role),
             tag=document.tag(index),
             input_type=kind,
+            description=semantics.description(document, source),
+            scroll=scroll,
             value=semantics.value(document, source, role, kind),
             placeholder=clean(
                 attributes.get("placeholder") or attributes.get("aria-placeholder", ""),
@@ -535,6 +589,7 @@ class _FrameExtractor:
             section=section,
             group=group,
             in_viewport=area is not None and not covered,
+            outside_viewport=self._outside(rect) if area is None else None,
             covered=covered,
             pinned=document.pinned(index),
             bounds=self._bounds(rect, area),
@@ -689,6 +744,15 @@ class _FrameExtractor:
             height=max(0.0, shown[3] - shown[1]),
         )
         return self._transform.bounds_to_viewport(local)
+
+    def _outside(self, rect: Rect) -> Literal["above", "below"] | None:
+        if self._viewport is None:
+            return None
+        if rect[3] <= self._viewport[1]:
+            return "above"
+        if rect[1] >= self._viewport[3]:
+            return "below"
+        return None
 
 
 def _absolute(base: str, href: str) -> str:

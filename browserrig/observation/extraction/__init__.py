@@ -44,6 +44,7 @@ async def extract(
     max_text: int,
     sparse_text: int = 0,
     names: bool = True,
+    viewport_expansion: int = 1000,
 ) -> Extraction:
     """Extract all frames; `frames[0]` must be the main frame.
 
@@ -82,9 +83,9 @@ async def extract(
         for frame, value in zip(_session_roots(frames), focused, strict=True)
         if isinstance(value, int)
     }
-    extraction = _Assembler(frames, documents, focus, limitations).run(
-        max_elements, max_text, sparse_text
-    )
+    extraction = _Assembler(
+        frames, documents, focus, limitations, viewport_expansion
+    ).run(max_elements, max_text, sparse_text)
     if not names:
         return extraction
     chrome = await chrome_names(
@@ -112,11 +113,13 @@ class _Assembler:
         documents: dict[str, Document],
         focus: dict[str, int],
         limitations: list[str],
+        viewport_expansion: int,
     ) -> None:
         self._frames = frames
         self._documents = documents
         self._focus = focus
         self._limitations = limitations
+        self._viewport_expansion = viewport_expansion
         self._prefixes: dict[str, str] = {}
         self._results: dict[str, FrameExtraction] = {}
         self._keys: dict[str, tuple[int, ...]] = {}
@@ -209,6 +212,7 @@ class _Assembler:
             fallback_section=section,
             text_limit=max_text,
             embedded=frame.parent is not None,
+            viewport_expansion=self._viewport_expansion,
         )
         if frame.id in self._covered:
             result.elements = [
@@ -218,6 +222,9 @@ class _Assembler:
                 )
                 for index, element in result.elements
             ]
+            result.headings = []
+            result.text = ""
+            result.alerts = []
         self._results[frame.id] = result
         self._keys[frame.id] = key
         return result
@@ -336,7 +343,9 @@ def _session_roots(frames: tuple[Frame, ...]) -> list[Frame]:
 async def _snapshot(cdp: CdpSession) -> CaptureSnapshotResult:
     async with asyncio.timeout(_TIMEOUT):
         return await cdp.dom_snapshot.capture_snapshot(
-            computed_styles=list(STYLES), include_paint_order=True
+            computed_styles=list(STYLES),
+            include_paint_order=True,
+            include_dom_rects=True,
         )
 
 
