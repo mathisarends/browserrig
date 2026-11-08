@@ -9,6 +9,7 @@ from browserrig.core import Bounds, FrameTransform
 from browserrig.observation.models import (
     CHECKABLE_ROLES,
     Canvas,
+    CookieBanner,
     Element,
     Heading,
     Modal,
@@ -16,6 +17,7 @@ from browserrig.observation.models import (
 )
 
 from . import semantics
+from .cookies import cookie_banners
 from .document import Document, Rect, clean
 from .styles import Style
 from .visibility import Occlusion, hidden, visible_area
@@ -116,6 +118,7 @@ class FrameExtraction:
     offscreen: list[Offscreen] = field(default_factory=list)
     alerts: list[str] = field(default_factory=list)
     modal: tuple[int, Modal] | None = None
+    cookie_banners: tuple[CookieBanner, ...] = ()
     text: str = ""
     _context: Callable[[int], Context] = field(
         default=lambda _index: ("", ""), repr=False
@@ -141,6 +144,7 @@ def extract_frame(
     focused: int | None,
     fallback_section: str,
     text_limit: int,
+    embedded: bool = False,
 ) -> FrameExtraction:
     extractor = _FrameExtractor(
         document,
@@ -151,7 +155,7 @@ def extract_frame(
         focused=focused,
         fallback_section=fallback_section,
     )
-    return extractor.run(text_limit)
+    return extractor.run(text_limit, embedded=embedded)
 
 
 class _FrameExtractor:
@@ -184,7 +188,7 @@ class _FrameExtractor:
         self._occlusion: Occlusion | None = None
         self._modal: int | None = None
 
-    def run(self, text_limit: int) -> FrameExtraction:
+    def run(self, text_limit: int, *, embedded: bool = False) -> FrameExtraction:
         result = FrameExtraction(
             self._document, _context=self._context, _covered=self._covered
         )
@@ -193,6 +197,14 @@ class _FrameExtractor:
             self._modal = modal[1]
             result.modal = (modal[0], self._modal_view(modal[1]))
         result.elements, result.offscreen = self._elements()
+        result.cookie_banners = cookie_banners(
+            self._document,
+            result.elements,
+            viewport=self._viewport,
+            covered=self._occluded,
+            modal=self._modal,
+            embedded=embedded,
+        )
         result.headings, result.alerts = self._headings_and_alerts()
         result.canvases = self._canvases({index for index, _ in result.elements})
         if text_limit > 0:

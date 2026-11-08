@@ -29,7 +29,7 @@ _FOOTNOTE = re.compile(r"\[\w[\w ]{0,7}\]")
 def render(snapshot: Snapshot) -> str:
     """Lists only what the viewport shows; the agent scrolls to see the rest."""
     lines = _header(snapshot)
-    if snapshot.elements or snapshot.headings:
+    if snapshot.elements or snapshot.headings or snapshot.cookie_banners:
         lines.extend(_body(snapshot))
     if snapshot.canvases:
         lines.extend(_canvases(snapshot.canvases))
@@ -70,8 +70,15 @@ def _header(snapshot: Snapshot) -> list[str]:
         lines.append(f"image: {_region(snapshot)}")
     if snapshot.modal is not None:
         name = f' "{_cut(snapshot.modal.name, 80)}"' if snapshot.modal.name else ""
+        guidance = (
+            ""
+            if any(banner.modal for banner in snapshot.cookie_banners)
+            else ("; interact with it first")
+        )
+        lines.append(f"modal: {snapshot.modal.role}{name} is open{guidance}")
+    if snapshot.cookie_banners:
         lines.append(
-            f"modal: {snapshot.modal.role}{name} is open; interact with it first"
+            f"cookie banners: {len(snapshot.cookie_banners)} detected heuristically"
         )
     if snapshot.alerts:
         lines.append(
@@ -87,7 +94,28 @@ def _body(snapshot: Snapshot) -> list[str]:
         *(heading for heading in snapshot.headings if heading.in_viewport),
     ]
     lines = ["", "in viewport:"]
-    lines.extend(_blocks(items, snapshot.url) or ["  (no interactive elements)"])
+    banner_refs = {ref for banner in snapshot.cookie_banners for ref in banner.refs}
+    for banner in snapshot.cookie_banners:
+        name = f": {_cut(banner.name, 80)}" if banner.name else ""
+        section = f"COOKIE BANNER{name}"
+        lines.append(f"  [{section}]")
+        if banner.text:
+            lines.append(f"    text: {_quote(banner.text, 600)}")
+        controls: list[ElementInfo | Heading] = [
+            element.model_copy(update={"section": section})
+            for element in snapshot.elements
+            if element.in_viewport and element.ref in banner.refs
+        ]
+        # The section header precedes the excerpt; reuse normal control/group rendering.
+        lines.extend(_blocks(controls, snapshot.url)[1:])
+    remaining = [
+        item
+        for item in items
+        if not isinstance(item, ElementInfo) or item.ref not in banner_refs
+    ]
+    lines.extend(_blocks(remaining, snapshot.url))
+    if not items and not snapshot.cookie_banners:
+        lines.append("  (no interactive elements)")
     covered = [element for element in snapshot.elements if element.covered]
     if covered:
         lines.extend(("", f"covered by an overlay: {_summary(covered)}"))

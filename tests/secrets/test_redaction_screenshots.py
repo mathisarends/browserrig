@@ -7,13 +7,15 @@ import pytest
 from PIL import Image
 
 from browserrig.core import Bounds, ReadinessPhase
-from browserrig.observation import CaptureContent, Element, capture
+from browserrig.observation import CaptureContent, CookieBanner, Element, capture
 from browserrig.observation.extraction import Extraction
 from browserrig.secrets.redaction import Redactor
 from tests.fakes import FakeReadiness, FakeTab
 
 
-@pytest.mark.parametrize("source", ["text", "title", "unbounded_element"])
+@pytest.mark.parametrize(
+    "source", ["text", "title", "unbounded_element", "cookie_banners"]
+)
 @pytest.mark.parametrize("bounded_element", [False, True])
 async def test_unlocated_secrets_withhold_images_even_with_other_bounded_hits(
     source, bounded_element
@@ -33,6 +35,8 @@ async def test_unlocated_secrets_withhold_images_even_with_other_bounded_hits(
     fields = {}
     if source == "unbounded_element":
         elements.append(field.model_copy(update={"ref": "e2", "bounds": None}))
+    elif source == "cookie_banners":
+        fields[source] = (CookieBanner(text=f"Cookies for {secret}"),)
     else:
         fields[source] = secret
     page = Extraction(

@@ -5,6 +5,7 @@ from browserrig.browser import Connect, Launch
 from browserrig.core import Bounds, Geometry, Point, Region, StaleElement
 from browserrig.observation import (
     BrowserPerception,
+    CookieBanner,
     DomCapture,
     Element,
     Snapshot,
@@ -126,6 +127,42 @@ def test_render_lists_only_the_viewport_and_reports_modal():
     assert 'modal: dialog "Cookies" is open; interact with it first' in text
     assert "[1] button" in text and "[2]" not in text and "below viewport" not in text
     assert "scroll 0 of 4000px (0.0 pages above, 4.0 below)" in text
+
+
+def test_cookie_context_has_its_own_block_and_leaves_navigation_available():
+    snapshot = _snapshot(
+        _element("1", 0, name="Continue", section="MAIN"),
+        _element(
+            "2", 1, name="Reject all", section="DIALOG: Privacy", group='form "Consent"'
+        ),
+        cookie_banners=(
+            CookieBanner(
+                name="Privacy",
+                text="We use cookies for analytics.",
+                refs=("2",),
+                modal=True,
+            ),
+        ),
+        modal=Modal(role="dialog", name="Privacy"),
+    )
+    text = render(snapshot)
+    assert "cookie banners: 1 detected heuristically" in text
+    assert (
+        '  [COOKIE BANNER: Privacy]\n    text: "We use cookies for analytics."' in text
+    )
+    assert text.count('[2] button "Reject all"') == 1
+    assert '    <form "Consent">\n      [2] button "Reject all"' in text
+    assert '[1] button "Continue"' in text and "[MAIN]" in text
+    assert "interact with it first" not in text and not snapshot.text
+    observe = BrowserPerception()
+    assert "choose whether to interact or navigate" in observe.renderer.instructions(
+        observe.screenshots
+    )
+
+
+def test_cookie_excerpt_is_rendered_even_when_no_controls_fit_the_budget():
+    snapshot = _snapshot(cookie_banners=(CookieBanner(text="We use cookies."),))
+    assert '    text: "We use cookies."' in render(snapshot)
 
 
 def test_render_lists_canvases_with_viewport_bounds_even_without_elements():

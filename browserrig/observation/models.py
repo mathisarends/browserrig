@@ -95,6 +95,15 @@ class Modal(Options):
     name: str
 
 
+class CookieBanner(Options):
+    """A likely visible consent UI, with the refs of its ordinary page controls."""
+
+    name: str = ""
+    text: str = ""
+    refs: tuple[str, ...] = ()
+    modal: bool = False
+
+
 class Canvas(Options):
     """A visible canvas; its pixels have no element refs, so agents point with coordinates.
 
@@ -127,6 +136,7 @@ class PageContent:
     canvases: tuple[Canvas, ...] = ()
     text: str = ""
     limitations: tuple[str, ...] = ()
+    cookie_banners: tuple[CookieBanner, ...] = ()
 
 
 class Snapshot(Options):
@@ -150,6 +160,7 @@ class Snapshot(Options):
     headings: tuple[Heading, ...] = ()
     alerts: tuple[str, ...] = ()
     modal: Modal | None = None
+    cookie_banners: tuple[CookieBanner, ...] = ()
     canvases: tuple[Canvas, ...] = ()
     limitations: tuple[str, ...] = ()
     image: str | None = Field(default=None, repr=False)
@@ -222,7 +233,9 @@ class PageFingerprint(Options):
     elements: tuple[ElementFingerprint, ...]
     alerts: tuple[str, ...] = ()
     modal: Modal | None = None
+    cookie_banners: tuple[CookieBanner, ...] = ()
     scroll_y: float
 
     def digest(self) -> str:
-        return hashlib.sha256(self.model_dump_json().encode("utf-8")).hexdigest()
+        data = self.model_dump_json(exclude={"cookie_banners": {"__all__": {"refs"}}})
+        return hashlib.sha256(data.encode("utf-8")).hexdigest()

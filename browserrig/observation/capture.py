@@ -186,6 +186,7 @@ async def capture_observation(
         headings=page.headings,
         alerts=page.alerts,
         modal=page.modal,
+        cookie_banners=page.cookie_banners,
         canvases=page.canvases,
         limitations=page.limitations,
         image=image,
@@ -388,5 +389,6 @@ def _fingerprint(page: PageContent, document_id: str) -> str:
         ),
         alerts=page.alerts,
         modal=page.modal,
+        cookie_banners=page.cookie_banners,
     )
     return fingerprint.digest()

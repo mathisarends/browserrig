@@ -13,6 +13,8 @@ def decision_change(before: Snapshot, after: Snapshot, *, dom: bool = True) -> s
         return "The set of open tabs changed."
     if before.modal != after.modal or set(after.alerts) - set(before.alerts):
         return "A modal or alert appeared or changed."
+    if before.cookie_banners != after.cookie_banners:
+        return "A cookie banner appeared, disappeared or changed."
     if (
         not dom
         or any(

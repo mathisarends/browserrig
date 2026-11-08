@@ -64,6 +64,29 @@ default is `0`. When the viewport holds fewer than five named controls, as on er
 and confirmation pages, observations add up to `sparse_text_chars` (default `1500`)
 characters of visible text anyway. Every observation states where the mouse rests.
 
+Likely cookie consent banners have a separate `[COOKIE BANNER: name]` block with up
+to 600 characters of visible text and their ordinary element refs. This excerpt is
+independent of both page-text budgets, so it also appears on busy pages. Detection
+combines consent text and decision controls with dialog/overlay presentation,
+consent container metadata, or explicit acceptance and rejection choices. It works
+over the same composed snapshots, including shadow DOM and frame documents;
+hidden, offscreen and covered banners are omitted. Footer settings launchers and
+cookie-policy articles alone do not qualify. The header marks detection as heuristic:
+unusual layouts or languages can be missed. Recognition does not click, choose a
+consent policy or require the agent to stay on the page.
+
+For example, a detected banner is rendered as:
+
+```text
+cookie banners: 1 detected heuristically
+
+in viewport:
+  [COOKIE BANNER: Privacy choices]
+    text: "We use cookies for analytics. Accept all Reject all"
+    [41] button "Accept all"
+    [42] button "Reject all"
+```
+
 An observation looks like this:
 
 ```text
@@ -72,7 +95,6 @@ url: https://shop.example/checkout
 tab: 3F2A9C...
 viewport: 1280x800, scroll 0 of 2400px (0.0 pages above, 2.0 below)
 cursor: x=640 y=412 (viewport CSS pixels)
-modal: dialog "Cookie settings" is open; interact with it first
 
 in viewport:
   [HEADER]
@@ -90,7 +112,8 @@ Only the elements and headings inside the viewport are listed and described; the
 header's scroll position says how much of the page lies above and below, and the
 agent scrolls to see more. A leading
 `*` marks elements that were not in the previous observation of the same document. There is no default element-count limit;
-`DomCapture(max_elements=N)` keeps the elements nearest to the viewport and reports
+`DomCapture(max_elements=N)` prioritizes detected banner controls, then keeps other
+elements nearest to the viewport, and reports
 the truncation. Hidden, inert and fully clipped controls are omitted. Controls behind
 a positioned overlay are reported as covered and are not listed individually.
 

@@ -7,6 +7,7 @@ from .handle import DomElementHandle, DomReferences
 from .images import ImageContext, ImageRetention, TrimInBatches, UntilCompaction
 from .models import (
     CapturedImage,
+    CookieBanner,
     Element,
     ElementInfo,
     ElementRef,
@@ -29,6 +30,7 @@ __all__ = [
     "TrimInBatches",
     "UntilCompaction",
     "CapturedImage",
+    "CookieBanner",
     "ExtractedContent",
     "DomRenderer",
     "Renderer",

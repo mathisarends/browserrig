@@ -17,6 +17,7 @@ from browserrig.browser import Frame
 from browserrig.core import BrowserError
 from browserrig.observation.models import (
     Canvas,
+    CookieBanner,
     Element,
     Heading,
     Modal,
@@ -167,6 +168,7 @@ class _Assembler:
                 )
             ),
             modal=self._modal(),
+            cookie_banners=self._cookie_banners(elements),
             canvases=self._canvases(),
             text=text,
             limitations=tuple(dict.fromkeys(self._limitations)),
@@ -206,6 +208,7 @@ class _Assembler:
             focused=self._focus.get(frame.cdp.session_id),
             fallback_section=section,
             text_limit=max_text,
+            embedded=frame.parent is not None,
         )
         if frame.id in self._covered:
             result.elements = [
@@ -266,14 +269,31 @@ class _Assembler:
                 return 0 if element.in_viewport else float("inf")
             return abs(element.bounds.y + element.bounds.height / 2 - middle)
 
+        banner_refs = {
+            ref for banner in self._cookie_banners(elements) for ref in banner.refs
+        }
         kept = {
-            id(element) for element in sorted(elements, key=distance)[:max_elements]
+            id(element)
+            for element in sorted(
+                elements, key=lambda el: (el.ref not in banner_refs, distance(el))
+            )[:max_elements]
         }
         self._limitations.append(
             f"Element list truncated to {max_elements} of {len(elements)}, nearest to the "
             "viewport first"
         )
         return [element for element in elements if id(element) in kept]
+
+    def _cookie_banners(self, elements: list[Element]) -> tuple[CookieBanner, ...]:
+        refs = {element.ref for element in elements if element.in_viewport}
+        return tuple(
+            banner.model_copy(
+                update={"refs": tuple(ref for ref in banner.refs if ref in refs)}
+            )
+            for frame_id, result in self._results.items()
+            if frame_id not in self._covered
+            for banner in result.cookie_banners
+        )
 
     def _canvases(self) -> tuple[Canvas, ...]:
         """Canvases of all uncovered frames, in page order."""
