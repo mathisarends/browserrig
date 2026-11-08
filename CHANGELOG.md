@@ -104,6 +104,8 @@
 
 ### Added
 
+- `VideoRecording` also writes the uncut session film as `original.mp4`, exposed as
+  `RecordingResult.original_path`, in the same FFmpeg pass as the edited `video.mp4`.
 - Add lock-wait, file/transfer/worker, navigation/JavaScript and presentation spans.
   Examples accept `--trace-hooks` for Harnessed hook timing independently of content
   capture. Turn summaries and model definitions/settings/schemas are captured when

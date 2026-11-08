@@ -138,8 +138,10 @@ recording = VideoRecording(Path(".browserrig/recordings"), padding=0.15)
 
 The existing `Activity` plugin supplies the cut times: model requests, context
 compaction and pauses are removed, with a short margin around each cut. Concurrent
-tool execution, page readiness and human handoffs remain visible. Original native
-captures and `timeline.json` are retained beside the edited video. The recording
+tool execution, page readiness and human handoffs remain visible. The same FFmpeg
+pass also writes the uncut `original.mp4` (`result.original_path`), which joins
+every capture in order without removing waits. Original native captures and
+`timeline.json` are retained beside both videos. The recording
 captures page content, including the iframe rendered by `InputVisualization()`.
 Cursor motion, clicks, keyboard shortcuts, highlights and find results are visible
 in Chrome and in the video. Native browser chrome is outside the capture.

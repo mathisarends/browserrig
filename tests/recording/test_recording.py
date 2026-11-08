@@ -178,6 +178,7 @@ async def test_session_records_tabs_and_edits_before_browser_cleanup(
         "browser-close",
     ]
     assert recording.result.path.read_bytes() == b"edited"
+    assert recording.result.original_path.read_bytes() == b"uncut"
     assert len(recording.result.sources) == 3
     assert len(edits) == 1
     assert [s.target_id for s in edits[0][0]] == ["first", "second", "first"]
@@ -392,8 +393,11 @@ def _install_editor(monkeypatch, edits):
         edits.append((segments, spans))
         path = directory / "video.mp4"
         path.write_bytes(b"edited")
+        original = directory / "original.mp4"
+        original.write_bytes(b"uncut")
         return RecordingResult(
             path,
+            original,
             tuple(s.path for s in segments),
             sum(s.ended_at - s.started_at for s in segments),
             sum(w.end - w.start for windows in spans for w in windows),

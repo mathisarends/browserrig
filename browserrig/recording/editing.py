@@ -9,6 +9,20 @@ from browserrig.core import BrowserError
 
 from .models import RecordingResult, Segment, Span
 
+_ENCODING = (
+    "-an",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "20",
+    "-pix_fmt",
+    "yuv420p",
+    "-movflags",
+    "+faststart",
+)
+
 
 async def edit_video(
     segments: tuple[Segment, ...],
@@ -20,13 +34,17 @@ async def edit_video(
     height: int,
     frame_rate: int,
 ) -> RecordingResult:
-    """Normalize VFR captures before trimming, retaining still frames during work."""
+    """Normalize VFR captures, then write the cut and the uncut film in one pass.
+
+    Still frames are retained during work. The uncut film joins every capture in
+    order without removing waits.
+    """
     graph = []
     labels = []
-    inputs = []
+    originals = []
     manifest = []
     duration = 0.0
-    for segment, windows in zip(segments, spans, strict=True):
+    for index, (segment, windows) in enumerate(zip(segments, spans, strict=True)):
         manifest.append(
             {
                 "source": segment.path.name,
@@ -36,19 +54,20 @@ async def edit_video(
                 "kept": [[span.start, span.end] for span in windows],
             }
         )
-        if not windows:
-            continue
-        index = len(inputs)
-        inputs.append(segment.path)
-        branches = "".join(f"[s{index}_{n}]" for n in range(len(windows)))
+        length = segment.ended_at - segment.started_at
+        branches = "".join(f"[s{index}_{n}]" for n in range(len(windows) + 1))
         graph.append(
             f"[{index}:v]setpts=PTS-STARTPTS,fps={frame_rate},"
             f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
-            "tpad=stop_mode=clone:"
-            f"stop_duration={segment.ended_at - segment.started_at:.9f},"
-            f"split={len(windows)}{branches}"
+            f"tpad=stop_mode=clone:stop_duration={length:.9f},"
+            f"split={len(windows) + 1}{branches}"
         )
+        graph.append(
+            f"[s{index}_{len(windows)}]trim=end_frame="
+            f"{max(1, math.ceil(length * frame_rate))},setpts=PTS-STARTPTS[o{index}]"
+        )
+        originals.append(f"[o{index}]")
         for number, window in enumerate(windows):
             label = f"v{len(labels)}"
             start_frame = math.floor(window.start * frame_rate)
@@ -65,32 +84,17 @@ async def edit_video(
     if not labels:
         raise BrowserError("The recording contains no retained video intervals")
     graph.append("".join(labels) + f"concat=n={len(labels)}:v=1:a=0[out]")
+    graph.append("".join(originals) + f"concat=n={len(originals)}:v=1:a=0[full]")
     script = directory / "edit.ffgraph"
     script.write_text(";\n".join(graph), encoding="utf-8")
     path = directory / "video.mp4"
+    original_path = directory / "original.mp4"
     command = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y"]
-    for source in inputs:
-        command.extend(["-i", str(source)])
-    command.extend(
-        [
-            "-filter_complex_script",
-            str(script),
-            "-map",
-            "[out]",
-            "-an",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "fast",
-            "-crf",
-            "20",
-            "-pix_fmt",
-            "yuv420p",
-            "-movflags",
-            "+faststart",
-            str(path),
-        ]
-    )
+    for segment in segments:
+        command.extend(["-i", str(segment.path)])
+    command.extend(["-filter_complex_script", str(script)])
+    for label, output in (("[out]", path), ("[full]", original_path)):
+        command.extend(["-map", label, *_ENCODING, str(output)])
     process = await asyncio.create_subprocess_exec(
         *command,
         stdin=subprocess.DEVNULL,
@@ -109,6 +113,7 @@ async def edit_video(
         raise BrowserError(f"Video editing failed: {errors.decode(errors='replace')}")
     return RecordingResult(
         path=path,
+        original_path=original_path,
         sources=tuple(segment.path for segment in segments),
         original_duration=sum(s.ended_at - s.started_at for s in segments),
         duration=duration,

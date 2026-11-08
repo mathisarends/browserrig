@@ -4,9 +4,10 @@ from pathlib import Path
 
 @dataclass(frozen=True, slots=True)
 class RecordingResult:
-    """The edited video and the original captures retained beside it."""
+    """The edited video, its uncut counterpart and the native captures beside them."""
 
     path: Path
+    original_path: Path
     sources: tuple[Path, ...]
     original_duration: float
     duration: float

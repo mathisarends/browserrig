@@ -103,6 +103,12 @@ async def test_native_recording_cuts_model_waits_across_tabs_and_closure(
     assert (
         sum(red > 180 and green < 60 and blue < 60 for red, green, blue in colors) <= 3
     )
+    # The uncut film keeps the model wait that the edited video removes.
+    original = await _duration(result.original_path)
+    assert original == pytest.approx(result.original_duration, abs=0.3)
+    assert original > float(metadata["format"]["duration"]) + 1
+    uncut = await _video_colors(result.original_path)
+    assert sum(red > 180 and green < 60 and blue < 60 for red, green, blue in uncut) > 3
 
 
 async def test_recording_follows_repeated_activation_of_existing_tabs(tmp_path, site):
@@ -215,3 +221,23 @@ async def _video_colors(path):
         timeout=30,
     )
     return list(zip(*[iter(decoded.stdout)] * 3, strict=True))
+
+
+async def _duration(path):
+    info = await asyncio.to_thread(
+        subprocess.run,
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "csv=p=0",
+            str(path),
+        ],
+        capture_output=True,
+        check=True,
+        timeout=30,
+    )
+    return float(info.stdout)
