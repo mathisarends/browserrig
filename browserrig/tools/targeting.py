@@ -33,7 +33,7 @@ class Targeting:
         scrolled = False
         if scroll:
             scrolled = await prepare_element(
-                tab, handle, self.browser.mouse, document_id=tab.document_id
+                tab, handle, self.browser.input.mouse, document_id=tab.document_id
             )
             # Wheel input may have moved ancestor documents; refresh their transforms.
             handle = await self.observe.element(tab, ref)

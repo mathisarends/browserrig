@@ -96,7 +96,7 @@ async def test_delayed_click_navigation_settles_the_destination(readiness_site):
         await observe.capture()
 
         async def click(_tab):
-            await browser.mouse.click(Point(x=60, y=30))
+            await browser.input.mouse.click(Point(x=60, y=30))
             return Effect("Clicked.")
 
         await session.scope[Actions].run(kind=ActionKind.CLICK, operation=click)

@@ -20,6 +20,7 @@ from harnessed.kernel import Scope, needs
 from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
     ActionKind,
+    BrowserCoordination,
     BrowserError,
     ElementPoint,
     ReadinessPhase,
@@ -111,6 +112,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     events = ACTION_EVENTS
     _mount = PluginState(_Mount)
     browser = needs(Browser)
+    _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
     readiness = needs(Readiness)
     observe = needs(BrowserPerception)
@@ -140,7 +142,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     ) -> ToolResult:
         """Run one mutation once. Its addressed tab cannot change with global focus."""
         record(kind=kind)
-        async with self.browser.action_lock:
+        async with self._coordination.exclusive():
             tab = self.browser.active_tab
             action_id = uuid4().hex
             dispatched = False

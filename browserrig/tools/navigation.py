@@ -7,7 +7,12 @@ from harnessed.kernel import needs
 from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab, validated_url
-from browserrig.core import ActionKind, BrowserError, ReadinessPhase
+from browserrig.core import (
+    ActionKind,
+    BrowserCoordination,
+    BrowserError,
+    ReadinessPhase,
+)
 from browserrig.core import browser_tool as tool
 from browserrig.events import NavigationStartedEvent
 from browserrig.readiness import Readiness
@@ -22,6 +27,7 @@ NEW_TAB_URL = "https://duckduckgo.com/"
 
 class NavigationTools(Plugin, needs=(Actions,)):
     _browser = needs(Browser)
+    _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
     _readiness = needs(Readiness)
 
@@ -122,7 +128,7 @@ class NavigationTools(Plugin, needs=(Actions,)):
         *,
         actions: Inject[Actions],
     ) -> str:
-        async with self._browser.action_lock:
+        async with self._coordination.exclusive():
 
             async def pause() -> None:
                 await asyncio.sleep(seconds)

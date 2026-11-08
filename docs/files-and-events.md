@@ -126,17 +126,28 @@ they are hidden. Put external files into the workspace from application code
 before asking the agent to upload them.
 
 Direct Python callers open the workspace themselves; `FileTransfer` connects it
-to one browser's bridge:
+to a browser host through an explicitly chosen bridge. In an agent session,
+`Chrome` binds its configured bridge to the current `FileSystem` and provides
+`FileTransfer` as an optional service. `FileTools` consumes that service for
+previews, uploads and download reception. A workspace change replaces the
+transfer service without reopening Chrome; `Browser` does not expose the bridge.
+For direct use:
 
 ```python
-from browserrig import ChromeBrowser, FileSystem, FileTransfer, LocalWorkspace
+from browserrig import (
+    ChromeBrowser,
+    FileSystem,
+    FileTransfer,
+    LocalWorkspace,
+    MountedWorkspace,
+)
 from browserrig.browser import Launch
 
 async with (
     FileSystem(LocalWorkspace(".browserrig/research")) as files,
     ChromeBrowser(Launch()) as browser,
 ):
-    transfer = FileTransfer(files, browser.bridge)
+    transfer = FileTransfer(files, MountedWorkspace())
     await browser.receive_downloads(transfer)  # later downloads land in files
     document = await files.read_file("report.pdf", page_number=2)
     staged = await transfer.stage(["report.pdf"])

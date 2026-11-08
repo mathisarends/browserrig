@@ -68,8 +68,8 @@ def _has_files(files: Inject[FileSystem | None]) -> bool:
     return files is not None
 
 
-def _reaches_chrome(browser: Inject[Browser], files: Inject[FileSystem | None]) -> bool:
-    return files is not None and browser.bridge is not None
+def _reaches_chrome(transfer: Inject[FileTransfer | None]) -> bool:
+    return transfer is not None
 
 
 _SOURCE = "files"
@@ -100,7 +100,6 @@ class _Delivery:
 
 @dataclass
 class _Transfer:
-    current: FileTransfer | None = None
     # Whether Chrome saves downloads into the workspace.
     receiving: bool = False
 
@@ -115,6 +114,7 @@ class FileTools(Plugin):
     _browser = needs(Browser)
     # Optional: without a workspace, the agent only lists downloads.
     _workspace = observes(FileSystem)
+    _file_transfer = observes(FileTransfer)
     _events = needs(BrowserEvents)
     _readiness = needs(Readiness)
     _observe = needs(BrowserPerception)
@@ -125,12 +125,10 @@ class FileTools(Plugin):
         return SystemPrompt(_INSTRUCTIONS)
 
     async def setup(self, _ctx: Scope) -> None:
-        bridge = self._browser.bridge
-        if self._workspace is None or bridge is None:
-            return
-        transfer = FileTransfer(self._workspace, bridge)
-        self._transfer.current = transfer
-        self._transfer.receiving = await self._browser.receive_downloads(transfer)
+        if self._file_transfer is not None:
+            self._transfer.receiving = await self._browser.receive_downloads(
+                self._file_transfer
+            )
 
     async def teardown(self) -> None:
         if self._transfer.receiving:
@@ -345,7 +343,7 @@ class FileTools(Plugin):
 
         async def upload(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
-            await self._browser.mouse.move_to(point)
+            await self._browser.input.mouse.move_to(point)
 
             staged = selected[0]
 
@@ -376,7 +374,7 @@ class FileTools(Plugin):
         return self._workspace
 
     def _staging(self) -> FileTransfer:
-        transfer = self._transfer.current
+        transfer = self._file_transfer
         if transfer is None:
             raise ToolError(
                 "The browser cannot reach the workspace; configure a file bridge"

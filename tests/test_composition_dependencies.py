@@ -26,12 +26,14 @@ import browserrig
 from browserrig import (
     Actions,
     Browser,
+    BrowserCoordination,
     BrowserPerception,
     Chrome,
     DomCapture,
     Files,
     FileSystem,
     FileTools,
+    FileTransfer,
     InputVisualization,
     LocalWorkspace,
     MountedWorkspace,
@@ -135,8 +137,14 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
     missing = {issue.plugin.name: issue.missing for issue in caught.value.issues}
     assert missing == {
         "KeyboardTools": (Actions, Browser, BrowserPerception),
-        "Actions": (Browser, BrowserEvents, Readiness, BrowserPerception),
-        "BrowserPerception": (Browser, BrowserEvents, Readiness),
+        "Actions": (
+            Browser,
+            BrowserCoordination,
+            BrowserEvents,
+            Readiness,
+            BrowserPerception,
+        ),
+        "BrowserPerception": (Browser, BrowserCoordination, BrowserEvents, Readiness),
         "Readiness": (BrowserEvents,),
         "DialogTools": (Browser,),
     }
@@ -185,7 +193,12 @@ async def test_browser_dependency_loss_and_replacement_restart_observation_state
         }
         assert missing == {
             "Readiness": (BrowserEvents,),
-            "BrowserPerception": (Browser, BrowserEvents, Readiness),
+            "BrowserPerception": (
+                Browser,
+                BrowserCoordination,
+                BrowserEvents,
+                Readiness,
+            ),
         }
 
 
@@ -370,6 +383,8 @@ async def test_file_tools_follow_the_workspace_and_the_browser_bridge(
 async def test_omitting_file_tools_removes_workspace_downloads_and_uploads(fake_chrome):
     agent = browserrig.Agent(model=ScriptedModel(["unused"]), without=(FileTools,))
     async with agent.session() as session:
+        assert session.scope[FileTransfer].files is session.scope[FileSystem]
+        assert session.scope[Browser].receiving is None
         names = {tool.name for tool in session.scope[ToolRegistry].definitions}
         assert not names.intersection(
             {
@@ -382,6 +397,66 @@ async def test_omitting_file_tools_removes_workspace_downloads_and_uploads(fake_
                 "upload_files",
             }
         )
+    assert fake_chrome[0].closed
+
+
+async def test_browser_services_are_isolated_between_sessions(fake_chrome):
+    agent = browserrig.Agent(model=ScriptedModel([]))
+    services = []
+    for _ in range(2):
+        async with agent.session() as session:
+            scope = session.scope
+            transfer = scope[FileTransfer]
+            assert transfer.files is scope[FileSystem]
+            assert scope[Browser].receiving is transfer
+            services.append((scope[BrowserCoordination], transfer))
+    assert services[0][0] is not services[1][0]
+    assert services[0][1] is not services[1][1]
+    assert len(fake_chrome) == 2 and all(item.closed for item in fake_chrome)
+
+
+async def test_workspace_changes_replace_transfer_without_reopening_chrome(
+    fake_chrome, tmp_path
+):
+    agent = browserrig.Agent(model=ScriptedModel([]), without=(Files,))
+    async with agent.session() as session:
+        scope = session.scope
+        browser, coordination = scope[Browser], scope[BrowserCoordination]
+        registry = scope[ToolRegistry]
+
+        def can_upload():
+            return "upload_files" in {item.name for item in registry.definitions}
+
+        assert FileTransfer not in scope and not can_upload()
+        async with (
+            FileSystem(LocalWorkspace(tmp_path / "first")) as first,
+            FileSystem(LocalWorkspace(tmp_path / "second")) as second,
+        ):
+            first_handle = await session.mount(Service(FileSystem, first))
+            first_transfer = scope[FileTransfer]
+            assert first_transfer.files is first and can_upload()
+            assert browser.receiving is first_transfer
+
+            second_handle = await session.mount(Service(FileSystem, second))
+            assert scope[FileTransfer].files is second and can_upload()
+            assert browser.receiving is scope[FileTransfer]
+            assert scope[FileTransfer] is not first_transfer
+
+            await second_handle.aclose()
+            await scope.settle()
+            assert scope[FileTransfer].files is first
+            assert browser.receiving is scope[FileTransfer]
+            await first_handle.aclose()
+            await scope.settle()
+            assert FileTransfer not in scope and not can_upload()
+            result = await registry.execute(
+                ToolCall("upload_files", {"ref": "file", "paths": ["note.txt"]})
+            )
+            assert result.is_error and "disabled" in result.text
+
+        assert scope[Browser] is browser
+        assert scope[BrowserCoordination] is coordination
+        assert len(fake_chrome) == 1 and not fake_chrome[0].closed
     assert fake_chrome[0].closed
 
 
@@ -458,6 +533,7 @@ def _provide(ctx, browser):
     removals = (
         ctx.provide(Browser, browser),
         ctx.provide(BrowserEvents, browser.events),
+        ctx.provide(BrowserCoordination, BrowserCoordination()),
     )
 
     async def remove():
@@ -480,7 +556,6 @@ def _fake_chrome(monkeypatch):
         resource = SimpleNamespace(
             browser=FakeBrowser(SimpleNamespace(emit=emit)), closed=False
         )
-        resource.browser.bridge = _options.bridge
         resources.append(resource)
         try:
             yield resource.browser

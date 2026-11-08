@@ -85,7 +85,7 @@ async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path):
         [str(files.workspace.directory / "report.txt")]
     )
     upload.actions.element_point.assert_awaited_once()
-    assert upload.services.browser.mouse.position == Point(x=40, y=30)
+    assert upload.services.browser.input.mouse.position == Point(x=40, y=30)
     uploaded = _first(upload.services.events, FilesUploadedEvent)
     assert uploaded.paths == (saved.path,) and uploaded.ref == "input"
     assert uploaded.target_id == "tab"

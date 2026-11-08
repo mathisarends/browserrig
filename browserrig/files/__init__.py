@@ -11,7 +11,7 @@ from .models import (
     FileSystemState,
     FileSystemView,
 )
-from .plugin import Files
+from .plugin import Files, FileTransfers
 from .system import FileSystem
 from .transfer import DOWNLOADS, FileTransfer, StagedFiles
 from .workspace import FileStat, LocalWorkspace, Workspace, workspace_path
@@ -34,6 +34,7 @@ __all__ = [
     "FileSystemState",
     "FileSystemView",
     "FileTransfer",
+    "FileTransfers",
     "LocalWorkspace",
     "MountedWorkspace",
     "StagedFiles",

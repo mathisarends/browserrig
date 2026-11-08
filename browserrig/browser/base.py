@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import TYPE_CHECKING, Protocol
 
 from browserrig.events import BrowserEvent, LiveEvent
-from browserrig.files import Download, FileBridge, FileTransfer
-from browserrig.input import Input, Keyboard, Mouse
+from browserrig.files import Download, FileTransfer
+from browserrig.input import Input
 
 from .tab import Tab
 
@@ -47,27 +46,12 @@ class BrowserEvents:
 
 
 class Browser(Protocol):
-    # Shared by BrowserPerception and Actions; it cannot live in either without a dependency cycle.
-    action_lock: asyncio.Lock
-    # How Chrome's host reaches the agent's workspace; `None` keeps them apart.
-    bridge: FileBridge | None
-    # How the browser's input is paced, presented and correlated with actions.
-    # Operate the devices through `mouse` and `keyboard`.
+    # The browser's devices, pacing, presentation and action correlation.
     input: Input
     tabs: Tabs
 
     @property
     def active_tab(self) -> Tab: ...
-
-    @property
-    def mouse(self) -> Mouse:
-        """The browser's one mouse; it acts on the active tab."""
-        ...
-
-    @property
-    def keyboard(self) -> Keyboard:
-        """The browser's one keyboard; it acts on the active tab."""
-        ...
 
     async def downloads(self) -> tuple[Download, ...]: ...
 

@@ -18,7 +18,6 @@ from pypdf import PdfReader, PdfWriter
 
 from browserrig import (
     BrowserDownload,
-    ChromeBrowser,
     FileBridge,
     FileOptions,
     Files,
@@ -522,10 +521,10 @@ async def test_open_file_reports_the_file_in_its_new_tab(files, monkeypatch):
 
 async def test_browsers_choose_the_bridge_and_files_choose_the_workspace(tmp_path):
     endpoint = "http://127.0.0.1:9222"
-    assert ChromeBrowser(Connect(endpoint=endpoint)).bridge is None
+    assert Connect(endpoint=endpoint).bridge is None
     bridge = MountedWorkspace("/workspace")
-    assert ChromeBrowser(Connect(endpoint=endpoint, bridge=bridge)).bridge is bridge
-    assert isinstance(ChromeBrowser(Launch()).bridge, MountedWorkspace)
+    assert Connect(endpoint=endpoint, bridge=bridge).bridge is bridge
+    assert isinstance(Launch().bridge, MountedWorkspace)
 
     workspace = LocalWorkspace(tmp_path)
     async with mounted(Files(workspace)) as (_services, ctx):

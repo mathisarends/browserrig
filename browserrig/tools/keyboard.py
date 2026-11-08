@@ -47,7 +47,7 @@ class KeyboardTools(Plugin, needs=(Actions,)):
 
         async def send(_tab: Tab) -> Effect:
             if key is not None:
-                await self._browser.keyboard.press_key(
+                await self._browser.input.keyboard.press_key(
                     key,
                     hold_control=hold_control,
                     hold_shift=hold_shift,
@@ -60,9 +60,9 @@ class KeyboardTools(Plugin, needs=(Actions,)):
                 entry = await secrets.prepare(text, browser=self._browser)
                 if entry is not None:
                     return _secret_entered(
-                        await secrets.enter(entry, self._browser.keyboard)
+                        await secrets.enter(entry, self._browser.input.keyboard)
                     )
-            return _entered(await self._browser.keyboard.type_text(text))
+            return _entered(await self._browser.input.keyboard.type_text(text))
 
         return await actions.run(kind=ActionKind.PRESS, operation=send)
 
@@ -85,7 +85,7 @@ class KeyboardTools(Plugin, needs=(Actions,)):
 
         async def type_text(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
-            await self._browser.mouse.move_to(point)
+            await self._browser.input.mouse.move_to(point)
             # Hover may reveal an overlay over the field; hit-test before focusing it.
             await actions.element_point(tab=tab, ref=ref, scroll=False)
             field = await self._observe.dom_element(tab, ref)
@@ -97,12 +97,12 @@ class KeyboardTools(Plugin, needs=(Actions,)):
             )
             await field.focus(select_all=clear)
             if clear:
-                await self._browser.keyboard.press_key("Backspace")
+                await self._browser.input.keyboard.press_key("Backspace")
             if entry is not None and secrets is not None:
                 return _secret_entered(
-                    await secrets.enter(entry, self._browser.keyboard)
+                    await secrets.enter(entry, self._browser.input.keyboard)
                 )
-            return _entered(await self._browser.keyboard.type_text(text))
+            return _entered(await self._browser.input.keyboard.type_text(text))
 
         return await actions.run(kind=ActionKind.TYPE, operation=type_text, check=check)
 

@@ -48,10 +48,10 @@ async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site
         # Unwatched, the cursor lands centered and nothing is reported.
         assert not any(isinstance(event, CursorStateEvent) for event in events)
         width, height = await first.viewport_size()
-        assert browser.mouse.position == Point(x=width / 2, y=height / 2)
+        assert browser.input.mouse.position == Point(x=width / 2, y=height / 2)
         browser.input.pace(HumanMotor())
         browser.input.present(Stage())
-        await browser.mouse.move_to(Point(x=100, y=120))
+        await browser.input.mouse.move_to(Point(x=100, y=120))
         second = await browser.tabs.open(site)
         assert (
             len(
@@ -64,7 +64,7 @@ async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site
             )
             == 1
         )
-        assert browser.mouse.position_in(second.id) is not None
+        assert browser.input.mouse.position_in(second.id) is not None
         opened = next(event for event in events if isinstance(event, TabPressedEvent))
         assert opened.gesture is TabGesture.OPEN and opened.target_id == first.id
         assert opened.from_position == (100, 120)

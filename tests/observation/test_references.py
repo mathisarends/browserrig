@@ -324,7 +324,7 @@ async def test_optional_backend_scroll_plan_runs_through_mouse_wheel_input():
     handle = SimpleNamespace(scroll_step=AsyncMock(side_effect=[step, None]))
     async with _observed(_Backend()) as env:
         scrolled = await prepare_element(
-            env.tab, handle, env.browser.mouse, document_id=env.tab.document_id
+            env.tab, handle, env.browser.input.mouse, document_id=env.tab.document_id
         )
         assert scrolled and handle.scroll_step.await_count == 2
         calls = env.tab.dispatch_wheel.await_args_list
@@ -337,7 +337,9 @@ async def test_scroll_plan_is_not_executed_after_navigation():
     handle = SimpleNamespace(scroll_step=AsyncMock())
     async with _observed(_Backend()) as env:
         with pytest.raises(StaleElement, match="Document changed"):
-            await prepare_element(env.tab, handle, env.browser.mouse, document_id="old")
+            await prepare_element(
+                env.tab, handle, env.browser.input.mouse, document_id="old"
+            )
         handle.scroll_step.assert_not_awaited()
         env.tab.dispatch_wheel.assert_not_awaited()
 

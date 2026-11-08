@@ -4,6 +4,15 @@
 
 ### Breaking changes
 
+- Group browser devices under `browser.input.mouse` and `browser.input.keyboard`;
+  the direct `browser.mouse` and `browser.keyboard` aliases are removed.
+  Move `action_lock` off `Browser`: inject the session's `BrowserCoordination`
+  service and use `async with coordination.exclusive():` for operations that
+  share control with actions, observations and human handoff.
+  `Browser.bridge` is removed. `Chrome` binds its configured bridge to the
+  optional workspace and provides `FileTransfer` for `FileTools` and other
+  consumers. Direct callers construct `FileTransfer(files, bridge)` explicitly.
+
 - Split the agent's files into a `Workspace` (where files live) and a
   `FileBridge` (how Chrome reaches them), so downloads and uploads also work with
   browsers on another pod or a cloud browser provider. Downloads land in the
@@ -20,7 +29,7 @@
   are hidden and downloads stay on the browser host. Omit all file tools with
   `without=(Files, FileTools)`.
   `browser.files` is removed and `FileSystem(options)` becomes
-  `FileSystem(workspace, options)`. `FileTransfer(files, browser.bridge)` replaces
+  `FileSystem(workspace, options)`. `FileTransfer(files, bridge)` replaces
   `files.resolve(path)` and `files.upload_paths(...)` with
   `await transfer.stage(paths)`, whose `browser_paths` `tabs.open(...)` accepts;
   direct `ChromeBrowser` users call `await browser.receive_downloads(transfer)` to

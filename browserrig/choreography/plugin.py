@@ -102,7 +102,7 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
 
         async def publish_cursor(_event: TurnStartedEvent) -> None:
             # Live subscribers often attach late, so seed their cursor at turn start.
-            await self._browser.mouse.publish_cursor()
+            await self._browser.input.mouse.publish_cursor()
 
         ctx.on(TurnStartedEvent, publish_cursor)
 
@@ -112,7 +112,7 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             return
         if event.tab.id != self._browser.active_tab.id:
             return
-        point = self._browser.mouse.position_in(event.tab.id)
+        point = self._browser.input.mouse.position_in(event.tab.id)
         if point is not None:
             await self._render(
                 CursorStateEvent(x=point.x, y=point.y, target_id=event.tab.id)

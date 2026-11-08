@@ -9,9 +9,9 @@ from harnessed.hooks import ExecuteTool, Next, PreStep, StepDecision
 from harnessed.kernel import Event, Scope, needs
 from pydantic import SecretStr
 
-from browserrig.core import TargetId, use_tracer
+from browserrig.core import BrowserCoordination, TargetId, use_tracer
 from browserrig.events import BROWSER_EVENTS
-from browserrig.files import FileBridge, MountedWorkspace
+from browserrig.files import FileBridge, FileTransfers, MountedWorkspace
 
 from .base import Browser, BrowserEvents
 from .chrome import ChromeBrowser
@@ -114,6 +114,9 @@ class Chrome(Plugin, slot="browserrig.browser"):
         )
         ctx.provide(Browser, browser)
         ctx.provide(BrowserEvents, browser.events)
+        ctx.provide(BrowserCoordination, BrowserCoordination())
+        if self.options.bridge is not None:
+            await ctx.install([FileTransfers(self.options.bridge)])
 
     # Outermost, so browser work in every other plugin's hooks is traced too.
     @hook(ExecuteTool, priority=-1000)

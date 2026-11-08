@@ -213,7 +213,7 @@ async def test_close_forgets_sessions_and_ignores_stale_target_listing(monkeypat
         gestures.append((gesture, tab_id))
         await switch()
 
-    monkeypatch.setattr(browser.mouse, "switch_tab", switch_tab)
+    monkeypatch.setattr(browser.input.mouse, "switch_tab", switch_tab)
     assert await browser.tabs.close(closed.id) is remaining
     assert gestures == [(TabGesture.CLOSE, "closing")]
     remaining.cdp.page.bring_to_front.assert_awaited_once_with()

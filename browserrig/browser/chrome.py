@@ -36,8 +36,8 @@ from browserrig.events import (
     ConnectedEvent,
     DisconnectedEvent,
 )
-from browserrig.files import Download, FileBridge, FileTransfer
-from browserrig.input import Input, InputTarget, Keyboard, Mouse
+from browserrig.files import Download, FileTransfer
+from browserrig.input import Input, InputTarget
 
 from .base import BrowserEvents, EventSink, _discard
 from .config import BrowserOptions, CdpEndpoint, Launch
@@ -78,7 +78,6 @@ class ChromeBrowser:
         on_tab_change: TabListener | None = None,
     ) -> None:
         self._options = options if options is not None else Launch()
-        self.bridge: FileBridge | None = self._options.bridge
         self.id = uuid4().hex
         self.events = BrowserEvents(self.id, emit)
         self._stack: AsyncExitStack | None = None
@@ -87,7 +86,6 @@ class ChromeBrowser:
         self._tasks: list[asyncio.Task[None]] = []
         self._failure: Exception | None = None
         self._connected = False
-        self.action_lock = asyncio.Lock()
         # One mouse and keyboard for the whole browser, aimed at the active tab.
         self.input = Input(self._focused_input)
         self.tabs = Tabs(
@@ -135,14 +133,6 @@ class ChromeBrowser:
     @property
     def active_tab(self) -> Tab:
         return self.tabs.active
-
-    @property
-    def mouse(self) -> Mouse:
-        return self.input.mouse
-
-    @property
-    def keyboard(self) -> Keyboard:
-        return self.input.keyboard
 
     async def downloads(self) -> tuple[Download, ...]:
         return self._downloads.all()

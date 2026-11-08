@@ -17,7 +17,7 @@ from .composition import (  # smelt: ignore[SMT106] -- public facade
     browser_pack,
     browser_plugins,
 )
-from .core import HandoffStatus, Point
+from .core import BrowserCoordination, HandoffStatus, Point
 from .files import (
     BrowserDownload,
     FileBridge,
@@ -151,6 +151,7 @@ __all__ = [
     "Point",
     "MouseEventKind",
     "Browser",
+    "BrowserCoordination",
     "Chrome",
     "ChromeBrowser",
     "BrowserDownload",

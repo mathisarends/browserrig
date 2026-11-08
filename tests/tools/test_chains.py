@@ -1,4 +1,3 @@
-import asyncio
 from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -20,7 +19,7 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig.core import ActionKind
+from browserrig.core import ActionKind, BrowserCoordination
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent, PageState
 from browserrig.observation import DomReferences, Element, Snapshot, decision_change
 from browserrig.observation.models import Offscreen
@@ -230,9 +229,9 @@ async def test_failed_comparison_keeps_input_successful_and_breaks_the_chain():
         chain_policy=DomActionChains(),
         browser=SimpleNamespace(
             active_tab=tab,
-            action_lock=asyncio.Lock(),
             input=SimpleNamespace(action=lambda _: nullcontext()),
         ),
+        _coordination=BrowserCoordination(),
         _prepare=AsyncMock(
             return_value=PageState(
                 url=before.url,

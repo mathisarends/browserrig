@@ -61,7 +61,7 @@ class PointerTools(Plugin, needs=(Actions,)):
     ) -> ToolResult:
         async def move(_tab: Tab) -> Effect:
             point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
-            await self._browser.mouse.move_to(point)
+            await self._browser.input.mouse.move_to(point)
             return Effect("Cursor moved without clicking.")
 
         return await actions.run(kind=ActionKind.MOVE_MOUSE, operation=move)
@@ -84,7 +84,7 @@ class PointerTools(Plugin, needs=(Actions,)):
     ) -> ToolResult:
         async def click(_tab: Tab) -> Effect:
             point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
-            await self._browser.mouse.click(point, count=count, button=button)
+            await self._browser.input.mouse.click(point, count=count, button=button)
             return Effect(_click_message(count, button), break_chain=button == "right")
 
         return await actions.run(
@@ -105,7 +105,7 @@ class PointerTools(Plugin, needs=(Actions,)):
         actions: Inject[Actions],
     ) -> ToolResult:
         async def scroll(_tab: Tab) -> Effect:
-            await self._browser.mouse.scroll(delta_y=delta_y)
+            await self._browser.input.mouse.scroll(delta_y=delta_y)
             return Effect("Scroll dispatched.")
 
         return await actions.run(
@@ -126,7 +126,7 @@ class PointerTools(Plugin, needs=(Actions,)):
         actions: Inject[Actions],
     ) -> ToolResult:
         async def drag(_tab: Tab) -> Effect:
-            await self._browser.mouse.drag(
+            await self._browser.input.mouse.drag(
                 start=_image_point(self._observe.coordinate_source(), start),
                 end=_image_point(self._observe.coordinate_source(), end),
                 duration=duration,
@@ -156,7 +156,7 @@ class PointerTools(Plugin, needs=(Actions,)):
     ) -> ToolResult:
         async def click(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
-            await self._browser.mouse.move_to(point)
+            await self._browser.input.mouse.move_to(point)
             if change := await actions.page_change(tab, after_input=False):
                 return Effect(
                     f"Hover changed the page: {change} The click was not dispatched. "
@@ -166,7 +166,7 @@ class PointerTools(Plugin, needs=(Actions,)):
                 )
             # Hover may reveal an overlay or move the target; hit-test again.
             current = await actions.element_point(tab=tab, ref=ref, scroll=False)
-            await self._browser.mouse.click(current, count=count, button=button)
+            await self._browser.input.mouse.click(current, count=count, button=button)
             return Effect(
                 _click_message(count, button),
                 prepared_scroll=point.scrolled,
@@ -197,7 +197,9 @@ class PointerTools(Plugin, needs=(Actions,)):
             target = await actions.element_point(tab=tab, ref=target_ref)
             start = await actions.element_point(tab=tab, ref=source_ref, scroll=False)
             end = await actions.element_point(tab=tab, ref=target_ref, scroll=False)
-            await self._browser.mouse.drag(start=start, end=end, duration=duration)
+            await self._browser.input.mouse.drag(
+                start=start, end=end, duration=duration
+            )
             return Effect(
                 "Drag dispatched; inspect the destination.",
                 prepared_scroll=prepared.scrolled or target.scrolled,

@@ -1,9 +1,9 @@
-import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
+from browserrig import BrowserCoordination
 from browserrig.browser import Tab
 from browserrig.tools import NavigationTools
 from browserrig.tools import navigation as navigation_module
@@ -34,9 +34,10 @@ async def test_forward_history_checks_bounds_and_only_dispatches_an_available_en
         page.navigate_to_history_entry.assert_not_awaited()
 
 
-async def test_wait_stages_its_pause_under_the_action_lock(monkeypatch):
+async def test_wait_stages_its_pause_under_exclusive_control(monkeypatch):
     tab = SimpleNamespace(id="tab-1")
-    browser = SimpleNamespace(action_lock=asyncio.Lock(), active_tab=tab)
+    browser = SimpleNamespace(active_tab=tab)
+    coordination = BrowserCoordination()
     staged = []
 
     async def stage(intent, staged_tab, step):
@@ -44,13 +45,13 @@ async def test_wait_stages_its_pause_under_the_action_lock(monkeypatch):
         await step()
 
     async def sleep(seconds):
-        assert seconds == 2 and browser.action_lock.locked()
+        assert seconds == 2 and coordination.busy
 
     pause = AsyncMock(side_effect=sleep)
     monkeypatch.setattr(navigation_module.asyncio, "sleep", pause)
     assert (
         await NavigationTools.wait(
-            SimpleNamespace(_browser=browser),
+            SimpleNamespace(_browser=browser, _coordination=coordination),
             seconds=2,
             actions=SimpleNamespace(stage=stage),
         )
@@ -58,4 +59,4 @@ async def test_wait_stages_its_pause_under_the_action_lock(monkeypatch):
     )
     assert staged == [(WaitIntent(2), tab)]
     pause.assert_awaited_once_with(2)
-    assert not browser.action_lock.locked()
+    assert not coordination.busy

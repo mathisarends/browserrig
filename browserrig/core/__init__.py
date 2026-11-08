@@ -1,5 +1,6 @@
-"""Shared values and configuration, independent of browser services."""
+"""Shared values, configuration and coordination, independent of browser backends."""
 
+from .coordination import BrowserCoordination
 from .errors import (
     BrowserClosed,
     BrowserError,
@@ -30,6 +31,7 @@ from .tools import BrowserToolMetadata, browser_tool
 from .tracing import record, span, traced, use_tracer
 
 __all__ = [
+    "BrowserCoordination",
     "ActionId",
     "ActionKind",
     "ActivityKind",

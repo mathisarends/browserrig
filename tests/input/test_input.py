@@ -254,7 +254,7 @@ async def test_send_keys_distinguishes_literal_text_from_named_keys(monkeypatch)
         return (await operation(tab)).text
 
     actions = SimpleNamespace(run=run)
-    tools = SimpleNamespace(_browser=SimpleNamespace(keyboard=devices.keyboard))
+    tools = SimpleNamespace(_browser=SimpleNamespace(input=devices))
     await KeyboardTools.send_keys(tools, text="Escape", actions=actions)
     assert [
         command["text"] for command in commands if command["type"] == "char"
@@ -791,7 +791,7 @@ async def test_send_keys_reports_a_slip_that_stayed():
         assert kind == "press"
         return (await operation(tab)).text
 
-    tools = SimpleNamespace(_browser=SimpleNamespace(keyboard=devices.keyboard))
+    tools = SimpleNamespace(_browser=SimpleNamespace(input=devices))
     reply = await KeyboardTools.send_keys(
         tools, text="hello", actions=SimpleNamespace(run=run)
     )

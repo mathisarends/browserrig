@@ -141,12 +141,12 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
         tab = browser.active_tab
         report = await wait_for_page(tab)
         before = await evaluate(tab, "document.documentElement.outerHTML")
-        await browser.mouse.move_to(Point(x=700, y=200))
+        await browser.input.mouse.move_to(Point(x=700, y=200))
         state = await capture(
             tab,
             DomCapture(marks=marks, cursor=True),
             report,
-            cursor=browser.mouse.position,
+            cursor=browser.input.mouse.position,
             screenshots=True,
         )
         assert await evaluate(tab, "document.documentElement.outerHTML") == before
@@ -337,14 +337,14 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
             tab, "document.querySelector('#board').addEventListener('click', () => {})"
         )
         report = await wait_for_page(tab)
-        await browser.mouse.move_to(Point(x=150, y=180))
+        await browser.input.mouse.move_to(Point(x=150, y=180))
         state = await capture(
             tab,
             DomCapture(cursor=True),
             report,
             region=Region(x=100, y=150, width=400, height=200),
             zoom=2,
-            cursor=browser.mouse.position,
+            cursor=browser.input.mouse.position,
             screenshots=True,
         )
         assert [canvas.bounds for canvas in state.canvases] == [

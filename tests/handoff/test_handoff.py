@@ -144,6 +144,7 @@ def _receipt(request) -> HandoffReceipt:
 async def test_handoff_reports_navigation_transient_popup_and_human_note():
     async def ask(request):
         assert request.reason == "Please log in"
+        assert holder["coordination"].busy
         browser = holder["browser"]
         await browser.events.emit(
             TabOpenedEvent(target_id="oauth", url="https://id.example/")
@@ -248,9 +249,9 @@ async def test_unsuccessful_handoffs_release_browser_and_hint_state(outcome):
 
     agent, model, holder = _agent([_request(), "Done"], ask, timeout=0.02)
     async with agent.session() as session:
-        browser = _prepare(holder)
+        _prepare(holder)
         result = await session.run("Log in")
-        assert not browser.action_lock.locked()
+        assert not holder["coordination"].busy
         await session.scope[Nudges].queue(
             "After handoff", key="after", cause_id="after"
         )
@@ -477,13 +478,13 @@ async def test_abort_cancels_the_callback_and_releases_the_handoff(
     store = JsonSessionStore(root=tmp_path / "sessions") if persistent else None
     agent, _model, holder = _agent([_request(), "Continued"], ask, store=store)
     async with agent.session(id="abort" if persistent else None) as session:
-        browser = _prepare(holder)
+        _prepare(holder)
         handle = await session.submit("Log in")
         async with asyncio.timeout(5):
             await started.wait()
             await session.abort()
             await handle.result()
-        assert cancelled.is_set() and not browser.action_lock.locked()
+        assert cancelled.is_set() and not holder["coordination"].busy
         finished = session.log.last(HandoffFinishedEvent)
         assert finished.status is HandoffStatus.CANCELLED
         assert session.scope[HumanHandoff].history[-1].status is HandoffStatus.CANCELLED

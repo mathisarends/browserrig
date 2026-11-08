@@ -225,11 +225,12 @@ available. See [Files and events](files-and-events.md#workspaces-bridges-and-rem
 
 ## Input choreography
 
-The browser has one mouse and one keyboard, `browser.mouse` and
-`browser.keyboard`, also available as `browser.input.mouse` and
+The browser has one mouse and one keyboard, `browser.input.mouse` and
 `browser.input.keyboard`. Both act on the active tab. `browser.input` shares the
 action context and event correlation across both devices. Browser tools
-use these same devices; `Actions` owns action serialization and readiness.
+use these same devices; `Actions` owns action transactions and readiness.
+The session service `BrowserCoordination` serializes those transactions with
+step observations, content extraction, waits and human handoff.
 Tab management lives in `browser.tabs`: `list()`, `open(target)`,
 `activate(target_id)` and `close(target_id)`. `browser.tabs.active` and
 `browser.active_tab` return the focused document.
@@ -261,7 +262,7 @@ on four seams, which other plugins can use the same way:
   `OpenFileIntent`, `UploadIntent`) stages the step and calls `next_()` to run it.
 - `TargetLocated` is observed once a tool has resolved its target element.
 
-The mouse remembers where it last rested in each tab (`browser.mouse.position_in(tab.id)`)
+The mouse remembers where it last rested in each tab (`browser.input.mouse.position_in(tab.id)`)
 and returns there when that tab comes back to the front. The first time a tab
 receives the pointer, both built-in motors put it in the center of the actual
 viewport. A custom motor can choose another landing point. There is no animation
@@ -324,10 +325,15 @@ custom motor may slip and correct itself; the plan is checked before the first k
 and `type_text` returns `TypedText(intended, entered)`. When a slip stays, the tools
 say so (without echoing text around a secret). Sensitive text refuses any plan
 that does not type it exactly. Empty replacement text
-clears the field. Direct Python callers can use `browser.keyboard.type_text(...)`,
-`browser.keyboard.press_key(...)`, `browser.mouse.move_to(Point(...))`, and
-`browser.mouse.scroll(delta_y=..., point=Point(...))`. Acquire `browser.action_lock`
-when combining direct inputs with other browser actions.
+clears the field. Direct Python callers can use `browser.input.keyboard.type_text(...)`,
+`browser.input.keyboard.press_key(...)`, `browser.input.mouse.move_to(Point(...))`, and
+`browser.input.mouse.scroll(delta_y=..., point=Point(...))`.
+When combining direct inputs with agent operations, inject the session's
+`BrowserCoordination` service and acquire `async with coordination.exclusive():`
+around the complete operation. The service is separate from `Browser`; nested
+readiness checks and captures share the outer operation's ownership.
+Standalone `ChromeBrowser` callers can create their own `BrowserCoordination`
+when they need to serialize concurrent operations.
 
 The choreography uses Harnessed's native transient event extension. `InputVisualization`
 registers the input events (`browserrig.events.INPUT_EVENTS`) and its scene events

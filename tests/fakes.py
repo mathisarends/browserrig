@@ -10,10 +10,11 @@ from harnessed import (
 from harnessed.kernel import Scope, needs
 from harnessed.testing import ScriptedModel
 
-from browserrig import Browser, FileSystem
+from browserrig import Browser, BrowserCoordination, FileSystem
 from browserrig.browser import BrowserEvents
 from browserrig.browser.network import NetworkActivity
 from browserrig.core import ReadinessStatus
+from browserrig.files import FileTransfers
 from browserrig.input import Input
 from browserrig.observation import BrowserPerception, DomReferences
 from browserrig.readiness import Readiness, ReadinessReport
@@ -64,14 +65,10 @@ class FakeBrowser:
         self.id = "browser-1"
         self.active_tab = FakeTab()
         self.tabs = FakeTabs()
-        self.action_lock = asyncio.Lock()
         self.log = log
-        self.bridge = None
         self.receiving = None
         self.events = BrowserEvents(self.id, self._emit)
         self.input = Input(lambda: self.active_tab.input)
-        self.mouse = self.input.mouse
-        self.keyboard = self.input.keyboard
 
     async def downloads(self):
         return ()
@@ -97,8 +94,11 @@ class FakeChrome(Plugin, needs=(SessionLog,)):
         log = self._setup_log
         browser = FakeBrowser(log)
         self.holder["browser"] = browser
+        coordination = BrowserCoordination()
+        self.holder["coordination"] = coordination
         ctx.provide(Browser, browser)
         ctx.provide(BrowserEvents, browser.events)
+        ctx.provide(BrowserCoordination, coordination)
 
 
 class FakeReadiness:
@@ -151,7 +151,8 @@ class FakeServices(Plugin, provides=True):
         super().__init__()
         self.events = []
         self.browser = FakeBrowser(SimpleNamespace(emit=self.record))
-        self.browser.bridge = bridge
+        self.bridge = bridge
+        self.coordination = BrowserCoordination()
         self.readiness = FakeReadiness()
         self.observe = FakeObserve()
 
@@ -161,8 +162,11 @@ class FakeServices(Plugin, provides=True):
     async def setup(self, ctx: Scope):
         ctx.provide(Browser, self.browser)
         ctx.provide(BrowserEvents, self.browser.events)
+        ctx.provide(BrowserCoordination, self.coordination)
         ctx.provide(Readiness, self.readiness)
         ctx.provide(BrowserPerception, self.observe)
+        if self.bridge is not None:
+            await ctx.install([FileTransfers(self.bridge)])
 
 
 class OpenFiles(Plugin):

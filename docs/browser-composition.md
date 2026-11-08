@@ -224,6 +224,20 @@ the cache breakpoint before the newest observation.
 
 ## Extension contracts
 
+Custom browser providers publish `Browser`, `BrowserEvents` and one
+`BrowserCoordination` instance per session. Actions, step observations, content
+extraction, waits and human handoff acquire `coordination.exclusive()` at their
+operation boundaries. Direct device calls use `browser.input.mouse` and
+`browser.input.keyboard`.
+
+`Chrome` also installs `browserrig.files.FileTransfers(bridge)` when a bridge is
+configured. This provider binds the optional `FileSystem` to a session
+`FileTransfer` service; replacing the workspace replaces only that service.
+`FileTools` consumes it without depending on browser-host configuration.
+Other browser providers can install the same provider or provide `FileTransfer`
+directly. Without it, workspace tools still read and write agent files, while
+browser previews and uploads are unavailable.
+
 Import these protocols from `browserrig` or their service packages. Strategies are
 reusable configuration objects; mutable state belongs in each probe or plugin's
 `PluginState`, never in a shared recipe object.

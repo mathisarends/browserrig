@@ -20,6 +20,7 @@ from pydantic import Field
 from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
     ActionKind,
+    BrowserCoordination,
     BrowserError,
     ReadinessPhase,
     ReadinessStatus,
@@ -69,6 +70,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     events = (ObservationCapturedEvent,)
     _state = PluginState(BrowserPerceptionState)
     _browser = needs(Browser)
+    _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
     _readiness = needs(Readiness)
 
@@ -170,7 +172,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 previous=self.snapshot,
                 region=region,
                 zoom=zoom,
-                cursor=browser.mouse.position_in(selected.id),
+                cursor=browser.input.mouse.position_in(selected.id),
                 screenshots=(self.screenshots.trigger == ScreenshotTrigger.EACH_STEP)
                 if screenshots is None
                 else screenshots,
@@ -298,7 +300,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         full_page: bool = False,
         offset: Annotated[int, Field(ge=0)] = 0,
     ) -> ToolResult:
-        async with self._browser.action_lock:
+        async with self._coordination.exclusive():
             tab = self._browser.active_tab
             report = await self._readiness.wait(tab)
             if report.status == ReadinessStatus.BLOCKED:
@@ -344,12 +346,13 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         nudges: Inject[Nudges | None],
     ) -> StepDecision:
         state = self._state
-        snapshot = await self.capture(
-            phase=ReadinessPhase.OBSERVATION,
-            screenshots=True if state.screenshot_requested else None,
-            region=state.screenshot_region,
-            zoom=state.screenshot_zoom,
-        )
+        async with self._coordination.exclusive():
+            snapshot = await self.capture(
+                phase=ReadinessPhase.OBSERVATION,
+                screenshots=True if state.screenshot_requested else None,
+                region=state.screenshot_region,
+                zoom=state.screenshot_zoom,
+            )
         state.screenshot_requested = False
         state.screenshot_region, state.screenshot_zoom = None, 1
         observations = []

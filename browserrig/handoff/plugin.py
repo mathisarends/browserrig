@@ -22,7 +22,7 @@ from harnessed.services import ToolRegistry
 from pydantic import Field, TypeAdapter, ValidationError
 
 from browserrig.browser import Browser, BrowserEvents
-from browserrig.core import HandoffStatus
+from browserrig.core import BrowserCoordination, HandoffStatus
 from browserrig.events import (
     HANDOFF_EVENTS,
     BrowserEvent,
@@ -68,6 +68,7 @@ class HumanHandoff(Plugin, provides=True):
     _state = PluginState(HandoffState)
     _tools = needs(ToolRegistry)
     _browser = needs(Browser)
+    _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
     _observe = needs(BrowserPerception)
     _context = needs(PluginInstructions)
@@ -167,7 +168,7 @@ class HumanHandoff(Plugin, provides=True):
         nudges: Inject[Nudges | None],
         secrets: Inject[Secrets | None],
     ) -> str:
-        async with self._browser.action_lock:
+        async with self._coordination.exclusive():
             tab = self._browser.active_tab
             request = HandoffRequestedEvent(
                 handoff_id=uuid4().hex,

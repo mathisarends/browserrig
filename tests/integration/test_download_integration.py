@@ -438,7 +438,8 @@ async def _receiving(options, workspace, emit=None):
         FileSystem(workspace) as files,
         ChromeBrowser(options, **events) as browser,
     ):
-        transfer = FileTransfer(files, browser.bridge)
+        assert options.bridge is not None
+        transfer = FileTransfer(files, options.bridge)
         assert await browser.receive_downloads(transfer)
         yield browser, files, transfer
 
