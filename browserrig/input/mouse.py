@@ -132,7 +132,9 @@ class Mouse:
         *,
         count: Literal[1, 2] = 1,
         button: Literal["left", "right"] = "left",
+        modifiers: int = 0,
     ) -> None:
+        """Click at `point`; `modifiers` are the flags of keys held meanwhile."""
         target = focused(self._focus)
         await self._move(target, point)
         mouse_button = MouseButton(button)
@@ -148,6 +150,7 @@ class Mouse:
                     button=mouse_button,
                     buttons=buttons,
                     click_count=click_count,
+                    modifiers=modifiers,
                 )
                 if hold > 0:
                     await asyncio.sleep(hold)
@@ -159,6 +162,7 @@ class Mouse:
                     button=mouse_button,
                     buttons=0,
                     click_count=click_count,
+                    modifiers=modifiers,
                 )
 
     @traced
@@ -333,6 +337,7 @@ class Mouse:
         button: MouseButton = MouseButton.LEFT,
         buttons: int = 0,
         click_count: int = 0,
+        modifiers: int = 0,
     ) -> None:
         await target.dispatch_mouse(
             kind,
@@ -342,6 +347,7 @@ class Mouse:
             else MouseButton.NONE,
             buttons=buttons,
             click_count=click_count,
+            modifiers=modifiers,
         )
         # The renderer now knows where the pointer is in this tab.
         rest = self._rest(target)

@@ -238,14 +238,15 @@ async def test_failed_comparison_keeps_input_successful_and_breaks_the_chain():
                 document_id=before.document_id,
             )
         ),
-        _settle=AsyncMock(return_value=""),
+        # The input itself succeeds, opening no tab and leaving no readiness note.
+        _dispatch=AsyncMock(return_value=(Effect("Entered once."), "", "")),
         _events=SimpleNamespace(emit=AsyncMock(side_effect=events.append)),
     )
     actions.page_change = lambda selected: Actions.page_change(actions, selected)
     result = await Actions.run(
         actions,
         kind=ActionKind.TYPE,
-        operation=AsyncMock(return_value=Effect("Entered once.")),
+        operation=AsyncMock(),
     )
     assert result.status is ToolStatus.OK and result.break_chain
     assert "Entered once" in result.text and "could not be checked" in result.text

@@ -1,3 +1,5 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Annotated, Literal
 
 from harnessed import (
@@ -25,6 +27,15 @@ type _ClickCount = Annotated[
 ]
 type _ClickButton = Annotated[
     Literal["left", "right"], Field(description="Mouse button to press.")
+]
+type _NewTab = Annotated[
+    bool,
+    Field(
+        description=(
+            "Ctrl+click (Cmd on macOS) to open a link in a new tab and switch to it, "
+            "keeping the current page open."
+        )
+    ),
 ]
 type _ScrollDelta = Annotated[float, Field(ge=-10000, le=10000)]
 
@@ -92,7 +103,8 @@ class PointerTools(Plugin, needs=(Actions,)):
         kind=ActionKind.CLICK_AT,
         description=(
             "Automatically move the cursor to image or viewport coordinates and click there; "
-            "count=2 performs a native double click; button=right performs a right click."
+            "count=2 performs a native double click; button=right performs a right click. "
+            "A click that opens a new tab switches to it."
         ),
     )
     async def click_at(
@@ -101,13 +113,26 @@ class PointerTools(Plugin, needs=(Actions,)):
         y: Annotated[float, Field(ge=0)],
         count: _ClickCount = 1,
         button: _ClickButton = "left",
+        new_tab: _NewTab = False,
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
+        _check_new_tab(new_tab, count, button)
+
         async def click(_tab: Tab) -> Effect:
             point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
-            await self._browser.input.mouse.click(point, count=count, button=button)
-            return Effect(_click_message(count, button), break_chain=button == "right")
+            if new_tab:
+                # Arrive first, so the key is held for the click alone.
+                await self._browser.input.mouse.move_to(point)
+            async with self._new_tab_keys(new_tab) as modifiers:
+                await self._browser.input.mouse.click(
+                    point, count=count, button=button, modifiers=modifiers
+                )
+            return Effect(
+                _click_message(count, button, new_tab),
+                break_chain=button == "right",
+                opens_tab=new_tab,
+            )
 
         return await actions.run(
             kind=ActionKind.CLICK_AT, operation=click, expects_change=True
@@ -180,7 +205,8 @@ class PointerTools(Plugin, needs=(Actions,)):
         description=(
             "Automatically move the cursor to a current observed ref and click it; "
             "count=2 performs a native double click; "
-            "button=right performs a right click."
+            "button=right performs a right click. "
+            "A click that opens a new tab switches to it."
         ),
     )
     async def click(
@@ -188,9 +214,12 @@ class PointerTools(Plugin, needs=(Actions,)):
         ref: str,
         count: _ClickCount = 1,
         button: _ClickButton = "left",
+        new_tab: _NewTab = False,
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
+        _check_new_tab(new_tab, count, button)
+
         async def click(tab: Tab) -> Effect:
             point = await actions.element_point(tab=tab, ref=ref)
             await self._browser.input.mouse.move_to(point)
@@ -203,11 +232,18 @@ class PointerTools(Plugin, needs=(Actions,)):
                 )
             # Hover may reveal an overlay or move the target; hit-test again.
             current = await actions.element_point(tab=tab, ref=ref, scroll=False)
-            await self._browser.input.mouse.click(current, count=count, button=button)
+            if new_tab:
+                # Arrive first, so the key is held for the click alone.
+                await self._browser.input.mouse.move_to(current)
+            async with self._new_tab_keys(new_tab) as modifiers:
+                await self._browser.input.mouse.click(
+                    current, count=count, button=button, modifiers=modifiers
+                )
             return Effect(
-                _click_message(count, button),
+                _click_message(count, button, new_tab),
                 prepared_scroll=point.scrolled,
                 break_chain=button == "right",
+                opens_tab=new_tab,
             )
 
         return await actions.run(
@@ -246,11 +282,30 @@ class PointerTools(Plugin, needs=(Actions,)):
             kind=ActionKind.DRAG, operation=drag, expects_change=True
         )
 
+    @asynccontextmanager
+    async def _new_tab_keys(self, new_tab: bool) -> AsyncGenerator[int]:
+        """Hold the key that opens a link in a new tab, so viewers see it pressed."""
+        if not new_tab:
+            yield 0
+            return
+        key = await self._browser.tabs.link_modifier()
+        async with self._browser.input.keyboard.hold(key) as modifiers:
+            yield modifiers
 
-def _click_message(count: Literal[1, 2], button: Literal["left", "right"]) -> str:
+
+def _check_new_tab(new_tab: bool, count: int, button: str) -> None:
+    if new_tab and (count != 1 or button != "left"):
+        raise ToolError("new_tab needs a single left click")
+
+
+def _click_message(
+    count: Literal[1, 2], button: Literal["left", "right"], new_tab: bool = False
+) -> str:
     gesture = "right click" if button == "right" else "click"
     if count == 2:
         gesture = "double " + gesture
+    if new_tab:
+        gesture = "new-tab click"
     return gesture.capitalize() + " dispatched."
 
 

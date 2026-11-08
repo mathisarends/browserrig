@@ -24,6 +24,7 @@ from browserrig.events import (
     NudgeQueuedEvent,
     ObservationCapturedEvent,
     ReadinessDegradedEvent,
+    TabActivatedEvent,
     TabClosedEvent,
     TabOpenedEvent,
 )
@@ -234,6 +235,12 @@ class Nudges(Plugin, slot="browserrig.nudges", provides=True, needs=(SessionLog,
             key=f"tab:{event.target_id}",
             cause_id=event.target_id,
         )
+
+    @hook(TabActivatedEvent)
+    async def _on_tab_activated(self, event: TabActivatedEvent) -> None:
+        # The opened tab is now in front, so pointing it out would only mislead.
+        if queued := self._state.queued.pop(f"tab:{event.target_id}", None):
+            await self._events.emit(NudgeExpiredEvent(nudge_id=queued.nudge_id))
 
     @hook(DownloadCompletedEvent)
     async def _on_download(self, event: DownloadCompletedEvent) -> None:

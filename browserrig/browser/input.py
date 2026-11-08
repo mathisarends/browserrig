@@ -65,12 +65,14 @@ class CdpInput:
         button: MouseButton,
         buttons: int,
         click_count: int,
+        modifiers: int = 0,
     ) -> None:
         await self._input(
             self._tab.cdp.input.dispatch_mouse_event(
                 type=kind.value,
                 x=point.x,
                 y=point.y,
+                modifiers=modifiers,
                 button=button,
                 buttons=buttons,
                 click_count=click_count,

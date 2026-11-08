@@ -84,6 +84,10 @@ _NAVIGATION_KINDS = {
     ActionKind.GO_FORWARD,
     ActionKind.RELOAD,
 }
+# Page input that opens a tab, like a target=_blank link, leads into it as in Chrome.
+_FOLLOWED_KINDS = _POINTER_KINDS | _CHAINABLE_KINDS
+# How long input that asked for a new tab waits for the browser to open it.
+_TAB_OPEN_SECONDS = 3.0
 
 
 _INSTRUCTIONS = Instructions(
@@ -159,16 +163,12 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
                     )
                 )
                 dispatched = True
+                followed = ""
                 if settle and kind in _NAVIGATION_KINDS:
                     effect, note = await self._navigate(tab, action_id, operation)
                 else:
-                    started = monotonic()
-                    with self.browser.input.action(action_id), span("operation"):
-                        effect = await operation(tab)
-                    note = (
-                        await self._settle(tab, kind, started)
-                        if settle and not tab.closed
-                        else ""
+                    effect, note, followed = await self._dispatch(
+                        tab, kind, action_id, operation, settle=settle
                     )
                 await self._events.emit(
                     ActionFinishedEvent(
@@ -183,11 +183,19 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
                     )
                 )
                 change = ""
-                if not effect.break_chain and not note and kind in _CHAINABLE_KINDS:
+                if (
+                    not effect.break_chain
+                    and not note
+                    and not followed
+                    and kind in _CHAINABLE_KINDS
+                ):
                     change = await self.page_change(tab)
                 result = ToolResult(
-                    effect.text + note,
-                    break_chain=effect.break_chain or bool(note) or bool(change),
+                    effect.text + followed + note,
+                    break_chain=effect.break_chain
+                    or bool(note)
+                    or bool(followed)
+                    or bool(change),
                 )
                 return (
                     result.with_note(change + " Observe before continuing.")
@@ -305,6 +313,62 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         if report.status != ReadinessStatus.READY:
             return f" Action executed; readiness is {report.status}: {report.reason}."
         return ""
+
+    async def _dispatch(
+        self,
+        tab: Tab,
+        kind: ActionKind,
+        action_id: str,
+        operation: Callable[[Tab], Awaitable[Effect]],
+        *,
+        settle: bool,
+    ) -> tuple[Effect, str, str]:
+        """Run input in `tab`, then wait for its page, or for a tab the input opened.
+
+        Returns the effect, a readiness note and a note on the tab that opened.
+        """
+        started = monotonic()
+        mark = self.browser.tabs.openings
+        with self.browser.input.action(action_id), span("operation"):
+            effect = await operation(tab)
+        settled = settle and not tab.closed
+        note = (
+            await self._settle(tab, kind, started)
+            if settled and not effect.opens_tab
+            else ""
+        )
+        if kind not in _FOLLOWED_KINDS or tab.closed:
+            return effect, note, ""
+        with self.browser.input.action(action_id):
+            followed = await self._follow(tab, mark, expected=effect.opens_tab)
+        if effect.opens_tab and not followed:
+            # Nothing opened, so the input acted in this tab instead.
+            if settled:
+                note = await self._settle(tab, kind, started)
+            followed = " No new tab opened; the input acted in this tab."
+        return effect, note, followed
+
+    @traced
+    async def _follow(self, tab: Tab, mark: int, *, expected: bool) -> str:
+        """Activate a tab the input opened and wait for its page, as Chrome shows it.
+
+        Input that asked for a new tab gives the browser a moment to open it; other input
+        has already settled, so a tab it opened is attached by now.
+        """
+        opened = await self.browser.tabs.opened_since(
+            mark, timeout=_TAB_OPEN_SECONDS if expected else 0
+        )
+        if opened is None:
+            return ""
+        await self.browser.tabs.activate(opened.id)
+        report = await self.readiness.wait(opened, phase=ReadinessPhase.NAVIGATION)
+        note = (
+            f" It opened tab {opened.id}, which is now active; "
+            f"the previous tab is {tab.id}."
+        )
+        if report.status != ReadinessStatus.READY:
+            note += f" Readiness is {report.status}: {report.reason}."
+        return note
 
     @traced
     async def _navigate(

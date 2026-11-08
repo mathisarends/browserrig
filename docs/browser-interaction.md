@@ -215,6 +215,14 @@ Both `click` and `click_at` accept `button="right"` for a native right click;
 the default is `button="left"`. Both tools automatically move the cursor to the
 target before clicking. Right clicks end the action chain so the agent can
 inspect the result before continuing.
+`new_tab=True` holds Ctrl (Cmd when Chrome runs on macOS) for a single left
+click, so a link opens in a new tab and the current page stays open. With
+`InputVisualization`, viewers see the key pressed on the keyboard. When any
+click, typed key or other page input opens a tab, whether through `new_tab`,
+`target=_blank` or `window.open`, the action switches to that tab like Chrome
+does, waits until its page is ready and names both tab IDs in its result, so
+`switch_tab` can return. A `new_tab` click that opens nothing reports that the
+input acted in the current tab.
 `wait(seconds=...)` pauses for 0–10 seconds (default: 1) and emits a transient
 `WaitingEvent` (`browser.waiting`) before the pause, with its requested duration,
 browser, tab, and document IDs for live UI display.

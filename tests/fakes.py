@@ -56,8 +56,14 @@ class FakeTab:
 
 
 class FakeTabs:
+    openings = 0
+
     async def list(self):
         return ()
+
+    async def opened_since(self, _mark, *, timeout=0):
+        del timeout
+        return None
 
 
 class FakeBrowser:

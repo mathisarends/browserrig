@@ -97,6 +97,13 @@
 
 ### Added
 
+- `click` and `click_at` take `new_tab=True` to Ctrl+click (Cmd on macOS) a link
+  into a new tab; the keyboard visualization shows the held key. Page input that
+  opens a tab, including `target=_blank` links and `window.open`, now switches
+  to the new tab and waits for its page instead of staying on the old one.
+  `Keyboard.hold(...)` holds modifiers around other input, and `Mouse.click`
+  takes their `modifiers`.
+
 - Visualize file reads/writes, content extraction, listings, JavaScript, screenshots,
   history navigation, form changes, handoff and failures through shared
   typed `WorkPresentedEvent` receipts. The local overlay shows them on the page

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable, Sequence
-from contextlib import AsyncExitStack
+from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from typing import TypedDict
 
@@ -17,6 +17,9 @@ _HIDDEN_KEY = "•"
 
 # The one named key a keystroke plan may use, to correct a slip.
 _ERASE = "Backspace"
+
+# How long viewers see a held modifier lit; held input is usually over sooner.
+_HELD_SHOWN_SECONDS = 0.6
 
 _MODIFIERS = {"Alt": 1, "Control": 2, "Meta": 4, "Shift": 8}
 _SPECIAL_KEYS = {
@@ -103,6 +106,38 @@ class Keyboard:
             await self._stroke(target, stroke)
         finally:
             await self._emit(target, KeyboardVisibilityEvent(visible=False))
+
+    @asynccontextmanager
+    async def hold(self, *modifiers: str) -> AsyncGenerator[int]:
+        """Hold `modifiers` down, such as Control for a click into a new tab.
+
+        Yields the modifier flags that input sent meanwhile must carry.
+        """
+        if not modifiers or any(name not in _MODIFIERS for name in modifiers):
+            raise BrowserError("Hold one or more of Alt, Control, Meta or Shift")
+        target = focused(self._focus)
+        async with AsyncExitStack() as held:
+            await self._emit(target, KeyboardVisibilityEvent(visible=True))
+            held.push_async_callback(
+                self._emit, target, KeyboardVisibilityEvent(visible=False)
+            )
+            flags = 0
+            for modifier in modifiers:
+                arguments = _Stroke(modifier).arguments()
+                held.push_async_callback(
+                    target.dispatch_key, "keyUp", modifiers=flags, **arguments
+                )
+                flags |= _MODIFIERS[modifier]
+                await target.dispatch_key("rawKeyDown", modifiers=flags, **arguments)
+            await self._emit(
+                target,
+                KeyPressedEvent(
+                    key=modifiers[-1],
+                    modifiers=modifiers[:-1],
+                    duration=_HELD_SHOWN_SECONDS,
+                ),
+            )
+            yield flags
 
     @traced
     async def type_text(

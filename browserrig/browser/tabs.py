@@ -62,6 +62,10 @@ class Tabs:
         self._target_context: str | None = None
         self._sessions: dict[str, str] = {}
         self._closed_targets: set[TargetId] = set()
+        # Every tab opened in this session, oldest first, and a signal for the next one.
+        self._opened: list[TargetId] = []
+        self._opening = asyncio.Event()
+        self._link_modifier = ""
         self._worlds = Worlds()
         self._attach_lock = asyncio.Lock()
         self._stack: AsyncExitStack | None = None
@@ -177,6 +181,37 @@ class Tabs:
         await self._input.mouse.switch_tab(TabGesture.CLOSE, target_id, close)
         return self.active
 
+    @property
+    def openings(self) -> int:
+        """How many tabs have opened so far; a mark to pass to `opened_since`."""
+        return len(self._opened)
+
+    async def opened_since(self, mark: int, *, timeout: float = 0) -> Tab | None:
+        """The newest open tab opened after `mark`, waiting up to `timeout` for one."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while True:
+            for target_id in reversed(self._opened[mark:]):
+                tab = self._tabs.get(target_id)
+                if tab is not None and not tab.closed:
+                    return tab
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                return None
+            with suppress(TimeoutError):
+                async with asyncio.timeout(remaining):
+                    await self._opening.wait()
+
+    async def link_modifier(self) -> str:
+        """The key held while clicking a link to open it in a new tab on the browser's host."""
+        if not self._link_modifier:
+            self._check()
+            version = await self.client.browser.get_version()
+            self._link_modifier = (
+                "Meta" if "Macintosh" in version.user_agent else "Control"
+            )
+        return self._link_modifier
+
     def focused(self) -> Tab | None:
         self._check()
         tab = self._tabs.get(self._active)
@@ -269,6 +304,9 @@ class Tabs:
                 self._tabs[target_id] = tab
                 self._sessions[attached.session_id] = target_id
                 if opened:
+                    self._opened.append(target_id)
+                    self._opening.set()
+                    self._opening = asyncio.Event()
                     await self._emit(
                         TabOpenedEvent(
                             target_id=tab.id, url=tab.url, opener_id=opener_id

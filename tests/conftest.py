@@ -38,6 +38,9 @@ async def site(pdf_document, xlsx_document) -> AsyncIterator[str]:
               root.innerHTML='<button>Shadow button</button>';
             </script><div style="height:2200px"></div>""",
         "/other": "<!doctype html><title>Other</title><h1>Other page</h1>",
+        "/links": """<!doctype html><title>Links</title>
+            <a href='/other'>Plain link</a> <a href='/other' target=_blank>Blank link</a>
+            <button onclick="this.textContent='Pressed'">Plain button</button>""",
         "/gestures": """<!doctype html><title>Gestures</title><style>
             body{margin:0} .box{position:absolute;width:120px;height:60px;background:#acf}
             #double{position:absolute;left:20px;top:20px;width:120px;height:40px}

@@ -89,6 +89,36 @@ async def test_click_dispatches_selected_button_and_click_count(
     assert len(receipts) == count * 2 and all(e.button == button for e in receipts)
 
 
+async def test_held_modifier_wraps_the_click_and_shows_on_the_keyboard(monkeypatch):
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
+    devices, _tab, events, commands = _rig()
+    async with devices.keyboard.hold("Control") as modifiers:
+        await devices.mouse.click(Point(x=120, y=80), modifiers=modifiers)
+    sent = [
+        (command["type"], command.get("key"), command.get("modifiers"))
+        for command in commands
+        if command["type"] != "mouseMoved"
+    ]
+    assert sent == [
+        ("rawKeyDown", "Control", 2),
+        ("mousePressed", None, 2),
+        ("mouseReleased", None, 2),
+        ("keyUp", "Control", 0),
+    ]
+    shown = [
+        e for e in events if isinstance(e, (KeyboardVisibilityEvent, KeyPressedEvent))
+    ]
+    assert [type(e) for e in shown] == [
+        KeyboardVisibilityEvent,
+        KeyPressedEvent,
+        KeyboardVisibilityEvent,
+    ]
+    assert shown[1].key == "Control" and not shown[2].visible
+    with pytest.raises(BrowserError):
+        async with devices.keyboard.hold("Enter"):
+            pass
+
+
 async def test_cancelled_right_click_releases_the_right_button(monkeypatch):
     monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
 

@@ -28,6 +28,7 @@ class InputTarget(Protocol):
         button: MouseButton,
         buttons: int,
         click_count: int,
+        modifiers: int = 0,
     ) -> None: ...
 
     async def dispatch_wheel(
