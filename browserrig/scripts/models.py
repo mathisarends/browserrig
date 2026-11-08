@@ -29,6 +29,10 @@ class ScrollArgs(ScriptArgs):
     clip: Bounds | None = None
 
 
+class UploadArgs(ScriptArgs):
+    count: int
+
+
 class OwnerScrollArgs(ScriptArgs):
     clip: Bounds | None = None
     target_bounds: Bounds

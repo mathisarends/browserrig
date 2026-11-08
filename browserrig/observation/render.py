@@ -119,6 +119,16 @@ def _body(snapshot: Snapshot) -> list[str]:
     covered = [element for element in snapshot.elements if element.covered]
     if covered:
         lines.extend(("", f"covered by an overlay: {_summary(covered)}"))
+    uploads: list[ElementInfo | Heading] = [
+        element
+        for element in snapshot.elements
+        if element.input_type == "file" and not element.in_viewport
+    ]
+    if uploads:
+        lines.extend(
+            ("", "file inputs outside view (upload_files accepts these refs):")
+        )
+        lines.extend(_blocks(uploads, snapshot.url))
     return lines
 
 

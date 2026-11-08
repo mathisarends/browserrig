@@ -28,6 +28,7 @@ from browserrig.core import (
     ActionKind,
     BrowserError,
     FileSource,
+    Point,
     ReadinessPhase,
 )
 from browserrig.core import browser_tool as tool
@@ -317,7 +318,8 @@ class FileTools(Plugin):
         kind=ActionKind.UPLOAD,
         enabled=_reaches_chrome,
         description=(
-            "Set a file input to existing workspace files, including downloads. Paths are "
+            "Set a file input or its associated HTML label to existing workspace files, "
+            "including downloads. Hidden inputs are supported. Paths are "
             "relative to the workspace."
         ),
     )
@@ -333,8 +335,15 @@ class FileTools(Plugin):
         transfer = self._staging()
         with _file_errors():
             staged = await transfer.stage(paths)
-        point = await self._actions.element_point(ref=ref)
-        await self._browser.input.mouse.move_to(point)
+        point: Point | None = None
+        if handle.element.in_viewport and not handle.element.covered:
+            try:
+                point = await self._actions.element_point(ref=ref)
+            except BrowserError as error:
+                if str(error) != "ELEMENT_BLOCKED":
+                    raise
+        if point is not None:
+            await self._browser.input.mouse.move_to(point)
 
         async def assign() -> None:
             handle = await self._observe.dom_element(tab, ref)

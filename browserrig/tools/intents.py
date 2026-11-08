@@ -43,10 +43,10 @@ class OpenFileIntent:
 
 @dataclass(frozen=True, slots=True)
 class UploadIntent:
-    """Assign `paths` to the file input at `point`."""
+    """Assign `paths` to a file input, optionally showing its visible target at `point`."""
 
     paths: tuple[str, ...]
-    point: Point
+    point: Point | None = None
 
 
 @dataclass(frozen=True, slots=True)

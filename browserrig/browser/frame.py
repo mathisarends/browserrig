@@ -11,7 +11,14 @@ from cdpify.domains.runtime import CallArgument, RemoteObject
 from pydantic import BaseModel
 
 from browserrig.core import Bounds, BrowserError, FrameTransform
-from browserrig.scripts import OWNER_HITS, OwnerHitsArgs, Script, failure
+from browserrig.scripts import (
+    FILE_INPUT,
+    OWNER_HITS,
+    OwnerHitsArgs,
+    Script,
+    UploadArgs,
+    failure,
+)
 
 from .worlds import Worlds
 
@@ -48,12 +55,20 @@ class Frame:
         return result.frame_tree
 
     async def upload_files(self, backend_node_id: int, paths: list[str]) -> None:
+        target = await self.run_on_node(
+            backend_node_id, FILE_INPUT, UploadArgs(count=len(paths)), by_value=False
+        )
+        if target.object_id is None:
+            raise BrowserError("STALE_ELEMENT")
         try:
             await self.cdp.dom.set_file_input_files(
-                files=paths, backend_node_id=backend_node_id
+                files=paths, object_id=target.object_id
             )
         except CDPCommandError as error:
             raise BrowserError("STALE_ELEMENT") from error
+        finally:
+            with suppress(CDPCommandError):
+                await self.cdp.runtime.release_object(object_id=target.object_id)
 
     @overload
     async def run_on_node[A: BaseModel, R](

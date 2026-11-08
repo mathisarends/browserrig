@@ -112,6 +112,9 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     ) -> R:
         """Run `step`, which does what `intent` describes, letting plugins stage it."""
         record(intent=type(intent).__name__)
+        action = self._invocation.context.current
+        if action is not None and not action.started:
+            await self._runner.start(action)
         context = self._mount.context
         assert context is not None
         performed = Perform(intent, tab, self.browser.input.action_id)

@@ -365,7 +365,9 @@ async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
         return ElementPoint(x=40, y=30, bounds=Bounds(x=0, y=0, width=80, height=60))
 
     handle = SimpleNamespace(
-        element=SimpleNamespace(input_type="file", bounds=None),
+        element=SimpleNamespace(
+            input_type="file", bounds=None, in_viewport=True, covered=False
+        ),
         upload_files=upload,
         locate=locate,
     )

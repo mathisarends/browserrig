@@ -89,6 +89,27 @@ async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path):
     assert uploaded.target_id == "tab"
 
 
+@pytest.mark.parametrize("placement", ["hidden", "covered", "blocked"])
+async def test_upload_does_not_require_a_pointer_target(tmp_path, placement):
+    files = FileSystem(LocalWorkspace(tmp_path / "workspace"))
+    await files.write_file("report.txt", "report")
+    async with _uploads(files) as upload:
+        upload.handle.element.in_viewport = placement != "hidden"
+        upload.handle.element.covered = placement == "covered"
+        upload.actions.element_point.side_effect = BrowserError("ELEMENT_BLOCKED")
+        result = await upload.tools.upload_files("input", ["report.txt"])
+    assert result.text == "Files assigned to input."
+    upload.handle.upload_files.assert_awaited_once_with(
+        [str(files.workspace.directory / "report.txt")]
+    )
+    if placement == "blocked":
+        upload.actions.element_point.assert_awaited_once()
+    else:
+        upload.actions.element_point.assert_not_awaited()
+    assert upload.services.browser.input.mouse.position == Point(x=0, y=0)
+    assert isinstance(upload.services.events[-1], ActionFinishedEvent)
+
+
 @pytest.mark.parametrize(
     "kind",
     [
@@ -198,7 +219,8 @@ async def _uploads(files):
         cdp = SimpleNamespace(input=SimpleNamespace(dispatch_mouse_event=AsyncMock()))
         services.browser.active_tab = Tab("tab", cdp, emit=services.record)
         handle = SimpleNamespace(
-            element=SimpleNamespace(input_type="file"), upload_files=AsyncMock()
+            element=SimpleNamespace(input_type="file", in_viewport=True, covered=False),
+            upload_files=AsyncMock(),
         )
         services.observe.element = AsyncMock(return_value=handle)
         actions = ctx[Actions]

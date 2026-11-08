@@ -223,10 +223,20 @@ class _FrameExtractor:
         candidates: dict[int, bool] = {}
         placements: dict[int, tuple[Rect, Rect | None, bool]] = {}
         labels: list[int] = []
+        hidden_uploads: list[int] = []
         for index in document.elements():
-            if not document.is_element(index) or not document.has_layout(index):
+            if not document.is_element(index):
                 continue
             tag = document.tag(index)
+            if (
+                tag == "input"
+                and semantics.input_type(document, index) == "file"
+                and self._placement(index) is None
+            ):
+                hidden_uploads.append(index)
+                continue
+            if not document.has_layout(index):
+                continue
             if tag == "label":
                 labels.append(index)
                 continue
@@ -246,6 +256,9 @@ class _FrameExtractor:
         kept.extend(proxies)
         built: list[tuple[int, Element]] = []
         offscreen: list[Offscreen] = []
+        for index in hidden_uploads:
+            element = self._element(index, ((0, 0, 0, 0), None, False), None)
+            built.append((index, element.model_copy(update={"bounds": None})))
         for index, control in kept:
             if placements[index][1] is not None:
                 built.append((index, self._element(index, placements[index], control)))
@@ -335,14 +348,17 @@ class _FrameExtractor:
         candidates: dict[int, bool],
         placements: dict[int, tuple[Rect, Rect | None, bool]],
     ) -> list[tuple[int, int]]:
-        """Visible labels stand in for visually hidden checkboxes and radios."""
+        """Visible labels stand in for hidden checkable controls and file inputs."""
         document = self._document
         proxies = []
         for label in labels:
             control = document.linked_control(label)
             if control is None or control in candidates:
                 continue
-            if semantics.role(document, control) not in CHECKABLE_ROLES:
+            if (
+                semantics.role(document, control) not in CHECKABLE_ROLES
+                and semantics.input_type(document, control) != "file"
+            ):
                 continue
             placement = self._placement(label)
             if placement is not None:

@@ -125,6 +125,12 @@ checked before the bridge hands the files to Chrome. `open_file`,
 they are hidden. Put external files into the workspace from application code
 before asking the agent to upload them.
 
+Uploads accept an observed file input or its associated HTML label. Hidden or
+covered file inputs do not need a clickable point; visible targets still get the
+normal cursor and transfer animation. The live input is checked before assignment,
+including whether it is disabled or accepts multiple files. No nearby input is
+chosen implicitly when the target is not a file input or an associated label.
+
 Direct Python callers open the workspace themselves; `FileTransfer` connects it
 to a browser host through an explicitly chosen bridge. In an agent session,
 `Chrome` binds its configured bridge to the current `FileSystem` and provides

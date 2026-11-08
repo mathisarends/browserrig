@@ -32,6 +32,7 @@ from .models import (
     SecretFocusArgs,
     SeedArgs,
     TabStrip,
+    UploadArgs,
 )
 
 __all__ = [
@@ -39,6 +40,7 @@ __all__ = [
     "CONTENT",
     "CURSOR",
     "ELEMENT",
+    "FILE_INPUT",
     "FIND",
     "FOCUSED",
     "OWNER_HITS",
@@ -78,6 +80,7 @@ __all__ = [
     "SecretFocusArgs",
     "SeedArgs",
     "TabStrip",
+    "UploadArgs",
     "failure",
 ]
 
@@ -90,6 +93,8 @@ class ScriptError(StrEnum):
     OPTION_NOT_FOUND = "OPTION_NOT_FOUND"
     NOT_A_SELECT = "NOT_A_SELECT"
     INVALID_VALUE = "INVALID_VALUE"
+    NOT_FILE_INPUT = "NOT_FILE_INPUT"
+    FILE_INPUT_NOT_MULTIPLE = "FILE_INPUT_NOT_MULTIPLE"
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +129,9 @@ ELEMENT: Script[ElementArgs, Any] = Script.load(
     ElementArgs,
     Any,
     uses=("geometry", "composed", "visibility", "hit", "elements"),
+)
+FILE_INPUT: Script[UploadArgs, Any] = Script.load(
+    "file_input", UploadArgs, Any, uses=("elements",)
 )
 SCROLL: Script[ScrollArgs, ScrollPlan | None] = Script.load(
     "scroll",

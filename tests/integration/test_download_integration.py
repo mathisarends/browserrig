@@ -30,15 +30,20 @@ from browserrig import (
     wait_for_page,
 )
 from browserrig.browser import DownloadState, Launch, screenshot
+from browserrig.core import BrowserError
 from browserrig.events import DownloadCompletedEvent, DownloadStartedEvent
+from browserrig.observation import DomCapture, DomReferences, capture
 from tests.javascript import evaluate
 from tests.observations import all_states, has_image
 
 pytestmark = pytest.mark.integration
 
 
+@pytest.mark.parametrize(
+    "mode", ["visible", "hidden", "transparent", "covered", "label", "nested"]
+)
 async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selection(
-    site, tmp_path
+    site, tmp_path, mode
 ):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -69,6 +74,13 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
                 )
                 == "report.txt"
             )
+            assert (
+                await evaluate(
+                    browser.active_tab,
+                    "document.querySelector('#other-upload').files.length",
+                )
+                == 0
+            )
             yield ModelChunk(text="Only the workspace file was uploaded")
             return
         if stage == 1:
@@ -83,6 +95,7 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
             element["ref"]
             for element in page["elements"]
             if element["name"] == "Upload report"
+            and (element["in_viewport"] if mode in {"label", "nested"} else True)
         ]
         assert len(refs) == 1
         ref = refs[0]
@@ -104,12 +117,80 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
         browser = session.scope[Browser]
         await evaluate(
             browser.active_tab,
-            "(() => {const input=document.createElement('input');input.type='file';"
-            "input.id='upload';input.setAttribute('aria-label','Upload report');"
-            "document.body.prepend(input);return true})()",
+            """(() => {
+                const input = document.createElement('input');
+                input.type = 'file'; input.id = 'upload';
+                input.setAttribute('aria-label', 'Upload report');
+                document.body.prepend(input);
+                const other = document.createElement('input');
+                other.type = 'file'; other.id = 'other-upload';
+                other.setAttribute('aria-label', 'Other attachment');
+                document.body.append(other);
+                return true;
+            })()""",
         )
+        modifications = {
+            "visible": "true",
+            "hidden": "document.querySelector('#upload').style.display = 'none'",
+            "transparent": "document.querySelector('#upload').style.opacity = '0'",
+            "covered": """(() => {
+                const input = document.querySelector('#upload');
+                const rect = input.getBoundingClientRect();
+                const cover = document.createElement('div');
+                Object.assign(cover.style, {position:'fixed',background:'white',zIndex:999,
+                    left:rect.x+'px',top:rect.y+'px',width:rect.width+'px',height:rect.height+'px'});
+                document.body.append(cover);
+            })()""",
+            "label": """(() => {
+                document.querySelector('#upload').style.display = 'none';
+                document.body.insertAdjacentHTML('afterbegin',
+                    '<label for="upload">Upload report</label>');
+            })()""",
+            "nested": """(() => {
+                const input = document.querySelector('#upload'); input.style.display = 'none';
+                const label = document.createElement('label'); label.textContent = 'Upload report';
+                input.before(label); label.append(input);
+            })()""",
+        }
+        await evaluate(browser.active_tab, modifications[mode])
         result = await session.run("Upload the report", max_steps=3)
     assert result.text == "Only the workspace file was uploaded"
+
+
+@pytest.mark.parametrize("invalid", ["disabled", "multiple", "retargeted"])
+async def test_upload_validates_the_live_input_before_assigning_files(
+    site, tmp_path, invalid
+):
+    report = tmp_path / "report.txt"
+    report.write_text("report")
+    async with ChromeBrowser(Launch(url=site)) as browser:
+        tab = browser.active_tab
+        await evaluate(
+            tab,
+            """document.body.innerHTML =
+            '<label for="upload">Report</label><input type="file" id="upload" hidden>' +
+            '<input id="text">';""",
+        )
+        state = await capture(tab, DomCapture(), await wait_for_page(tab))
+        label = next(element for element in state.elements if element.tag == "label")
+        handle = await DomReferences().resolve(tab, state, label.ref)
+        changes = {
+            "disabled": "document.querySelector('#upload').disabled = true",
+            "multiple": "true",
+            "retargeted": "document.querySelector('label').htmlFor = 'text'",
+        }
+        await evaluate(tab, changes[invalid])
+        codes = {
+            "disabled": "ELEMENT_DISABLED",
+            "multiple": "FILE_INPUT_NOT_MULTIPLE",
+            "retargeted": "NOT_FILE_INPUT",
+        }
+        paths = [str(report)] * (2 if invalid == "multiple" else 1)
+        with pytest.raises(BrowserError, match=codes[invalid]):
+            await handle.upload_files(paths)
+        assert (
+            await evaluate(tab, "document.querySelector('#upload').files.length") == 0
+        )
 
 
 async def test_downloaded_workbook_is_read_as_context_without_browser_preview(
