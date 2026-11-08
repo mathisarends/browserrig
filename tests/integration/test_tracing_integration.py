@@ -84,6 +84,7 @@ async def test_browser_methods_nest_below_harnessed_spans(site, trace_hooks):
         "browserrig.browser.tab.Tab.frames",
         "browserrig.input.mouse.Mouse.click",
         "browserrig.operation",
+        "browserrig.core.BrowserCoordination.acquire",
     ):
         assert named(name), name
     hooks = named("harnessed.hook")

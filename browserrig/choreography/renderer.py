@@ -6,6 +6,7 @@ from functools import cache
 from importlib.resources import files
 from typing import Literal
 
+from harnessed.tracing import traced
 from pydantic import Field
 
 from browserrig.browser import Overlay, Tab
@@ -66,6 +67,7 @@ class IframeView:
             overlays, self._overlays = self._overlays, {}
             await asyncio.gather(*(overlay.close() for overlay in overlays.values()))
 
+    @traced
     async def _show(self, tab: Tab, event: LiveEvent | BrowserEvent | None) -> None:
         async with self._lock:
             if self._closed:

@@ -9,6 +9,8 @@ from tempfile import NamedTemporaryFile
 from typing import IO
 from zipfile import ZipFile, is_zipfile
 
+from harnessed.tracing import record, traced
+
 from . import containers
 from .config import FileOptions
 from .content import ParsedContent, ReadContext, ReadRequest
@@ -48,6 +50,7 @@ class FileReader:
         self.directory = cache_directory
         self.options = options
 
+    @traced
     def read(
         self,
         path: Path,
@@ -70,6 +73,7 @@ class FileReader:
         with path.open("rb") as stream:
             sample = stream.read(65536)
         format_ = _format(path, sample)
+        record(format=format_)
         if format_ in READERS and path.stat().st_size > self.options.max_file_bytes:
             raise ValueError("File exceeds max_file_bytes for document parsing")
         if request.member is not None:
@@ -105,7 +109,9 @@ class FileReader:
         key = self._key(path, request)
         content_path = self._cache_path(f"{key}.md")
         metadata_path = self._cache_path(f"{key}.json")
-        if not content_path.is_file() or not metadata_path.is_file():
+        cached = content_path.is_file() and metadata_path.is_file()
+        record(cached=cached)
+        if not cached:
             self._extract(path, format_, request, content_path, metadata_path)
         details = FileContent.model_validate_json(
             metadata_path.read_text(encoding="utf-8")

@@ -2,6 +2,8 @@ import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from harnessed.tracing import span
+
 
 class BrowserCoordination:
     """Serialize agent actions, observations and human control within one session.
@@ -20,5 +22,9 @@ class BrowserCoordination:
     @asynccontextmanager
     async def exclusive(self) -> AsyncGenerator[None]:
         """Hold exclusive control until the operation finishes or is cancelled."""
-        async with self._lock:
+        with span("browserrig.core.BrowserCoordination.acquire", contended=self.busy):
+            await self._lock.acquire()
+        try:
             yield
+        finally:
+            self._lock.release()

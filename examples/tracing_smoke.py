@@ -51,6 +51,7 @@ async def main() -> None:
         tracing_plugins(
             enabled=args.trace,
             capture_content=args.trace_content,
+            trace_hooks=args.trace_hooks,
             max_content_length=args.trace_max_content_length,
         ) as telemetry,
     ):

@@ -181,6 +181,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self.url = tree.frame.url
         self._main_frame_id = tree.frame.id
 
+    @traced
     async def evaluate(self, expression: str, *, timeout: float = 10) -> str:
         """Evaluate once in the main page world and render its completion value."""
         group = f"browserrig-evaluate-{uuid4().hex}"
@@ -273,6 +274,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         history = await self.cdp.page.get_navigation_history()
         return history.current_index + 1 < len(history.entries)
 
+    @traced
     async def reload(self) -> None:
         await self.cdp.page.reload()
 
@@ -282,6 +284,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
     async def bring_to_front(self) -> None:
         await self.cdp.page.bring_to_front()
 
+    @traced
     async def navigate(self, url: str) -> None:
         result = await self.cdp.page.navigate(url=validated_url(url))
         if result.error_text:

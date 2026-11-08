@@ -3,6 +3,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import PurePath, PurePosixPath
 
+from harnessed.tracing import traced
+
 from .bridge import BrowserDownload, FileBridge
 from .system import FileSystem
 
@@ -39,10 +41,12 @@ class FileTransfer:
         self.files = files
         self.bridge = bridge
 
+    @traced
     async def download_directory(self) -> PurePath:
         """Where Chrome saves downloads on its host."""
         return await self.bridge.download_directory(self.files.workspace)
 
+    @traced
     async def receive(
         self, download_id: str, filename: str, url: str, browser_path: str | None
     ) -> str:
@@ -61,6 +65,7 @@ class FileTransfer:
             )
         return str(destination)
 
+    @traced
     async def stage(self, paths: Sequence[str]) -> StagedFiles:
         """Make workspace files readable by Chrome, validating the whole selection first."""
         if not paths:

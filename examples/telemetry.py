@@ -32,9 +32,17 @@ def add_tracing_arguments(parser: argparse.ArgumentParser) -> None:
         "--trace", action="store_true", help="Export agent traces to local Phoenix/OTLP"
     )
     parser.add_argument(
+        "--trace-hooks",
+        action="store_true",
+        help="Trace each hook invocation to find harness overhead (implies --trace)",
+    )
+    parser.add_argument(
         "--trace-content",
         action="store_true",
-        help="Also capture model/tool inputs and outputs (implies --trace; may contain secrets)",
+        help=(
+            "Also capture turn/model/tool content and request details "
+            "(implies --trace; may contain secrets)"
+        ),
     )
     parser.add_argument(
         "--trace-max-content-length",
@@ -49,10 +57,11 @@ async def tracing_plugins(
     *,
     enabled: bool = False,
     capture_content: bool | ContentCapture = False,
+    trace_hooks: bool = False,
     max_content_length: int = 16_384,
     content_filter: TraceContentFilter | None = None,
 ) -> AsyncIterator[list[PluginLike]]:
-    if not enabled and not capture_content:
+    if not enabled and not capture_content and not trace_hooks:
         yield []
         return
 
@@ -87,5 +96,6 @@ async def tracing_plugins(
                 capture_content=capture_content,
                 max_content_length=max_content_length,
                 content_filter=content_filter,
+                trace_hooks=trace_hooks,
             )
         ]

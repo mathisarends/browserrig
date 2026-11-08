@@ -6,9 +6,13 @@ from dataclasses import replace
 
 import pytest
 from harnessed import Agent, Plugin, PolicyDecision, tool
+from harnessed.kernel import needs
+from harnessed.models import ModelInfo
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
+from pydantic import BaseModel
 
+from browserrig import Files, FileSystem, LocalWorkspace
 from examples.telemetry import tracing_plugins
 
 
@@ -85,6 +89,19 @@ class Echo(Plugin):
     async def echo(self, value: str) -> str:
         """Return the supplied value."""
         return value
+
+
+class FileEcho(Plugin):
+    files = needs(FileSystem)
+
+    @tool(readonly=True)
+    async def file_echo(self) -> str:
+        """Read the test note."""
+        return (await self.files.read_file("note.txt")).text
+
+
+class TraceAnswer(BaseModel):
+    value: str
 
 
 def _attributes(attributes):
@@ -230,3 +247,94 @@ async def test_redaction_and_application_filter_leave_live_history_intact(collec
     assert TraceContentKind.TURN_OUTPUT in seen
     assert TraceContentKind.MODEL_TOOLS in seen
     assert TraceContentKind.MODEL_SETTINGS in seen
+
+
+@pytest.mark.parametrize("trace_hooks", [False, True])
+async def test_library_and_worker_spans_share_the_tool_context(
+    collector, tmp_path, trace_hooks
+):
+    (tmp_path / "note.txt").write_text("PRIVATE FILE CONTENT", encoding="utf-8")
+    async with tracing_plugins(
+        enabled=not trace_hooks, trace_hooks=trace_hooks
+    ) as plugins:
+        result = await Agent(
+            model=ScriptedModel([call("file_echo"), "Read"]),
+            plugins=[
+                *plugins,
+                Files(LocalWorkspace(tmp_path)),
+                FileEcho(),
+                Approvals(default=PolicyDecision.ALLOW),
+            ],
+        ).run("Read the note")
+    assert result.text == "Read"
+    spans = [
+        span
+        for _, request in collector
+        for resource in request.resource_spans
+        for scope in resource.scope_spans
+        for span in scope.spans
+    ]
+    tool_span = next(span for span in spans if span.name == "harnessed.tool")
+    read = next(
+        span
+        for span in spans
+        if span.name == "browserrig.files.system.FileSystem.read_file"
+    )
+    worker = next(
+        span
+        for span in spans
+        if span.name == "browserrig.files.reading.FileReader.read"
+    )
+    assert read.parent_span_id == tool_span.span_id
+    assert worker.parent_span_id == read.span_id
+    assert worker.trace_id == read.trace_id == tool_span.trace_id
+    assert _attributes(worker.attributes)["harnessed.format"] == "text"
+    hooks = [span for span in spans if span.name == "harnessed.hook"]
+    assert bool(hooks) is trace_hooks
+    if trace_hooks:
+        assert any(span.trace_id == tool_span.trace_id for span in hooks)
+        assert all("harnessed.hook.event" in _attributes(s.attributes) for s in hooks)
+    assert "PRIVATE FILE CONTENT" not in str(spans)
+
+
+async def test_structured_turn_output_and_schema_use_the_content_policy(collector):
+    from harnessed.integrations.opentelemetry import (  # pylint: disable=import-outside-toplevel
+        ContentCapture,
+        TraceContentKind,
+    )
+
+    secret = "structured-secret-123"
+    seen = []
+
+    def filter_content(content):
+        seen.append(content.kind)
+        return content
+
+    async with tracing_plugins(
+        capture_content=ContentCapture.redacted(secret), content_filter=filter_content
+    ) as plugins:
+        result = await Agent(
+            model=ScriptedModel(
+                [json.dumps({"value": secret})],
+                info=ModelInfo("test", supports_structured_output=True),
+            ),
+            plugins=plugins,
+        ).run("Return the value", output=TraceAnswer)
+    assert result.output == TraceAnswer(value=secret)
+    spans = [
+        span
+        for _, request in collector
+        for resource in request.resource_spans
+        for scope in resource.scope_spans
+        for span in scope.spans
+    ]
+    turn = _attributes(next(s for s in spans if s.name == "harnessed.turn").attributes)
+    output = json.loads(turn["output.value"])
+    assert output["validated_output"] == {"value": "[redacted]"}
+    model = _attributes(
+        next(s for s in spans if s.name == "harnessed.model").attributes
+    )
+    assert "TraceAnswer" in model["request.output_schema.value"]
+    assert TraceContentKind.MODEL_OUTPUT_SCHEMA in seen
+    assert TraceContentKind.TURN_OUTPUT in seen
+    assert secret not in str(spans)

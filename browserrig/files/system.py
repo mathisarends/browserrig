@@ -7,6 +7,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import Self
 
+from harnessed.tracing import traced
+
 from .config import FileOptions
 from .content import ReadRequest
 from .models import FileContent, FileEntry, FileListing
@@ -64,6 +66,7 @@ class FileSystem:
     async def exists(self, path: str) -> bool:
         return await self.workspace.stat(workspace_path(path)) is not None
 
+    @traced
     async def list_files(
         self, path: str = ".", *, offset: int = 0, limit: int = 100
     ) -> FileListing:
@@ -80,6 +83,7 @@ class FileSystem:
             next_offset=offset + limit if offset + limit < len(children) else None,
         )
 
+    @traced
     async def read_file(
         self,
         path: str,
@@ -120,6 +124,7 @@ class FileSystem:
             }
         )
 
+    @traced
     async def write_file(
         self, path: str, content: str, *, overwrite: bool = False
     ) -> FileEntry:
@@ -141,6 +146,7 @@ class FileSystem:
             raise FileNotFoundError(f"File not found: {path}")
         return stat
 
+    @traced
     async def _local_copy(self, stat: FileStat) -> Path:
         if stat.size is not None and stat.size > self.options.max_file_bytes:
             raise ValueError("File exceeds max_file_bytes for reading")
