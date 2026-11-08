@@ -1,6 +1,13 @@
 from typing import Annotated, Literal
 
-from harnessed import Inject, Instructions, Plugin, SystemPrompt, ToolResult
+from harnessed import (
+    Inject,
+    Instructions,
+    Plugin,
+    SystemPrompt,
+    ToolError,
+    ToolResult,
+)
 from harnessed.kernel import needs
 from pydantic import Field
 
@@ -19,6 +26,7 @@ type _ClickCount = Annotated[
 type _ClickButton = Annotated[
     Literal["left", "right"], Field(description="Mouse button to press.")
 ]
+type _ScrollDelta = Annotated[float, Field(ge=-10000, le=10000)]
 
 
 _INSTRUCTIONS = Instructions(
@@ -94,18 +102,23 @@ class PointerTools(Plugin, needs=(Actions,)):
     @tool(
         kind=ActionKind.SCROLL,
         description=(
-            "Scroll vertically by CSS pixels at the current cursor position. "
+            "Scroll by CSS pixels at the current cursor position: delta_y down (negative up), "
+            "delta_x right (negative left), e.g. for carousels or wide tables. "
             "Use move_mouse first to target a particular scrollable area."
         ),
     )
     async def scroll(
         self,
-        delta_y: Annotated[float, Field(ge=-10000, le=10000)],
+        delta_y: _ScrollDelta = 0,
+        delta_x: _ScrollDelta = 0,
         *,
         actions: Inject[Actions],
     ) -> ToolResult:
+        if delta_y == 0 and delta_x == 0:
+            raise ToolError("Provide a non-zero delta_y or delta_x")
+
         async def scroll(_tab: Tab) -> Effect:
-            await self._browser.input.mouse.scroll(delta_y=delta_y)
+            await self._browser.input.mouse.scroll(delta_y=delta_y, delta_x=delta_x)
             return Effect("Scroll dispatched.")
 
         return await actions.run(

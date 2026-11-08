@@ -198,14 +198,15 @@ as well as clicks. Focus uses `preventScroll` to avoid an extra browser jump.
 must fit in the viewport together before the gesture starts.
 
 It always provides `move_mouse(x=..., y=...)`,
-`scroll(delta_y=...)`,
+`scroll(delta_y=..., delta_x=...)`,
 `click_at(x=..., y=..., count=2)` and
 `drag_at(start=Point(...), end=Point(...))`.
 Both drag tools use the same mouse gesture. The browser handles pointer dragging
 and native HTML5 drag and drop, including `DataTransfer`, automatically.
 `move_mouse` moves the cursor without clicking and can reveal hover controls.
 `scroll` sends wheel input at the current cursor position: move over a sidebar,
-panel, or other scrollable area first to scroll that area.
+panel, or other scrollable area first to scroll that area. `delta_x` scrolls
+sideways, for example through a carousel or a wide table.
 Both `click` and `click_at` accept `button="right"` for a native right click;
 the default is `button="left"`. Both tools automatically move the cursor to the
 target before clicking. Right clicks end the action chain so the agent can

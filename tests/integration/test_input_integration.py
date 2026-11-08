@@ -207,6 +207,50 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
         assert holder["browser"].input.mouse.position.y == pytest.approx(160)
 
 
+async def test_scroll_moves_a_carousel_horizontally(site):
+    holder = {}
+
+    class Carousel(Plugin, needs=(Browser,)):
+        _setup_browser = needs(Browser)
+
+        async def setup(self):
+            tab = holder["tab"] = self._setup_browser.active_tab
+            await evaluate(
+                tab,
+                """document.body.innerHTML = `<style>
+                    body{margin:0}
+                    #track{position:absolute;top:80px;left:20px;width:400px;height:200px;
+                        overflow-x:auto;overflow-y:hidden;white-space:nowrap}
+                    .slide{display:inline-block;width:400px;height:180px}
+                    </style><div id=track>${'<div class=slide>Slide</div>'.repeat(5)}</div>`;""",
+            )
+
+    agent = Agent(
+        model=ScriptedModel(
+            [
+                scripted_call("move_mouse", x=200, y=160),
+                scripted_call("scroll", delta_x=240),
+                "Done",
+            ]
+        ),
+        browser=Chrome.launch(url=site),
+        plugins=[Approvals(default=PolicyDecision.ALLOW), Carousel()],
+    )
+    async with agent.session() as session:
+        result = await session.run("Scroll the carousel sideways", max_steps=5)
+        assert result.text == "Done"
+        receipts = [
+            e for e in result.events if isinstance(e, ToolExecutionFinishedEvent)
+        ]
+        assert receipts and all(not receipt.result.is_error for receipt in receipts)
+        state = await evaluate(
+            holder["tab"],
+            "({left:document.querySelector('#track').scrollLeft,page:scrollY})",
+        )
+        assert state["left"] == pytest.approx(240, abs=1)
+        assert state["page"] == 0
+
+
 async def test_element_highlight_uses_live_bounds_after_scroll(site):
     holder = {}
     output = io.StringIO()
