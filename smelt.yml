@@ -8,12 +8,20 @@ project:
   root_packages: [browserrig]
   test_roots: [tests]
   exclude:
+    - {path: ".browserrig/**", reason: "Generated browser state and temporary worktrees are not project sources."}
+    - {path: ".uv-cache/**", reason: "Local uv cache contains third-party packages and downloaded checkouts."}
     - {path: "evals/**", reason: "Eval scripts drive the library like a user would."}
     - {path: "examples/**", reason: "Examples use the public API only."}
 
 debt: .smelt/debt.json
 
+ignore:
+  - rule: yaml-file-extension
+    paths: [pnpm-lock.yaml]
+    reason: "pnpm requires this exact lockfile name."
+
 structure:
+  file_naming: {yaml_extension: yml, compose_basename: compose}
   contracts:
     conventions:
       match: browserrig
@@ -88,6 +96,10 @@ tests:
 # error: deterministic patterns without false positives in this codebase.
 # warning: heuristics that need a look in context.
 rules:
+  information-hiding: warning
+  prefer-callable-instance: hint
+  private-class-constant: error
+  redundant-module-name: hint
   # Source conventions
   import-cycle: error
   public-definitions-first: error

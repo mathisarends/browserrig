@@ -36,11 +36,22 @@ uv run --no-sync python tests/check_distribution.py
 prek hooks use the uv and pnpm dependencies pinned in the lockfiles.
 The existing `.pre-commit-config.yml` configures the checks; `--overwrite` replaces
 any previously installed pre-commit hook.
-Smelt is pinned to 0.5.0 through the same Python lockfile for local checks, hooks
+Smelt is pinned to 0.6.0 through the same Python lockfile for local checks, hooks
 and CI. Its hook runs on every commit, including configuration-only changes.
 The checked-in `.smelt.schema.json` supplies offline editor validation for
 `smelt.yml`; refresh it with `uv run --locked smelt config schema > .smelt.schema.json`
 when upgrading Smelt.
+
+The official Smelt agent skill and offline reference live in `.agents/skills/smelt`.
+Refresh them after upgrading with `uv run --locked smelt skill install --force`.
+Smelt 0.6.0 enables all six new reviews here: YAML files use `.yml` (except
+the filename required by pnpm), Compose files use `compose`, and checks review
+callable instances, private class constants, internal public attributes and
+redundant module names. The `information-hiding` group also enables the review
+of internal public module symbols; existing stricter individual severities remain.
+Callable-instance suggestions remain advisory: action-chain policies implement
+the named `check` protocol, while extraction and occlusion objects retain their
+descriptive operations and reusable state. No public API rename is required.
 
 The adopted rules review explicit `None` defaults, caller-before-helper order,
 enum discriminator tags, class names, secret settings fields, module exports and
@@ -48,8 +59,8 @@ deterministic test inputs. `browserrig.kinds` retains a reasoned export exceptio
 for its public compatibility facade. Module docstrings remain optional.
 Inspect accepted findings with `uv run --locked smelt debt --show`.
 After fixing findings, `uv run --locked smelt debt --prune` removes resolved entries
-without accepting new debt. The grouped version-2 baseline requires Smelt 0.5.0;
-its nine existing accepted occurrences are preserved by this migration.
+without accepting new debt. The grouped version-2 baseline requires Smelt >=0.5.0;
+its nine existing accepted occurrences are preserved without rewriting the baseline.
 On Linux and macOS, use `pnpm` instead of `pnpm.cmd` and `cp .env.example .env`
 instead of `Copy-Item`.
 
