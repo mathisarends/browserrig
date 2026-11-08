@@ -401,7 +401,7 @@ class _Backend:
         if self.capture_error == "failure":
             raise BrowserError("Capture failed")
         if self.capture_error == "navigation":
-            tab.document_id = "another-document"
+            tab.document_id += "-next"
         elements = tuple(
             ElementInfo(ref=ref, role="button", name="Shape A", bounds=bounds)
             for ref, bounds in self.objects.items()

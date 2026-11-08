@@ -266,3 +266,50 @@ async def test_main_snapshot_failure_asks_to_observe_again(site, monkeypatch):
         monkeypatch.setattr(type(tab.cdp.dom_snapshot), "capture_snapshot", unavailable)
         with pytest.raises(BrowserError, match="Page snapshot failed"):
             await capture(tab, DomCapture(), report)
+
+
+async def test_capture_recovers_from_navigation_during_the_first_snapshot(
+    site, monkeypatch
+):
+    async with ChromeBrowser(Launch(url=site)) as browser:
+        tab = browser.active_tab
+        report = await wait_for_page(tab)
+        domain = type(tab.cdp.dom_snapshot)
+        original = domain.capture_snapshot
+        calls = 0
+
+        async def navigating_snapshot(self, **kwargs):
+            nonlocal calls
+            calls += 1
+            result = await original(self, **kwargs)
+            if calls == 1:
+                await tab.navigate(site + "/other")
+                await wait_for_page(tab)
+                await evaluate(
+                    tab, "document.body.innerHTML='<button>Destination</button>'"
+                )
+            return result
+
+        monkeypatch.setattr(domain, "capture_snapshot", navigating_snapshot)
+        snapshot = await capture(tab, DomCapture(), report)
+        assert calls == 2 and snapshot.url == site + "/other"
+        assert snapshot.document_id == tab.document_id != report.document_id
+        assert [element.name for element in snapshot.elements] == ["Destination"]
+        assert snapshot.readiness == "degraded"
+
+
+async def test_capture_keeps_dom_when_chrome_cannot_take_a_screenshot(
+    site, monkeypatch
+):
+    async with ChromeBrowser(Launch(url=site)) as browser:
+        tab = browser.active_tab
+        report = await wait_for_page(tab)
+
+        async def unavailable(_domain, **_kwargs):
+            raise CDPCommandError("Page.captureScreenshot", -32000, "unavailable")
+
+        monkeypatch.setattr(type(tab.cdp.page), "capture_screenshot", unavailable)
+        snapshot = await capture(tab, DomCapture(), report, screenshots=True)
+        assert snapshot.image is None
+        assert any(element.name == "Email" for element in snapshot.elements)
+        assert "Screenshot unavailable" in snapshot.limitations[-1]

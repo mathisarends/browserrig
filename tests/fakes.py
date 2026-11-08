@@ -39,6 +39,9 @@ class FakeTab:
     async def sync_document(self):
         pass
 
+    def layout_changed(self):
+        pass
+
     def check_navigation(self):
         pass
 

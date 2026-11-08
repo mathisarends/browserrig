@@ -19,6 +19,7 @@ from browserrig.core import (
     ReadinessPhase,
     ReadinessStatus,
     Region,
+    StaleElement,
 )
 from browserrig.readiness import ReadinessReport
 
@@ -36,6 +37,9 @@ from .references import References
 
 # Longest side of a zoomed region image, to bound image tokens.
 _MAX_REGION_SIDE = 2000
+# Both attempts share this budget; an exhausted readiness wait gets only one second.
+_CAPTURE_SECONDS = 10
+_SCREENSHOT_SECONDS = 2
 
 
 class Redaction(Protocol):
@@ -120,26 +124,19 @@ async def capture_observation(
         )
         return CapturedObservation(snapshot, DomReferences())
     try:
-        # A pending renderer must not hold the next model iteration indefinitely
-        # after the readiness budget has already expired.
-        async with asyncio.timeout(1 if report.timed_out else None):
-            await tab.sync_document()
-            document_id = tab.document_id
-            content = await strategy.collect(
-                tab,
-                report,
-                screenshots=screenshots,
-                region=region,
-                zoom=zoom,
-                cursor=cursor,
-            )
-            await tab.sync_document()
-            if tab.document_id != document_id:
-                raise BrowserError(
-                    "Document changed during capture; act on the next observation"
-                )
-    except (BrowserError, CDPCommandError, TimeoutError):
+        content, document_id = await _collect(
+            tab,
+            strategy,
+            report,
+            screenshots=screenshots,
+            region=region,
+            zoom=zoom,
+            cursor=cursor,
+        )
+    except (BrowserError, CDPCommandError, TimeoutError) as error:
         if not report.timed_out:
+            if isinstance(error, TimeoutError):
+                raise BrowserError("Page capture timed out; observe again") from error
             raise
         snapshot = Snapshot(
             id=snapshot_id,
@@ -174,8 +171,12 @@ async def capture_observation(
         height=page.height,
         scroll_y=page.scroll_y,
         page_height=page.page_height,
-        readiness=report.status,
-        readiness_reason=report.reason,
+        readiness=report.status
+        if document_id == report.document_id
+        else ReadinessStatus.DEGRADED,
+        readiness_reason=report.reason
+        if document_id == report.document_id
+        else "Document changed during capture; readiness has not been confirmed.",
         fingerprint=content.fingerprint
         if content.fingerprint is not None
         else _fingerprint(page, document_id),
@@ -294,9 +295,18 @@ class DomCapture(Options):
             await asyncio.gather(shot, return_exceptions=True)
             raise
         page.limitations = (*page.limitations, *notes)
+        try:
+            async with asyncio.timeout(_SCREENSHOT_SECONDS):
+                pixels = await shot
+        except (BrowserError, CDPCommandError, TimeoutError):
+            page.limitations = (
+                *page.limitations,
+                "Screenshot unavailable; DOM observation retained",
+            )
+            return CaptureContent(page=page)
         image = await asyncio.to_thread(
             annotate,
-            await shot,
+            pixels,
             page.elements if self.marks else (),
             area,
             scale,
@@ -305,6 +315,61 @@ class DomCapture(Options):
         return CaptureContent(
             page=page, image=image, geometry=geometry, area=area, scale=scale
         )
+
+
+async def _collect(
+    tab: Tab,
+    strategy: CaptureStrategy,
+    report: ReadinessReport,
+    *,
+    screenshots: bool,
+    region: Region | None,
+    zoom: float,
+    cursor: Point | None,
+) -> tuple[CaptureContent, str]:
+    """Retry a read-only observation once after a document/context race."""
+    retried = False
+    async with asyncio.timeout(1 if report.timed_out else _CAPTURE_SECONDS):
+        while True:
+            try:
+                await tab.sync_document()
+                document_id = tab.document_id
+                content = await strategy.collect(
+                    tab,
+                    report,
+                    screenshots=screenshots,
+                    region=region,
+                    zoom=zoom,
+                    cursor=cursor,
+                )
+                await tab.sync_document()
+                if tab.document_id != document_id:
+                    raise StaleElement("Document changed during capture; observe again")
+                return content, document_id
+            except (BrowserError, CDPCommandError) as error:
+                if retried or report.timed_out or not _capture_race(error):
+                    raise
+                retried = True
+                tab.layout_changed()
+
+
+def _capture_race(error: BrowserError | CDPCommandError) -> bool:
+    if isinstance(error, StaleElement):
+        return True
+    cause = error.__cause__ if error.__cause__ is not None else error
+    return isinstance(cause, CDPCommandError) and any(
+        message in cause.message.lower()
+        for message in (
+            "cannot find context",
+            "execution context was destroyed",
+            "cannot find default execution context",
+            "no frame with given id",
+            "frame was detached",
+            "inspected target navigated",
+            "no node with given id",
+            "could not find node with given id",
+        )
+    )
 
 
 def _limited(page: PageContent, tab: Tab) -> PageContent:

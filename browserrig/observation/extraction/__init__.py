@@ -14,7 +14,7 @@ from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from harnessed.tracing import record, traced
 
 from browserrig.browser import Frame
-from browserrig.core import BrowserError
+from browserrig.core import BrowserError, StaleElement
 from browserrig.observation.models import (
     Canvas,
     CookieBanner,
@@ -129,7 +129,7 @@ class _Assembler:
         main = self._frames[0]
         document = self._documents.get(main.id)
         if document is None:
-            raise BrowserError(
+            raise StaleElement(
                 "Page snapshot missed the main document; try again after the next observation"
             )
         for frame in self._frames:

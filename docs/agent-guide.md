@@ -192,6 +192,13 @@ such as submission. The tool does not overwrite the page's result or retry typin
 Insertion with `clear=false` accounts for the field's selection when available.
 Password and secret entry values are not read back by this check.
 
+Observations retry once when a document or execution context changes during capture.
+Both attempts share a ten-second capture budget; after a readiness timeout, capture
+gets one second and does not retry. A screenshot failure or a stalled screenshot
+keeps the usable DOM observation with an explicit limitation. A newly captured
+document is marked degraded until its readiness has been confirmed. Browser input
+and submissions are never replayed by this recovery.
+
 Each built-in tool declares its own stable `ActionKind` through immutable
 `BrowserToolMetadata`. Use `event.tool.metadata.get(BrowserToolMetadata)` in native
 policy, execution or result-review hooks; the registration is captured when the
