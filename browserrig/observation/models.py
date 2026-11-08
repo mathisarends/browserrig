@@ -84,6 +84,8 @@ class Element(ElementInfo):
     frame_id: str
     backend_id: int
     tag: str
+    # An explicitly associated rendered label, used to reveal a hidden file input.
+    upload_label_ref: str | None = None
 
 
 class Offscreen(ElementRef):

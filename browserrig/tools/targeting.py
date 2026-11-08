@@ -30,6 +30,9 @@ class Targeting:
 
         Use `scroll=False` to re-check the target after hover or other input moved it.
         """
+        # Page scripts may scroll or move an iframe without dispatching device input.
+        # Start every aim from current frame geometry, including scroll=False checks.
+        tab.layout_changed()
         handle = await self.observe.element(tab, ref)
         scrolled = False
         if scroll:

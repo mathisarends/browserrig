@@ -366,7 +366,11 @@ async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
 
     handle = SimpleNamespace(
         element=SimpleNamespace(
-            input_type="file", bounds=None, in_viewport=True, covered=False
+            input_type="file",
+            bounds=None,
+            in_viewport=True,
+            covered=False,
+            upload_label_ref=None,
         ),
         upload_files=upload,
         locate=locate,
@@ -391,6 +395,7 @@ async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
         "cursor moves to 40,30 0.00",
         "mouse mouseMoved 40,30",
         "cursor rests in tab-1 at 40,30",
+        "highlight input",
         "transfer upload at 40.0,30.0 0.45",
         "sleep 0.45",
         "upload 1 file",

@@ -82,7 +82,7 @@ async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path):
     upload.handle.upload_files.assert_awaited_once_with(
         [str(files.workspace.directory / "report.txt")]
     )
-    upload.actions.element_point.assert_awaited_once()
+    assert upload.actions.element_point.await_count == 2
     assert upload.services.browser.input.mouse.position == Point(x=40, y=30)
     uploaded = _first(upload.services.events, FilesUploadedEvent)
     assert uploaded.paths == (saved.path,) and uploaded.ref == "input"
@@ -96,13 +96,16 @@ async def test_upload_does_not_require_a_pointer_target(tmp_path, placement):
     async with _uploads(files) as upload:
         upload.handle.element.in_viewport = placement != "hidden"
         upload.handle.element.covered = placement == "covered"
+        upload.handle.element.bounds = (
+            None if placement == "hidden" else Bounds(x=0, y=0, width=80, height=60)
+        )
         upload.actions.element_point.side_effect = BrowserError("ELEMENT_BLOCKED")
         result = await upload.tools.upload_files("input", ["report.txt"])
     assert result.text == "Files assigned to input."
     upload.handle.upload_files.assert_awaited_once_with(
         [str(files.workspace.directory / "report.txt")]
     )
-    if placement == "blocked":
+    if placement in {"blocked", "covered"}:
         upload.actions.element_point.assert_awaited_once()
     else:
         upload.actions.element_point.assert_not_awaited()
@@ -219,7 +222,13 @@ async def _uploads(files):
         cdp = SimpleNamespace(input=SimpleNamespace(dispatch_mouse_event=AsyncMock()))
         services.browser.active_tab = Tab("tab", cdp, emit=services.record)
         handle = SimpleNamespace(
-            element=SimpleNamespace(input_type="file", in_viewport=True, covered=False),
+            element=SimpleNamespace(
+                input_type="file",
+                in_viewport=True,
+                covered=False,
+                bounds=Bounds(x=0, y=0, width=80, height=60),
+                upload_label_ref=None,
+            ),
             upload_files=AsyncMock(),
         )
         services.observe.element = AsyncMock(return_value=handle)

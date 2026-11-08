@@ -145,6 +145,12 @@ hard clipping and the current clip of inner scroll containers remain excluded.
 Scroll containers are explicit targets with remaining wheel distances in each
 direction, so an agent can scroll a list or carousel by ref.
 
+Element actions reveal their target before moving the cursor, including native
+select/date updates, uploads and links that start downloads. Each aim refreshes
+frame geometry so page-script scrolling and iframe movement use current viewport
+coordinates. A hidden file input uses its explicitly associated rendered label
+when available; inputs without a rendered target are assigned directly.
+
 Observations include up to 3,000 characters of page text by default, prioritizing
 the visible text before nearby context. Associated field descriptions are also
 shown on their controls. `max_text_chars=0` restores controls-only output on dense

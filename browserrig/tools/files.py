@@ -27,8 +27,8 @@ from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
     ActionKind,
     BrowserError,
+    ElementPoint,
     FileSource,
-    Point,
     ReadinessPhase,
 )
 from browserrig.core import browser_tool as tool
@@ -335,15 +335,29 @@ class FileTools(Plugin):
         transfer = self._staging()
         with _file_errors():
             staged = await transfer.stage(paths)
-        point: Point | None = None
-        if handle.element.in_viewport and not handle.element.covered:
+        point: ElementPoint | None = None
+        prepared_scroll = False
+        target_ref = handle.element.upload_label_ref or ref
+        if (
+            handle.element.in_viewport
+            or handle.element.bounds is not None
+            or target_ref != ref
+        ):
             try:
-                point = await self._actions.element_point(ref=ref)
+                point = await self._actions.element_point(ref=target_ref)
+                prepared_scroll = point.scrolled
+                await self._browser.input.mouse.move_to(point)
+                # Hover handlers can move the target or programmatically scroll a panel.
+                current = await self._actions.element_point(
+                    ref=target_ref, scroll=False
+                )
+                if (current.x, current.y) != (point.x, point.y):
+                    await self._browser.input.mouse.move_to(current)
+                point = current
             except BrowserError as error:
                 if str(error) != "ELEMENT_BLOCKED":
                     raise
-        if point is not None:
-            await self._browser.input.mouse.move_to(point)
+                point = None
 
         async def assign() -> None:
             handle = await self._observe.dom_element(tab, ref)
@@ -358,7 +372,7 @@ class FileTools(Plugin):
             )
 
         await self._actions.stage(UploadIntent(staged.paths, point), tab, assign)
-        return Effect("Files assigned to input.")
+        return Effect("Files assigned to input.", prepared_scroll=prepared_scroll)
 
     def _files(self) -> FileSystem:
         if self._workspace is None:

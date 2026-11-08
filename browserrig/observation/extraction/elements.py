@@ -278,23 +278,22 @@ class _FrameExtractor:
         kept.extend(proxies)
         built: list[tuple[int, Element]] = []
         offscreen: list[Offscreen] = []
-        for index in hidden_uploads:
-            element = self._element(index, ((0, 0, 0, 0), None, False), None)
-            built.append(
-                (
-                    index,
-                    element.model_copy(
-                        update={"bounds": None, "outside_viewport": None}
-                    ),
-                )
-            )
+        upload_labels: dict[int, str] = {}
         for index, control in kept:
             rect = placements[index][0]
             if (
                 placements[index][1] is not None
                 or visible_area(document, index, rect, self._preview) is not None
             ):
-                built.append((index, self._element(index, placements[index], control)))
+                element = self._element(index, placements[index], control)
+                built.append((index, element))
+                if (
+                    control is not None
+                    and element.input_type == "file"
+                    and not element.covered
+                    and (control not in upload_labels or element.in_viewport)
+                ):
+                    upload_labels[control] = element.ref
                 continue
             backend_id = document.backend_ids[index]
             offscreen.append(
@@ -304,6 +303,19 @@ class _FrameExtractor:
                     backend_id=backend_id,
                 )
             )
+        built.extend(
+            (
+                index,
+                self._element(index, ((0, 0, 0, 0), None, False), None).model_copy(
+                    update={
+                        "bounds": None,
+                        "outside_viewport": None,
+                        "upload_label_ref": upload_labels.get(index),
+                    }
+                ),
+            )
+            for index in hidden_uploads
+        )
         built.sort(key=lambda item: item[0])
         return built, offscreen
 

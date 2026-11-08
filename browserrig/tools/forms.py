@@ -38,10 +38,14 @@ class FormTools(Plugin):
     ) -> Effect:
         tab = self._actions.tab
         await self._observe.dom_element(tab, ref)
-        await self._actions.element_point(ref=ref)
+        point = await self._actions.element_point(ref=ref)
+        await self._actions.browser.input.mouse.move_to(point)
+        current = await self._actions.element_point(ref=ref, scroll=False)
+        if (current.x, current.y) != (point.x, point.y):
+            await self._actions.browser.input.mouse.move_to(current)
         handle = await self._observe.dom_element(tab, ref)
         await handle.select(value)
-        return Effect("Option selected.")
+        return Effect("Option selected.", prepared_scroll=point.scrolled)
 
     @tool(
         kind=ActionKind.SET_DATE,
@@ -63,7 +67,13 @@ class FormTools(Plugin):
             "week",
         }:
             raise BrowserError("Element is not a native date/time input")
-        await self._actions.element_point(ref=ref)
+        point = await self._actions.element_point(ref=ref)
+        await self._actions.browser.input.mouse.move_to(point)
+        current = await self._actions.element_point(ref=ref, scroll=False)
+        if (current.x, current.y) != (point.x, point.y):
+            await self._actions.browser.input.mouse.move_to(current)
         handle = await self._observe.dom_element(tab, ref)
         await handle.set_value(value)
-        return Effect("Date/time value set and verified.")
+        return Effect(
+            "Date/time value set and verified.", prepared_scroll=point.scrolled
+        )
