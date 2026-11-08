@@ -3,7 +3,7 @@ from odf.opendocument import OpenDocumentSpreadsheet
 from odf.table import Table, TableCell, TableRow
 from odf.text import P
 
-from browserrig import FileSystem, FileSystemOptions
+from browserrig import FileOptions, FileSystem, LocalWorkspace
 
 
 async def test_ods_repetition_respects_output_budget_and_allows_a_small_selection(
@@ -20,7 +20,9 @@ async def test_ods_repetition_respects_output_budget_and_allows_a_small_selectio
     path = tmp_path / "repeat.ods"
     book.save(str(path))
     source = path.read_bytes()
-    files = FileSystem(FileSystemOptions(directory=tmp_path, max_expanded_bytes=8192))
+    files = FileSystem(
+        LocalWorkspace(tmp_path), options=FileOptions(max_expanded_bytes=8192)
+    )
     with pytest.raises(
         ValueError, match="Extracted content exceeds max_expanded_bytes"
     ):
@@ -39,7 +41,9 @@ async def test_extraction_budget_counts_utf8_bytes_and_limitations(
     tmp_path, name, source
 ):
     (tmp_path / name).write_text(source, encoding="utf-8")
-    files = FileSystem(FileSystemOptions(directory=tmp_path, max_expanded_bytes=16))
+    files = FileSystem(
+        LocalWorkspace(tmp_path), options=FileOptions(max_expanded_bytes=16)
+    )
     with pytest.raises(
         ValueError, match="Extracted content exceeds max_expanded_bytes"
     ):

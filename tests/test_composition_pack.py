@@ -18,8 +18,9 @@ from browserrig import (
     Chrome,
     DomCapture,
     Done,
-    FileSystemOptions,
+    Files,
     FileTools,
+    LocalWorkspace,
     browser_pack,
     browser_plugins,
 )
@@ -68,12 +69,12 @@ def test_resolved_browser_pack_retains_replacements_and_removal_provenance():
 def test_facade_reports_kit_origins_replacements_and_exclusions_without_resources(
     tmp_path,
 ):
-    files = FileSystemOptions(directory=tmp_path / "files")
+    workspace = LocalWorkspace(tmp_path / "files")
     observe = BrowserPerception(capture=DomCapture(marks=False))
     agent = browserrig.Agent(
         model=ScriptedModel([]),
-        browser=Chrome.launch(files=files),
-        plugins=[observe],
+        browser=Chrome.launch(),
+        plugins=[observe, Files(workspace)],
         without=(FileTools,),
     )
     description = agent.describe()
@@ -86,7 +87,7 @@ def test_facade_reports_kit_origins_replacements_and_exclusions_without_resource
     assert {item.plugin.name for item in description.removed} == {
         "FileTools",
     }
-    assert not files.directory.exists()
+    assert not workspace.directory.exists()
 
 
 async def test_nested_pack_instructions_follow_overrides_and_exclusions():

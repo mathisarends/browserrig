@@ -18,7 +18,17 @@ from .composition import (  # smelt: ignore[SMT106] -- public facade
     browser_plugins,
 )
 from .core import HandoffStatus, Point
-from .files import FileSystem, FileSystemOptions
+from .files import (
+    BrowserDownload,
+    FileBridge,
+    FileOptions,
+    Files,
+    FileSystem,
+    FileTransfer,
+    LocalWorkspace,
+    MountedWorkspace,
+    Workspace,
+)
 from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanResponse
 from .kinds import MouseEventKind
 from .nudges import Nudges
@@ -141,8 +151,15 @@ __all__ = [
     "Browser",
     "Chrome",
     "ChromeBrowser",
+    "BrowserDownload",
+    "FileBridge",
+    "FileOptions",
+    "Files",
     "FileSystem",
-    "FileSystemOptions",
+    "FileTransfer",
+    "LocalWorkspace",
+    "MountedWorkspace",
+    "Workspace",
     "SessionSetup",
     "Nudges",
     "BrowserPerception",

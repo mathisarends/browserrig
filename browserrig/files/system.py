@@ -1,54 +1,81 @@
 import asyncio
-import re
+import hashlib
+import json
+import tempfile
 from pathlib import Path
-from uuid import uuid4
+from types import TracebackType
+from typing import Self
 
-from .config import FileSystemOptions
+from .config import FileOptions
 from .content import ReadRequest
 from .models import FileContent, FileEntry, FileListing
 from .reading import FileReader
+from .workspace import FileStat, LocalWorkspace, Workspace, workspace_path
 
 
 class FileSystem:
-    """Local workspace and an optional separately configured download directory.
+    """The agent's files: a workspace and the readers that parse it.
 
-    Construction creates no files or directories. Browser startup initializes them;
-    files persist after the browser closes. All paths are confined to these roots.
-    File operations are awaitable and run blocking I/O and parsing in worker threads.
+    Paths are relative to the workspace, such as `notes/summary.md`. The file system
+    knows nothing about browsers; `FileTransfer` brings downloads in and hands files
+    to Chrome. Construction creates nothing; entering the context initializes the
+    workspace and leaving it removes temporary copies.
     """
 
     def __init__(
-        self,
-        options: FileSystemOptions | None = None,
-        *,
-        download_directory: str | None = None,
+        self, workspace: Workspace, options: FileOptions | None = None
     ) -> None:
-        self._options = options if options is not None else FileSystemOptions()
-        self.directory = (
-            self._options.directory or Path(".browserrig/files") / uuid4().hex
-        ).resolve()
-        self.download_directory = (
-            Path(download_directory).resolve()
-            if download_directory is not None
-            else self.directory / "downloads"
+        self.workspace = workspace
+        self.options = options if options is not None else FileOptions()
+        # Remote files are copied here to be parsed; local files are parsed in place.
+        self._cache: tempfile.TemporaryDirectory[str] | None = None
+        self._reader: FileReader | None = (
+            FileReader(workspace.directory / ".content", self.options)
+            if isinstance(workspace, LocalWorkspace)
+            else None
         )
-        self.pending_directory = self.download_directory / ".pending"
-        self._reader = FileReader(self.directory / ".content", self._options)
+
+    async def __aenter__(self) -> Self:
+        await self.initialize()
+        return self
+
+    async def __aexit__(
+        self,
+        _type: type[BaseException] | None,
+        _error: BaseException | None,
+        _traceback: TracebackType | None,
+    ) -> None:
+        await self.aclose()
 
     async def initialize(self) -> None:
-        await asyncio.to_thread(self._initialize)
+        await self.workspace.initialize()
 
-    async def resolve(self, path: str | Path, *, require_file: bool = False) -> Path:
-        """Resolve a confined path, optionally requiring an existing regular file."""
-        return await asyncio.to_thread(self._resolve, path, require_file=require_file)
+    async def aclose(self) -> None:
+        """Remove local copies of remote files; the workspace itself is kept."""
+        if self._cache is not None:
+            cache = self._cache
+            self._cache = None
+            self._reader = None
+            await asyncio.to_thread(cache.cleanup)
 
-    async def exists(self, path: str | Path) -> bool:
-        return await asyncio.to_thread(self._exists, path)
+    async def exists(self, path: str) -> bool:
+        return await self.workspace.stat(workspace_path(path)) is not None
 
     async def list_files(
         self, path: str = ".", *, offset: int = 0, limit: int = 100
     ) -> FileListing:
-        return await asyncio.to_thread(self._list_files, path, offset, limit)
+        if offset < 0 or not 1 <= limit <= 200:
+            raise ValueError("Use offset >= 0 and a limit between 1 and 200")
+        directory = workspace_path(path)
+        children = sorted(
+            await self.workspace.list(directory),
+            key=lambda child: child.path.name.casefold(),
+        )
+        return FileListing(
+            directory=str(directory),
+            entries=tuple(_entry(child) for child in children[offset : offset + limit]),
+            next_offset=offset + limit if offset + limit < len(children) else None,
+        )
 
     async def read_file(
         self,
@@ -62,6 +89,10 @@ class FileSystem:
         offset: int = 0,
         max_chars: int = 20000,
     ) -> FileContent:
+        if offset < 0 or not 1 <= max_chars <= 200000:
+            raise ValueError("Use offset >= 0 and max_chars between 1 and 200000")
+        if page_number is not None and page_number < 1:
+            raise ValueError("page_number must be at least 1")
         request = ReadRequest(
             page_number=page_number,
             sheet=sheet,
@@ -69,136 +100,82 @@ class FileSystem:
             member=member,
             ocr=ocr,
         )
-        return await asyncio.to_thread(
-            self._read_file, path, request, offset, max_chars
+        target = await self.file(path)
+        if isinstance(self.workspace, LocalWorkspace):
+            source = self.workspace.host_path(target.path)
+        else:
+            source = await self._local_copy(target)
+        reader = self._reader
+        assert reader is not None
+        content = await asyncio.to_thread(
+            reader.read, source, request, offset, max_chars
         )
-
-    async def upload_paths(self, paths: list[str]) -> list[str]:
-        """Validate the entire selection before passing host paths to Chrome."""
-        return await asyncio.to_thread(self._upload_paths, paths)
+        return content.model_copy(
+            update={
+                "path": str(target.path),
+                "extracted_path": self._extracted_path(content.extracted_path),
+            }
+        )
 
     async def write_file(
         self, path: str, content: str, *, overwrite: bool = False
     ) -> FileEntry:
-        return await asyncio.to_thread(self._write_file, path, content, overwrite)
-
-    async def complete_download(
-        self, download_id: str, filename: str, path: str | None
-    ) -> str:
-        return await asyncio.to_thread(
-            self._complete_download, download_id, filename, path
-        )
-
-    def _initialize(self) -> None:
-        self.directory.mkdir(parents=True, exist_ok=True)
-        self.pending_directory.mkdir(parents=True, exist_ok=True)
-
-    def _exists(self, path: str | Path) -> bool:
-        return self._resolve(path).exists()
-
-    def _list_files(self, path: str, offset: int, limit: int) -> FileListing:
-        if offset < 0 or not 1 <= limit <= 200:
-            raise ValueError("Use offset >= 0 and a limit between 1 and 200")
-        directory = self._resolve(path)
-        children = sorted(directory.iterdir(), key=lambda child: child.name.casefold())
-        entries = []
-        for child in children[offset : offset + limit]:
-            # Do not expose metadata for symlinks pointing outside the workspace.
-            try:
-                resolved = self._resolve(child)
-            except ValueError:
-                continue
-            is_directory = resolved.is_dir()
-            entries.append(
-                FileEntry(
-                    path=str(child),
-                    name=child.name,
-                    is_directory=is_directory,
-                    size=None if is_directory else resolved.stat().st_size,
-                )
-            )
-        return FileListing(
-            directory=str(directory),
-            entries=tuple(entries),
-            next_offset=offset + limit if offset + limit < len(children) else None,
-        )
-
-    def _read_file(
-        self,
-        path: str,
-        request: ReadRequest,
-        offset: int,
-        max_chars: int,
-    ) -> FileContent:
-        if offset < 0 or not 1 <= max_chars <= 200000:
-            raise ValueError("Use offset >= 0 and max_chars between 1 and 200000")
-        if request.page_number is not None and request.page_number < 1:
-            raise ValueError("page_number must be at least 1")
-        resolved = self._resolve(path, require_file=True)
-        return self._reader.read(resolved, request, offset, max_chars)
-
-    def _write_file(self, path: str, content: str, overwrite: bool) -> FileEntry:
-        resolved = self._resolve(path)
+        target = workspace_path(path)
         data = content.encode("utf-8")
-        if len(data) > self._options.max_file_bytes:
+        if len(data) > self.options.max_file_bytes:
             raise ValueError("Content exceeds max_file_bytes")
-        resolved.parent.mkdir(parents=True, exist_ok=True)
-        with resolved.open("wb" if overwrite else "xb") as stream:
-            stream.write(data)
+        await self.workspace.write_bytes(target, data, overwrite=overwrite)
         return FileEntry(
-            path=str(resolved), name=resolved.name, is_directory=False, size=len(data)
+            path=str(target), name=target.name, is_directory=False, size=len(data)
         )
 
-    def _complete_download(
-        self, download_id: str, filename: str, path: str | None
-    ) -> str:
-        if not re.fullmatch(r"[a-zA-Z0-9-]+", download_id):
-            raise ValueError("Invalid download ID")
-        name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", filename).strip(" .") or "download"
-        # Prefixing also handles Windows device names such as CON and NUL.
-        if name.split(".")[0].upper() in {
-            "CON",
-            "PRN",
-            "AUX",
-            "NUL",
-            *(f"COM{i}" for i in range(10)),
-            *(f"LPT{i}" for i in range(10)),
-        }:
-            name = "_" + name
-        suffix = Path(name).suffix[:20]
-        name = Path(name).stem[:160] + suffix
-        source = self._resolve(path or self.pending_directory / download_id)
-        destination = self._resolve(self.download_directory / download_id / name)
-        if source != destination:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            source.rename(destination)
-        if not destination.is_file():
-            raise FileNotFoundError(
-                "Downloaded file is missing on disk; download it again"
-            )
-        return str(destination)
-
-    def _resolve(self, path: str | Path, *, require_file: bool = False) -> Path:
-        resolved = Path(path)
-        if not resolved.is_absolute():
-            resolved = self.directory / resolved
-        resolved = resolved.resolve()
-        if not any(
-            resolved.is_relative_to(root)
-            for root in (self.directory, self.download_directory)
-        ):
-            raise ValueError(
-                "Path is outside the agent workspace and download directory"
-            )
-        if require_file and not resolved.is_file():
+    async def file(self, path: str) -> FileStat:
+        """An existing regular file in the workspace."""
+        stat = await self.workspace.stat(workspace_path(path))
+        if stat is None or stat.is_directory:
             raise FileNotFoundError(f"File not found: {path}")
-        return resolved
+        return stat
 
-    def _upload_paths(self, paths: list[str]) -> list[str]:
-        if not paths:
-            raise ValueError("Select at least one workspace file to upload")
-        resolved = [self._resolve(path) for path in paths]
-        for path in resolved:
-            if not path.is_file():
-                raise FileNotFoundError(f"Upload requires an existing file: {path}")
-        return [str(path) for path in resolved]
+    async def _local_copy(self, stat: FileStat) -> Path:
+        if stat.size is not None and stat.size > self.options.max_file_bytes:
+            raise ValueError("File exceeds max_file_bytes for reading")
+        if self._cache is None:
+            # Lives as long as this file system; aclose removes it.
+            self._cache = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
+                prefix="browserrig-"
+            )
+            self._reader = FileReader(Path(self._cache.name) / ".content", self.options)
+        key = hashlib.sha256(
+            json.dumps([str(stat.path), stat.size, stat.modified]).encode()
+        ).hexdigest()[:32]
+        # Keep the name: readers detect formats by suffix and report the file name.
+        copy = Path(self._cache.name) / "sources" / key / stat.path.name
+        if not copy.is_file():
+            data = await self.workspace.read_bytes(stat.path)
+            await asyncio.to_thread(_write_atomically, copy, data)
+        return copy
+
+    def _extracted_path(self, extracted: str | None) -> str | None:
+        """Report a saved extraction only when the agent can read it in the workspace."""
+        if extracted is None or not isinstance(self.workspace, LocalWorkspace):
+            return None
+        path = Path(extracted)
+        if not path.is_relative_to(self.workspace.directory):
+            return None
+        return path.relative_to(self.workspace.directory).as_posix()
+
+
+def _entry(stat: FileStat) -> FileEntry:
+    return FileEntry(
+        path=str(stat.path),
+        name=stat.path.name,
+        is_directory=stat.is_directory,
+        size=stat.size,
+    )
+
+
+def _write_atomically(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".partial")
+    temporary.write_bytes(data)
+    temporary.replace(path)

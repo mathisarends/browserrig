@@ -10,7 +10,7 @@ from typing import IO
 from zipfile import ZipFile, is_zipfile
 
 from . import containers
-from .config import FileSystemOptions
+from .config import FileOptions
 from .content import ParsedContent, ReadContext, ReadRequest
 from .formats import READERS, signature_format
 from .kinds import FileExtension as Ext
@@ -44,7 +44,7 @@ _CACHE_VERSION = 4
 
 
 class FileReader:
-    def __init__(self, cache_directory: Path, options: FileSystemOptions) -> None:
+    def __init__(self, cache_directory: Path, options: FileOptions) -> None:
         self.directory = cache_directory
         self.options = options
 

@@ -9,7 +9,7 @@ from pydantic import SecretStr, ValidationError
 from browserrig import (
     Agent,
     Chrome,
-    FileSystemOptions,
+    MountedWorkspace,
     Viewport,
     browser_pack,
     browser_plugins,
@@ -18,10 +18,10 @@ from browserrig.browser import Connect, Launch
 from browserrig.browser import plugin as chrome_plugin
 
 
-def test_factories_validate_options_without_opening_resources(tmp_path, monkeypatch):
+def test_factories_validate_options_without_opening_resources(monkeypatch):
     runtime = Mock(side_effect=AssertionError("Browser opened before session entry"))
     monkeypatch.setattr(chrome_plugin, "ChromeBrowser", runtime)
-    files = FileSystemOptions(directory=tmp_path / "workspace")
+    bridge = MountedWorkspace("/workspace")
     setup = _SessionProbe()
     launched = Chrome.launch(
         executable=Path("chrome"),
@@ -30,8 +30,6 @@ def test_factories_validate_options_without_opening_resources(tmp_path, monkeypa
         viewport=Viewport(width=900),
         timeout=12,
         arguments=("--disable-extensions",),
-        download_directory=str(tmp_path),
-        files=files,
         session_setup=(setup,),
     )
     connected = Chrome.connect(
@@ -40,8 +38,7 @@ def test_factories_validate_options_without_opening_resources(tmp_path, monkeypa
         timeout=12,
         headers={"Authorization": "Bearer credential"},
         viewport=Viewport(width=900),
-        download_directory=str(tmp_path),
-        files=files,
+        bridge=bridge,
         session_setup=(setup,),
     )
     for browser in (launched, connected):
@@ -52,20 +49,20 @@ def test_factories_validate_options_without_opening_resources(tmp_path, monkeypa
         assert browser.options.url == "https://example.org"
         assert browser.options.viewport.width == 900
         assert browser.options.timeout == 12
-        assert browser.options.files == files
         assert browser.options.session_setup == (setup,)
-        assert browser.options.download_directory == str(tmp_path)
     assert isinstance(launched.options, Launch)
     assert launched.options.executable == Path("chrome")
     assert not launched.options.headless
     assert launched.options.arguments == ("--disable-extensions",)
+    # A launched Chrome shares this machine's disk with the workspace.
+    assert launched.options.bridge == MountedWorkspace()
+    assert connected.options.bridge is bridge
     assert isinstance(connected.options, Connect)
     assert (
         connected.options.headers["Authorization"].get_secret_value()
         == "Bearer credential"
     )
     assert "credential" not in repr(connected.options)
-    assert not files.directory.exists()
     runtime.assert_not_called()
 
 
@@ -104,7 +101,7 @@ def test_factory_defaults_and_secret_inputs_preserve_existing_options():
         endpoint=endpoint, headers={"Authorization": header}
     )
     assert "credential" not in repr(connected.options)
-    assert connected.options.files is None
+    assert connected.options.bridge is None
     assert connected.options.viewport is None
 
 

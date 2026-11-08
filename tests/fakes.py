@@ -10,7 +10,7 @@ from harnessed import (
 from harnessed.kernel import Scope, needs
 from harnessed.testing import ScriptedModel
 
-from browserrig import Browser
+from browserrig import Browser, FileSystem
 from browserrig.browser import BrowserEvents
 from browserrig.core import ReadinessStatus
 from browserrig.input import Input
@@ -64,7 +64,8 @@ class FakeBrowser:
         self.tabs = FakeTabs()
         self.action_lock = asyncio.Lock()
         self.log = log
-        self.files = None
+        self.bridge = None
+        self.receiving = None
         self.events = BrowserEvents(self.id, self._emit)
         self.input = Input(lambda: self.active_tab.input)
         self.mouse = self.input.mouse
@@ -72,6 +73,11 @@ class FakeBrowser:
 
     async def downloads(self):
         return ()
+
+    async def receive_downloads(self, transfer):
+        # Without CDP nothing is saved; the transfer is kept for staging checks.
+        self.receiving = transfer
+        return False
 
     async def _emit(self, event):
         # Some tests build the fake without a log and never emit.
@@ -139,10 +145,11 @@ class FakeObserve:
 class FakeServices(Plugin, provides=True):
     """Provide fake browser services, so real tool plugins run without Chrome."""
 
-    def __init__(self):
+    def __init__(self, bridge=None):
         super().__init__()
         self.events = []
         self.browser = FakeBrowser(SimpleNamespace(emit=self.record))
+        self.browser.bridge = bridge
         self.readiness = FakeReadiness()
         self.observe = FakeObserve()
 
@@ -156,13 +163,28 @@ class FakeServices(Plugin, provides=True):
         ctx.provide(BrowserPerception, self.observe)
 
 
+class OpenFiles(Plugin):
+    """Provide an already open file system as the session's workspace."""
+
+    def __init__(self, files: FileSystem) -> None:
+        super().__init__()
+        self.files = files
+
+    async def setup(self, ctx: Scope) -> None:
+        ctx.provide(FileSystem, self.files)
+
+
 @asynccontextmanager
-async def mounted(*plugins):
-    """Start a session with `plugins` on fake services; yield the services and context."""
-    services = FakeServices()
+async def mounted(*plugins, bridge=None, files=None):
+    """Start a session with `plugins` on fake services; yield the services and context.
+
+    `files` becomes the session's workspace; `bridge` lets the fake browser reach it.
+    """
+    services = FakeServices(bridge)
+    workspace = () if files is None else (OpenFiles(files),)
     agent = Agent(
         model=ScriptedModel(["Done"]),
-        plugins=[services, *plugins],
+        plugins=[services, *workspace, *plugins],
     )
     async with agent.session() as session:
         yield session.scope[FakeServices], session.scope

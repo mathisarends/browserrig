@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 from pydantic import Field, InstanceOf, SecretStr, field_validator, model_validator
 
 from browserrig.core import Options, TargetId
-from browserrig.files import FileSystemOptions
+from browserrig.files import FileBridge, MountedWorkspace
 
 from .process import ChromeProcess
 from .setup import SessionSetup
@@ -40,9 +40,8 @@ class Launch(Options):
     session_setup: tuple[InstanceOf[SessionSetup], ...] = ()
     timeout: float = Field(default=20, gt=0, le=120)
     arguments: tuple[str, ...] = ()
-    download_directory: str | None = None
-    # The agent's workspace for downloads and local files.
-    files: FileSystemOptions = FileSystemOptions()
+    # Chrome runs on this machine, so it sees a local workspace directly.
+    bridge: InstanceOf[FileBridge] = Field(default_factory=MountedWorkspace)
 
     @field_validator("arguments")
     @classmethod
@@ -84,16 +83,13 @@ class Connect(Options):
     headers: dict[str, SecretStr] = Field(default_factory=dict, repr=False)
     viewport: Viewport | None = None
     session_setup: tuple[InstanceOf[SessionSetup], ...] = ()
-    download_directory: str | None = None
-    # A browser running elsewhere gets a local workspace only when one is configured.
-    files: FileSystemOptions | None = None
+    # Without a bridge, downloads stay on the browser host and uploads are unavailable.
+    bridge: InstanceOf[FileBridge] | None = None
 
     @model_validator(mode="after")
     def _target_ownership(self) -> Self:
-        if self.target_id and (self.url != "about:blank" or self.download_directory):
-            raise ValueError(
-                "An attached target keeps its URL and browser-wide download policy"
-            )
+        if self.target_id and self.url != "about:blank":
+            raise ValueError("An attached target keeps its URL")
         return self
 
     @field_validator("endpoint")

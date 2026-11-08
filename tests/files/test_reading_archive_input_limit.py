@@ -6,7 +6,7 @@ from zipfile import ZipFile
 
 import pytest
 
-from browserrig import FileSystem, FileSystemOptions
+from browserrig import FileOptions, FileSystem, LocalWorkspace
 
 
 @pytest.mark.parametrize("extension", ["zip", "tar", "gz", "eml"])
@@ -35,11 +35,15 @@ async def test_member_selection_checks_outer_input_size_before_extraction(
         )
         path.write_bytes(message.as_bytes())
     size = path.stat().st_size
-    bounded = FileSystem(FileSystemOptions(directory=tmp_path, max_file_bytes=size - 1))
+    bounded = FileSystem(
+        LocalWorkspace(tmp_path), options=FileOptions(max_file_bytes=size - 1)
+    )
     with pytest.raises(ValueError, match="max_file_bytes"):
         await bounded.read_file(path.name, member=member)
     assert not (tmp_path / ".content").exists()
-    exact = FileSystem(FileSystemOptions(directory=tmp_path, max_file_bytes=size))
+    exact = FileSystem(
+        LocalWorkspace(tmp_path), options=FileOptions(max_file_bytes=size)
+    )
     assert payload.decode() in (await exact.read_file(path.name, member=member)).text
 
 
@@ -52,7 +56,8 @@ async def test_nested_member_cannot_bypass_input_size_limit(tmp_path):
         archive.writestr("inner.zip", inner.getvalue())
     assert path.stat().st_size < len(inner.getvalue())
     files = FileSystem(
-        FileSystemOptions(directory=tmp_path, max_file_bytes=path.stat().st_size)
+        LocalWorkspace(tmp_path),
+        options=FileOptions(max_file_bytes=path.stat().st_size),
     )
     with pytest.raises(ValueError, match="max_file_bytes"):
         await files.read_file(path.name, member="inner.zip!/notes.txt")

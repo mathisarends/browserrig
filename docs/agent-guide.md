@@ -412,14 +412,12 @@ reopen them by application-owned ID, configure Harnessed 0.13.0's native store:
 ```python
 from pathlib import Path
 from harnessed.integrations.json import JsonSessionStore
-from browserrig import Agent, Chrome, FileSystemOptions
+from browserrig import Agent, Files, LocalWorkspace
 
 agent = Agent(
     model=model,
     store=JsonSessionStore(root=Path(".browserrig/sessions")),
-    browser=Chrome.launch(
-        files=FileSystemOptions(directory=Path(".browserrig/workspace")),
-    ),
+    plugins=[Files(LocalWorkspace(".browserrig/workspace"))],
 )
 async with agent.session(id="voyager") as session:
     await session.run("Find the Voyager launch dates.", max_steps=20)

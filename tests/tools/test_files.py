@@ -2,26 +2,35 @@ import asyncio
 
 # CDP handlers are exercised directly for missing and repeated completion events.
 # pylint: disable=protected-access
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
 from io import BytesIO
-from pathlib import Path
+from pathlib import PurePath, PurePosixPath, PureWindowsPath
 from threading import Event
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
-from harnessed import ToolError
+from harnessed import Agent, ToolError
+from harnessed.testing import ScriptedModel
 from pypdf import PdfReader, PdfWriter
 
 from browserrig import (
+    BrowserDownload,
     ChromeBrowser,
+    FileBridge,
+    FileOptions,
+    Files,
     FileSystem,
-    FileSystemOptions,
+    LocalWorkspace,
+    MountedWorkspace,
+    Workspace,
 )
 from browserrig.browser import Connect, Launch, Tab
 from browserrig.browser import downloads as downloads_module
 from browserrig.browser.downloads import Downloads
+from browserrig.browser.tabs import file_url
 from browserrig.events import (
     DownloadCanceledEvent,
     DownloadCompletedEvent,
@@ -34,25 +43,52 @@ from browserrig.events import (
     FilesListedEvent,
     FileWrittenEvent,
 )
-from browserrig.files import DownloadState
+from browserrig.files import DownloadState, FileStat, FileTransfer, workspace_path
 from browserrig.files.reading import FileReader
 from browserrig.kinds import FileSource, ReadinessPhase
 from browserrig.tools import Actions, FileTools
 from tests.fakes import mounted
+
+_PENDING = PurePosixPath("downloads/.pending")
+# Chrome on this machine reads the workspace directly.
+_MOUNTED = MountedWorkspace()
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("", "."),
+        (".", "."),
+        ("notes/./a.md", "notes/a.md"),
+        ("notes\\a.md", "notes/a.md"),
+        ("notes/../a.md", "a.md"),
+    ],
+)
+def test_workspace_paths_are_normalized_posix_paths(path, expected):
+    assert workspace_path(path) == PurePosixPath(expected)
+
+
+@pytest.mark.parametrize(
+    "path", ["../a.md", "notes/../../a.md", "/etc/passwd", "C:\\secret.txt", "C:a"]
+)
+def test_workspace_paths_reject_absolute_and_escaping_paths(path):
+    with pytest.raises(ValueError, match="outside the workspace"):
+        workspace_path(path)
 
 
 async def test_workspace_text_round_trip_pagination_and_explicit_overwrite(files):
     content = "Grüße aus dem Weltall 🌍\n" * 10
     assert not await files.exists("notes/research.md")
     saved = await files.write_file("notes/research.md", content)
+    assert saved.path == "notes/research.md"
     assert await files.exists(saved.path)
-    assert await files.resolve(saved.path, require_file=True) == Path(saved.path)
     assert saved.size == len(content.encode())
-    assert (await files.list_files()).entries[1].name == "notes"
+    assert "notes" in {entry.name for entry in (await files.list_files()).entries}
     assert (await files.list_files("notes")).entries[0].path == saved.path
     with pytest.raises(FileExistsError):
         await files.write_file("notes/research.md", "oops")
     first = await files.read_file(saved.path, max_chars=17)
+    assert first.path == saved.path
     second = await files.read_file(
         saved.path, offset=first.next_offset, max_chars=20000
     )
@@ -92,7 +128,9 @@ async def test_read_file_keeps_the_event_loop_responsive(files, monkeypatch):
         await asyncio.wait_for(started.wait(), timeout=2)
         # The parser is still waiting, but unrelated async file work can finish.
         assert not task.done()
-        assert (await files.list_files()).entries[1].name == "report.txt"
+        assert "report.txt" in {
+            entry.name for entry in (await files.list_files()).entries
+        }
     finally:
         release.set()
         content = await asyncio.wait_for(task, timeout=5)
@@ -102,23 +140,23 @@ async def test_read_file_keeps_the_event_loop_responsive(files, monkeypatch):
 @pytest.mark.parametrize("path", ["../private.txt", "notes/../../private.txt"])
 async def test_workspace_rejects_traversal_for_read_write_and_list(files, path):
     for operation in (
-        files.resolve,
         files.exists,
         files.read_file,
         files.list_files,
+        files.file,
         lambda p: files.write_file(p, "secret"),
     ):
         with pytest.raises(ValueError, match="outside"):
             await operation(path)
     with pytest.raises(ValueError, match="outside"):
-        await files.resolve(files.directory.parent / "secret.txt")
+        await files.read_file(str(files.workspace.directory.parent / "secret.txt"))
 
 
 async def test_workspace_rejects_symlink_escapes(files, tmp_path):
     outside = tmp_path / "private"
     outside.mkdir()
     (outside / "secret.txt").write_text("secret")
-    link = files.directory / "shortcut"
+    link = files.workspace.directory / "shortcut"
     try:
         link.symlink_to(outside, target_is_directory=True)
     except OSError:
@@ -136,49 +174,48 @@ async def test_workspace_rejects_symlink_escapes(files, tmp_path):
 
 
 async def test_pdf_pages_and_character_continuation(files, pdf_document):
-    path = files.directory / "report.pdf"
-    path.write_bytes(pdf_document)
-    first = await files.read_file(str(path), max_chars=8)
-    rest = await files.read_file(str(path), page_number=1, offset=first.next_offset)
+    (files.workspace.directory / "report.pdf").write_bytes(pdf_document)
+    first = await files.read_file("report.pdf", max_chars=8)
+    rest = await files.read_file("report.pdf", page_number=1, offset=first.next_offset)
     assert "First page: Voyager 1" in first.text + rest.text
     assert first.page_count == 2
     assert first.page_number == 1
-    second = await files.read_file(str(path), page_number=2)
+    assert first.extracted_path.startswith(".content/")
+    second = await files.read_file("report.pdf", page_number=2)
     assert "Second page: Voyager 2" in second.text
     assert "First page" not in second.text
     with pytest.raises(ValueError, match="2 pages"):
-        await files.read_file(str(path), page_number=3)
+        await files.read_file("report.pdf", page_number=3)
     with pytest.raises(ValueError, match="at least 1"):
-        await files.read_file(str(path), page_number=0)
+        await files.read_file("report.pdf", page_number=0)
 
 
 async def test_empty_encrypted_and_invalid_pdf_report_usable_errors(files):
-    path = files.directory / "report.pdf"
+    path = files.workspace.directory / "report.pdf"
     writer = PdfWriter()
     writer.add_blank_page(width=100, height=100)
     writer.write(path)
-    empty = await files.read_file(str(path))
+    empty = await files.read_file("report.pdf")
     assert empty.status == "partial"
     assert any("No extractable text" in item for item in empty.limitations)
     writer.encrypt("secret")
     writer.write(path)
     with pytest.raises(ValueError, match="encrypted"):
-        await files.read_file(str(path))
+        await files.read_file("report.pdf")
     path.write_bytes(b"not a PDF")
     with pytest.raises(ValueError, match="Could not read PDF"):
-        await files.read_file(str(path))
+        await files.read_file("report.pdf")
 
 
 async def test_binary_missing_and_oversized_files_are_not_read_as_text(files):
-    path = files.directory / "image.png"
-    path.write_bytes(b"\x89PNG\x00\x01")
+    (files.workspace.directory / "image.png").write_bytes(b"\x89PNG\x00\x01")
     with pytest.raises(OSError, match="identify image"):
-        await files.read_file(str(path))
+        await files.read_file("image.png")
     with pytest.raises(FileNotFoundError):
         await files.read_file("missing.txt")
-    small = FileSystem(FileSystemOptions(directory=files.directory, max_file_bytes=2))
+    small = FileSystem(files.workspace, options=FileOptions(max_file_bytes=2))
     with pytest.raises(ValueError, match="max_file_bytes"):
-        await small.read_file(str(path))
+        await small.read_file("image.png")
     with pytest.raises(ValueError, match="max_file_bytes"):
         await small.write_file("large.txt", "abc")
     await files.write_file("notes.txt", "test")
@@ -186,86 +223,165 @@ async def test_binary_missing_and_oversized_files_are_not_read_as_text(files):
         await files.read_file("notes.txt", page_number=1)
 
 
-async def test_downloads_keep_extensions_and_duplicate_names_without_overwriting(
-    files, pdf_document
+async def test_mounted_downloads_keep_extensions_and_duplicate_names(
+    files, transfer, pdf_document
 ):
     paths = []
     for download_id in ("first", "second"):
-        (files.pending_directory / download_id).write_bytes(pdf_document)
-        paths.append(await files.complete_download(download_id, "report.pdf", None))
-    assert paths[0] != paths[1]
-    assert all(Path(path).name == "report.pdf" for path in paths)
-    assert all(Path(path).read_bytes() == pdf_document for path in paths)
-    assert len(PdfReader(BytesIO(Path(paths[0]).read_bytes())).pages) == 2
+        _pending(files, download_id).write_bytes(pdf_document)
+        paths.append(await _complete(transfer, download_id, "report.pdf"))
+    assert paths == ["downloads/first/report.pdf", "downloads/second/report.pdf"]
+    stored = [(files.workspace.directory / path).read_bytes() for path in paths]
+    assert stored == [pdf_document, pdf_document]
+    assert len(PdfReader(BytesIO(stored[0])).pages) == 2
+    assert not _pending(files, "first").exists()
 
 
 @pytest.mark.parametrize(
     "filename", ["../../report.pdf", "CON.pdf", "bad:name?.pdf", "a" * 300 + ".pdf"]
 )
-async def test_download_names_are_safe_on_windows_and_preserve_suffix(files, filename):
-    (files.pending_directory / "download-id").write_bytes(b"content")
-    saved = Path(await files.complete_download("download-id", filename, None))
-    assert saved.is_relative_to(files.download_directory)
-    assert saved.suffix == ".pdf"
-    assert saved.read_bytes() == b"content"
-
-
-async def test_explicit_download_directory_is_accessible_without_opening_other_paths(
-    tmp_path,
+async def test_download_names_are_safe_on_windows_and_preserve_suffix(
+    files, transfer, filename
 ):
-    files = FileSystem(
-        FileSystemOptions(directory=tmp_path / "workspace"),
-        download_directory=str(tmp_path / "downloads"),
-    )
-    await files.initialize()
-    (files.pending_directory / "id").write_text("download")
-    path = await files.complete_download("id", "note.txt", None)
-    assert (await files.read_file(path)).text == "download"
-    with pytest.raises(ValueError, match="outside"):
-        await files.resolve(tmp_path / "other")
+    _pending(files, "download-id").write_bytes(b"content")
+    saved = PurePosixPath(await _complete(transfer, "download-id", filename))
+    assert saved.parent == PurePosixPath("downloads/download-id")
+    assert saved.suffix == ".pdf"
+    assert (files.workspace.directory / saved).read_bytes() == b"content"
 
 
-async def test_uploads_resolve_workspace_and_separate_download_paths(tmp_path):
-    files = FileSystem(
-        FileSystemOptions(directory=tmp_path / "workspace"),
-        download_directory=str(tmp_path / "downloads"),
-    )
+async def test_mounted_workspace_tells_chrome_the_pending_directory(files, transfer):
+    directory = await transfer.download_directory()
+    assert directory == files.workspace.directory / "downloads" / ".pending"
+    assert (files.workspace.directory / _PENDING).is_dir()
+
+
+async def test_mounted_workspace_maps_paths_onto_another_host(tmp_path):
+    files = FileSystem(LocalWorkspace(tmp_path))
+    transfer = FileTransfer(files, MountedWorkspace("/workspace"))
     await files.initialize()
+    await files.write_file("downloads/id/report.txt", "report")
+    staged = await transfer.stage(["downloads/id/report.txt"])
+    assert staged.paths == ("downloads/id/report.txt",)
+    assert staged.browser_paths == (
+        PurePosixPath("/workspace/downloads/id/report.txt"),
+    )
+    assert await transfer.download_directory() == PurePosixPath(
+        "/workspace/downloads/.pending"
+    )
+    windows = MountedWorkspace("D:\\agent")
+    assert windows.browser_path == PureWindowsPath("D:/agent")
+    with pytest.raises(ValueError, match="absolute"):
+        MountedWorkspace("workspace")
+
+
+@pytest.mark.parametrize(
+    ("path", "url"),
+    [
+        (PurePosixPath("/workspace/a b/r.pdf"), "file:///workspace/a%20b/r.pdf"),
+        (PureWindowsPath("C:/Users/a b/r.pdf"), "file:///C:/Users/a%20b/r.pdf"),
+        (PureWindowsPath("//server/share/r.pdf"), "file://server/share/r.pdf"),
+    ],
+)
+def test_browser_host_paths_open_as_file_urls_of_the_host_os(path, url):
+    assert file_url(path) == url
+
+
+async def test_stage_validates_the_whole_selection_and_returns_host_paths(
+    files, transfer
+):
     saved = await files.write_file("report.txt", "report")
-    (files.pending_directory / "id").write_text("download")
-    downloaded = await files.complete_download("id", "note.txt", None)
-    assert await files.upload_paths(["report.txt", downloaded]) == [
-        saved.path,
-        downloaded,
-    ]
+    _pending(files, "id").write_text("download")
+    downloaded = await _complete(transfer, "id", "note.txt")
+    staged = await transfer.stage(["report.txt", downloaded])
+    assert staged.paths == (saved.path, downloaded)
+    assert staged.browser_paths == (
+        files.workspace.directory / "report.txt",
+        files.workspace.directory / "downloads/id/note.txt",
+    )
 
 
-async def test_uploads_reject_empty_missing_directory_and_outside_paths(
-    files, tmp_path
+async def test_stage_rejects_empty_missing_directory_and_outside_paths(
+    files, transfer, tmp_path
 ):
     saved = await files.write_file("report.txt", "report")
     secret = tmp_path / "secret.txt"
     secret.write_text("private")
     for path in (str(secret), "../secret.txt"):
         with pytest.raises(ValueError, match="outside"):
-            await files.upload_paths([saved.path, path])
+            await transfer.stage([saved.path, path])
     for path in ("missing.txt", "."):
-        with pytest.raises(FileNotFoundError, match="existing file"):
-            await files.upload_paths([path])
+        with pytest.raises(FileNotFoundError, match="File not found"):
+            await transfer.stage([path])
     with pytest.raises(ValueError, match="at least one"):
-        await files.upload_paths([])
+        await transfer.stage([])
 
 
-async def test_uploads_reject_symlinks_to_outside_files(files, tmp_path):
+async def test_stage_rejects_symlinks_to_outside_files(files, transfer, tmp_path):
     secret = tmp_path / "secret.txt"
     secret.write_text("private")
-    link = files.directory / "report.txt"
+    link = files.workspace.directory / "report.txt"
     try:
         link.symlink_to(secret)
     except OSError:
         pytest.skip("Creating symlinks is unavailable on this host")
     with pytest.raises(ValueError, match="outside"):
-        await files.upload_paths([str(link)])
+        await transfer.stage(["report.txt"])
+
+
+async def test_workspace_without_a_bridge_keeps_files_but_cannot_reach_chrome(files):
+    await files.write_file("report.txt", "report")
+    async with _file_tools(files, bridge=None) as (services, tools):
+        assert services.browser.receiving is None
+        await tools.read_file("report.txt")
+        with pytest.raises(ToolError, match="file bridge"):
+            await tools.open_file("report.txt")
+    assert _first(services.events, FileReadFinishedEvent).path == "report.txt"
+
+
+async def test_remote_workspace_and_cloud_bridge_handle_reads_downloads_and_uploads(
+    pdf_document,
+):
+    workspace = _MemoryWorkspace()
+    bridge = _CloudBridge()
+    assert isinstance(workspace, Workspace) and isinstance(bridge, FileBridge)
+    files = FileSystem(workspace)
+    transfer = FileTransfer(files, bridge)
+    await files.initialize()
+
+    assert await transfer.download_directory() == PurePosixPath("/cloud/downloads")
+    bridge.remote["dl-1"] = pdf_document
+    path = await transfer.receive(
+        "dl-1", "report.pdf", "https://example.org/report.pdf", None
+    )
+    assert path == "downloads/dl-1/report.pdf"
+    assert workspace.files[PurePosixPath(path)] == pdf_document
+    assert bridge.received[0].url == "https://example.org/report.pdf"
+
+    # Remote files are parsed from a local copy; the extraction stays local.
+    document = await files.read_file(path, page_number=2)
+    assert "Second page: Voyager 2" in document.text
+    assert document.path == path and document.extracted_path is None
+    assert len(workspace.reads) == 1
+    await files.read_file(path, page_number=1)
+    assert len(workspace.reads) == 1
+
+    staged = await transfer.stage([path])
+    assert staged.browser_paths == (PurePosixPath("/cloud/uploads/report.pdf"),)
+    assert bridge.uploaded == {"report.pdf": pdf_document}
+
+    listing = await files.list_files("downloads/dl-1")
+    assert [entry.path for entry in listing.entries] == [path]
+    await files.aclose()
+
+
+async def test_remote_reads_respect_the_size_limit_before_copying():
+    workspace = _MemoryWorkspace()
+    files = FileSystem(workspace, options=FileOptions(max_file_bytes=4))
+    await workspace.write_bytes(PurePosixPath("large.txt"), b"too large")
+    with pytest.raises(ValueError, match="max_file_bytes"):
+        await files.read_file("large.txt")
+    assert not workspace.reads
 
 
 _COMPLETED = DownloadProgressEvent(
@@ -277,11 +393,12 @@ async def test_download_completion_falls_back_to_guid_and_tolerates_repeated_eve
     tmp_path,
 ):
     files, downloads, emit = await _started_download(tmp_path)
-    (files.pending_directory / "id").write_text("download")
+    _pending(files, "id").write_text("download")
     await downloads.handle(_COMPLETED)
     await downloads.handle(_COMPLETED)
     (download,) = downloads.all()
     assert download.state is DownloadState.COMPLETED
+    assert download.path == "downloads/id/note.txt"
     assert (await files.read_file(download.path)).text == "download"
     assert download.error is None
     completed = [call.args[0] for call in emit.await_args_list]
@@ -295,6 +412,30 @@ async def test_missing_download_fails_without_raising(tmp_path):
     assert download.path is None
     assert "could not be saved" in download.error
     assert isinstance(emit.await_args.args[0], DownloadFailedEvent)
+
+
+async def test_a_failing_bridge_ends_the_download_as_failed(tmp_path):
+    class _Broken(MountedWorkspace):
+        async def receive(self, workspace, download, destination):
+            raise RuntimeError("provider unavailable")
+
+    _, downloads, emit = await _started_download(tmp_path, _Broken())
+    await downloads.handle(_COMPLETED)
+    (download,) = downloads.all()
+    assert download.state is DownloadState.COMPLETED and download.path is None
+    assert "provider unavailable" in download.error
+    assert isinstance(emit.await_args.args[0], DownloadFailedEvent)
+
+
+async def test_downloads_are_not_received_unless_chrome_saves_them_for_the_bridge(
+    tmp_path,
+):
+    _, downloads, emit = await _started_download(tmp_path, None)
+    await downloads.handle(_COMPLETED)
+    (download,) = downloads.all()
+    assert download.state is DownloadState.COMPLETED
+    assert download.path is None and download.error is None
+    assert isinstance(emit.await_args.args[0], DownloadCompletedEvent)
 
 
 async def test_download_progress_is_throttled_and_cancel_is_not_a_failure(
@@ -365,6 +506,7 @@ async def test_open_file_reports_the_file_in_its_new_tab(files, monkeypatch):
         browser.active_tab = Tab("current", SimpleNamespace(), emit=services.record)
         browser.tabs.open = AsyncMock(return_value=opened)
         await tools.open_file("report.txt")
+    browser.tabs.open.assert_awaited_once_with(files.workspace.directory / "report.txt")
     report = _first(services.events, FileOpenedEvent)
     # Nobody watches, so nothing is staged and nothing pauses.
     sleep.assert_not_awaited()
@@ -375,14 +517,23 @@ async def test_open_file_reports_the_file_in_its_new_tab(files, monkeypatch):
     assert services.readiness.phases == [ReadinessPhase.NAVIGATION]
 
 
-def test_remote_browser_requires_explicit_shared_filesystem(tmp_path):
+async def test_browsers_choose_the_bridge_and_files_choose_the_workspace(tmp_path):
     endpoint = "http://127.0.0.1:9222"
-    assert ChromeBrowser(Connect(endpoint=endpoint)).files is None
-    shared = ChromeBrowser(
-        Connect(endpoint=endpoint, files=FileSystemOptions(directory=tmp_path))
-    )
-    assert shared.files.directory == tmp_path
-    assert ChromeBrowser(Launch()).files is not None
+    assert ChromeBrowser(Connect(endpoint=endpoint)).bridge is None
+    bridge = MountedWorkspace("/workspace")
+    assert ChromeBrowser(Connect(endpoint=endpoint, bridge=bridge)).bridge is bridge
+    assert isinstance(ChromeBrowser(Launch()).bridge, MountedWorkspace)
+
+    workspace = LocalWorkspace(tmp_path)
+    async with mounted(Files(workspace)) as (_services, ctx):
+        assert ctx[FileSystem].workspace is workspace
+    # Without a workspace, each session gets its own.
+    agent = Agent(model=ScriptedModel(["Done", "Done"]), plugins=[Files()])
+    directories = []
+    for _ in range(2):
+        async with agent.session() as session:
+            directories.append(session.scope[FileSystem].workspace.directory)
+    assert directories[0] != directories[1]
 
 
 async def test_io_errors_become_model_visible_tool_errors(files):
@@ -391,8 +542,9 @@ async def test_io_errors_become_model_visible_tool_errors(files):
             await tools.list_files("missing")
 
 
-@pytest.mark.parametrize("path", ["missing.txt", "downloads"])
+@pytest.mark.parametrize("path", ["missing.txt", "notes"])
 async def test_open_file_requires_an_existing_regular_file(files, path):
+    (files.workspace.directory / "notes").mkdir()
     async with _file_tools(files) as (_services, tools):
         with pytest.raises(ToolError, match="File not found"):
             await tools.open_file(path)
@@ -415,10 +567,98 @@ async def test_cancelled_read_reports_failure_and_propagates_cancellation(
 
 @pytest.fixture(name="files")
 async def _files(tmp_path):
-    workspace = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
-    assert not workspace.directory.exists()
-    await workspace.initialize()
-    return workspace
+    files = FileSystem(LocalWorkspace(tmp_path / "workspace"))
+    assert not files.workspace.directory.exists()
+    await files.initialize()
+    return files
+
+
+@pytest.fixture(name="transfer")
+async def _transfer(files):
+    transfer = FileTransfer(files, MountedWorkspace())
+    await transfer.download_directory()
+    return transfer
+
+
+class _MemoryWorkspace:
+    """A workspace that lives elsewhere, such as on a pod or in a bucket."""
+
+    def __init__(self) -> None:
+        self.files: dict[PurePosixPath, bytes] = {}
+        self.reads: list[PurePosixPath] = []
+
+    async def initialize(self) -> None:
+        pass
+
+    async def stat(self, path: PurePosixPath) -> FileStat | None:
+        if path in self.files:
+            return FileStat(path, False, len(self.files[path]), 1.0)
+        if any(path in item.parents for item in self.files):
+            return FileStat(path, True, None, 1.0)
+        return None
+
+    async def list(self, path: PurePosixPath) -> Sequence[FileStat]:
+        children = {
+            path / item.relative_to(path).parts[0]
+            for item in self.files
+            if path in item.parents
+        }
+        return [await self.stat(child) for child in children]
+
+    async def read_bytes(self, path: PurePosixPath) -> bytes:
+        self.reads.append(path)
+        return self.files[path]
+
+    async def write_bytes(
+        self, path: PurePosixPath, data: bytes, *, overwrite: bool = False
+    ) -> None:
+        if path in self.files and not overwrite:
+            raise FileExistsError(path)
+        self.files[path] = data
+
+    async def create_directory(self, path: PurePosixPath) -> None:
+        pass
+
+    async def move(self, source: PurePosixPath, destination: PurePosixPath) -> None:
+        self.files[destination] = self.files.pop(source)
+
+
+class _CloudBridge:
+    """A cloud browser provider's file API, reached without a shared disk."""
+
+    def __init__(self) -> None:
+        self.remote: dict[str, bytes] = {}
+        self.received: list[BrowserDownload] = []
+        self.uploaded: dict[str, bytes] = {}
+
+    async def download_directory(  # pylint: disable=unused-argument
+        self, workspace: Workspace
+    ) -> PurePath:
+        return PurePosixPath("/cloud/downloads")
+
+    async def receive(
+        self,
+        workspace: Workspace,
+        download: BrowserDownload,
+        destination: PurePosixPath,
+    ) -> None:
+        self.received.append(download)
+        await workspace.write_bytes(destination, self.remote[download.id])
+
+    async def send(
+        self, workspace: Workspace, paths: Sequence[PurePosixPath]
+    ) -> list[PurePath]:
+        for path in paths:
+            self.uploaded[path.name] = await workspace.read_bytes(path)
+        return [PurePosixPath("/cloud/uploads") / path.name for path in paths]
+
+
+def _pending(files, download_id):
+    return files.workspace.directory / _PENDING / download_id
+
+
+async def _complete(transfer, download_id, filename):
+    return await transfer.receive(download_id, filename, "https://example.org", None)
 
 
 def _progress(received, state, total=8):
@@ -432,9 +672,9 @@ class _FileTools(FileTools, provides=True):
 
 
 @asynccontextmanager
-async def _file_tools(files):
-    async with mounted(Actions(), _FileTools()) as (services, ctx):
-        services.browser.files = files
+async def _file_tools(files, bridge=_MOUNTED):
+    plugins = (Actions(), _FileTools())
+    async with mounted(*plugins, bridge=bridge, files=files) as (services, ctx):
         yield services, ctx[_FileTools]
 
 
@@ -442,11 +682,15 @@ def _first(events, kind):
     return next(event for event in events if isinstance(event, kind))
 
 
-async def _started_download(tmp_path):
-    files = FileSystem(FileSystemOptions(directory=tmp_path))
+async def _started_download(tmp_path, bridge=_MOUNTED):
+    files = FileSystem(LocalWorkspace(tmp_path))
     await files.initialize()
+    transfer = FileTransfer(files, bridge) if bridge is not None else None
     emit = AsyncMock()
-    downloads = Downloads(files=files, directory=None, emit=emit)
+    downloads = Downloads(emit=emit)
+    cdp = SimpleNamespace(browser=SimpleNamespace(set_download_behavior=AsyncMock()))
+    receiving = await downloads.receive(cdp, "context", transfer)
+    assert receiving is (transfer is not None)
     await downloads.handle(
         DownloadWillBeginEvent(
             frame_id="frame",

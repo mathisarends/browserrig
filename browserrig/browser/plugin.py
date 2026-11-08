@@ -11,7 +11,7 @@ from pydantic import SecretStr
 
 from browserrig.core import TargetId, use_tracer
 from browserrig.events import BROWSER_EVENTS
-from browserrig.files import FileSystemOptions
+from browserrig.files import FileBridge, MountedWorkspace
 
 from .base import Browser, BrowserEvents
 from .chrome import ChromeBrowser
@@ -41,13 +41,14 @@ class Chrome(Plugin, slot="browserrig.browser"):
         session_setup: tuple[SessionSetup, ...] = (),
         timeout: float = 20,
         arguments: tuple[str, ...] = (),
-        download_directory: str | None = None,
-        files: FileSystemOptions | None = None,
+        bridge: FileBridge | None = None,
     ) -> Self:
         """Configure a process started at session entry and stopped at session exit.
 
-        This call validates configuration without starting Chrome or creating files.
-        Use the returned plugin as `Agent(browser=...)` or in `plugins=[...]`.
+        Chrome runs on this machine, so it reads a local workspace directly; pass a
+        `bridge` for a workspace it cannot see. This call validates configuration
+        without starting Chrome. Use the returned plugin as `Agent(browser=...)` or
+        in `plugins=[...]`.
         """
         return cls(
             Launch(
@@ -58,8 +59,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
                 session_setup=session_setup,
                 timeout=timeout,
                 arguments=arguments,
-                download_directory=download_directory,
-                files=files if files is not None else FileSystemOptions(),
+                bridge=bridge if bridge is not None else MountedWorkspace(),
             )
         )
 
@@ -74,14 +74,16 @@ class Chrome(Plugin, slot="browserrig.browser"):
         headers: Mapping[str, str | SecretStr] | None = None,
         viewport: Viewport | None = None,
         session_setup: tuple[SessionSetup, ...] = (),
-        download_directory: str | None = None,
-        files: FileSystemOptions | None = None,
+        bridge: FileBridge | None = None,
     ) -> Self:
         """Configure a connection opened at session entry to an existing CDP browser.
 
         Session exit disconnects without stopping the external process. By default
         a fresh isolated context is created; `target_id` selects an existing tab.
-        This call validates configuration without connecting or creating files.
+        Chrome runs elsewhere, so it reaches the agent's workspace only through a
+        `bridge`; without one, downloads stay on its host and the agent cannot open
+        or upload workspace files. This call validates configuration without
+        connecting.
         """
         return cls(
             Connect(
@@ -95,8 +97,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
                 },
                 viewport=viewport,
                 session_setup=session_setup,
-                download_directory=download_directory,
-                files=files,
+                bridge=bridge,
             )
         )
 

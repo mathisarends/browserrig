@@ -31,7 +31,7 @@ from browserrig.events import (
     ConnectedEvent,
     DisconnectedEvent,
 )
-from browserrig.files import Download, FileSystem
+from browserrig.files import Download, FileBridge, FileTransfer
 from browserrig.input import Input, InputTarget, Keyboard, Mouse
 
 from .base import BrowserEvents, EventSink, _discard
@@ -70,20 +70,12 @@ class ChromeBrowser:
         on_tab_change: TabListener | None = None,
     ) -> None:
         self._options = options if options is not None else Launch()
-        files = self._options.files
-        self.files = (
-            FileSystem(files, download_directory=self._options.download_directory)
-            if files is not None
-            else None
-        )
+        self.bridge: FileBridge | None = self._options.bridge
         self.id = uuid4().hex
         self.events = BrowserEvents(self.id, emit)
         self._stack: AsyncExitStack | None = None
-        self._downloads = Downloads(
-            files=self.files,
-            directory=self._options.download_directory,
-            emit=self.events.emit,
-        )
+        self._downloads = Downloads(emit=self.events.emit)
+        self._context: str | None = None
         self._tasks: list[asyncio.Task[None]] = []
         self._failure: Exception | None = None
         self._connected = False
@@ -106,8 +98,6 @@ class ChromeBrowser:
         self._stack = AsyncExitStack()
         try:
             options = self._options
-            if self.files is not None:
-                await self.files.initialize()
             async with asyncio.timeout(options.timeout):
                 endpoint = await self._resolve_endpoint()
                 self.client = await self._stack.enter_async_context(
@@ -117,9 +107,7 @@ class ChromeBrowser:
                         default_timeout=options.timeout,
                     )
                 )
-                context = await self.tabs.start(self.client, self._stack)
-                if context is not None:
-                    await self._downloads.enable(self.client, context)
+                self._context = await self.tabs.start(self.client, self._stack)
                 self._start_listeners()
                 self._stack.push_async_callback(self._stop_listeners)
                 await self.client.target.set_discover_targets(discover=True)
@@ -150,6 +138,15 @@ class ChromeBrowser:
 
     async def downloads(self) -> tuple[Download, ...]:
         return self._downloads.all()
+
+    async def receive_downloads(self, transfer: FileTransfer | None) -> bool:
+        """Save later downloads into the workspace through `transfer`; `None` stops.
+
+        Returns whether downloads are received. An attached tab keeps its browser's
+        download policy, so its downloads are tracked only.
+        """
+        self._check()
+        return await self._downloads.receive(self.client, self._context, transfer)
 
     async def aclose(self) -> None:
         if self._close_task is None:

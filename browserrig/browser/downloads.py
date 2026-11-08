@@ -10,7 +10,7 @@ from browserrig.events import (
     DownloadProgressedEvent,
     DownloadStartedEvent,
 )
-from browserrig.files import Download, DownloadState, FileSystem
+from browserrig.files import Download, DownloadState, FileTransfer
 
 from .base import EventSink
 
@@ -19,28 +19,30 @@ _PROGRESS_INTERVAL_SECONDS = 0.2
 
 
 class Downloads:
-    """Track browser downloads and move completed files into the workspace."""
+    """Track browser downloads and bring completed files into the workspace."""
 
-    def __init__(
-        self, *, files: FileSystem | None, directory: str | None, emit: EventSink
-    ) -> None:
-        self._files = files
-        self._directory = directory
+    def __init__(self, *, emit: EventSink) -> None:
+        # Only downloads Chrome saves where the bridge expects them can be received.
+        self._transfer: FileTransfer | None = None
         self._emit = emit
         self._items: dict[str, Download] = {}
         self._progress_at: dict[str, float] = {}
 
-    async def enable(self, client: CdpClient, context_id: str | None) -> None:
-        directory = (
-            str(self._files.pending_directory) if self._files else self._directory
+    async def receive(
+        self, client: CdpClient, context_id: str | None, transfer: FileTransfer | None
+    ) -> bool:
+        self._transfer = None
+        if transfer is None or context_id is None:
+            return False
+        directory = await transfer.download_directory()
+        await client.browser.set_download_behavior(
+            behavior="allowAndName",
+            download_path=str(directory),
+            browser_context_id=context_id,
+            events_enabled=True,
         )
-        if directory is not None:
-            await client.browser.set_download_behavior(
-                behavior="allowAndName",
-                download_path=directory,
-                browser_context_id=context_id,
-                events_enabled=True,
-            )
+        self._transfer = transfer
+        return True
 
     def all(self) -> tuple[Download, ...]:
         return tuple(self._items.values())
@@ -73,14 +75,15 @@ class Downloads:
         if event.state == DownloadState.IN_PROGRESS:
             await self._report_progress(previous, int(event.received_bytes), total)
             return
-        path, error = event.file_path, None
-        if event.state == DownloadState.COMPLETED and self._files is not None:
+        path, error = None, None
+        transfer = self._transfer
+        if event.state == DownloadState.COMPLETED and transfer is not None:
             try:
-                path = await self._files.complete_download(
-                    guid, previous.filename, path
+                path = await transfer.receive(
+                    guid, previous.filename, previous.url, event.file_path or None
                 )
-            except (OSError, ValueError) as failure:
-                # A single missing file must not stop browser event processing.
+            except Exception as failure:  # pylint: disable=broad-exception-caught
+                # A custom bridge may fail in its own ways; the download must still end.
                 path, error = None, f"Downloaded file could not be saved: {failure}"
         download = Download(
             id=guid,

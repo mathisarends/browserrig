@@ -1,4 +1,5 @@
-from .config import FileSystemOptions
+from .bridge import BrowserDownload, FileBridge, MountedWorkspace
+from .config import FileOptions
 from .kinds import FileExtension
 from .models import (
     Download,
@@ -9,17 +10,31 @@ from .models import (
     FileSystemState,
     FileSystemView,
 )
+from .plugin import Files
 from .system import FileSystem
+from .transfer import DOWNLOADS, FileTransfer, StagedFiles
+from .workspace import FileStat, LocalWorkspace, Workspace, workspace_path
 
 __all__ = [
+    "DOWNLOADS",
+    "BrowserDownload",
     "Download",
     "DownloadState",
+    "FileBridge",
     "FileContent",
-    "FileExtension",
     "FileEntry",
+    "FileExtension",
     "FileListing",
+    "FileOptions",
+    "Files",
+    "FileStat",
     "FileSystem",
-    "FileSystemOptions",
     "FileSystemState",
     "FileSystemView",
+    "FileTransfer",
+    "LocalWorkspace",
+    "MountedWorkspace",
+    "StagedFiles",
+    "Workspace",
+    "workspace_path",
 ]

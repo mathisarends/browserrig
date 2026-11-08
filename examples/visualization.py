@@ -15,9 +15,10 @@ from browserrig import (
     Agent,
     Browser,
     Chrome,
-    FileSystemOptions,
+    Files,
     IframeRenderer,
     InputVisualization,
+    LocalWorkspace,
     VideoRecording,
     Viewport,
 )
@@ -46,9 +47,9 @@ async def main() -> None:
                 url=url,
                 headless=not args.headed,
                 viewport=Viewport(width=1440, height=1000),
-                files=FileSystemOptions(directory=directory / "workspace"),
             ),
             plugins=[
+                Files(LocalWorkspace(directory / "workspace")),
                 InputVisualization(renderer=renderer),
                 VideoRecording(directory / "recording", width=1440, height=1000),
             ],

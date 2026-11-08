@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from contextlib import AsyncExitStack, suppress
-from pathlib import Path
+from pathlib import Path, PurePath, PureWindowsPath
 from typing import TYPE_CHECKING
+from urllib.parse import quote
 
 from cdpify import CdpClient, CdpSession
 from cdpify.domains.page import FrameNavigatedEvent
@@ -118,17 +119,18 @@ class Tabs:
             )
         return tuple(found)
 
-    async def open(self, target: str | Path = "about:blank") -> Tab:
-        """Open a URL, or a local file that calling code has already vetted.
+    async def open(self, target: str | PurePath = "about:blank") -> Tab:
+        """Open a URL, or a file on the browser host that calling code has vetted.
 
         Strings may come from the model and are limited to HTTP(S) and about:blank.
-        A `Path` opens as file:// without checks; resolve it through `files` first.
+        A path opens as file:// without checks; get it from `FileTransfer.stage` first.
         """
-        url = (
-            target.absolute().as_uri()
-            if isinstance(target, Path)
-            else validated_url(target)
-        )
+        if isinstance(target, Path):
+            url = target.absolute().as_uri()
+        elif isinstance(target, PurePath):
+            url = file_url(target)
+        else:
+            url = validated_url(target)
         self._check()
         opened: list[Tab] = []
 
@@ -352,6 +354,19 @@ class Tabs:
                 self._worlds.invalidate(frame_id=frame.id)
                 for tab in self._tabs.values():
                     tab.layout_changed()
+
+
+def file_url(path: PurePath) -> str:  # smelt: ignore[SMT429] -- pure, table-tested
+    """A file:// URL for a path on the browser host, whose OS may differ from ours."""
+    if not path.is_absolute():
+        raise ValueError("A browser host path must be absolute")
+    posix = path.as_posix()
+    if isinstance(path, PureWindowsPath):
+        if path.drive.endswith(":"):
+            rest = posix[len(path.drive) :].lstrip("/")
+            return f"file:///{path.drive}/{quote(rest)}"
+        return "file:" + quote(posix)
+    return "file://" + quote(posix)
 
 
 async def _enable_session(

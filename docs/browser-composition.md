@@ -437,7 +437,7 @@ custom-event support does not imply every persisted SDK event appears in a turn 
 replaces the built-in one: `plugins=[BrowserPerception(capture=DomCapture(...),
 screenshots=Screenshots(...)), Readiness(...), ImageContext(...), Actions(...),
 InputPacing(motor)]`.
-Pass `without=(FileTools,)` when local file tools should be omitted.
+Pass `without=(Files, FileTools)` when local file tools should be omitted.
 
 The default recipe mounts every tool group; ref-based tools hide themselves for
 captures without refs. Transient availability (for example a missing workspace) still uses
@@ -447,4 +447,4 @@ Keep file readers as ordinary functions/strategies, not one plugin per file form
 For manual compositions, add `ImageContext()` explicitly: `BrowserPerception` no longer
 injects images itself. Configure `Readiness` and `BrowserPerception` independently.
 Harnessed filesystem tools can replace local file tools by passing
-`without=(FileTools,)`; browser download paths are not automatically sandbox paths.
+`without=(Files, FileTools)`; browser download paths are not automatically sandbox paths.

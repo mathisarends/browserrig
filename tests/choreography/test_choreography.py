@@ -37,7 +37,7 @@ from browserrig.events import (
     KeyPressedEvent,
     NavigationStartedEvent,
 )
-from browserrig.files import FileSystem, FileSystemOptions
+from browserrig.files import FileSystem, LocalWorkspace, MountedWorkspace
 from browserrig.input import mouse as mouse_module
 from browserrig.pacing import InputPacing
 from browserrig.scripts import FindResult
@@ -134,9 +134,13 @@ def _timeline(monkeypatch):
 
 
 @asynccontextmanager
-async def _staged(timeline, *plugins, staging=STAGING):
+async def _staged(timeline, *plugins, staging=STAGING, files=None):
     staged = tuple(plugin() for plugin in staging)
-    async with mounted(*staged, Actions(), *plugins) as (services, ctx):
+    bridge = MountedWorkspace() if files is not None else None
+    async with mounted(*staged, Actions(), *plugins, bridge=bridge, files=files) as (
+        services,
+        ctx,
+    ):
         services.events = timeline
         browser = services.browser
         browser.active_tab = _Tab(timeline, "tab-1")
@@ -327,11 +331,10 @@ async def test_wait_announces_its_duration_then_pauses(timeline):
 async def test_open_file_moves_the_file_out_before_the_new_tab_opens(
     timeline, tmp_path
 ):
-    files = FileSystem(FileSystemOptions(directory=tmp_path))
+    files = FileSystem(LocalWorkspace(tmp_path))
     await files.initialize()
     await files.write_file("report.txt", "report")
-    async with _staged(timeline, _FileTools()) as (services, ctx):
-        services.browser.files = files
+    async with _staged(timeline, _FileTools(), files=files) as (_, ctx):
         await ctx[_FileTools].open_file("report.txt")
     assert _shown(timeline) == [
         "open_file started",
@@ -351,7 +354,7 @@ async def test_open_file_moves_the_file_out_before_the_new_tab_opens(
 async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
     timeline, tmp_path, monkeypatch
 ):
-    files = FileSystem(FileSystemOptions(directory=tmp_path))
+    files = FileSystem(LocalWorkspace(tmp_path))
     await files.initialize()
     await files.write_file("report.txt", "report")
 
@@ -375,8 +378,7 @@ async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
         return False
 
     monkeypatch.setattr(targeting_module, "prepare_element", prepare)
-    async with _staged(timeline, _FileTools()) as (services, ctx):
-        services.browser.files = files
+    async with _staged(timeline, _FileTools(), files=files) as (services, ctx):
         services.observe.element = element
         # Already resting on the input, so the pointer does not travel.
         await services.browser.mouse.move_to(Point(x=40, y=30))

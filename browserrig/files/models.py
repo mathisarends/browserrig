@@ -1,5 +1,4 @@
 from enum import StrEnum
-from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
@@ -23,12 +22,15 @@ class Download(Options):
     received_bytes: int = 0
     total_bytes: int | None = None
     path: str | None = None
+    """Workspace path once completed and saved; otherwise `None`."""
     error: str | None = None
 
 
 class FileSystemState(Options):
-    directory: Path | None
-    download_directory: Path | None
+    workspace: bool
+    """Whether the agent has a workspace for file tools."""
+    download_directory: str | None
+    """Workspace directory for downloads; `None` while they stay on the browser host."""
     downloads: tuple[Download, ...]
     total_downloads: int = Field(ge=0)
 

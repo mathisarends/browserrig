@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 from harnessed import ToolError
 
-from browserrig import FileSystem, FileSystemOptions
+from browserrig import FileSystem, LocalWorkspace, MountedWorkspace
 from browserrig.browser import Tab
 from browserrig.core import Bounds, BrowserError, ElementPoint, Point
 from browserrig.events import (
@@ -57,7 +57,7 @@ async def test_validation_rejects_before_dispatch():
 async def test_upload_rejects_invalid_selection_before_any_browser_input(
     tmp_path, selection
 ):
-    files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
+    files = FileSystem(LocalWorkspace(tmp_path / "workspace"))
     await files.initialize()
     saved = await files.write_file("report.txt", "report")
     secret = tmp_path / "secret.txt"
@@ -74,7 +74,7 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(
 
 
 async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path):
-    files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
+    files = FileSystem(LocalWorkspace(tmp_path / "workspace"))
     await files.initialize()
     saved = await files.write_file("report.txt", "report")
     async with _uploads(files) as upload:
@@ -82,7 +82,10 @@ async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path):
             "input", ["report.txt"], actions=upload.actions
         )
     assert result.text == "Files assigned to input."
-    upload.handle.upload_files.assert_awaited_once_with([saved.path])
+    # Chrome reads the file on its own host; events keep the workspace path.
+    upload.handle.upload_files.assert_awaited_once_with(
+        [str(files.workspace.directory / "report.txt")]
+    )
     upload.actions.element_point.assert_awaited_once()
     assert upload.services.browser.mouse.position == Point(x=40, y=30)
     uploaded = _first(upload.services.events, FilesUploadedEvent)
@@ -193,10 +196,11 @@ class _Upload(NamedTuple):
 
 @asynccontextmanager
 async def _uploads(files):
-    async with mounted(Actions(), _FileTools()) as (services, ctx):
+    plugins = (Actions(), _FileTools())
+    bridge = MountedWorkspace()
+    async with mounted(*plugins, bridge=bridge, files=files) as (services, ctx):
         cdp = SimpleNamespace(input=SimpleNamespace(dispatch_mouse_event=AsyncMock()))
         services.browser.active_tab = Tab("tab", cdp, emit=services.record)
-        services.browser.files = files
         handle = SimpleNamespace(
             element=SimpleNamespace(input_type="file"), upload_files=AsyncMock()
         )

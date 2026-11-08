@@ -1,6 +1,8 @@
 import asyncio
 import base64
-from pathlib import Path
+from collections.abc import Sequence
+from contextlib import asynccontextmanager
+from pathlib import Path, PurePath, PurePosixPath
 
 import pytest
 import yaml
@@ -12,14 +14,19 @@ from harnessed.testing import CallbackModel
 from browserrig import (
     Agent,
     Browser,
+    BrowserDownload,
     BrowserPerception,
     Chrome,
     ChromeBrowser,
-    FileSystemOptions,
+    Files,
+    FileSystem,
+    FileTransfer,
+    LocalWorkspace,
     Readiness,
     ReadinessOptions,
     Screenshots,
     ScreenshotTrigger,
+    Workspace,
     wait_for_page,
 )
 from browserrig.browser import DownloadState, Launch, screenshot
@@ -87,8 +94,11 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
 
     agent = Agent(
         model=CallbackModel(respond),
-        browser=Chrome.launch(url=site, files=FileSystemOptions(directory=workspace)),
-        plugins=[Approvals(default=PolicyDecision.ALLOW)],
+        browser=Chrome.launch(url=site),
+        plugins=[
+            Files(LocalWorkspace(workspace)),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
     )
     async with agent.session() as session:
         browser = session.scope[Browser]
@@ -105,9 +115,11 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
 async def test_downloaded_workbook_is_read_as_context_without_browser_preview(
     site, tmp_path
 ):
-    async with ChromeBrowser(
-        Launch(url=site, files=FileSystemOptions(directory=tmp_path / "workspace")),
-    ) as browser:
+    async with _receiving(Launch(url=site), LocalWorkspace(tmp_path / "workspace")) as (
+        browser,
+        files,
+        _,
+    ):
         tab = browser.active_tab
         await wait_for_page(tab)
         await evaluate(
@@ -121,13 +133,14 @@ async def test_downloaded_workbook_is_read_as_context_without_browser_preview(
                 or downloads[-1].state != DownloadState.COMPLETED
             ):
                 await asyncio.sleep(0.02)
-        document = await browser.files.read_file(
+        document = await files.read_file(
             downloads[-1].path,
             sheet="Revenue",
             cell_range="A1:C2",
         )
         assert "Voyager" in document.text and "=B2*2" in document.text
-        assert document.extracted_path and Path(document.extracted_path).is_file()
+        assert document.extracted_path
+        assert (tmp_path / "workspace" / document.extracted_path).is_file()
         assert len(await browser.tabs.list()) == 1 and browser.active_tab.id == tab.id
 
 
@@ -163,8 +176,11 @@ async def test_agent_reads_selected_workbook_cells_as_context(
 
     result = await Agent(
         model=CallbackModel(respond),
-        browser=Chrome.launch(url=site, files=FileSystemOptions(directory=tmp_path)),
-        plugins=[Approvals(default=PolicyDecision.ALLOW)],
+        browser=Chrome.launch(url=site),
+        plugins=[
+            Files(LocalWorkspace(tmp_path)),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
     ).run("Read the downloaded workbook", max_steps=2)
     assert result.text == "Workbook read as context"
 
@@ -175,9 +191,11 @@ async def test_scoped_download_has_enum_state_and_namespaced_events(site, tmp_pa
     async def collect(event):
         received.append(event)
 
-    async with ChromeBrowser(
-        Launch(url=site, download_directory=str(tmp_path)), emit=collect
-    ) as browser:
+    async with _receiving(Launch(url=site), LocalWorkspace(tmp_path), collect) as (
+        browser,
+        _,
+        _,
+    ):
         tab = browser.active_tab
         await wait_for_page(tab)
         await evaluate(
@@ -192,8 +210,8 @@ async def test_scoped_download_has_enum_state_and_namespaced_events(site, tmp_pa
                     break
                 await asyncio.sleep(0.02)
         assert downloads[0].received_bytes == len(b"download payload")
-        assert downloads[0].path is not None
-        assert Path(downloads[0].path).read_bytes() == b"download payload"
+        assert downloads[0].path == f"downloads/{downloads[0].id}/example.txt"
+        assert (tmp_path / downloads[0].path).read_bytes() == b"download payload"
         assert any(isinstance(event, DownloadStartedEvent) for event in received)
         assert any(isinstance(event, DownloadCompletedEvent) for event in received)
 
@@ -201,9 +219,12 @@ async def test_scoped_download_has_enum_state_and_namespaced_events(site, tmp_pa
 async def test_default_downloads_can_be_read_and_viewed_as_pdf_in_a_new_tab(
     site, tmp_path
 ):
-    async with ChromeBrowser(
-        Launch(url=site, files=FileSystemOptions(directory=tmp_path / "workspace")),
-    ) as browser:
+    workspace = tmp_path / "workspace"
+    async with _receiving(Launch(url=site), LocalWorkspace(workspace)) as (
+        browser,
+        files,
+        transfer,
+    ):
         original = browser.active_tab
         await wait_for_page(original)
         await evaluate(original, "document.querySelector('#download').click()")
@@ -215,19 +236,20 @@ async def test_default_downloads_can_be_read_and_viewed_as_pdf_in_a_new_tab(
                 await asyncio.sleep(0.02)
         downloaded = downloads[-1]
         assert downloaded.error is None
-        document = await browser.files.read_file(downloaded.path, page_number=2)
+        document = await files.read_file(downloaded.path, page_number=2)
         assert "Second page: Voyager 2" in document.text
-        opened = await browser.tabs.open(await browser.files.resolve(downloaded.path))
+        staged = await transfer.stage([downloaded.path])
+        opened = await browser.tabs.open(staged.browser_paths[0])
         await wait_for_page(opened)
         assert opened.id != original.id
-        assert opened.url == Path(downloaded.path).as_uri()
+        assert opened.url == (workspace / downloaded.path).as_uri()
         assert await evaluate(opened, "document.contentType") == "application/pdf"
         assert original.url == site + "/"
         assert len(await browser.tabs.list()) == 2
         image = await screenshot(opened)
         assert len(image) > 1000
         (tmp_path / "pdf-preview.png").write_bytes(base64.b64decode(image))
-    assert Path(downloaded.path).is_file()
+    assert (workspace / downloaded.path).is_file()
 
 
 async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(
@@ -279,7 +301,8 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(
                 "open_downloaded_file", {"download_id": files["downloads"][-1]["id"]}
             )
         elif stage == 3:
-            assert page["page"]["url"] == Path(downloaded_path).as_uri()
+            downloaded = tmp_path / "workspace" / downloaded_path
+            assert page["page"]["url"] == downloaded.as_uri()
             assert page["page"]["tab"] != original_tab
             tool_call = ToolCall("screenshot", {})
         elif stage == 4:
@@ -308,10 +331,11 @@ async def test_agent_downloads_reads_previews_and_returns_to_its_original_tab(
     model = CallbackModel(respond)
     agent = Agent(
         model=model,
-        browser=Chrome.launch(
-            url=site, files=FileSystemOptions(directory=tmp_path / "workspace")
-        ),
-        plugins=[Approvals(default=PolicyDecision.ALLOW)],
+        browser=Chrome.launch(url=site),
+        plugins=[
+            Files(LocalWorkspace(tmp_path / "workspace")),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
     )
     result = await agent.run(
         "Download the PDF, inspect it and save notes", max_steps=30
@@ -354,10 +378,9 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
 
     result = await Agent(
         model=CallbackModel(respond),
-        browser=Chrome.launch(
-            url=site + "/canvas", files=FileSystemOptions(directory=tmp_path)
-        ),
+        browser=Chrome.launch(url=site + "/canvas"),
         plugins=[
+            Files(LocalWorkspace(tmp_path)),
             BrowserPerception(
                 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
             ),
@@ -366,3 +389,89 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
         ],
     ).run("Preview the PDF and return to the original tab", max_steps=3)
     assert result.text == "Back on original tab"
+
+
+async def test_a_bridge_moves_downloads_and_uploads_between_separate_disks(
+    site, tmp_path
+):
+    """Chrome and the workspace share no directory, as with a cloud browser."""
+    workspace = LocalWorkspace(tmp_path / "workspace")
+    host = tmp_path / "browser-host"
+    bridge = _CopyBridge(host)
+    async with _receiving(Launch(url=site, bridge=bridge), workspace) as (
+        browser,
+        files,
+        transfer,
+    ):
+        tab = browser.active_tab
+        await wait_for_page(tab)
+        await evaluate(
+            tab,
+            "(() => {const a=document.createElement('a');a.href='/download';"
+            "a.download='example.txt';a.click();return true})()",
+        )
+        async with asyncio.timeout(5):
+            while (
+                not (downloads := await browser.downloads())
+                or downloads[-1].state is not DownloadState.COMPLETED
+            ):
+                await asyncio.sleep(0.02)
+        downloaded = downloads[-1]
+        assert downloaded.error is None
+        assert (await files.read_file(downloaded.path)).text == ("download payload")
+        assert bridge.received[0].filename == "example.txt"
+        assert not any((host / "downloads").iterdir())
+
+        staged = await transfer.stage([downloaded.path])
+        assert staged.browser_paths == (host / "uploads" / "example.txt",)
+        opened = await browser.tabs.open(staged.browser_paths[0])
+        await wait_for_page(opened)
+        assert opened.url == (host / "uploads" / "example.txt").as_uri()
+    assert (tmp_path / "workspace" / downloaded.path).is_file()
+
+
+@asynccontextmanager
+async def _receiving(options, workspace, emit=None):
+    """Open Chrome that saves downloads into `workspace`, as `FileTools` arranges."""
+    events = {} if emit is None else {"emit": emit}
+    async with (
+        FileSystem(workspace) as files,
+        ChromeBrowser(options, **events) as browser,
+    ):
+        transfer = FileTransfer(files, browser.bridge)
+        assert await browser.receive_downloads(transfer)
+        yield browser, files, transfer
+
+
+class _CopyBridge:
+    """Copies bytes to and from a directory only Chrome can see."""
+
+    def __init__(self, host: Path) -> None:
+        self.host = host
+        self.received: list[BrowserDownload] = []
+
+    async def download_directory(  # pylint: disable=unused-argument
+        self, workspace: Workspace
+    ) -> PurePath:
+        (self.host / "downloads").mkdir(parents=True, exist_ok=True)
+        return self.host / "downloads"
+
+    async def receive(
+        self,
+        workspace: Workspace,
+        download: BrowserDownload,
+        destination: PurePosixPath,
+    ) -> None:
+        self.received.append(download)
+        source = self.host / "downloads" / download.id
+        await workspace.write_bytes(destination, source.read_bytes())
+        source.unlink()
+
+    async def send(
+        self, workspace: Workspace, paths: Sequence[PurePosixPath]
+    ) -> list[PurePath]:
+        uploads = self.host / "uploads"
+        uploads.mkdir(parents=True, exist_ok=True)
+        for path in paths:
+            (uploads / path.name).write_bytes(await workspace.read_bytes(path))
+        return [uploads / path.name for path in paths]

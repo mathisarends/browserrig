@@ -13,10 +13,11 @@ import browserrig
 from browserrig import (
     BrowserPerception,
     Chrome,
-    FileSystemOptions,
+    Files,
     ImageContext,
     InputPacing,
     InputVisualization,
+    LocalWorkspace,
     Readiness,
     ReadinessOptions,
     Screenshots,
@@ -55,10 +56,9 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
                 Instructions(title="Custom extension", text="Use the custom extension.")
             )
 
-    file_system = FileSystemOptions(directory=tmp_path / "files")
-    browser = Chrome.launch(
-        url="https://example.com", headless=False, files=file_system
-    )
+    workspace = LocalWorkspace(tmp_path / "files")
+    browser = Chrome.launch(url="https://example.com", headless=False)
+    files = Files(workspace)
     readiness = ReadinessOptions(quiet_ms=123)
     approvals = Approvals(default=PolicyDecision.DENY)
     extension = Extension()
@@ -72,6 +72,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
             ),
             Readiness(options=readiness),
             approvals,
+            files,
             extension,
         ],
         without=(Compaction,),
@@ -83,11 +84,12 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
         == readiness
     )
     assert extension in agent.plugins
+    assert [item for item in agent.plugins if isinstance(item, Files)] == [files]
     assert [item for item in agent.plugins if isinstance(item, Approvals)] == [
         approvals
     ]
     assert not any(isinstance(item, Compaction) for item in agent.plugins)
-    assert not file_system.directory.exists()
+    assert not workspace.directory.exists()
 
 
 def test_facade_mounts_every_tool_group_once():

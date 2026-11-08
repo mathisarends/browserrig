@@ -6,7 +6,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Protocol
 
 from browserrig.events import BrowserEvent, LiveEvent
-from browserrig.files import Download, FileSystem
+from browserrig.files import Download, FileBridge, FileTransfer
 from browserrig.input import Input, Keyboard, Mouse
 
 from .tab import Tab
@@ -49,7 +49,8 @@ class BrowserEvents:
 class Browser(Protocol):
     # Shared by BrowserPerception and Actions; it cannot live in either without a dependency cycle.
     action_lock: asyncio.Lock
-    files: FileSystem | None
+    # How Chrome's host reaches the agent's workspace; `None` keeps them apart.
+    bridge: FileBridge | None
     # How the browser's input is paced, presented and correlated with actions.
     # Operate the devices through `mouse` and `keyboard`.
     input: Input
@@ -69,6 +70,10 @@ class Browser(Protocol):
         ...
 
     async def downloads(self) -> tuple[Download, ...]: ...
+
+    async def receive_downloads(self, transfer: FileTransfer | None) -> bool:
+        """Save later downloads through `transfer`; return whether they are received."""
+        ...
 
 
 async def _discard(_event: BrowserEvent | LiveEvent) -> None:

@@ -7,7 +7,7 @@ from pathlib import Path
 from harnessed.integrations.json import JsonSessionStore
 from harnessed.testing import ScriptedModel
 
-from browserrig import Agent, Chrome, FileSystemOptions
+from browserrig import Agent, Chrome, Files, LocalWorkspace
 
 
 async def main() -> None:
@@ -23,10 +23,8 @@ async def main() -> None:
     first = Agent(
         model=ScriptedModel(["First page inspected."]),
         store=JsonSessionStore(root=args.root / "sessions"),
-        browser=Chrome.launch(
-            url=args.url,
-            files=FileSystemOptions(directory=args.root / "workspace"),
-        ),
+        browser=Chrome.launch(url=args.url),
+        plugins=[Files(LocalWorkspace(args.root / "workspace"))],
     )
     async with first.session(id=args.id) as session:
         print((await session.run("Inspect the page.", max_steps=1)).text)
@@ -35,10 +33,8 @@ async def main() -> None:
     second = Agent(
         model=ScriptedModel(["Previous conversation retained; fresh page inspected."]),
         store=JsonSessionStore(root=args.root / "sessions"),
-        browser=Chrome.launch(
-            url=args.url,
-            files=FileSystemOptions(directory=args.root / "workspace"),
-        ),
+        browser=Chrome.launch(url=args.url),
+        plugins=[Files(LocalWorkspace(args.root / "workspace"))],
     )
     async with second.session(id=args.id) as session:
         result = await session.run("Continue from the previous answer.", max_steps=1)

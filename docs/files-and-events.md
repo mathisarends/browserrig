@@ -14,28 +14,35 @@ flowchart LR
 
 ## Downloads and events
 
-Launched browsers automatically get a workspace under `.browserrig/files/<unique-id>/`
-and save downloads in its `downloads/` directory. Files remain available after the
-browser closes. Choose a reusable workspace explicitly:
+The agent works in one **workspace**. Downloads land in its `downloads/` folder,
+so everything the agent can read, write, open or upload has a workspace-relative
+path such as `downloads/<id>/report.pdf` or `notes/summary.md`.
+
+The default recipe's `Files` plugin gives each session a local workspace under
+`.browserrig/files/<unique-id>/`. Files remain available after the session ends.
+Choose a reusable workspace explicitly:
 
 ```python
-from pathlib import Path
-from browserrig import Agent, Chrome, FileSystemOptions
+from browserrig import Agent, Chrome, FileOptions, Files, LocalWorkspace
 
 agent = Agent(
     model=model,
-    browser=Chrome.launch(
-        url="https://example.com",
-        files=FileSystemOptions(directory=Path(".browserrig/research")),
-    ),
+    browser=Chrome.launch(url="https://example.com"),
+    plugins=[
+        Files(
+            LocalWorkspace(".browserrig/research"),
+            options=FileOptions(max_file_bytes=20_000_000),
+        )
+    ],
 )
 ```
 
-`files` belongs to the browser options, so `browser_plugins()`, `Chrome` and
-`ChromeBrowser` use it as well.
-The constructor creates no files or directories; browser startup creates the directories.
-File access is confined to the workspace and any explicitly configured download
-directory, including checks for path traversal and symlinks leaving those roots.
+The workspace belongs to the agent, not to the browser: `Files` opens it as the
+session's `FileSystem` service. The browser only decides, through its `bridge`,
+whether Chrome can save downloads into it and read from it. Constructors create
+no files or directories; the session creates them.
+File tools only accept workspace-relative paths; absolute paths, `..` traversal
+and symlinks leaving the workspace are rejected.
 
 The agent sees the workspace and its latest 20 downloads before every step.
 File tools are available alongside the browser tools:
@@ -90,7 +97,8 @@ and support targeted `cell_range` reads elsewhere in the sheet. These processing
 bounds are separate from response pagination.
 
 `FileTools` includes workspace operations, downloads and `upload_files`.
-Omit it with `without=(FileTools,)` to remove the entire file capability.
+Omit `Files` and `FileTools` with `without=(Files, FileTools)` to remove the entire
+file capability; `without=(Files,)` leaves only `list_downloads`.
 
 File tools report facts as durable `browser.files.*` events, registered by
 `FileTools` (`FILE_EVENTS` and `UPLOAD_EVENTS`). Presentation,
@@ -111,26 +119,135 @@ exactly one finished or failed event.
 
 `open_file` and `open_downloaded_file` remain available for a visual preview.
 `switch_tab` returns to the original page. DOM uploads through
-`FileTools.upload_files` accept workspace-relative paths or absolute paths
-returned by file tools. Every selected file must exist within the workspace or
-configured download directory; the whole selection is checked before browser
-input. Uploads are disabled without a shared local filesystem, including remote
-browsers without explicit `FileSystemOptions`. Stage external files in the workspace
-from application code before asking the agent to upload them.
+`FileTools.upload_files` take workspace-relative paths. The whole selection is
+checked before the bridge hands the files to Chrome. `open_file`,
+`open_downloaded_file` and `upload_files` need a bridge (see below); without one
+they are hidden. Put external files into the workspace from application code
+before asking the agent to upload them.
 
-Direct Python callers can use `await browser.files.read_file(path, page_number=2)` and
-`await browser.tabs.open(await browser.files.resolve(path))`; `tabs.open` opens a `Path`
-as a local file and only accepts HTTP(S) URLs as strings. Filesystem operations are
-asynchronous: await initialization, path resolution, existence checks, reads, writes,
-listings, upload validation and download completion. Blocking filesystem work and
-document parsing run internally in worker threads. Standalone synchronous programs
-can call these methods from an async entry point using `asyncio.run`.
+Direct Python callers open the workspace themselves; `FileTransfer` connects it
+to one browser's bridge:
+
+```python
+from browserrig import ChromeBrowser, FileSystem, FileTransfer, LocalWorkspace
+from browserrig.browser import Launch
+
+async with (
+    FileSystem(LocalWorkspace(".browserrig/research")) as files,
+    ChromeBrowser(Launch()) as browser,
+):
+    transfer = FileTransfer(files, browser.bridge)
+    await browser.receive_downloads(transfer)  # later downloads land in files
+    document = await files.read_file("report.pdf", page_number=2)
+    staged = await transfer.stage(["report.pdf"])
+    await browser.tabs.open(staged.browser_paths[0])
+```
+
+`staged.browser_paths` are the files' paths on the browser host, which
+`browser.tabs.open(...)` accepts as a `PurePath`. `tabs.open` only accepts
+HTTP(S) URLs as strings. File operations are
+asynchronous; blocking file work and document parsing run in worker threads.
+Standalone synchronous programs can call these methods from an async entry point
+using `asyncio.run`.
+
+### Workspaces, bridges and remote browsers
+
+Two interfaces separate *where the agent's files live* from *how Chrome reaches
+them*:
+
+| Interface | Responsibility | Built in |
+| --- | --- | --- |
+| `Workspace` | Stores the agent's files: `stat`, `list`, `read_bytes`, `write_bytes`, `create_directory`, `move`. Paths are workspace-relative `PurePosixPath`s. | `LocalWorkspace(directory)` |
+| `FileBridge` | Moves files between the workspace and the machine that runs Chrome: `download_directory`, `receive`, `send`. | `MountedWorkspace(browser_path=None)` |
+
+`MountedWorkspace` is for a browser that sees the workspace directory on its own
+file system: on the same machine, or on a pod that mounts the same volume.
+Nothing is copied. Pass `browser_path` when Chrome sees the directory at another
+absolute path, for example `MountedWorkspace("/workspace")` for a container mount.
+
+| Setup | Configuration |
+| --- | --- |
+| Local Chrome (default) | `Chrome.launch()` with the default `Files()`: a fresh `LocalWorkspace`, mounted for Chrome |
+| Local Chrome, chosen directory | `Chrome.launch()` with `Files(LocalWorkspace("research"))` |
+| Chrome on a pod with a shared volume | `Chrome.connect(endpoint, bridge=MountedWorkspace("/workspace"))` with `Files(LocalWorkspace("/mnt/agent"))` |
+| Cloud browser with a file API | `Chrome.connect(endpoint, bridge=ProviderBridge(...))` |
+| Remote browser, no file transfer | `Chrome.connect(endpoint)`: workspace tools only |
+| No files at all | `without=(Files, FileTools)` |
+
+`Chrome.launch` mounts the workspace for Chrome by default. `Chrome.connect` never
+assumes that the browser shares the agent's disk: without a bridge, downloads stay
+on the browser host and `open_file`, `open_downloaded_file` and `upload_files` are
+hidden. Without `Files` there are no workspace tools.
+
+A cloud browser provider usually exposes downloads and uploads through an API.
+Implement `FileBridge` against it; the protocol is structural and needs no base
+class:
+
+```python
+from collections.abc import Sequence
+from pathlib import PurePath, PurePosixPath
+
+from browserrig import (
+    Agent,
+    BrowserDownload,
+    Chrome,
+    Files,
+    LocalWorkspace,
+    Workspace,
+)
+
+
+class ProviderBridge:
+    def __init__(self, session):
+        self.session = session  # the provider's SDK session
+
+    async def download_directory(self, workspace: Workspace) -> PurePath:
+        # Where Chrome saves downloads on the provider's machine.
+        return PurePosixPath("/tmp/downloads")
+
+    async def receive(
+        self,
+        workspace: Workspace,
+        download: BrowserDownload,
+        destination: PurePosixPath,
+    ) -> None:
+        # Chrome names the file by download.id in the download directory.
+        data = await self.session.files.read(f"/tmp/downloads/{download.id}")
+        await workspace.write_bytes(destination, data)
+
+    async def send(
+        self, workspace: Workspace, paths: Sequence[PurePosixPath]
+    ) -> list[PurePath]:
+        remote = []
+        for path in paths:
+            target = PurePosixPath("/tmp/uploads") / path
+            await self.session.files.write(
+                str(target), await workspace.read_bytes(path)
+            )
+            remote.append(target)
+        return remote
+
+
+agent = Agent(
+    model=model,
+    browser=Chrome.connect(endpoint=session.cdp_url, bridge=ProviderBridge(session)),
+    plugins=[Files(LocalWorkspace(".browserrig/research"))],
+)
+```
+
+The workspace can be remote too, such as a bucket or a pod's file API: implement
+`Workspace` and pass it to `Files(...)`. Reading from a remote workspace parses a
+local temporary copy, so `extracted_path` is `None` there; the text is still
+returned and paginated. `LocalWorkspace` keeps the extraction under `.content/`.
+
+A failing bridge never breaks the browser: the download ends as completed with an
+error in `list_downloads`, and previews and uploads return a tool error.
 
 ### File access boundaries and optional sandboxes
 
 Browserrig's built-in file tools confine reads, writes, listings, previews and
-uploads to the configured workspace and download directory. Path traversal and
-symlinks resolving outside those roots are rejected. Browserrig does not expose
+uploads to the workspace. Path traversal and symlinks resolving outside it are
+rejected. Browserrig does not expose
 a shell tool. Keep the workspace dedicated to agent files; anything placed in it
 is available to the agent.
 
@@ -150,7 +267,7 @@ failure never falls back to host execution. See the
 
 These backends do not redirect Browserrig's local `FileTools`, uploads, Chrome
 downloads or document readers. In a custom composition, omit Browserrig's
-`FileTools` before adding `FilesystemTools` to avoid duplicate
+`Files` and `FileTools` before adding `FilesystemTools` to avoid duplicate
 tool names and host file access through those tools. Transfer files explicitly
 from application code; copied sandbox results must be exported before session
 close. Browserrig does not implement Harnessed's `FileSystemBackend` protocol, so
@@ -160,19 +277,16 @@ The file reader uses a shared `FileExtension` enum and a registry of readers wit
 a common call signature and declared selection capabilities. New formats can be
 registered without extending a central parser dispatch chain.
 
-`Chrome.launch(download_directory="ABSOLUTE_PATH_ON_BROWSER_HOST")` overrides the
-download location. Downloads first use `.pending/` and then move into a folder
-named by their stable download ID, preserving their filename and extension.
-Duplicate filenames get separate folders. `DownloadState` includes `IN_PROGRESS`,
+Chrome saves each download in the bridge's download directory
+(`downloads/.pending/` for `MountedWorkspace`). When it completes, the bridge
+stores it at `downloads/<download-id>/<filename>`, preserving the filename and
+extension; duplicate filenames get separate folders. `DownloadState` includes `IN_PROGRESS`,
 `COMPLETED`, and `CANCELED`; download events use the `browser.download.*` namespace.
 `Download.total_bytes` is `None` when the server does not announce a size.
 Canceled downloads emit `DownloadCanceledEvent` instead of `DownloadFailedEvent`.
 
-Connected browsers keep their existing host semantics: `Chrome.connect(...)` enables
-workspace tools only when `files=FileSystemOptions(...)` explicitly identifies a
-directory shared with the browser host at the same absolute path. Without it,
-download tracking still works but local file reads and previews are unavailable.
-Attaching to an existing `target_id` retains its browser-wide download policy.
+Attaching to an existing `target_id` retains its browser-wide download policy, so
+its downloads are not received into the workspace.
 The OpenAI example accepts `--workspace .browserrig/research` to reuse a directory.
 
 Subscribe to durable facts and live choreography from a session while a run is

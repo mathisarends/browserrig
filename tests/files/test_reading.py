@@ -5,7 +5,6 @@ import struct
 import tarfile
 from email.message import EmailMessage
 from io import BytesIO
-from pathlib import Path
 from xml.etree import ElementTree
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
@@ -18,11 +17,11 @@ from openpyxl import Workbook
 from PIL import Image, ImageDraw, ImageFont
 from pptx import Presentation
 
-from browserrig import FileSystem, FileSystemOptions
+from browserrig import FileOptions, FileSystem, LocalWorkspace
 
 
 async def test_xlsx_preserves_coordinates_formulas_formats_and_hidden_content(files):
-    path = files.directory / "report.xlsx"
+    path = files.workspace.directory / "report.xlsx"
     book = Workbook()
     sheet = book.active
     sheet.title = "Revenue"
@@ -36,7 +35,7 @@ async def test_xlsx_preserves_coordinates_formulas_formats_and_hidden_content(fi
     book.create_sheet("Internal").sheet_state = "hidden"
     book.save(path)
     before = path.read_bytes()
-    result = await files.read_file(str(path), cell_range="A1:C4")
+    result = await files.read_file(path.name, cell_range="A1:C4")
     assert result.sheets == ("Revenue", "Internal")
     assert result.sheet == "Revenue" and result.cell_range == "A1:C4"
     assert "Voyager" in result.text and "0.125 [format: 0.0%]" in result.text
@@ -48,24 +47,24 @@ async def test_xlsx_preserves_coordinates_formulas_formats_and_hidden_content(fi
         "recalculated" in item for item in result.limitations
     )
     with pytest.raises(ValueError, match="Unknown sheet"):
-        await files.read_file(str(path), sheet="Missing")
+        await files.read_file(path.name, sheet="Missing")
     with pytest.raises(ValueError, match="A1 range"):
-        await files.read_file(str(path), cell_range="A:Z")
+        await files.read_file(path.name, cell_range="A:Z")
 
 
 async def test_format_detection_does_not_depend_on_download_extension(
     files, pdf_document
 ):
-    pdf = files.directory / "download.bin"
+    pdf = files.workspace.directory / "download.bin"
     pdf.write_bytes(pdf_document)
-    assert "Second page" in (await files.read_file(str(pdf), page_number=2)).text
+    assert "Second page" in (await files.read_file(pdf.name, page_number=2)).text
     book = Workbook()
     book.active["B3"] = "Correct cell"
     buffer = BytesIO()
     book.save(buffer)
-    path = files.directory / "workbook.bin"
+    path = files.workspace.directory / "workbook.bin"
     path.write_bytes(buffer.getvalue())
-    result = await files.read_file(str(path), cell_range="B3:B3")
+    result = await files.read_file(path.name, cell_range="B3:B3")
     assert result.format == "xlsx" and "Correct cell" in result.text
 
 
@@ -79,7 +78,7 @@ async def test_xlsx_tolerates_bad_dimensions_and_irrelevant_invalid_formatting(
     book.save(source)
     source.seek(0)
     namespace = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
-    path = files.directory / "producer-edge.xlsx"
+    path = files.workspace.directory / "producer-edge.xlsx"
     with ZipFile(source) as original, ZipFile(path, "w") as output:
         for entry in original.infolist():
             value = original.read(entry)
@@ -103,7 +102,7 @@ async def test_xlsx_tolerates_bad_dimensions_and_irrelevant_invalid_formatting(
                 value = ElementTree.tostring(root, encoding="utf-8")
             output.writestr(entry, value)
     before = path.read_bytes()
-    result = await files.read_file(str(path))
+    result = await files.read_file(path.name)
     assert result.cell_range == "A1:B3" and "Actual data" in result.text
     assert path.read_bytes() == before
 
@@ -116,7 +115,7 @@ async def test_xlsx_infers_omitted_row_and_cell_references(files):
     book.save(source)
     source.seek(0)
     namespace = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
-    path = files.directory / "implicit-coordinates.xlsx"
+    path = files.workspace.directory / "implicit-coordinates.xlsx"
     with ZipFile(source) as original, ZipFile(path, "w") as output:
         for entry in original.infolist():
             value = original.read(entry)
@@ -127,7 +126,7 @@ async def test_xlsx_infers_omitted_row_and_cell_references(files):
                     node.attrib.pop("r", None)
                 value = ElementTree.tostring(root, encoding="utf-8")
             output.writestr(entry, value)
-    result = await files.read_file(str(path))
+    result = await files.read_file(path.name)
     assert result.cell_range == "A1:B2"
     assert "| 1 | First row | 42 |" in result.text
     assert "| 2 | Second row |  |" in result.text
@@ -143,7 +142,7 @@ async def test_legacy_biff_xls_values_are_read_without_a_conversion_backend(file
         + record(4, struct.pack("<HH3sB", 1, 0, bytes(3), 7) + b"Voyager")
         + record(10, b"")
     )
-    (files.directory / "legacy.xls").write_bytes(content)
+    (files.workspace.directory / "legacy.xls").write_bytes(content)
     result = await files.read_file("legacy.xls")
     assert (
         "42.0" in result.text and "Voyager" in result.text and result.sheet == "Sheet 1"
@@ -156,7 +155,7 @@ async def test_nested_word_tables_are_not_silently_omitted(files):
     outer.cell(0, 0).text = "Outer cell"
     inner = outer.cell(0, 0).add_table(rows=1, cols=1)
     inner.cell(0, 0).text = "Nested sentinel"
-    document.save(files.directory / "nested.docx")
+    document.save(files.workspace.directory / "nested.docx")
     result = await files.read_file("nested.docx")
     assert "Outer cell" in result.text and "Nested sentinel" in result.text
 
@@ -165,7 +164,7 @@ async def test_sparse_sheet_reports_view_and_allows_targeted_read(files):
     book = Workbook()
     book.active["A1"] = "Start"
     book.active["ZZ10000"] = "Far away"
-    book.save(files.directory / "sparse.xlsx")
+    book.save(files.workspace.directory / "sparse.xlsx")
     preview = await files.read_file("sparse.xlsx")
     assert preview.status == "partial" and any(
         "ZZ10000" in item for item in preview.limitations
@@ -177,18 +176,18 @@ async def test_sparse_sheet_reports_view_and_allows_targeted_read(files):
 async def test_derived_text_is_complete_cached_and_invalidated_after_source_changes(
     files,
 ):
-    path = files.directory / "large.docx"
+    path = files.workspace.directory / "large.docx"
     document = Document()
     document.add_heading("Research", 1)
     document.add_paragraph("Grüße 🌍 " * 12000)
     document.add_paragraph("FINAL_SENTINEL")
     document.save(path)
-    first = await files.read_file(str(path), max_chars=51)
+    first = await files.read_file(path.name, max_chars=51)
     assert len(first.text) == 51 and first.next_offset == 51
-    artifact = Path(first.extracted_path)
+    artifact = files.workspace.directory / first.extracted_path
     assert "FINAL_SENTINEL" in artifact.read_text(encoding="utf-8")
     stamp = artifact.stat().st_mtime_ns
-    rest = await files.read_file(str(path), offset=first.next_offset, max_chars=200000)
+    rest = await files.read_file(path.name, offset=first.next_offset, max_chars=200000)
     assert first.text + rest.text == artifact.read_text(encoding="utf-8")
     assert (
         rest.extracted_path == first.extracted_path
@@ -199,14 +198,14 @@ async def test_derived_text_is_complete_cached_and_invalidated_after_source_chan
     )[:20000]
     document.add_paragraph("ADDED_LATER")
     document.save(path)
-    changed = await files.read_file(str(path), max_chars=200000)
+    changed = await files.read_file(path.name, max_chars=200000)
     assert (
         "ADDED_LATER" in changed.text and changed.extracted_path != first.extracted_path
     )
 
 
 async def test_presentation_reads_tables_notes_and_selected_slide(files):
-    path = files.directory / "slides.pptx"
+    path = files.workspace.directory / "slides.pptx"
     deck = Presentation()
     first = deck.slides.add_slide(deck.slide_layouts[1])
     first.shapes.title.text = "First slide"
@@ -214,19 +213,19 @@ async def test_presentation_reads_tables_notes_and_selected_slide(files):
     second = deck.slides.add_slide(deck.slide_layouts[1])
     second.shapes.title.text = "Second slide"
     deck.save(path)
-    result = await files.read_file(str(path))
+    result = await files.read_file(path.name)
     assert result.page_count == 2 and "Speaker context" in result.text
-    selected = await files.read_file(str(path), page_number=2)
+    selected = await files.read_file(path.name, page_number=2)
     assert "Second slide" in selected.text and "First slide" not in selected.text
 
 
 async def test_open_document_text_and_spreadsheet(files):
     document = OpenDocumentText()
     document.text.addElement(P(text="OpenDocument research"))
-    document.save(str(files.directory / "notes.odt"))
+    document.save(str(files.workspace.directory / "notes.odt"))
     assert "OpenDocument research" in (await files.read_file("notes.odt")).text
-    (files.directory / "renamed.bin").write_bytes(
-        (files.directory / "notes.odt").read_bytes()
+    (files.workspace.directory / "renamed.bin").write_bytes(
+        (files.workspace.directory / "notes.odt").read_bytes()
     )
     assert (await files.read_file("renamed.bin")).format == "odt"
     workbook = OpenDocumentSpreadsheet()
@@ -237,13 +236,13 @@ async def test_open_document_text_and_spreadsheet(files):
     row.addElement(cell)
     table.addElement(row)
     workbook.spreadsheet.addElement(table)
-    workbook.save(str(files.directory / "table.ods"))
+    workbook.save(str(files.workspace.directory / "table.ods"))
     result = await files.read_file("table.ods")
     assert result.sheets == ("Data",) and "A1: ODS sentinel" in result.text
 
 
 async def test_csv_handles_quoted_delimiters_newlines_and_ranges(files):
-    path = files.directory / "data.csv"
+    path = files.workspace.directory / "data.csv"
     path.write_text('Name;Value\n"A;B";"first\nsecond"\nTail;42\n', encoding="utf-8")
     result = await files.read_file("data.csv", cell_range="A2:B2")
     assert (
@@ -256,13 +255,15 @@ async def test_csv_handles_quoted_delimiters_newlines_and_ranges(files):
 async def test_utf16_text_pagination_is_character_based_and_large_text_is_streamed(
     files,
 ):
-    path = files.directory / "notes.txt"
+    path = files.workspace.directory / "notes.txt"
     text = "Grüße aus dem Weltall 🌍\r\n" * 20
     path.write_bytes(text.encode("utf-16"))
     first = await files.read_file("notes.txt", max_chars=19)
     rest = await files.read_file("notes.txt", offset=first.next_offset)
     assert first.text + rest.text == text and first.encoding == "utf-16"
-    tiny = FileSystem(FileSystemOptions(directory=files.directory, max_file_bytes=2))
+    tiny = FileSystem(
+        LocalWorkspace(files.workspace.directory), options=FileOptions(max_file_bytes=2)
+    )
     assert (await tiny.read_file("notes.txt", max_chars=19)).text == text[:19]
     await files.write_file("manufacturer.txt", "BMW research notes")
     assert (await files.read_file("manufacturer.txt")).text == "BMW research notes"
@@ -282,7 +283,7 @@ async def test_html_and_rtf_are_read_without_running_scripts(files):
 async def test_epub_preserves_spine_order_and_rejects_encrypted_chapters(
     files, encrypted
 ):
-    path = files.directory / "book.epub"
+    path = files.workspace.directory / "book.epub"
     with ZipFile(path, "w") as archive:
         archive.writestr(
             "META-INF/container.xml",
@@ -321,7 +322,7 @@ async def test_email_body_and_attachment_use_the_same_read_path(files):
         subtype="markdown",
         filename="notes.md",
     )
-    (files.directory / "mail.eml").write_bytes(message.as_bytes())
+    (files.workspace.directory / "mail.eml").write_bytes(message.as_bytes())
     result = await files.read_file("mail.eml")
     assert (
         "Message body" in result.text
@@ -337,18 +338,19 @@ async def test_nested_archives_and_compressed_text_are_accessible(files):
     inner = BytesIO()
     with ZipFile(inner, "w") as archive:
         archive.writestr("notes.md", "# Nested payload")
-    with ZipFile(files.directory / "outer.zip", "w") as archive:
+    with ZipFile(files.workspace.directory / "outer.zip", "w") as archive:
         archive.writestr("folder/inner.zip", inner.getvalue())
     listing = await files.read_file("outer.zip")
     assert "folder/inner.zip" in listing.text and listing.entry_count == 1
     nested = await files.read_file("outer.zip", member="folder/inner.zip!/notes.md")
     assert nested.text == "# Nested payload"
     limited = FileSystem(
-        FileSystemOptions(directory=files.directory, max_archive_depth=1)
+        LocalWorkspace(files.workspace.directory),
+        options=FileOptions(max_archive_depth=1),
     )
     with pytest.raises(ValueError, match="max_archive_depth"):
         await limited.read_file("outer.zip", member="folder/inner.zip!/notes.md")
-    with gzip.open(files.directory / "note.txt.gz", "wb") as stream:
+    with gzip.open(files.workspace.directory / "note.txt.gz", "wb") as stream:
         stream.write(b"Compressed payload")
     assert (
         await files.read_file("note.txt.gz", member="note.txt")
@@ -358,7 +360,7 @@ async def test_nested_archives_and_compressed_text_are_accessible(files):
 async def test_archive_members_cannot_escape_follow_links_or_expand_without_bound(
     files,
 ):
-    path = files.directory / "unsafe.zip"
+    path = files.workspace.directory / "unsafe.zip"
     with ZipFile(path, "w", compression=ZIP_DEFLATED) as archive:
         archive.writestr("../escape.md", "outside")
         archive.writestr("large.txt", "x" * 10000)
@@ -371,15 +373,16 @@ async def test_archive_members_cannot_escape_follow_links_or_expand_without_boun
     with pytest.raises(ValueError, match="regular"):
         await files.read_file("unsafe.zip", member="link.md")
     bounded = FileSystem(
-        FileSystemOptions(directory=files.directory, max_expanded_bytes=100)
+        LocalWorkspace(files.workspace.directory),
+        options=FileOptions(max_expanded_bytes=100),
     )
     with pytest.raises(ValueError, match="max_expanded_bytes"):
         await bounded.read_file("unsafe.zip", member="large.txt")
-    assert not (files.directory.parent / "escape.md").exists()
+    assert not (files.workspace.directory.parent / "escape.md").exists()
 
 
 async def test_sqlite_is_read_only_and_retains_null_and_binary_values(files):
-    path = files.directory / "data.sqlite"
+    path = files.workspace.directory / "data.sqlite"
     connection = sqlite3.connect(path)
     connection.execute('CREATE TABLE "odd table" (name TEXT, value BLOB)')
     connection.execute('INSERT INTO "odd table" VALUES (?, ?)', (None, b"abc"))
@@ -405,9 +408,9 @@ async def test_local_ocr_reads_real_image_and_scanned_pdf(files, suffix):
         fill="black",
         font=ImageFont.load_default(size=52),
     )
-    path = files.directory / f"scan.{suffix}"
+    path = files.workspace.directory / f"scan.{suffix}"
     image.save(path)
-    result = await files.read_file(str(path))
+    result = await files.read_file(path.name)
     assert "MISSION" in result.text.upper() and "2026" in result.text
     assert any("OCR" in item for item in result.limitations)
     assert result.extracted_path is not None
@@ -416,7 +419,7 @@ async def test_local_ocr_reads_real_image_and_scanned_pdf(files, suffix):
 async def test_unsupported_binary_has_explicit_status_and_no_screenshot_instruction(
     files,
 ):
-    (files.directory / "unknown.bin").write_bytes(b"\0\xff\x01binary")
+    (files.workspace.directory / "unknown.bin").write_bytes(b"\0\xff\x01binary")
     result = await files.read_file("unknown.bin")
     assert result.status == "unsupported" and result.size == 9
     assert (
@@ -428,13 +431,14 @@ async def test_unsupported_binary_has_explicit_status_and_no_screenshot_instruct
 
 
 async def test_tar_index_and_selected_entry_enforce_expansion_budget(files):
-    path = files.directory / "large.tar.gz"
+    path = files.workspace.directory / "large.tar.gz"
     with tarfile.open(path, "w:gz") as archive:
         entry = tarfile.TarInfo("large.txt")
         entry.size = 10000
         archive.addfile(entry, BytesIO(b"x" * entry.size))
     bounded = FileSystem(
-        FileSystemOptions(directory=files.directory, max_expanded_bytes=100)
+        LocalWorkspace(files.workspace.directory),
+        options=FileOptions(max_expanded_bytes=100),
     )
     with pytest.raises(ValueError, match="max_expanded_bytes"):
         await bounded.read_file("large.tar.gz")
@@ -443,12 +447,12 @@ async def test_tar_index_and_selected_entry_enforce_expansion_budget(files):
 
 
 async def test_archive_pagination_reuses_entry_and_rejects_bad_crc(files):
-    path = files.directory / "archive.zip"
+    path = files.workspace.directory / "archive.zip"
     content = b"CONTAINER_PAYLOAD_0123456789"
     with ZipFile(path, "w") as archive:
         archive.writestr("notes.txt", content)
     first = await files.read_file("archive.zip", member="notes.txt", max_chars=7)
-    sources = list((files.directory / ".content").glob("*.source.txt"))
+    sources = list((files.workspace.directory / ".content").glob("*.source.txt"))
     assert len(sources) == 1
     stamp = sources[0].stat().st_mtime_ns
     rest = await files.read_file(
@@ -457,7 +461,7 @@ async def test_archive_pagination_reuses_entry_and_rejects_bad_crc(files):
     assert first.text + rest.text == content.decode()
     assert sources[0].stat().st_mtime_ns == stamp
     corrupted = path.read_bytes().replace(b"CONTAINER_PAYLOAD", b"CORRUPTED_PAYLOAD", 1)
-    (files.directory / "broken.zip").write_bytes(corrupted)
+    (files.workspace.directory / "broken.zip").write_bytes(corrupted)
     with pytest.raises(ValueError, match="CRC"):
         await files.read_file("broken.zip", member="notes.txt")
 
@@ -468,7 +472,9 @@ async def test_derived_cache_cannot_follow_a_directory_symlink_outside_workspace
     outside = tmp_path / "outside"
     outside.mkdir()
     try:
-        (files.directory / ".content").symlink_to(outside, target_is_directory=True)
+        (files.workspace.directory / ".content").symlink_to(
+            outside, target_is_directory=True
+        )
     except OSError:
         pytest.skip("Creating symlinks is unavailable on this host")
     await files.write_file("page.html", "<p>Cached text</p>")
@@ -479,6 +485,6 @@ async def test_derived_cache_cannot_follow_a_directory_symlink_outside_workspace
 
 @pytest.fixture(name="files")
 async def _files(tmp_path):
-    result = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
+    result = FileSystem(LocalWorkspace(tmp_path / "workspace"))
     await result.initialize()
     return result

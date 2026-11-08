@@ -29,9 +29,11 @@ from browserrig import (
     BrowserPerception,
     Chrome,
     DomCapture,
+    Files,
     FileSystem,
-    FileSystemOptions,
     FileTools,
+    LocalWorkspace,
+    MountedWorkspace,
     Readiness,
     Screenshots,
     ScreenshotTrigger,
@@ -301,11 +303,10 @@ _REF_CALLS = (
 )
 
 
-async def test_ref_and_coordinate_tools_are_exposed(fake_chrome, tmp_path):
+async def test_ref_and_coordinate_tools_are_exposed(fake_chrome):
     agent = browserrig.Agent(model=ScriptedModel(["unused"]))
     ref_tools = {call.name for call in _REF_CALLS}
     async with agent.session() as session:
-        session.scope[Browser].files = FileSystem(FileSystemOptions(directory=tmp_path))
         tools = session.scope[ToolRegistry]
         names = {item.name for item in tools.definitions}
         assert {"move_mouse", "click_at", "scroll", "drag_at", "send_keys"} <= names
@@ -313,44 +314,55 @@ async def test_ref_and_coordinate_tools_are_exposed(fake_chrome, tmp_path):
     assert fake_chrome[0].closed
 
 
-async def test_file_tools_follow_workspace_availability_and_reject_stale_calls(
+_WORKSPACE_TOOLS = {
+    "list_files",
+    "read_file",
+    "write_file",
+    "open_file",
+    "open_downloaded_file",
+    "upload_files",
+}
+
+
+async def test_file_tools_follow_the_workspace_and_the_browser_bridge(
     fake_chrome, tmp_path
 ):
-    workspace_tools = {
-        "list_files",
-        "read_file",
-        "write_file",
-        "open_file",
-        "open_downloaded_file",
-        "upload_files",
-    }
-    agent = browserrig.Agent(model=ScriptedModel(["unused"]))
-    async with agent.session() as session:
+    without_files = browserrig.Agent(model=ScriptedModel(["unused"]), without=(Files,))
+    async with without_files.session() as session:
         tools = session.scope[ToolRegistry]
-        assert "list_downloads" in {item.name for item in tools.definitions}
-        assert not workspace_tools & {item.name for item in tools.definitions}
+        names = {item.name for item in tools.definitions}
+        assert "list_downloads" in names and not _WORKSPACE_TOOLS & names
         result = await tools.execute(
             ToolCall("write_file", {"path": "note.txt", "content": "test"})
         )
         assert result.is_error and "disabled" in result.text
-        upload = ToolCall(
-            "upload_files", {"ref": "file", "paths": [str(tmp_path / "secret")]}
-        )
+        upload = ToolCall("upload_files", {"ref": "file", "paths": ["secret"]})
         assert (await tools.execute(upload)).is_error
-        browser = session.scope[Browser]
-        browser.files = FileSystem(FileSystemOptions(directory=tmp_path / "workspace"))
-        await browser.files.initialize()
-        assert workspace_tools <= {item.name for item in tools.definitions}
+
+    # A remote browser without a bridge cannot reach the agent's files.
+    unbridged = browserrig.Agent(
+        model=ScriptedModel(["unused"]),
+        browser=Chrome.connect(endpoint="http://localhost:9222"),
+        plugins=[Files(LocalWorkspace(tmp_path / "unbridged"))],
+    )
+    async with unbridged.session() as session:
+        names = {item.name for item in session.scope[ToolRegistry].definitions}
+        assert _WORKSPACE_TOOLS & names == {"list_files", "read_file", "write_file"}
+
+    workspace = LocalWorkspace(tmp_path / "workspace")
+    agent = browserrig.Agent(
+        model=ScriptedModel(["unused"]), plugins=[Files(workspace)]
+    )
+    async with agent.session() as session:
+        tools = session.scope[ToolRegistry]
+        assert {item.name for item in tools.definitions} >= _WORKSPACE_TOOLS
         call = ToolCall("write_file", {"path": "note.txt", "content": "test"})
-        plan = tools.plan(call)
-        upload_plan = tools.plan(upload)
         assert not (await tools.execute(call)).is_error
-        assert (await browser.files.read_file("note.txt")).text == "test"
-        browser.files = None
-        assert tools.check_enabled(plan, scope=session.scope).is_error
-        assert tools.check_enabled(upload_plan, scope=session.scope).is_error
-        assert not workspace_tools & {item.name for item in tools.definitions}
-    assert fake_chrome[0].closed
+        assert session.scope[FileSystem].workspace is workspace
+        # The local browser saves downloads into the workspace through its mount.
+        assert session.scope[Browser].receiving.bridge == MountedWorkspace()
+    assert (workspace.directory / "note.txt").read_text() == "test"
+    assert all(item.closed for item in fake_chrome)
 
 
 async def test_omitting_file_tools_removes_workspace_downloads_and_uploads(fake_chrome):
@@ -466,6 +478,7 @@ def _fake_chrome(monkeypatch):
         resource = SimpleNamespace(
             browser=FakeBrowser(SimpleNamespace(emit=emit)), closed=False
         )
+        resource.browser.bridge = _options.bridge
         resources.append(resource)
         try:
             yield resource.browser

@@ -219,8 +219,9 @@ Model screenshots omit application overlays and the presentation cursor.
 Set `DomCapture(cursor=True)` to add a red cursor arrow after capture, with its tip
 at the exact input coordinate. This optional marker follows crop and zoom coordinates.
 All gestures use real CDP input and release mouse buttons even when interrupted.
-Workspace tools are hidden when a connected browser has no shared local file
-system; `list_downloads` remains available.
+Workspace tools are hidden without the `Files` plugin, and previews and uploads
+are hidden when the browser has no file bridge; `list_downloads` remains
+available. See [Files and events](files-and-events.md#workspaces-bridges-and-remote-browsers).
 
 ## Input choreography
 

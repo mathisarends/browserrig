@@ -4,6 +4,31 @@
 
 ### Breaking changes
 
+- Split the agent's files into a `Workspace` (where files live) and a
+  `FileBridge` (how Chrome reaches them), so downloads and uploads also work with
+  browsers on another pod or a cloud browser provider. Downloads land in the
+  workspace's `downloads/` folder, and file tools, events and `Download.path` use
+  workspace-relative paths such as `downloads/<id>/report.pdf`.
+  The workspace is no longer a browser option: the new `Files` plugin, part of
+  the default recipe, opens it as the session's `FileSystem` service. Replace
+  `Chrome.launch(files=FileSystemOptions(directory=...))` with
+  `plugins=[Files(LocalWorkspace(...))]`; processing limits move to
+  `Files(options=FileOptions(...))`. `download_directory=` is removed: browsers
+  take a `bridge=`, either `MountedWorkspace(browser_path)` for a shared volume
+  or a `FileBridge` for a provider's file API. `Chrome.launch()` defaults to
+  `MountedWorkspace()`; `Chrome.connect()` has no bridge, so previews and uploads
+  are hidden and downloads stay on the browser host. Omit all file tools with
+  `without=(Files, FileTools)`.
+  `browser.files` is removed and `FileSystem(options)` becomes
+  `FileSystem(workspace, options)`. `FileTransfer(files, browser.bridge)` replaces
+  `files.resolve(path)` and `files.upload_paths(...)` with
+  `await transfer.stage(paths)`, whose `browser_paths` `tabs.open(...)` accepts;
+  direct `ChromeBrowser` users call `await browser.receive_downloads(transfer)` to
+  save downloads into the workspace.
+  `FileSystemState` reports `workspace: bool` and a relative
+  `download_directory`, and `FileContent.extracted_path` is relative to the
+  workspace, or `None` for a remote workspace.
+
 - `Presenter.leave(...)` and `Presenter.enter(...)` receive the current action as a
   keyword argument, `action_id`, the same way `show(...)` receives events that
   already carry it. `Stage()` takes no arguments; replace

@@ -2,7 +2,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .config import FileSystemOptions
+from .config import FileOptions
 from .models import FileContent, FileReadStatus
 
 
@@ -22,7 +22,7 @@ class ReadContext:
     path: Path
     format: str
     request: ReadRequest
-    options: FileSystemOptions
+    options: FileOptions
 
 
 @dataclass

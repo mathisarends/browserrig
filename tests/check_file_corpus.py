@@ -2,13 +2,14 @@ import argparse
 import asyncio
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 from urllib.request import urlopen
 from uuid import uuid4
 
-from browserrig import FileSystem, FileSystemOptions
+from browserrig import FileSystem, LocalWorkspace
 
 _MANIFEST = Path(__file__).with_name("file_corpus.json")
 
@@ -56,10 +57,10 @@ def _source(directory: Path, entry: dict, download: bool) -> Path:
 
 
 async def _inspect(path: Path, workspace: Path, entry: dict) -> dict:
-    files = FileSystem(
-        FileSystemOptions(directory=workspace), download_directory=str(path.parent)
-    )
-    first = await files.read_file(str(path), max_chars=200000)
+    workspace.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(path, workspace / path.name)
+    files = FileSystem(LocalWorkspace(workspace))
+    first = await files.read_file(path.name, max_chars=200000)
     selections = [{}]
     if first.sheets:
         selections = [{"sheet": sheet} for sheet in first.sheets]
@@ -70,7 +71,7 @@ async def _inspect(path: Path, workspace: Path, entry: dict) -> dict:
         offset = 0
         while True:
             result = await files.read_file(
-                str(path), offset=offset, max_chars=200000, **selection
+                path.name, offset=offset, max_chars=200000, **selection
             )
             chunks.append(result.text)
             limitations.update(result.limitations)

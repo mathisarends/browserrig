@@ -7,6 +7,16 @@ from openpyxl import Workbook
 from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
+from browserrig import LocalWorkspace
+
+
+@pytest.fixture(autouse=True)
+def _default_workspaces(tmp_path_factory, monkeypatch):
+    """Keep default workspaces out of the repository."""
+    monkeypatch.setattr(
+        LocalWorkspace, "default_root", tmp_path_factory.mktemp("workspaces")
+    )
+
 
 @pytest.fixture
 async def site(pdf_document, xlsx_document) -> AsyncIterator[str]:

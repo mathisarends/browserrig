@@ -15,8 +15,9 @@ from browserrig import (
     Agent,
     Chrome,
     Done,
-    FileSystemOptions,
+    Files,
     ImageContext,
+    LocalWorkspace,
     TerminalEvents,
     UntilCompaction,
     VideoRecording,
@@ -79,9 +80,9 @@ async def main() -> None:
             browser=Chrome.launch(
                 url=args.url,
                 headless=not args.headed,
-                files=FileSystemOptions(directory=args.workspace),
             ),
             plugins=[
+                Files(LocalWorkspace(args.workspace)),
                 ImageContext(UntilCompaction()),
                 VideoRecording(args.video) if args.video is not None else None,
                 Approvals(default=PolicyDecision.ALLOW),

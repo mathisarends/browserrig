@@ -15,6 +15,7 @@ from harnessed.plugins import ContextState
 from .activity import Activity
 from .browser import Chrome
 from .choreography import InputVisualization, TabStrip
+from .files import Files
 from .nudges import Nudges
 from .observation import BrowserPerception, ImageContext
 from .pacing import InputPacing
@@ -43,7 +44,7 @@ def browser_plugins(
     A plugin that fills the same slot as a default
     replaces it in place, such as `BrowserPerception(...)`, `Readiness(...)` or
     `ContextCompaction(...)`; any other plugin is added. `without` drops defaults by type,
-    such as `(FileTools,)` for an agent without local files. `None`
+    such as `(Files, FileTools)` for an agent without local files. `None`
     entries are skipped, so optional plugins can be written inline.
     """
     pack = browser_pack(browser=browser).without(*without)
@@ -90,6 +91,8 @@ def browser_pack(*, browser: Chrome | None = None) -> PluginPack:
             TabTools(),
             DialogTools(),
             FindTools(),
+            # The agent's workspace, independent of the browser.
+            Files(),
             FileTools(),
             ContextCompaction(trigger=WindowRatio()),
         ],
