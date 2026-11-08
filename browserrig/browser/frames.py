@@ -29,17 +29,12 @@ async def discover_frames(
     Keep usable siblings when a frame detaches; bound work on frame-heavy pages.
     """
     root = await tab.frame_tree()
-    width, height = await (await tab.main_frame()).run(VIEWPORT)
+    main = Frame(
+        root.frame.id, tab.cdp, document_id=root.frame.loader_id, worlds=tab.worlds
+    )
+    width, height = await main.run(VIEWPORT)
     viewport = Bounds(x=0, y=0, width=width, height=height)
-    result = [
-        Frame(
-            root.frame.id,
-            tab.cdp,
-            visible=viewport,
-            document_id=root.frame.loader_id,
-            worlds=tab.worlds,
-        )
-    ]
+    result = [replace(main, visible=viewport)]
     limitations: list[str] = []
     target_map = {info.target_id: info for info in targets if info.type == "iframe"}
     seen = {root.frame.id}
@@ -94,10 +89,18 @@ async def discover_frames(
             owner_id=owner.backend_node_id,
             worlds=tab.worlds,
         )
-        size = await child.run_on_owner(OWNER_SIZE)
+        # Both only need the owner; a box error matters only for a visible frame.
+        size, box = await asyncio.gather(
+            child.run_on_owner(OWNER_SIZE),
+            parent.cdp.dom.get_box_model(backend_node_id=owner.backend_node_id),
+            return_exceptions=True,
+        )
+        if isinstance(size, BaseException):
+            raise size
         if not size or min(size) <= 0:
             return None
-        box = await parent.cdp.dom.get_box_model(backend_node_id=owner.backend_node_id)
+        if isinstance(box, BaseException):
+            raise box
         transform = space.child(box.model.content, *size)
         visible = transform.bounds_to_viewport(
             Bounds(x=0, y=0, width=size[0], height=size[1])

@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated, Literal
@@ -230,8 +231,12 @@ class PointerTools(Plugin):
     ) -> Effect:
         prepared = await self._actions.element_point(ref=source_ref)
         target = await self._actions.element_point(ref=target_ref)
-        start = await self._actions.element_point(ref=source_ref, scroll=False)
-        end = await self._actions.element_point(ref=target_ref, scroll=False)
+        # Revealing is sequential (the second scroll may move the first ref);
+        # the final hit-tests are independent.
+        start, end = await asyncio.gather(
+            self._actions.element_point(ref=source_ref, scroll=False),
+            self._actions.element_point(ref=target_ref, scroll=False),
+        )
         await self._browser.input.mouse.drag(start=start, end=end, duration=duration)
         return Effect(
             "Drag dispatched; inspect the destination.",
