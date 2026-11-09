@@ -273,6 +273,10 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
     async def go_forward(self) -> bool:
         return await self._history(1)
 
+    async def can_go_back(self) -> bool:
+        history = await self.cdp.page.get_navigation_history()
+        return history.current_index > 0
+
     async def can_go_forward(self) -> bool:
         history = await self.cdp.page.get_navigation_history()
         return history.current_index + 1 < len(history.entries)

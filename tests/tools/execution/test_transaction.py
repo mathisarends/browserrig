@@ -52,6 +52,26 @@ async def test_validation_rejects_before_dispatch():
 
 
 @pytest.mark.parametrize(
+    "kind, method, message",
+    [
+        (ActionKind.GO_FORWARD, "can_go_forward", "no next history entry"),
+        (ActionKind.GO_BACK, "can_go_back", "No previous history entry"),
+    ],
+)
+async def test_unavailable_history_is_rejected_before_dispatch(kind, method, message):
+    operation = AsyncMock()
+    async with mounted(Actions()) as (services, ctx):
+        available = AsyncMock(return_value=False)
+        setattr(services.browser.active_tab, method, available)
+        with pytest.raises(ToolError, match=message) as caught:
+            await ctx[Actions].run(kind=kind, operation=operation)
+    assert "may have run" not in str(caught.value)
+    operation.assert_not_awaited()
+    available.assert_awaited_once()
+    assert not _first(services.events, ActionFailedEvent).dispatched
+
+
+@pytest.mark.parametrize(
     "selection", ["outside", "missing", "directory", "no_workspace"]
 )
 async def test_upload_rejects_invalid_selection_before_any_browser_input(

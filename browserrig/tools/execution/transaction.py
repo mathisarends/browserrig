@@ -195,6 +195,10 @@ class ActionRunner:
     @traced
     async def _prepare(self, tab: Tab, kind: ActionKind) -> PageState:
         """Return the pre-action baseline once the page accepts input."""
+        if kind is ActionKind.GO_FORWARD and not await tab.can_go_forward():
+            raise BrowserError("Cannot go forward: no next history entry")
+        if kind is ActionKind.GO_BACK and not await tab.can_go_back():
+            raise BrowserError("No previous history entry")
         if kind in NAVIGATION_KINDS and tab.dialog:
             raise BrowserError("A JavaScript dialog must be handled first")
         if kind in TAB_KINDS | NAVIGATION_KINDS:

@@ -24,6 +24,7 @@ async def test_forward_history_checks_bounds_and_only_dispatches_an_available_en
         navigate_to_history_entry=AsyncMock(),
     )
     tab = Tab("tab", SimpleNamespace(page=page))
+    assert await tab.can_go_back() is (current > 0)
     assert await tab.can_go_forward() is available
     assert await tab.go_forward() is available
     if available:
