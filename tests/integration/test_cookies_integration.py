@@ -130,7 +130,9 @@ async def test_banner_text_survives_busy_page_and_disappears_after_normal_click(
         )
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        before = await capture(tab, DomCapture(), report)
+        before = await capture(
+            tab, DomCapture(max_text_chars=0, sparse_text_chars=0), report
+        )
         assert not before.text and len(before.cookie_banners) == 1
         banner = before.cookie_banners[0]
         assert banner.name == "Privacy choices" and "analytics" in banner.text

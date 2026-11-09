@@ -50,17 +50,19 @@ share their page's session.
 
 `DomCapture` reads every frame document with one `DOMSnapshot.captureSnapshot` call per
 CDP session and derives roles, names, states, visibility and landmark sections from
-that data in Python, without walking the DOM in the page. Normal observations omit
-page-text excerpts and do not capture new screenshots. Use `extract_content()`
-to read the page. The agent can call `screenshot()` to request the current view as an
+that data in Python, without walking the DOM in the page. Normal observations include
+up to 3,000 characters of visible page text, along with nearby control previews,
+and do not capture new screenshots. Use `extract_content()` to read the full page.
+The agent can call `screenshot()` to request the current view as an
 image in its next iteration. `ImageContext` keeps the latest screenshot by default,
 including during subsequent text-only steps until compaction removes its snapshot.
-`observe()` refreshes page state. Use
+`BrowserPerception.capture()` refreshes page state. Use
 `BrowserPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` to enable images
 on every step. Pass it in `plugins` of `Agent` or `browser_plugins()`; it replaces
 the default `BrowserPerception()`.
-`BrowserPerception(capture=DomCapture(max_text_chars=N))` enables a page-text excerpt; its
-default is `0`. When the viewport holds fewer than five named controls, as on error, challenge
+`BrowserPerception(capture=DomCapture(max_text_chars=N))` sets the page-text budget;
+its default is `3000`. Set both `max_text_chars=0` and `sparse_text_chars=0` to
+omit page-text excerpts. When the viewport holds fewer than five named controls, as on error, challenge
 and confirmation pages, observations add up to `sparse_text_chars` (default `1500`)
 characters of visible text anyway. Every observation states where the mouse rests.
 

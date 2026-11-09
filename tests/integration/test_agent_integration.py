@@ -85,7 +85,10 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
     )
     for index, request in enumerate(model.requests):
         states = all_states(request.messages)
-        assert states and all("text" not in state for state in states)
+        assert states
+        assert all(len(state.get("text", "").strip()) <= 3000 for state in states)
+        assert "Email" in states[0]["text"]
+        assert all("never-echo-this" not in state.get("text", "") for state in states)
         images = [message for message in request.messages if has_image(message)]
         assert len(images) == (1 if index >= 1 else 0)
         if not images:

@@ -29,7 +29,7 @@ pytestmark = pytest.mark.integration
 _LINE = re.compile(r'^\s*\*?\[(?P<ref>[^\]]+)\] \S+ "(?P<name>[^"]*)"')
 
 
-async def test_only_viewport_controls_are_described_and_the_rest_are_known(site):
+async def test_strict_viewport_controls_are_described_and_the_rest_are_known(site):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await evaluate(
@@ -41,7 +41,10 @@ async def test_only_viewport_controls_are_described_and_the_rest_are_known(site)
         """,
         )
         report = await wait_for_page(tab)
-        state = await capture(tab, DomCapture(), report)
+        strategy = DomCapture(
+            viewport_expansion=0, max_text_chars=0, sparse_text_chars=0
+        )
+        state = await capture(tab, strategy, report)
         assert 0 < len(state.elements) < 300
         assert all(element.in_viewport for element in state.elements)
         assert len(state.elements) + len(state.offscreen) == 300
@@ -52,7 +55,7 @@ async def test_only_viewport_controls_are_described_and_the_rest_are_known(site)
         with pytest.raises(StaleElement, match="outside the viewport"):
             state.element(state.offscreen[-1].ref)
         assert await evaluate(tab, "scrollY") == 0
-        visual = await capture(tab, DomCapture(), report, screenshots=True)
+        visual = await capture(tab, strategy, report, screenshots=True)
         assert visual.image is not None
         limited = await capture(tab, DomCapture(max_elements=10), report)
         assert len(limited.elements) == 10
