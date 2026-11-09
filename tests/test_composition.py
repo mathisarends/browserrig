@@ -193,6 +193,12 @@ def test_one_file_tool_group_replaces_the_combined_default_in_place(group):
     assert not any(type(plugin) is FileTools for plugin in composed)
 
 
+def test_without_matches_each_file_tool_group_exactly():
+    assert not isinstance(FileTools(), (WorkspaceTools, BrowserFileTools))
+    with pytest.raises(ValueError, match="no recipes matching: BrowserFileTools"):
+        browser_plugins(without=(BrowserFileTools,))
+
+
 def test_two_file_tool_groups_conflict():
     with pytest.raises(PluginConflict, match="browserrig.file-tools"):
         browser_plugins(WorkspaceTools(), BrowserFileTools())

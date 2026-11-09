@@ -617,7 +617,8 @@ actions. `WorkspaceTools()` (list/read/write) and `BrowserFileTools()`
 of them in `plugins` replaces the default `FileTools()`. For example,
 `Agent(..., plugins=[WorkspaceTools()])` keeps workspace I/O without exposing
 browser file actions. Use `FileTools()` for both groups; two file tool groups
-raise `PluginConflict`. Download receiving remains controlled by
+raise `PluginConflict`. `FileTools` subclasses neither group, so
+`without=(WorkspaceTools,)` matches only a standalone `WorkspaceTools()`. Download receiving remains controlled by
 `DownloadReceiving()`.
 
 Workspace tools also work without Chrome, perception, readiness or browser actions:

@@ -54,20 +54,16 @@ _INSTRUCTIONS = Instructions(
 )
 
 
-class WorkspaceTools(Plugin, slot=FILE_TOOLS_SLOT):
-    """List, read and write workspace files without browser services.
+class _WorkspaceIO(Plugin):
+    """List, read and write tools shared by WorkspaceTools and FileTools.
 
-    Without a FileSystem, tools are unavailable. Files() provides the workspace.
+    Without a FileSystem, tools are unavailable.
     With a browser, receipts carry its identity and pass its event filters.
     """
 
-    events = FILE_EVENTS
     _workspace = observes(FileSystem)
     _browser_events = observes(BrowserEvents)
     _log = needs(SessionLog)
-
-    def instructions(self) -> SystemPrompt:
-        return SystemPrompt(_INSTRUCTIONS)
 
     @tool(
         kind=ActionKind.LIST_FILES,
@@ -212,6 +208,18 @@ class WorkspaceTools(Plugin, slot=FILE_TOOLS_SLOT):
             await self._browser_events.emit(event)
         else:
             await self._log.emit(event)
+
+
+class WorkspaceTools(_WorkspaceIO, slot=FILE_TOOLS_SLOT):
+    """List, read and write workspace files without browser services.
+
+    Files() provides the workspace.
+    """
+
+    events = FILE_EVENTS
+
+    def instructions(self) -> SystemPrompt:
+        return SystemPrompt(_INSTRUCTIONS)
 
 
 @contextmanager
