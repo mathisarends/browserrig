@@ -34,7 +34,31 @@ async def test_download_receiving_owns_binding_and_cleanup_without_tools(
         async with agent.session() as session:
             assert session.scope[DownloadReceiving].receiving is supported
             assert calls == [transfer]
-        assert calls == [transfer, None]
+        # Only an active binding is released.
+        assert calls == ([transfer, None] if supported else [transfer])
+
+
+async def test_download_receiving_cleanup_tolerates_closed_browser(tmp_path):
+    async def receive(transfer):
+        if transfer is None:
+            raise RuntimeError("browser closed")
+        return True
+
+    browser = SimpleNamespace(receive_downloads=receive)
+    async with FileSystem(LocalWorkspace(tmp_path)) as files:
+        transfer = FileTransfer(files, MountedWorkspace())
+        agent = Agent(
+            model=ScriptedModel([]),
+            plugins=[
+                Service(Browser, browser),
+                Service(FileTransfer, transfer),
+                DownloadReceiving(),
+            ],
+        )
+        async with agent.session() as session:
+            receiving = session.scope[DownloadReceiving]
+            assert receiving.receiving
+        assert not receiving.receiving
 
 
 async def test_download_receiving_follows_transfer_replacement_and_removal(tmp_path):
