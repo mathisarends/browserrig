@@ -9,6 +9,7 @@ from .models import TabInfo
 from .overlays import Overlay, Overlays
 from .plugin import Chrome, TabChanged
 from .policy import DomainNotAllowed, NavigationPolicy
+from .receiving import DownloadReceiving
 from .setup import SessionSetup
 from .tab import Tab, validated_url
 from .tabs import Tabs
@@ -25,6 +26,7 @@ __all__ = [
     "Frame",
     "Download",
     "DownloadState",
+    "DownloadReceiving",
     "Launch",
     "Overlay",
     "Overlays",

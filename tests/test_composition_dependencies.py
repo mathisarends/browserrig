@@ -380,11 +380,13 @@ async def test_file_tools_follow_the_workspace_and_the_browser_bridge(
     assert all(item.closed for item in fake_chrome)
 
 
-async def test_omitting_file_tools_removes_workspace_downloads_and_uploads(fake_chrome):
+async def test_omitting_file_tools_keeps_download_receiving_without_exposing_tools(
+    fake_chrome,
+):
     agent = browserrig.Agent(model=ScriptedModel(["unused"]), without=(FileTools,))
     async with agent.session() as session:
         assert session.scope[FileTransfer].files is session.scope[FileSystem]
-        assert session.scope[Browser].receiving is None
+        assert session.scope[Browser].receiving is session.scope[FileTransfer]
         names = {tool.name for tool in session.scope[ToolRegistry].definitions}
         assert not names.intersection(
             {

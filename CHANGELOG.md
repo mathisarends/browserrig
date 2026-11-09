@@ -4,6 +4,11 @@
 
 ### Breaking changes
 
+- Download receiving belongs to the new `DownloadReceiving()` plugin, included
+  in the default browser pack. Removing `FileTools` only removes model tools;
+  remove `DownloadReceiving` to stop receiving later downloads. Manual
+  compositions add it alongside `FileTransfers()` to save browser downloads.
+
 - Headed `Chrome.launch(...)` no longer pins `viewport` as device metrics; it sets
   the initial window size and pages follow the window when a person resizes it.
   Headless launches and `Chrome.connect(viewport=...)` still pin the viewport.

@@ -342,7 +342,10 @@ for application code that explicitly owns an operation.
 `browserrig.files.FileTransfers()`, which observes that bridge and the optional
 `FileSystem`, providing `FileTransfer` when both are available. Replacing the
 workspace replaces only that service. Explicit compositions using Chrome, Files
-and FileTools must also include `FileTransfers()`; plugin setup no longer installs
+and FileTools must also include `FileTransfers()` and `DownloadReceiving()`;
+the latter owns receiving downloads independently of model tools. Removing
+`FileTools` leaves download receiving enabled; remove `DownloadReceiving` to stop
+importing later downloads into the workspace. Plugin setup no longer installs
 nested plugins. `FileTools` consumes the transfer without depending on host
 configuration. Other browser providers can publish `FileBridge`, configure
 `FileTransfers(bridge)` in their application composition or provide `FileTransfer`

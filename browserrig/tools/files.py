@@ -1,7 +1,7 @@
 import asyncio
 import hashlib
 from collections.abc import Generator
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Annotated
@@ -19,11 +19,11 @@ from harnessed import (
 )
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.kernel import PluginScope, needs, observes
+from harnessed.kernel import needs, observes
 from harnessed.models import UserMessage
 from pydantic import Field
 
-from browserrig.browser import Browser, BrowserEvents, Tab
+from browserrig.browser import Browser, BrowserEvents, DownloadReceiving, Tab
 from browserrig.core import (
     ActionKind,
     BrowserError,
@@ -98,18 +98,12 @@ class _Delivery:
     visible: bool = False
 
 
-@dataclass
-class _Transfer:
-    # Whether Chrome saves downloads into the workspace.
-    receiving: bool = False
-
-
 class FileTools(Plugin):
     """Workspace files, downloads and uploads to observed file inputs."""
 
     events = FILE_EVENTS + UPLOAD_EVENTS
     _delivery = PluginState(_Delivery)
-    _transfer = PluginState(_Transfer)
+    _receiving = observes(DownloadReceiving)
 
     _browser = needs(Browser)
     # Optional: without a workspace, the agent only lists downloads.
@@ -123,18 +117,6 @@ class FileTools(Plugin):
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
-
-    async def setup(self, scope: PluginScope) -> None:  # pylint: disable=unused-argument
-        if self._file_transfer is not None:
-            self._transfer.receiving = await self._browser.receive_downloads(
-                self._file_transfer
-            )
-
-    async def teardown(self, scope: PluginScope) -> None:  # pylint: disable=unused-argument
-        if self._transfer.receiving:
-            # The browser may already be closing with the session.
-            with suppress(Exception):
-                await self._browser.receive_downloads(None)
 
     @tool(
         kind=ActionKind.LIST_DOWNLOADS,
@@ -394,7 +376,9 @@ class FileTools(Plugin):
         downloads = await self._browser.downloads()
         state = FileSystemState(
             workspace=self._workspace is not None,
-            download_directory=str(DOWNLOADS) if self._transfer.receiving else None,
+            download_directory=str(DOWNLOADS)
+            if self._receiving is not None and self._receiving.receiving
+            else None,
             downloads=downloads[-20:],
             total_downloads=len(downloads),
         )

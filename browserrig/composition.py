@@ -13,7 +13,7 @@ from harnessed.plugins import Compaction as ContextCompaction
 from harnessed.plugins import ContextState
 
 from .activity import Activity
-from .browser import Chrome
+from .browser import Chrome, DownloadReceiving
 from .choreography import InputVisualization, TabStrip
 from .files import Files, FileTransfers
 from .nudges import Nudges
@@ -94,6 +94,7 @@ def browser_pack(*, browser: Chrome | None = None) -> PluginPack:
             # The agent's workspace, independent of the browser.
             Files(),
             FileTransfers(),
+            DownloadReceiving(),
             FileTools(),
             ContextCompaction(trigger=WindowRatio()),
         ],

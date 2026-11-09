@@ -513,7 +513,7 @@ async def test_a_bridge_moves_downloads_and_uploads_between_separate_disks(
 
 @asynccontextmanager
 async def _receiving(options, workspace, emit=None):
-    """Open Chrome that saves downloads into `workspace`, as `FileTools` arranges."""
+    """Open Chrome that saves downloads into `workspace`, as `DownloadReceiving` arranges."""
     events = {} if emit is None else {"emit": emit}
     async with (
         FileSystem(workspace) as files,
