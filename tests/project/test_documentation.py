@@ -15,7 +15,15 @@ _ROOT = Path(__file__).resolve().parents[2]
 )
 def test_documented_browserrig_imports_exist(path):
     source = (_ROOT / path).read_text(encoding="utf-8")
-    missing = []
+    missing = [
+        (module, name)
+        for module, name in _browserrig_imports(source)
+        if not hasattr(importlib.import_module(module), name)
+    ]
+    assert not missing, path
+
+
+def _browserrig_imports(source):
     for block in re.finditer(r"```python\s*\n(.*?)```", source, re.DOTALL):
         try:
             tree = ast.parse(block.group(1))
@@ -23,11 +31,9 @@ def test_documented_browserrig_imports_exist(path):
             # Some examples intentionally show fragments rather than complete programs.
             continue
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith(
-                "browserrig"
-            ):
-                module = importlib.import_module(node.module)
-                for name in node.names:
-                    if not hasattr(module, name.name):
-                        missing.append((node.module, name.name))
-    assert missing == [], path
+            if not isinstance(node, ast.ImportFrom) or not (
+                node.module or ""
+            ).startswith("browserrig"):
+                continue
+            for name in node.names:
+                yield node.module, name.name

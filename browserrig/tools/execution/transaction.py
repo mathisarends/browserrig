@@ -45,6 +45,7 @@ class ActionRunner:
         events: BrowserEvents,
         readiness: Readiness,
         observe: BrowserPerception,
+        *,
         page_change: Callable[[Tab], Awaitable[str]],
     ) -> None:
         self._browser = browser
@@ -102,9 +103,7 @@ class ActionRunner:
                     )
                 if action is not None and not action.started:
                     await self.start(action)
-                tab.check_navigation()
-                if self._browser.active_tab is not tab:
-                    self._browser.active_tab.check_navigation()
+                self._check_navigation(tab)
                 await self._events.emit(
                     ActionFinishedEvent(
                         action_id=action_id,
@@ -117,25 +116,8 @@ class ActionRunner:
                         expects_change=expects_change,
                     )
                 )
-                change = ""
-                if (
-                    not effect.break_chain
-                    and not note
-                    and not followed
-                    and kind in CHAINABLE_KINDS
-                ):
-                    change = await self._page_change(tab)
-                result = ToolResult(
-                    effect.text + followed + note,
-                    break_chain=effect.break_chain
-                    or bool(note)
-                    or bool(followed)
-                    or bool(change),
-                )
-                return (
-                    result.with_note(change + " Observe before continuing.")
-                    if change
-                    else result
+                return await self._result(
+                    tab, kind, effect, followed=followed, note=note
                 )
             except asyncio.CancelledError:
                 if action is not None:
@@ -179,6 +161,36 @@ class ActionRunner:
             )
         )
         action.started = True
+
+    async def _result(
+        self, tab: Tab, kind: ActionKind, effect: Effect, *, followed: str, note: str
+    ) -> ToolResult:
+        change = ""
+        if (
+            not effect.break_chain
+            and not note
+            and not followed
+            and kind in CHAINABLE_KINDS
+        ):
+            change = await self._page_change(tab)
+        result = ToolResult(
+            effect.text + followed + note,
+            break_chain=effect.break_chain
+            or bool(note)
+            or bool(followed)
+            or bool(change),
+        )
+        return (
+            result.with_note(change + " Observe before continuing.")
+            if change
+            else result
+        )
+
+    def _check_navigation(self, tab: Tab) -> None:
+        tab.check_navigation()
+        active = self._browser.active_tab
+        if active is not tab:
+            active.check_navigation()
 
     @traced
     async def _prepare(self, tab: Tab, kind: ActionKind) -> PageState:

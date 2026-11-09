@@ -25,8 +25,8 @@ from tests.javascript import evaluate
 pytestmark = pytest.mark.integration
 
 
-@pytest.fixture
-async def guarded_site():
+@pytest.fixture(name="guarded_site")
+async def _guarded_site():
     requests = []
     blocked = asyncio.Event()
     receipts = []

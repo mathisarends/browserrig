@@ -124,21 +124,21 @@ def _result(
 ) -> WorkPresentedEvent:
     match event.kind:
         case ActionKind.READ_FILE:
-            return _file(event, FileContent.model_validate_json(result.text))
+            event = _file(event, FileContent.model_validate_json(result.text))
         case ActionKind.WRITE_FILE:
             entry = FileEntry.model_validate_json(result.text)
-            return replace(
+            event = replace(
                 event,
                 detail=f"{entry.path} · {entry.size or 0:,} bytes saved",
                 artifact_path=entry.path,
             )
         case ActionKind.LIST_FILES | ActionKind.LIST_TABS | ActionKind.LIST_DOWNLOADS:
-            return _listing(event, result)
+            event = _listing(event, result)
         case ActionKind.EXTRACT_CONTENT if extraction is not None:
             detail = f"{event.detail} · {len(extraction.markdown):,} characters · {extraction.url}"
             if extraction.next_offset is not None:
                 detail += f" · continues at {extraction.next_offset}"
-            return replace(
+            event = replace(
                 event,
                 title=extraction.title or event.title,
                 detail=clipped(detail, 500),
@@ -153,7 +153,7 @@ def _result(
                 region=_area(extraction.region),
             )
         case ActionKind.SCREENSHOT:
-            return replace(
+            event = replace(
                 event,
                 phase=WorkPhase.RUNNING,
                 detail="Requested · waiting for the next observation",
@@ -161,10 +161,12 @@ def _result(
         case ActionKind.JAVASCRIPT:
             # The overlay shows the returned value; the preview keeps the full result.
             value = result.text.removeprefix("JavaScript result:\n")
-            return replace(
+            event = replace(
                 event, detail=clipped(value, 300), preview=clipped(result.text)
             )
-    return replace(event, preview=clipped(result.text))
+        case _:
+            event = replace(event, preview=clipped(result.text))
+    return event
 
 
 def _listing(event: WorkPresentedEvent, result: ToolResult) -> WorkPresentedEvent:

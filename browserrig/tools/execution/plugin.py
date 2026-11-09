@@ -79,7 +79,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
             self._events,
             self.readiness,
             self.observe,
-            self.page_change,
+            page_change=self.page_change,
         )
         self._mount.invocation = ToolExecution(self._runner, self._coordination)
 
