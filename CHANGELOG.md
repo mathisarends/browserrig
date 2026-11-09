@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (unreleased)
 
 ### Breaking changes
 
@@ -43,7 +43,9 @@
   direct `ChromeBrowser` users call `await browser.receive_downloads(transfer)` to
   save downloads into the workspace.
   A custom `Workspace` implements only `stat`, `list`, `read_bytes` and
-  `write_bytes`; `MountedWorkspace` needs a `LocalWorkspace`.
+  `write_bytes`; `write_bytes(path, data, *, overwrite=True)` must atomically
+  reject existing files with `FileExistsError` when `overwrite=False`, including
+  concurrent creates. `MountedWorkspace` needs a `LocalWorkspace`.
   `FileSystemState` reports `workspace: bool` and a relative
   `download_directory`, and `FileContent.extracted_path` is relative to the
   workspace, or `None` for a remote workspace.
@@ -56,6 +58,11 @@
 
 - Model screenshots omit the pointer marker by default. Use
   `DomCapture(cursor=True)` to opt into the existing post-capture marker.
+
+- Default DOM observations include up to 3,000 characters of visible page text
+  and a 1,000-pixel context buffer for nearby controls. Set
+  `DomCapture(max_text_chars=0, sparse_text_chars=0, viewport_expansion=0)` to retain
+  strict controls-only viewport observations. Comparison probes still omit text.
 
 - Rename the browser observation plugin from `Observe` to `BrowserPerception`,
   describing the page structure, element references and optional screenshots
@@ -93,16 +100,21 @@
   preserve `SystemPrompt.from_plugins(format=...)` to choose a format.
   `SystemPrompt(...)` explicitly omits plugin blocks, with omissions listed by
   `print(agent.prompt)`.
-- **Storage reset required:** conversation state uses format 2, execution
+- **Storage reset required when upgrading from Harnessed 0.12 or older:**
+  conversation state uses format 2, execution
   checkpoints and JSON stores format 3, audit envelopes version 5. Older formats
   are rejected without automatic migration. Back up application-owned data and
-  start new snapshots, stores and audit logs.
+  start new snapshots, stores and audit logs. Harnessed 0.13 data already uses
+  these formats and needs no migration for 0.14.
 - Human-handoff history persists through feature instruction state and is delivered
   by its own `PrepareRequest` hook. The removed `DynamicContext` service is no
   longer used. The `Done` output bridge dispatches by session log identity and
   restores native output methods after its last activation closes.
 
 ### Added
+
+- Export `ActionKind` and `FileTransfers` from `browserrig` for custom tools and
+  explicit plugin compositions.
 
 - `VideoRecording` also writes the uncut session film as `original.mp4`, exposed as
   `RecordingResult.original_path`, in the same FFmpeg pass as the edited `video.mp4`.
@@ -167,6 +179,20 @@
   browser plugins for `Agent(browser=...)`, `browser_pack()`, `browser_plugins()` and
   explicit Harnessed plugin composition. Configuration is validated immediately;
   browser resources open per session.
+
+### Fixed
+
+- Enforce `overwrite=False` at the workspace write, preventing concurrent file
+  creation from silently overwriting another writer's content.
+- Coordinate parallel remote file reads and use unique temporary cache files.
+- Keep in-flight downloads bound to their original workspace and bridge when
+  file services change. Hide paths belonging to another workspace until it is
+  restored, preventing previews from opening an unrelated file at the same path.
+- Align Harnessed compatibility documentation with the pinned 0.14.0 release and
+  validate Browserrig imports in Python documentation examples.
+- Reject unavailable history navigation before marking an action as dispatched.
+- Split native recordings at model, compaction and pause boundaries to keep stale
+  wait frames out of the edited film while retaining them in `original.mp4`.
 
 ## 0.1.0 (2026-11-03)
 

@@ -116,10 +116,10 @@ To publish a version:
 1. Prepare and merge a PR with the same version in `pyproject.toml` and
    `browserrig/__init__.py`. Keep `uv.lock` current (`uv lock`) and add the matching
    `## <version>` section to `CHANGELOG.md`, replacing any `unreleased` label with
-   the release date. The initial `0.1.0` metadata and notes are already present.
+   the release date. The `0.2.0` metadata and notes are prepared in this checkout.
 2. Once `main` is green, manually publish a GitHub release with a matching tag,
-   such as `v0.1.0`, targeting the prepared commit on `main`. Alternatively, push
-   that tag yourself: `git tag v0.1.0 <commit>` and `git push origin v0.1.0`.
+   such as `v0.2.0`, targeting the prepared commit on `main`. Alternatively, push
+   that tag yourself: `git tag v0.2.0 <commit>` and `git push origin v0.2.0`.
 3. Watch **Actions → Release package** and approve the `pypi` environment if required
    reviewers are configured. Both stable and prerelease tags must exactly match
    `v` plus the Python package version (for example `v0.2.0rc1`).
