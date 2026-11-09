@@ -655,6 +655,50 @@ async def test_window_resize_outdates_coordinates_and_nudges_the_agent():
         assert "resized from 800x600 to 1000x700" in str(hints[0].message.content)
 
 
+async def test_resize_round_trip_requires_a_new_screenshot_even_with_identical_pixels():
+    agent, _model, _capture, holder = _agent(
+        [call("screenshot"), *_steps(2), call("screenshot"), *_steps(1), "Done"],
+        frames=[("same pixels", 2), ("same pixels", 2)],
+    )
+    async with agent.session() as session:
+        browser = _browser_ready(holder)
+        observe = session.scope[BrowserPerception]
+        await session.run("Inspect", max_steps=2)
+        original = observe.coordinate_source()
+        # A resize away and back retains the original dimensions, but may change the page.
+        browser.active_tab.viewport_revision += 2
+        await session.run("Continue after resizing", max_steps=1)
+        with pytest.raises(StaleElement, match="resized.*screenshot again"):
+            observe.coordinate_source()
+        await session.run("Refresh the screenshot", max_steps=2)
+        refreshed = observe.coordinate_source()
+        assert refreshed.id != original.id
+        assert refreshed.viewport_revision == browser.active_tab.viewport_revision
+        assert refreshed.geometry == original.geometry
+
+
+@pytest.mark.parametrize("dialog", [False, True])
+async def test_placeholder_observations_do_not_report_a_viewport_resize(dialog):
+    agent, _model, capture, holder = _agent([*_steps(4), "Done"], after=(Nudges(),))
+    async with agent.session() as session:
+        browser = _browser_ready(holder)
+        first = await session.run("Inspect", max_steps=1)
+        capture.size = (0, 0)
+        browser.active_tab.dialog = ("alert", "Confirm") if dialog else None
+        placeholder = await session.run("Capture unavailable", max_steps=1)
+        capture.size = (800, 600)
+        browser.active_tab.dialog = None
+        restored = await session.run("Continue", max_steps=1)
+        hints = _recorded([first, placeholder, restored], "browser.nudges")
+        assert not any("viewport was resized" in str(h.message.content) for h in hints)
+        capture.size = (1000, 700)
+        browser.active_tab.viewport_revision += 1
+        resized = await session.run("Actual resize", max_steps=1)
+        hints = _recorded([resized], "browser.nudges")
+        assert len(hints) == 1
+        assert "resized from 800x600 to 1000x700" in str(hints[0].message.content)
+
+
 class Probe(ReadinessStrategy):
     budget = 0.01
 

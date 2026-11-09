@@ -19,6 +19,7 @@ from browserrig.choreography import Stage
 from browserrig.core import Point
 from browserrig.events import CursorStateEvent
 from browserrig.input import HumanMotor
+from browserrig.readiness import wait_for_page
 from tests.observations import latest
 
 pytestmark = pytest.mark.integration
@@ -86,6 +87,7 @@ async def test_drag_pointer_and_html5_transfer(site, native, coordinates):
 async def test_drag_uses_browser_behavior_for_draggable_ancestor(site, prevented):
     async with ChromeBrowser(Launch(url=site + "/gestures")) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         await evaluate(
             tab,
             """(() => {
@@ -128,6 +130,7 @@ async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site)
         browser.input.pace(HumanMotor())
         browser.input.present(Stage())
         tab = browser.active_tab
+        await wait_for_page(tab)
         await evaluate(
             tab,
             """window.dragEnds = [];

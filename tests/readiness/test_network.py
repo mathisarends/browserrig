@@ -9,9 +9,11 @@ from cdpify.domains.network import (
     ResourceType,
 )
 
+from browserrig.browser import network as network_module
 from browserrig.browser.network import NetworkActivity
-from browserrig.core import ReadinessPhase
+from browserrig.core import ReadinessPhase, ReadinessStage
 from browserrig.readiness import NetworkQuiet, ReadinessOptions, wait_for_page
+from browserrig.readiness.policies import ReadinessContext
 from tests.fakes import FakeTab
 
 _OPTIONS = ReadinessOptions(
@@ -104,12 +106,21 @@ async def test_a_request_chain_is_followed_but_a_later_poll_is_not():
     await asyncio.wait_for(asyncio.gather(steps, finish), 1)
 
 
-async def test_requests_open_before_the_action_never_count():
+async def test_requests_open_before_the_action_never_count(monkeypatch):
     """Long polls and streams the page held open do not hold readiness."""
     tab = FakeTab()
+    # Use an explicitly earlier timestamp; short sleeps can share a clock tick on Windows.
+    monkeypatch.setattr(network_module, "monotonic", lambda: 0.0)
     tab.network.handle(_sent("long-poll"))
-    await asyncio.sleep(0.01)
-    assert await _wait(tab, since=monotonic()) < 0.1
+    context = ReadinessContext(
+        tab=tab,
+        phase=ReadinessPhase.AFTER_ACTION,
+        stage=ReadinessStage.ONGOING,
+        options=_OPTIONS,
+        since=monotonic(),
+    )
+    assert await _POLICY.create(context).check()
+    assert tab.network.since(0)[0].finished is None
 
 
 async def test_background_polling_outside_the_reaction_window_never_counts():

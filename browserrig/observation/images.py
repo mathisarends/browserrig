@@ -233,9 +233,20 @@ def _positive(value: object) -> bool:
 
 
 def _same_screen(kept: CapturedImage, new: CapturedImage) -> bool:
-    return (kept.tab_id, kept.document_id, kept.geometry, kept.image) == (
+    return (
+        kept.tab_id,
+        kept.document_id,
+        kept.viewport_revision,
+        kept.width,
+        kept.height,
+        kept.geometry,
+        kept.image,
+    ) == (
         new.tab_id,
         new.document_id,
+        new.viewport_revision,
+        new.width,
+        new.height,
         new.geometry,
         new.image,
     )

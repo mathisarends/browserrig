@@ -184,6 +184,8 @@ class Snapshot(Options):
     # Where the mouse rests, in viewport CSS pixels; None before it entered this tab.
     cursor: Point | None = None
     captured_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    # Resize generation at capture start, including for retained screenshots.
+    viewport_revision: int = 0
 
     def element(self, ref: str) -> ElementInfo:
         for element in self.elements:
@@ -209,6 +211,7 @@ class CapturedImage:
     width: float
     height: float
     geometry: Geometry | None
+    viewport_revision: int = 0
 
     @classmethod
     def from_snapshot(cls, snapshot: Snapshot, browser_id: str) -> Self:
@@ -224,6 +227,7 @@ class CapturedImage:
             snapshot.width,
             snapshot.height,
             snapshot.geometry,
+            snapshot.viewport_revision,
         )
 
 

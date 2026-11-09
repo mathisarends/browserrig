@@ -106,6 +106,8 @@ async def capture_observation(
     `redaction` hides secrets in all text and blacks out elements showing one.
     """
     snapshot_id = uuid4().hex
+    # A resize while collecting leaves the whole capture outdated, including its image.
+    viewport_revision = tab.viewport_revision
     if tab.dialog:
         snapshot = Snapshot(
             id=snapshot_id,
@@ -118,6 +120,7 @@ async def capture_observation(
             height=0,
             scroll_y=0,
             fingerprint="dialog",
+            viewport_revision=viewport_revision,
             tabs=tabs,
             text=f"Open {tab.dialog[0]} dialog: {tab.dialog[1]}",
             cursor=cursor,
@@ -150,6 +153,7 @@ async def capture_observation(
             height=0,
             scroll_y=0,
             fingerprint=f"readiness:{report.id}",
+            viewport_revision=viewport_revision,
             tabs=tabs,
             text="The page is still loading. Observe again before using page controls.",
         )
@@ -193,6 +197,7 @@ async def capture_observation(
         image=image,
         geometry=content.geometry,
         cursor=cursor,
+        viewport_revision=viewport_revision,
     )
     references = (
         content.references if content.references is not None else DomReferences()

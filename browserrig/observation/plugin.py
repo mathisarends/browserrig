@@ -164,8 +164,6 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         async with self._state.lock:
             selected = tab if tab is not None else browser.active_tab
             report = await readiness.wait(selected, phase=phase)
-            # Read before capturing: a resize during capture leaves this observation outdated.
-            revision = selected.viewport_revision
             observation = await capture_observation(
                 selected,
                 self.capture_strategy,
@@ -181,7 +179,6 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 redaction=self._secrets(),
             )
             self._state.observation = observation
-            self._state.viewport_revision = revision
             snapshot = observation.snapshot
             await self._events.emit(
                 ObservationCapturedEvent(
@@ -331,7 +328,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         tab = self._browser.active_tab
         if (
             tab.id == snapshot.tab_id
-            and tab.viewport_revision != self._state.viewport_revision
+            and tab.viewport_revision != snapshot.viewport_revision
         ):
             raise StaleElement(
                 "The browser window was resized after the last observation; "
@@ -342,6 +339,10 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             if (image.width, image.height) != (snapshot.width, snapshot.height):
                 raise StaleElement(
                     "The viewport changed size since the last shown image; screenshot again"
+                )
+            if image.viewport_revision != snapshot.viewport_revision:
+                raise StaleElement(
+                    "The browser window was resized since the last shown image; screenshot again"
                 )
             if (image.tab_id, image.document_id) != (
                 snapshot.tab_id,
@@ -403,6 +404,9 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         """Notice a viewport resized from outside, such as by a person resizing the window."""
         state = self._state
         size = (snapshot.width, snapshot.height)
+        # Dialogs and unavailable captures have placeholder dimensions, not a viewport.
+        if snapshot.width <= 0 or snapshot.height <= 0:
+            return
         previous = state.viewports.get(snapshot.tab_id)
         state.viewports[snapshot.tab_id] = size
         if previous is None or previous == size:

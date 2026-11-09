@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.0 (2026-11-09)
 
 ### Breaking changes
 
@@ -194,6 +194,10 @@
 
 ### Fixed
 
+- Keep a screenshot's resize revision so returning to the original window size
+  cannot reactivate outdated screenshot coordinates.
+- Ignore placeholder viewport dimensions from dialogs and unavailable captures
+  when reporting window resizes.
 - Enforce `overwrite=False` at the workspace write, preventing concurrent file
   creation from silently overwriting another writer's content.
 - Coordinate parallel remote file reads and use unique temporary cache files.

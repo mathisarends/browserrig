@@ -32,8 +32,6 @@ class BrowserPerceptionState:
     included: frozenset[str] = frozenset()
     # Viewport size of each tab at its last step observation, to notice window resizes.
     viewports: dict[TargetId, tuple[float, float]] = field(default_factory=dict)
-    # The tab's resize count when the current observation started capturing.
-    viewport_revision: int = 0
 
 
 @dataclass
