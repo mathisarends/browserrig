@@ -256,7 +256,7 @@ class HumanHandoff(Plugin, provides=True):
         return receipt.model_dump_json()
 
     async def _record(self, receipt: HandoffReceipt) -> None:
-        # Harnessed 0.13 stores feature instruction state as text. Keep that wire format at
+        # Harnessed stores feature instruction state as text. Keep that wire format at
         # this boundary; callers and handoff logic work with typed receipts.
         history = (*self.history, receipt)[-self.history_limit :]
         try:

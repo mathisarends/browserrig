@@ -133,7 +133,7 @@ chosen implicitly when the target is not a file input or an associated label.
 
 Direct Python callers open the workspace themselves; `FileTransfer` connects it
 to a browser host through an explicitly chosen bridge. In an agent session,
-`Chrome` binds its configured bridge to the current `FileSystem` and provides
+`FileTransfers` binds Chrome's configured bridge to the current `FileSystem` and provides
 `FileTransfer` as an optional service. `FileTools` consumes that service for
 previews, uploads and download reception. A workspace change replaces the
 transfer service without reopening Chrome; `Browser` does not expose the bridge.
@@ -197,9 +197,9 @@ A workspace the agent reaches only through an API needs its own `FileBridge`.
 | --- | --- |
 | Local Chrome (default) | `Chrome.launch()` with the default `Files()`: a fresh `LocalWorkspace`, mounted for Chrome |
 | Local Chrome, chosen directory | `Chrome.launch()` with `Files(LocalWorkspace("research"))` |
-| Chrome on a pod with a shared volume | `Chrome.connect(endpoint, bridge=MountedWorkspace("/workspace"))` with `Files(LocalWorkspace("/mnt/agent"))` |
-| Cloud browser with a file API | `Chrome.connect(endpoint, bridge=ProviderBridge(...))` |
-| Remote browser, no file transfer | `Chrome.connect(endpoint)`: workspace tools only |
+| Chrome on a pod with a shared volume | `Chrome.connect(endpoint=endpoint, bridge=MountedWorkspace("/workspace"))` with `Files(LocalWorkspace("/mnt/agent"))` |
+| Cloud browser with a file API | `Chrome.connect(endpoint=endpoint, bridge=ProviderBridge(...))` |
+| Remote browser, no file transfer | `Chrome.connect(endpoint=endpoint)`: workspace tools only |
 | No files at all | `without=(Files, FileTools)` |
 
 `Chrome.launch` mounts the workspace for Chrome by default. `Chrome.connect` never

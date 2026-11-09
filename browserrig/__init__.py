@@ -18,7 +18,7 @@ from .composition import (  # smelt: ignore[SMT106] -- public facade
     browser_pack,
     browser_plugins,
 )
-from .core import BrowserCoordination, HandoffStatus, Point
+from .core import ActionKind, BrowserCoordination, HandoffStatus, Point
 from .files import (
     BrowserDownload,
     FileBridge,
@@ -26,6 +26,7 @@ from .files import (
     Files,
     FileSystem,
     FileTransfer,
+    FileTransfers,
     LocalWorkspace,
     MountedWorkspace,
     Workspace,
@@ -93,6 +94,7 @@ from .tools import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "ActionKind",
     "AllowedDomains",
     "DomainNotAllowed",
     "Agent",
@@ -164,6 +166,7 @@ __all__ = [
     "Files",
     "FileSystem",
     "FileTransfer",
+    "FileTransfers",
     "LocalWorkspace",
     "MountedWorkspace",
     "Workspace",

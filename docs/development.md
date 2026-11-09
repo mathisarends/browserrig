@@ -134,7 +134,7 @@ version and tag. This setup PR creates no release or tag itself.
 
 ## Harnessed compatibility
 
-Harnessed and all provider extras are pinned to the published 0.13.0 release.
+Harnessed and all provider extras are pinned to the published 0.14.0 release.
 `session.append_message(UserMessage(...))` adds durable background without starting
 a turn. State format 2, checkpoint/store format 3 and audit envelope 5 reject older
 data; back up old application data and start fresh stores.
@@ -147,7 +147,7 @@ uses `session.scope[HumanHandoff].history`. Verify restoration and model deliver
 in `tests/handoff/test_handoff.py`, including after compaction.
 
 The opt-in `Done` plugin uses native hooks for continuation and tool execution.
-Harnessed 0.13.0 has no output-policy hook or injectable output handler, so
+Harnessed 0.14.0 has no output-policy hook or injectable output handler, so
 `browserrig/completion/output.py` bridges internal `OutputHandler` methods through a
 registry keyed by session log identity. Only active `Done` sessions alter output
 handling; other sessions use the original methods. The last activation's cleanup

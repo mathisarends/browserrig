@@ -1,6 +1,6 @@
 """Route the final-answer contract through done for sessions that mount Done.
 
-Harnessed 0.13 has no output-policy hook or injectable output handler, so this
+Harnessed 0.14 has no output-policy hook or injectable output handler, so this
 patches OutputHandler and dispatches by session log. Other sessions, including
 concurrent ones, keep the native handler.
 """

@@ -34,7 +34,7 @@ than the wheel for Browserrig itself.
 
 To run the examples from a source checkout instead (uv required):
 
-Harnessed and all provider extras are pinned to the published `0.13.0` release,
+Harnessed and all provider extras are pinned to the published `0.14.0` release,
 with native ordinary-message input and explicit stream contexts.
 Existing Harnessed 0.12 snapshots, stores and audit logs are incompatible; back up
 old application data and start new stores. See the [upgrade notes](CHANGELOG.md).

@@ -13,10 +13,13 @@ from importlib.resources import files
 from pathlib import Path
 
 import browserrig
+from browserrig import ActionKind, FileTransfers
 from harnessed import Session
 from browserrig.scripts import CHOREOGRAPHY, CONTENT, ELEMENT, OVERLAY, SECRET_FIELD
 
 assert callable(Session.append_message)
+assert ActionKind.MOVE_MOUSE.value == 'move_mouse'
+assert any(isinstance(plugin, FileTransfers) for plugin in browserrig.browser_plugins())
 assert browserrig.__version__ == importlib.metadata.version('browserrig')
 distribution = importlib.metadata.distribution('browserrig')
 assert distribution.metadata['License-Expression']
