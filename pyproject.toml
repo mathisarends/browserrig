@@ -24,10 +24,19 @@ dependencies = [
     "httpx2>=2.16,<3",
     "pillow>=13,<14",
     "pydantic>=2.12,<3",
-    "pypdf>=6.21.4,<7",
     "pyyaml>=6,<7",
-    "beautifulsoup4>=4.14,<5",
     "charset-normalizer>=3.4,<4",
+]
+
+[project.optional-dependencies]
+openai = ["harnessed[openai]==0.14.0"]
+anthropic = ["harnessed[anthropic]==0.14.0"]
+mcp = ["harnessed[mcp]==0.14.0"]
+otel = ["harnessed[otel]==0.14.0"]
+# Document, spreadsheet, PDF and media readers for `read_file`.
+files = [
+    "pypdf>=6.21.4,<7",
+    "beautifulsoup4>=4.14,<5",
     "defusedxml>=0.7.1,<0.8",
     "markdownify>=1.2,<2",
     "odfpy>=1.4.1,<2",
@@ -37,17 +46,15 @@ dependencies = [
     "striprtf>=0.0.29,<0.1",
     "mutagen>=1.47,<2",
     "xlrd>=2.0.2,<3",
+]
+# Local CPU OCR for images and scanned PDFs; includes the file readers.
+ocr = [
+    "browserrig[files]",
     "rapidocr==3.9.2",
     "onnxruntime==1.30.0",
     "opencv-python>=4.13,<5",
     "pypdfium2>=5.14,<6",
 ]
-
-[project.optional-dependencies]
-openai = ["harnessed[openai]==0.14.0"]
-anthropic = ["harnessed[anthropic]==0.14.0"]
-mcp = ["harnessed[mcp]==0.14.0"]
-otel = ["harnessed[otel]==0.14.0"]
 
 [project.urls]
 Homepage = "https://github.com/mathisarends/browserrig"

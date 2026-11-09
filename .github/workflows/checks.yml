@@ -21,7 +21,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python }}
-      - run: uv sync --locked --extra openai --extra mcp --extra otel
+      - run: uv sync --locked --extra openai --extra mcp --extra otel --extra ocr
       - run: uv run --no-sync prek validate-config .pre-commit-config.yml
       - run: uv run --no-sync ruff check browserrig examples tests
       - run: uv run --no-sync ruff format --check browserrig examples tests
@@ -78,7 +78,7 @@ jobs:
         env:
           BROWSERRIG_CHROME: ${{ steps.chrome.outputs.chrome-path }}
         run: timeout 20s "$BROWSERRIG_CHROME" --headless=new --dump-dom about:blank
-      - run: uv sync --locked
+      - run: uv sync --locked --extra ocr
       - run: uv run --no-sync pytest -m integration
         env:
           BROWSERRIG_CHROME: ${{ steps.chrome.outputs.chrome-path }}

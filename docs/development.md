@@ -15,7 +15,7 @@ Within the same visibility, put callers before their helpers when definition-tim
 dependencies permit it.
 
 ```powershell
-uv sync --locked --extra openai
+uv sync --locked --extra openai --extra ocr
 pnpm.cmd install --frozen-lockfile
 uv run prek install --overwrite
 uv run prek run --all-files

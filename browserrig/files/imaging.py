@@ -7,7 +7,6 @@ from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING
 
-import pypdfium2
 from PIL import Image, ImageOps
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
@@ -17,6 +16,7 @@ if TYPE_CHECKING:
     from rapidocr import RapidOCR
 
 from .content import ParsedContent, ReadContext
+from .extras import OCR_MISSING, ocr_installed
 
 _OCR_LOCK = Lock()
 _PDF_LOCK = Lock()
@@ -43,9 +43,12 @@ def read_pdf(context: ReadContext) -> ParsedContent:
     except PyPdfError as error:
         raise ValueError("Could not read PDF: invalid or damaged document") from error
     details = ParsedContent((), "pdf", page_number=number, page_count=count)
-    if context.request.ocr is True or (
+    wants_ocr = context.request.ocr is True or (
         not text.strip() and context.options.ocr and context.request.ocr is not False
-    ):
+    )
+    if wants_ocr and not ocr_installed():
+        details.limitations.append(OCR_MISSING)
+    elif wants_ocr:
         with _pdf_image(context.path, number) as image:
             text = _image_text(image)
         details.limitations.append(
@@ -82,6 +85,15 @@ def read_image(context: ReadContext) -> ParsedContent:
                 (metadata,),
                 format_,
                 ["OCR is disabled; only image metadata is available"],
+                status="metadata_only",
+                page_number=number,
+                page_count=count,
+            )
+        if not ocr_installed():
+            return ParsedContent(
+                (metadata,),
+                format_,
+                [OCR_MISSING],
                 status="metadata_only",
                 page_number=number,
                 page_count=count,
@@ -125,7 +137,8 @@ def _engine() -> RapidOCR:
 
 def _pdf_image(path: Path, number: int) -> Image.Image:
     # PDFium is not thread-safe even for different documents.
-    with _PDF_LOCK, pypdfium2.PdfDocument(str(path)) as document:
+    pdfium = import_module("pypdfium2")
+    with _PDF_LOCK, pdfium.PdfDocument(str(path)) as document:
         page = document[number - 1]
         try:
             scale = min(2, 4000 / max(page.get_size()))

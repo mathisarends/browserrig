@@ -8,12 +8,15 @@ from tempfile import TemporaryDirectory
 from zipfile import ZipFile
 
 _SMOKE = """
+import asyncio
 import importlib.metadata
+from importlib.util import find_spec
 from importlib.resources import files
 from pathlib import Path
 
 import browserrig
 from browserrig import ActionKind, FileTransfers
+from browserrig.files import FileSystem, LocalWorkspace
 from harnessed import Session
 from browserrig.scripts import CHOREOGRAPHY, CONTENT, ELEMENT, OVERLAY, SECRET_FIELD
 
@@ -30,7 +33,22 @@ assert files('browserrig').joinpath('py.typed').is_file()
 assert all(script.declaration for script in (CHOREOGRAPHY, CONTENT, ELEMENT, OVERLAY, SECRET_FIELD))
 assert files('browserrig.choreography').joinpath('view.html').is_file()
 assert files('browserrig.choreography').joinpath('view.css').is_file()
-print('Installed wheel: public API, version, typing data and scripts OK')
+
+
+async def read_without_file_extras():
+    # The base install reads text; richer formats point to the optional extra.
+    async with FileSystem(LocalWorkspace('workspace')) as workspace:
+        await workspace.write_file('notes.txt', 'hello')
+        await workspace.write_file('table.csv', 'a,b')
+        assert (await workspace.read_file('notes.txt')).text == 'hello'
+        table = await workspace.read_file('table.csv')
+        assert table.status == 'partial' and table.text == 'a,b'
+        assert 'browserrig[files]' in table.limitations[0]
+
+
+assert find_spec('openpyxl') is None and find_spec('rapidocr') is None
+asyncio.run(read_without_file_extras())
+print('Installed wheel: public API, version, typing data, scripts and base file reading OK')
 """
 
 

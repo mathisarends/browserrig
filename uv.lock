@@ -121,36 +121,51 @@ name = "browserrig"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
-    { name = "beautifulsoup4" },
     { name = "cdpify", extra = ["websocket"] },
     { name = "charset-normalizer" },
-    { name = "defusedxml" },
     { name = "harnessed" },
     { name = "httpx2" },
-    { name = "markdownify" },
-    { name = "mutagen" },
-    { name = "odfpy" },
-    { name = "onnxruntime" },
-    { name = "opencv-python" },
-    { name = "openpyxl" },
     { name = "pillow" },
     { name = "pydantic" },
-    { name = "pypdf" },
-    { name = "pypdfium2" },
-    { name = "python-docx" },
-    { name = "python-pptx" },
     { name = "pyyaml" },
-    { name = "rapidocr" },
-    { name = "striprtf" },
-    { name = "xlrd" },
 ]
 
 [package.optional-dependencies]
 anthropic = [
     { name = "harnessed", extra = ["anthropic"] },
 ]
+files = [
+    { name = "beautifulsoup4" },
+    { name = "defusedxml" },
+    { name = "markdownify" },
+    { name = "mutagen" },
+    { name = "odfpy" },
+    { name = "openpyxl" },
+    { name = "pypdf" },
+    { name = "python-docx" },
+    { name = "python-pptx" },
+    { name = "striprtf" },
+    { name = "xlrd" },
+]
 mcp = [
     { name = "harnessed", extra = ["mcp"] },
+]
+ocr = [
+    { name = "beautifulsoup4" },
+    { name = "defusedxml" },
+    { name = "markdownify" },
+    { name = "mutagen" },
+    { name = "odfpy" },
+    { name = "onnxruntime" },
+    { name = "opencv-python" },
+    { name = "openpyxl" },
+    { name = "pypdf" },
+    { name = "pypdfium2" },
+    { name = "python-docx" },
+    { name = "python-pptx" },
+    { name = "rapidocr" },
+    { name = "striprtf" },
+    { name = "xlrd" },
 ]
 openai = [
     { name = "harnessed", extra = ["openai"] },
@@ -173,34 +188,35 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "beautifulsoup4", specifier = ">=4.14,<5" },
+    { name = "beautifulsoup4", marker = "extra == 'files'", specifier = ">=4.14,<5" },
+    { name = "browserrig", extras = ["files"], marker = "extra == 'ocr'" },
     { name = "cdpify", extras = ["websocket"], specifier = "==0.5.0" },
     { name = "charset-normalizer", specifier = ">=3.4,<4" },
-    { name = "defusedxml", specifier = ">=0.7.1,<0.8" },
+    { name = "defusedxml", marker = "extra == 'files'", specifier = ">=0.7.1,<0.8" },
     { name = "harnessed", specifier = "==0.14.0" },
     { name = "harnessed", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = "==0.14.0" },
     { name = "harnessed", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==0.14.0" },
     { name = "harnessed", extras = ["openai"], marker = "extra == 'openai'", specifier = "==0.14.0" },
     { name = "harnessed", extras = ["otel"], marker = "extra == 'otel'", specifier = "==0.14.0" },
     { name = "httpx2", specifier = ">=2.16,<3" },
-    { name = "markdownify", specifier = ">=1.2,<2" },
-    { name = "mutagen", specifier = ">=1.47,<2" },
-    { name = "odfpy", specifier = ">=1.4.1,<2" },
-    { name = "onnxruntime", specifier = "==1.30.0" },
-    { name = "opencv-python", specifier = ">=4.13,<5" },
-    { name = "openpyxl", specifier = ">=3.1.5,<4" },
+    { name = "markdownify", marker = "extra == 'files'", specifier = ">=1.2,<2" },
+    { name = "mutagen", marker = "extra == 'files'", specifier = ">=1.47,<2" },
+    { name = "odfpy", marker = "extra == 'files'", specifier = ">=1.4.1,<2" },
+    { name = "onnxruntime", marker = "extra == 'ocr'", specifier = "==1.30.0" },
+    { name = "opencv-python", marker = "extra == 'ocr'", specifier = ">=4.13,<5" },
+    { name = "openpyxl", marker = "extra == 'files'", specifier = ">=3.1.5,<4" },
     { name = "pillow", specifier = ">=13,<14" },
     { name = "pydantic", specifier = ">=2.12,<3" },
-    { name = "pypdf", specifier = ">=6.21.4,<7" },
-    { name = "pypdfium2", specifier = ">=5.14,<6" },
-    { name = "python-docx", specifier = ">=1.2,<2" },
-    { name = "python-pptx", specifier = ">=1.0.2,<2" },
+    { name = "pypdf", marker = "extra == 'files'", specifier = ">=6.21.4,<7" },
+    { name = "pypdfium2", marker = "extra == 'ocr'", specifier = ">=5.14,<6" },
+    { name = "python-docx", marker = "extra == 'files'", specifier = ">=1.2,<2" },
+    { name = "python-pptx", marker = "extra == 'files'", specifier = ">=1.0.2,<2" },
     { name = "pyyaml", specifier = ">=6,<7" },
-    { name = "rapidocr", specifier = "==3.9.2" },
-    { name = "striprtf", specifier = ">=0.0.29,<0.1" },
-    { name = "xlrd", specifier = ">=2.0.2,<3" },
+    { name = "rapidocr", marker = "extra == 'ocr'", specifier = "==3.9.2" },
+    { name = "striprtf", marker = "extra == 'files'", specifier = ">=0.0.29,<0.1" },
+    { name = "xlrd", marker = "extra == 'files'", specifier = ">=2.0.2,<3" },
 ]
-provides-extras = ["openai", "anthropic", "mcp", "otel"]
+provides-extras = ["openai", "anthropic", "mcp", "otel", "files", "ocr"]
 
 [package.metadata.requires-dev]
 dev = [

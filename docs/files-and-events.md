@@ -57,9 +57,12 @@ File tools are available alongside the browser tools:
 | `open_file(path)` | Open a workspace/download file in a new active tab. |
 
 Pass paths returned by `list_files` or `list_downloads`, or paths relative to the
-workspace. The normal installation (`uv sync --locked`) includes all file readers
-and local CPU OCR; no separate parser extras, browser preview or screenshots are
-needed to read supported content.
+workspace. Without extras, `read_file` reads plain text. Install
+`browserrig[files]` for the document, spreadsheet, PDF and media readers below, or
+`browserrig[ocr]` for those readers plus local CPU OCR. When a reader is missing,
+`read_file` names the extra to install; text-based formats such as CSV or HTML
+fall back to their raw text with status `partial`. Without OCR, images return
+metadata only and scanned PDF pages report that OCR is not installed.
 
 | Format | Content and selection |
 | --- | --- |

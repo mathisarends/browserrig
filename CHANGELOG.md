@@ -4,6 +4,12 @@
 
 ### Breaking changes
 
+- File readers and OCR are optional. The base installation reads plain text;
+  install `browserrig[files]` for document, spreadsheet, PDF and media readers, or
+  `browserrig[ocr]` for those readers plus local CPU OCR (RapidOCR, ONNX Runtime,
+  OpenCV, PDFium). Without them, `read_file` names the missing extra and returns
+  raw text for text-based formats.
+
 - Pin Harnessed and all provider/MCP/OTel extras to 0.14.0. Migrate plugin lifecycle
   methods to `PluginScope`, and compose `FileTransfers()` explicitly in the browser
   pack. Manual Chrome/Files/FileTools compositions must add `FileTransfers()`.

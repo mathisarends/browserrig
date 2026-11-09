@@ -28,9 +28,14 @@ Set `OPENAI_API_KEY` in your environment, save the Python example below as
 enable the corresponding Harnessed integrations. For direct browser access
 without a model provider, install `browserrig` without an extra.
 
-The base installation includes document readers and local CPU OCR, including
-ONNX Runtime and OpenCV. These native dependencies make the installation larger
-than the wheel for Browserrig itself.
+The base installation reads plain text files only. Add the `files` extra for
+document, spreadsheet, PDF and media readers, or the `ocr` extra for those readers
+plus local CPU OCR (ONNX Runtime and OpenCV, a much larger download):
+
+```sh
+python -m pip install "browserrig[openai,files]"  # document readers
+python -m pip install "browserrig[openai,ocr]"    # document readers and OCR
+```
 
 To run the examples from a source checkout instead (uv required):
 

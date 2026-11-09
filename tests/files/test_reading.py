@@ -2,6 +2,7 @@ import gzip
 import json
 import sqlite3
 import struct
+import sys
 import tarfile
 from email.message import EmailMessage
 from io import BytesIO
@@ -414,6 +415,32 @@ async def test_local_ocr_reads_real_image_and_scanned_pdf(files, suffix):
     assert "MISSION" in result.text.upper() and "2026" in result.text
     assert any("OCR" in item for item in result.limitations)
     assert result.extracted_path is not None
+
+
+async def test_image_without_ocr_extra_returns_metadata_and_install_hint(
+    files, monkeypatch
+):
+    # A None entry makes the package unimportable, as if it were not installed.
+    monkeypatch.setitem(sys.modules, "rapidocr", None)
+    Image.new("RGB", (20, 10), "white").save(files.workspace.directory / "scan.png")
+    result = await files.read_file("scan.png")
+    assert result.status == "metadata_only" and "20 × 10" in result.text
+    assert any("browserrig[ocr]" in item for item in result.limitations)
+
+
+async def test_missing_file_extra_falls_back_to_raw_text_or_install_hint(
+    files, monkeypatch
+):
+    monkeypatch.delitem(sys.modules, "browserrig.files.spreadsheets")
+    monkeypatch.setitem(sys.modules, "xlrd", None)
+    (files.workspace.directory / "table.csv").write_bytes(b"a,b\n1,2\n")
+    table = await files.read_file("table.csv")
+    assert table.status == "partial" and table.text == "a,b\n1,2\n"
+    assert "browserrig[files]" in table.limitations[0]
+    assert "xlrd" in table.limitations[0]
+    Workbook().save(files.workspace.directory / "report.xlsx")
+    book = await files.read_file("report.xlsx")
+    assert book.status == "unsupported" and "browserrig[files]" in book.limitations[0]
 
 
 async def test_unsupported_binary_has_explicit_status_and_no_screenshot_instruction(

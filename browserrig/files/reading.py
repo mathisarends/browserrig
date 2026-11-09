@@ -14,6 +14,7 @@ from harnessed.tracing import record, traced
 from . import containers
 from .config import FileOptions
 from .content import ParsedContent, ReadContext, ReadRequest
+from .extras import FILES_MISSING, ocr_installed
 from .formats import READERS, signature_format
 from .kinds import FileExtension as Ext
 from .models import FileContent
@@ -42,7 +43,7 @@ _UNSUPPORTED = {
     Ext.EXE,
     Ext.DLL,
 }
-_CACHE_VERSION = 4
+_CACHE_VERSION = 5
 
 
 class FileReader:
@@ -105,6 +106,11 @@ class FileReader:
                 "No local content reader is available for this format",
                 offset,
                 max_chars,
+            )
+        missing = _missing_module(format_)
+        if missing is not None:
+            return _without_reader(
+                path, sample, format_, missing, offset=offset, max_chars=max_chars
             )
         key = self._key(path, request)
         content_path = self._cache_path(f"{key}.md")
@@ -278,6 +284,7 @@ class FileReader:
             stat.st_size,
             asdict(request),
             self.options.model_dump(),
+            ocr_installed(),
             _CACHE_VERSION,
         )
         return hashlib.sha256(
@@ -288,7 +295,7 @@ class FileReader:
         spec = READERS.get(format_)
         if spec is None:
             raise ValueError(f"No content reader for {format_}")
-        return spec.read(ReadContext(path, format_, request, self.options))
+        return spec.load()(ReadContext(path, format_, request, self.options))
 
 
 def _write_block(stream: IO[str], block: str, limit: int) -> None:
@@ -369,6 +376,43 @@ def _validate_selection(format_: str, request: ReadRequest) -> None:
         raise ValueError(
             "cell_range is only supported for spreadsheets and delimited tables"
         )
+
+
+def _missing_module(format_: str) -> str | None:
+    spec = READERS.get(format_)
+    if spec is None:
+        return None
+    try:
+        spec.load()
+    except ModuleNotFoundError as error:
+        if error.name is None or error.name.partition(".")[0] == "browserrig":
+            raise
+        return error.name
+    return None
+
+
+def _without_reader(
+    path: Path,
+    sample: bytes,
+    format_: str,
+    module: str,
+    *,
+    offset: int,
+    max_chars: int,
+) -> FileContent:
+    reason = FILES_MISSING.format(format=format_, module=module)
+    encoding = text_encoding(sample)
+    if encoding is None:
+        return _unsupported(path, format_, reason, offset, max_chars)
+    result = text_result(path, encoding, offset, max_chars)
+    return result.model_copy(
+        update={
+            "media_type": mimetypes.guess_type(path.name)[0] or "text/plain",
+            "format": format_,
+            "status": "partial",
+            "limitations": (f"{reason}; showing the raw text instead",),
+        }
+    )
 
 
 def _unsupported(
