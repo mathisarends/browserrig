@@ -20,8 +20,8 @@ class Input:
 
     def __init__(self, focus: Focus) -> None:
         self._action_id = ""
-        self._motor: Motor = Instant()
-        self._presenter: Presenter = Unseen()
+        self._default_motor: Motor = Instant()
+        self._default_presenter: Presenter = Unseen()
         self._motors: dict[object, Motor] = {}
         self._presenters: dict[object, Presenter] = {}
         self.mouse = Mouse(
@@ -46,7 +46,7 @@ class Input:
             self._action_id = previous
 
     def motor(self) -> Motor:
-        return next(reversed(self._motors.values()), self._motor)
+        return next(reversed(self._motors.values()), self._default_motor)
 
     def pace(self, motor: Motor) -> Callable[[], None]:
         """Override the motor; the idempotent undo may run in any order."""
@@ -59,7 +59,7 @@ class Input:
         return restore
 
     def presenter(self) -> Presenter:
-        return next(reversed(self._presenters.values()), self._presenter)
+        return next(reversed(self._presenters.values()), self._default_presenter)
 
     def present(self, presenter: Presenter) -> Callable[[], None]:
         """Override presentation; the idempotent undo may run in any order."""
