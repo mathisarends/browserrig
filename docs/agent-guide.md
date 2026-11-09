@@ -397,13 +397,13 @@ sections: `section_delivery=SectionDelivery.CONTEXT` delivers guidance until the
 mount closes or suspends; `SectionDelivery.IGNORE` skips it. Import `SectionDelivery`
 from `harnessed`. The fixed system prompt stays unchanged.
 
-Harnessed 0.14 uses state format 2, checkpoint/JSON-store format 3 and audit
-envelope version 5, unchanged from 0.13. Existing 0.13 data needs no migration.
+Harnessed 0.15 uses state format 2, checkpoint/JSON-store format 3 and audit
+envelope version 5, unchanged from 0.13 and 0.14. Existing 0.13/0.14 data needs no migration.
 Older, incompatible formats are rejected without automatic migration. See
 [upgrade notes](../CHANGELOG.md) for all Browserrig API changes.
 
 Install the optional MCP client with `uv sync --locked --extra openai --extra mcp`.
-Harnessed and all provider extras are pinned to the published 0.14.0 release,
+Harnessed and all provider extras are pinned to the published 0.15.0 release,
 including `session.append_message(UserMessage(...))`. Add MCP servers through
 the native plugin:
 
@@ -426,7 +426,7 @@ linked MCP guide for migration details.
 `MCP.stdio("catalog", command=..., args=[...])` starts a local server instead.
 Connections belong to each session, tool names are prefixed (for example
 `catalog__search`), and existing approval policies apply. See the
-[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.14.0/docs/guides/mcp.md).
+[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.15.0/docs/guides/mcp.md).
 
 Harnessed closes failed MCP transports, hides their tools, wakes pending
 calls and drains owned tasks. Failed operations are not retried automatically;
@@ -465,7 +465,7 @@ For standalone kernel compositions, call `await ctx.settle()` followed by
 ## Saving and restoring sessions
 
 Sessions stay in memory by default. To save conversations automatically and
-reopen them by application-owned ID, configure Harnessed 0.14.0's native store:
+reopen them by application-owned ID, configure Harnessed 0.15.0's native store:
 
 ```python
 from pathlib import Path
@@ -537,7 +537,7 @@ envelopes use format **3**, and audit envelopes use version **5**. Earlier forma
 old JSONL stores and raw `SessionState` JSON cannot be opened as new store files.
 Keep legacy data separate;
 there is no automatic migration. See the
-[Harnessed sessions guide](https://github.com/mathisarends/harnessed/blob/v0.14.0/docs/guides/sessions.md)
+[Harnessed sessions guide](https://github.com/mathisarends/harnessed/blob/v0.15.0/docs/guides/sessions.md)
 for atomic repository adapters, recovery and storage details.
 
 Custom models expose immutable `GenerationSettings` from `harnessed.models`.

@@ -12,7 +12,6 @@ from harnessed import (
     ToolStatus,
     tool,
 )
-from harnessed.core.runtime.output import OutputHandler
 from harnessed.errors import OutputUnavailable, OutputValidationError
 from harnessed.events import (
     ApprovalRequestedEvent,
@@ -21,6 +20,7 @@ from harnessed.events import (
     TextDeltaEvent,
     TurnResultEvent,
 )
+from harnessed.hooks import OutputDecision, PrepareOutput, TurnStopping
 from harnessed.kernel import needs
 from harnessed.models import ModelChunk, ModelInfo, ModelUsage
 from harnessed.plugins import AgentLoop, Approvals, FinalStepPolicy
@@ -190,6 +190,39 @@ async def test_invalid_final_output_still_obeys_the_native_retry_limit():
     with pytest.raises(OutputValidationError):
         await agent.run("Task", output=_Answer)
     assert len(model.requests) == 2
+
+
+@pytest.mark.parametrize("native", [False, True])
+async def test_done_composes_with_other_output_policies(native):
+    model = ScriptedModel(
+        [
+            call("done", success=True),
+            "One more progress message.",
+            _answer(native, title="Item", count=1),
+        ],
+        info=ModelInfo("test", supports_structured_output=native),
+    )
+    decisions = []
+
+    async def defer_second_step(_event, next_):
+        decision = await next_()
+        decisions.append(decision)
+        return OutputDecision.DEFER if len(decisions) == 2 else decision
+
+    def continue_second_step(_event):
+        return True if len(decisions) == 2 else None
+
+    async with Agent(model=model, plugins=[Done()]).session() as session:
+        session.scope.on(PrepareOutput, defer_second_step, priority=100)
+        session.scope.on(TurnStopping, continue_second_step)
+        result = await session.run("Task", output=_Answer)
+
+    assert result.completed and result.require_output() == _Answer(
+        title="Item", count=1
+    )
+    assert decisions == [OutputDecision.ENFORCE] * 3
+    assert all(request.output_schema is None for request in model.requests[:2])
+    assert model.requests[-1].output_schema is not None
 
 
 @pytest.mark.parametrize("success", [False, True])
@@ -396,11 +429,24 @@ async def test_runtime_mount_and_removal_restore_native_completion_and_output():
     assert [tool.name for tool in model.requests[-1].tools] == ["final_answer"]
 
 
-async def test_overlapping_done_sessions_isolate_native_output_and_cleanup():
-
-    native_prepare, native_validate = OutputHandler.prepare, OutputHandler.validate
-    first_model = ScriptedModel(["Progress", call("done", success=True), "First"])
-    second_model = ScriptedModel(["Progress", call("done", success=True), "Second"])
+@pytest.mark.parametrize("native", [False, True])
+async def test_overlapping_done_sessions_isolate_native_output_and_cleanup(native):
+    first_model = ScriptedModel(
+        [
+            "Progress",
+            call("done", success=True),
+            _answer(native, title="First", count=1),
+        ],
+        info=ModelInfo("test", supports_structured_output=native),
+    )
+    second_model = ScriptedModel(
+        [
+            "Progress",
+            call("done", success=True),
+            _answer(native, title="Second", count=1),
+        ],
+        info=ModelInfo("test", supports_structured_output=native),
+    )
     plain_model = ScriptedModel([call("final_answer", title="Native", count=1)])
     async with (
         Agent(model=first_model).session() as first,
@@ -410,19 +456,21 @@ async def test_overlapping_done_sessions_isolate_native_output_and_cleanup():
         first_mount = await first.mount(Done(), section_delivery=SectionDelivery.IGNORE)
         async with second.use(Done(), section_delivery=SectionDelivery.IGNORE):
             first_result, plain_result = await asyncio.gather(
-                first.run("First task"), plain.run("Plain task", output=_Answer)
+                first.run("First task", output=_Answer),
+                plain.run("Plain task", output=_Answer),
             )
-            assert first_result.text == "First" and first_result.completed
+            assert first_result.require_output() == _Answer(title="First", count=1)
             assert plain_result.require_output() == _Answer(title="Native", count=1)
             await first_mount.aclose()
-            second_result = await second.run("Second task")
-            assert second_result.text == "Second" and second_result.completed
+            second_result = await second.run("Second task", output=_Answer)
+            assert second_result.require_output() == _Answer(title="Second", count=1)
             assert len(second_model.requests) == 3
-        assert OutputHandler.prepare is native_prepare
-        assert OutputHandler.validate is native_validate
+    for model in (first_model, second_model):
+        assert all(request.output_schema is None for request in model.requests[:2])
+        assert model.requests[-1].output_schema is not None
 
 
-async def test_done_bridge_is_released_after_session_startup_failure():
+async def test_failed_done_startup_does_not_affect_native_output():
 
     class Broken(Plugin):
         context = needs(SessionContext)
@@ -430,14 +478,15 @@ async def test_done_bridge_is_released_after_session_startup_failure():
         async def setup(self, _scope):
             raise RuntimeError("Startup failed")
 
-    native_prepare, native_validate = OutputHandler.prepare, OutputHandler.validate
     agent = Agent(model=ScriptedModel([]), plugins=[Done(), Broken()])
     with pytest.raises(ExceptionGroup) as caught:
         async with agent.session():
             pytest.fail("Startup should fail")
     assert "Startup failed" in repr(caught.value)
-    assert OutputHandler.prepare is native_prepare
-    assert OutputHandler.validate is native_validate
+    model = ScriptedModel([call("final_answer", title="Native", count=1)])
+    result = await Agent(model=model).run("Task", output=_Answer)
+    assert result.require_output() == _Answer(title="Native", count=1)
+    assert [tool.name for tool in model.requests[0].tools] == ["final_answer"]
 
 
 def test_browser_facade_accepts_the_opt_in_plugin_without_changing_defaults():

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Pin Harnessed and every provider/MCP/OTel extra to 0.15.0. `Done` defers
+  structured output through the session-scoped `PrepareOutput` hook instead of
+  patching Harnessed's global output handler. `browser_tool` attaches its
+  activation binding through the public `registration()` helper. Existing
+  Harnessed 0.14 conversations, checkpoints and stores need no migration.
+
 ## 0.2.0 (2026-11-09)
 
 ### Breaking changes

@@ -134,7 +134,7 @@ version and tag. This setup PR creates no release or tag itself.
 
 ## Harnessed compatibility
 
-Harnessed and all provider extras are pinned to the published 0.14.0 release.
+Harnessed and all provider extras are pinned to the published 0.15.0 release.
 `session.append_message(UserMessage(...))` adds durable background without starting
 a turn. State format 2, checkpoint/store format 3 and audit envelope 5 reject older
 data; back up old application data and start fresh stores.
@@ -147,12 +147,12 @@ uses `session.scope[HumanHandoff].history`. Verify restoration and model deliver
 in `tests/handoff/test_handoff.py`, including after compaction.
 
 The opt-in `Done` plugin uses native hooks for continuation and tool execution.
-Harnessed 0.14.0 has no output-policy hook or injectable output handler, so
-`browserrig/completion/output.py` bridges internal `OutputHandler` methods through a
-registry keyed by session log identity. Only active `Done` sessions alter output
-handling; other sessions use the original methods. The last activation's cleanup
-restores them. Plugins use the restricted `SessionContext`, without recovering
-the application `Session`. Verify native/tool structured output, retries, limits,
+Its `PrepareOutput` hook defers native JSON constraints and the reserved
+`final_answer` tool until the current turn has a successful `done` receipt.
+`PrepareRequest` keeps the declared schema visible as guidance during work.
+Both hooks compose with `next_()` and belong to the mounting scope; removing
+the plugin restores native behavior. Plugins use the restricted `SessionContext`,
+without recovering the application `Session`. Verify native/tool structured output, retries, limits,
 streaming, overlapping sessions and runtime removal in
 `tests/completion/test_completion.py`. `browserrig/completion/models.py` holds the
 single table of tools each completion phase permits; the plugin enforces it through
@@ -160,19 +160,17 @@ single table of tools each completion phase permits; the plugin enforces it thro
 `tests/test_agent_session_store.py` also checks reopening a paused `Done` turn with
 `restore_outputs`, retained image assets and Browserrig's custom durable events.
 
-The remaining public SDK extension points are tracked upstream:
+`browser_tool` uses `harnessed.kernel.registration()` for its activation binding.
+Each mounted method dispatches browser actions through its own scope; cleanup
+removes that binding without changing other activations of the same recipe.
+Verify direct calls, concurrent mounts and cleanup in `tests/core/test_tools.py`
+and the action-pipeline tests in `tests/tools/execution/test_invocation.py`.
 
-- [Harnessed #92](https://github.com/mathisarends/harnessed/issues/92): a
-  session-scoped output policy, needed to replace the global `Done` adapter.
-- [Harnessed #93](https://github.com/mathisarends/harnessed/issues/93): attach
-  custom method registrations through a public helper instead of mutating
-  `_harnessed_registrations` in `browser_tool`.
-- [Harnessed #94](https://github.com/mathisarends/harnessed/issues/94): durable
-  plugin-owned state through a public service instead of the internal
-  `PluginInstructions` persistence dependency in `HumanHandoff`.
-
-These are integration boundaries in the pinned Harnessed release; the existing
-compatibility code remains in place until supported upstream APIs are available.
+The remaining public SDK extension point is tracked in
+[Harnessed #94](https://github.com/mathisarends/harnessed/issues/94): durable
+plugin-owned state through a public service instead of the internal
+`PluginInstructions` persistence dependency in `HumanHandoff`. That compatibility
+code remains in place until a supported upstream API is available.
 
 ## Project status
 

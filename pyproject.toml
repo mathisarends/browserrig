@@ -19,7 +19,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "harnessed==0.14.0",
+    "harnessed==0.15.0",
     "cdpify[websocket]==0.5.0",
     "httpx2>=2.16,<3",
     "pillow>=13,<14",
@@ -29,10 +29,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-openai = ["harnessed[openai]==0.14.0", "pydantic-ai-slim[openai]>=2.66,<3"]
-anthropic = ["harnessed[anthropic]==0.14.0"]
-mcp = ["harnessed[mcp]==0.14.0"]
-otel = ["harnessed[otel]==0.14.0"]
+openai = ["harnessed[openai]==0.15.0", "pydantic-ai-slim[openai]>=2.66,<3"]
+anthropic = ["harnessed[anthropic]==0.15.0"]
+mcp = ["harnessed[mcp]==0.15.0"]
+otel = ["harnessed[otel]==0.15.0"]
 # Document, spreadsheet, PDF and media readers for `read_file`.
 files = [
     "pypdf>=6.21.4,<7",

@@ -6,7 +6,7 @@ from typing import cast
 from weakref import WeakKeyDictionary
 
 from harnessed import ToolChain, tool
-from harnessed.kernel import PluginBase, Scope, Waterfall
+from harnessed.kernel import PluginBase, Scope, Waterfall, registration
 
 from .kinds import ActionKind
 
@@ -77,9 +77,7 @@ def browser_tool[F: Callable[..., Awaitable[object]]](
                 BrowserToolCall(metadata, arguments.arguments), default=perform
             )
 
-        wrapped = register(cast(F, execute))
-        vars(wrapped)["_harnessed_registrations"].append(binding)
-        return wrapped
+        return registration(binding)(register(cast(F, execute)))
 
     return decorate
 

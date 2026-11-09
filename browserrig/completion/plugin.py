@@ -1,3 +1,5 @@
+import json
+
 from harnessed import (
     Instructions,
     Plugin,
@@ -15,17 +17,19 @@ from harnessed.events import AssistantMessageEvent, ToolCallFinishedEvent
 from harnessed.hooks import (
     ExecuteTool,
     Next,
+    OutputDecision,
+    PrepareOutput,
+    PrepareRequest,
     PreStep,
     StepDecision,
     ToolPolicy,
     TurnStopping,
 )
-from harnessed.kernel import PluginScope, needs
-from harnessed.models import StopReason, UserMessage
+from harnessed.kernel import needs
+from harnessed.models import ModelRequest, StopReason, SystemMessage, UserMessage
 from harnessed.services import SessionContext
 
 from .models import DENIALS, Phase, closing_step, permits
-from .output import activate
 from .state import CompletionState
 
 _FINAL_INSTRUCTION = (
@@ -71,8 +75,32 @@ class Done(Plugin, slot="completion"):
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
 
-    async def setup(self, scope: PluginScope) -> None:
-        scope.effect(activate(self._session.log, self._finished))
+    @hook(PrepareRequest)
+    async def _output_guidance(
+        self, event: PrepareRequest, next_: Next[ModelRequest]
+    ) -> ModelRequest:
+        request = await next_()
+        if event.session.log is not self._session.log or self._finished():
+            return request
+        schema = event.session.log.current_turn().start.output_schema
+        if schema is None:
+            return request
+        return request.append_message(
+            SystemMessage(
+                "After done, the final answer must match this JSON Schema. "
+                "Progress messages before done may use ordinary text.\n"
+                + json.dumps(schema.json_schema, default=dict, ensure_ascii=False)
+            )
+        )
+
+    @hook(PrepareOutput)
+    async def _prepare_output(
+        self, event: PrepareOutput, next_: Next[OutputDecision]
+    ) -> OutputDecision:
+        decision = await next_()
+        if event.session.log is self._session.log and not self._finished():
+            return OutputDecision.DEFER
+        return decision
 
     @tool(
         description=(
