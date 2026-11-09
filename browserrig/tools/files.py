@@ -38,7 +38,7 @@ from .effects import Effect
 from .execution import Actions
 from .file_observation import FileSystemObservation
 from .intents import OpenFileIntent, UploadIntent
-from .workspace import FILE_TOOLS_SLOT, _file_errors, _WorkspaceIO
+from .workspace import FILE_TOOLS_SLOT, WorkspaceIO, file_errors
 
 
 def _reaches_chrome(transfer: Inject[FileTransfer | None]) -> bool:
@@ -101,7 +101,7 @@ class _BrowserFileActions(FileSystemObservation):
         description="Open a workspace file in a new active browser tab, including PDFs.",
     )
     async def open_file(self, path: str) -> Effect:
-        with _file_errors():
+        with file_errors():
             staged = await self._staging().stage([path])
         return await self._open(staged, FileSource.WORKSPACE)
 
@@ -125,7 +125,7 @@ class _BrowserFileActions(FileSystemObservation):
             raise ToolError(
                 download.error or "Download has no accessible path; download it again"
             )
-        with _file_errors():
+        with file_errors():
             try:
                 staged = await self._staging().stage([download.path])
             except FileNotFoundError as error:
@@ -151,7 +151,7 @@ class _BrowserFileActions(FileSystemObservation):
         if handle.element.input_type != "file":
             raise BrowserError("Target is not a file input")
         transfer = self._staging()
-        with _file_errors():
+        with file_errors():
             staged = await transfer.stage(paths)
         point: ElementPoint | None = None
         prepared_scroll = False
@@ -241,7 +241,7 @@ class BrowserFileTools(_BrowserFileActions, slot=FILE_TOOLS_SLOT):
         return SystemPrompt(_BROWSER_INSTRUCTIONS)
 
 
-class FileTools(_WorkspaceIO, _BrowserFileActions, slot=FILE_TOOLS_SLOT):
+class FileTools(WorkspaceIO, _BrowserFileActions, slot=FILE_TOOLS_SLOT):
     """Convenience group containing both workspace and browser file tools.
 
     It subclasses neither group, so `without` matches each group exactly.

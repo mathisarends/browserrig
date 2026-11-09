@@ -56,7 +56,7 @@ _INSTRUCTIONS = Instructions(
 )
 
 
-class _WorkspaceIO(FileSystemObservation):
+class WorkspaceIO(FileSystemObservation):
     """List, read and write tools shared by WorkspaceTools and FileTools.
 
     Without a FileSystem, tools are unavailable.
@@ -81,7 +81,7 @@ class _WorkspaceIO(FileSystemObservation):
         limit: Annotated[int, Field(ge=1, le=200)] = 100,
     ) -> FileListing:
         files = self._files()
-        with _file_errors():
+        with file_errors():
             listing = await files.list_files(path, offset=offset, limit=limit)
         await self._emit_workspace(
             FilesListedEvent(
@@ -135,7 +135,7 @@ class _WorkspaceIO(FileSystemObservation):
             )
         )
         try:
-            with _file_errors():
+            with file_errors():
                 content = await files.read_file(
                     path,
                     page_number=page_number,
@@ -190,7 +190,7 @@ class _WorkspaceIO(FileSystemObservation):
     ) -> FileEntry:
         files = self._files()
 
-        with _file_errors():
+        with file_errors():
             created = not await files.exists(path)
             entry = await files.write_file(path, content, overwrite=overwrite)
         size = entry.size if entry.size is not None else len(content.encode("utf-8"))
@@ -212,7 +212,7 @@ class _WorkspaceIO(FileSystemObservation):
             await self._log.emit(event)
 
 
-class WorkspaceTools(_WorkspaceIO, slot=FILE_TOOLS_SLOT):
+class WorkspaceTools(WorkspaceIO, slot=FILE_TOOLS_SLOT):
     """List, read and write workspace files without browser services.
 
     Files() provides the workspace.
@@ -225,7 +225,7 @@ class WorkspaceTools(_WorkspaceIO, slot=FILE_TOOLS_SLOT):
 
 
 @contextmanager
-def _file_errors() -> Generator[None, None, None]:
+def file_errors() -> Generator[None, None, None]:
     try:
         yield
     except (OSError, ValueError) as error:
