@@ -38,6 +38,7 @@ class FileSystem:
             else None
         )
         self._exits = AsyncExitStack()
+        self._copy_locks: dict[str, asyncio.Lock] = {}
 
     async def __aenter__(self) -> Self:
         if isinstance(self.workspace, AbstractAsyncContextManager):
@@ -164,9 +165,10 @@ class FileSystem:
         ).hexdigest()[:32]
         # Keep the name: readers detect formats by suffix and report the file name.
         copy = Path(self._cache.name) / "sources" / key / stat.path.name
-        if not copy.is_file():
-            data = await self.workspace.read_bytes(stat.path)
-            await asyncio.to_thread(_write_atomically, copy, data)
+        async with self._copy_locks.setdefault(key, asyncio.Lock()):
+            if not copy.is_file():
+                data = await self.workspace.read_bytes(stat.path)
+                await asyncio.to_thread(_write_atomically, copy, data)
         return copy
 
     def _extracted_path(self, extracted: str | None) -> str | None:
@@ -190,6 +192,15 @@ def _entry(stat: FileStat) -> FileEntry:
 
 def _write_atomically(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".partial")
-    temporary.write_bytes(data)
-    temporary.replace(path)
+    with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+        temporary = Path(stream.name)
+        try:
+            stream.write(data)
+        except BaseException:
+            stream.close()
+            temporary.unlink(missing_ok=True)
+            raise
+    try:
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)

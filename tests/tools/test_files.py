@@ -140,6 +140,16 @@ async def test_remote_workspace_receives_the_overwrite_policy():
         assert workspace.files[PurePosixPath("note.txt")] == b"second"
 
 
+async def test_concurrent_remote_reads_share_one_cached_copy():
+    workspace = _MemoryWorkspace()
+    path = PurePosixPath("report.txt")
+    await workspace.write_bytes(path, b"shared report")
+    async with FileSystem(workspace) as files:
+        results = await asyncio.gather(*(files.read_file(str(path)) for _ in range(20)))
+        assert all(result.text == "shared report" for result in results)
+        assert workspace.reads == [path]
+
+
 async def test_read_file_keeps_the_event_loop_responsive(files, monkeypatch):
     await files.write_file("report.txt", "threaded read")
     loop = asyncio.get_running_loop()
