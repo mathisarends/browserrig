@@ -49,8 +49,9 @@ File tools are available alongside the browser tools:
 
 `WorkspaceTools()` contains list/read/write and can run without a browser.
 `BrowserFileTools()` contains download listing, previews and uploads.
-The default `FileTools()` combines both groups. To select only one group, remove
-`FileTools` from the browser pack and add the desired group explicitly.
+The default `FileTools()` combines both groups. All three share one slot: pass
+`WorkspaceTools()` or `BrowserFileTools()` in `plugins` to replace the default
+with only that group.
 `DownloadReceiving()` independently binds browser downloads to the workspace;
 removing tools does not stop download receiving.
 

@@ -11,6 +11,7 @@ from harnessed.testing import ScriptedModel
 
 import browserrig
 from browserrig import (
+    BrowserFileTools,
     BrowserPerception,
     Chrome,
     Files,
@@ -26,6 +27,7 @@ from browserrig import (
     Secrets,
     TabStrip,
     WindowRatio,
+    WorkspaceTools,
     browser_plugins,
 )
 from browserrig.input import Instant
@@ -179,6 +181,21 @@ def test_two_plugins_for_the_same_default_conflict():
         browser_plugins(BrowserPerception(), BrowserPerception())
     with pytest.raises(PluginConflict, match="browserrig.images"):
         browser_plugins(ImageContext(), ImageContext())
+
+
+@pytest.mark.parametrize("group", [WorkspaceTools, BrowserFileTools])
+def test_one_file_tool_group_replaces_the_combined_default_in_place(group):
+    defaults = browser_plugins()
+    tools = group()
+    composed = browser_plugins(tools)
+    assert len(composed) == len(defaults)
+    assert composed[_index(defaults, FileTools)] is tools
+    assert not any(type(plugin) is FileTools for plugin in composed)
+
+
+def test_two_file_tool_groups_conflict():
+    with pytest.raises(PluginConflict, match="browserrig.file-tools"):
+        browser_plugins(WorkspaceTools(), BrowserFileTools())
 
 
 def test_configured_pacing_and_choreography_replace_their_defaults_in_place():

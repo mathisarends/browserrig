@@ -612,12 +612,13 @@ InputPacing(motor)]`.
 Pass `without=(Files, FileTools)` when local file tools should be omitted.
 
 `FileTools()` is the convenience group for both workspace I/O and browser file
-actions. For independent tool selection, remove that group and add
-`WorkspaceTools()` (list/read/write) and/or `BrowserFileTools()`
-(download listing, opening files and uploads). For example,
-`Agent(..., without=(FileTools,), plugins=[WorkspaceTools()])` keeps workspace
-I/O without exposing browser file actions. Download receiving remains controlled
-by `DownloadReceiving()`.
+actions. `WorkspaceTools()` (list/read/write) and `BrowserFileTools()`
+(download listing, opening files and uploads) fill the same slot, so passing one
+of them in `plugins` replaces the default `FileTools()`. For example,
+`Agent(..., plugins=[WorkspaceTools()])` keeps workspace I/O without exposing
+browser file actions. Use `FileTools()` for both groups; two file tool groups
+raise `PluginConflict`. Download receiving remains controlled by
+`DownloadReceiving()`.
 
 Workspace tools also work without Chrome, perception, readiness or browser actions:
 

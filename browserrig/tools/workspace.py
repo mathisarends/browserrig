@@ -34,6 +34,9 @@ from browserrig.files import (
     FileSystem,
 )
 
+# The file tool groups are alternatives: placing one replaces the default FileTools.
+FILE_TOOLS_SLOT = "browserrig.file-tools"
+
 
 def _has_files(files: Inject[FileSystem | None]) -> bool:
     return files is not None
@@ -51,7 +54,7 @@ _INSTRUCTIONS = Instructions(
 )
 
 
-class WorkspaceTools(Plugin):
+class WorkspaceTools(Plugin, slot=FILE_TOOLS_SLOT):
     """List, read and write workspace files without browser services.
 
     Without a FileSystem, tools are unavailable. Files() provides the workspace.

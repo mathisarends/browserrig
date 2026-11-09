@@ -50,7 +50,7 @@ from browserrig.readiness import Readiness
 from .effects import Effect
 from .execution import Actions
 from .intents import OpenFileIntent, UploadIntent
-from .workspace import WorkspaceTools, _file_errors
+from .workspace import FILE_TOOLS_SLOT, WorkspaceTools, _file_errors
 
 
 def _reaches_chrome(transfer: Inject[FileTransfer | None]) -> bool:
@@ -83,7 +83,7 @@ class _Delivery:
     visible: bool = False
 
 
-class BrowserFileTools(Plugin):
+class BrowserFileTools(Plugin, slot=FILE_TOOLS_SLOT):
     """List browser downloads, open files and upload to observed browser inputs.
 
     DownloadReceiving independently owns the browser's download binding.

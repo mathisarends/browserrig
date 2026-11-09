@@ -135,7 +135,8 @@
 
 - Compose `WorkspaceTools()` for browser-independent list/read/write tools and
   `BrowserFileTools()` for download listing, file previews and uploads.
-  `FileTools()` remains the combined convenience group in the default pack.
+  `FileTools()` remains the combined convenience group in the default pack. The
+  three groups share one slot, so either group replaces the default in place.
 
 - The observation facade exports `Canvas`, `Heading`, `Modal`, `Offscreen` and
   `Option`, completing the nested data types used by public capture contracts.
