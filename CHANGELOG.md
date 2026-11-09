@@ -4,6 +4,10 @@
 
 ### Breaking changes
 
+- Compose `WorkspaceTools()` for browser-independent list/read/write tools and
+  `BrowserFileTools()` for download listing, file previews and uploads.
+  `FileTools()` remains the combined convenience group in the default pack.
+
 - Download receiving belongs to the new `DownloadReceiving()` plugin, included
   in the default browser pack. Removing `FileTools` only removes model tools;
   remove `DownloadReceiving` to stop receiving later downloads. Manual

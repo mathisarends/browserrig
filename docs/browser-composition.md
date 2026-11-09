@@ -600,6 +600,30 @@ screenshots=Screenshots(...)), Readiness(...), ImageContext(...), Actions(...),
 InputPacing(motor)]`.
 Pass `without=(Files, FileTools)` when local file tools should be omitted.
 
+`FileTools()` is the convenience group for both workspace I/O and browser file
+actions. For independent tool selection, remove that group and add
+`WorkspaceTools()` (list/read/write) and/or `BrowserFileTools()`
+(download listing, opening files and uploads). For example,
+`Agent(..., without=(FileTools,), plugins=[WorkspaceTools()])` keeps workspace
+I/O without exposing browser file actions. Download receiving remains controlled
+by `DownloadReceiving()`.
+
+Workspace tools also work without Chrome, perception, readiness or browser actions:
+
+```python
+from harnessed import Agent
+from browserrig import Files, LocalWorkspace, WorkspaceTools
+
+agent = Agent(
+    model=model,
+    plugins=[Files(LocalWorkspace(directory)), WorkspaceTools()],
+)
+```
+
+Configure Harnessed approvals as usual to permit writes. Workspace-only receipts
+are session events without a browser identity; the combined `FileTools` retains
+browser-correlated receipts.
+
 The default recipe mounts every tool group; ref-based tools hide themselves for
 captures without refs. Transient availability (for example a missing workspace) still uses
 tool gates, including execution-time rechecks. Existing upload path validation is retained.

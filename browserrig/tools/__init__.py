@@ -4,7 +4,7 @@ from .chains import ActionChainPolicy, DomActionChains, ObserveAfterInput
 from .dialogs import DialogTools
 from .effects import Effect
 from .execution import Actions
-from .files import FileTools
+from .files import BrowserFileTools, FileTools
 from .find import FindTools
 from .forms import FormTools
 from .intents import (
@@ -22,6 +22,7 @@ from .keyboard import KeyboardTools
 from .mouse import PointerTools
 from .navigation import NavigationTools
 from .tabs import TabTools
+from .workspace import WorkspaceTools
 
 __all__ = [
     "PointerTools",
@@ -35,6 +36,8 @@ __all__ = [
     "Effect",
     "DialogTools",
     "FileTools",
+    "BrowserFileTools",
+    "WorkspaceTools",
     "FindIntent",
     "FindTools",
     "Intent",

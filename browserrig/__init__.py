@@ -79,6 +79,7 @@ from .secrets import Secret, Secrets, SecretValue, Totp, env
 from .terminal import TerminalEvents
 from .tools import (
     Actions,
+    BrowserFileTools,
     DialogTools,
     DomActionChains,
     FileTools,
@@ -90,6 +91,7 @@ from .tools import (
     ObserveAfterInput,
     PointerTools,
     TabTools,
+    WorkspaceTools,
 )
 
 __version__ = "0.2.0"
@@ -139,6 +141,8 @@ __all__ = [
     "FindTools",
     "DialogTools",
     "FileTools",
+    "BrowserFileTools",
+    "WorkspaceTools",
     "JavaScriptTools",
     "InputVisualization",
     "IframeRenderer",
