@@ -15,6 +15,7 @@ from harnessed import (
 from harnessed.kernel import needs, observes
 from pydantic import Field
 
+from browserrig.browser import BrowserEvents
 from browserrig.core import ActionKind
 from browserrig.core import browser_tool as tool
 from browserrig.events import (
@@ -54,10 +55,12 @@ class WorkspaceTools(Plugin):
     """List, read and write workspace files without browser services.
 
     Without a FileSystem, tools are unavailable. Files() provides the workspace.
+    With a browser, receipts carry its identity and pass its event filters.
     """
 
     events = FILE_EVENTS
     _workspace = observes(FileSystem)
+    _browser_events = observes(BrowserEvents)
     _log = needs(SessionLog)
 
     def instructions(self) -> SystemPrompt:
@@ -201,7 +204,11 @@ class WorkspaceTools(Plugin):
         return self._workspace
 
     async def _emit_workspace(self, event: BrowserEvent) -> None:
-        await self._log.emit(event)
+        # Browser filters such as secret redaction must see every receipt.
+        if self._browser_events is not None:
+            await self._browser_events.emit(event)
+        else:
+            await self._log.emit(event)
 
 
 @contextmanager

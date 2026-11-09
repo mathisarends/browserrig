@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from harnessed import Agent, PolicyDecision
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.plugins import Approvals
@@ -10,6 +12,10 @@ from browserrig.events import FileReadFinishedEvent, FileWrittenEvent
 from browserrig.files import FileSystem, MountedWorkspace
 from browserrig.tools import Actions
 from tests.fakes import mounted
+
+
+class _WorkspaceTools(WorkspaceTools, provides=True):
+    """Expose the mounted plugin, so tests can call its tools directly."""
 
 
 async def test_workspace_tools_run_without_browser_or_action_services(tmp_path):
@@ -48,6 +54,21 @@ async def test_workspace_tools_run_without_browser_or_action_services(tmp_path):
     assert "Workspace only" in replies[-1].text
     assert any(isinstance(event, FileWrittenEvent) for event in result.events)
     assert any(isinstance(event, FileReadFinishedEvent) for event in result.events)
+
+
+async def test_workspace_receipts_pass_through_the_browser_when_one_is_composed(
+    tmp_path,
+):
+    async with (
+        FileSystem(LocalWorkspace(tmp_path)) as files,
+        mounted(_WorkspaceTools(), files=files) as (services, scope),
+    ):
+        # Stands in for a filter such as Secrets redaction.
+        services.browser.events.add_filter(lambda event: replace(event, path="***"))
+        await scope[_WorkspaceTools].write_file("secret.txt", "value")
+    (written,) = services.events
+    assert isinstance(written, FileWrittenEvent)
+    assert written.browser_id == services.browser.id and written.path == "***"
 
 
 async def test_browser_file_tools_do_not_expose_workspace_io(tmp_path):

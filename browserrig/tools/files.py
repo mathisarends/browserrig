@@ -31,7 +31,6 @@ from browserrig.core import browser_tool as tool
 from browserrig.events import (
     FILE_EVENTS,
     UPLOAD_EVENTS,
-    BrowserEvent,
     FileOpenedEvent,
     FilesUploadedEvent,
 )
@@ -302,6 +301,3 @@ class FileTools(WorkspaceTools, BrowserFileTools):
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
-
-    async def _emit_workspace(self, event: BrowserEvent) -> None:
-        await self._events.emit(event)

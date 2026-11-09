@@ -631,9 +631,10 @@ agent = Agent(
 )
 ```
 
-Configure Harnessed approvals as usual to permit writes. Workspace-only receipts
-are session events without a browser identity; the combined `FileTools` retains
-browser-correlated receipts.
+Configure Harnessed approvals as usual to permit writes. Without a browser,
+workspace receipts are plain session events. With a browser, every file tool
+group stamps them with its identity and applies its event filters, such as
+`Secrets` redaction.
 
 The default recipe mounts every tool group; ref-based tools hide themselves for
 captures without refs. Transient availability (for example a missing workspace) still uses
