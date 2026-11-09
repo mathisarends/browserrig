@@ -22,6 +22,8 @@ class Input:
         self._action_id = ""
         self._motor: Motor = Instant()
         self._presenter: Presenter = Unseen()
+        self._motors: dict[object, Motor] = {}
+        self._presenters: dict[object, Presenter] = {}
         self.mouse = Mouse(
             focus,
             emit=self._emit,
@@ -44,30 +46,30 @@ class Input:
             self._action_id = previous
 
     def motor(self) -> Motor:
-        return self._motor
+        return next(reversed(self._motors.values()), self._motor)
 
     def pace(self, motor: Motor) -> Callable[[], None]:
-        """Perform input through `motor` until the returned callback runs."""
-        previous, self._motor = self._motor, motor
+        """Override the motor; the idempotent undo may run in any order."""
+        token = object()
+        self._motors[token] = motor
 
         def restore() -> None:
-            if self._motor is motor:
-                self._motor = previous
+            self._motors.pop(token, None)
 
         return restore
 
     def presenter(self) -> Presenter:
-        return self._presenter
+        return next(reversed(self._presenters.values()), self._presenter)
 
     def present(self, presenter: Presenter) -> Callable[[], None]:
-        """Report input through `presenter` until the returned callback runs."""
-        previous, self._presenter = self._presenter, presenter
+        """Override presentation; the idempotent undo may run in any order."""
+        token = object()
+        self._presenters[token] = presenter
 
         def restore() -> None:
-            if self._presenter is presenter:
-                self._presenter = previous
+            self._presenters.pop(token, None)
 
         return restore
 
     async def _emit(self, target: InputTarget, event: InputEvent) -> None:
-        await self._presenter.show(target, replace(event, action_id=self._action_id))
+        await self.presenter().show(target, replace(event, action_id=self._action_id))

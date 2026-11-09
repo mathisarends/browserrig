@@ -614,6 +614,33 @@ def test_restoring_a_motor_brings_back_the_previous_one():
     assert isinstance(devices.motor(), Instant)
 
 
+@pytest.mark.parametrize(
+    "install,selected,create",
+    [("pace", "motor", Instant), ("present", "presenter", Unseen)],
+)
+@pytest.mark.parametrize("order", [(0, 1), (1, 0)])
+@pytest.mark.parametrize("shared", [False, True])
+def test_input_overrides_can_be_removed_independently(
+    install, selected, create, order, shared
+):
+    devices = Input(lambda: None)
+    current = getattr(devices, selected)
+    original = current()
+    first = create()
+    second = first if shared else create()
+    register = getattr(devices, install)
+    undo = (register(first), register(second))
+    assert current() is second
+    undo[order[0]]()
+    assert current() is (second if order[0] == 0 else first)
+    undo[order[0]]()
+    assert current() is (second if order[0] == 0 else first)
+    undo[order[1]]()
+    assert current() is original
+    undo[order[1]]()
+    assert current() is original
+
+
 class _SlowMotor:
     """A motor unlike any built in: slow keys, fixed paths, corner landings."""
 

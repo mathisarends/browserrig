@@ -203,6 +203,10 @@
 
 ### Fixed
 
+- Input motor and presenter overrides can be removed in any order, including
+  repeated removal and multiple registrations of the same configuration instance.
+  Removing another plugin no longer reactivates an already removed override.
+
 - Keep a screenshot's resize revision so returning to the original window size
   cannot reactivate outdated screenshot coordinates.
 - Ignore placeholder viewport dimensions from dialogs and unavailable captures
