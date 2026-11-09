@@ -285,10 +285,10 @@ async def test_scroll_and_hover_by_ref_target_the_element_not_the_cursor(site):
         nonlocal step
         step += 1
         if step == 1:
-            ref = _ref(request, "Second item")
+            ref = _ref(request, "Second item", role="button")
             yield ModelChunk(tool_call=ToolCall("scroll", {"ref": ref, "delta_y": 180}))
         elif step == 2:
-            ref = _ref(request, "First item")
+            ref = _ref(request, "First item", role="button")
             yield ModelChunk(tool_call=ToolCall("move_mouse", {"ref": ref}))
         else:
             yield ModelChunk(text="Done")
@@ -450,8 +450,10 @@ def _assert_events(streamed, output, stored, coordinates):
     assert '"browser.cursor.moved"' not in stored
 
 
-def _ref(request, name):
+def _ref(request, name, *, role=None):
     state = latest(request.messages)
     return next(
-        element["ref"] for element in state["elements"] if element["name"] == name
+        element["ref"]
+        for element in state["elements"]
+        if element["name"] == name and (role is None or element["role"] == role)
     )

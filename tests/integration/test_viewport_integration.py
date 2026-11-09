@@ -26,7 +26,7 @@ from tests.javascript import evaluate
 pytestmark = pytest.mark.integration
 
 
-_LINE = re.compile(r'^\s*\*?\[(?P<ref>[^\]]+)\] \S+ "(?P<name>[^"]*)"')
+_LINE = re.compile(r'^\s*\*?\[(?P<ref>[^\]]+)\] (?P<role>\S+) "(?P<name>[^"]*)"')
 
 
 async def test_strict_viewport_controls_are_described_and_the_rest_are_known(site):
@@ -201,7 +201,7 @@ async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
 
     async def respond(request):
         nonlocal count
-        entry = _element(request, "Nested target")
+        entry = _element(request, "Nested target", role="button")
         count += 1
         if count == 1:
             yield ModelChunk(tool_call=ToolCall("click", {"ref": entry["ref"]}))
@@ -364,9 +364,16 @@ def _state(request):
     return elements
 
 
-def _element(request, name):
+def _element(request, name, *, role=None):
     elements = _state(request)
-    entry = next((item for item in elements if item["name"] == name), None)
+    entry = next(
+        (
+            item
+            for item in elements
+            if item["name"] == name and (role is None or item["role"] == role)
+        ),
+        None,
+    )
     assert entry is not None, [item["name"] for item in elements]
     return entry
 
