@@ -6,11 +6,16 @@ from .find import FindMark, FoundMatch, PageMatches, close_find, find_text
 from .handle import DomElementHandle, DomReferences
 from .images import ImageContext, ImageRetention, TrimInBatches, UntilCompaction
 from .models import (
+    Canvas,
     CapturedImage,
     CookieBanner,
     Element,
     ElementInfo,
     ElementRef,
+    Heading,
+    Modal,
+    Offscreen,
+    Option,
     PageContent,
     ScrollInfo,
     Snapshot,
@@ -21,6 +26,11 @@ from .render import render
 from .renderer import DomRenderer, Renderer
 
 __all__ = [
+    "Canvas",
+    "Heading",
+    "Modal",
+    "Offscreen",
+    "Option",
     "ScrollInfo",
     "CaptureContent",
     "CaptureStrategy",

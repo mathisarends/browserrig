@@ -386,6 +386,16 @@ deriving the existing fingerprint from the redacted page and document identity.
 `Extraction` name remains an alias for it. DOM and non-DOM data can coexist in a
 snapshot and survive JSON round trips.
 
+All capture data types are available from the observation facade, including the
+nested values needed for headings, modals, canvases and select options:
+
+```python
+from browserrig.observation import Canvas, Heading, Modal, Offscreen, Option, PageContent
+```
+
+`PageContent` is capture data; `ExtractedContent` in the same facade is the separate
+Markdown extraction result returned by `BrowserPerception.extracted_content`.
+
 A custom strategy returns `CaptureContent(page=PageContent(...), references=resolver)`.
 Keep object bindings in that capture's resolver, not in reusable strategy configuration.
 `resolve(tab, snapshot, ref)` receives the redacted published snapshot. Its handle's

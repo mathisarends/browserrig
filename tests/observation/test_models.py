@@ -5,20 +5,35 @@ from browserrig.browser import Connect, Launch
 from browserrig.core import Bounds, Geometry, Point, Region, StaleElement
 from browserrig.observation import (
     BrowserPerception,
+    Canvas,
     CookieBanner,
     DomCapture,
     Element,
+    Heading,
+    Modal,
+    Offscreen,
+    Option,
     Snapshot,
     render,
 )
 from browserrig.observation.models import (
-    Canvas,
     ElementFingerprint,
-    Heading,
-    Modal,
-    Offscreen,
     PageFingerprint,
 )
+
+
+def test_public_capture_models_describe_selected_options():
+    element = _element(
+        "choice",
+        0,
+        role="combobox",
+        name="Mission",
+        options=(Option(label="Voyager", selected=True), Option(label="Pioneer")),
+    )
+    rendered = render(_snapshot(element))
+    assert "Voyager" in rendered and "Pioneer" in rendered
+    restored = Snapshot.model_validate_json(_snapshot(element).model_dump_json())
+    assert restored.element("choice").options == element.options
 
 
 def test_render_lists_visible_elements_by_section_and_group_without_routing_data():

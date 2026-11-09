@@ -134,6 +134,9 @@
 
 ### Added
 
+- The observation facade exports `Canvas`, `Heading`, `Modal`, `Offscreen` and
+  `Option`, completing the nested data types used by public capture contracts.
+
 - Export `ActionKind` and `FileTransfers` from `browserrig` for custom tools and
   explicit plugin compositions.
 
