@@ -9,8 +9,10 @@ from harnessed.kernel import PluginScope, needs
 
 from browserrig.activity import Activity
 from browserrig.browser import Browser
-from browserrig.core import BrowserError
+from browserrig.core import ActivityKind, BrowserError
 from browserrig.events import (
+    ActivityFinishedEvent,
+    ActivityStartedEvent,
     PageCaptureFinishedEvent,
     PageCaptureStartedEvent,
     TabActivatedEvent,
@@ -107,6 +109,25 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
     async def _after_capture(self, event: PageCaptureFinishedEvent) -> None:
         async with self._lock:
             self._captures.pop(event.capture_id, None)
+        await self._activate()
+
+    @hook(ActivityStartedEvent, ActivityFinishedEvent)
+    async def _on_activity(
+        self, event: ActivityStartedEvent | ActivityFinishedEvent
+    ) -> None:
+        if event.kind not in {
+            ActivityKind.LLM,
+            ActivityKind.COMPACTION,
+            ActivityKind.PAUSED,
+        }:
+            return
+        async with self._lock:
+            if self._finish_task is not None or self._capture is None:
+                return
+            # Native recordings can contain sparse frames with coarse timestamps.
+            # Separate wait boundaries so trimming never extends a stale wait frame
+            # across the work that follows. Keep every segment in the uncut film.
+            await self._stop_capture()
         await self._activate()
 
     async def _activate(self) -> None:

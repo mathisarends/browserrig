@@ -151,6 +151,8 @@ The recording follows `browser.active_tab` when you open or activate a tab throu
 Browserrig, or close the active tab. Each switch saves a native capture; the captures
 are joined in order into one `video.mp4`. Reactivating the current tab keeps its
 capture running.
+Wait boundaries also split native captures so sparse video frames cannot carry a
+waiting scene into resumed work. The uncut film retains those wait segments.
 Manual tab selection in Chrome's UI is not tracked; use `browser.tabs.activate(...)`
 to select the tab that Browserrig controls and records.
 Close tabs through Browserrig so their recordings can be saved before destruction.

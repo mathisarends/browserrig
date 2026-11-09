@@ -62,9 +62,15 @@ async def test_native_recording_cuts_model_waits_across_tabs_and_closure(
     result = recording.result
     assert result is not None
     assert result.path.is_file()
-    assert len(result.sources) == 3
+    assert len(result.sources) == 5
     manifest = json.loads((result.path.parent / "timeline.json").read_text())
-    assert [s["target_id"] for s in manifest] == [first.id, second.id, first.id]
+    assert [s["target_id"] for s in manifest] == [
+        first.id,
+        first.id,
+        first.id,
+        second.id,
+        first.id,
+    ]
     retained = sum(end - start for s in manifest for start, end in s["kept"])
     assert result.original_duration - retained >= 1.5
     # Retained intervals round outward to whole frames to preserve brief actions.

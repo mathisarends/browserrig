@@ -268,10 +268,10 @@ async def test_session_exception_finalizes_open_activity(
     assert recording.result.path.exists()
     assert len(edits) == 1
     # An unfinished LLM interval is projected through the end of the capture.
-    assert edits[0][1] == ((Span(0, 1),),)
+    assert edits[0][1] == ((Span(0, 1),), ())
     assert recording.result.original_duration == 10
     assert recording.result.duration == 1
-    tab.cdp.page.stop_screen_recording.assert_awaited_once()
+    assert tab.cdp.page.stop_screen_recording.await_count == 2
 
 
 @pytest.mark.parametrize("elapsed", [0.0, 0.016, 2.0])
