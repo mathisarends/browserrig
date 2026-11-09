@@ -6,6 +6,8 @@
 
 - `browser_tool` requires an async callback. Synchronous callbacks now fail at
   declaration time instead of silently skipping the browser action pipeline.
+  Mark a synchronous decorator wrapper that returns a coroutine with
+  `inspect.markcoroutinefunction`.
 
 - Download receiving belongs to the new `DownloadReceiving()` plugin, included
   in the default browser pack. Removing `FileTools` only removes model tools;

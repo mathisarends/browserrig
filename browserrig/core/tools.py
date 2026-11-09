@@ -50,7 +50,10 @@ def browser_tool[F: Callable[..., Awaitable[object]]](
 
     def decorate(callback: F) -> F:
         if not iscoroutinefunction(callback):
-            raise TypeError("browser_tool requires an async function")
+            raise TypeError(
+                "browser_tool requires an async function; mark a synchronous wrapper "
+                "that returns a coroutine with inspect.markcoroutinefunction"
+            )
         binding = _ToolBinding()
         parameters = signature(callback)
 
