@@ -1,3 +1,4 @@
+import asyncio
 from urllib.parse import urlsplit
 
 import pytest
@@ -112,3 +113,20 @@ class _SessionProbe:
     async def apply(self, cdp, *, frame):
         await cdp.page.get_frame_tree()
         self.sessions.append((cdp.session_id, frame))
+
+
+async def test_viewport_resizes_are_counted_and_report_the_new_size(site):
+    async with ChromeBrowser(Launch(url=site)) as browser:
+        tab = browser.active_tab
+        await wait_for_page(tab)
+        before = tab.viewport_revision
+        # Stands in for a person resizing the window; both resize the main frame.
+        await tab.cdp.emulation.set_device_metrics_override(
+            width=700, height=500, device_scale_factor=1, mobile=False
+        )
+        async with asyncio.timeout(5):
+            while tab.viewport_revision == before:
+                await asyncio.sleep(0.02)
+        width, height = await tab.viewport_size()
+        # The client width excludes a page scrollbar.
+        assert width <= 700 and height == 500

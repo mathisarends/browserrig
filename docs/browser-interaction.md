@@ -46,6 +46,23 @@ applies the optional `viewport` metrics to pages first; custom setups then run i
 the supplied order. `Viewport` only holds configuration data. Same-process frames
 share their page's session.
 
+### Resizable windows
+
+The viewport is not fixed. A headless launch pins `viewport` as device metrics,
+because nobody can resize it. A headed launch uses `viewport` only as the initial
+`--window-size` and lets pages follow the window, so a person can make it
+narrower, wider or shorter while the agent works. `Connect` pins metrics only
+when a `viewport` is passed; without one, pages follow the remote window.
+
+When a page resizes, browserrig drops cached frame geometry and treats earlier
+coordinates as outdated: `click_at`, `move_to` and coordinate drags fail with a
+stale-coordinates error until the agent observes again, and a screenshot whose
+viewport size differs from the current observation cannot supply coordinates.
+The next observation of that tab is complete rather than a list of changes, and
+with `Nudges` installed the agent receives a hint such as "The browser viewport
+was resized from 1280x800 to 960x720". Ref-based actions are unaffected, since
+they locate their target again before every input.
+
 ## Element references and screenshot marks
 
 `DomCapture` reads every frame document with one `DOMSnapshot.captureSnapshot` call per

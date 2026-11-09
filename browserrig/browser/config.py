@@ -55,6 +55,14 @@ class Launch(Options):
             )
         return arguments
 
+    @property
+    def emulated_viewport(self) -> Viewport | None:
+        """Metrics pinned on each page; a headed window follows its own size instead.
+
+        People resize a visible window, so its page viewport must change with it.
+        """
+        return self.viewport if self.headless else None
+
     def process(self) -> ChromeProcess:
         """The Chrome process these options describe, not started yet."""
         flags = [f"--window-size={self.viewport.width},{self.viewport.height}"]
@@ -105,6 +113,11 @@ class Connect(Options):
                 "A browser WebSocket is required; a page WebSocket cannot manage tabs"
             )
         return endpoint
+
+    @property
+    def emulated_viewport(self) -> Viewport | None:
+        """Metrics pinned on each page; without them, pages follow the remote window."""
+        return self.viewport
 
     async def cdp_endpoint(self, _stack: AsyncExitStack) -> CdpEndpoint:
         """Return the configured endpoint and its request headers."""

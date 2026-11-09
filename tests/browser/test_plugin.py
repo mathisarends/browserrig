@@ -147,3 +147,12 @@ def test_factories_keep_ownership_and_endpoint_validation(factory, options):
 class _SessionProbe:
     async def apply(self, _cdp, *, frame):
         pass
+
+
+def test_only_headless_launches_pin_the_viewport_so_visible_windows_can_be_resized():
+    viewport = Viewport(width=900)
+    assert Launch(viewport=viewport).emulated_viewport == viewport
+    assert Launch(viewport=viewport, headless=False).emulated_viewport is None
+    endpoint = SecretStr("http://127.0.0.1:9222")
+    assert Connect(endpoint=endpoint).emulated_viewport is None
+    assert Connect(endpoint=endpoint, viewport=viewport).emulated_viewport == viewport

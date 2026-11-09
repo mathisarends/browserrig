@@ -9,6 +9,7 @@ from uuid import uuid4
 from cdpify import UNSET, CDPCommandError, CdpSession
 from cdpify.domains.page import (
     FrameNavigatedEvent,
+    FrameResizedEvent,
     FrameStartedLoadingEvent,
     FrameStartedNavigatingEvent,
     FrameStoppedLoadingEvent,
@@ -83,6 +84,8 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self._emit = emit
         self._discover_frames = discover_frames
         self._layout_revision = 0
+        # Counts viewport resizes, as when a person resizes the browser window.
+        self.viewport_revision = 0
         self._frames_key: tuple[str, str, int] | None = None
         self._frames: tuple[Frame, ...] = ()
         self._current_action = current_action
@@ -137,6 +140,9 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
                 self.loading = False
                 self.navigation_pending = False
                 await self.report_change(settled=True)
+            case FrameResizedEvent():
+                self.viewport_revision += 1
+                self.layout_changed()
             case JavascriptDialogOpeningEvent(type=kind, message=message):
                 self.dialog = (str(kind), message)
                 self.input.dialog_opened.set()

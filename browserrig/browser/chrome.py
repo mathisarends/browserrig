@@ -14,6 +14,7 @@ from cdpify.domains.network import (
 )
 from cdpify.domains.page import (
     FrameNavigatedEvent,
+    FrameResizedEvent,
     FrameStartedLoadingEvent,
     FrameStartedNavigatingEvent,
     FrameStoppedLoadingEvent,
@@ -57,6 +58,7 @@ _EVENTS = (
     FrameStartedNavigatingEvent,
     LifecycleEventEvent,
     FrameStoppedLoadingEvent,
+    FrameResizedEvent,
     JavascriptDialogOpeningEvent,
     JavascriptDialogClosedEvent,
     ExecutionContextDestroyedEvent,

@@ -35,6 +35,7 @@ class FakeTab:
         self.quiet_ms = 1000
         self.probes = 0
         self.network = NetworkActivity()
+        self.viewport_revision = 0
 
     async def sync_document(self):
         pass

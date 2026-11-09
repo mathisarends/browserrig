@@ -164,6 +164,8 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         async with self._state.lock:
             selected = tab if tab is not None else browser.active_tab
             report = await readiness.wait(selected, phase=phase)
+            # Read before capturing: a resize during capture leaves this observation outdated.
+            revision = selected.viewport_revision
             observation = await capture_observation(
                 selected,
                 self.capture_strategy,
@@ -179,6 +181,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 redaction=self._secrets(),
             )
             self._state.observation = observation
+            self._state.viewport_revision = revision
             snapshot = observation.snapshot
             await self._events.emit(
                 ObservationCapturedEvent(
@@ -325,8 +328,21 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         snapshot = self.snapshot
         if snapshot is None:
             raise StaleElement("Observe before using coordinates")
+        tab = self._browser.active_tab
+        if (
+            tab.id == snapshot.tab_id
+            and tab.viewport_revision != self._state.viewport_revision
+        ):
+            raise StaleElement(
+                "The browser window was resized after the last observation; "
+                "coordinates are outdated, observe again"
+            )
         image = self._state.delivered_image
         if image is not None:
+            if (image.width, image.height) != (snapshot.width, snapshot.height):
+                raise StaleElement(
+                    "The viewport changed size since the last shown image; screenshot again"
+                )
             if (image.tab_id, image.document_id) != (
                 snapshot.tab_id,
                 snapshot.document_id,
@@ -355,6 +371,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             )
         state.screenshot_requested = False
         state.screenshot_region, state.screenshot_zoom = None, 1
+        await self._track_viewport(snapshot, nudges)
         observations = []
         key = self._page_key(snapshot)
         # Text-only pages the model still sees are not repeated; images are always delivered.
@@ -381,6 +398,31 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 refs=refs,
             )
         return await next_()
+
+    async def _track_viewport(self, snapshot: Snapshot, nudges: Nudges | None) -> None:
+        """Notice a viewport resized from outside, such as by a person resizing the window."""
+        state = self._state
+        size = (snapshot.width, snapshot.height)
+        previous = state.viewports.get(snapshot.tab_id)
+        state.viewports[snapshot.tab_id] = size
+        if previous is None or previous == size:
+            return
+        # Every position moved, so the next observation of this tab is complete, not a delta.
+        state.bases = {
+            page: base
+            for page, base in state.bases.items()
+            if page[0] != snapshot.tab_id
+        }
+        if nudges is not None:
+            await nudges.queue(
+                f"The browser viewport was resized from {previous[0]:.0f}x{previous[1]:.0f} "
+                f"to {size[0]:.0f}x{size[1]:.0f}, likely by the user. The layout may have "
+                "reflowed: earlier coordinates, positions and screenshots are outdated, "
+                "so rely on the current observation.",
+                key=f"viewport:{snapshot.tab_id}",
+                cause_id=snapshot.id,
+                target_id=snapshot.tab_id,
+            )
 
     def _observation(self, snapshot: Snapshot) -> UserMessage:
         """The snapshot, or only its changes while the last complete one is still in context."""

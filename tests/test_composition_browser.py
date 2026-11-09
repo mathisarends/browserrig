@@ -70,6 +70,7 @@ class CountingCapture:
         self.captures = []
         # (image, geometry scale) per capture; by default every capture shows a new screen.
         self.frames = frames
+        self.size = (800, 600)
 
     async def collect(  # pylint: disable=unused-argument
         self, tab, _report, *, screenshots, region=None, zoom=1, cursor=None
@@ -80,8 +81,8 @@ class CountingCapture:
             page=Extraction(
                 url=tab.url,
                 title="Example",
-                width=800,
-                height=600,
+                width=self.size[0],
+                height=self.size[1],
                 scroll_y=0,
                 page_height=600,
             ),
@@ -629,6 +630,29 @@ async def test_hint_observations_are_skipped_while_there_is_nothing_to_report():
             )
             == 0
         )
+
+
+async def test_window_resize_outdates_coordinates_and_nudges_the_agent():
+    agent, _model, capture, holder = _agent(
+        [call("screenshot"), *_steps(2), "Done"], after=(Nudges(),)
+    )
+    async with agent.session() as session:
+        browser = _browser_ready(holder)
+        observe = session.scope[BrowserPerception]
+        first = await session.run("Inspect", max_steps=2)
+        assert observe.coordinate_source().geometry is not None
+        # A person resizes the window after the agent last looked.
+        browser.active_tab.viewport_revision += 1
+        with pytest.raises(StaleElement, match="resized"):
+            observe.coordinate_source()
+        capture.size = (1000, 700)
+        second = await session.run("Continue", max_steps=1)
+        # The earlier screenshot no longer matches the viewport it would map onto.
+        with pytest.raises(StaleElement, match="changed size"):
+            observe.coordinate_source()
+        hints = _recorded([first, second], "browser.nudges")
+        assert len(hints) == 1
+        assert "resized from 800x600 to 1000x700" in str(hints[0].message.content)
 
 
 class Probe(ReadinessStrategy):

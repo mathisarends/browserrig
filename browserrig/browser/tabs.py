@@ -442,7 +442,7 @@ async def _enable_session(
             )
         ),
     )
-    viewport = options.viewport
+    viewport = options.emulated_viewport
     if viewport is not None and not frame:
         await cdp.emulation.set_device_metrics_override(
             width=viewport.width,

@@ -4,6 +4,12 @@
 
 ### Breaking changes
 
+- Headed `Chrome.launch(...)` no longer pins `viewport` as device metrics; it sets
+  the initial window size and pages follow the window when a person resizes it.
+  Headless launches and `Chrome.connect(viewport=...)` still pin the viewport.
+  After a resize, coordinate tools reject outdated observations and screenshots,
+  and `Nudges` tells the agent the old and new viewport size.
+
 - File readers and OCR are optional. The base installation reads plain text;
   install `browserrig[files]` for document, spreadsheet, PDF and media readers, or
   `browserrig[ocr]` for those readers plus local CPU OCR (RapidOCR, ONNX Runtime,
