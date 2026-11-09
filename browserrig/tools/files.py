@@ -1,25 +1,16 @@
-import hashlib
-from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Annotated
 
-import yaml
 from harnessed import (
     Inject,
     Instructions,
-    Plugin,
-    PluginState,
     SystemPrompt,
     ToolError,
-    hook,
 )
-from harnessed.events import ObservationsIncludedEvent
-from harnessed.hooks import Next, PreStep, StepDecision
 from harnessed.kernel import needs, observes
-from harnessed.models import UserMessage
 from pydantic import Field
 
-from browserrig.browser import Browser, BrowserEvents, DownloadReceiving, Tab
+from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
     ActionKind,
     BrowserError,
@@ -35,12 +26,8 @@ from browserrig.events import (
     FilesUploadedEvent,
 )
 from browserrig.files import (
-    DOWNLOADS,
     Download,
     DownloadState,
-    FileSystem,
-    FileSystemState,
-    FileSystemView,
     FileTransfer,
     StagedFiles,
 )
@@ -49,15 +36,13 @@ from browserrig.readiness import Readiness
 
 from .effects import Effect
 from .execution import Actions
+from .file_observation import FileSystemObservation
 from .intents import OpenFileIntent, UploadIntent
 from .workspace import FILE_TOOLS_SLOT, _file_errors, _WorkspaceIO
 
 
 def _reaches_chrome(transfer: Inject[FileTransfer | None]) -> bool:
     return transfer is not None
-
-
-_SOURCE = "files"
 
 
 _INSTRUCTIONS = Instructions(
@@ -88,22 +73,13 @@ _BROWSER_INSTRUCTIONS = Instructions(
 )
 
 
-@dataclass
-class _Delivery:
-    sent: str | None = None
-    visible: bool = False
-
-
-class _BrowserFileActions(Plugin):
+class _BrowserFileActions(FileSystemObservation):
     """Download listing, file previews and uploads shared by BrowserFileTools and FileTools.
 
     DownloadReceiving independently owns the browser's download binding.
     """
 
-    _delivery = PluginState(_Delivery)
-    _receiving = observes(DownloadReceiving)
     _browser = needs(Browser)
-    _workspace = observes(FileSystem)
     _file_transfer = observes(FileTransfer)
     _events = needs(BrowserEvents)
     _readiness = needs(Readiness)
@@ -223,40 +199,6 @@ class _BrowserFileActions(Plugin):
                 "The browser cannot reach the workspace; configure a file bridge"
             )
         return transfer
-
-    @hook(PreStep)
-    async def _before_step(
-        self, event: PreStep, next_: Next[StepDecision]
-    ) -> StepDecision:
-        downloads = await self._browser.downloads()
-        state = FileSystemState(
-            workspace=self._workspace is not None,
-            download_directory=str(DOWNLOADS)
-            if self._receiving is not None and self._receiving.receiving
-            else None,
-            downloads=downloads[-20:],
-            total_downloads=len(downloads),
-        )
-        content = yaml.safe_dump(
-            FileSystemView(file_system=state).model_dump(mode="json"),
-            allow_unicode=True,
-            sort_keys=False,
-        )
-        ref = hashlib.sha256(content.encode()).hexdigest()[:16]
-        delivery = self._delivery
-        # Resend only changes, or when the model no longer sees the last copy (e.g. compaction).
-        if not (delivery.visible and delivery.sent == ref):
-            event.session.observe(UserMessage(content), source=_SOURCE, refs=(ref,))
-            delivery.sent, delivery.visible = ref, False
-        return await next_()
-
-    @hook(ObservationsIncludedEvent)
-    async def _included(self, event: ObservationsIncludedEvent) -> None:
-        delivery = self._delivery
-        delivery.visible = any(
-            item.source == _SOURCE and delivery.sent in item.refs
-            for item in event.observations
-        )
 
     async def _open(
         self,

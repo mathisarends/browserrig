@@ -47,7 +47,8 @@ and symlinks leaving the workspace are rejected.
 The agent sees the workspace and its latest 20 downloads before every step.
 File tools are available alongside the browser tools:
 
-`WorkspaceTools()` contains list/read/write and can run without a browser.
+`WorkspaceTools()` contains list/read/write and can run without a browser; with
+one, it shows the same file system observation, so new downloads stay visible.
 `BrowserFileTools()` contains download listing, previews and uploads.
 The default `FileTools()` combines both groups. All three share one slot: pass
 `WorkspaceTools()` or `BrowserFileTools()` in `plugins` to replace the default

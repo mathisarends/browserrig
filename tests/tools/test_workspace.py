@@ -1,5 +1,6 @@
 from dataclasses import replace
 
+import pytest
 from harnessed import Agent, PolicyDecision
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.plugins import Approvals
@@ -11,7 +12,7 @@ from browserrig.browser import Browser
 from browserrig.events import FileReadFinishedEvent, FileWrittenEvent
 from browserrig.files import FileSystem, MountedWorkspace
 from browserrig.tools import Actions
-from tests.fakes import mounted
+from tests.fakes import FakeServices, mounted
 
 
 class _WorkspaceTools(WorkspaceTools, provides=True):
@@ -69,6 +70,26 @@ async def test_workspace_receipts_pass_through_the_browser_when_one_is_composed(
     (written,) = services.events
     assert isinstance(written, FileWrittenEvent)
     assert written.browser_id == services.browser.id and written.path == "***"
+
+
+@pytest.mark.parametrize("with_browser", [False, True])
+async def test_workspace_tools_show_downloads_only_with_a_browser(
+    tmp_path, with_browser
+):
+    model = ScriptedModel(["Done"])
+    browser = [FakeServices()] if with_browser else []
+    agent = Agent(
+        model=model,
+        plugins=[*browser, Files(LocalWorkspace(tmp_path)), WorkspaceTools()],
+    )
+    async with agent.session() as session:
+        await session.run("Check the downloads")
+    observed = [
+        message.text
+        for message in model.requests[0].messages
+        if message.text.startswith("file_system:\n")
+    ]
+    assert len(observed) == (1 if with_browser else 0)
 
 
 async def test_browser_file_tools_do_not_expose_workspace_io(tmp_path):
