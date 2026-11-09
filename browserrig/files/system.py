@@ -132,9 +132,12 @@ class FileSystem:
         data = content.encode("utf-8")
         if len(data) > self.options.max_file_bytes:
             raise ValueError("Content exceeds max_file_bytes")
-        if not overwrite and await self.workspace.stat(target) is not None:
-            raise FileExistsError(f"File exists: {target}; pass overwrite=true")
-        await self.workspace.write_bytes(target, data)
+        try:
+            await self.workspace.write_bytes(target, data, overwrite=overwrite)
+        except FileExistsError as error:
+            raise FileExistsError(
+                f"File exists: {target}; pass overwrite=true"
+            ) from error
         return FileEntry(
             path=str(target), name=target.name, is_directory=False, size=len(data)
         )

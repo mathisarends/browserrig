@@ -177,6 +177,12 @@ them*:
 | `Workspace` | Stores the agent's files: `stat`, `list`, `read_bytes`, `write_bytes`. Paths are workspace-relative `PurePosixPath`s. | `LocalWorkspace(directory)` |
 | `FileBridge` | Moves files between the workspace and the machine that runs Chrome: `download_directory`, `receive`, `send`. | `MountedWorkspace(browser_path=None)` |
 
+Custom workspaces implement `write_bytes(path, data, *, overwrite=True)`.
+With `overwrite=False`, creation must atomically fail with `FileExistsError` if
+another file already exists, including concurrent writes. Use exclusive creation
+on a local disk or the storage provider's conditional-create operation; a separate
+existence check followed by an unconditional write cannot enforce this contract.
+
 `MountedWorkspace` is for a browser that sees a `LocalWorkspace` directory on its
 own file system: on the same machine, or on a pod that mounts the same volume.
 Nothing is copied. Pass `browser_path` when Chrome sees the directory at another

@@ -110,6 +110,36 @@ async def test_directory_listing_is_bounded(files):
     )
 
 
+async def test_concurrent_writes_require_explicit_overwrite(files):
+    results = await asyncio.gather(
+        *(files.write_file("shared.txt", str(index)) for index in range(20)),
+        return_exceptions=True,
+    )
+    winners = [
+        index
+        for index, result in enumerate(results)
+        if not isinstance(result, Exception)
+    ]
+    assert len(winners) == 1
+    assert all(
+        isinstance(result, FileExistsError)
+        for index, result in enumerate(results)
+        if index != winners[0]
+    )
+    assert (await files.read_file("shared.txt")).text == str(winners[0])
+
+
+async def test_remote_workspace_receives_the_overwrite_policy():
+    workspace = _MemoryWorkspace()
+    async with FileSystem(workspace) as files:
+        await files.write_file("note.txt", "first")
+        with pytest.raises(FileExistsError, match="overwrite=true"):
+            await files.write_file("note.txt", "second")
+        assert workspace.files[PurePosixPath("note.txt")] == b"first"
+        await files.write_file("note.txt", "second", overwrite=True)
+        assert workspace.files[PurePosixPath("note.txt")] == b"second"
+
+
 async def test_read_file_keeps_the_event_loop_responsive(files, monkeypatch):
     await files.write_file("report.txt", "threaded read")
     loop = asyncio.get_running_loop()
@@ -617,7 +647,11 @@ class _MemoryWorkspace:
         self.reads.append(path)
         return self.files[path]
 
-    async def write_bytes(self, path: PurePosixPath, data: bytes) -> None:
+    async def write_bytes(
+        self, path: PurePosixPath, data: bytes, *, overwrite: bool = True
+    ) -> None:
+        if not overwrite and path in self.files:
+            raise FileExistsError(str(path))
         self.files[path] = data
 
 

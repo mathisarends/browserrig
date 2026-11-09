@@ -60,8 +60,14 @@ class Workspace(Protocol):
 
     async def read_bytes(self, path: PurePosixPath) -> bytes: ...
 
-    async def write_bytes(self, path: PurePosixPath, data: bytes) -> None:
-        """Create or replace the file, creating parent directories as needed."""
+    async def write_bytes(
+        self, path: PurePosixPath, data: bytes, *, overwrite: bool = True
+    ) -> None:
+        """Write a file, creating parents; atomically reject existing files if not overwrite.
+
+        Raise `FileExistsError` when `overwrite=False` and the file already exists,
+        including when another writer creates it concurrently.
+        """
         ...
 
 
@@ -101,8 +107,10 @@ class LocalWorkspace:
     async def read_bytes(self, path: PurePosixPath) -> bytes:
         return await asyncio.to_thread(self.host_path(path).read_bytes)
 
-    async def write_bytes(self, path: PurePosixPath, data: bytes) -> None:
-        await asyncio.to_thread(self._write, path, data)
+    async def write_bytes(
+        self, path: PurePosixPath, data: bytes, *, overwrite: bool = True
+    ) -> None:
+        await asyncio.to_thread(self._write, path, data, overwrite=overwrite)
 
     def _stat(self, path: PurePosixPath) -> FileStat | None:
         resolved = self.host_path(path)
@@ -131,7 +139,8 @@ class LocalWorkspace:
                 entries.append(stat)
         return entries
 
-    def _write(self, path: PurePosixPath, data: bytes) -> None:
+    def _write(self, path: PurePosixPath, data: bytes, *, overwrite: bool) -> None:
         resolved = self.host_path(path)
         resolved.parent.mkdir(parents=True, exist_ok=True)
-        resolved.write_bytes(data)
+        with resolved.open("wb" if overwrite else "xb") as stream:
+            stream.write(data)
