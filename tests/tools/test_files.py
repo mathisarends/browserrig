@@ -456,6 +456,33 @@ async def test_missing_download_fails_without_raising(tmp_path):
     assert isinstance(emit.await_args.args[0], DownloadFailedEvent)
 
 
+@pytest.mark.parametrize("complete_before_switch", [False, True])
+async def test_downloads_keep_their_workspace_when_the_transfer_changes(
+    tmp_path, complete_before_switch
+):
+    files, downloads, emit = await _started_download(tmp_path)
+    _pending(files, "id").write_text("original download")
+    original = FileTransfer(files, _MOUNTED)
+    client = SimpleNamespace(browser=SimpleNamespace(set_download_behavior=AsyncMock()))
+    if complete_before_switch:
+        await downloads.handle(_COMPLETED)
+    other = FileSystem(LocalWorkspace(tmp_path / "other"))
+    # The same relative path must never open an unrelated file in the new workspace.
+    await other.write_file("downloads/id/note.txt", "unrelated file")
+    await downloads.receive(client, "context", FileTransfer(other, _MOUNTED))
+    if not complete_before_switch:
+        await downloads.handle(_COMPLETED)
+    (download,) = downloads.all()
+    assert download.state is DownloadState.COMPLETED and download.path is None
+    assert "another workspace" in download.error
+    assert (await files.read_file("downloads/id/note.txt")).text == "original download"
+    assert (await other.read_file("downloads/id/note.txt")).text == "unrelated file"
+    assert isinstance(emit.await_args.args[0], DownloadCompletedEvent)
+    await downloads.receive(client, "context", original)
+    (download,) = downloads.all()
+    assert download.path == "downloads/id/note.txt" and download.error is None
+
+
 async def test_a_failing_bridge_ends_the_download_as_failed(tmp_path):
     class _Broken(MountedWorkspace):
         async def receive(self, workspace, download, destination):

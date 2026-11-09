@@ -26,6 +26,7 @@ class Downloads:
         self._transfer: FileTransfer | None = None
         self._emit = emit
         self._items: dict[str, Download] = {}
+        self._transfers: dict[str, FileTransfer | None] = {}
         self._progress_at: dict[str, float] = {}
 
     async def receive(
@@ -45,13 +46,14 @@ class Downloads:
         return True
 
     def all(self) -> tuple[Download, ...]:
-        return tuple(self._items.values())
+        return tuple(self._visible(item) for item in self._items.values())
 
     async def handle(
         self, event: DownloadWillBeginEvent | DownloadProgressEvent
     ) -> None:
         match event:
             case DownloadWillBeginEvent():
+                self._transfers[event.guid] = self._transfer
                 self._items[event.guid] = Download(
                     id=event.guid, url=event.url, filename=event.suggested_filename
                 )
@@ -76,7 +78,7 @@ class Downloads:
             await self._report_progress(previous, int(event.received_bytes), total)
             return
         path, error = None, None
-        transfer = self._transfer
+        transfer = self._transfers.get(guid)
         if event.state == DownloadState.COMPLETED and transfer is not None:
             try:
                 path = await transfer.receive(
@@ -110,6 +112,25 @@ class Downloads:
                 )
             case DownloadState.CANCELED:
                 await self._emit(DownloadCanceledEvent(download_id=guid))
+
+    def _visible(self, download: Download) -> Download:
+        owner = self._transfers.get(download.id)
+        current = self._transfer
+        if download.path is not None and (
+            owner is None
+            or current is None
+            or owner.files.workspace is not current.files.workspace
+        ):
+            return download.model_copy(
+                update={
+                    "path": None,
+                    "error": (
+                        "Download belongs to another workspace; "
+                        "restore that workspace to open it"
+                    ),
+                }
+            )
+        return download
 
     async def _report_progress(
         self, download: Download, received: int, total: int | None

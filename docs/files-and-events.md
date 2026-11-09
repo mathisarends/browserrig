@@ -137,6 +137,10 @@ to a browser host through an explicitly chosen bridge. In an agent session,
 `FileTransfer` as an optional service. `FileTools` consumes that service for
 previews, uploads and download reception. A workspace change replaces the
 transfer service without reopening Chrome; `Browser` does not expose the bridge.
+Each download retains the transfer and workspace selected when it started.
+After switching workspaces, downloads saved in another workspace have no accessible
+`path` until that workspace is restored, so previews cannot open an unrelated file
+with the same relative name. In-flight downloads finish in their original workspace.
 For direct use:
 
 ```python
