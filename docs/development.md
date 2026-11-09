@@ -20,9 +20,9 @@ pnpm.cmd install --frozen-lockfile
 uv run prek install --overwrite
 uv run prek run --all-files
 
-uv run ruff check browserrig examples tests
-uv run ruff format --check browserrig examples tests
-uv run pylint browserrig examples tests
+uv run ruff check browserrig examples evals tests
+uv run ruff format --check browserrig examples evals tests
+uv run pylint browserrig examples evals tests
 uv run ty check
 uv run --locked smelt check --show-hints --fail-on warning
 pnpm.cmd run lint
@@ -68,7 +68,7 @@ JavaScript is checked with ESLint and Prettier: braces for every control block,
 at most two nested blocks, and no nested ternary expressions. Pylint limits Python
 blocks to three nesting levels; Ruff also checks for simplifications. CI runs the
 same lint, formatting, and type checks. To format code, run
-`uv run ruff format browserrig examples tests` and `pnpm.cmd run format`.
+`uv run ruff format browserrig examples evals tests` and `pnpm.cmd run format`.
 
 Integration tests require Chrome or Chromium. Set `BROWSERRIG_CHROME` or
 `Chrome.launch(executable=...)` to select the executable. Media validation also

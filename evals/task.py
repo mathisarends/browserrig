@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 
 from browserrig import Secret
 
-from .checks import Answer, Check, Probe
+from .checks import Answer, Check, Expected, Probe
 
 STAGES = ("practice", "reference", "wild")
 
@@ -26,6 +26,8 @@ class Task:
             raise ValueError(f"{self.name}: unknown stage {self.stage!r}")
         if not self.checks:
             raise ValueError(f"{self.name}: a task needs at least one check")
+        if self.max_steps < 1:
+            raise ValueError(f"{self.name}: max_steps must be at least 1")
 
     @property
     def probes(self) -> tuple[str, ...]:
@@ -35,6 +37,6 @@ class Task:
         )
 
 
-def answer(*patterns, label: str = "answer") -> Answer:
+def answer(*patterns: Expected, label: str = "answer") -> Answer:
     """The final answer matches every pattern."""
     return Answer(label, patterns)

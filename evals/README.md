@@ -19,7 +19,9 @@ evals/bench.sh list                  # what exists
 The script needs `uv` and `OPENAI_API_KEY` in `.env`. On Windows run it from Git Bash.
 At the end it prints a summary and compares scores with the latest earlier run that
 shares tasks. Results land in `evals/results/<timestamp>-<label>.json`; each run's
-downloads and written files stay in `evals/results/workspaces/`.
+downloads and written files stay in `evals/results/workspaces/`. The JSON snapshot
+is replaced atomically after every finished attempt, so completed results remain
+available if a later task fails or the run is interrupted.
 
 ```sh
 evals/bench.sh report evals/results/<run>.json --against evals/results/<older>.json
@@ -40,13 +42,36 @@ resets now and then.
 ## Reading results
 
 - `pass` means the run finished and reached every milestone. `fail` lists the
-  missed milestones. `error` means the harness or site crashed, not the agent.
+  missed milestones. `error` means execution or evaluation failed; `error_phase`
+  identifies setup, execution, evidence collection or checks. Other checks still
+  run after an evaluator raises, and available answers and usage are retained.
+- Errors are excluded from milestone averages in both summaries and comparisons.
+  Comparisons show error counts separately; a task with no scored attempts on one
+  side has no comparable score.
 - **Capabilities, weakest first** averages scores per tag, such as `upload`,
   `login` or `widgets`. This is where broken tools show up.
 - Run with `--repeat 3` before trusting a single regression; live sites are noisy.
 - With `--trace`, start Phoenix first (`docker compose up -d --wait`). Then
   `uv run python -m evals.analyze evals/results/<run>.json` shows how the
   context grows per step.
+
+Tracing setup lives in `evals/telemetry.py`. It respects the standard OTLP endpoint
+variables and `OTEL_SERVICE_NAME`; `PHOENIX_PROJECT_NAME` defaults to
+`browserrig-evals`. Trace capture settings remain the same as before this cleanup.
+Analysis dumps include the attempt number so repeated tasks do not overwrite each
+other.
+
+## Code and offline checks
+
+`task.py` defines missions, `runner.py` executes them, and `checks.py` evaluates
+their evidence. `results.py` defines the Pydantic result models and snapshot writer;
+`run.py` coordinates the CLI. `report.py` and `analyze.py` consume these records.
+
+```sh
+uv run ruff check evals
+uv run ruff format --check evals
+uv run pytest tests/project/test_evals.py
+```
 
 ## Checks
 

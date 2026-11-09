@@ -7,7 +7,8 @@ uv run python -m evals.probe https://example.com --js "document.title"
 import argparse
 import asyncio
 
-from browserrig import ChromeBrowser, Launch, wait_for_page
+from browserrig import ChromeBrowser, wait_for_page
+from browserrig.browser import Launch
 from browserrig.observation import DomCapture, capture, render
 from browserrig.observation.content import extract_content
 

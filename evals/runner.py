@@ -2,16 +2,16 @@
 
 import json
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from harnessed import PolicyDecision
+from harnessed import PolicyDecision, ToolCall
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.kernel import PluginLike
-from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
-from pydantic_ai.models.openai import OpenAIResponsesModel
+from pydantic import TypeAdapter
 
 from browserrig import (
     Agent,
@@ -25,7 +25,10 @@ from browserrig import (
 from browserrig.browser import Browser
 
 from .checks import Evidence
+from .results import CheckResult, TaskResult, ToolRecord, Usage
 from .task import Task
+
+_TOOL_CALL_ADAPTER = TypeAdapter(ToolCall)
 
 
 @dataclass(frozen=True)
@@ -38,7 +41,91 @@ class RunOptions:
     plugins: tuple[PluginLike, ...] = ()
 
 
+async def run_task(
+    task: Task, options: RunOptions, workspace: Path, attempt: int = 1
+) -> TaskResult:
+    """Return a record on execution or check failure; cancellation still propagates."""
+    record = TaskResult(
+        task=task.name,
+        stage=task.stage,
+        tags=list(task.tags),
+        attempt=attempt,
+        url=task.url,
+        workspace=str(workspace),
+        status="error",
+        score=0.0,
+        seconds=0.0,
+    )
+    phase: Literal["setup", "execution", "evidence", "checks"] = "setup"
+    started = time.monotonic()
+    try:
+        workspace.mkdir(parents=True, exist_ok=True)
+        async with _agent(task, options, workspace).session() as session:
+            record.session_id = session.id
+            phase = "execution"
+            result = await session.run(task.prompt, max_steps=task.max_steps)
+            phase = "evidence"
+            probes = await _read_probes(session.scope[Browser], task.probes)
+
+        tools = _tool_calls(result.events)
+        record.completed = result.completed
+        record.stop_reason = str(result.stop_reason)
+        record.answer = result.text
+        record.probes = probes
+        record.usage = Usage(
+            input=result.usage.input_tokens,
+            output=result.usage.output_tokens,
+            cache_read=result.usage.cache_read_tokens,
+            reasoning=result.usage.reasoning_tokens,
+        )
+        record.tool_calls = len(tools)
+        record.tool_errors = sum(tool.error for tool in tools)
+        record.tools = tools
+        evidence = Evidence(
+            answer=result.text,
+            completed=result.completed,
+            workspace=workspace,
+            tools=tools,
+            transcript="\n".join(
+                [
+                    *(repr(message) for message in result.messages),
+                    *(json.dumps(tool.args, default=str) for tool in tools),
+                ]
+            ),
+            probes=probes,
+        )
+        phase = "checks"
+        checks = _evaluate_checks(task, evidence)
+        reached = sum(check.ok for check in checks)
+        record.checks = checks
+        record.score = round(reached / len(checks), 3)
+        record.status = (
+            "pass" if result.completed and reached == len(checks) else "fail"
+        )
+        errors = [
+            f"{check.label}: {check.error}"
+            for check in checks
+            if check.error is not None
+        ]
+        if errors:
+            record.status = "error"
+            record.error = "; ".join(errors)
+            record.error_phase = "checks"
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        record.status = "error"
+        record.error = f"{type(error).__name__}: {error}"
+        record.error_phase = phase
+    finally:
+        record.seconds = round(time.monotonic() - started, 1)
+    return record
+
+
 def _agent(task: Task, options: RunOptions, workspace: Path) -> Agent:
+    # Provider dependencies are needed only when executing a live task.
+    # pylint: disable=import-outside-toplevel
+    from harnessed.models.pydantic_ai import PydanticAIModel
+    from pydantic_ai.models.openai import OpenAIResponsesModel
+
     plugins: list[PluginLike] = [
         Files(LocalWorkspace(workspace)),
         Approvals(default=PolicyDecision.ALLOW),
@@ -63,96 +150,41 @@ async def _read_probes(
             probes[expression] = json.loads(
                 await browser.active_tab.evaluate(expression)
             )
-        except Exception as error:  # noqa: BLE001 - a failed probe is a missed milestone
+        except Exception as error:  # pylint: disable=broad-exception-caught
             probes[expression] = {"probe_error": f"{type(error).__name__}: {error}"}
     return probes
 
 
-def _tool_calls(events) -> list[dict[str, Any]]:
-    calls = []
+def _tool_calls(events: Iterable[object]) -> list[ToolRecord]:
+    calls: list[ToolRecord] = []
     for event in events:
         if not isinstance(event, ToolCallFinishedEvent):
             continue
         content = event.result.content
         text = content if isinstance(content, str) else json.dumps(content, default=str)
+        # Harnessed's schema turns frozen argument mappings and tuples back into JSON.
+        call = _TOOL_CALL_ADAPTER.dump_python(event.call, mode="json")
         calls.append(
-            {
-                "name": event.call.name,
-                "args": event.call.arguments,
-                "error": event.result.is_error,
-                "chars": len(text),
-                "preview": text[:300],
-            }
+            ToolRecord(
+                name=event.call.name,
+                args=call["arguments"],
+                error=event.result.is_error,
+                chars=len(text),
+                preview=text[:300],
+            )
         )
     return calls
 
 
-async def run_task(
-    task: Task, options: RunOptions, workspace: Path, attempt: int = 1
-) -> dict[str, Any]:
-    """Run `task` once; the record always has a status, even when the run crashed."""
-    workspace.mkdir(parents=True, exist_ok=True)
-    record: dict[str, Any] = {
-        "task": task.name,
-        "stage": task.stage,
-        "tags": list(task.tags),
-        "attempt": attempt,
-        "url": task.url,
-        "workspace": str(workspace),
-    }
-    started = time.monotonic()
-    try:
-        async with _agent(task, options, workspace).session() as session:
-            record["session_id"] = session.id
-            result = await session.run(task.prompt, max_steps=task.max_steps)
-            probes = await _read_probes(session.scope[Browser], task.probes)
-    except Exception as error:  # noqa: BLE001 - one broken site must not stop the suite
-        record.update(
-            status="error",
-            score=0.0,
-            error=f"{type(error).__name__}: {error}",
-            seconds=round(time.monotonic() - started, 1),
-        )
-        return record
-
-    tools = _tool_calls(result.events)
-    evidence = Evidence(
-        answer=result.text,
-        completed=result.completed,
-        workspace=workspace,
-        tools=tools,
-        transcript="\n".join(
-            [
-                *(repr(m) for m in result.messages),
-                *(json.dumps(t["args"], default=str) for t in tools),
-            ]
-        ),
-        probes=probes,
-    )
-    checks = []
+def _evaluate_checks(task: Task, evidence: Evidence) -> list[CheckResult]:
+    checks: list[CheckResult] = []
     for check in task.checks:
-        miss = check.evaluate(evidence)
-        checks.append({"label": check.label, "ok": miss is None, "detail": miss})
-    reached = sum(c["ok"] for c in checks)
-    passed = result.completed and reached == len(checks)
-    usage = result.usage
-    record.update(
-        status="pass" if passed else "fail",
-        score=round(reached / len(checks), 3),
-        seconds=round(time.monotonic() - started, 1),
-        completed=result.completed,
-        stop_reason=str(result.stop_reason),
-        answer=result.text,
-        checks=checks,
-        probes=probes,
-        usage={
-            "input": usage.input_tokens,
-            "output": usage.output_tokens,
-            "cache_read": usage.cache_read_tokens,
-            "reasoning": usage.reasoning_tokens,
-        },
-        tool_calls=len(tools),
-        tool_errors=sum(t["error"] for t in tools),
-        tools=tools,
-    )
-    return record
+        try:
+            miss = check.evaluate(evidence)
+            checks.append(CheckResult(label=check.label, ok=miss is None, detail=miss))
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            detail = f"{type(error).__name__}: {error}"
+            checks.append(
+                CheckResult(label=check.label, ok=False, detail=detail, error=detail)
+            )
+    return checks

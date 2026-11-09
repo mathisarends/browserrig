@@ -23,9 +23,9 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: uv sync --locked --extra openai --extra mcp --extra otel --extra ocr
       - run: uv run --no-sync prek validate-config .pre-commit-config.yml
-      - run: uv run --no-sync ruff check browserrig examples tests
-      - run: uv run --no-sync ruff format --check browserrig examples tests
-      - run: uv run --no-sync pylint browserrig examples tests
+      - run: uv run --no-sync ruff check browserrig examples evals tests
+      - run: uv run --no-sync ruff format --check browserrig examples evals tests
+      - run: uv run --no-sync pylint browserrig examples evals tests
       - run: uv run --no-sync ty check
       - run: uv run --no-sync smelt check --fail-on warning --format github
       - run: uv run --no-sync pytest -m "not integration"

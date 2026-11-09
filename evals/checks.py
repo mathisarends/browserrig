@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
+from .results import ToolRecord
+
 
 @dataclass(frozen=True)
 class Evidence:
@@ -17,7 +19,7 @@ class Evidence:
     completed: bool
     workspace: Path
     # name, args and error flag of every tool call, in order.
-    tools: list[dict[str, Any]]
+    tools: list[ToolRecord]
     # Model-visible history plus tool arguments, for leak checks.
     transcript: str
     # JavaScript probe results from the active tab, read before the browser closed.
@@ -25,7 +27,8 @@ class Evidence:
 
 
 class Check(Protocol):
-    label: str
+    @property
+    def label(self) -> str: ...
 
     def evaluate(self, evidence: Evidence) -> str | None:
         """None when the milestone is reached, else why not."""
@@ -33,10 +36,6 @@ class Check(Protocol):
 
 
 type Expected = str | Callable[[], str]
-
-
-def _resolve(value: Expected) -> str:
-    return value() if callable(value) else value
 
 
 @dataclass(frozen=True)
@@ -91,7 +90,9 @@ class ToolUsed:
     count: int = 1
 
     def evaluate(self, evidence: Evidence) -> str | None:
-        calls = sum(t["name"] == self.name and not t["error"] for t in evidence.tools)
+        calls = sum(
+            tool.name == self.name and not tool.error for tool in evidence.tools
+        )
         return (
             None
             if calls >= self.count
@@ -118,7 +119,7 @@ class Probe:
             return f"probe failed: {value['probe_error']}"
         try:
             held = self.expect(value)
-        except Exception as error:  # noqa: BLE001 - a malformed page value is a miss
+        except Exception as error:  # pylint: disable=broad-exception-caught
             held = False
             value = f"{value!r} ({type(error).__name__})"
         return (
@@ -154,3 +155,7 @@ class Custom:
 
     def evaluate(self, evidence: Evidence) -> str | None:
         return self.test(evidence)
+
+
+def _resolve(value: Expected) -> str:
+    return value if isinstance(value, str) else value()
