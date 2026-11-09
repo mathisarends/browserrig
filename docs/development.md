@@ -160,6 +160,20 @@ single table of tools each completion phase permits; the plugin enforces it thro
 `tests/test_agent_session_store.py` also checks reopening a paused `Done` turn with
 `restore_outputs`, retained image assets and Browserrig's custom durable events.
 
+The remaining public SDK extension points are tracked upstream:
+
+- [Harnessed #92](https://github.com/mathisarends/harnessed/issues/92): a
+  session-scoped output policy, needed to replace the global `Done` adapter.
+- [Harnessed #93](https://github.com/mathisarends/harnessed/issues/93): attach
+  custom method registrations through a public helper instead of mutating
+  `_harnessed_registrations` in `browser_tool`.
+- [Harnessed #94](https://github.com/mathisarends/harnessed/issues/94): durable
+  plugin-owned state through a public service instead of the internal
+  `PluginInstructions` persistence dependency in `HumanHandoff`.
+
+These are integration boundaries in the pinned Harnessed release; the existing
+compatibility code remains in place until supported upstream APIs are available.
+
 ## Project status
 
 The core is implemented and tested against real Chrome, including transformed,

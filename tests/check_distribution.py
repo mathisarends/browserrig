@@ -15,14 +15,18 @@ from importlib.resources import files
 from pathlib import Path
 
 import browserrig
-from browserrig import ActionKind, FileTransfers
+from browserrig import ActionKind, Browser, DownloadReceiving, FileTransfers, WorkspaceTools
 from browserrig.files import FileSystem, LocalWorkspace
-from harnessed import Session
+from harnessed import Agent, Session
+from harnessed.plugins import Service
+from harnessed.services import ToolRegistry
+from harnessed.testing import ScriptedModel
 from browserrig.scripts import CHOREOGRAPHY, CONTENT, ELEMENT, OVERLAY, SECRET_FIELD
 
 assert callable(Session.append_message)
 assert ActionKind.MOVE_MOUSE.value == 'move_mouse'
 assert any(isinstance(plugin, FileTransfers) for plugin in browserrig.browser_plugins())
+assert any(isinstance(plugin, DownloadReceiving) for plugin in browserrig.browser_plugins())
 assert browserrig.__version__ == importlib.metadata.version('browserrig')
 distribution = importlib.metadata.distribution('browserrig')
 assert distribution.metadata['License-Expression']
@@ -44,6 +48,15 @@ async def read_without_file_extras():
         table = await workspace.read_file('table.csv')
         assert table.status == 'partial' and table.text == 'a,b'
         assert 'browserrig[files]' in table.limitations[0]
+        agent = Agent(
+            model=ScriptedModel([]),
+            plugins=[Service(FileSystem, workspace), WorkspaceTools()],
+        )
+        async with agent.session() as session:
+            assert Browser not in session.scope
+            assert {tool.name for tool in session.scope[ToolRegistry].definitions} == {
+                'list_files', 'read_file', 'write_file',
+            }
 
 
 assert find_spec('openpyxl') is None and find_spec('rapidocr') is None

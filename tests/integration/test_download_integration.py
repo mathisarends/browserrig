@@ -9,7 +9,8 @@ import yaml
 from harnessed import PolicyDecision, ToolCall
 from harnessed.models import ImagePart, ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
-from harnessed.testing import CallbackModel
+from harnessed.services import ToolRegistry
+from harnessed.testing import CallbackModel, ScriptedModel
 
 from browserrig import (
     Agent,
@@ -20,6 +21,7 @@ from browserrig import (
     ChromeBrowser,
     Files,
     FileSystem,
+    FileTools,
     FileTransfer,
     LocalWorkspace,
     Readiness,
@@ -37,6 +39,41 @@ from tests.javascript import evaluate
 from tests.observations import all_states, has_image
 
 pytestmark = pytest.mark.integration
+
+
+async def test_default_pack_receives_downloads_without_file_tools(
+    site, tmp_path, pdf_document
+):
+    agent = Agent(
+        model=ScriptedModel([]),
+        browser=Chrome.launch(url=site),
+        plugins=[Files(LocalWorkspace(tmp_path))],
+        without=(FileTools,),
+    )
+    async with agent.session() as session:
+        browser = session.scope[Browser]
+        files = session.scope[FileSystem]
+        names = {tool.name for tool in session.scope[ToolRegistry].definitions}
+        assert not names.intersection(
+            {"list_downloads", "read_file", "write_file", "upload_files"}
+        )
+        await wait_for_page(browser.active_tab)
+        await evaluate(
+            browser.active_tab,
+            "(() => { document.querySelector('#download').click(); return true; })()",
+        )
+        async with asyncio.timeout(10):
+            while (
+                not (downloads := await browser.downloads())
+                or downloads[-1].state != DownloadState.COMPLETED
+            ):
+                await asyncio.sleep(0.02)
+        download = downloads[-1]
+        assert download.error is None and download.path is not None
+        assert (
+            await files.workspace.read_bytes(PurePosixPath(download.path))
+            == pdf_document
+        )
 
 
 @pytest.mark.parametrize(

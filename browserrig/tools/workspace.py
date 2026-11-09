@@ -15,9 +15,7 @@ from harnessed import (
 from harnessed.kernel import needs, observes
 from pydantic import Field
 
-from browserrig.core import (
-    ActionKind,
-)
+from browserrig.core import ActionKind
 from browserrig.core import browser_tool as tool
 from browserrig.events import (
     FILE_EVENTS,

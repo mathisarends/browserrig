@@ -7,10 +7,6 @@
 - `browser_tool` requires an async callback. Synchronous callbacks now fail at
   declaration time instead of silently skipping the browser action pipeline.
 
-- Compose `WorkspaceTools()` for browser-independent list/read/write tools and
-  `BrowserFileTools()` for download listing, file previews and uploads.
-  `FileTools()` remains the combined convenience group in the default pack.
-
 - Download receiving belongs to the new `DownloadReceiving()` plugin, included
   in the default browser pack. Removing `FileTools` only removes model tools;
   remove `DownloadReceiving` to stop receiving later downloads. Manual
@@ -136,6 +132,10 @@
   restores native output methods after its last activation closes.
 
 ### Added
+
+- Compose `WorkspaceTools()` for browser-independent list/read/write tools and
+  `BrowserFileTools()` for download listing, file previews and uploads.
+  `FileTools()` remains the combined convenience group in the default pack.
 
 - The observation facade exports `Canvas`, `Heading`, `Modal`, `Offscreen` and
   `Option`, completing the nested data types used by public capture contracts.

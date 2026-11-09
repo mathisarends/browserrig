@@ -47,6 +47,13 @@ and symlinks leaving the workspace are rejected.
 The agent sees the workspace and its latest 20 downloads before every step.
 File tools are available alongside the browser tools:
 
+`WorkspaceTools()` contains list/read/write and can run without a browser.
+`BrowserFileTools()` contains download listing, previews and uploads.
+The default `FileTools()` combines both groups. To select only one group, remove
+`FileTools` from the browser pack and add the desired group explicitly.
+`DownloadReceiving()` independently binds browser downloads to the workspace;
+removing tools does not stop download receiving.
+
 | Tool | Behavior |
 | --- | --- |
 | `list_files(path=".", offset=0, limit=100)` | List a directory; follow `next_offset` for more. |
