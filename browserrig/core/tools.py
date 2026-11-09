@@ -1,4 +1,4 @@
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
 from inspect import iscoroutinefunction, signature
@@ -27,7 +27,7 @@ class BrowserToolCall(Waterfall[object]):
     arguments: Mapping[str, object]
 
 
-def browser_tool[F: Callable[..., object]](
+def browser_tool[F: Callable[..., Awaitable[object]]](
     *,
     description: str,
     kind: ActionKind,
@@ -35,7 +35,10 @@ def browser_tool[F: Callable[..., object]](
     readonly: bool = False,
     chainable: bool = False,
 ) -> Callable[[F], F]:
-    """Declare a browser tool whose execution is coordinated by the Actions plugin."""
+    """Declare an async browser tool coordinated by the Actions plugin.
+
+    Synchronous callbacks are rejected rather than bypassing browser coordination.
+    """
     metadata = BrowserToolMetadata(chainable=chainable, kind=kind)
     register = tool(
         description=description,
@@ -47,7 +50,7 @@ def browser_tool[F: Callable[..., object]](
 
     def decorate(callback: F) -> F:
         if not iscoroutinefunction(callback):
-            return register(callback)
+            raise TypeError("browser_tool requires an async function")
         binding = _ToolBinding()
         parameters = signature(callback)
 

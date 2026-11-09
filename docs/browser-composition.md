@@ -293,7 +293,8 @@ operation boundaries. Direct device calls use `browser.input.mouse` and
 `browser.input.keyboard`.
 
 Async methods declared with `browser_tool` automatically enter the browser tool
-execution pipeline. `Actions` selects the lifecycle from `ActionKind`: page input
+execution pipeline. Synchronous callbacks are rejected at declaration time.
+`Actions` selects the lifecycle from `ActionKind`: page input
 gets serialization, preparation, action events and readiness; tab/navigation tools
 use their navigation handling. Listing, workspace I/O, screenshot requests and
 dialog handling pass through without input preparation. Dialog handling must stay

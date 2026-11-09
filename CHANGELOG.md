@@ -4,6 +4,9 @@
 
 ### Breaking changes
 
+- `browser_tool` requires an async callback. Synchronous callbacks now fail at
+  declaration time instead of silently skipping the browser action pipeline.
+
 - Compose `WorkspaceTools()` for browser-independent list/read/write tools and
   `BrowserFileTools()` for download listing, file previews and uploads.
   `FileTools()` remains the combined convenience group in the default pack.
