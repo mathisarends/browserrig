@@ -56,6 +56,8 @@ class TaskResult(BaseModel):
 class BenchmarkResult(BaseModel):
     run: str
     model: str
+    # Snapshots written before subscription support used API keys.
+    provider: Literal["openai", "openai-codex"] = "openai"
     selection: str
     repeat: int = Field(ge=1)
     project: str

@@ -1,8 +1,8 @@
 """Run benchmark tasks on live websites and report milestone scores.
 
-uv run --env-file .env --extra openai python -m evals.run --tasks @practice
-uv run --env-file .env --extra openai python -m evals.run --tasks saucedemo_checkout --headed
-uv run --env-file .env --extra openai python -m evals.run --list
+uv run --extra openai python -m evals.run --tasks @practice
+uv run --extra openai python -m evals.run --tasks saucedemo_checkout --headed
+uv run --extra openai python -m evals.run --list
 
 Prefer evals/bench.sh, which wraps these commands per stage.
 """
@@ -43,7 +43,16 @@ async def main() -> None:
     parser.add_argument(
         "--humanlike", action="store_true", help="Keep input pacing and cursor"
     )
-    parser.add_argument("--model", default=os.getenv("OPENAI_MODEL", "gpt-6.1-terra"))
+    parser.add_argument(
+        "--provider",
+        choices=("openai-codex", "openai"),
+        default="openai-codex",
+        help="Authentication provider (default: openai-codex, using the subscription)",
+    )
+    parser.add_argument(
+        "--model",
+        help="Model (default: gpt-6.1-terra; --provider openai also reads OPENAI_MODEL)",
+    )
     parser.add_argument("--label", default="", help="Suffix for the results file")
     parser.add_argument(
         "--trace", action="store_true", help="Export traces to local Phoenix"
@@ -52,18 +61,35 @@ async def main() -> None:
     if args.list:
         _list_tasks()
         return
-    if not os.environ.get("OPENAI_API_KEY"):
+    if args.provider == "openai" and not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY in the environment or in .env")
 
     tasks = select(args.tasks)
     if not tasks:
         parser.error("Select at least one task")
+
+    # Resolve once so concurrent tasks share the provider's OAuth refresh state.
+    # pylint: disable=import-outside-toplevel
+    from pydantic_ai.exceptions import UserError
+    from pydantic_ai.models import infer_model
+
+    model_name = args.model or (
+        os.getenv("OPENAI_MODEL", "gpt-6.1-terra")
+        if args.provider == "openai"
+        else "gpt-6.1-terra"
+    )
+    prefix = "openai-responses" if args.provider == "openai" else args.provider
+    try:
+        model = infer_model(f"{prefix}:{model_name}")
+    except UserError as error:
+        parser.error(str(error))
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S-%f")
     run_name = f"{stamp}{'-' + args.label if args.label else ''}"
     project = os.getenv("PHOENIX_PROJECT_NAME", DEFAULT_PROJECT)
     run = BenchmarkResult(
         run=run_name,
-        model=args.model,
+        model=model_name,
+        provider=args.provider,
         selection=args.tasks or "all",
         repeat=args.repeat,
         project=project,
@@ -73,7 +99,7 @@ async def main() -> None:
     write_run(out, run)
     async with tracing_plugins(args.trace, project) as tracer:
         options = RunOptions(
-            model=args.model,
+            model=model,
             headed=args.headed,
             humanlike=args.humanlike,
             plugins=tracer,

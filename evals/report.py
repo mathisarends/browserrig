@@ -20,7 +20,7 @@ RESULTS = Path(__file__).with_name("results")
 def summary(run: BenchmarkResult) -> str:
     records = run.tasks
     usage = [r.usage for r in records if r.usage is not None]
-    lines = [f"Run {run.run}  model {run.model}", "", "Tasks"]
+    lines = [f"Run {run.run}  model {run.model}  provider {run.provider}", "", "Tasks"]
     for stage in STAGES:
         grouped = {n: a for n, a in _by_task(records).items() if a[0].stage == stage}
         if grouped:
@@ -47,7 +47,7 @@ def summary(run: BenchmarkResult) -> str:
 
 def compare(run: BenchmarkResult, before: BenchmarkResult) -> str:
     now, then = _by_task(run.tasks), _by_task(before.tasks)
-    lines = [f"Compared with {before.run} ({before.model})"]
+    lines = [f"Compared with {before.run} ({before.provider}:{before.model})"]
     changes = []
     comparable = 0
     for name in sorted(now.keys() & then.keys()):

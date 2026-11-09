@@ -1,11 +1,13 @@
 """Run one task in its own browser and workspace and score its milestones."""
 
+from __future__ import annotations
+
 import json
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from harnessed import PolicyDecision, ToolCall
 from harnessed.events import ToolCallFinishedEvent
@@ -28,12 +30,15 @@ from .checks import Evidence
 from .results import CheckResult, TaskResult, ToolRecord, Usage
 from .task import Task
 
+if TYPE_CHECKING:
+    from pydantic_ai.models import Model as NativeModel
+
 _TOOL_CALL_ADAPTER = TypeAdapter(ToolCall)
 
 
 @dataclass(frozen=True)
 class RunOptions:
-    model: str
+    model: str | NativeModel
     headed: bool = False
     # Keep human-like input pacing and the on-page cursor; off by default for speed.
     humanlike: bool = False
@@ -124,7 +129,6 @@ def _agent(task: Task, options: RunOptions, workspace: Path) -> Agent:
     # Provider dependencies are needed only when executing a live task.
     # pylint: disable=import-outside-toplevel
     from harnessed.models.pydantic_ai import PydanticAIModel
-    from pydantic_ai.models.openai import OpenAIResponsesModel
 
     plugins: list[PluginLike] = [
         Files(LocalWorkspace(workspace)),
@@ -134,7 +138,7 @@ def _agent(task: Task, options: RunOptions, workspace: Path) -> Agent:
     if task.secrets:
         plugins.append(Secrets(task.secrets))
     return Agent(
-        model=PydanticAIModel(OpenAIResponsesModel(options.model)),
+        model=PydanticAIModel(options.model),
         browser=Chrome.launch(url=task.url, headless=not options.headed),
         plugins=plugins,
         without=() if options.humanlike else (InputPacing, InputVisualization),

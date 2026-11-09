@@ -16,7 +16,22 @@ evals/bench.sh @upload,@download     # every task with these tags
 evals/bench.sh list                  # what exists
 ```
 
-The script needs `uv` and `OPENAI_API_KEY` in `.env`. On Windows run it from Git Bash.
+The script needs `uv`. On Windows run it from Git Bash. By default, benchmarks
+use your ChatGPT/Codex subscription through Pydantic AI's
+[`openai-codex` provider](https://pydantic.dev/docs/ai/models/openai-codex/)
+with **`gpt-6.1-terra`**. Sign in once with `codex login`; the provider reads
+`~/.codex/auth.json` (or `$CODEX_HOME/auth.json`). No API key or `.env` file is
+needed. Parallel tasks share one provider and its in-memory token refresh state.
+Subscription errors do not fall back to API billing.
+
+Choose another model explicitly with `--model`. `OPENAI_MODEL` is only used in
+API-key mode, so an existing `.env` cannot change the subscription's Terra default.
+To use API billing instead, set `OPENAI_API_KEY` in `.env` or the environment:
+
+```sh
+evals/bench.sh smoke --provider openai
+```
+
 At the end it prints a summary and compares scores with the latest earlier run that
 shares tasks. Results land in `evals/results/<timestamp>-<label>.json`; each run's
 downloads and written files stay in `evals/results/workspaces/`. The JSON snapshot
@@ -65,7 +80,9 @@ other.
 
 `task.py` defines missions, `runner.py` executes them, and `checks.py` evaluates
 their evidence. `results.py` defines the Pydantic result models and snapshot writer;
-`run.py` coordinates the CLI. `report.py` and `analyze.py` consume these records.
+`run.py` coordinates the CLI. Snapshots record the model and provider; older
+snapshots without a provider are read as `openai` (API key). `report.py` and
+`analyze.py` consume these records.
 
 ```sh
 uv run ruff check evals

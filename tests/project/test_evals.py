@@ -284,6 +284,134 @@ def test_result_files_roundtrip_nested_pydantic_models(tmp_path):
     assert "error" not in saved["tasks"][0]
 
 
+@pytest.fixture(name="benchmark_cli")
+def prepared_benchmark_cli(tmp_path, monkeypatch):
+    pytest.importorskip("pydantic_ai.models.openai_codex")
+    captured = {}
+
+    async def execute(_tasks, options, benchmark, output, _parallel):
+        captured.update(options=options, benchmark=benchmark, output=output)
+
+    (tmp_path / "auth.json").write_text(
+        json.dumps(
+            {
+                "tokens": {
+                    "access_token": "test-access",
+                    "refresh_token": "test-refresh",
+                    "account_id": "test-account",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-6-astra")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(run, "load_dotenv", lambda: None)
+    monkeypatch.setattr(run, "run_tasks", execute)
+    monkeypatch.setattr(report, "RESULTS", tmp_path / "results")
+    return captured
+
+
+@pytest.mark.parametrize("api_key", [None, "test-api-key"])
+async def test_cli_defaults_to_subscription_and_terra(
+    benchmark_cli, monkeypatch, api_key
+):
+    if api_key is not None:
+        monkeypatch.setenv("OPENAI_API_KEY", api_key)
+    monkeypatch.setattr(sys, "argv", ["evals.run", "--tasks", "saucedemo_checkout"])
+
+    await run.main()
+
+    native = benchmark_cli["options"].model
+    assert native.system == "openai-codex"
+    assert native.model_name == "gpt-6.1-terra"
+    saved = json.loads(benchmark_cli["output"].read_text(encoding="utf-8"))
+    assert saved["provider"] == "openai-codex"
+    assert saved["model"] == "gpt-6.1-terra"
+
+
+@pytest.mark.parametrize(
+    ("provider", "model_args", "expected_model"),
+    [
+        ("openai-codex", ["--model", "gpt-6-luna"], "gpt-6-luna"),
+        ("openai", [], "gpt-6-astra"),
+        ("openai", ["--model", "gpt-6.1-terra"], "gpt-6.1-terra"),
+    ],
+)
+async def test_cli_explicit_provider_and_model(
+    benchmark_cli, monkeypatch, provider, model_args, expected_model
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evals.run",
+            "--tasks",
+            "saucedemo_checkout",
+            "--provider",
+            provider,
+            *model_args,
+        ],
+    )
+
+    await run.main()
+
+    native = benchmark_cli["options"].model
+    assert native.system == provider
+    assert native.model_name == expected_model
+    assert benchmark_cli["benchmark"].provider == provider
+
+
+async def test_cli_missing_subscription_login_does_not_fall_back_to_api(
+    benchmark_cli, tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "missing"))
+    monkeypatch.setattr(sys, "argv", ["evals.run", "--tasks", "saucedemo_checkout"])
+
+    with pytest.raises(SystemExit) as error:
+        await run.main()
+
+    assert error.value.code == 2
+    assert "codex login" in capsys.readouterr().err
+    assert not benchmark_cli
+    assert not (tmp_path / "results").exists()
+
+
+async def test_cli_api_provider_requires_key(benchmark_cli, monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["evals.run", "--provider", "openai"])
+
+    with pytest.raises(SystemExit) as error:
+        await run.main()
+
+    assert error.value.code == 2
+    assert "OPENAI_API_KEY" in capsys.readouterr().err
+    assert not benchmark_cli
+
+
+async def test_cli_lists_tasks_without_credentials(
+    benchmark_cli, tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "missing"))
+    monkeypatch.setattr(sys, "argv", ["evals.run", "--list"])
+
+    await run.main()
+
+    assert "saucedemo_checkout" in capsys.readouterr().out
+    assert not benchmark_cli
+
+
+def test_legacy_results_default_to_api_provider():
+    payload = _benchmark([]).model_dump(exclude_unset=True)
+    assert "provider" not in payload
+
+    restored = BenchmarkResult.model_validate(payload)
+
+    assert restored.provider == "openai"
+
+
 @pytest.mark.parametrize("option", ["--repeat", "--parallel"])
 @pytest.mark.parametrize("value", ["0", "-2"])
 async def test_cli_rejects_nonpositive_counts(option, value, monkeypatch, capsys):

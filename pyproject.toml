@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-openai = ["harnessed[openai]==0.14.0"]
+openai = ["harnessed[openai]==0.14.0", "pydantic-ai-slim[openai]>=2.66,<3"]
 anthropic = ["harnessed[anthropic]==0.14.0"]
 mcp = ["harnessed[mcp]==0.14.0"]
 otel = ["harnessed[otel]==0.14.0"]

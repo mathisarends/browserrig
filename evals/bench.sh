@@ -21,7 +21,8 @@ Options (passed on to evals.run)
   --parallel N    Concurrent browsers (default 3)
   --headed        Show the browser windows
   --humanlike     Keep human-like input pacing and the on-page cursor
-  --model NAME    OpenAI model (default: $OPENAI_MODEL or gpt-6.1-terra)
+  --provider NAME openai-codex (default, subscription) or openai (API key)
+  --model NAME    Model (default: gpt-6.1-terra; openai also reads $OPENAI_MODEL)
   --trace         Export traces to Phoenix (start it first: docker compose up -d --wait)
   --label TEXT    Suffix for the results file (default: the command)
 
@@ -54,11 +55,6 @@ case "$command" in
     smoke) selection="saucedemo_checkout,heroku_file_roundtrip,heroku_dialogs,w3c_widgets,todomvc_state" ;;
     *) selection="$command" ;;
 esac
-
-if [ ! -f .env ] && [ -z "${OPENAI_API_KEY:-}" ]; then
-    echo "Set OPENAI_API_KEY in .env or the environment (cp .env.example .env)." >&2
-    exit 1
-fi
 
 extras=(--extra openai)
 label="${command//[^A-Za-z0-9_-]/_}"
