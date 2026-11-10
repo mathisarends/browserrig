@@ -198,6 +198,7 @@ async def test_element_action_reveals_a_preview_before_clicking(site):
     )
     async with agent.session() as session:
         browser, observe = session.scope[Browser], session.scope[BrowserPerception]
+        await wait_for_page(browser.active_tab)
         await evaluate(
             browser.active_tab,
             """document.body.innerHTML = `

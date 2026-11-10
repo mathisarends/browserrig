@@ -34,6 +34,32 @@ after the current text selection ends; pass the same view and other selectors.
 
 ## Downloads and events
 
+Completed downloads automatically retain the original and create adjacent
+`<filename>.md` and `<filename>.extraction.json` files. Indexing runs in the
+background; `list_downloads` includes the extraction path, processing status,
+indexed pages, pending OCR pages and any error independently of download status.
+The file system waits for its indexing jobs before closing the workspace.
+
+PDFs are scanned once for native text across all pages, within `max_file_bytes`,
+`max_expanded_bytes` and `max_index_pages` (default 2,000). Up to
+`auto_ocr_pages` (default 3) pages without native text then use local OCR when it
+is enabled and installed. Set this budget to 0 to defer automatic OCR entirely,
+or set `auto_extract=False` to disable automatic sidecars. The page budget limits
+automatic work, not latency; OCR time depends on page resolution and hardware.
+
+Workbook indexing visits all sheets while retaining the readers' explicit limits
+for large/sparse ranges. Unsupported formats and failed conversions remain
+inspectable beside the raw file. Searchable text is not a complete interpretation
+of drawings, images, charts or document annotations.
+
+An explicit `read_file` of an indexed source adds its full selected page/sheet to
+the sidecar, regardless of `max_chars`. Use `page_number` and `ocr=True` to recognize
+pending PDF pages on demand; the per-page cache avoids repeating unchanged OCR.
+The returned `document_path` names the sidecar; `extracted_path` continues to name
+the complete selected extraction. Source changes invalidate the document index.
+Unmanaged Markdown files are never overwritten. Internal index chunks stay under
+`.content/index/` and the adjacent Markdown is the canonical search surface.
+
 The agent works in one **workspace**. Downloads land in its `downloads/` folder,
 so everything the agent can read, write, open or upload has a workspace-relative
 path such as `downloads/<id>/report.pdf` or `notes/summary.md`.

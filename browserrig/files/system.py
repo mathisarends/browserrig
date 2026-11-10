@@ -11,7 +11,8 @@ from harnessed.tracing import traced
 
 from .config import FileOptions
 from .content import ReadRequest
-from .models import FileContent, FileEntry, FileListing
+from .indexing import Indexing
+from .models import FileContent, FileEntry, FileExtraction, FileListing
 from .reading import FileReader
 from .workspace import FileStat, LocalWorkspace, Workspace, workspace_path
 
@@ -30,6 +31,9 @@ class FileSystem:
     ) -> None:
         self.workspace = workspace
         self.options = options if options is not None else FileOptions()
+        self._indexing = Indexing(
+            workspace, self.options, read=self._index_read, source=self._index_source
+        )
         # Remote files are copied here to be parsed; local files are parsed in place.
         self._cache: tempfile.TemporaryDirectory[str] | None = None
         self._reader: FileReader | None = (
@@ -57,6 +61,7 @@ class FileSystem:
     async def aclose(self) -> None:
         """Remove local copies of remote files; the workspace itself is kept."""
         try:
+            await self._indexing.close()
             if self._cache is not None:
                 cache = self._cache
                 self._cache = None
@@ -84,6 +89,13 @@ class FileSystem:
             entries=tuple(_entry(child) for child in children[offset : offset + limit]),
             next_offset=offset + limit if offset + limit < len(children) else None,
         )
+
+    async def start_extraction(self, path: str, *, url: str = "") -> None:
+        """Create a Markdown sidecar and start bounded background document indexing."""
+        await self._indexing.start(str(workspace_path(path)), url=url)
+
+    def extraction(self, path: str) -> FileExtraction | None:
+        return self._indexing.state(str(workspace_path(path)))
 
     @traced
     async def read_file(
@@ -123,6 +135,24 @@ class FileSystem:
         content = await asyncio.to_thread(
             reader.read, source, request, offset, max_chars
         )
+        document_path = None
+        try:
+            document_path = await self._indexing.record(
+                content.model_copy(update={"path": str(target.path)}), source=target
+            )
+        except (OSError, ValueError) as error:
+            content = content.model_copy(
+                update={
+                    "status": "partial"
+                    if content.status == "complete"
+                    else content.status,
+                    "limitations": (
+                        *content.limitations,
+                        f"Markdown sidecar could not be updated: {error}",
+                    ),
+                }
+            )
+        content = content.model_copy(update={"document_path": document_path})
         return content.model_copy(
             update={
                 "path": str(target.path),
@@ -230,6 +260,21 @@ class FileSystem:
                 data = await self.workspace.read_bytes(stat.path)
                 await asyncio.to_thread(_write_atomically, copy, data)
         return copy
+
+    async def _index_source(self, path: str) -> Path:
+        target = await self.file(path)
+        if isinstance(self.workspace, LocalWorkspace):
+            return self.workspace.host_path(target.path)
+        return await self._local_copy(target)
+
+    async def _index_read(self, path: str, **selectors) -> FileContent:
+        source = await self._index_source(path)
+        reader = self._reader
+        assert reader is not None
+        content = await asyncio.to_thread(
+            reader.read, source, ReadRequest(**selectors), 0, 200000
+        )
+        return content.model_copy(update={"path": path})
 
     def _extracted_path(self, extracted: str | None) -> str | None:
         """Report a saved extraction only when the agent can read it in the workspace."""

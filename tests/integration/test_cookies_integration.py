@@ -59,6 +59,7 @@ _NOTICE = "<p>We use cookies to personalize content.</p>" + _CHOICES
 async def test_cookie_banner_has_context_and_existing_action_refs(site, markup):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
         state = await capture(
@@ -112,6 +113,7 @@ async def test_cookie_banner_has_context_and_existing_action_refs(site, markup):
 async def test_content_and_invisible_banners_are_not_reported(site, markup):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
         state = await capture(tab, DomCapture(), report)
@@ -122,6 +124,7 @@ async def test_content_and_invisible_banners_are_not_reported(site, markup):
 async def test_banner_text_survives_busy_page_and_disappears_after_normal_click(site):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         markup = "<nav>" + "<button>Navigation</button>" * 6 + "</nav>"
         markup += (
             "<div id=cookie-banner style='position:fixed;bottom:0'>"
@@ -152,6 +155,7 @@ async def test_banner_text_survives_busy_page_and_disappears_after_normal_click(
 async def test_consent_inside_composed_documents(site, surface):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         if surface == "closed-shadow":
             await evaluate(tab, "document.body.innerHTML = '<div id=host></div>'")
             await evaluate(
@@ -185,6 +189,7 @@ async def test_consent_inside_composed_documents(site, surface):
 async def test_banner_remains_actionable_under_element_limit(site):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         markup = "<nav>" + "<button>Navigation</button>" * 8 + "</nav>"
         markup += f"<div id=cookie-banner>{_NOTICE}</div>"
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
@@ -198,6 +203,7 @@ async def test_banner_remains_actionable_under_element_limit(site):
 async def test_multiple_banners_have_separate_bounded_excerpts(site):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         markup = (
             "<div id=cookie-banner><p>We use cookies. "
             + "Details. " * 120

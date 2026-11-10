@@ -124,11 +124,16 @@ class Downloads:
             return download.model_copy(
                 update={
                     "path": None,
+                    "extraction": None,
                     "error": (
                         "Download belongs to another workspace; "
                         "restore that workspace to open it"
                     ),
                 }
+            )
+        if download.path is not None and owner is not None:
+            return download.model_copy(
+                update={"extraction": owner.files.extraction(download.path)}
             )
         return download
 

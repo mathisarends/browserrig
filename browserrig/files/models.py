@@ -14,6 +14,16 @@ class DownloadState(StrEnum):
     CANCELED = "canceled"
 
 
+class FileExtraction(Options):
+    path: str
+    metadata_path: str
+    status: Literal["processing", "complete", "partial", "failed"]
+    page_count: int | None = None
+    indexed_pages: tuple[int, ...] = ()
+    pending_ocr_pages: tuple[int, ...] = ()
+    error: str | None = None
+
+
 class Download(Options):
     id: str
     filename: str
@@ -24,6 +34,7 @@ class Download(Options):
     path: str | None = None
     """Workspace path once completed and saved; otherwise `None`."""
     error: str | None = None
+    extraction: FileExtraction | None = None
 
 
 class FileSystemState(Options):
@@ -75,3 +86,5 @@ class FileContent(Options):
     cell_range: str | None = None
     member: str | None = None
     entry_count: int | None = None
+    document_path: str | None = None
+    """Durable Markdown beside the source, when download indexing is configured."""
