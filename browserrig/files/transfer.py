@@ -63,6 +63,7 @@ class FileTransfer:
             raise FileNotFoundError(
                 "Downloaded file is missing in the workspace; download it again"
             )
+        await self.files.start_extraction(str(destination), url=url)
         return str(destination)
 
     @traced
