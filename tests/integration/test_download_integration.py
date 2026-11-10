@@ -152,6 +152,7 @@ async def test_agent_uploads_workspace_files_and_rejects_a_mixed_outside_selecti
     )
     async with agent.session() as session:
         browser = session.scope[Browser]
+        await wait_for_page(browser.active_tab)
         await evaluate(
             browser.active_tab,
             """(() => {
@@ -202,6 +203,7 @@ async def test_upload_validates_the_live_input_before_assigning_files(
     report.write_text("report")
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         await evaluate(
             tab,
             """document.body.innerHTML =
