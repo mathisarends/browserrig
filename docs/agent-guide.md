@@ -146,7 +146,9 @@ their ref marks continue to cover the real viewport only. Set
 `viewport_expansion=0` for a strict viewport observation. Hidden/inert content,
 hard clipping and the current clip of inner scroll containers remain excluded.
 Scroll containers are explicit targets with remaining wheel distances in each
-direction, so an agent can scroll a list or carousel by ref.
+direction. `scroll_element(ref=...)` moves only that list or carousel and stops at
+its boundary; `scroll_page(...)` moves only the outer document. Both work
+independently of cursor position and report their actual movement.
 
 Element actions reveal their target before moving the cursor, including native
 select/date updates, uploads and links that start downloads. Each aim refreshes

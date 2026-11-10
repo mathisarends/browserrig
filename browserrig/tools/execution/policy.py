@@ -43,6 +43,8 @@ ACTION_KINDS = (
     | NAVIGATION_KINDS
     | {
         ActionKind.SCROLL,
+        ActionKind.SCROLL_PAGE,
+        ActionKind.SCROLL_ELEMENT,
         ActionKind.JAVASCRIPT,
         ActionKind.UPLOAD,
         ActionKind.FIND_IN_PAGE,

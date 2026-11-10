@@ -84,7 +84,8 @@ async def test_each_browser_tool_has_a_unique_stable_kind(fake_chrome):
         "click": ActionKind.CLICK,
         "click_at": ActionKind.CLICK_AT,
         "move_mouse": ActionKind.MOVE_MOUSE,
-        "scroll": ActionKind.SCROLL,
+        "scroll_page": ActionKind.SCROLL_PAGE,
+        "scroll_element": ActionKind.SCROLL_ELEMENT,
         "drag": ActionKind.DRAG,
         "drag_at": ActionKind.DRAG_AT,
         "type_text": ActionKind.TYPE,
@@ -314,6 +315,7 @@ _REF_CALLS = (
     ToolCall("type_text", {"ref": "stale-ref", "text": "x"}),
     ToolCall("select_option", {"ref": "stale-ref", "value": "x"}),
     ToolCall("set_date", {"ref": "stale-ref", "value": "2026-01-01"}),
+    ToolCall("scroll_element", {"ref": "stale-ref", "delta_y": 100}),
     ToolCall("upload_files", {"ref": "stale-ref", "paths": ["/tmp/x"]}),
 )
 
@@ -324,7 +326,15 @@ async def test_ref_and_coordinate_tools_are_exposed(fake_chrome):
     async with agent.session() as session:
         tools = session.scope[ToolRegistry]
         names = {item.name for item in tools.definitions}
-        assert {"move_mouse", "click_at", "scroll", "drag_at", "send_keys"} <= names
+        assert {
+            "move_mouse",
+            "click_at",
+            "scroll_page",
+            "scroll_element",
+            "drag_at",
+            "send_keys",
+        } <= names
+        assert "scroll" not in names
         assert ref_tools <= names
     assert fake_chrome[0].closed
 

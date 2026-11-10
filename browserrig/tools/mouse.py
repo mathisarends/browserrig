@@ -19,6 +19,7 @@ from browserrig.observation import BrowserPerception, CapturedImage, Snapshot
 
 from .effects import Effect
 from .execution import Actions
+from .scrolling import scroll_element, scroll_page
 
 type _ClickCount = Annotated[
     Literal[1, 2],
@@ -67,8 +68,8 @@ class PointerTools(Plugin):
     @tool(
         kind=ActionKind.MOVE_MOUSE,
         description=(
-            "Move the cursor without clicking, to hover menus or tooltips or to target "
-            "scroll. Give an observed ref, or x and y in image or viewport coordinates."
+            "Move the cursor without clicking, to hover menus or tooltips. "
+            "Give an observed ref, or x and y in image or viewport coordinates."
         ),
     )
     async def move_mouse(
@@ -127,33 +128,44 @@ class PointerTools(Plugin):
         )
 
     @tool(
-        kind=ActionKind.SCROLL,
+        kind=ActionKind.SCROLL_PAGE,
         description=(
-            "Scroll by CSS pixels: delta_y down (negative up), delta_x right (negative left), "
-            "e.g. for carousels or wide tables. With ref, the wheel turns over that observed "
-            "element, so a list, panel or modal scrolls instead of the page; without ref, "
-            "it turns at the current cursor position."
+            "Scroll only the outer page, independently of the cursor and nested panels. "
+            "delta_y is CSS pixels down (negative up); delta_x is right (negative left). "
+            "Reports actual movement or the page boundary/scroll lock. "
+            "Use scroll_element to move an inner list, panel or carousel."
         ),
     )
-    async def scroll(
+    async def scroll_page(
         self,
         delta_y: _ScrollDelta = 0,
         delta_x: _ScrollDelta = 0,
-        ref: str | None = None,
     ) -> Effect:
         if delta_y == 0 and delta_x == 0:
             raise ToolError("Provide a non-zero delta_y or delta_x")
+        return await scroll_page(self._actions.tab, delta_y=delta_y, delta_x=delta_x)
 
-        point = None
-        if ref is not None:
-            point = await self._actions.element_point(ref=ref)
-        await self._browser.input.mouse.scroll(
-            delta_y=delta_y, delta_x=delta_x, point=point
-        )
-        return Effect(
-            "Scroll dispatched.",
-            prepared_scroll=point is not None and point.scrolled,
-        )
+    @tool(
+        kind=ActionKind.SCROLL_ELEMENT,
+        description=(
+            "Scroll only the observed container ref marked scroll(...), independently "
+            "of the cursor. delta_y is CSS pixels down (negative up); delta_x is right "
+            "(negative left). Stops at its boundary without scrolling ancestors or the page. "
+            "Reports actual movement; a ref for a non-scrollable element is rejected. "
+            "Use scroll_page for the outer document."
+        ),
+    )
+    async def scroll_element(
+        self,
+        ref: str,
+        delta_y: _ScrollDelta = 0,
+        delta_x: _ScrollDelta = 0,
+    ) -> Effect:
+        if delta_y == 0 and delta_x == 0:
+            raise ToolError("Provide a non-zero delta_y or delta_x")
+        tab = self._actions.tab
+        handle = await self._observe.dom_element(tab, ref)
+        return await scroll_element(tab, handle, delta_y=delta_y, delta_x=delta_x)
 
     @tool(
         kind=ActionKind.DRAG_AT,
