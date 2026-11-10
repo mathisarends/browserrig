@@ -38,6 +38,20 @@ The agent works in one **workspace**. Downloads land in its `downloads/` folder,
 so everything the agent can read, write, open or upload has a workspace-relative
 path such as `downloads/<id>/report.pdf` or `notes/summary.md`.
 
+## Saved webpage extractions
+
+With `Files()` configured, every new `extract_content` snapshot is written to
+`pages/<unique-id>/content.md` with `source.json` recording the URL, title, capture
+time, extraction mode and limitations. The response names the saved path.
+`max_chars` bounds the tool response, independently of the saved Markdown.
+Subsequent `offset` calls read the same snapshot while the tab, document, extraction
+mode and workspace remain the same; `offset=0` captures a new version.
+
+The snapshot covers loaded, extractable content and is bounded to 2,000,000
+characters plus DOM traversal limits. Missing or truncated content is reported.
+Without a workspace the tool still works and explicitly reports that no file was
+saved. Configured secret values are redacted before persistence.
+
 The default recipe's `Files` plugin gives each session a local workspace under
 `.browserrig/files/<unique-id>/`. Files remain available after the session ends.
 Choose a reusable workspace explicitly:

@@ -13,7 +13,7 @@ from harnessed import (
 )
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.kernel import PluginScope, needs
+from harnessed.kernel import PluginScope, needs, observes
 from harnessed.models import UserMessage
 from harnessed.tracing import traced
 from pydantic import Field
@@ -32,14 +32,16 @@ from browserrig.core import browser_tool as tool
 from browserrig.events import (
     ObservationCapturedEvent,
 )
+from browserrig.files import FileSystem
 from browserrig.nudges import Nudges
 from browserrig.readiness import Readiness
 from browserrig.secrets import Secrets
 
+from .archive import save_content
 from .capture import CaptureStrategy, DomCapture, capture_observation
 from .config import Screenshots, ScreenshotTrigger
 from .content import PageContent as ExtractedContent
-from .content import extract_content
+from .content import extract_document
 from .delta import delta, unmarked
 from .handle import DomElementHandle
 from .models import CapturedImage, Snapshot
@@ -73,6 +75,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
     _readiness = needs(Readiness)
+    _workspace = observes(FileSystem)
 
     def __init__(
         self,
@@ -291,7 +294,9 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             "Reads the page's main region when it has one; full_page=true adds header, "
             "navigation and footer. Same-site links are paths that navigate accepts. "
             "max_chars limits the Markdown body; a longer page ends with the offset that reads "
-            "its next part. Unavailable content is reported."
+            "its next part. With a workspace, the full snapshot is saved as Markdown and "
+            "its path is returned. Continuation offsets read that same snapshot. "
+            "Unavailable content is reported."
         ),
     )
     async def extract_content(
@@ -305,9 +310,32 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             report = await self._readiness.wait(tab)
             if report.status == ReadinessStatus.BLOCKED:
                 raise ToolError(report.reason)
-            content = await extract_content(
-                tab, max_chars=max_chars, full_page=full_page, offset=offset
-            )
+            files = self._workspace
+            key = (tab.id, tab.document_id, full_page, id(files))
+            saved = self._state.saved_content
+            if offset == 0 or saved is None or self._state.content_key != key:
+                saved = await extract_document(tab, full_page=full_page)
+                secrets = self._secrets()
+                if secrets is not None:
+                    saved = secrets.redact(saved)
+                if files is not None:
+                    try:
+                        saved = await save_content(files, saved, full_page=full_page)
+                    except (OSError, ValueError) as error:
+                        raise ToolError(
+                            f"Page extraction could not be saved: {error}"
+                        ) from error
+                else:
+                    saved = saved.model_copy(
+                        update={
+                            "limitations": (
+                                *saved.limitations,
+                                "No workspace is configured; the snapshot was not saved to a file",
+                            )
+                        }
+                    )
+                self._state.saved_content, self._state.content_key = saved, key
+            content = saved.page(offset, max_chars)
             self._state.extracted_content = content
             return ToolResult(content.render())
 
