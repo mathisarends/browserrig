@@ -3,9 +3,10 @@
 ## Unreleased
 
 - Add opt-in `Todos()` with Pydantic `Todo` and `TodoList` models. `update_todos`
-  saves a bounded plan with stable IDs and at most one step in progress. While
-  steps are open, the list is appended to each model request, so it stays in view
-  after compaction. Lists persist with the session's feature state.
+  saves a bounded plan with stable IDs and at most one step in progress, and
+  returns the list as its result. Open lists are reminded only when no update is
+  left in context (e.g. after compaction) or the last one is `remind_after` steps
+  old. Lists persist with the session's feature state.
 
 - Pin Harnessed and every provider/MCP/OTel extra to 0.15.0. `Done` defers
   structured output through the session-scoped `PrepareOutput` hook instead of

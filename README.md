@@ -125,8 +125,8 @@ answers](https://github.com/mathisarends/browserrig/blob/main/docs/agent-guide.m
 ordinary text responses retain Harnessed's default completion behavior.
 
 Mount `plugins=[Todos()]` to add an optional [task todo list](docs/todos.md).
-While steps are open, the plan is shown to the model on every request and
-survives compaction and session restoration. Completed steps are agent reports,
+Open plans are reminded after compaction or when they go stale, and survive
+session restoration. Completed steps are agent reports,
 not verified outcomes.
 
 ## Session videos
@@ -200,7 +200,7 @@ for release notes.
 | Guide | Contents |
 | --- | --- |
 | [Agent guide](https://github.com/mathisarends/browserrig/blob/main/docs/agent-guide.md) | Setup, action chains, prompts, sessions and controls |
-| [Task todos](docs/todos.md) | Optional task plan, recitation and session persistence |
+| [Task todos](docs/todos.md) | Optional task plan, reminders and session persistence |
 | [Browser interaction](https://github.com/mathisarends/browserrig/blob/main/docs/browser-interaction.md) | Direct access, observations, input and page content |
 | [Files and events](https://github.com/mathisarends/browserrig/blob/main/docs/files-and-events.md) | Downloads, workspace, file readers and event streams |
 | [Browser composition](https://github.com/mathisarends/browserrig/blob/main/docs/browser-composition.md) | Configure and compose browser plugins |

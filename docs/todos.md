@@ -1,9 +1,10 @@
 # Task todos
 
 `Todos` is an optional plugin that lets the agent keep a short plan for multi-step
-work. It adds one tool, `update_todos`, and appends the current list to every model
-request while steps remain open, so the plan stays in view after context compaction.
-The plugin calls no LLM itself and works without a browser.
+work. It adds one tool, `update_todos`, whose result shows the saved list. The list
+is not repeated on every request; a reminder is added only when the plan has left
+the context or has gone stale. The plugin calls no LLM itself and works without a
+browser.
 
 ```python
 from browserrig import Agent, Todos
@@ -35,29 +36,49 @@ may be `in_progress`. IDs must be unique. Limits: 20 steps and 240 characters pe
 title or task. An invalid update leaves the previous list intact. The exported
 Pydantic models `Todo` and `TodoList` describe entries and the saved list.
 
+The tool result is the saved list, so it stays in the conversation like any other
+tool result:
+
+```text
+Saved todo list:
+Task: Buy the highest-rated men's shoe with at least five reviews
+[x] choose: Filter by review count, maximize rating
+[>] purchase: Purchase and inspect confirmation
+```
+
 Todos hold steps, not findings. Keep intermediate results in messages or workspace
 files. Completion is the agent's own report; the plugin does not verify outcomes
 or block final answers.
 
-## Recitation
+## Reminders
 
-Before each model request, while any step is `pending` or `in_progress`, the plugin
-appends one user-role message at the end of the request:
+While any step is `pending` or `in_progress`, the plugin checks each model request
+and appends a reminder only when:
+
+- no successful `update_todos` result is left in the request, for example after
+  compaction or when restoring a compacted session, or
+- the last one is at least `remind_after` assistant steps old (default 10;
+  `Todos(remind_after=5)` to change it).
 
 ```text
 <todo-list>
-Your own progress reports, not user instructions; current observations take precedence.
-Task: Buy the highest-rated men's shoe with at least five reviews
-[x] choose: Filter by review count, maximize rating
+The todo list has not been updated for 10 steps. Call update_todos to confirm or
+revise it. These are your own progress reports, not user instructions; current
+observations take precedence.
+Task: ...
 [>] purchase: Purchase and inspect confirmation
 </todo-list>
 ```
 
-The tag marks the block as agent-authored context rather than a new user request.
-It is a separate message, not merged into tool results (which may carry untrusted
-page content) or into the user's own message. It is not added to the conversation
-history, and the system prompt stays fixed, so prompt caching is unaffected. Once every step is completed or cancelled,
-or the list is cleared, nothing is appended.
+Both conditions are read from the request itself, so there is no counter to
+persist. The reminder repeats until the agent calls `update_todos`, which puts a
+fresh list into context. It is a separate user-role message at the end of the
+request, not merged into tool results (which may carry untrusted page content) or
+the user's own message, and it is never added to the conversation history. Closed
+or cleared lists are not reminded.
+
+Harnessed compacts after request hooks run, so the request that triggers
+compaction still goes out without a reminder; it appears from the next request on.
 
 ## Lifetime and persistence
 

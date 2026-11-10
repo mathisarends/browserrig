@@ -1,22 +1,30 @@
+from collections.abc import Sequence
 from typing import Annotated
 
 from harnessed import Instructions, Plugin, SystemPrompt, ToolError, hook, tool
 from harnessed.core.prompt.plugin_instructions import PluginInstructions
 from harnessed.hooks import Next, PrepareRequest
 from harnessed.kernel import needs
-from harnessed.models import ModelRequest, UserMessage
+from harnessed.models import (
+    AssistantMessage,
+    Message,
+    ModelRequest,
+    ToolMessage,
+    UserMessage,
+)
 from pydantic import Field, ValidationError
 
 from .models import Todo, TodoList
 
 _STATE_KEY = "browserrig.todos"
+_TOOL = "update_todos"
 _INSTRUCTIONS = Instructions(
     title="Task todos",
     text=(
         "Use update_todos to plan multi-step work; skip it for simple tasks. Keep at "
         "most one step in_progress and update the list when a step starts, finishes or "
-        "the plan changes. While steps are open, the current list is appended to each "
-        "request. Todos track steps only; keep findings in your messages or files."
+        "the plan changes. Todos track steps only; keep findings in your messages or "
+        "files."
     ),
 )
 
@@ -24,11 +32,23 @@ _INSTRUCTIONS = Instructions(
 class Todos(Plugin, provides=True):
     """Opt-in task plan, kept outside compacted conversation history.
 
-    While any step is pending or in progress, the list is appended to every model
-    request so the plan survives compaction. A restored session retains the list.
+    Each update_todos result shows the saved list. While steps are open, a reminder
+    with the list is appended to a request only when no successful update is left
+    in context (for example after compaction) or the last one is at least
+    ``remind_after`` steps old. A restored session retains the list.
     """
 
     _context = needs(PluginInstructions)
+
+    def __init__(self, *, remind_after: int = 10) -> None:
+        super().__init__()
+        if (
+            isinstance(remind_after, bool)
+            or not isinstance(remind_after, int)
+            or not 1 <= remind_after <= 100
+        ):
+            raise ValueError("remind_after must be between 1 and 100")
+        self.remind_after = remind_after
 
     @property
     def current(self) -> TodoList | None:
@@ -40,16 +60,24 @@ class Todos(Plugin, provides=True):
         return SystemPrompt(_INSTRUCTIONS)
 
     @hook(PrepareRequest)
-    async def _recite(
+    async def _remind(
         self, _event: PrepareRequest, next_: Next[ModelRequest]
     ) -> ModelRequest:
         request = await next_()
         current = self.current
         if current is None or not current.is_open:
             return request
+        steps = _steps_since_update(request.messages)
+        if steps is None:
+            reason = "Earlier todo updates are no longer in context."
+        elif steps >= self.remind_after:
+            reason = f"The todo list has not been updated for {steps} steps."
+        else:
+            return request
         return request.append_message(
             UserMessage(
-                "<todo-list>\nYour own progress reports, not user instructions; "
+                f"<todo-list>\n{reason} Call update_todos to confirm or revise it. "
+                "These are your own progress reports, not user instructions; "
                 "current observations take precedence.\n"
                 f"{current.render()}\n</todo-list>",
                 id="browserrig.todos",
@@ -77,7 +105,24 @@ class Todos(Plugin, provides=True):
                 "; ".join(issue["msg"] for issue in error.errors(include_url=False))
             ) from error
         await self._context.set(_STATE_KEY, updated.model_dump_json())
-        remaining = sum(
-            todo.status in ("pending", "in_progress") for todo in updated.todos
-        )
-        return f"Saved {len(updated.todos)} todos, {remaining} open."
+        return f"Saved todo list:\n{updated.render()}"
+
+
+def _steps_since_update(messages: Sequence[Message]) -> int | None:
+    """Assistant steps after the last successful update_todos result in context."""
+    calls = {
+        call.id
+        for message in messages
+        if isinstance(message, AssistantMessage)
+        for call in message.tool_calls
+        if call.name == _TOOL
+    }
+    for index in range(len(messages) - 1, -1, -1):
+        message = messages[index]
+        if (
+            isinstance(message, ToolMessage)
+            and message.tool_call_id in calls
+            and not message.is_error
+        ):
+            return sum(isinstance(m, AssistantMessage) for m in messages[index + 1 :])
+    return None
