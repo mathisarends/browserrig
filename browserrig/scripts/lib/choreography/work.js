@@ -24,7 +24,7 @@
       // A status, not the code: finished receipts carry the returned value.
       return item.detail;
     }
-    if (item.kind === action.WRITE_FILE) {
+    if (item.kind === action.WRITE_FILE || item.kind === action.EDIT_FILE) {
       return name(item.artifact_path || item.source_path || item.detail);
     }
     const source =
@@ -139,6 +139,7 @@
         }
         break;
       case action.WRITE_FILE:
+      case action.EDIT_FILE:
         if (finished && cursor.visible() && once(event, 'fly')) {
           ui.fly(cursor.point(), caption.anchor());
         }

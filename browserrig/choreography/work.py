@@ -19,6 +19,7 @@ SILENT_WORK = {
     ActionKind.READ_FILE: "Reading file",
     ActionKind.EXTRACT_CONTENT: "Reading page content",
     ActionKind.WRITE_FILE: "Saving file",
+    ActionKind.EDIT_FILE: "Editing file",
     ActionKind.LIST_FILES: "Listing files",
     ActionKind.LIST_DOWNLOADS: "Listing downloads",
     ActionKind.LIST_TABS: "Listing tabs",
@@ -52,13 +53,9 @@ def started(call: ToolCall, kind: ActionKind) -> WorkPresentedEvent:
                 detail += f" · from character {args['offset']}"
         case ActionKind.JAVASCRIPT:
             preview = clipped(str(args.get("code", "")))
-        case ActionKind.WRITE_FILE:
-            preview = clipped(str(args.get("content", "")))
-            detail += (
-                " · replacing existing file if present"
-                if args.get("overwrite")
-                else " · creating file"
-            )
+        case ActionKind.WRITE_FILE | ActionKind.EDIT_FILE:
+            preview, change = _file_change(kind, args)
+            detail += f" · {change}"
         case ActionKind.SCREENSHOT:
             value = args.get("region")
             # Invalid tool arguments must reach ordinary tool validation, not break presentation.
@@ -125,7 +122,7 @@ def _result(
     match event.kind:
         case ActionKind.READ_FILE:
             event = _file(event, FileContent.model_validate_json(result.text))
-        case ActionKind.WRITE_FILE:
+        case ActionKind.WRITE_FILE | ActionKind.EDIT_FILE:
             entry = FileEntry.model_validate_json(result.text)
             event = replace(
                 event,
@@ -249,6 +246,24 @@ def _area(bounds: Bounds | None) -> CaptureRegion | None:
 
 def _limitations(items: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(clipped(item, 240) for item in items[:6])
+
+
+def _file_change(kind: ActionKind, args: Mapping[str, Any]) -> tuple[str, str]:
+    """The text being saved and how it changes the file."""
+    if kind is ActionKind.EDIT_FILE:
+        change = (
+            "replacing every match"
+            if args.get("replace_all")
+            else "replacing one match"
+        )
+        return clipped(str(args.get("new_text", ""))), change
+    if args.get("append"):
+        change = "appending to file"
+    elif args.get("overwrite"):
+        change = "replacing existing file if present"
+    else:
+        change = "creating file"
+    return clipped(str(args.get("content", ""))), change
 
 
 def _selection(args: Mapping[str, Any]) -> str:

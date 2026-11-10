@@ -3,7 +3,7 @@ import hashlib
 import json
 import tempfile
 from contextlib import AbstractAsyncContextManager, AsyncExitStack
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import TracebackType
 from typing import Self
 
@@ -39,6 +39,7 @@ class FileSystem:
         )
         self._exits = AsyncExitStack()
         self._copy_locks: dict[str, asyncio.Lock] = {}
+        self._edit_locks: dict[str, asyncio.Lock] = {}
 
     async def __aenter__(self) -> Self:
         if isinstance(self.workspace, AbstractAsyncContextManager):
@@ -127,21 +128,75 @@ class FileSystem:
 
     @traced
     async def write_file(
-        self, path: str, content: str, *, overwrite: bool = False
+        self,
+        path: str,
+        content: str,
+        *,
+        overwrite: bool = False,
+        append: bool = False,
     ) -> FileEntry:
+        """Save UTF-8 text; `append` adds to the end and creates a missing file."""
+        if overwrite and append:
+            raise ValueError("Pass either overwrite=true or append=true, not both")
         target = workspace_path(path)
         data = content.encode("utf-8")
-        if len(data) > self.options.max_file_bytes:
-            raise ValueError("Content exceeds max_file_bytes")
+        if append:
+            async with self._edit_lock(target):
+                existing = await self.workspace.stat(target)
+                if existing is not None:
+                    if existing.is_directory:
+                        raise IsADirectoryError(f"Not a file: {target}")
+                    data = await self.workspace.read_bytes(target) + data
+                return await self._save(target, data, overwrite=existing is not None)
         try:
-            await self.workspace.write_bytes(target, data, overwrite=overwrite)
+            return await self._save(target, data, overwrite=overwrite)
         except FileExistsError as error:
             raise FileExistsError(
-                f"File exists: {target}; pass overwrite=true"
+                f"File exists: {target}; pass overwrite=true or append=true"
             ) from error
+
+    @traced
+    async def edit_file(
+        self, path: str, old_text: str, new_text: str, *, replace_all: bool = False
+    ) -> FileEntry:
+        """Replace `old_text` in a UTF-8 file; it must match exactly once unless `replace_all`."""
+        if not old_text:
+            raise ValueError("old_text must not be empty")
+        if old_text == new_text:
+            raise ValueError("old_text and new_text are identical")
+        target = workspace_path(path)
+        async with self._edit_lock(target):
+            stat = await self.file(path)
+            try:
+                text = (await self.workspace.read_bytes(stat.path)).decode("utf-8")
+            except UnicodeDecodeError as error:
+                raise ValueError(
+                    f"{target} is not UTF-8 text; edit_file only changes text files"
+                ) from error
+            matches = text.count(old_text)
+            if matches == 0:
+                raise ValueError(f"old_text not found in {target}")
+            if matches > 1 and not replace_all:
+                raise ValueError(
+                    f"old_text matches {matches} places in {target}; include more "
+                    "surrounding text or pass replace_all=true"
+                )
+            updated = text.replace(old_text, new_text)
+            return await self._save(target, updated.encode("utf-8"), overwrite=True)
+
+    async def _save(
+        self, target: PurePosixPath, data: bytes, *, overwrite: bool
+    ) -> FileEntry:
+        if len(data) > self.options.max_file_bytes:
+            raise ValueError("Content exceeds max_file_bytes")
+        await self.workspace.write_bytes(target, data, overwrite=overwrite)
         return FileEntry(
             path=str(target), name=target.name, is_directory=False, size=len(data)
         )
+
+    def _edit_lock(self, target: PurePosixPath) -> asyncio.Lock:
+        # Serializes read-modify-write changes to one file within this file system.
+        return self._edit_locks.setdefault(str(target), asyncio.Lock())
 
     async def file(self, path: str) -> FileStat:
         """An existing regular file in the workspace."""

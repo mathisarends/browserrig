@@ -37,7 +37,7 @@ PATTERNS = {
     "Dialoge": {"handle_dialog"},
     "Drag & Drop": {"drag", "drag_at"},
     "Warten": {"wait"},
-    "Dateien": {"read_file", "write_file", "upload_files", "list_files"},
+    "Dateien": {"read_file", "write_file", "edit_file", "upload_files", "list_files"},
 }
 
 

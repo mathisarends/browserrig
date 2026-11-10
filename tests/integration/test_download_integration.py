@@ -55,7 +55,7 @@ async def test_default_pack_receives_downloads_without_file_tools(
         files = session.scope[FileSystem]
         names = {tool.name for tool in session.scope[ToolRegistry].definitions}
         assert not names.intersection(
-            {"list_downloads", "read_file", "write_file", "upload_files"}
+            {"list_downloads", "read_file", "write_file", "edit_file", "upload_files"}
         )
         await wait_for_page(browser.active_tab)
         await evaluate(

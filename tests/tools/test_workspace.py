@@ -41,6 +41,7 @@ async def test_workspace_tools_run_without_browser_or_action_services(tmp_path):
             "list_files",
             "read_file",
             "write_file",
+            "edit_file",
         }
         result = await session.run("Save and read a note")
         assert (

@@ -101,6 +101,7 @@ async def test_each_browser_tool_has_a_unique_stable_kind(fake_chrome):
         "list_files": ActionKind.LIST_FILES,
         "read_file": ActionKind.READ_FILE,
         "write_file": ActionKind.WRITE_FILE,
+        "edit_file": ActionKind.EDIT_FILE,
         "open_file": ActionKind.OPEN_FILE,
         "open_downloaded_file": ActionKind.OPEN_DOWNLOADED_FILE,
         "upload_files": ActionKind.UPLOAD,
@@ -332,6 +333,7 @@ _WORKSPACE_TOOLS = {
     "list_files",
     "read_file",
     "write_file",
+    "edit_file",
     "open_file",
     "open_downloaded_file",
     "upload_files",
@@ -361,7 +363,12 @@ async def test_file_tools_follow_the_workspace_and_the_browser_bridge(
     )
     async with unbridged.session() as session:
         names = {item.name for item in session.scope[ToolRegistry].definitions}
-        assert _WORKSPACE_TOOLS & names == {"list_files", "read_file", "write_file"}
+        assert _WORKSPACE_TOOLS & names == {
+            "list_files",
+            "read_file",
+            "write_file",
+            "edit_file",
+        }
 
     workspace = LocalWorkspace(tmp_path / "workspace")
     agent = browserrig.Agent(
@@ -394,6 +401,7 @@ async def test_omitting_file_tools_keeps_download_receiving_without_exposing_too
                 "list_files",
                 "read_file",
                 "write_file",
+                "edit_file",
                 "open_file",
                 "open_downloaded_file",
                 "upload_files",

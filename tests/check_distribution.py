@@ -55,7 +55,7 @@ async def read_without_file_extras():
         async with agent.session() as session:
             assert Browser not in session.scope
             assert {tool.name for tool in session.scope[ToolRegistry].definitions} == {
-                'list_files', 'read_file', 'write_file',
+                'list_files', 'read_file', 'write_file', 'edit_file',
             }
 
 

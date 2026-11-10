@@ -140,6 +140,67 @@ async def test_remote_workspace_receives_the_overwrite_policy():
         assert workspace.files[PurePosixPath("note.txt")] == b"second"
 
 
+async def test_append_creates_missing_files_and_adds_to_existing_ones(files):
+    created = await files.write_file("notes/log.md", "# Log\n", append=True)
+    appended = await files.write_file("notes/log.md", "- step one\n", append=True)
+    assert created.size == 6 and appended.size == 17
+    assert (await files.read_file("notes/log.md")).text == "# Log\n- step one\n"
+    with pytest.raises(ValueError, match="not both"):
+        await files.write_file("notes/log.md", "x", overwrite=True, append=True)
+    with pytest.raises(IsADirectoryError):
+        await files.write_file("notes", "x", append=True)
+
+
+async def test_concurrent_appends_keep_every_line():
+    workspace = _MemoryWorkspace()
+    async with FileSystem(workspace) as files:
+        await asyncio.gather(
+            *(
+                files.write_file("log.txt", f"{index}\n", append=True)
+                for index in range(20)
+            )
+        )
+        lines = workspace.files[PurePosixPath("log.txt")].decode().splitlines()
+        assert sorted(lines, key=int) == [str(index) for index in range(20)]
+
+
+async def test_edit_file_replaces_exactly_one_match(files):
+    await files.write_file("notes.md", "# Notes\n- price: TBD\n- stock: TBD\n")
+    edited = await files.edit_file("notes.md", "price: TBD", "price: 42 €")
+    assert edited.path == "notes.md" and edited.size == len(
+        "# Notes\n- price: 42 €\n- stock: TBD\n".encode()
+    )
+    assert (await files.read_file("notes.md")).text == (
+        "# Notes\n- price: 42 €\n- stock: TBD\n"
+    )
+    with pytest.raises(ValueError, match="matches 2 places"):
+        await files.edit_file("notes.md", ": ", " = ")
+    await files.edit_file("notes.md", ": ", " = ", replace_all=True)
+    assert (await files.read_file("notes.md")).text == (
+        "# Notes\n- price = 42 €\n- stock = TBD\n"
+    )
+
+
+@pytest.mark.parametrize(
+    ("edit", "error", "message"),
+    [
+        (("notes.md", "absent", "x"), ValueError, "not found"),
+        (("notes.md", "", "x"), ValueError, "must not be empty"),
+        (("notes.md", "Notes", "Notes"), ValueError, "identical"),
+        (("missing.md", "Notes", "x"), FileNotFoundError, "File not found"),
+        (("image.bin", "a", "b"), ValueError, "not UTF-8 text"),
+    ],
+)
+async def test_edit_file_rejects_unsafe_edits_without_changing_the_file(
+    files, edit, error, message
+):
+    await files.write_file("notes.md", "# Notes\n")
+    await files.workspace.write_bytes(PurePosixPath("image.bin"), b"\xff\xfea")
+    with pytest.raises(error, match=message):
+        await files.edit_file(*edit)
+    assert (await files.read_file("notes.md")).text == "# Notes\n"
+
+
 async def test_concurrent_remote_reads_share_one_cached_copy():
     workspace = _MemoryWorkspace()
     path = PurePosixPath("report.txt")
@@ -547,7 +608,21 @@ async def test_file_tools_report_listing_reads_and_writes(files):
             await tools.read_file("missing.txt")
         await tools.write_file("b.txt", "new")
         await tools.write_file("b.txt", "again", overwrite=True)
-    listed, started, finished, missing, failed, created, replaced = services.events
+        await tools.write_file("b.txt", "!", append=True)
+        await tools.edit_file("b.txt", "again", "edited")
+        with pytest.raises(ToolError, match="not found"):
+            await tools.edit_file("b.txt", "absent", "x")
+    (
+        listed,
+        started,
+        finished,
+        missing,
+        failed,
+        created,
+        replaced,
+        appended,
+        edited,
+    ) = services.events
     assert isinstance(listed, FilesListedEvent)
     assert listed.entries == len(listing.entries)
     assert isinstance(started, FileReadStartedEvent) and started.path == "a.txt"
@@ -563,6 +638,10 @@ async def test_file_tools_report_listing_reads_and_writes(files):
         isinstance(created, FileWrittenEvent) and created.created and created.size == 3
     )
     assert isinstance(replaced, FileWrittenEvent) and not replaced.created
+    assert isinstance(appended, FileWrittenEvent) and appended.size == 6
+    assert isinstance(edited, FileWrittenEvent) and not edited.created
+    assert edited.size == len("edited!")
+    assert (await files.read_file("b.txt")).text == "edited!"
 
 
 async def test_open_file_reports_the_file_in_its_new_tab(files, monkeypatch):

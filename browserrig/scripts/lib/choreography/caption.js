@@ -40,6 +40,7 @@ function createChoreographyCaption(ui) {
       [action.OPEN_FILE]: 'file',
       [action.OPEN_DOWNLOADED_FILE]: 'file',
       [action.WRITE_FILE]: 'write',
+      [action.EDIT_FILE]: 'write',
       [action.LIST_FILES]: 'folder',
       [action.LIST_TABS]: 'tabs',
       [action.LIST_DOWNLOADS]: 'download',

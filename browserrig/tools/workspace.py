@@ -55,7 +55,7 @@ _INSTRUCTIONS = Instructions(
 
 
 class WorkspaceIO(FileSystemObservation):
-    """List, read and write tools shared by WorkspaceTools and FileTools.
+    """List, read, write and edit tools shared by WorkspaceTools and FileTools.
 
     Without a FileSystem, tools are unavailable.
     With a browser, receipts carry its identity and pass its event filters.
@@ -181,21 +181,53 @@ class WorkspaceIO(FileSystemObservation):
         kind=ActionKind.WRITE_FILE,
         chainable=True,
         enabled=_has_files,
-        description="Save UTF-8 text in the workspace. Existing files require overwrite=true.",
+        description=(
+            "Save UTF-8 text in the workspace. Existing files require overwrite=true; "
+            "append=true adds content to the end, creating the file if missing."
+        ),
     )
     async def write_file(
-        self, path: str, content: str, overwrite: bool = False
+        self, path: str, content: str, overwrite: bool = False, append: bool = False
     ) -> FileEntry:
         files = self._files()
 
         with file_errors():
             created = not await files.exists(path)
-            entry = await files.write_file(path, content, overwrite=overwrite)
-        size = entry.size if entry.size is not None else len(content.encode("utf-8"))
-        await self._emit_workspace(
-            FileWrittenEvent(path=entry.path, size=size, created=created)
-        )
+            entry = await files.write_file(
+                path, content, overwrite=overwrite, append=append
+            )
+        await self._emit_written(entry, created=created)
         return entry
+
+    @tool(
+        kind=ActionKind.EDIT_FILE,
+        chainable=True,
+        enabled=_has_files,
+        description=(
+            "Replace exact text in a UTF-8 workspace file. old_text must match once; "
+            "include surrounding lines to make it unique, or pass replace_all=true."
+        ),
+    )
+    async def edit_file(
+        self,
+        path: str,
+        old_text: Annotated[str, Field(min_length=1)],
+        new_text: str,
+        replace_all: bool = False,
+    ) -> FileEntry:
+        files = self._files()
+
+        with file_errors():
+            entry = await files.edit_file(
+                path, old_text, new_text, replace_all=replace_all
+            )
+        await self._emit_written(entry, created=False)
+        return entry
+
+    async def _emit_written(self, entry: FileEntry, *, created: bool) -> None:
+        await self._emit_workspace(
+            FileWrittenEvent(path=entry.path, size=entry.size or 0, created=created)
+        )
 
     def _files(self) -> FileSystem:
         if self._workspace is None:

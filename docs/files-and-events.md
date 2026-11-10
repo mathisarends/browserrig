@@ -60,7 +60,8 @@ removing tools does not stop download receiving.
 | --- | --- |
 | `list_files(path=".", offset=0, limit=100)` | List a directory; follow `next_offset` for more. |
 | `read_file(path, page_number=None, sheet=None, cell_range=None, member=None, ocr=None, offset=0, max_chars=20000)` | Read native document content, worksheet cells, archive members or OCR text. Returns structure, limitations, a saved extraction path and continuation offsets. |
-| `write_file(path, content, overwrite=False)` | Save UTF-8 text and create parent directories; overwriting requires an explicit flag. |
+| `write_file(path, content, overwrite=False, append=False)` | Save UTF-8 text and create parent directories; overwriting requires an explicit flag. `append=True` adds to the end and creates a missing file. |
+| `edit_file(path, old_text, new_text, replace_all=False)` | Replace exact text in a UTF-8 file. `old_text` must match once unless `replace_all=True`. |
 | `list_downloads()` | List download IDs, status, saved paths, and file errors. |
 | `open_downloaded_file(download_id)` | Open a completed download in a new active tab. |
 | `open_file(path)` | Open a workspace/download file in a new active tab. |
@@ -122,7 +123,7 @@ such as a file drawer, is left to the viewer:
 | `FileReadStartedEvent` | `read_file` | `read_id`, requested path and selectors |
 | `FileReadFinishedEvent` | `read_file` | `read_id`, path, format, status, character count, pages and offsets |
 | `FileReadFailedEvent` | `read_file` | `read_id`, requested path and reason, including cancellation |
-| `FileWrittenEvent` | `write_file` | Path, size and whether the file was created |
+| `FileWrittenEvent` | `write_file`, `edit_file` | Path, size and whether the file was created |
 | `FileOpenedEvent` | `open_file`, `open_downloaded_file` | Path, `FileSource` and download ID; `target_id` is the new tab |
 | `FilesUploadedEvent` | `upload_files` | Paths and the file input reference |
 

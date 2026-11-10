@@ -72,6 +72,7 @@ class ActionKind(StrEnum):
     LIST_FILES = "list_files"
     READ_FILE = "read_file"
     WRITE_FILE = "write_file"
+    EDIT_FILE = "edit_file"
     OPEN_FILE = "open_file"
     OPEN_DOWNLOADED_FILE = "open_downloaded_file"
     SCREENSHOT = "screenshot"

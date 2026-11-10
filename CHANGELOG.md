@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add `edit_file(path, old_text, new_text, replace_all=False)` to the workspace
+  tools. It replaces exact text in a UTF-8 file and fails when `old_text` is
+  missing or ambiguous, so the agent can update notes without rewriting them.
+  `write_file` gains `append=True`, which adds to the end and creates a missing
+  file. Both emit `FileWrittenEvent`; `FileSystem` has matching methods.
+
 - Add opt-in `Todos()` with Pydantic `Todo` and `TodoList` models. `update_todos`
   saves a bounded plan with stable IDs and at most one step in progress, and
   returns the list as its result. Open lists are reminded only when no update is

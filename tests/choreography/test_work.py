@@ -3,7 +3,7 @@ from harnessed import ToolCall, ToolResult, ToolStatus
 from browserrig.choreography import WorkPhase
 from browserrig.choreography.work import finished, started
 from browserrig.core import ActionKind
-from browserrig.files import FileContent
+from browserrig.files import FileContent, FileEntry
 from browserrig.observation import ExtractedContent
 
 
@@ -92,6 +92,23 @@ def test_javascript_receipt_shows_code_then_returned_value():
     assert done.phase is WorkPhase.COMPLETED
     assert done.detail == '{"answer": 42}'
     assert done.preview == 'JavaScript result:\n{"answer": 42}'
+
+
+def test_append_and_edit_receipts_name_the_change_and_saved_file():
+    appending = started(
+        ToolCall("write_file", {"path": "log.md", "content": "- a", "append": True}),
+        ActionKind.WRITE_FILE,
+    )
+    assert appending.detail == "log.md · appending to file"
+    editing = started(
+        ToolCall("edit_file", {"path": "log.md", "old_text": "- a", "new_text": "- b"}),
+        ActionKind.EDIT_FILE,
+    )
+    assert editing.title == "Editing file" and editing.preview == "- b"
+    assert editing.detail == "log.md · replacing one match"
+    entry = FileEntry(path="log.md", name="log.md", is_directory=False, size=3)
+    done = finished(editing, ToolResult(entry.model_dump_json()), elapsed=0.01)
+    assert done.detail == "log.md · 3 bytes saved" and done.artifact_path == "log.md"
 
 
 def test_custom_result_does_not_break_successful_file_tool():
