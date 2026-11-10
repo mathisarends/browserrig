@@ -185,6 +185,17 @@ cleanup with `scope.effect(...)`. Keep mount-owned mutable data in `PluginState`
 Direct tool calls need an active instance. In isolated tests, use
 `harnessed.testing.mount_plugin(recipe, services=...)` to obtain one.
 
+## Links and web search
+
+The default system prompt tells the agent to follow observed links with
+`click(ref=...)`, including search results and links in above/below previews.
+The URL shown next to a link identifies its destination; the ref is the action
+target. `click(ref=..., new_tab=True)` keeps the current page open.
+
+Use `search(query=...)` for web searches; it opens DuckDuckGo results in the
+active tab. Reserve `navigate(url=...)` for an initial URL or a known destination
+without a usable observed link ref.
+
 ## Action chains and stable tool kinds
 
 Browserrig uses Harnessed's native scheduler for action chains. For forms, the

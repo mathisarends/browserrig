@@ -3,7 +3,7 @@ from functools import partial
 from typing import Annotated
 from urllib.parse import quote_plus, urljoin, urlsplit
 
-from harnessed import Plugin
+from harnessed import Instructions, Plugin, SystemPrompt
 from harnessed.kernel import needs
 from pydantic import Field
 
@@ -25,11 +25,28 @@ from .intents import NavigateIntent, WaitIntent
 NEW_TAB_URL = "https://duckduckgo.com/"
 
 
+_INSTRUCTIONS = Instructions(
+    title="Browser navigation and web search",
+    text=(
+        "When an observation shows a link with a ref, follow it with click(ref=...). "
+        "The displayed URL identifies the destination; use the ref to open it. "
+        "This also applies to search results and links in above/below previews, since "
+        "click scrolls the target into view. Use click(ref=..., new_tab=True) to keep "
+        "the current page open. Use search(query=...) for web searches on DuckDuckGo. "
+        "Reserve navigate(url=...) for an initial URL or a known destination without "
+        "a usable observed link ref."
+    ),
+)
+
+
 class NavigationTools(Plugin):
     _browser = needs(Browser)
     _actions = needs(Actions)
     _events = needs(BrowserEvents)
     _readiness = needs(Readiness)
+
+    def instructions(self) -> SystemPrompt:
+        return SystemPrompt(_INSTRUCTIONS)
 
     @tool(
         kind=ActionKind.NAVIGATE,
