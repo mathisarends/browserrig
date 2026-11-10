@@ -32,7 +32,11 @@ _INSTRUCTIONS = Instructions(
         "The displayed URL identifies the destination; use the ref to open it. "
         "This also applies to search results and links in above/below previews, since "
         "click scrolls the target into view. Use click(ref=..., new_tab=True) to keep "
-        "the current page open. Use search(query=...) for web searches on DuckDuckGo. "
+        "the current page open. When already on DuckDuckGo with an observed search field, "
+        "enter or revise the query there with type_text(ref=..., text=...), then submit "
+        "with send_keys(key='Enter') or click the observed search button. "
+        "Use search(query=...) to start a DuckDuckGo web search from another site, "
+        "or when no usable search field is observed. "
         "Reserve navigate(url=...) for an initial URL or a known destination without "
         "a usable observed link ref."
     ),

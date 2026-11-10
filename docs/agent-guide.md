@@ -192,9 +192,12 @@ The default system prompt tells the agent to follow observed links with
 The URL shown next to a link identifies its destination; the ref is the action
 target. `click(ref=..., new_tab=True)` keeps the current page open.
 
-Use `search(query=...)` for web searches; it opens DuckDuckGo results in the
-active tab. Reserve `navigate(url=...)` for an initial URL or a known destination
-without a usable observed link ref.
+When already on DuckDuckGo, use its observed search field to enter or revise the
+query with `type_text(ref=..., text=...)`, then submit with `send_keys(key="Enter")`
+or click the observed search button. Use `search(query=...)` to start a DuckDuckGo
+web search from another site or when no usable search field is observed. Reserve
+`navigate(url=...)` for an initial URL or a known destination without a usable
+observed link ref.
 
 ## Action chains and stable tool kinds
 
