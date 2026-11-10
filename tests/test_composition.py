@@ -190,7 +190,7 @@ def test_one_file_tool_group_replaces_the_combined_default_in_place(group):
     composed = browser_plugins(tools)
     assert len(composed) == len(defaults)
     assert composed[_index(defaults, FileTools)] is tools
-    assert not any(type(plugin) is FileTools for plugin in composed)
+    assert not any(isinstance(plugin, FileTools) for plugin in composed)
 
 
 def test_without_matches_each_file_tool_group_exactly():

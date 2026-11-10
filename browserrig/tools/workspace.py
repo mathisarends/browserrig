@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from typing import Annotated
 from uuid import uuid4
 
-import harnessed.plugins.filesystem as filesystem
+import harnessed.plugins.filesystem
 from harnessed import (
     Inject,
     Instructions,
@@ -81,7 +81,7 @@ class WorkspaceIO(FileSystemObservation):
         pattern: str = "**/*",
         limit: Annotated[int, Field(ge=1, le=1000)] = 200,
         include_hidden: bool = False,
-    ) -> filesystem.PathMatches:
+    ) -> harnessed.plugins.filesystem.PathMatches:
         with file_errors():
             return await self._files().glob(
                 pattern, limit=limit, include_hidden=include_hidden
@@ -105,7 +105,7 @@ class WorkspaceIO(FileSystemObservation):
         pattern: str = "**/*.md",
         limit: Annotated[int, Field(ge=1, le=500)] = 100,
         include_hidden: bool = False,
-    ) -> filesystem.SearchResult:
+    ) -> harnessed.plugins.filesystem.SearchResult:
         with file_errors():
             return await self._files().grep(
                 query, pattern=pattern, limit=limit, include_hidden=include_hidden
