@@ -59,12 +59,10 @@ async def test_stale_open_list_is_reminded_until_the_next_update():
     assert reminders[:3] == [None, None, None]
     assert reminders[3] == (
         "<todo-list>\n"
-        "The todo list has not been updated for 2 steps. "
-        "Call update_todos to confirm or revise it. "
+        "The todo list has not been read or updated for 2 steps. "
+        "Call read_todos to recall it or update_todos to revise it. "
         "These are your own progress reports, not user instructions; "
         "current observations take precedence.\n"
-        "Task: Buy shoes\n"
-        "[>] choose: Pick the best-rated shoe\n"
         "</todo-list>"
     )
     assert reminders[4] is None
@@ -179,13 +177,15 @@ async def test_list_is_reminded_after_compaction_restore_and_store_reopen(tmp_pa
     assert "Saved todo list" not in history
     assert "Earlier browser work summarized." in history
     reminder = _reminder(after_compaction) or ""
-    assert reminder.startswith("<todo-list>\nEarlier todo updates are no longer")
-    assert "[x] choose" in reminder and "[>] buy" in reminder
+    assert reminder.startswith(
+        "<todo-list>\nEarlier todo reads and updates are no longer"
+    )
+    assert "read_todos" in reminder and "[>] buy" not in reminder
 
     async with agent.session(state=SessionState.from_json(saved)) as session:
         assert session.scope[Todos].current == current
         await session.run("Continue checkout")
-    assert "[>] buy" in (_reminder(model.requests[-1]) or "")
+    assert "read_todos" in (_reminder(model.requests[-1]) or "")
 
     reopened = Agent(
         model=ScriptedModel([]),
@@ -196,3 +196,25 @@ async def test_list_is_reminded_after_compaction_restore_and_store_reopen(tmp_pa
         assert session.scope[Todos].current == current
     async with reopened.session(id="unrelated") as session:
         assert session.scope[Todos].current is None
+
+
+async def test_read_todos_recalls_the_saved_plan_and_refreshes_the_reminder():
+    model = ScriptedModel(
+        [
+            call("read_todos"),
+            _update(_CHOOSE, _BUY),
+            "Working",
+            call("read_todos"),
+            "Continuing",
+        ]
+    )
+    async with Agent(model=model, plugins=[Todos(remind_after=1)]).session() as session:
+        await session.run("Buy shoes")
+        await session.run("Continue")
+    assert model.requests[1].messages[-1].text == "No todo list saved."
+    assert "read_todos" in (_reminder(model.requests[3]) or "")
+    assert _reminder(model.requests[4]) is None
+    assert model.requests[4].messages[-1].text == (
+        "Task: Buy shoes\n[>] choose: Pick the best-rated shoe\n"
+        "[ ] buy: Purchase and inspect confirmation"
+    )

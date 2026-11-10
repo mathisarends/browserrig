@@ -9,13 +9,13 @@ from harnessed import (
     SystemPrompt,
 )
 from harnessed.kernel import PluginLike
-from harnessed.plugins import Compaction as ContextCompaction
-from harnessed.plugins import ContextState
+from harnessed.plugins import Compaction, ContextState
 
 from .activity import Activity
 from .browser import Chrome, DownloadReceiving
 from .choreography import InputVisualization, TabStrip
 from .files import Files, FileTransfers
+from .memory import TaskMemory
 from .nudges import Nudges
 from .observation import BrowserPerception, ImageContext
 from .pacing import InputPacing
@@ -32,6 +32,8 @@ from .tools import (
     PointerTools,
     TabTools,
 )
+
+ContextCompaction = Compaction
 
 
 def browser_plugins(
@@ -96,7 +98,7 @@ def browser_pack(*, browser: Chrome | None = None) -> PluginPack:
             FileTransfers(),
             DownloadReceiving(),
             FileTools(),
-            ContextCompaction(trigger=WindowRatio()),
+            TaskMemory(trigger=WindowRatio()),
         ],
         prompt=SystemPrompt.from_plugins(
             format=PromptFormat.MARKDOWN,

@@ -92,6 +92,7 @@ architecture:
     terminal: {path: terminal, may_depend_on: [core]}
     completion: {path: completion}
     todos: {path: todos, may_depend_on: [core]}
+    memory: {path: memory, may_depend_on: [core, files]}
 
 tests:
   # tests/<package>/test_<module>.py mirrors browserrig/<package>/<module>.py; a topic

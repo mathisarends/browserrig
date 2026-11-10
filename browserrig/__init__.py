@@ -35,6 +35,7 @@ from .files import (
 from .guardrails import AllowedDomains
 from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanResponse
 from .kinds import MouseEventKind
+from .memory import MemoryAction, TaskMemory, TaskMemoryEvent, TaskMemoryState
 from .nudges import Nudges
 from .observation import (
     BrowserPerception,
@@ -98,6 +99,10 @@ from .tools import (
 __version__ = "0.2.0"
 
 __all__ = [
+    "MemoryAction",
+    "TaskMemory",
+    "TaskMemoryEvent",
+    "TaskMemoryState",
     "ActionKind",
     "AllowedDomains",
     "DomainNotAllowed",

@@ -45,12 +45,15 @@ defaults by type (see [Composing plugins](#composing-plugins)). Conversations
 stay in memory; see
 [Saving and restoring sessions](#saving-and-restoring-sessions).
 By default, older steps are summarized once a request reaches 80% of the model's
-context window (the default `ContextCompaction(trigger=WindowRatio(0.8))`), so long runs do
+context window (the default `TaskMemory(trigger=WindowRatio(0.8))`), so long runs do
 not stop at the context limit. Many providers report no window; the trigger then
 fires at 100k tokens (`WindowRatio(fallback_tokens=...)`), or pass
 `PydanticAIModel(..., context_window=...)` to use the ratio. Pass your own
-`ContextCompaction(...)` from `browserrig` in `plugins` to tune it, or
+`TaskMemory(...)` from `browserrig` in `plugins` to tune it, or
 `without=(ContextCompaction,)` to keep every step.
+Task memory asks the agent to save a concise workspace checkpoint before compaction
+and read it afterward; see [task memory](task-memory.md). Passing plain
+`ContextCompaction(...)` keeps native summarization without that protocol.
 Without an `Approvals` plugin, Harnessed's default `ASK` policy applies; the example
 above allows actions automatically. The constructor does not open Chrome or files.
 

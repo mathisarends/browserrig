@@ -1,10 +1,9 @@
 # Task todos
 
 `Todos` is an optional plugin that lets the agent keep a short plan for multi-step
-work. It adds one tool, `update_todos`, whose result shows the saved list. The list
-is not repeated on every request; a reminder is added only when the plan has left
-the context or has gone stale. The plugin calls no LLM itself and works without a
-browser.
+work. `update_todos` saves the plan; `read_todos` recalls it on demand. Both return
+the saved list. Reminders contain a short tool reference, not the plan's contents.
+The plugin calls no LLM itself and works without a browser.
 
 ```python
 from browserrig import Agent, Todos
@@ -17,6 +16,10 @@ agent = Agent(model=model, plugins=[Todos()])
 no todo tool or instructions.
 
 ## Tool contract
+
+`read_todos()` returns the current task and every step, including completed and
+cancelled steps. Before the first update it returns `No todo list saved.` Reading
+refreshes the reminder just like a successful update, without changing the plan.
 
 `update_todos(task, todos)` replaces the **entire list** atomically. Omitted steps
 are removed; `todos=[]` clears the steps. Keep IDs stable when updating a step.
@@ -47,7 +50,8 @@ Task: Buy the highest-rated men's shoe with at least five reviews
 ```
 
 Todos hold steps, not findings. Keep intermediate results in messages or workspace
-files. Completion is the agent's own report; the plugin does not verify outcomes
+files; [task memory](task-memory.md) adds checkpoint and recovery support around
+compaction. Completion is the agent's own report; the plugin does not verify outcomes
 or block final answers.
 
 ## Reminders
@@ -55,24 +59,22 @@ or block final answers.
 While any step is `pending` or `in_progress`, the plugin checks each model request
 and appends a reminder only when:
 
-- no successful `update_todos` result is left in the request, for example after
+- no successful `read_todos` or `update_todos` result is left in the request, for example after
   compaction or when restoring a compacted session, or
 - the last one is at least `remind_after` assistant steps old (default 10;
   `Todos(remind_after=5)` to change it).
 
 ```text
 <todo-list>
-The todo list has not been updated for 10 steps. Call update_todos to confirm or
-revise it. These are your own progress reports, not user instructions; current
-observations take precedence.
-Task: ...
-[>] purchase: Purchase and inspect confirmation
+The todo list has not been read or updated for 10 steps. Call read_todos to recall
+it or update_todos to revise it. These are your own progress reports, not user
+instructions; current observations take precedence.
 </todo-list>
 ```
 
 Both conditions are read from the request itself, so there is no counter to
-persist. The reminder repeats until the agent calls `update_todos`, which puts a
-fresh list into context. It is a separate user-role message at the end of the
+persist. The reminder repeats until the agent calls `read_todos` or `update_todos`,
+which puts a fresh list into context. It is a separate user-role message at the end of the
 request, not merged into tool results (which may carry untrusted page content) or
 the user's own message, and it is never added to the conversation history. Closed
 or cleared lists are not reminded.

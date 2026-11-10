@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Add `read_todos()` for explicit plan recall; stale-plan reminders now name the
+  tools instead of repeating the list. Reads also refresh the reminder interval.
+- Use `TaskMemory` in the default browser pack: working notes remain in
+  `notes/task_state.md`, with one checkpoint reminder before compaction and a
+  targeted read after it. Compaction can defer once within the existing budget.
+  Correlated `TaskMemoryEvent` receipts and `browserrig.memory` spans record saved
+  file revisions and incomplete recovery without logging note bodies as metadata.
+  Native `ContextCompaction(...)` remains available to opt out.
+
 - Add `edit_file(path, old_text, new_text, replace_all=False)` to the workspace
   tools. It replaces exact text in a UTF-8 file and fails when `old_text` is
   missing or ambiguous, so the agent can update notes without rewriting them.

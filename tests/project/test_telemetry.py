@@ -12,8 +12,63 @@ from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel
 
-from browserrig import Files, FileSystem, LocalWorkspace
+from browserrig import Files, FileSystem, LocalWorkspace, TaskMemory, WorkspaceTools
 from examples.telemetry import tracing_plugins
+
+
+async def test_memory_handover_exports_correlated_metadata_without_note_contents(
+    collector, tmp_path
+):
+    notes = "PRIVATE MEMORY TEXT: candidate 42, purchase unconfirmed."
+    summary = ScriptedModel(["Earlier work summarized."])
+    model = ScriptedModel(
+        [
+            call("write_file", path="scratch.txt", content="old " * 2000),
+            call("write_file", path="more.txt", content="more " * 4000),
+            call("write_file", path="notes/task_state.md", content=notes),
+            call("read_file", path="notes/task_state.md"),
+            "Finished",
+        ],
+        info=ModelInfo("test"),
+    )
+    async with tracing_plugins(enabled=True, capture_content=False) as tracing:
+        await Agent(
+            model=model,
+            plugins=[
+                *tracing,
+                Files(LocalWorkspace(tmp_path)),
+                WorkspaceTools(),
+                TaskMemory(
+                    trigger=lambda state: state.input_tokens >= 5000,
+                    fallback_tokens=5000,
+                    summarizer=summary,
+                    keep_turns=0,
+                    keep_steps=1,
+                ),
+                Approvals(default=PolicyDecision.ALLOW),
+            ],
+        ).run("Compare products", max_steps=8)
+    spans = [
+        span
+        for _, request in collector
+        for resource in request.resource_spans
+        for scope in resource.scope_spans
+        for span in scope.spans
+    ]
+    receipts = [
+        _attributes(span.attributes)
+        for span in spans
+        if span.name == "browserrig.memory"
+    ]
+    compacted = next(r for r in receipts if r["harnessed.action"] == "compacted")
+    restored = next(r for r in receipts if r["harnessed.action"] == "restored")
+    assert compacted["harnessed.checkpoint_saved"] is True
+    assert compacted["harnessed.compaction_id"] == restored["harnessed.compaction_id"]
+    assert compacted["harnessed.revision"] == restored["harnessed.revision"]
+    assert restored["harnessed.restore_pending"] is False
+    assert any(span.name == "browserrig.memory.defer_compaction" for span in spans)
+    assert len(summary.requests) == 1
+    assert notes not in str(spans)
 
 
 def test_disabled_tracing_keeps_optional_dependencies_unloaded():

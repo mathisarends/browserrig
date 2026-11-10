@@ -26,6 +26,7 @@ from browserrig import (
     Secret,
     Secrets,
     TabStrip,
+    TaskMemory,
     WindowRatio,
     WorkspaceTools,
     browser_plugins,
@@ -160,9 +161,8 @@ def test_plugins_replace_matching_defaults_in_place():
     compaction = Compaction(trigger=WindowRatio(0.5))
     defaults = browser_plugins()
     composed = browser_plugins(compaction, images, observe)
-    assert [type(plugin) for plugin in composed] == [
-        type(plugin) for plugin in defaults
-    ]
+    assert len(composed) == len(defaults)
+    assert composed[_index(defaults, TaskMemory)] is compaction
     assert observe in composed and images in composed and compaction in composed
     assert composed.index(observe) == _index(defaults, BrowserPerception)
     assert composed.index(images) == _index(defaults, ImageContext)

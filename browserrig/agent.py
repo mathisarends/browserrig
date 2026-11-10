@@ -31,6 +31,10 @@ class Agent(harnessed.Agent):
     to keep everything, or a configured `ContextCompaction`. Input is paced like a
     person and streamed for people
     watching; pass `without=(InputPacing, InputVisualization)` to work at full speed unseen.
+
+    The default `TaskMemory` compaction asks for a workspace checkpoint before
+    summarizing and an explicit read afterward. Configure `TaskMemory(...)` to
+    tune this protocol; plain `ContextCompaction(...)` disables its memory guidance.
     """
 
     def __init__(

@@ -201,6 +201,7 @@ for release notes.
 | --- | --- |
 | [Agent guide](https://github.com/mathisarends/browserrig/blob/main/docs/agent-guide.md) | Setup, action chains, prompts, sessions and controls |
 | [Task todos](docs/todos.md) | Optional task plan, reminders and session persistence |
+| [Task memory](docs/task-memory.md) | Workspace checkpoints, recovery after compaction and correlated traces |
 | [Browser interaction](https://github.com/mathisarends/browserrig/blob/main/docs/browser-interaction.md) | Direct access, observations, input and page content |
 | [Files and events](https://github.com/mathisarends/browserrig/blob/main/docs/files-and-events.md) | Downloads, workspace, file readers and event streams |
 | [Browser composition](https://github.com/mathisarends/browserrig/blob/main/docs/browser-composition.md) | Configure and compose browser plugins |
