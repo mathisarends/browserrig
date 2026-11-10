@@ -32,6 +32,8 @@ from .models import (
     SecretFocusArgs,
     SeedArgs,
     TabStrip,
+    TargetScrollArgs,
+    TargetScrollResult,
     TextState,
     UploadArgs,
 )
@@ -49,6 +51,7 @@ __all__ = [
     "OVERLAY_STYLES",
     "OWNER_SIZE",
     "PAGE_FACTS",
+    "TARGET_SCROLL",
     "RESET",
     "SCROLL",
     "SCROLL_OWNER",
@@ -81,6 +84,8 @@ __all__ = [
     "SecretFocusArgs",
     "SeedArgs",
     "TabStrip",
+    "TargetScrollArgs",
+    "TargetScrollResult",
     "TextState",
     "UploadArgs",
     "failure",
@@ -146,6 +151,9 @@ SCROLL_OWNER: Script[OwnerScrollArgs, ScrollPlan | None] = Script.load(
     OwnerScrollArgs,
     ScrollPlan | None,
     uses=("geometry", "composed", "elements", "scroll"),
+)
+TARGET_SCROLL: Script[TargetScrollArgs, TargetScrollResult] = Script.load(
+    "target_scroll", TargetScrollArgs, TargetScrollResult, uses=("elements",)
 )
 CONTENT: Script[ContentArgs, ContentExtraction] = Script.load(
     "content",

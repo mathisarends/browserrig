@@ -240,19 +240,29 @@ as well as clicks. Focus uses `preventScroll` to avoid an extra browser jump.
 must fit in the viewport together before the gesture starts.
 
 It always provides `move_mouse(x=..., y=...)`,
-`scroll(delta_y=..., delta_x=...)`,
+`scroll_page(delta_y=..., delta_x=...)`,
+`scroll_element(ref=..., delta_y=..., delta_x=...)`,
 `click_at(x=..., y=..., count=2)` and
 `drag_at(start=Point(...), end=Point(...))`.
 Both drag tools use the same mouse gesture. The browser handles pointer dragging
 and native HTML5 drag and drop, including `DataTransfer`, automatically.
 `move_mouse` moves the cursor without clicking and can reveal hover controls.
-`scroll` sends wheel input at the current cursor position: move over a sidebar,
-panel, or other scrollable area first to scroll that area. `delta_x` scrolls
-sideways, for example through a carousel or a wide table.
-Both also take an observed `ref` instead of coordinates: `move_mouse(ref=...)`
-hovers that element, and `scroll(ref=..., delta_y=...)` turns the wheel over it,
-so a list inside a modal or sidebar scrolls without a screenshot. The ref is
-revealed first, like a click target.
+`scroll_page` scrolls the outer document directly,
+independently of the cursor and any nested editor or panel under it. It reports
+the actual before/after position, or says that the page did not move at a boundary
+or because scrolling is disabled. Page scrolling respects CSS overflow locks and
+does not move the cursor or emit wheel input. `delta_x` scrolls sideways.
+`scroll_element(ref=...)` scrolls only the observed container marked `scroll(...)`,
+including a panel, list or horizontal carousel. It stops at that container's
+boundary without propagating to parents or the page, and reports actual movement.
+It does not reveal the container by scrolling ancestors, move the cursor or emit
+wheel input. A ref for an ordinary control is rejected instead of silently
+scrolling its parent. `move_mouse(ref=...)` still reveals and hovers its target.
+
+These two tools replace the old cursor-dependent `scroll` agent tool. Migrate
+no-ref page scrolling to `scroll_page`, and container refs to `scroll_element`.
+For custom wheel handlers, native wheel input remains available to applications
+through `browser.input.mouse.scroll(delta_y=..., point=Point(...))`.
 Both `click` and `click_at` accept `button="right"` for a native right click;
 the default is `button="left"`. Both tools automatically move the cursor to the
 target before clicking. Right clicks end the action chain so the agent can

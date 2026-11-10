@@ -29,6 +29,19 @@ class ScrollArgs(ScriptArgs):
     clip: Bounds | None = None
 
 
+class TargetScrollArgs(ScriptArgs):
+    delta_x: float = 0
+    delta_y: float = 0
+    page: bool = False
+
+
+class TargetScrollResult(Options):
+    before: Point
+    after: Point
+    blocked: bool = False
+    scrollable: bool = True
+
+
 class UploadArgs(ScriptArgs):
     count: int
 

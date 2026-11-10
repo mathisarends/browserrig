@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Replace the agent's `scroll` tool with `scroll_page` and `scroll_element(ref=...)`.
+  Both scroll their named target directly, independently of the cursor, and report
+  actual movement or a blocked/boundary result. Container scrolling never propagates
+  to ancestors. Native wheel input remains available through `browser.input.mouse.scroll`.
+
 - Add `read_todos()` for explicit plan recall; stale-plan reminders now name the
   tools instead of repeating the list. Reads also refresh the reminder interval.
 - Use `TaskMemory` in the default browser pack: working notes remain in
