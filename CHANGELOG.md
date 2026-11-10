@@ -8,6 +8,11 @@
   activation binding through the public `registration()` helper. Existing
   Harnessed 0.14 conversations, checkpoints and stores need no migration.
 
+- Plugin instructions are about 45% shorter. Coordinate rules now live only in
+  "Screenshot coordinates", form batching moved into "Browser action chains"
+  (`FormTools` no longer adds a "Form filling" block), and details already
+  shown by observation labels or tool descriptions were removed.
+
 ## 0.2.0 (2026-11-09)
 
 ### Breaking changes

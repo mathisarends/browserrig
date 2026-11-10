@@ -33,14 +33,13 @@ from .transaction import ActionRunner
 _INSTRUCTIONS = Instructions(
     title="Browser action chains",
     text=(
-        "Prefer multiple ordered tool calls in one response when no intermediate "
-        "observation is needed; put submission last. Inputs may continue while the page "
-        "remains suitable. "
-        "Navigation, tab changes, scrolling, "
-        "drags, coordinates, JavaScript, uploads, dialogs, waiting and screenshot end the "
-        "remaining chain. Use coordinate actions alone with a fresh screenshot. A navigation, "
-        "new menu, suggestions, modal, alert or input failure interrupts remaining actions; "
-        "skipped calls were not executed. Inspect the next observation before continuing."
+        "Send several ordered tool calls in one response when no intermediate observation "
+        "is needed, such as independent form fields with known refs and values; put "
+        "submission last. Navigation, tab changes, scrolling, drags, coordinates, JavaScript, "
+        "uploads, dialogs, waiting and screenshots end the remaining chain; send coordinate "
+        "actions alone. A navigation, new menu, suggestions, modal, alert or input failure "
+        "interrupts the remaining actions; skipped calls were not executed. Inspect the next "
+        "observation before continuing."
     ),
 )
 

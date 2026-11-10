@@ -1,4 +1,4 @@
-from harnessed import Instructions, Plugin, SystemPrompt
+from harnessed import Plugin
 from harnessed.kernel import needs
 
 from browserrig.core import ActionKind, BrowserError
@@ -8,23 +8,11 @@ from browserrig.observation import BrowserPerception
 from .effects import Effect
 from .execution import Actions
 
-_INSTRUCTIONS = Instructions(
-    title="Form filling",
-    text=(
-        "On forms, prefer multiple ordered tool calls in one response for independent "
-        "fields with known refs and values. Ordinary value updates and automatic reveal "
-        "scrolling do not need a roundtrip per field. Observe before deciding a later "
-        "value or submission based on new suggestions, options or validation results."
-    ),
-)
-
 
 class FormTools(Plugin):
+    # Batching form fields is covered by the action-chain instructions of Actions.
     _observe = needs(BrowserPerception)
     _actions = needs(Actions)
-
-    def instructions(self) -> SystemPrompt:
-        return SystemPrompt(_INSTRUCTIONS)
 
     @tool(
         kind=ActionKind.SELECT,

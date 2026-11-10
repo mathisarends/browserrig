@@ -48,13 +48,11 @@ _CLOSING_HINT = (
 _INSTRUCTIONS = Instructions(
     title="Explicit task completion",
     text=(
-        "You may write brief progress messages between tool calls, including "
-        "standalone text messages. These do not end the task. When browser work "
-        "is finished, call done alone, after inspecting the last action's result. "
-        "Then write the final answer in the next response, following the format "
-        "requested by the user and any declared output schema. Use success=false "
-        "if the task could not be completed. A success report is your assessment, "
-        "not independent verification. Do not call done before required work is finished."
+        "Brief progress messages between tool calls do not end the task. When browser "
+        "work is finished, inspect the last action's result, then call done alone. Write "
+        "the final answer in the next response, following the requested format and any "
+        "declared output schema. Use success=false if the task could not be completed. "
+        "Do not call done before required work is finished."
     ),
 )
 

@@ -42,11 +42,11 @@ type _ScrollDelta = Annotated[float, Field(ge=-10000, le=10000)]
 _INSTRUCTIONS = Instructions(
     title="Screenshot coordinates",
     text=(
-        "Coordinates are pixels from the top-left of the newest shown image for this document; "
-        "region and canvas images are mapped back to the viewport automatically. "
-        "A red cursor marker shows the pointer position when the screenshot was captured; "
-        "it is omitted when outside the image. "
-        "Observe again if the tab or document changes before pointing."
+        "Coordinates are pixels from the top-left of the newest screenshot still in context, "
+        "including its crop and zoom; region and canvas images map back to the viewport "
+        "automatically. Without a screenshot in context, coordinates are viewport CSS pixels, "
+        "like cursor and canvas positions. A red marker shows the pointer at capture time. "
+        "After a tab or document change, take a fresh screenshot before pointing."
     ),
 )
 

@@ -182,7 +182,6 @@ async def test_facade_renders_complete_blocks_in_plugin_list_order(completion_la
         "## Browser image history",
         "## Screenshot coordinates",
         "## Browser action chains",
-        "## Form filling",
         "## Workspace and downloads",
         *(
             ["## Extension", "## Explicit task completion"]

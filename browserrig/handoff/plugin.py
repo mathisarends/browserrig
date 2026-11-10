@@ -45,14 +45,12 @@ _HISTORY = TypeAdapter(tuple[HandoffReceipt, ...])
 _INSTRUCTIONS = Instructions(
     title="Human handoff",
     text=(
-        "Use request_human when a person must log in, confirm 2FA, or complete a blocked "
-        "browser step. The tool waits for the person. Its receipt distinguishes the human's "
-        "report from measured page changes. After human control or a host pause, inspect "
-        "the fresh browser observation and use its references before acting. A done report "
-        "does not prove success. Verify the requested state before repeating login or "
-        "submission. Recent handoffs remain in browser.handoffs across compaction; current "
-        "page observations take precedence over these historical reports. Never request "
-        "passwords, recovery codes or other credential values in the response note."
+        "Use request_human when a person must log in, confirm 2FA or complete a blocked "
+        "browser step; the tool waits for them. After a handoff or host pause, act on the "
+        "fresh observation and its refs. A human's done report does not prove success: "
+        "verify the requested state before repeating login or submission. Current "
+        "observations take precedence over earlier handoff reports. Never ask for "
+        "passwords, recovery codes or other credential values in the note."
     ),
 )
 

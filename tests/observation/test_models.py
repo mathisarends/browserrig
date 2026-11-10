@@ -282,7 +282,7 @@ def test_default_observation_explains_context_without_enabling_screenshots():
     observe = BrowserPerception()
     instructions = observe.renderer.instructions(observe.screenshots)
     assert "bounded page-text excerpt" in instructions
-    assert "marked as previews" in instructions and "scroll(up=" in instructions
+    assert "above/below previews" in instructions and "scroll(up=" in instructions
     assert "Screenshots are included only when requested" in instructions
 
 
