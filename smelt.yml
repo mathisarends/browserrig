@@ -91,6 +91,7 @@ architecture:
       may_depend_on: [core, scripts, input, browser, observation, tools, files, secrets]
     terminal: {path: terminal, may_depend_on: [core]}
     completion: {path: completion}
+    todos: {path: todos, may_depend_on: [core]}
 
 tests:
   # tests/<package>/test_<module>.py mirrors browserrig/<package>/<module>.py; a topic

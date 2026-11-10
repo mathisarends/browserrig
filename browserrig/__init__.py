@@ -77,6 +77,7 @@ from .readiness import (
 from .recording import RecordingResult, VideoRecording
 from .secrets import Secret, Secrets, SecretValue, Totp, env
 from .terminal import TerminalEvents
+from .todos import Todo, TodoList, Todos
 from .tools import (
     Actions,
     BrowserFileTools,
@@ -190,6 +191,9 @@ __all__ = [
     "Viewport",
     "WindowRatio",
     "TerminalEvents",
+    "Todo",
+    "TodoList",
+    "Todos",
     "browser_plugins",
     "browser_pack",
     "wait_for_page",
