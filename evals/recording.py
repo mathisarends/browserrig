@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -95,7 +96,12 @@ async def _login(context: BrowserContext, name: str, site: Site) -> None:
     username, password, submit = labels[name]
     page = await context.new_page()
     try:
-        response = await page.goto(site.url.rstrip("/") + paths[name])
+        response = None
+        for _ in range(10):
+            response = await page.goto(site.url.rstrip("/") + paths[name])
+            if response is None or response.status not in {502, 503, 504}:
+                break
+            await asyncio.sleep(2)
         if response is None or response.status >= 400:
             raise RuntimeError(f"Login page unavailable for {name}")
         if name == "reddit":

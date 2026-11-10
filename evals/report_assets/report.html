@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WebArena Hard · Agent-Diagnose</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #152239;
+        --muted: #64748b;
+        --line: #dfe6ee;
+        --bg: #f4f7fa;
+        --green: #087e65;
+        --red: #c13c4a;
+        --amber: #a56b08;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          Inter,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+        font-size: 14px;
+      }
+      header {
+        background: #13253d;
+        color: #fff;
+        padding: 38px max(28px, calc((100vw - 1400px) / 2));
+        border-top: 5px solid #41d7b5;
+      }
+      .eyebrow {
+        letter-spacing: 0.14em;
+        font-size: 11px;
+        font-weight: 750;
+        text-transform: uppercase;
+        color: #8fe8d3;
+      }
+      h1 {
+        font-size: clamp(26px, 3vw, 40px);
+        letter-spacing: -0.04em;
+        margin: 12px 0;
+      }
+      header p {
+        color: #b8c9dc;
+        max-width: 900px;
+        line-height: 1.7;
+        margin: 8px 0;
+      }
+      main {
+        max-width: 1456px;
+        margin: auto;
+        padding: 26px 28px 60px;
+      }
+      .meta {
+        font:
+          12px ui-monospace,
+          SFMono-Regular,
+          Consolas,
+          monospace;
+        color: #b8c9dc;
+        margin-top: 16px;
+        overflow-wrap: anywhere;
+      }
+      .notice {
+        background: #fff8e9;
+        color: #735219;
+        border: 1px solid #ecdcb8;
+        border-radius: 10px;
+        padding: 14px 18px;
+        line-height: 1.65;
+        margin-bottom: 22px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+      .card {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 20px;
+      }
+      .card .label {
+        font-size: 12px;
+        font-weight: 650;
+        color: var(--muted);
+      }
+      .card strong {
+        display: block;
+        font-size: 30px;
+        letter-spacing: -0.04em;
+        margin: 10px 0 6px;
+      }
+      .card small {
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      h2 {
+        font-size: 21px;
+        margin: 0 0 8px;
+        letter-spacing: -0.025em;
+      }
+      .intro {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.65;
+        margin: 0 0 18px;
+      }
+      .section {
+        margin: 30px 0;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      .panel {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 22px;
+      }
+      .panel h3 {
+        margin: 0 0 14px;
+        font-size: 15px;
+      }
+      .pattern {
+        display: grid;
+        grid-template-columns: minmax(140px, 1.3fr) 1fr 100px;
+        gap: 14px;
+        align-items: center;
+        padding: 11px 0;
+        border-bottom: 1px solid #edf1f5;
+      }
+      .pattern:last-child {
+        border: 0;
+      }
+      .pattern button {
+        padding: 0;
+        border: 0;
+        background: none;
+        text-align: left;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .bar {
+        height: 8px;
+        background: #edf1f5;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      .bar span {
+        display: block;
+        height: 100%;
+        background: #20aa8b;
+      }
+      .pattern small {
+        color: var(--muted);
+        font-size: 11px;
+        display: block;
+        margin-top: 4px;
+      }
+      .rate {
+        text-align: right;
+        font:
+          12px ui-monospace,
+          Consolas,
+          monospace;
+      }
+      .empty {
+        color: var(--muted);
+        padding: 20px 0;
+        line-height: 1.7;
+      }
+      .finding {
+        border-bottom: 1px solid var(--line);
+        padding: 16px 0;
+      }
+      .finding:first-child {
+        padding-top: 0;
+      }
+      .finding:last-child {
+        border: 0;
+      }
+      .finding h4 {
+        font-size: 14px;
+        margin: 0 0 8px;
+      }
+      .finding p {
+        font-size: 12px;
+        line-height: 1.7;
+        margin: 8px 0;
+        color: #45566e;
+      }
+      .tag {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 5px;
+        background: #eef3f8;
+        font-size: 11px;
+        font-weight: 600;
+        color: #52647d;
+        margin: 0 4px 4px 0;
+      }
+      .tag.pass {
+        color: #08745c;
+        background: #e3f6ee;
+      }
+      .tag.fail {
+        color: #a72e3c;
+        background: #ffecef;
+      }
+      .tag.error {
+        color: #976000;
+        background: #fff2d9;
+      }
+      .tag.blocked,
+      .tag.pending {
+        color: #627089;
+        background: #edf0f5;
+      }
+      .filterbar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 18px 0;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+      }
+      input,
+      select {
+        min-height: 40px;
+        padding: 8px 12px;
+        border: 1px solid #ccd6e2;
+        border-radius: 7px;
+        background: white;
+        color: var(--ink);
+      }
+      input {
+        flex: 1;
+        min-width: 180px;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid #0da98a;
+        outline-offset: 3px;
+      }
+      .button {
+        background: #eef3f8;
+        color: #33465f;
+        border: 1px solid #d5deea;
+        border-radius: 6px;
+        padding: 6px 9px;
+        font-size: 12px;
+        text-decoration: none;
+        display: inline-block;
+      }
+      .button:hover {
+        background: #dfe9f3;
+      }
+      .tablewrap {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+      }
+      th {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.045em;
+        color: #6b7a90;
+        background: #f9fbfd;
+        padding: 14px 16px;
+        white-space: nowrap;
+      }
+      td {
+        padding: 15px 16px;
+        border-top: 1px solid #edf1f5;
+        vertical-align: top;
+        font-size: 12px;
+      }
+      .task-button {
+        border: 0;
+        padding: 0;
+        color: #146c67;
+        font-weight: 750;
+        background: none;
+        font-size: 14px;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .task-intent {
+        max-width: 560px;
+        line-height: 1.6;
+      }
+      .task-intent small {
+        display: block;
+        color: var(--muted);
+        margin-top: 6px;
+      }
+      .number {
+        font-family: ui-monospace, Consolas, monospace;
+        white-space: nowrap;
+      }
+      .footnote {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.8;
+        margin-top: 18px;
+      }
+      dialog {
+        border: 0;
+        border-radius: 14px;
+        padding: 0;
+        width: min(1100px, 94vw);
+        max-height: 92vh;
+        box-shadow: 0 30px 100px #0005;
+        color: var(--ink);
+      }
+      dialog::backdrop {
+        background: #091b35b0;
+        backdrop-filter: blur(2px);
+      }
+      .dialoghead {
+        position: sticky;
+        top: 0;
+        background: #14273e;
+        color: white;
+        padding: 20px 26px;
+        display: flex;
+        justify-content: space-between;
+        z-index: 1;
+      }
+      .dialoghead h2 {
+        margin: 0;
+      }
+      .dialoghead button {
+        background: #ffffff18;
+        color: white;
+        border: 0;
+        border-radius: 6px;
+        padding: 7px 13px;
+      }
+      .dialogbody {
+        padding: 25px;
+      }
+      .dialogbody h3 {
+        margin: 26px 0 12px;
+        font-size: 16px;
+      }
+      .dialogbody p {
+        line-height: 1.75;
+      }
+      pre {
+        background: #f1f5f9;
+        padding: 14px;
+        border-radius: 7px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font:
+          11px/1.7 ui-monospace,
+          Consolas,
+          monospace;
+        max-height: 380px;
+        overflow: auto;
+      }
+      details {
+        margin: 12px 0;
+        border: 1px solid var(--line);
+        padding: 12px 15px;
+        border-radius: 8px;
+      }
+      summary {
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 650;
+      }
+      .timeline {
+        padding-left: 22px;
+      }
+      .timeline li {
+        padding: 8px 0 14px 9px;
+        border-left: 2px solid #dce6ef;
+        font-size: 12px;
+      }
+      .timeline li.failed {
+        border-color: #e06b79;
+      }
+      .timeline pre {
+        margin: 8px 0;
+        max-height: 180px;
+      }
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 18px 0;
+      }
+      @media (max-width: 950px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .cards {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      @media (max-width: 600px) {
+        main {
+          padding: 20px 14px;
+        }
+        header {
+          padding: 26px 20px;
+        }
+        .cards {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .card {
+          padding: 15px;
+        }
+        .card strong {
+          font-size: 26px;
+        }
+        .pattern {
+          grid-template-columns: 1fr 80px;
+        }
+        .pattern .bar {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="eyebrow">Browserrig / Capability evaluation</div>
+      <h1>Was kann der Agent — und wo scheitert er?</h1>
+      <p>
+        WebArena-Verified Hard · eingefrorene Aufgaben, offizielle Auswertung und
+        konkrete Belege aus Browser-Tools und Phoenix-Traces.
+      </p>
+      <div class="meta" id="metadata"></div>
+    </header>
+    <main>
+      <div class="notice" id="coverage"></div>
+      <div class="cards" id="cards"></div>
+      <div class="section grid">
+        <section class="panel">
+          <h2>Interaktionsmuster</h2>
+          <p class="intro">
+            Aufgaben-Erfolgsquote bei Verwendung des Musters. Mehrere Muster pro Aufgabe
+            sind möglich. Das zeigt Zusammenhänge, keine bewiesene Fehlerursache.
+            Anklicken filtert die Aufgaben.
+          </p>
+          <div id="patterns"></div>
+        </section>
+        <section class="panel">
+          <h2>Konkrete nächste Schritte</h2>
+          <p class="intro">
+            Aus tatsächlichen Fehlern, offiziellen Assertions und beobachtetem Ablauf
+            abgeleitet. Vermutete Ursachen sind als Hypothese markiert.
+          </p>
+          <div id="findings"></div>
+        </section>
+      </div>
+      <section class="section">
+        <h2>Alle 48 Aufgaben · mit vollständigem Kontext</h2>
+        <p class="intro">
+          Aufgaben-ID öffnen: Evaluator-Differenz, konkrete Verbesserungshypothesen,
+          Tool-Verlauf, Kontextwachstum und Artefakte.
+        </p>
+        <div class="filterbar">
+          <input
+            id="search"
+            aria-label="Aufgaben durchsuchen"
+            placeholder="ID, Aufgabenbeschreibung oder Fehlermeldung suchen …"
+          />
+          <select id="status" aria-label="Status">
+            <option value="">Alle Status</option>
+            <option value="fail">Fehlgeschlagen</option>
+            <option value="error">Lauffehler</option>
+            <option value="pass">Bestanden</option>
+            <option value="pending">Ausstehend</option>
+            <option value="blocked">Infrastruktur-blockiert</option>
+          </select>
+          <select id="site" aria-label="Website">
+            <option value="">Alle Websites</option>
+          </select>
+          <select id="pattern" aria-label="Interaktionsmuster">
+            <option value="">Alle Muster</option>
+          </select>
+          <select id="sort" aria-label="Sortierung">
+            <option value="status">Probleme zuerst</option>
+            <option value="tokens">Meiste Tokens</option>
+            <option value="time">Längste Dauer</option>
+            <option value="id">Aufgaben-ID</option>
+          </select>
+          <button class="button" id="reset">Zurücksetzen</button>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Aufgabe</th>
+                <th>Status</th>
+                <th>Auftrag / beobachtete Probleme</th>
+                <th>Modellschritte</th>
+                <th>Tokens in</th>
+                <th>Dauer</th>
+              </tr>
+            </thead>
+            <tbody id="tasks"></tbody>
+          </table>
+        </div>
+        <p class="footnote" id="footnote"></p>
+      </section>
+    </main>
+    <dialog id="detail">
+      <div class="dialoghead">
+        <h2 id="detail-title"></h2>
+        <button id="close">Schließen ×</button>
+      </div>
+      <div class="dialogbody" id="detail-body"></div>
+    </dialog>
+    <script type="application/json" id="report-data">
+      $data
+    </script>
+    <script type="module">
+      $script;
+    </script>
+  </body>
+</html>

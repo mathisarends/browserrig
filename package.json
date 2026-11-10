@@ -7,8 +7,8 @@
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
-    "format": "prettier --write \"browserrig/**/*.js\" \"*.mjs\"",
-    "format:check": "prettier --check \"browserrig/**/*.js\" \"*.mjs\""
+    "format": "prettier --write \"browserrig/**/*.js\" \"evals/report_assets/**/*.{mjs,html}\" \"*.mjs\"",
+    "format:check": "prettier --check \"browserrig/**/*.js\" \"evals/report_assets/**/*.{mjs,html}\" \"*.mjs\""
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

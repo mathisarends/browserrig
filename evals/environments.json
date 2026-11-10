@@ -7,7 +7,7 @@
     "password": "Password.123"
   },
   "shopping_admin": {
-    "url": "http://localhost:7780",
+    "url": "http://localhost:7780/admin",
     "control_port": 7781,
     "image": "am1n3e/webarena-verified-shopping_admin",
     "username": "admin",

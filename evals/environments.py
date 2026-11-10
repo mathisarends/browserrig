@@ -2,8 +2,10 @@
 
 import argparse
 import asyncio
+import copy
 import json
 import re
+from collections import Counter
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -39,10 +41,31 @@ class Environments:
                     f"The official reset command requires its default image for {name}"
                 )
             url = urlsplit(site.url)
-            if url.scheme != "http" or url.hostname != "localhost" or url.port is None:
+            local = url.hostname == "localhost" or (url.hostname or "").endswith(
+                ".localhost"
+            )
+            if url.scheme != "http" or not local or url.port is None:
                 raise ValueError(
                     f"The official local containers require http://localhost:PORT for {name}"
                 )
+
+    def for_task(self, sites: tuple[str, ...]) -> "Environments":
+        """Cookies ignore ports: give cross-site apps distinct local hostnames."""
+        hosts = Counter(urlsplit(self.sites[name].url).hostname for name in sites)
+        if len(hosts) == len(sites):
+            return self
+        isolated = copy.deepcopy(self)
+        for name in sites:
+            # Preserve GitLab's tested canonical origin; isolate the peer apps.
+            if name == "gitlab":
+                continue
+            parsed = urlsplit(self.sites[name].url)
+            if hosts[parsed.hostname] < 2:
+                continue
+            host = name.replace("_", "-") + ".localhost"
+            url = parsed._replace(netloc=f"{host}:{parsed.port}").geturl()
+            isolated.sites[name] = self.sites[name].model_copy(update={"url": url})
+        return isolated
 
     def render(self, text: str) -> str:
         for name, site in self.sites.items():
@@ -102,7 +125,8 @@ class Environments:
         """Upstream start recreates each site's container from its baseline image."""
         for name in sorted(sites):
             site = self.sites[name]
-            port = urlsplit(site.url).port
+            parsed = urlsplit(site.url)
+            port = parsed.port
             if port is None:
                 raise ValueError(f"An explicit local port is required for {name}")
             arguments = [
@@ -129,7 +153,7 @@ class Environments:
                 "env-ctrl",
                 "init",
                 "--base-url",
-                site.url,
+                parsed._replace(path="", query="", fragment="").geturl(),
                 log=log,
                 timeout=180,
             )

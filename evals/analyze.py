@@ -37,10 +37,16 @@ def px_spans(project: str, session_id: str) -> list[dict]:
     return json.loads(out.stdout or "[]")
 
 
-def analyze(record: TaskResult, project: str, dump_dir: Path | None) -> dict:
+def analyze(
+    record: TaskResult,
+    project: str,
+    dump_dir: Path | None,
+    *,
+    spans: list[dict] | None = None,
+) -> dict:
     if record.session_id is None:
         raise ValueError(f"{record.task}: no session to analyze")
-    spans = px_spans(project, record.session_id)
+    spans = px_spans(project, record.session_id) if spans is None else spans
     models = sorted(
         (s for s in spans if s["name"] == "harnessed.model"),
         key=lambda s: s["start_time"],

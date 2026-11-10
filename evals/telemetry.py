@@ -17,6 +17,12 @@ async def tracing_plugins(
         yield ()
         return
 
+    # Large browser observations produce sizeable spans. Keep batches small and
+    # allow a busy local collector enough time; explicit user settings still win.
+    os.environ.setdefault("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", "32")
+    os.environ.setdefault("OTEL_BSP_SCHEDULE_DELAY", "1000")
+    os.environ.setdefault("OTEL_EXPORTER_OTLP_TIMEOUT", "60")
+
     # OTel is an optional extra.
     # pylint: disable=import-outside-toplevel
     from harnessed.integrations.opentelemetry import OpenTelemetryTracer, otlp_provider

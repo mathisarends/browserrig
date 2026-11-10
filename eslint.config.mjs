@@ -5,7 +5,7 @@ import globals from 'globals';
 export default defineConfig([
   {
     ignores: [
-      '.venv/**',
+      '**/.venv/**',
       '.pytest_cache/**',
       '.ruff_cache/**',
       '.uv-cache/**',

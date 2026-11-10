@@ -109,6 +109,19 @@ def test_selection_never_resamples_and_rejects_unknown_ids():
         select(tasks, "9999")
 
 
+def test_cross_site_setup_isolates_port_independent_php_session_cookies():
+    original = Environments()
+
+    isolated = original.for_task(("shopping", "reddit"))
+
+    assert isolated.sites["shopping"].url == "http://shopping.localhost:7770"
+    assert isolated.sites["reddit"].url == "http://reddit.localhost:9999"
+    assert original.sites["shopping"].url == "http://localhost:7770"
+    assert isolated.evaluator_config()["environments"]["__SHOPPING__"]["urls"] == [
+        "http://shopping.localhost:7770"
+    ]
+
+
 def test_agent_prompt_does_not_include_grading_rules_or_reference_answers():
     task = _task().model_copy(
         update={

@@ -93,6 +93,9 @@ flushes the HAR, then invokes the unmodified official evaluator. Containers
 are explicitly initialized with their base URL after startup; this
 handles the current image CLI's required parameter. Browser locale is fixed to
 English (en-US) and timezone to UTC, including the automated login context.
+Cross-site attempts use distinct `.localhost` hostnames when apps would otherwise
+share a cookie domain. Ports do not isolate cookies: Reddit and Shopping both use
+`PHPSESSID`. Each attempt saves its exact URL mappings for offline grading.
 Shared mutable containers require `--parallel 1`; a process lock prevents overlapping runs from
 this checkout. Resets and login are outside the agent time budget. A timeout or
 unfinished session cannot pass. Cancellation closes the recording context and
@@ -141,6 +144,46 @@ For Phoenix, start `docker compose up -d --wait` and pass `--trace`. Existing
 OTel export and `python -m evals.analyze` keep working; session IDs link task results
 to traces. HARs and traces contain benchmark account/session data; keep artifacts
 local or redact them before sharing.
+
+## HTML diagnosis report
+
+The first [sanitized baseline](baselines/hard-48-v1-terra-2026-11-10.json) records
+29/43 official passes (67.4%), five infrastructure-blocked tasks, and one partial
+trace. Review annotations flag potential evaluator sensitivities without changing
+the official scores. Detailed HTML, HARs and trace exports remain local under
+`evals/results/`.
+
+Compatible suite shards can be combined into a standalone HTML report:
+
+```powershell
+uv run --no-sync python -m evals.html_report --glob '20261110-*suite-*.json' --output evals/results/webarena-hard-48-report.html --revision <agent-commit>
+```
+
+The report includes all 48 frozen IDs. Missing results remain pending; use
+`--blocked 267,428,558,561,760 --blocked-reason "..."` for infrastructure that
+could not be provisioned. Blocked and pending tasks never receive invented scores.
+`--watch --expected 43` updates the report as those 43 tasks finish. It rejects
+duplicate task attempts and incompatible models, datasets or budgets.
+
+The generator writes `.html`, `.data.json`, and a combined `.run.json`, plus cached
+Phoenix evidence and context dumps beside the report. No model or LLM judge is
+called. Interaction-pattern rates show task-level associations; tool error counts
+refer only to the matching tools. Failure details include the official assertions,
+recorded mutation requests, and literal expected-versus-sent form-field differences.
+These diagnostic comparisons do not change upstream grading. Session/token fields
+are redacted in the embedded request summaries; raw local artifacts are retained.
+Optional `.reviews.json` files add explicitly labeled Codex trace reviews, bound to
+the exact session IDs so findings cannot silently carry over to a different run.
+Trace coverage checks model-token totals and tool counts against local results.
+Incomplete traces are marked; complete local tool records are preferred when a
+Phoenix export loses spans. New runs also retain `messages.json` when available.
+The exporter uses small batches and a longer timeout by default, respecting explicit
+OpenTelemetry environment overrides.
+
+Corrections that failed before an agent session started may be retained as
+`setup-only-*suite-*.json`. They are disclosed in the report and excluded from the
+capability score; the generator verifies that they contain no agent sessions or
+model usage. Actual agent failures must remain in the scored suite.
 
 ## Reproduce the freeze
 

@@ -13,8 +13,10 @@ from typing import TYPE_CHECKING, Literal
 from harnessed import PolicyDecision, ToolCall
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.kernel import PluginLike
+from harnessed.models import Message
 from harnessed.plugins import Approvals
-from pydantic import TypeAdapter
+from pydantic import ConfigDict, TypeAdapter
+from pydantic_core import PydanticSerializationError
 
 from browserrig import (
     Agent,
@@ -35,6 +37,9 @@ if TYPE_CHECKING:
     from pydantic_ai.models import Model as NativeModel
 
 _TOOL_CALL_ADAPTER = TypeAdapter(ToolCall)
+_MESSAGES_ADAPTER = TypeAdapter(
+    list[Message], config=ConfigDict(ser_json_bytes="base64")
+)
 
 
 @dataclass(frozen=True)
@@ -60,6 +65,7 @@ async def run_task(
 ) -> TaskResult:
     """Isolate failures per attempt; cancellation propagates after flushing the HAR."""
     environments = environments or Environments()
+    environments = environments.for_task(task.sites)
     record = TaskResult(
         task=task.name,
         task_id=task.task_id,
@@ -104,6 +110,7 @@ async def run_task(
                 else:
                     phase = "evidence"
                     _capture(record, result)
+                    _write_messages(result.messages, workspace)
             # Grading files are outside the agent's Files workspace.
             (workspace / "agent_response.json").write_text(
                 record.answer or "null", encoding="utf-8"
@@ -166,6 +173,15 @@ def _agent(options: RunOptions, workspace: Path, endpoint: str, target: str) -> 
         ],
         without=() if options.humanlike else (InputPacing, InputVisualization),
     )
+
+
+def _write_messages(messages: Iterable[Message], workspace: Path) -> None:
+    values = list(messages)
+    try:
+        payload = _MESSAGES_ADAPTER.dump_json(values)
+    except PydanticSerializationError:
+        payload = json.dumps([repr(message) for message in values]).encode("utf-8")
+    (workspace / "messages.json").write_bytes(payload)
 
 
 def _capture(record: TaskResult, result) -> None:

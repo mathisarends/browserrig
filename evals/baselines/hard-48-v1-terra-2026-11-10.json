@@ -1,0 +1,832 @@
+{
+  "subset": "browserrig-webarena-verified-hard-48-v1",
+  "dataset_sha256": "9a89e53078942118ab623a1bbfcd461a38bd102a49e7ca258679cf15537bd422",
+  "agent_commit": "ac975f21191a964ae1f463dc436a36e8169055c9",
+  "agent_source_sha256": "29e7c0dfc42d925350376dd7bc57563e4e9205ceed3802b6e187379b849c7b5d",
+  "model": "gpt-6.1-terra",
+  "provider": "openai-codex",
+  "date": "2026-11-10",
+  "max_steps": 50,
+  "timeout": 300,
+  "scoring": "Unmodified webarena-verified 1.2.3; official binary score retained. Review labels do not change scores.",
+  "summary": {
+    "planned": 48,
+    "executed": 43,
+    "passed": 29,
+    "failed": 14,
+    "infrastructure_errors": 0,
+    "blocked": 5,
+    "pass_rate": 0.6744186046511628,
+    "input_tokens": 8559964,
+    "output_tokens": 12929,
+    "trace_complete": 42,
+    "trace_partial": 1
+  },
+  "blocked_reason": "Insufficient local disk for Map archives plus extraction; Wikipedia source unavailable. No substitute websites or resampling.",
+  "tasks": [
+    {
+      "task_id": 29,
+      "sites": [
+        "reddit"
+      ],
+      "operation": "retrieve",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 54.3,
+      "input_tokens": 32359,
+      "output_tokens": 123,
+      "tool_calls": 3,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 106,
+      "sites": [
+        "gitlab"
+      ],
+      "operation": "navigate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 88.4,
+      "input_tokens": 190204,
+      "output_tokens": 218,
+      "tool_calls": 10,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 116,
+      "sites": [
+        "shopping_admin"
+      ],
+      "operation": "retrieve",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 292.6,
+      "input_tokens": 837574,
+      "output_tokens": 1006,
+      "tool_calls": 34,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 124,
+      "sites": [
+        "shopping"
+      ],
+      "operation": "retrieve",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 59.7,
+      "input_tokens": 52578,
+      "output_tokens": 140,
+      "tool_calls": 4,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-filter-scope"
+      ]
+    },
+    {
+      "task_id": 143,
+      "sites": [
+        "shopping"
+      ],
+      "operation": "retrieve",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 73.4,
+      "input_tokens": 52962,
+      "output_tokens": 237,
+      "tool_calls": 4,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-filter-scope"
+      ]
+    },
+    {
+      "task_id": 149,
+      "sites": [
+        "shopping"
+      ],
+      "operation": "retrieve",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 70.9,
+      "input_tokens": 66109,
+      "output_tokens": 119,
+      "tool_calls": 5,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 157,
+      "sites": [
+        "shopping_admin"
+      ],
+      "operation": "navigate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 88.3,
+      "input_tokens": 22832,
+      "output_tokens": 65,
+      "tool_calls": 2,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 165,
+      "sites": [
+        "shopping"
+      ],
+      "operation": "retrieve",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 43.6,
+      "input_tokens": 18871,
+      "output_tokens": 75,
+      "tool_calls": 2,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 186,
+      "sites": [
+        "shopping_admin"
+      ],
+      "operation": "retrieve",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 75.5,
+      "input_tokens": 79593,
+      "output_tokens": 183,
+      "tool_calls": 6,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 200,
+      "sites": [
+        "shopping_admin"
+      ],
+      "operation": "retrieve",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 56.2,
+      "input_tokens": 30601,
+      "output_tokens": 97,
+      "tool_calls": 3,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 214,
+      "sites": [
+        "shopping_admin"
+      ],
+      "operation": "retrieve",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 89.8,
+      "input_tokens": 134547,
+      "output_tokens": 320,
+      "tool_calls": 11,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-benchmark-sensitivity"
+      ]
+    },
+    {
+      "task_id": 267,
+      "sites": [
+        "wikipedia",
+        "map"
+      ],
+      "operation": "retrieve",
+      "status": "blocked",
+      "score": null,
+      "seconds": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "tool_calls": null,
+      "tool_errors": null,
+      "trace_coverage": null,
+      "review_categories": []
+    },
+    {
+      "task_id": 271,
+      "sites": [
+        "shopping"
+      ],
+      "operation": "navigate",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 67.1,
+      "input_tokens": 47755,
+      "output_tokens": 171,
+      "tool_calls": 4,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-url-state"
+      ]
+    },
+    {
+      "task_id": 284,
+      "sites": [
+        "shopping"
+      ],
+      "operation": "navigate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 113.8,
+      "input_tokens": 332681,
+      "output_tokens": 365,
+      "tool_calls": 15,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 307,
+      "sites": [
+        "gitlab"
+      ],
+      "operation": "retrieve",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 92.3,
+      "input_tokens": 212683,
+      "output_tokens": 227,
+      "tool_calls": 9,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 316,
+      "sites": [
+        "gitlab"
+      ],
+      "operation": "retrieve",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 73.8,
+      "input_tokens": 75807,
+      "output_tokens": 174,
+      "tool_calls": 6,
+      "tool_errors": 1,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 399,
+      "sites": [
+        "reddit"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 55.5,
+      "input_tokens": 31880,
+      "output_tokens": 125,
+      "tool_calls": 5,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 415,
+      "sites": [
+        "gitlab"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 106.3,
+      "input_tokens": 94608,
+      "output_tokens": 219,
+      "tool_calls": 8,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 428,
+      "sites": [
+        "wikipedia",
+        "map"
+      ],
+      "operation": "navigate",
+      "status": "blocked",
+      "score": null,
+      "seconds": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "tool_calls": null,
+      "tool_errors": null,
+      "trace_coverage": null,
+      "review_categories": []
+    },
+    {
+      "task_id": 443,
+      "sites": [
+        "gitlab"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 120.0,
+      "input_tokens": 550705,
+      "output_tokens": 491,
+      "tool_calls": 21,
+      "tool_errors": 2,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 489,
+      "sites": [
+        "shopping_admin"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 70.9,
+      "input_tokens": 71689,
+      "output_tokens": 169,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 499,
+      "sites": [
+        "shopping_admin"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 89.9,
+      "input_tokens": 114559,
+      "output_tokens": 245,
+      "tool_calls": 10,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 507,
+      "sites": [
+        "shopping"
+      ],
+      "operation": "mutate",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 133.5,
+      "input_tokens": 296286,
+      "output_tokens": 303,
+      "tool_calls": 15,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-benchmark-sensitivity"
+      ]
+    },
+    {
+      "task_id": 509,
+      "sites": [
+        "shopping"
+      ],
+      "operation": "mutate",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 151.6,
+      "input_tokens": 1224449,
+      "output_tokens": 918,
+      "tool_calls": 26,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-multi-criteria"
+      ]
+    },
+    {
+      "task_id": 520,
+      "sites": [
+        "shopping"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 39.4,
+      "input_tokens": 20397,
+      "output_tokens": 67,
+      "tool_calls": 2,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 522,
+      "sites": [
+        "gitlab"
+      ],
+      "operation": "mutate",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 132.8,
+      "input_tokens": 467093,
+      "output_tokens": 350,
+      "tool_calls": 15,
+      "tool_errors": 1,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-async-completion"
+      ]
+    },
+    {
+      "task_id": 523,
+      "sites": [
+        "gitlab"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 127.3,
+      "input_tokens": 301928,
+      "output_tokens": 289,
+      "tool_calls": 12,
+      "tool_errors": 0,
+      "trace_coverage": "partial",
+      "review_categories": []
+    },
+    {
+      "task_id": 549,
+      "sites": [
+        "shopping_admin"
+      ],
+      "operation": "mutate",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 93.8,
+      "input_tokens": 189906,
+      "output_tokens": 330,
+      "tool_calls": 11,
+      "tool_errors": 1,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-create-vs-select"
+      ]
+    },
+    {
+      "task_id": 558,
+      "sites": [
+        "gitlab",
+        "wikipedia"
+      ],
+      "operation": "mutate",
+      "status": "blocked",
+      "score": null,
+      "seconds": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "tool_calls": null,
+      "tool_errors": null,
+      "trace_coverage": null,
+      "review_categories": []
+    },
+    {
+      "task_id": 561,
+      "sites": [
+        "gitlab",
+        "wikipedia"
+      ],
+      "operation": "mutate",
+      "status": "blocked",
+      "score": null,
+      "seconds": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "tool_calls": null,
+      "tool_errors": null,
+      "trace_coverage": null,
+      "review_categories": []
+    },
+    {
+      "task_id": 565,
+      "sites": [
+        "gitlab",
+        "reddit"
+      ],
+      "operation": "mutate",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 208.2,
+      "input_tokens": 957575,
+      "output_tokens": 1625,
+      "tool_calls": 35,
+      "tool_errors": 6,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-benchmark-sensitivity"
+      ]
+    },
+    {
+      "task_id": 581,
+      "sites": [
+        "reddit"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 73.5,
+      "input_tokens": 48437,
+      "output_tokens": 195,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 610,
+      "sites": [
+        "reddit"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 136.5,
+      "input_tokens": 88683,
+      "output_tokens": 331,
+      "tool_calls": 12,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 617,
+      "sites": [
+        "reddit"
+      ],
+      "operation": "mutate",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 112.0,
+      "input_tokens": 217102,
+      "output_tokens": 379,
+      "tool_calls": 13,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-source-selection"
+      ]
+    },
+    {
+      "task_id": 625,
+      "sites": [
+        "reddit"
+      ],
+      "operation": "mutate",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 74.2,
+      "input_tokens": 71101,
+      "output_tokens": 170,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-target-context"
+      ]
+    },
+    {
+      "task_id": 638,
+      "sites": [
+        "reddit"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 79.8,
+      "input_tokens": 70637,
+      "output_tokens": 217,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 640,
+      "sites": [
+        "reddit"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 72.3,
+      "input_tokens": 51975,
+      "output_tokens": 209,
+      "tool_calls": 8,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 645,
+      "sites": [
+        "reddit"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 80.6,
+      "input_tokens": 43936,
+      "output_tokens": 172,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 672,
+      "sites": [
+        "shopping",
+        "reddit"
+      ],
+      "operation": "mutate",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 125.2,
+      "input_tokens": 311246,
+      "output_tokens": 470,
+      "tool_calls": 18,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-row-cardinality"
+      ]
+    },
+    {
+      "task_id": 686,
+      "sites": [
+        "reddit",
+        "gitlab"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 100.6,
+      "input_tokens": 84088,
+      "output_tokens": 234,
+      "tool_calls": 9,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 696,
+      "sites": [
+        "shopping_admin"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 90.1,
+      "input_tokens": 145437,
+      "output_tokens": 259,
+      "tool_calls": 11,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 701,
+      "sites": [
+        "shopping_admin"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 96.5,
+      "input_tokens": 192128,
+      "output_tokens": 439,
+      "tool_calls": 16,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 735,
+      "sites": [
+        "reddit"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 96.2,
+      "input_tokens": 78515,
+      "output_tokens": 201,
+      "tool_calls": 8,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 760,
+      "sites": [
+        "map",
+        "shopping_admin"
+      ],
+      "operation": "navigate",
+      "status": "blocked",
+      "score": null,
+      "seconds": null,
+      "input_tokens": null,
+      "output_tokens": null,
+      "tool_calls": null,
+      "tool_errors": null,
+      "trace_coverage": null,
+      "review_categories": []
+    },
+    {
+      "task_id": 786,
+      "sites": [
+        "gitlab"
+      ],
+      "operation": "retrieve",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 64.6,
+      "input_tokens": 35019,
+      "output_tokens": 96,
+      "tool_calls": 3,
+      "tool_errors": 1,
+      "trace_coverage": "complete",
+      "review_categories": []
+    },
+    {
+      "task_id": 795,
+      "sites": [
+        "shopping"
+      ],
+      "operation": "mutate",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 44.1,
+      "input_tokens": 24280,
+      "output_tokens": 119,
+      "tool_calls": 2,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-benchmark-sensitivity"
+      ]
+    },
+    {
+      "task_id": 801,
+      "sites": [
+        "gitlab"
+      ],
+      "operation": "mutate",
+      "status": "fail",
+      "score": 0.0,
+      "seconds": 151.2,
+      "input_tokens": 475002,
+      "output_tokens": 625,
+      "tool_calls": 29,
+      "tool_errors": 1,
+      "trace_coverage": "complete",
+      "review_categories": [
+        "review-benchmark-sensitivity"
+      ]
+    },
+    {
+      "task_id": 804,
+      "sites": [
+        "gitlab"
+      ],
+      "operation": "mutate",
+      "status": "pass",
+      "score": 1.0,
+      "seconds": 69.0,
+      "input_tokens": 114147,
+      "output_tokens": 162,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "trace_coverage": "complete",
+      "review_categories": []
+    }
+  ]
+}
