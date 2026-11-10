@@ -2,7 +2,7 @@
 
 Harnessed `Agent` is the composition root. Browserrig plugins own session state,
 tools and hooks; ordinary Python strategies implement capture, rendering,
-readiness and action-chain decisions. Browserrig targets Harnessed 0.15.0.
+readiness and action-chain decisions. Browserrig targets Harnessed 0.15.1.
 
 ## A browser agent with screenshots
 

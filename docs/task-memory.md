@@ -115,5 +115,10 @@ success, token use and repeated work in separately labeled runs before claiming 
 improvement. No new paid evaluation is required to enable the protocol.
 
 The integration wraps the compaction policy and summarizer of pinned Harnessed
-0.15.0. This narrow internal boundary is covered by real compaction, recovery,
+0.15.1. This narrow internal boundary is covered by real compaction, recovery,
 budget and session-store tests; review it when upgrading Harnessed.
+
+Harnessed 0.15.1's [Compaction API proposal](https://github.com/mathisarends/harnessed/blob/v0.15.1/docs/contributing/compaction-api.md)
+describes future work. Its proposed `llm`, replaceable `prompt` and
+`keep_last_steps` options are not available in this release; continue using the
+current options above, including `keep_steps`.

@@ -1,6 +1,6 @@
 # Browserrig
 
-Browserrig is an event-driven Chrome automation library for AI agents and Python applications. It combines direct browser access with a composable [Harnessed](https://github.com/mathisarends/harnessed/releases/tag/v0.15.0) agent, structured page observations, browser actions, and typed events.
+Browserrig is an event-driven Chrome automation library for AI agents and Python applications. It combines direct browser access with a composable [Harnessed](https://github.com/mathisarends/harnessed/releases/tag/v0.15.1) agent, structured page observations, browser actions, and typed events.
 
 Agents can navigate tabs, interact with DOM elements or screenshot coordinates, download and read files, and be paused or steered during a session. Chrome can be launched locally or connected through CDP.
 
@@ -39,7 +39,7 @@ python -m pip install "browserrig[openai,ocr]"    # document readers and OCR
 
 To run the examples from a source checkout instead (uv required):
 
-Harnessed and all provider extras are pinned to the published `0.15.0` release,
+Harnessed and all provider extras are pinned to the published `0.15.1` release,
 with native ordinary-message input and explicit stream contexts.
 Existing Harnessed 0.12 snapshots, stores and audit logs are incompatible; back up
 old application data and start new stores. See the [upgrade notes](CHANGELOG.md).

@@ -134,7 +134,7 @@ version and tag. This setup PR creates no release or tag itself.
 
 ## Harnessed compatibility
 
-Harnessed and all provider extras are pinned to the published 0.15.0 release.
+Harnessed and all provider extras are pinned to the published 0.15.1 release.
 `session.append_message(UserMessage(...))` adds durable background without starting
 a turn. State format 2, checkpoint/store format 3 and audit envelope 5 reject older
 data; back up old application data and start fresh stores.

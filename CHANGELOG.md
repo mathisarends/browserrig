@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Pin Harnessed and every provider/MCP/OTel extra to 0.15.1. This upstream
+  documentation-only patch leaves runtime APIs and persisted formats unchanged;
+  its Compaction API proposal is future work, so no application or data migration
+  is required.
+
 - Add `read_todos()` for explicit plan recall; stale-plan reminders now name the
   tools instead of repeating the list. Reads also refresh the reminder interval.
 - Use `TaskMemory` in the default browser pack: working notes remain in
