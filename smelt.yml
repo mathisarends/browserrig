@@ -70,7 +70,7 @@ architecture:
     readiness: {path: readiness, may_depend_on: [core, scripts, files, browser]}
     observation:
       path: observation
-      may_depend_on: [core, scripts, browser, readiness, nudges, secrets]
+      may_depend_on: [core, scripts, files, browser, readiness, nudges, secrets]
     nudges: {path: nudges, may_depend_on: [core, browser]}
     # Observation redacts with secrets; the way back is recorded debt.
     secrets: {path: secrets, may_depend_on: [core, scripts, input, browser]}

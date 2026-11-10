@@ -1,4 +1,5 @@
 import re
+from typing import Self
 from urllib.parse import urljoin, urlsplit
 
 from cdpify import CDPCommandError
@@ -24,11 +25,14 @@ class PageContent(Options):
     offset: int = 0
     next_offset: int | None = None
     partial: bool = False
+    extracted_path: str | None = None
     # The visible part of the page that was read, in viewport CSS pixels.
     region: Bounds | None = None
 
     def render(self) -> str:
         text = f"# {_heading(self.title) or 'Page content'}\n\nSource: <{_source(self.url)}>"
+        if self.extracted_path is not None:
+            text += f"\n\nSaved extraction: {self.extracted_path}"
         if self.offset:
             text += f"\n\n(continued from offset {self.offset})"
         if self.markdown:
@@ -38,6 +42,22 @@ class PageContent(Options):
                 f"> - {item}" for item in self.limitations
             )
         return text
+
+    def page(self, offset: int, max_chars: int) -> Self:
+        """Read a response-sized part of the same saved snapshot."""
+        if not 0 <= offset <= _MAX_OFFSET or not 1 <= max_chars <= 200000:
+            raise ValueError("Use offset in [0, 2000000] and max_chars in [1, 200000]")
+        limitations = list(self.limitations)
+        body, following = _page(self.markdown, offset, max_chars, False, limitations)
+        return self.model_copy(
+            update={
+                "markdown": body,
+                "offset": offset,
+                "next_offset": following,
+                "limitations": tuple(limitations),
+                "partial": self.partial or following is not None,
+            }
+        )
 
 
 @traced
@@ -54,6 +74,31 @@ async def extract_content(
         raise ValueError("max_chars must be between 1 and 200000")
     if not 0 <= offset <= _MAX_OFFSET:
         raise ValueError(f"offset must be between 0 and {_MAX_OFFSET}")
+    return await _extract_document(
+        tab, max_chars=max_chars, full_page=full_page, offset=offset
+    )
+
+
+async def extract_document(tab: Tab, *, full_page: bool = False) -> PageContent:
+    """Capture one bounded snapshot before response pagination."""
+    content = await _extract_document(
+        tab, max_chars=_MAX_OFFSET, full_page=full_page, offset=0
+    )
+    limitations = tuple(
+        item
+        for item in content.limitations
+        if not item.startswith("Page content continues;")
+    )
+    if content.next_offset is not None:
+        limitations += (
+            "Saved extraction reached the 2000000-character snapshot limit",
+        )
+    return content.model_copy(update={"next_offset": None, "limitations": limitations})
+
+
+async def _extract_document(
+    tab: Tab, *, max_chars: int, full_page: bool, offset: int
+) -> PageContent:
     if tab.dialog:
         raise BrowserError("Handle the open dialog before extracting page content")
     await tab.sync_document()

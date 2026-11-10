@@ -14,6 +14,8 @@ from .models import CapturedImage
 class BrowserPerceptionState:
     observation: CapturedObservation | None = None
     extracted_content: ExtractedContent | None = None
+    saved_content: ExtractedContent | None = None
+    content_key: tuple[TargetId, DocumentId, bool, int] | None = None
     delivered_image: CapturedImage | None = None
     screenshot_requested: bool = False
     screenshot_region: Region | None = None
