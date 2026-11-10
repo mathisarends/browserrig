@@ -1,0 +1,8 @@
+[project]
+name = "browserrig-webarena-evaluator"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = ["webarena-verified==1.2.3"]
+
+[tool.uv]
+package = false

@@ -1,0 +1,2355 @@
+[
+  {
+    "sites": [
+      "reddit"
+    ],
+    "task_id": 29,
+    "intent_template_id": 33,
+    "start_urls": [
+      "__REDDIT__"
+    ],
+    "intent": "In the DIY forum, get the username and post title of the most recent post, and count the number of comments on that post that are not from the author and have more downvotes than upvotes. Return a list of objects with keys \"username\", \"post_title\", and \"count\".",
+    "intent_template": "In the {{forum}} forum, get the username and post title of the most recent post, and count the number of comments on that post that are not from the author and have more downvotes than upvotes. {{retrieved_data_format_spec}}.",
+    "instantiation_dict": {
+      "forum": "DIY",
+      "retrieved_data_format_spec": "Return a list of objects with keys \"username\", \"post_title\", and \"count\""
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "username": {
+                "type": "string"
+              },
+              "post_title": {
+                "type": "string"
+              },
+              "count": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            {
+              "username": "ziostraccette",
+              "post_title": "How can I bring an HDMI cable from my pc downstairs to my TV upstairs?",
+              "count": 0
+            }
+          ]
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "gitlab"
+    ],
+    "task_id": 106,
+    "intent_template_id": 349,
+    "start_urls": [
+      "__GITLAB__"
+    ],
+    "intent": "Navigate to the page showing the list of open issues in the umano/AndroidSlidingUpPanel repository that have labels related to all except BUG",
+    "intent_template": "Navigate to the page showing the list of {{state}} issues in the {{repo}} repository that have labels related to {{label}}",
+    "instantiation_dict": {
+      "label": "all except BUG",
+      "repo": "umano/AndroidSlidingUpPanel",
+      "state": "open"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "navigate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "ignored_query_params_patterns": [
+          ".*"
+        ],
+        "expected": {
+          "url": "^__GITLAB__/umano/AndroidSlidingUpPanel/-/issues.*$"
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "ignored_query_params_patterns": [
+          "page",
+          "sort"
+        ],
+        "expected": {
+          "url": "__GITLAB__/api/graphql",
+          "http_method": "POST",
+          "headers": {
+            "referer": "__GITLAB__/umano/AndroidSlidingUpPanel/-/issues/?state=opened&not%5Blabel_name%5D%5B%5D=BUG"
+          }
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping_admin"
+    ],
+    "task_id": 116,
+    "intent_template_id": 245,
+    "start_urls": [
+      "__SHOPPING_ADMIN__"
+    ],
+    "intent": "Return the customer nickname(s) who gave a rating of 3 stars or below for tanks products",
+    "intent_template": "Return the customer nickname(s) who gave a rating of 3 stars or below for {{product}}",
+    "instantiation_dict": {
+      "product": "tanks products"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            "Dominic",
+            "Trey",
+            "Edmund",
+            "Merrie",
+            "Shaunte",
+            "Teofila",
+            "Carma",
+            "Yan",
+            "Valorie",
+            "Mikkel",
+            "Matthew",
+            "Monroe",
+            "Scotty",
+            "Alexander",
+            "Tracey",
+            "Joey"
+          ]
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping"
+    ],
+    "task_id": 124,
+    "intent_template_id": 159,
+    "start_urls": [
+      "__SHOPPING__"
+    ],
+    "intent": "What is the price range of wireless earphone in the One Stop Market?. Return an object with keys \"min\" and \"max\" (as numbers, e.g., 10.99) only, without any additional details.",
+    "intent_template": "What is the price range of {{product}} in the One Stop Market?. {{retrieved_data_format_spec}}.",
+    "instantiation_dict": {
+      "product": "wireless earphone",
+      "retrieved_data_format_spec": "Return an object with keys \"min\" and \"max\" (as numbers, e.g., 10.99) only, without any additional details"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "min": {
+                "type": "number",
+                "format": "currency"
+              },
+              "max": {
+                "type": "number",
+                "format": "currency"
+              }
+            }
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            {
+              "min": 0.01,
+              "max": 298.0
+            }
+          ]
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping"
+    ],
+    "task_id": 143,
+    "intent_template_id": 162,
+    "start_urls": [
+      "__SHOPPING__"
+    ],
+    "intent": "Return how much I spent on home decoration shopping during January 29, 2023 without considering shipping and handling fee. Return the value as a number (e.g., 10.99) only, without any additional details",
+    "intent_template": "Return how much I spent on {{category}} shopping {{time}} without considering shipping and handling fee. {{retrieved_data_format_spec}}",
+    "instantiation_dict": {
+      "category": "home decoration",
+      "time": "during January 29, 2023",
+      "retrieved_data_format_spec": "Return the value as a number (e.g., 10.99) only, without any additional details"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "currency"
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            260.69
+          ]
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping"
+    ],
+    "task_id": 149,
+    "intent_template_id": 155,
+    "start_urls": [
+      "__SHOPPING__"
+    ],
+    "intent": "Get the color of the artifical plants I bought Feb 2023.",
+    "intent_template": "Get the {{option}} of the {{product}} I bought {{time}}.{{retrieved_data_format_spec}}",
+    "instantiation_dict": {
+      "option": "color",
+      "product": "artifical plants",
+      "time": "Feb 2023",
+      "retrieved_data_format_spec": ""
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            "Green-vines"
+          ]
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping_admin"
+    ],
+    "task_id": 157,
+    "intent_template_id": 255,
+    "start_urls": [
+      "__SHOPPING_ADMIN__"
+    ],
+    "intent": "View the details of all customers",
+    "intent_template": "View the details of all customers",
+    "instantiation_dict": {},
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "navigate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING_ADMIN__/customer/index/"
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping"
+    ],
+    "task_id": 165,
+    "intent_template_id": 136,
+    "start_urls": [
+      "__SHOPPING__/sandgrens-swedish-handmade-wooden-clog-sandal-copenhagen.html"
+    ],
+    "intent": "Get all review titles with 2 stars or below for the product on the current page.",
+    "intent_template": "Get all review titles with 2 stars or below for the product on the current page.",
+    "instantiation_dict": {},
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            "So cute but too small",
+            "Toe rubbed"
+          ]
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping_admin"
+    ],
+    "task_id": 186,
+    "intent_template_id": 368,
+    "start_urls": [
+      "__SHOPPING_ADMIN__"
+    ],
+    "intent": "Give me the product names and the sizes of the products that have 2-3 units left. Return a list of objects with keys \"name\" and \"size\".",
+    "intent_template": "Give me the {{Attribute}} of the products that have {{N}} units left{{retrieved_data_format_spec}}",
+    "instantiation_dict": {
+      "Attribute": "product names and the sizes",
+      "N": "2-3",
+      "retrieved_data_format_spec": ". Return a list of objects with keys \"name\" and \"size\"."
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "size": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            {
+              "name": "Eos V-Neck Hoodie-S-Blue",
+              "size": "S"
+            },
+            {
+              "name": "Minerva LumaTech™ V-Tee-XS-Blue",
+              "size": "XS"
+            }
+          ]
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping_admin"
+    ],
+    "task_id": 200,
+    "intent_template_id": 366,
+    "start_urls": [
+      "__SHOPPING_ADMIN__"
+    ],
+    "intent": "Get the billing name of the oldest complete order.",
+    "intent_template": "Get the {{attribute}} of the {{status}} order.{{retrieved_data_format_spec}}",
+    "instantiation_dict": {
+      "attribute": "billing name",
+      "status": "oldest complete",
+      "retrieved_data_format_spec": ""
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            "John Lee"
+          ]
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping_admin"
+    ],
+    "task_id": 214,
+    "intent_template_id": 249,
+    "start_urls": [
+      "__SHOPPING_ADMIN__"
+    ],
+    "intent": "Get the title and rating for all reviews with 3 stars or below for Erica Sports Bra. Return a list of objects with keys \"title\" and \"rating\".",
+    "intent_template": "Get the title and rating for all reviews with 3 stars or below for {{product}}. {{retrieved_data_format_spec}}.",
+    "instantiation_dict": {
+      "product": "Erica Sports Bra",
+      "retrieved_data_format_spec": "Return a list of objects with keys \"title\" and \"rating\""
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "rating": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            {
+              "title": "Doesn't fit me. Luma fail.",
+              "rating": "2"
+            },
+            {
+              "title": "does not fit. worthless.",
+              "rating": "1"
+            }
+          ]
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "wikipedia",
+      "map"
+    ],
+    "task_id": 267,
+    "intent_template_id": 85,
+    "start_urls": [
+      "__MAP__",
+      "__WIKIPEDIA__"
+    ],
+    "intent": "Get the relation ID of the closest national park to the hometown of Stephen King and the time to drive there. Return a list of objects with keys \"relation_id\" (integer) and \"duration\" (in HH:MM:SS format) only, without any additional details. (Use the OSRM direction service and the provided wiki to look up any needed information and search both source and destination by coordinates from the place official page on the wiki.)",
+    "intent_template": "Get the relation ID of the closest national park to {{city}} and the {{metric_phrase}} to {{travel_mode}} there. {{retrieved_data_format_spec}}. (Use the OSRM direction service and the provided wiki to look up any needed information and search both source and destination by coordinates from the place official page on the wiki.)",
+    "instantiation_dict": {
+      "city": "the hometown of Stephen King",
+      "travel_mode": "drive",
+      "metric_phrase": "time",
+      "retrieved_data_format_spec": "Return a list of objects with keys \"relation_id\" (integer) and \"duration\" (in HH:MM:SS format) only, without any additional details"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "relation_id": {
+                "type": "integer"
+              },
+              "duration": {
+                "type": "string",
+                "format": "duration"
+              }
+            }
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            {
+              "relation_id": 2176999,
+              "duration": "01:33:00"
+            }
+          ]
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "ignored_query_params_patterns": [
+          ".*"
+        ],
+        "expected": {
+          "url": "^.*/route/.*/-68.2177005,44.3494709;-68.767507,44.8030715.*$",
+          "headers": {
+            "Cookie": "^(?!.*_osm_directions_engine=fossgis_osrm_(?:bicycle|foot)).*$"
+          }
+        }
+      }
+    ],
+    "revision": 4
+  },
+  {
+    "sites": [
+      "shopping"
+    ],
+    "task_id": 271,
+    "intent_template_id": 139,
+    "start_urls": [
+      "__SHOPPING__"
+    ],
+    "intent": "Open the \"makeup remover\" category page filtered to under $46.99",
+    "intent_template": "Open the \"{{product_category}}\" category page filtered to {{price_range}}",
+    "instantiation_dict": {
+      "price_range": "under $46.99",
+      "product_category": "makeup remover"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "navigate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING__/beauty-personal-care/makeup/makeup-remover.html",
+          "query_params": {
+            "price": [
+              "0-46.99"
+            ]
+          }
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping"
+    ],
+    "task_id": 284,
+    "intent_template_id": 207,
+    "start_urls": [
+      "__SHOPPING__"
+    ],
+    "intent": "View the product page for the least expensive shoe storage with a minimum storage capacity of 12 pairs.",
+    "intent_template": "View the product page for the least expensive {{product}} with a minimum storage capacity of {{min_storage}}.",
+    "instantiation_dict": {
+      "product": "shoe storage",
+      "min_storage": "12 pairs"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "navigate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING__/onlyeasy-over-the-door-shoe-storage-organizer-hanging-shoe-rack-holder-with-24-large-fabric-pockets-22-1-x-61-4-herringbone-grey-mxrodsb1p.html"
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "gitlab"
+    ],
+    "task_id": 307,
+    "intent_template_id": 321,
+    "start_urls": [
+      "__GITLAB__/a11yproject/a11yproject.com"
+    ],
+    "intent": "How many commits did Nic Chan make on April 7th 2022 in the current repository?",
+    "intent_template": "How many commits did {{user}} make {{period}} in the current repository?",
+    "instantiation_dict": {
+      "user": "Nic Chan",
+      "period": "on April 7th 2022"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            5
+          ]
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "gitlab"
+    ],
+    "task_id": 316,
+    "intent_template_id": 324,
+    "start_urls": [
+      "__GITLAB__"
+    ],
+    "intent": "Get the email addresses of the top 3 contributors (by commit count) to facebook\"s guide on building react apps repo",
+    "intent_template": "Get the {{attribute}} of the top 3 contributors (by commit count) to {{repo}} repo{{retrieved_data_format_spec}}",
+    "instantiation_dict": {
+      "repo": "facebook\"s guide on building react apps",
+      "attribute": "email addresses",
+      "retrieved_data_format_spec": ""
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            "dan.abramov@gmail.com",
+            "timer150@gmail.com",
+            "ian@iansutherland.ca"
+          ]
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "reddit"
+    ],
+    "task_id": 399,
+    "intent_template_id": 6,
+    "start_urls": [
+      "__REDDIT__"
+    ],
+    "intent": "Change my bio to \"I am a robot\" in the discussion forum",
+    "intent_template": "Change my bio to \"{{content}}\" in the discussion forum",
+    "instantiation_dict": {
+      "content": "I am a robot"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "last_event_only": false,
+        "expected": {
+          "url": "__REDDIT__/user/MarvelsGrantMan136/edit_biography",
+          "http_method": "POST",
+          "post_data": {
+            "user_biography[biography]": "I am a robot"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "gitlab"
+    ],
+    "task_id": 415,
+    "intent_template_id": 360,
+    "start_urls": [
+      "__GITLAB__"
+    ],
+    "intent": "Reply on the merge request assigned to me for verification functions: if the last comment is from the author, reply \"Thank you\"; otherwise tag the author (e.g., @user) as a reminder.",
+    "intent_template": "Reply on the merge request assigned to me for {{topic}}: if the last comment is from the author, reply \"Thank you\"; otherwise tag the author (e.g., @user) as a reminder.",
+    "instantiation_dict": {
+      "topic": "verification functions"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__GITLAB__/byteblaze/a11y-webring.club/notes?target_id=138783&target_type=merge_request",
+          "http_method": "POST",
+          "post_data": {
+            "$.note.noteable_type": "MergeRequest",
+            "$.note.note": "^.*@davepgreene.*$"
+          }
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "wikipedia",
+      "map"
+    ],
+    "task_id": 428,
+    "intent_template_id": 371,
+    "start_urls": [
+      "__MAP__",
+      "__WIKIPEDIA__"
+    ],
+    "intent": "On the map site, view the info page for the undergrad college of the person who developed the Nash equilibrium (use the provided wiki site to look up any needed information).",
+    "intent_template": "On the map site, view the info page for {{description}} (use the provided wiki site to look up any needed information).",
+    "instantiation_dict": {
+      "description": "the undergrad college of the person who developed the Nash equilibrium"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "navigate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "ignored_query_params_patterns": [
+          ".*"
+        ],
+        "expected": {
+          "url": "__MAP__/relation/2279034"
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "gitlab"
+    ],
+    "task_id": 443,
+    "intent_template_id": 308,
+    "start_urls": [
+      "__GITLAB__/byteblaze/gimmiethat.space"
+    ],
+    "intent": "Update and commit (to a new branch with no merged request) the website code for the current project using the simple online file editor to change the browser tab title to \"Not an interesting site\"",
+    "intent_template": "Update and commit (to {{target_branch}}) the website code for the current project using the simple online file editor to change the browser tab title to \"{{title}}\"",
+    "instantiation_dict": {
+      "title": "Not an interesting site",
+      "target_branch": "a new branch with no merged request"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__GITLAB__/byteblaze/gimmiethat.space/-/update/main/index.html",
+          "http_method": "POST",
+          "post_data": {
+            "_method": "put",
+            "file_path": "index.html",
+            "branch_name": "^(?!main$).+$",
+            "original_branch": "main",
+            "content": "^<\\!doctype html>.*<head>.*<title>Not an interesting site</title>.*</head>.*</html>$"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping_admin"
+    ],
+    "task_id": 489,
+    "intent_template_id": 275,
+    "start_urls": [
+      "__SHOPPING_ADMIN__"
+    ],
+    "intent": "Change the page title of \"Privacy Policy\" page on my site to \"No privacy policy is needed in this dystopian world\".",
+    "intent_template": "Change the page title of \"{{old_heading}}\" page on my site to \"{{heading}}\".",
+    "instantiation_dict": {
+      "heading": "No privacy policy is needed in this dystopian world",
+      "old_heading": "Privacy Policy"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING_ADMIN__/cms/page/save/back/edit",
+          "http_method": "POST",
+          "post_data": {
+            "title": "No privacy policy is needed in this dystopian world",
+            "is_active": "1",
+            "store_id[0]": "0",
+            "page_id": "4"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping_admin"
+    ],
+    "task_id": 499,
+    "intent_template_id": 284,
+    "start_urls": [
+      "__SHOPPING_ADMIN__"
+    ],
+    "intent": "Update order #304 with the USPS tracking number 13849373987",
+    "intent_template": "Update order #{{order}} with the {{service}} tracking number {{tracking}}",
+    "instantiation_dict": {
+      "tracking": "13849373987",
+      "order": "304",
+      "service": "USPS"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING_ADMIN__/admin/order_shipment/save/order_id/304/",
+          "http_method": "POST",
+          "post_data": {
+            "tracking[1][carrier_code]": "usps",
+            "tracking[1][number]": "13849373987"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping"
+    ],
+    "task_id": 507,
+    "intent_template_id": 172,
+    "start_urls": [
+      "__SHOPPING__"
+    ],
+    "intent": "Buy the highest rated product from the Ceiling light category within a budget above 1000. Discard any items in your cart if it is not empty.",
+    "intent_template": "Buy the highest rated product from the {{product_category}} category within a budget {{dollar_value}}. Discard any items in your cart if it is not empty.",
+    "instantiation_dict": {
+      "product_category": "Ceiling light",
+      "dollar_value": "above 1000"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "decode_base64_query": true,
+        "expected": {
+          "url": "^__SHOPPING__/checkout/cart/add/uenc/.*/product/71506$",
+          "http_method": "POST",
+          "post_data": {
+            "product": "71506"
+          }
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "ignored_query_params_patterns": [
+          "\\_"
+        ],
+        "expected": {
+          "url": "__SHOPPING__/rest/default/V1/carts/mine/totals",
+          "response_content": {
+            "items_qty": 1,
+            "$.items[0].name": "40''X138\" Hight Ceiling Chandelier Crystal Raindrop Chandeliers Staircase Large Chandelier Villa Entrance Foyer Pendant Light Grand Light Foyer High Ceiling Fixture 15 GU10 Bulb Include Remote Dimming"
+          }
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING__/rest/default/V1/carts/mine/payment-information",
+          "http_method": "POST",
+          "post_data": {
+            "$.billingAddress.customerId": "27"
+          }
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING__/checkout/onepage/success"
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping"
+    ],
+    "task_id": 509,
+    "intent_template_id": 216,
+    "start_urls": [
+      "__SHOPPING__"
+    ],
+    "intent": "Buy the best rating product from \"Men\"s shoe\" category with at least 5 reviews and the product is least expensive. Choose any available variant.",
+    "intent_template": "Buy the best rating product from \"{{category}}\" category with at least 5 reviews and the product is least expensive. Choose any available variant.",
+    "instantiation_dict": {
+      "category": "Men\"s shoe"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "decode_base64_query": true,
+        "expected": {
+          "url": "^__SHOPPING__/checkout/cart/add/uenc/.*/product/65885$",
+          "http_method": "POST",
+          "post_data": {
+            "product": "65885"
+          }
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "ignored_query_params_patterns": [
+          "\\_"
+        ],
+        "expected": {
+          "url": "__SHOPPING__/rest/default/V1/carts/mine/totals",
+          "response_content": {
+            "items_qty": 1,
+            "$.items[0].name": "Clarks Men's Tunsil Lane Oxford"
+          }
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING__/rest/default/V1/carts/mine/payment-information",
+          "http_method": "POST",
+          "post_data": {
+            "$.billingAddress.customerId": "27"
+          }
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING__/checkout/onepage/success"
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping"
+    ],
+    "task_id": 520,
+    "intent_template_id": 196,
+    "start_urls": [
+      "__SHOPPING__/magnetic-metal-stainless-steel-d-pads-kits-directional-pad-replacement-parts-for-xbox-one-elite-controller-elite-series-2-xbox-one-xbox-one-s-x-controller.html"
+    ],
+    "intent": "Add the product on the current page to my wishlist",
+    "intent_template": "Add the product on the current page to my wishlist",
+    "instantiation_dict": {},
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING__/wishlist/index/add/",
+          "http_method": "POST",
+          "post_data": {
+            "product": "37313",
+            "qty": "1"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "gitlab"
+    ],
+    "task_id": 522,
+    "intent_template_id": 352,
+    "start_urls": [
+      "__GITLAB__"
+    ],
+    "intent": "Fork all repos from facebook.",
+    "intent_template": "Fork {{repo}}.",
+    "instantiation_dict": {
+      "repo": "all repos from facebook"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__GITLAB__/api/v4/projects/122/fork",
+          "http_method": "POST",
+          "post_data": {
+            "id": "122",
+            "name": "create-react-app",
+            "namespace_id": 2505,
+            "path": "create-react-app"
+          },
+          "response_status": 201
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "gitlab"
+    ],
+    "task_id": 523,
+    "intent_template_id": 354,
+    "start_urls": [
+      "__GITLAB__"
+    ],
+    "intent": "Star the top five most stared repos in Gitlab",
+    "intent_template": "Star the top {{number}} most stared repos in Gitlab",
+    "instantiation_dict": {
+      "number": "five"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__GITLAB__/umano/AndroidSlidingUpPanel/toggle_star.json",
+          "http_method": "POST",
+          "response_content": {
+            "star_count": 56
+          }
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__GITLAB__/facebook/create-react-app/toggle_star.json",
+          "http_method": "POST",
+          "response_content": {
+            "star_count": 53
+          }
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__GITLAB__/kkroening/ffmpeg-python/toggle_star.json",
+          "http_method": "POST",
+          "response_content": {
+            "star_count": 52
+          }
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__GITLAB__/mk-j/PHP_XLSXWriter/toggle_star.json",
+          "http_method": "POST",
+          "response_content": {
+            "star_count": 48
+          }
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__GITLAB__/koush/AndroidAsync/toggle_star.json",
+          "http_method": "POST",
+          "response_content": {
+            "star_count": 47
+          }
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping_admin"
+    ],
+    "task_id": 549,
+    "intent_template_id": 252,
+    "start_urls": [
+      "__SHOPPING_ADMIN__"
+    ],
+    "intent": "Add a new size XXXL to green Minerva LumaTech V-Tee",
+    "intent_template": "Add {{option_spec}} to {{base_setting}} {{product}}",
+    "instantiation_dict": {
+      "option_spec": "a new size XXXL",
+      "base_setting": "green",
+      "product": "Minerva LumaTech V-Tee"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING_ADMIN__/catalog/product_attribute/save/attribute_id/144",
+          "http_method": "POST",
+          "response_status": 302,
+          "post_data": {
+            "serialized_options": "^.*swatchtext%5Bvalue%5D%5Boption_\\d+%5D%5B0%5D=XXXL.*$"
+          }
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "post_data_schema": {
+          "type": "object",
+          "properties": {
+            "$['configurable-matrix-serialized'][?(@.newProduct == 1)].attributes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "expected": {
+          "url": "^__SHOPPING_ADMIN__/catalog/product/save/id/1492/type/configurable/store/0/set/\\d+/back/edit$",
+          "http_method": "POST",
+          "response_status": 302,
+          "post_data": {
+            "product[name]": "Minerva LumaTech&trade; V-Tee",
+            "$['configurable-matrix-serialized'][?(@.newProduct == 1)].attributes": [
+              "size: xxxl, color: green"
+            ]
+          }
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "gitlab",
+      "wikipedia"
+    ],
+    "task_id": 558,
+    "intent_template_id": 87,
+    "start_urls": [
+      "__GITLAB__",
+      "__WIKIPEDIA__"
+    ],
+    "intent": "Create a repository named nolan_young_fans with a README file containing only Christopher Nolan's theatrically released feature-length films after 2010 (use the provided wiki site to look up any needed information). Use the Web IDE to create the README. Structure it with the repository name as the main heading and a bulleted list of the film titles. Commit to the default branch.",
+    "intent_template": "Create a repository named {{name}} with a README file containing {{topics}} (use the provided wiki site to look up any needed information). Use the Web IDE to create the README. Structure it with the repository name as the main heading and a bulleted list of the film titles. Commit to the default branch.",
+    "instantiation_dict": {
+      "name": "nolan_young_fans",
+      "topics": "only Christopher Nolan's theatrically released feature-length films after 2010"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__GITLAB__/projects",
+          "http_method": "POST",
+          "post_data": {
+            "project[name]": "nolan_young_fans",
+            "project[path]": "nolan_young_fans",
+            "project[namespace_id]": "2505"
+          },
+          "response_status": 302
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "post_data_schema": {
+          "type": "object",
+          "properties": {
+            "$.actions[0].content": {
+              "type": "string",
+              "format": "markdown"
+            }
+          }
+        },
+        "expected": {
+          "url": "__GITLAB__/api/v4/projects/byteblaze%2Fnolan_young_fans/repository/commits",
+          "http_method": "POST",
+          "post_data": {
+            "branch": "main",
+            "$.actions[0].action": "^(update|create)$",
+            "$.actions[0].file_path": "README.md",
+            "$.actions[0].content": "# nolan_young_fans\n\n- Inception\n- The Dark Knight Rises\n- Interstellar\n- Dunkirk\n- Tenet\n- Oppenheimer",
+            "$.actions[1].action": null
+          },
+          "response_status": 201
+        }
+      }
+    ],
+    "revision": 3
+  },
+  {
+    "sites": [
+      "gitlab",
+      "wikipedia"
+    ],
+    "task_id": 561,
+    "intent_template_id": 87,
+    "start_urls": [
+      "__GITLAB__",
+      "__WIKIPEDIA__"
+    ],
+    "intent": "Create a repository named bafta_awards_nolan with a README file containing movies that are nominated BAFTA Awards by Christopher Nolan (use the provided wiki site to look up any needed information). Use the Web IDE to create the README. Structure it with the repository name as the main heading and a bulleted list of the film titles. Commit to the default branch.",
+    "intent_template": "Create a repository named {{name}} with a README file containing {{topics}} (use the provided wiki site to look up any needed information). Use the Web IDE to create the README. Structure it with the repository name as the main heading and a bulleted list of the film titles. Commit to the default branch.",
+    "instantiation_dict": {
+      "name": "bafta_awards_nolan",
+      "topics": "movies that are nominated BAFTA Awards by Christopher Nolan"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__GITLAB__/projects",
+          "http_method": "POST",
+          "post_data": {
+            "project[name]": "bafta_awards_nolan",
+            "project[path]": "bafta_awards_nolan",
+            "project[namespace_id]": "2505"
+          },
+          "response_status": 302
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "post_data_schema": {
+          "type": "object",
+          "properties": {
+            "$.actions[0].content": {
+              "type": "string",
+              "format": "markdown"
+            }
+          }
+        },
+        "expected": {
+          "url": "__GITLAB__/api/v4/projects/byteblaze%2Fbafta_awards_nolan/repository/commits",
+          "http_method": "POST",
+          "post_data": {
+            "branch": "main",
+            "$.actions[0].action": "^(update|create)$",
+            "$.actions[0].file_path": "README.md",
+            "$.actions[0].content": "# bafta_awards_nolan\n\n- Batman Begins\n- The Dark Knight\n- Inception\n- The Dark Knight Rises\n- Interstellar\n- Dunkirk\n- Tenet",
+            "$.actions[1].action": null
+          },
+          "response_status": 201
+        }
+      }
+    ],
+    "revision": 3
+  },
+  {
+    "sites": [
+      "gitlab",
+      "reddit"
+    ],
+    "task_id": 565,
+    "intent_template_id": 88,
+    "start_urls": [
+      "__GITLAB__",
+      "__REDDIT__"
+    ],
+    "intent": "Create a private repository named TODO with a README file containing links to the 10 most active DIY posts from the DIY forum. Use the Web IDE to create the README. Structure it with the repository name as the main heading, \"Most Active DIY Threads\" as a subheading, and a bulleted list of the posts as markdown links (using their titles as link text) in the same order they appear on the forum. Commit to the default branch.",
+    "intent_template": "Create a private repository named {{name}} with a README file containing links to the {{num}} most active DIY posts from the DIY forum. Use the Web IDE to create the README. Structure it with the repository name as the main heading, \"Most Active DIY Threads\" as a subheading, and a bulleted list of the posts as markdown links (using their titles as link text) in the same order they appear on the forum. Commit to the default branch.",
+    "instantiation_dict": {
+      "name": "TODO",
+      "num": 10
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__GITLAB__/projects",
+          "http_method": "POST",
+          "post_data": {
+            "project[template_name]": null,
+            "project[name]": "TODO",
+            "project[path]": "todo",
+            "project[namespace_id]": "2505",
+            "project[visibility_level]": "0"
+          },
+          "response_status": 302
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "post_data_schema": {
+          "type": "object",
+          "properties": {
+            "$.actions[0].content": {
+              "type": "string",
+              "format": "markdown"
+            }
+          }
+        },
+        "expected": {
+          "url": "__GITLAB__/api/v4/projects/byteblaze%2FTODO/repository/commits",
+          "http_method": "POST",
+          "post_data": {
+            "branch": "main",
+            "$.actions[0].action": "^(update|create)$",
+            "$.actions[0].file_path": "README.md",
+            "$.actions[0].content": "# TODO\n\n## Most Active DIY Threads\n\n- [Separate glued plastic parts](__REDDIT__/f/DIY/118903/separate-glued-plastic-parts)\n- [How would you fix this dryer vent mess?](__REDDIT__/f/DIY/118923/how-would-you-fix-this-dryer-vent-mess)\n- [Basement Bulkhead/Soffit + Wall Framing](__REDDIT__/f/DIY/118935/basement-bulkhead-soffit-wall-framing)\n- [GE Water Heater Pilot Light Won't Stay Lit](__REDDIT__/f/DIY/118904/ge-water-heater-pilot-light-won-t-stay-lit)\n- [Attempting to move a wall outlet in my basement a few inches to the left and am totally stumped. Any help GREATLY appreciated!!](__REDDIT__/f/DIY/118960/attempting-to-move-a-wall-outlet-in-my-basement-a-few-inches)\n- [AFCI Outlet Question](__REDDIT__/f/DIY/118931/afci-outlet-question)\n- [Teflon tape to attach washing machine drain hose to pipe?](__REDDIT__/f/DIY/118824/teflon-tape-to-attach-washing-machine-drain-hose-to-pipe)\n- [Paver base for shed?](__REDDIT__/f/DIY/118866/paver-base-for-shed)\n- [Ways to locate our buried electrical service?](__REDDIT__/f/DIY/118820/ways-to-locate-our-buried-electrical-service)\n- [How to eliminate transitions for disability/mobility reasons](__REDDIT__/f/DIY/118836/how-to-eliminate-transitions-for-disability-mobility-reasons)",
+            "$.actions[1].action": null
+          },
+          "response_status": 201
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "reddit"
+    ],
+    "task_id": 581,
+    "intent_template_id": 7,
+    "start_urls": [
+      "__REDDIT__"
+    ],
+    "intent": "Create a new forum with name and title \"cmu_lti\", description \"Language Technologies Institute at Carnegie Mellon University\", and sidebar \"**announcement**, paper, **alumni**\"",
+    "intent_template": "Create a new forum with name and title \"{{name}}\", description \"{{description}}\", and sidebar \"{{sidebar_list}}\"",
+    "instantiation_dict": {
+      "name": "cmu_lti",
+      "description": "Language Technologies Institute at Carnegie Mellon University",
+      "sidebar_list": "**announcement**, paper, **alumni**"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__REDDIT__/create_forum",
+          "http_method": "POST",
+          "response_status": 302,
+          "post_data": {
+            "forum[name]": "cmu_lti",
+            "forum[title]": "cmu_lti",
+            "forum[description]": "Language Technologies Institute at Carnegie Mellon University",
+            "forum[sidebar]": "**announcement**, paper, **alumni**"
+          }
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "reddit"
+    ],
+    "task_id": 610,
+    "intent_template_id": 9,
+    "start_urls": [
+      "__REDDIT__"
+    ],
+    "intent": "Post a review of my recent reading, titled \"To Kill a Mockingbird by Harper Lee\" in f/books and then comment \"good book!\" on the created post",
+    "intent_template": "Post a review of my recent reading, titled \"{{book}}\" in f/books and then comment \"{{content}}\" on the created post",
+    "instantiation_dict": {
+      "book": "To Kill a Mockingbird by Harper Lee",
+      "content": "good book!"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": [
+            "__REDDIT__/submit",
+            "__REDDIT__/submit/books"
+          ],
+          "http_method": "POST",
+          "post_data": {
+            "submission[title]": "To Kill a Mockingbird by Harper Lee",
+            "submission[forum]": "10037"
+          },
+          "response_status": 302
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "^__REDDIT__/f/books/\\d+/-/comment$",
+          "http_method": "POST",
+          "headers": {
+            "referer": "^__REDDIT__/f/books/\\d+/to-kill-a-mockingbird-by-harper-lee$"
+          },
+          "post_data": {
+            "$.^reply_to_submission_\\d+\\[comment\\]$": "good book!"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "reddit"
+    ],
+    "task_id": 617,
+    "intent_template_id": 11,
+    "start_urls": [
+      "__REDDIT__/f/pics"
+    ],
+    "intent": "Re-post the image of Firework from this forum to news forum using the image URL and title \"from /f/pics\"",
+    "intent_template": "Re-post the image of {{content}} from this forum to {{forum}} forum using the image URL and title \"from /f/pics\"",
+    "instantiation_dict": {
+      "content": "Firework",
+      "forum": "news"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "^__REDDIT__/submit.*$",
+          "http_method": "POST",
+          "post_data": {
+            "submission[url]": "__REDDIT__/submission_images/92411be6af4e9ad5ccd3ccbaa01c10457bb00e704e99c58dd430de1a958307fd.jpg",
+            "submission[title]": "from /f/pics",
+            "submission[forum]": "10064"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "reddit"
+    ],
+    "task_id": 625,
+    "intent_template_id": 13,
+    "start_urls": [
+      "__REDDIT__"
+    ],
+    "intent": "Create a discussion post titled \"the effectiveness of deep learning\" in a relevant forum and ask users for their opinions with the simple prompt, \"your opinion\"",
+    "intent_template": "Create a discussion post titled \"{{topic}}\" in a relevant forum and ask users for their opinions with the simple prompt, \"your opinion\"",
+    "instantiation_dict": {
+      "topic": "the effectiveness of deep learning"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": [
+            "__REDDIT__/submit",
+            "__REDDIT__/submit/deeplearning"
+          ],
+          "http_method": "POST",
+          "post_data": {
+            "submission[title]": "the effectiveness of deep learning",
+            "submission[body]": "your opinion",
+            "submission[forum]": "10043"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "reddit"
+    ],
+    "task_id": 638,
+    "intent_template_id": 6100,
+    "start_urls": [
+      "__REDDIT__"
+    ],
+    "intent": "Create a post in the most appropriate forum. Title it \"Must have product at last for ever recommendations\" and in post details ask \"I need recommendations for Must have product at last for ever within a budget of $30 please\"",
+    "intent_template": "Create a post in the most appropriate forum. Title it \"{{category}} recommendations\" and in post details ask \"I need recommendations for {{category}} within a budget of {{price}} please\"",
+    "instantiation_dict": {
+      "category": "Must have product at last for ever",
+      "price": "$30"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": [
+            "__REDDIT__/submit",
+            "__REDDIT__/submit/BuyItForLife"
+          ],
+          "http_method": "POST",
+          "post_data": {
+            "submission[title]": "Must have product at last for ever recommendations",
+            "submission[body]": "I need recommendations for Must have product at last for ever within a budget of $30 please",
+            "submission[forum]": "10003"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "reddit"
+    ],
+    "task_id": 640,
+    "intent_template_id": 16,
+    "start_urls": [
+      "__REDDIT__"
+    ],
+    "intent": "Post a notice in f/books titled \"book reading Meet up!\". Set post details to \"virtual meetup for book reading on March 15th\"",
+    "intent_template": "Post a notice in {{forum}} titled \"{{interest}} Meet up!\". Set post details to \"virtual meetup for {{interest}} on {{date}}\"",
+    "instantiation_dict": {
+      "interest": "book reading",
+      "date": "March 15th",
+      "forum": "f/books"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": [
+            "__REDDIT__/submit",
+            "__REDDIT__/submit/books"
+          ],
+          "http_method": "POST",
+          "post_data": {
+            "submission[title]": "book reading Meet up!",
+            "submission[body]": "virtual meetup for book reading on March 15th",
+            "submission[forum]": "10037"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "reddit"
+    ],
+    "task_id": 645,
+    "intent_template_id": 19,
+    "start_urls": [
+      "__REDDIT__"
+    ],
+    "intent": "Post in books forum with title \"What could machine learning help the books field?\"",
+    "intent_template": "Post in {{forum}} forum with title \"{{title}}\"",
+    "instantiation_dict": {
+      "model_type": "machine learning",
+      "title": "What could machine learning help the books field?",
+      "forum": "books"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": [
+            "__REDDIT__/submit",
+            "__REDDIT__/submit/books"
+          ],
+          "http_method": "POST",
+          "post_data": {
+            "submission[title]": "What could machine learning help the books field?",
+            "submission[forum]": "10037"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping",
+      "reddit"
+    ],
+    "task_id": 672,
+    "intent_template_id": 101,
+    "start_urls": [
+      "__SHOPPING__",
+      "__REDDIT__"
+    ],
+    "intent": "Create a post in the game related discussion forum about Nintendo Switch Fortnite Wildcat Console EU to report customer reviews with 3 stars and less rating from the OneStopShop with the post title \"real user feedback on Nintendo Switch Fortnite Wildcat Console EU\". Format the post body as a bullet point list in the same order they appear (md format: - \"<review title>\").",
+    "intent_template": "Create a post in the game related discussion forum about {{product}} to report customer reviews with {{rating}} rating from the OneStopShop with the post title \"real user feedback on {{product}}\". Format the post body as a bullet point list in the same order they appear (md format: - \"<review title>\").",
+    "instantiation_dict": {
+      "product": "Nintendo Switch Fortnite Wildcat Console EU",
+      "rating": "3 stars and less"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "post_data_schema": {
+          "type": "object",
+          "properties": {
+            "$.actions[0].content": {
+              "type": "string",
+              "format": "markdown"
+            }
+          }
+        },
+        "expected": {
+          "url": "^__REDDIT__/submit.*$",
+          "http_method": "POST",
+          "post_data": {
+            "submission[title]": "real user feedback on Nintendo Switch Fortnite Wildcat Console EU",
+            "submission[body]": "- \"EU charger and wild cat card doesn't even work!\"\r\n- \"REFUND REJECTED\"\r\n- \"Charging port not compatible\"\r\n- \"not compatible in the US\"\r\n- \"Wildcard Bonus Credits Not Redeemable!\"\r\n- \"Code not available!!\"\r\n- \"Code not available!!\"",
+            "submission[forum]": "10048"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "reddit",
+      "gitlab"
+    ],
+    "task_id": 686,
+    "intent_template_id": 117,
+    "start_urls": [
+      "__REDDIT__",
+      "__GITLAB__"
+    ],
+    "intent": "Promote auth0/angular-storage in the discussion forum technology by creating a post with the project description as the title.",
+    "intent_template": "Promote {{repo}} in the discussion forum {{forum}} by creating a post with the project description as the title.",
+    "instantiation_dict": {
+      "repo": "auth0/angular-storage",
+      "forum": "technology"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "^__REDDIT__/submit/?.*$",
+          "http_method": "POST",
+          "post_data": {
+            "submission[mediaType]": "url",
+            "submission[url]": "__GITLAB__/auth0/angular-storage",
+            "submission[title]": "A storage library for AngularJS done right",
+            "submission[forum]": "10082"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping_admin"
+    ],
+    "task_id": 696,
+    "intent_template_id": 256,
+    "start_urls": [
+      "__SHOPPING_ADMIN__"
+    ],
+    "intent": "Add a simple product named \"FancyBoy Man Causal Jeans\" with 42 in stock, available in size 34 and color Blue, priced at $169.99 using the appropriate attribute set.",
+    "intent_template": "Add a simple product named \"{{product}}\" with {{stock}} in stock, available in {{size}} and color {{color}}, priced at ${{price}} using the appropriate attribute set.",
+    "instantiation_dict": {
+      "product": "FancyBoy Man Causal Jeans",
+      "stock": "42",
+      "size": "size 34",
+      "color": "Blue",
+      "price": "169.99"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "ignored_query_params_patterns": [
+          "isAjax"
+        ],
+        "expected": {
+          "url": "^__SHOPPING_ADMIN__/catalog/product/save/type/simple/store/0/set/\\d+/back/edit$",
+          "http_method": "POST",
+          "response_status": 302,
+          "post_data": {
+            "product[name]": "FancyBoy Man Causal Jeans",
+            "product[price]": "169.99",
+            "product[status]": "1",
+            "product[quantity_and_stock_status][qty]": "42",
+            "product[quantity_and_stock_status][is_in_stock]": "1",
+            "product[size]": "177",
+            "product[color]": "50"
+          }
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping_admin"
+    ],
+    "task_id": 701,
+    "intent_template_id": 258,
+    "start_urls": [
+      "__SHOPPING_ADMIN__"
+    ],
+    "intent": "Create a new marketing price rule called \"Mother's day sale\" for all registered customers that offers 15% discount on checkout on all their cart",
+    "intent_template": "Create a new marketing price rule called \"{{topic}}\" for all registered customers that offers {{rule}}",
+    "instantiation_dict": {
+      "topic": "Mother's day sale",
+      "rule": "15% discount on checkout on all their cart"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING_ADMIN__/sales_rule/promo_quote/save",
+          "http_method": "POST",
+          "response_status": 302,
+          "post_data": {
+            "name": "Mother's day sale",
+            "is_active": "1",
+            "customer_group_ids[0]": "1",
+            "website_ids[0]": "1",
+            "coupon_type": "1",
+            "simple_action": "by_percent",
+            "discount_amount": 15
+          }
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "reddit"
+    ],
+    "task_id": 735,
+    "intent_template_id": 27,
+    "start_urls": [
+      "__REDDIT__"
+    ],
+    "intent": "Edit my post on Lord of the Rings season 2 cast announcement with the lowest vote count by adding a line to the body that says \"The cast is amazing!\"",
+    "intent_template": "Edit my post on {{post}} by adding a line to the body that says \"{{content}}\"",
+    "instantiation_dict": {
+      "post": "Lord of the Rings season 2 cast announcement with the lowest vote count",
+      "content": "The cast is amazing!"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__REDDIT__/f/television/70886/-/edit",
+          "http_method": "POST",
+          "post_data": {
+            "submission[title]": "‘The Lord Of The Rings: The Rings Of Power’ Adds 8 To Season 2 Cast",
+            "submission[body]": "The cast is amazing!"
+          },
+          "response_status": 302
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "map",
+      "shopping_admin"
+    ],
+    "task_id": 760,
+    "intent_template_id": 42,
+    "start_urls": [
+      "__MAP__",
+      "__SHOPPING_ADMIN__"
+    ],
+    "intent": "Show on the map the route and driving time from Allentown, PA to the city where my E-commerce customer Amanda Kim lives. (Use the OSRM direction service.)",
+    "intent_template": "Show on the map the {{view_type}} from {{city1}} to {{city2}}. (Use the OSRM direction service.)",
+    "instantiation_dict": {
+      "city1": "Allentown, PA",
+      "city2": "the city where my E-commerce customer Amanda Kim lives",
+      "view_type": "route and driving time"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "navigate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "ignored_query_params_patterns": [
+          ".*"
+        ],
+        "expected": {
+          "url": "^.*/route/v1/.*/-75.4716115,40.6022552;-74.4041622,40.0757384.*$",
+          "headers": {
+            "Cookie": "^(?!.*_osm_directions_engine=fossgis_osrm_(?:bicycle|foot)).*$"
+          }
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "gitlab"
+    ],
+    "task_id": 786,
+    "intent_template_id": 316,
+    "start_urls": [
+      "__GITLAB__/vinta/awesome-python"
+    ],
+    "intent": "Get the number of commits of the contributor who has the most commits to branch master in the current repository",
+    "intent_template": "Get the {{attribute}} of the contributor who has the most commits to branch {{branch_name}} in the current repository{{retrieved_data_format_spec}}",
+    "instantiation_dict": {
+      "branch_name": "master",
+      "attribute": "number of commits",
+      "retrieved_data_format_spec": ""
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "expected": {
+          "task_type": "retrieve",
+          "status": "SUCCESS",
+          "retrieved_data": [
+            414
+          ]
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "shopping"
+    ],
+    "task_id": 795,
+    "intent_template_id": 191,
+    "start_urls": [
+      "__SHOPPING__"
+    ],
+    "intent": "Change the delivery address for my second most recent order to 6726 McPherson Blvd, Pittsburgh, PA.",
+    "intent_template": "Change the delivery address for {{order_selector}} to {{address}}.",
+    "instantiation_dict": {
+      "order_selector": "my second most recent order",
+      "address": "6726 McPherson Blvd, Pittsburgh, PA"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "ACTION_NOT_ALLOWED_ERROR",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__SHOPPING__/sales/order/history/"
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "gitlab"
+    ],
+    "task_id": 801,
+    "intent_template_id": 600,
+    "start_urls": [
+      "__GITLAB__"
+    ],
+    "intent": "create a new group \"crew\" with members ASWATFZLLC, patrickhlauke, westurner, linkmatrix",
+    "intent_template": "create a new group \"{{name}}\" with members {{members}}",
+    "instantiation_dict": {
+      "name": "crew",
+      "members": "ASWATFZLLC, patrickhlauke, westurner, linkmatrix"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "ignored_query_params": [
+          "serializer"
+        ],
+        "expected": {
+          "url": "__GITLAB__/groups",
+          "http_method": "POST",
+          "post_data": {
+            "group[name]": "crew",
+            "group[path]": "crew"
+          },
+          "response_status": 302
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "ignored_query_params": [
+          "serializer"
+        ],
+        "post_data_schema": {
+          "type": "object",
+          "properties": {
+            "user_id": {
+              "type": "string",
+              "format": "string_list"
+            }
+          }
+        },
+        "expected": {
+          "url": "^__GITLAB__/api/v4/groups/\\d+/invitations$",
+          "http_method": "POST",
+          "post_data": {
+            "user_id": "83,119,561,145"
+          },
+          "response_status": 201
+        }
+      }
+    ],
+    "revision": 2
+  },
+  {
+    "sites": [
+      "gitlab"
+    ],
+    "task_id": 804,
+    "intent_template_id": 999,
+    "start_urls": [
+      "__GITLAB__"
+    ],
+    "intent": "Assign the issue regarding flash alerts in dialog components to myself and tag primer to include them as a participant.",
+    "intent_template": "Assign the issue regarding {{issue}} {{issue_location}}to {{account}}.",
+    "instantiation_dict": {
+      "issue": "flash alerts in dialog components",
+      "issue_location": "",
+      "account": "myself and tag primer to include them as a participant"
+    },
+    "eval": [
+      {
+        "evaluator": "AgentResponseEvaluator",
+        "results_schema": {
+          "type": "null"
+        },
+        "expected": {
+          "task_type": "mutate",
+          "status": "SUCCESS",
+          "retrieved_data": null
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "ignored_query_params": [
+          "serializer"
+        ],
+        "post_data_schema": {
+          "type": "object",
+          "properties": {
+            "$.issue.assignee_ids": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "expected": {
+          "url": "__GITLAB__/primer/design/-/issues/104.json",
+          "http_method": "PUT",
+          "post_data": {
+            "$.issue.assignee_ids": [
+              2330
+            ]
+          }
+        }
+      },
+      {
+        "evaluator": "NetworkEventEvaluator",
+        "expected": {
+          "url": "__GITLAB__/primer/design/notes",
+          "query_params": {
+            "target_type": [
+              "Issue"
+            ],
+            "target_id": [
+              "83759"
+            ]
+          },
+          "http_method": "POST",
+          "post_data": {
+            "$.note.note": "^.*@primer.*$"
+          }
+        }
+      }
+    ],
+    "revision": 2
+  }
+]

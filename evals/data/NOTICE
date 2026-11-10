@@ -1,0 +1,17 @@
+WebArena-Verified Hard subset for Browserrig
+
+Source: https://github.com/ServiceNow/webarena-verified
+Version: v1.2.3
+Commit: 6473f72db5dcefc97b5725b59e734504edc28a21
+License: Apache-2.0; see LICENSE.webarena-verified.
+
+tasks.json contains 48 task definitions selected without semantic modification
+from assets/dataset/webarena-verified.json. Browserrig selected and reformatted
+this subset; the task IDs, instructions, revisions and evaluation rules are
+unchanged. manifest.json records selection and provenance.
+
+Citation:
+Amine El hattami, Megh Thakkar, Nicolas Chapados, Christopher Pal.
+WebArena Verified: Reliable Evaluation for Web Agents.
+Workshop on Scaling Environments for Agents, 2025.
+https://openreview.net/forum?id=94tlGxmqkN

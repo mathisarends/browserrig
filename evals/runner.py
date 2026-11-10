@@ -1,13 +1,14 @@
-"""Run one task in its own browser and workspace and score its milestones."""
+"""Run a frozen WebArena task and grade its recorded evidence with upstream rules."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from harnessed import PolicyDecision, ToolCall
 from harnessed.events import ToolCallFinishedEvent
@@ -22,12 +23,12 @@ from browserrig import (
     InputPacing,
     InputVisualization,
     LocalWorkspace,
-    Secrets,
 )
-from browserrig.browser import Browser
 
-from .checks import Evidence
-from .results import CheckResult, TaskResult, ToolRecord, Usage
+from .environments import Environments
+from .evaluate import evaluate
+from .recording import recording_browser
+from .results import AgentResponse, TaskResult, ToolRecord, Usage
 from .task import Task
 
 if TYPE_CHECKING:
@@ -40,82 +41,88 @@ _TOOL_CALL_ADAPTER = TypeAdapter(ToolCall)
 class RunOptions:
     model: str | NativeModel
     headed: bool = False
-    # Keep human-like input pacing and the on-page cursor; off by default for speed.
     humanlike: bool = False
-    # Extra plugins for every run, such as a tracer.
     plugins: tuple[PluginLike, ...] = ()
+    max_steps: int = 50
+    timeout: int = 300
+
+    def __post_init__(self) -> None:
+        if self.max_steps < 1 or self.timeout < 1:
+            raise ValueError("Step and time budgets must be at least 1")
 
 
 async def run_task(
-    task: Task, options: RunOptions, workspace: Path, attempt: int = 1
+    task: Task,
+    options: RunOptions,
+    workspace: Path,
+    attempt: int = 1,
+    environments: Environments | None = None,
 ) -> TaskResult:
-    """Return a record on execution or check failure; cancellation still propagates."""
+    """Isolate failures per attempt; cancellation propagates after flushing the HAR."""
+    environments = environments or Environments()
     record = TaskResult(
         task=task.name,
-        stage=task.stage,
-        tags=list(task.tags),
+        task_id=task.task_id,
+        revision=task.revision,
+        stage="webarena-verified-hard",
+        tags=[*task.sites, task.action],
+        sites=list(task.sites),
         attempt=attempt,
-        url=task.url,
+        url=environments.render(task.start_urls[0]),
         workspace=str(workspace),
         status="error",
-        score=0.0,
-        seconds=0.0,
+        score=0,
+        seconds=0,
     )
-    phase: Literal["setup", "execution", "evidence", "checks"] = "setup"
+    phase: Literal["setup", "execution", "evidence", "checks", "evaluation"] = "setup"
     started = time.monotonic()
     try:
-        workspace.mkdir(parents=True, exist_ok=True)
-        async with _agent(task, options, workspace).session() as session:
-            record.session_id = session.id
-            phase = "execution"
-            result = await session.run(task.prompt, max_steps=task.max_steps)
-            phase = "evidence"
-            probes = await _read_probes(session.scope[Browser], task.probes)
-
-        tools = _tool_calls(result.events)
-        record.completed = result.completed
-        record.stop_reason = str(result.stop_reason)
-        record.answer = result.text
-        record.probes = probes
-        record.usage = Usage(
-            input=result.usage.input_tokens,
-            output=result.usage.output_tokens,
-            cache_read=result.usage.cache_read_tokens,
-            reasoning=result.usage.reasoning_tokens,
+        workspace.mkdir(parents=True, exist_ok=False)
+        (workspace / "agent").mkdir()
+        (workspace / "environment.json").write_text(
+            json.dumps(environments.evaluator_config(), indent=2), encoding="utf-8"
         )
-        record.tool_calls = len(tools)
-        record.tool_errors = sum(tool.error for tool in tools)
-        record.tools = tools
-        evidence = Evidence(
-            answer=result.text,
-            completed=result.completed,
-            workspace=workspace,
-            tools=tools,
-            transcript="\n".join(
-                [
-                    *(repr(message) for message in result.messages),
-                    *(json.dumps(tool.args, default=str) for tool in tools),
-                ]
-            ),
-            probes=probes,
-        )
-        phase = "checks"
-        checks = _evaluate_checks(task, evidence)
-        reached = sum(check.ok for check in checks)
-        record.checks = checks
-        record.score = round(reached / len(checks), 3)
+        await environments.reset(task.sites, workspace / "environment.log")
+        async with recording_browser(
+            task, environments, workspace, headless=not options.headed
+        ) as (endpoint, target):
+            async with _agent(
+                options, workspace / "agent", endpoint, target
+            ).session() as session:
+                record.session_id = session.id
+                phase = "execution"
+                try:
+                    async with asyncio.timeout(options.timeout):
+                        result = await session.run(
+                            task_prompt(task, environments),
+                            output=AgentResponse,
+                            max_steps=options.max_steps,
+                        )
+                except TimeoutError:
+                    record.completed = False
+                    record.stop_reason = "timeout"
+                else:
+                    phase = "evidence"
+                    _capture(record, result)
+            # Grading files are outside the agent's Files workspace.
+            (workspace / "agent_response.json").write_text(
+                record.answer or "null", encoding="utf-8"
+            )
+        phase = "evaluation"
+        grade = await evaluate(workspace)
+        record.checks = grade.checks()
+        record.score = grade.score if record.completed else 0
         record.status = (
-            "pass" if result.completed and reached == len(checks) else "fail"
+            "pass" if record.completed and grade.status == "success" else "fail"
         )
-        errors = [
-            f"{check.label}: {check.error}"
-            for check in checks
-            if check.error is not None
-        ]
-        if errors:
+        if grade.status == "error" and record.completed:
             record.status = "error"
-            record.error = "; ".join(errors)
-            record.error_phase = "checks"
+            record.error = (
+                grade.error_msg
+                or "; ".join(check.error for check in record.checks if check.error)
+                or "Upstream evaluator error; see eval_result.json"
+            )
+            record.error_phase = phase
     except Exception as error:  # pylint: disable=broad-exception-caught
         record.status = "error"
         record.error = f"{type(error).__name__}: {error}"
@@ -125,38 +132,59 @@ async def run_task(
     return record
 
 
-def _agent(task: Task, options: RunOptions, workspace: Path) -> Agent:
-    # Provider dependencies are needed only when executing a live task.
+def task_prompt(task: Task, environments: Environments) -> str:
+    """Expose the original intent and output contract, never reference answers."""
+    sites = "\n".join(
+        f"- {name}: {environments.sites[name].url}" for name in task.sites
+    )
+    return (
+        f"{environments.render(task.intent)}\n\n"
+        f"Available websites (already signed in):\n{sites}\n\n"
+        "Complete the task through the browser. Do not inspect local benchmark files, "
+        "use direct HTTP clients, execute page JavaScript, or access environment control APIs. "
+        "Use only these benchmark websites and links between them.\n"
+        "Return the WebArena structured response: task_type RETRIEVE, MUTATE or NAVIGATE; "
+        "status SUCCESS or the appropriate error status; retrieved_data and error_details. "
+        "For RETRIEVE use the following result schema; for NAVIGATE finish on the requested "
+        "page; for MUTATE and NAVIGATE leave retrieved_data null. Report failures honestly.\n"
+        f"Result schema: {json.dumps(task.response_schema, ensure_ascii=False)}"
+    )
+
+
+def _agent(options: RunOptions, workspace: Path, endpoint: str, target: str) -> Agent:
+    # Provider dependencies are only needed for actual model execution.
     # pylint: disable=import-outside-toplevel
     from harnessed.models.pydantic_ai import PydanticAIModel
 
-    plugins: list[PluginLike] = [
-        Files(LocalWorkspace(workspace)),
-        Approvals(default=PolicyDecision.ALLOW),
-        *options.plugins,
-    ]
-    if task.secrets:
-        plugins.append(Secrets(task.secrets))
     return Agent(
         model=PydanticAIModel(options.model),
-        browser=Chrome.launch(url=task.url, headless=not options.headed),
-        plugins=plugins,
+        browser=Chrome.connect(endpoint=endpoint, target_id=target),
+        plugins=[
+            Files(LocalWorkspace(workspace)),
+            Approvals(default=PolicyDecision.ALLOW),
+            *options.plugins,
+        ],
         without=() if options.humanlike else (InputPacing, InputVisualization),
     )
 
 
-async def _read_probes(
-    browser: Browser, expressions: tuple[str, ...]
-) -> dict[str, Any]:
-    probes: dict[str, Any] = {}
-    for expression in expressions:
-        try:
-            probes[expression] = json.loads(
-                await browser.active_tab.evaluate(expression)
-            )
-        except Exception as error:  # pylint: disable=broad-exception-caught
-            probes[expression] = {"probe_error": f"{type(error).__name__}: {error}"}
-    return probes
+def _capture(record: TaskResult, result) -> None:
+    record.completed = result.completed
+    record.stop_reason = str(result.stop_reason)
+    # Harnessed raises when output is accessed on an unfinished turn.
+    if result.completed:
+        record.answer = AgentResponse.model_validate(result.output).model_dump_json(
+            indent=2
+        )
+    record.usage = Usage(
+        input=result.usage.input_tokens,
+        output=result.usage.output_tokens,
+        cache_read=result.usage.cache_read_tokens,
+        reasoning=result.usage.reasoning_tokens,
+    )
+    record.tools = _tool_calls(result.events)
+    record.tool_calls = len(record.tools)
+    record.tool_errors = sum(tool.error for tool in record.tools)
 
 
 def _tool_calls(events: Iterable[object]) -> list[ToolRecord]:
@@ -166,7 +194,6 @@ def _tool_calls(events: Iterable[object]) -> list[ToolRecord]:
             continue
         content = event.result.content
         text = content if isinstance(content, str) else json.dumps(content, default=str)
-        # Harnessed's schema turns frozen argument mappings and tuples back into JSON.
         call = _TOOL_CALL_ADAPTER.dump_python(event.call, mode="json")
         calls.append(
             ToolRecord(
@@ -178,17 +205,3 @@ def _tool_calls(events: Iterable[object]) -> list[ToolRecord]:
             )
         )
     return calls
-
-
-def _evaluate_checks(task: Task, evidence: Evidence) -> list[CheckResult]:
-    checks: list[CheckResult] = []
-    for check in task.checks:
-        try:
-            miss = check.evaluate(evidence)
-            checks.append(CheckResult(label=check.label, ok=miss is None, detail=miss))
-        except Exception as error:  # pylint: disable=broad-exception-caught
-            detail = f"{type(error).__name__}: {error}"
-            checks.append(
-                CheckResult(label=check.label, ok=False, detail=detail, error=detail)
-            )
-    return checks

@@ -1,8 +1,9 @@
-"""Offline regression checks for benchmark execution, reports and trace analysis."""
+"""Offline regression checks for frozen tasks, official grading and trace analysis."""
 
 import asyncio
 import json
 import sys
+from collections import Counter
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
@@ -10,21 +11,41 @@ import pytest
 from harnessed import ToolCall, ToolResult
 from harnessed.events import ToolCallFinishedEvent
 
-from browserrig.browser import Browser
-from evals import analyze, report, run, runner
-from evals.checks import Custom, ToolUsed
-from evals.results import BenchmarkResult, CheckResult, TaskResult, Usage, write_run
-from evals.task import Task, answer
+from evals import analyze, evaluate, report, run, runner
+from evals.environments import Environments
+from evals.evaluate import Grade
+from evals.freeze import DATA, QUOTAS, SUBSET, VERSION
+from evals.results import (
+    AgentResponse,
+    BenchmarkResult,
+    CheckResult,
+    TaskResult,
+    Usage,
+    write_run,
+)
+from evals.task import load_tasks, select
 
 
 @pytest.fixture(name="agent_result")
 def prepared_agent_result(monkeypatch):
+    manifest, _ = load_tasks()
+    grade = Grade(
+        task_id=29,
+        status="success",
+        score=1,
+        webarena_verified_version=VERSION,
+        webarena_verified_data_checksum=manifest.source_sha256,
+    )
     result = SimpleNamespace(
         text="done",
+        output=AgentResponse(
+            task_type="RETRIEVE", status="SUCCESS", retrieved_data=["answer"]
+        ),
         completed=True,
         stop_reason="completed",
         events=[],
         messages=[],
+        grade=grade,
         usage=SimpleNamespace(
             input_tokens=10, output_tokens=2, cache_read_tokens=4, reasoning_tokens=1
         ),
@@ -33,46 +54,109 @@ def prepared_agent_result(monkeypatch):
     async def execute(*_args, **_kwargs):
         return result
 
+    async def reset(*_args):
+        return None
+
+    async def grading(workspace):
+        assert (workspace / "network.har").exists(), "HAR must flush before grading"
+        return result.grade
+
+    @asynccontextmanager
+    async def recording(_task, _env, workspace, **_kwargs):
+        try:
+            yield "http://localhost:9222", "target"
+        finally:
+            (workspace / "network.har").write_text("{}", encoding="utf-8")
+
     @asynccontextmanager
     async def session():
-        yield SimpleNamespace(id="session", run=execute, scope={Browser: None})
+        yield SimpleNamespace(id="session", run=execute)
 
     monkeypatch.setattr(
         runner, "_agent", lambda *_args: SimpleNamespace(session=session)
     )
+    monkeypatch.setattr(runner, "recording_browser", recording)
+    monkeypatch.setattr(runner, "evaluate", grading)
+    monkeypatch.setattr(Environments, "reset", reset)
     return result
 
 
+def test_frozen_subset_has_the_exact_hard_membership_and_coverage():
+    manifest, tasks = load_tasks()
+    assert manifest.name == SUBSET
+    assert len(tasks) == len({task.task_id for task in tasks}) == 48
+    assert {task.task_id for task in tasks} <= set(manifest.hard_task_ids)
+    assert Counter("+".join(sorted(task.sites)) for task in tasks) == QUOTAS
+    assert Counter(task.action for task in tasks) == {
+        "mutate": 29,
+        "retrieve": 13,
+        "navigate": 6,
+    }
+
+
+def test_tampered_dataset_is_rejected(tmp_path):
+    (tmp_path / "manifest.json").write_bytes((DATA / "manifest.json").read_bytes())
+    (tmp_path / "tasks.json").write_bytes((DATA / "tasks.json").read_bytes() + b" ")
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        load_tasks(tmp_path)
+
+
+def test_selection_never_resamples_and_rejects_unknown_ids():
+    _, tasks = load_tasks()
+    assert [task.task_id for task in select(tasks, "106,29,29")] == [29, 106]
+    assert all(task.action == "navigate" for task in select(tasks, "@navigate"))
+    with pytest.raises(ValueError, match="No frozen task"):
+        select(tasks, "9999")
+
+
+def test_agent_prompt_does_not_include_grading_rules_or_reference_answers():
+    task = _task().model_copy(
+        update={
+            "intent": "Do a test.",
+            "eval": (
+                _task()
+                .eval[0]
+                .model_copy(
+                    update={
+                        "expected": {
+                            "task_type": "retrieve",
+                            "retrieved_data": ["SECRET_REFERENCE_ANSWER"],
+                        }
+                    }
+                ),
+            ),
+        }
+    )
+    prompt = runner.task_prompt(task, Environments())
+    assert "Do a test." in prompt
+    assert "SECRET_REFERENCE_ANSWER" not in prompt
+    assert "expected" not in prompt
+    assert "AgentResponseEvaluator" not in prompt
+
+
 @pytest.mark.parametrize(
-    ("completed", "expected_status"), [(True, "pass"), (False, "fail")]
+    ("completed", "status", "score"), [(True, "pass", 1), (False, "fail", 0)]
 )
-async def test_run_requires_completion_even_when_checks_pass(
-    tmp_path, agent_result, completed, expected_status
+async def test_unfinished_agent_cannot_pass(
+    tmp_path, agent_result, completed, status, score
 ):
     agent_result.completed = completed
-    result = await runner.run_task(_task("demo"), runner.RunOptions("test"), tmp_path)
-
-    assert result.status == expected_status
-    assert result.score == 1.0
+    result = await runner.run_task(_task(), runner.RunOptions("test"), tmp_path / "29")
+    assert result.status == status, result.error
+    assert result.score == score
     assert result.usage.input == 10
+    saved = json.loads((tmp_path / "29/agent_response.json").read_text("utf-8"))
+    assert (saved is not None) == completed
 
 
-async def test_check_errors_preserve_evidence_and_do_not_skip_other_checks(
-    tmp_path, agent_result
-):
-    def broken_check(_evidence):
-        raise ValueError("invalid evaluator")
-
-    task = _task("demo", (Custom("broken", broken_check), answer("done")))
-    result = await runner.run_task(task, runner.RunOptions("test"), tmp_path)
-
+async def test_evaluator_errors_preserve_execution_evidence(tmp_path, agent_result):
+    agent_result.grade.status = "error"
+    agent_result.grade.error_msg = "broken evaluator"
+    result = await runner.run_task(_task(), runner.RunOptions("test"), tmp_path / "29")
     assert result.status == "error"
-    assert result.error_phase == "checks"
-    assert result.answer == agent_result.text
-    assert result.usage.output == 2
-    assert result.score == 0.5
-    assert result.checks[0].error == "ValueError: invalid evaluator"
-    assert result.checks[1].ok is True
+    assert result.error_phase == "evaluation"
+    assert result.error == "broken evaluator"
+    assert result.answer and result.usage.output == 2
 
 
 async def test_tool_evidence_serializes_harnessed_arguments(tmp_path, agent_result):
@@ -84,37 +168,89 @@ async def test_tool_evidence_serializes_harnessed_arguments(tmp_path, agent_resu
             result=ToolResult("uploaded"),
         )
     ]
-    task = _task("demo", (ToolUsed("upload", "upload_files"),))
-
-    result = await runner.run_task(task, runner.RunOptions("test"), tmp_path)
-    saved = json.loads(result.model_dump_json())
-
+    result = await runner.run_task(_task(), runner.RunOptions("test"), tmp_path / "29")
     assert result.status == "pass", result.error
     assert result.tool_calls == 1
-    assert saved["tools"][0]["args"] == {
-        "paths": ["note.txt"],
-        "options": {"mode": "test"},
-    }
+    assert result.tools[0].args == {"paths": ["note.txt"], "options": {"mode": "test"}}
 
 
 async def test_workspace_setup_failure_becomes_a_task_error(tmp_path):
     workspace = tmp_path / "file"
     workspace.write_text("occupied", encoding="utf-8")
-
-    result = await runner.run_task(_task("demo"), runner.RunOptions("test"), workspace)
-
+    result = await runner.run_task(_task(), runner.RunOptions("test"), workspace)
     assert result.status == "error"
     assert result.error_phase == "setup"
     assert "FileExistsError" in result.error
 
 
-async def test_run_cancellation_is_not_reported_as_a_task_error(tmp_path, monkeypatch):
+@pytest.mark.usefixtures("agent_result")
+async def test_run_cancellation_propagates_and_flushes_har(tmp_path, monkeypatch):
     def cancel(*_args):
         raise asyncio.CancelledError
 
     monkeypatch.setattr(runner, "_agent", cancel)
     with pytest.raises(asyncio.CancelledError):
-        await runner.run_task(_task("demo"), runner.RunOptions("test"), tmp_path)
+        await runner.run_task(_task(), runner.RunOptions("test"), tmp_path / "29")
+    assert (tmp_path / "29/network.har").exists()
+
+
+@pytest.mark.usefixtures("agent_result")
+async def test_timeout_is_an_agent_failure(tmp_path, monkeypatch):
+    async def timeout(*_args, **_kwargs):
+        raise TimeoutError
+
+    @asynccontextmanager
+    async def session():
+        yield SimpleNamespace(id="session", run=timeout)
+
+    monkeypatch.setattr(
+        runner, "_agent", lambda *_args: SimpleNamespace(session=session)
+    )
+    result = await runner.run_task(_task(), runner.RunOptions("test"), tmp_path / "29")
+    assert result.status == "fail", result.error
+    assert result.score == 0
+    assert result.stop_reason == "timeout"
+
+
+@pytest.mark.parametrize("checksum_matches", [True, False])
+async def test_official_result_parsing_and_dataset_validation(
+    tmp_path, monkeypatch, checksum_matches
+):
+    manifest, _ = load_tasks()
+    workspace = tmp_path / "29"
+    workspace.mkdir()
+
+    async def invoke(*_args, **_kwargs):
+        (workspace / "eval_result.json").write_text(
+            json.dumps(
+                {
+                    "task_id": 29,
+                    "status": "success",
+                    "score": 1,
+                    "webarena_verified_version": VERSION,
+                    "webarena_verified_data_checksum": manifest.source_sha256
+                    if checksum_matches
+                    else "wrong",
+                    "evaluators_results": [
+                        {
+                            "evaluator_name": "AgentResponseEvaluator",
+                            "status": "success",
+                            "score": 1,
+                            "assertions": None,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(evaluate.upstream, "invoke", invoke)
+    if not checksum_matches:
+        with pytest.raises(ValueError, match="frozen dataset"):
+            await evaluate.evaluate(workspace)
+    else:
+        grade = await evaluate.evaluate(workspace)
+        assert grade.checks()[0].ok
 
 
 def test_reports_exclude_errors_consistently_and_show_error_counts():
@@ -197,8 +333,8 @@ async def test_finished_results_survive_an_interrupted_suite(tmp_path, monkeypat
     output = tmp_path / "run.json"
     benchmark = _benchmark([])
 
-    async def execute(task, _options, _workspace, _attempt):
-        if task.name == "second":
+    async def execute(task, _options, _workspace, _attempt, _environments):
+        if task.task_id == 106:
             raise asyncio.CancelledError
         return _record(task.name)
 
@@ -213,35 +349,19 @@ async def test_finished_results_survive_an_interrupted_suite(tmp_path, monkeypat
         )
 
     saved = json.loads(output.read_text(encoding="utf-8"))
-    assert [record["task"] for record in saved["tasks"]] == ["first"]
+    assert [record["task"] for record in saved["tasks"]] == ["29"]
     assert saved["tasks"][0]["status"] == "pass"
 
 
-async def test_interruption_closes_other_attempts(tmp_path, monkeypatch):
-    active = asyncio.Event()
-    closed = asyncio.Event()
-
-    async def execute(task, _options, _workspace, _attempt):
-        if task.name == "first":
-            await active.wait()
-            raise asyncio.CancelledError
-        active.set()
-        try:
-            await asyncio.Event().wait()
-        finally:
-            closed.set()
-
-    monkeypatch.setattr(run, "run_task", execute)
-    with pytest.raises(asyncio.CancelledError):
+async def test_shared_sites_reject_parallel_execution(tmp_path):
+    with pytest.raises(ValueError, match="parallel must be 1"):
         await run.run_tasks(
-            [_task("first"), _task("second")],
+            [],
             runner.RunOptions("test"),
             _benchmark([]),
             tmp_path / "run.json",
             parallel=2,
         )
-
-    assert closed.is_set()
 
 
 def test_failed_snapshot_write_preserves_previous_result(tmp_path, monkeypatch):
@@ -289,7 +409,7 @@ def prepared_benchmark_cli(tmp_path, monkeypatch):
     pytest.importorskip("pydantic_ai.models.openai_codex")
     captured = {}
 
-    async def execute(_tasks, options, benchmark, output, _parallel):
+    async def execute(_tasks, options, benchmark, output, _parallel, **_kwargs):
         captured.update(options=options, benchmark=benchmark, output=output)
 
     (tmp_path / "auth.json").write_text(
@@ -309,6 +429,11 @@ def prepared_benchmark_cli(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setattr(run, "load_dotenv", lambda: None)
     monkeypatch.setattr(run, "run_tasks", execute)
+
+    async def preflight(*_args):
+        return None
+
+    monkeypatch.setattr(run, "preflight", preflight)
     monkeypatch.setattr(report, "RESULTS", tmp_path / "results")
     return captured
 
@@ -319,7 +444,7 @@ async def test_cli_defaults_to_subscription_and_terra(
 ):
     if api_key is not None:
         monkeypatch.setenv("OPENAI_API_KEY", api_key)
-    monkeypatch.setattr(sys, "argv", ["evals.run", "--tasks", "saucedemo_checkout"])
+    monkeypatch.setattr(sys, "argv", ["evals.run", "--tasks", "29"])
 
     await run.main()
 
@@ -349,7 +474,7 @@ async def test_cli_explicit_provider_and_model(
         [
             "evals.run",
             "--tasks",
-            "saucedemo_checkout",
+            "29",
             "--provider",
             provider,
             *model_args,
@@ -369,7 +494,7 @@ async def test_cli_missing_subscription_login_does_not_fall_back_to_api(
 ):
     monkeypatch.setenv("OPENAI_API_KEY", "test-api-key")
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "missing"))
-    monkeypatch.setattr(sys, "argv", ["evals.run", "--tasks", "saucedemo_checkout"])
+    monkeypatch.setattr(sys, "argv", ["evals.run", "--tasks", "29"])
 
     with pytest.raises(SystemExit) as error:
         await run.main()
@@ -399,7 +524,7 @@ async def test_cli_lists_tasks_without_credentials(
 
     await run.main()
 
-    assert "saucedemo_checkout" in capsys.readouterr().out
+    assert "48 tasks" in capsys.readouterr().out
     assert not benchmark_cli
 
 
@@ -426,14 +551,13 @@ async def test_cli_rejects_nonpositive_counts(option, value, monkeypatch, capsys
 
 
 def test_task_rejects_an_empty_step_budget():
-    with pytest.raises(ValueError, match="max_steps must be at least 1"):
-        Task("demo", "practice", "https://example.com", "Finish", (answer("done"),), 0)
+    with pytest.raises(ValueError, match="budgets must be at least 1"):
+        runner.RunOptions("test", max_steps=0)
 
 
-def _task(name, checks=None):
-    return Task(
-        name, "practice", "https://example.com", "Finish", checks or (answer("done"),)
-    )
+def _task(name="demo"):
+    _, tasks = load_tasks()
+    return tasks[1] if name == "second" else tasks[0]
 
 
 def _record(name, status="pass", score=1.0):

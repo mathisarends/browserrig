@@ -12,7 +12,6 @@ from statistics import mean
 from pydantic import ValidationError
 
 from .results import BenchmarkResult, TaskResult
-from .task import STAGES
 
 RESULTS = Path(__file__).with_name("results")
 
@@ -21,16 +20,16 @@ def summary(run: BenchmarkResult) -> str:
     records = run.tasks
     usage = [r.usage for r in records if r.usage is not None]
     lines = [f"Run {run.run}  model {run.model}  provider {run.provider}", "", "Tasks"]
-    for stage in STAGES:
+    for stage in dict.fromkeys(record.stage for record in records):
         grouped = {n: a for n, a in _by_task(records).items() if a[0].stage == stage}
         if grouped:
             lines.append(f" {stage}")
             lines += [_task_line(name, attempts) for name, attempts in grouped.items()]
     # Execution and evaluator errors have no reliable agent score.
     scored = [r for r in records if r.status != "error"]
-    lines += ["", "Stages (mean milestone score, errors excluded)"]
+    lines += ["", "Benchmark scores (errors excluded)"]
     lines += _group_scores(scored, lambda r: [r.stage])
-    lines += ["", "Capabilities, weakest first"]
+    lines += ["", "Sites and operations, weakest first"]
     lines += _group_scores(scored, lambda r: r.tags)
     passed = sum(r.status == "pass" for r in records)
     errors = len(records) - len(scored)
@@ -40,12 +39,18 @@ def summary(run: BenchmarkResult) -> str:
         f"Total  {passed}/{len(records)} passed, {errors} errors (execution or checks), "
         f"mean score {score}",
         f"Tokens {sum(u.input for u in usage):,} in / {sum(u.output for u in usage):,} out, "
-        f"{sum(record.seconds for record in records):.0f}s agent time",
+        f"{sum(record.seconds for record in records):.0f}s wall time including setup",
     ]
     return "\n".join(lines)
 
 
 def compare(run: BenchmarkResult, before: BenchmarkResult) -> str:
+    if (run.dataset_sha256, run.max_steps, run.timeout) != (
+        before.dataset_sha256,
+        before.max_steps,
+        before.timeout,
+    ):
+        return "Runs have different datasets or budgets; comparison skipped."
     now, then = _by_task(run.tasks), _by_task(before.tasks)
     lines = [f"Compared with {before.run} ({before.provider}:{before.model})"]
     changes = []
@@ -87,7 +92,11 @@ def previous_run(current: Path) -> BenchmarkResult | None:
             earlier = BenchmarkResult.model_validate_json(path.read_text("utf-8"))
         except (ValidationError, OSError):
             continue
-        if names & {record.task for record in earlier.tasks}:
+        if (run.dataset_sha256, run.max_steps, run.timeout) == (
+            earlier.dataset_sha256,
+            earlier.max_steps,
+            earlier.timeout,
+        ) and names & {record.task for record in earlier.tasks}:
             return earlier
     return None
 

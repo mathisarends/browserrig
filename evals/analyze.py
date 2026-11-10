@@ -134,7 +134,7 @@ def main() -> None:
             added = ", ".join(f"{k}={v}" for k, v in step["added"].items())
             print(
                 f"    {step['step']:>2} prompt={step['prompt']:>6} uncached={step['uncached']:>6}"
-                f" +[{added}] → {','.join(step['calls']) or 'answer'}"
+                f" +[{added}] -> {','.join(step['calls']) or 'answer'}"
             )
     out = args.results.with_suffix(".analysis.json")
     out.write_text(json.dumps(reports, indent=2, ensure_ascii=False), encoding="utf-8")

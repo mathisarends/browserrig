@@ -74,6 +74,10 @@ dev = [
     "smelt-cli==0.6.0",
     "ty>=0.0.93,<0.1",
 ]
+evals = [
+    "filelock>=3.20,<4",
+    "playwright>=1.55,<2",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["browserrig"]

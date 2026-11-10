@@ -6,6 +6,20 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, JsonValue
 
 
+class AgentResponse(BaseModel):
+    task_type: Literal["RETRIEVE", "MUTATE", "NAVIGATE"]
+    status: Literal[
+        "SUCCESS",
+        "NOT_FOUND_ERROR",
+        "ACTION_NOT_ALLOWED_ERROR",
+        "PERMISSION_DENIED_ERROR",
+        "DATA_VALIDATION_ERROR",
+        "UNKNOWN_ERROR",
+    ]
+    retrieved_data: list[JsonValue] | None = None
+    error_details: str | None = None
+
+
 class ToolRecord(BaseModel):
     name: str
     # Older snapshots contain repr strings of Harnessed's immutable mappings.
@@ -31,6 +45,9 @@ class Usage(BaseModel):
 
 class TaskResult(BaseModel):
     task: str
+    task_id: int | None = None
+    revision: int | None = None
+    sites: list[str] = Field(default_factory=list)
     stage: str
     tags: list[str]
     attempt: int = Field(default=1, ge=1)
@@ -50,11 +67,19 @@ class TaskResult(BaseModel):
     tool_errors: int | None = None
     tools: list[ToolRecord] = Field(default_factory=list)
     error: str | None = None
-    error_phase: Literal["setup", "execution", "evidence", "checks"] | None = None
+    error_phase: (
+        Literal["setup", "execution", "evidence", "checks", "evaluation"] | None
+    ) = None
 
 
 class BenchmarkResult(BaseModel):
     run: str
+    subset: str | None = None
+    dataset_sha256: str | None = None
+    upstream_revision: str | None = None
+    upstream_version: str | None = None
+    max_steps: int | None = None
+    timeout: int | None = None
     model: str
     # Snapshots written before subscription support used API keys.
     provider: Literal["openai", "openai-codex"] = "openai"

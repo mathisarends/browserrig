@@ -1,0 +1,40 @@
+{
+  "shopping": {
+    "url": "http://localhost:7770",
+    "control_port": 7771,
+    "image": "am1n3e/webarena-verified-shopping",
+    "username": "emma.lopez@gmail.com",
+    "password": "Password.123"
+  },
+  "shopping_admin": {
+    "url": "http://localhost:7780",
+    "control_port": 7781,
+    "image": "am1n3e/webarena-verified-shopping_admin",
+    "username": "admin",
+    "password": "admin1234"
+  },
+  "gitlab": {
+    "url": "http://localhost:8023",
+    "control_port": 8024,
+    "image": "am1n3e/webarena-verified-gitlab",
+    "username": "byteblaze",
+    "password": "hello1234"
+  },
+  "reddit": {
+    "url": "http://localhost:9999",
+    "control_port": 9998,
+    "image": "am1n3e/webarena-verified-reddit",
+    "username": "MarvelsGrantMan136",
+    "password": "test1234"
+  },
+  "map": {
+    "url": "http://localhost:3000",
+    "control_port": 3001,
+    "image": "am1n3e/webarena-verified-map"
+  },
+  "wikipedia": {
+    "url": "http://localhost:8888",
+    "control_port": 8889,
+    "image": "am1n3e/webarena-verified-wikipedia"
+  }
+}

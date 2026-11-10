@@ -1,113 +1,155 @@
-# Live-site benchmark
+# WebArena-Verified Hard
 
-Missions on real websites that show whether the agent's tools work and where it
-struggles. Each task has several milestones (checks), so a long mission shows how far
-the agent got, not only whether it passed.
+Browserrig runs a frozen **48-task subset of WebArena-Verified Hard**, replacing the
+previous practice/reference/wild benchmark. Tasks and grading rules come unchanged
+from [ServiceNow/WebArena-Verified](https://github.com/ServiceNow/webarena-verified)
+**v1.2.3**, commit `6473f72db5dcefc97b5725b59e734504edc28a21`.
+
+## Frozen dataset
+
+[The manifest](data/manifest.json) records exact IDs, source hashes, subset hash,
+selection seed and algorithm. The sample has 10 tasks each for Shopping, Shopping
+Admin, GitLab and Reddit, plus 8 cross-site tasks. Those include Map and Wikipedia.
+There are 29 mutation, 13 retrieval and 6 navigation tasks.
+
+Selection uses site quotas, proportional operation quotas and template diversity,
+with SHA-256 tie-breaking. It uses no agent scores and never resamples at runtime.
+This is a deliberately balanced development subset, not an unbiased estimate of
+all 258 Hard tasks. Report it as **browserrig-webarena-verified-hard-48-v1**,
+not as a full WebArena-Verified Hard score. Keep separate tasks for final evaluation
+if you repeatedly tune against these 48.
+
+The original JSON definitions and evaluators are retained. Only concrete site URL
+placeholders are resolved. Expected answers, evaluation rules, HARs and evaluator
+configuration are outside the agent's Files workspace. The agent receives the
+original intent and the upstream result schema.
+
+The official evaluator requires its complete 812-task reference file internally.
+We use the copy shipped with its pinned package and validate its checksum against
+the manifest's upstream source hash. Only the 48 frozen IDs are executed or scored;
+the other reference definitions cause no agent calls or token usage.
+
+## Install and prepare
+
+Use Python 3.12 or later, uv, local Chrome and Docker with Linux containers.
+
+```powershell
+uv sync --locked --group evals --extra openai --extra otel
+uv sync --project evals/evaluator --locked --no-dev
+uv run --no-sync python -m evals.run --list
+```
+
+The official evaluator has its own locked environment because its pinned Pydantic
+version differs from Browserrig's. Playwright records HAR from the same installed
+Chrome that Browserrig controls; no Playwright browser download is needed.
+
+Website images and Map/Wikipedia datasets are large. The explicit setup command
+downloads the official images and auxiliary data; allow substantial disk space and
+download time. It does not run an agent:
+
+```powershell
+uv run --no-sync python -m evals.environments prepare
+uv run --no-sync python -m evals.run --check
+```
+
+To start with only GitLab, use `prepare --sites gitlab`, followed by
+`evals.run --tasks @gitlab --check`. The latter also includes cross-site GitLab
+tasks, so prepare their sites too, or select numeric IDs instead.
+
+[environments.json](environments.json) contains local URLs, control ports, image
+names and upstream demo-account credentials. `--config PATH` and `--data-dir PATH`
+override the config and auxiliary-data directory. Use dedicated benchmark
+containers: upstream `env start` replaces containers named `webarena_verified_*`
+on each attempt. Image tags follow upstream defaults; the dataset and evaluator
+are pinned, while exact local image IDs are captured in preflight logs. Archive
+these logs alongside a published result.
+
+The normal runner checks Docker, local images and data before loading a model.
+It never implicitly pulls multi-gigabyte images. Check/setup diagnostics go to
+`.browserrig/webarena-*.log`.
 
 ## Run
 
-```sh
-evals/bench.sh smoke                 # 5 quick practice tasks, one per core capability
-evals/bench.sh practice              # all practice tasks
-evals/bench.sh reference --repeat 2  # research tasks, twice each
-evals/bench.sh wild                  # popular sites, realism check
-evals/bench.sh saucedemo_checkout --headed
-evals/bench.sh @upload,@download     # every task with these tags
-evals/bench.sh list                  # what exists
+```powershell
+# One inexpensive first attempt; task 29 is part of the frozen subset.
+uv run --no-sync python -m evals.run --tasks 29 --max-steps 30 --timeout 180
+
+# All 48 tasks, with fixed default budgets: 50 steps and 300 agent seconds each.
+uv run --no-sync python -m evals.run --trace --label baseline
+
+# Select frozen IDs or filter by site / operation.
+uv run --no-sync python -m evals.run --tasks 29,106,116 --headed
+uv run --no-sync python -m evals.run --tasks @retrieve --repeat 2
 ```
 
-The script needs `uv`. On Windows run it from Git Bash. By default, benchmarks
-use your ChatGPT/Codex subscription through Pydantic AI's
-[`openai-codex` provider](https://pydantic.dev/docs/ai/models/openai-codex/)
-with **`gpt-6.1-terra`**. Sign in once with `codex login`; the provider reads
-`~/.codex/auth.json` (or `$CODEX_HOME/auth.json`). No API key or `.env` file is
-needed. Parallel tasks share one provider and its in-memory token refresh state.
-Subscription errors do not fall back to API billing.
+Default authentication uses the existing subscription provider `openai-codex`,
+with model `gpt-6.1-terra`. Run `codex login` first. Explicit `--provider openai`
+uses `OPENAI_API_KEY` and optionally `OPENAI_MODEL`; `--model` overrides the model.
+There is no automatic fallback between providers.
 
-Choose another model explicitly with `--model`. `OPENAI_MODEL` is only used in
-API-key mode, so an existing `.env` cannot change the subscription's Terra default.
-To use API billing instead, set `OPENAI_API_KEY` in `.env` or the environment:
+Each attempt recreates its websites, signs into the public benchmark accounts,
+opens the original start URLs, records a full embedded-content HAR, runs Browserrig,
+flushes the HAR, then invokes the unmodified official evaluator. Containers
+are explicitly initialized with their base URL after startup; this
+handles the current image CLI's required parameter. Browser locale is fixed to
+English (en-US) and timezone to UTC, including the automated login context.
+Shared mutable containers require `--parallel 1`; a process lock prevents overlapping runs from
+this checkout. Resets and login are outside the agent time budget. A timeout or
+unfinished session cannot pass. Cancellation closes the recording context and
+preserves already written results.
 
-```sh
-evals/bench.sh smoke --provider openai
+The Bash convenience wrapper supports `all`, `list`, `check`, `prepare`,
+`report`, `evaluate`, or frozen IDs / filters.
+
+## Scores, artifacts and traces
+
+The official evaluator checks the structured agent response and, where required,
+network requests and responses. This produces a binary task score, without an LLM
+judge. Infrastructure/evaluator errors are reported separately from task failures.
+The report shows success counts over all attempts, scored means excluding errors,
+per-site/operation breakdowns, tokens and elapsed time. Setup time is included in
+elapsed time. Completed attempts are saved atomically.
+
+Artifacts live in:
+
+```text
+evals/results/<run>.json
+evals/results/workspaces/<run>/attempt-<n>/<task-id>/
+  agent/                # agent-visible files only
+  agent_response.json   # structured final response, or null if unfinished
+  network.har           # full recorded network evidence
+  environment.json      # evaluator URL mappings
+  environment.log       # official reset diagnostics
+  evaluator.log
+  eval_result.json      # full upstream assertions and provenance checksums
 ```
 
-At the end it prints a summary and compares scores with the latest earlier run that
-shares tasks. Results land in `evals/results/<timestamp>-<label>.json`; each run's
-downloads and written files stay in `evals/results/workspaces/`. The JSON snapshot
-is replaced atomically after every finished attempt, so completed results remain
-available if a later task fails or the run is interrupted.
+Re-grade a saved attempt without a model or running website:
 
-```sh
-evals/bench.sh report evals/results/<run>.json --against evals/results/<older>.json
+```powershell
+uv run --no-sync python -m evals.evaluate evals/results/workspaces/<run>/attempt-1/29
+uv run --no-sync python -m evals.report evals/results/<run>.json
 ```
 
-## Stages
+Re-grading writes the attempt's `eval_result.json`; it does not rewrite the aggregate
+run snapshot. Keep the pinned evaluator and dataset when moving artifacts.
+Automatic run comparisons require
+the same dataset hash and budgets. Historical custom-benchmark artifacts remain
+readable but are not compared against this dataset.
 
-| Stage | Sites | Checks | Run it |
-|---|---|---|---|
-| `practice` | the-internet, saucedemo, httpbin, W3C ARIA examples, toscrape, TodoMVC, OrangeHRM | strict, content is fixed | after changes to tools or prompts |
-| `reference` | arXiv, Our World in Data, SEC EDGAR, W3C specs, MDN, PyPI, OpenStreetMap, Wikipedia, Python docs | strict on facts | weekly, before releases |
-| `wild` | GitHub, Reddit, HN, pricing pages, news | sanity only, read the trace | weekly, before releases |
+For Phoenix, start `docker compose up -d --wait` and pass `--trace`. Existing
+OTel export and `python -m evals.analyze` keep working; session IDs link task results
+to traces. HARs and traces contain benchmark account/session data; keep artifacts
+local or redact them before sharing.
 
-A failure in `practice` usually means a broken tool or a model mistake. In `reference`
-and `wild` check the site first. `orangehrm_employee` uses a shared public demo that
-resets now and then.
+## Reproduce the freeze
 
-## Reading results
-
-- `pass` means the run finished and reached every milestone. `fail` lists the
-  missed milestones. `error` means execution or evaluation failed; `error_phase`
-  identifies setup, execution, evidence collection or checks. Other checks still
-  run after an evaluator raises, and available answers and usage are retained.
-- Errors are excluded from milestone averages in both summaries and comparisons.
-  Comparisons show error counts separately; a task with no scored attempts on one
-  side has no comparable score.
-- **Capabilities, weakest first** averages scores per tag, such as `upload`,
-  `login` or `widgets`. This is where broken tools show up.
-- Run with `--repeat 3` before trusting a single regression; live sites are noisy.
-- With `--trace`, start Phoenix first (`docker compose up -d --wait`). Then
-  `uv run python -m evals.analyze evals/results/<run>.json` shows how the
-  context grows per step.
-
-Tracing setup lives in `evals/telemetry.py`. It respects the standard OTLP endpoint
-variables and `OTEL_SERVICE_NAME`; `PHOENIX_PROJECT_NAME` defaults to
-`browserrig-evals`. Trace capture settings remain the same as before this cleanup.
-Analysis dumps include the attempt number so repeated tasks do not overwrite each
-other.
-
-## Code and offline checks
-
-`task.py` defines missions, `runner.py` executes them, and `checks.py` evaluates
-their evidence. `results.py` defines the Pydantic result models and snapshot writer;
-`run.py` coordinates the CLI. Snapshots record the model and provider; older
-snapshots without a provider are read as `openai` (API key). `report.py` and
-`analyze.py` consume these records.
-
-```sh
-uv run ruff check evals
-uv run ruff format --check evals
-uv run pytest tests/project/test_evals.py
+```powershell
+git clone https://github.com/ServiceNow/webarena-verified.git .browserrig/webarena-verified-upstream
+git -C .browserrig/webarena-verified-upstream checkout 6473f72db5dcefc97b5725b59e734504edc28a21
+uv run --no-sync python -m evals.freeze .browserrig/webarena-verified-upstream
 ```
 
-## Checks
-
-Defined in `evals/checks.py` and attached per task in `evals/suites/`:
-
-| Check | Milestone |
-|---|---|
-| `Answer` | The final answer matches regexes; a pattern may be computed, such as next month's date |
-| `Workspace` | Files matching a glob exist in the workspace, optionally containing text |
-| `ToolUsed` | A tool such as `upload_files` or `open_tab` succeeded at least n times |
-| `Probe` | JavaScript on the active tab, read before the browser closes, such as localStorage or the URL |
-| `NoLeak` | A secret never reaches the answer, the tool arguments or the model history |
-| `Custom` | Any other condition on the evidence |
-
-Logins use `Secrets`, so every login also tests that the agent types
-`{{secret:NAME}}` and never sees the password. The demo passwords are public.
-
-## Add a task
-
-Add a `Task` to the stage module in `evals/suites/`. Use a unique name, a start URL,
-a prompt and at least one check. Tag the capabilities it exercises. Verify the
-expected values against the live site before relying on them.
+Do not regenerate during normal evaluation. Intentional changes require a new
+subset version and baseline. The imported data is Apache-2.0 licensed; see
+[data/NOTICE](data/NOTICE) and [upstream license](data/LICENSE.webarena-verified).
