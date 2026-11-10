@@ -1,10 +1,14 @@
 import hashlib
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import replace
 
 from harnessed import Instructions, PluginState, SystemPrompt, hook
 from harnessed.core.budget import ContextBudget
-from harnessed.core.compaction import CompactionPolicy, ModelSummarizer, Summarizer
+from harnessed.core.compaction import (
+    CompactionPolicy,
+    CompactionPrompt,
+    ModelSummarizer,
+)
 from harnessed.core.prompt.plugin_instructions import PluginInstructions
 from harnessed.core.tokens import TokenCounter, count_request
 from harnessed.events import CompactionAppliedEvent
@@ -12,7 +16,7 @@ from harnessed.hooks import Next, PrepareRequest, PreStep, SessionAppended, Step
 from harnessed.kernel import PluginScope, needs, observes
 from harnessed.models import Model, ModelRequest, UserMessage
 from harnessed.plugins import Compaction, ContextState
-from harnessed.services import SessionContext
+from harnessed.services import SessionContext, Summarizer
 from harnessed.tracing import span
 
 from browserrig.events import FileReadFinishedEvent, FileWrittenEvent
@@ -47,23 +51,23 @@ class TaskMemory(Compaction, provides=True):
         warn_at: float = 0.7,
         fallback_tokens: int = 70_000,
         trigger: Callable[[ContextState], bool] | None = None,
-        summarizer: Summarizer | Model | str | None = None,
-        keep_turns: int = 2,
-        keep_steps: int = 2,
-        keep_first_turns: int = 0,
-        preserve_turns: Iterable[str] = (),
-        summary_tokens: int = 2048,
-        focus: str = "",
+        llm: Model | str | None = None,
+        prompt: CompactionPrompt | None = None,
+        summarizer: Summarizer | None = None,
+        keep_last_steps: int = 2,
+        target_ratio: float | None = None,
+        target_tokens: int | None = None,
+        max_summary_tokens: int | None = None,
     ) -> None:
         super().__init__(
             trigger=_default_trigger if trigger is None else trigger,
+            llm=llm,
+            prompt=prompt,
             summarizer=summarizer,
-            keep_turns=keep_turns,
-            keep_steps=keep_steps,
-            keep_first_turns=keep_first_turns,
-            preserve_turns=preserve_turns,
-            summary_tokens=summary_tokens,
-            focus=focus,
+            keep_last_steps=keep_last_steps,
+            target_ratio=target_ratio,
+            target_tokens=target_tokens,
+            max_summary_tokens=max_summary_tokens,
         )
         normalized = workspace_path(path)
         if (
@@ -98,11 +102,11 @@ class TaskMemory(Compaction, provides=True):
         await super().setup(scope)
         if self._files is None:
             return
-        # Compatibility boundary for pinned Harnessed 0.15: wrap its existing
+        # Compatibility boundary for pinned Harnessed 0.16: wrap its existing
         # policy, retaining native budgets, usage accounting and emergency recovery.
         policy = scope[CompactionPolicy]
         summarizer = policy.summarizer or ModelSummarizer(
-            self._model, focus=self.config.focus
+            policy.llm or self._model, prompt=policy.prompt, counter=self._counter
         )
         scope.provide(
             CompactionPolicy,

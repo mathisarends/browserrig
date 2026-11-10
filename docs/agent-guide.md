@@ -51,6 +51,10 @@ fires at 100k tokens (`WindowRatio(fallback_tokens=...)`), or pass
 `PydanticAIModel(..., context_window=...)` to use the ratio. Pass your own
 `TaskMemory(...)` from `browserrig` in `plugins` to tune it, or
 `without=(ContextCompaction,)` to keep every step.
+GPT-6.1 Terra uses a shared 256,000-token application context limit and an
+8,192-token output reserve on both API and subscription runs, even if its adapter
+reports no window. Its default compaction retains two steps, targets 40% input
+occupancy and allows up to 8,192 summary tokens; see [task memory](task-memory.md).
 Task memory asks the agent to save a concise workspace checkpoint before compaction
 and read it afterward; see [task memory](task-memory.md). Passing plain
 `ContextCompaction(...)` keeps native summarization without that protocol.
@@ -416,13 +420,14 @@ sections: `section_delivery=SectionDelivery.CONTEXT` delivers guidance until the
 mount closes or suspends; `SectionDelivery.IGNORE` skips it. Import `SectionDelivery`
 from `harnessed`. The fixed system prompt stays unchanged.
 
-Harnessed 0.15 uses state format 2, checkpoint/JSON-store format 3 and audit
-envelope version 5, unchanged from 0.13 and 0.14. Existing 0.13/0.14 data needs no migration.
-Older, incompatible formats are rejected without automatic migration. See
+Harnessed 0.16 uses state format 3, checkpoint/JSON-store format 3 and audit
+envelope version 6. Earlier conversation states and audit envelopes are rejected
+without automatic migration; retain their original application environment to
+read them and start new stores. See
 [upgrade notes](../CHANGELOG.md) for all Browserrig API changes.
 
 Install the optional MCP client with `uv sync --locked --extra openai --extra mcp`.
-Harnessed and all provider extras are pinned to the published 0.15.0 release,
+Harnessed and all provider extras are pinned to the published 0.16.0 release,
 including `session.append_message(UserMessage(...))`. Add MCP servers through
 the native plugin:
 
@@ -445,7 +450,7 @@ linked MCP guide for migration details.
 `MCP.stdio("catalog", command=..., args=[...])` starts a local server instead.
 Connections belong to each session, tool names are prefixed (for example
 `catalog__search`), and existing approval policies apply. See the
-[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.15.0/docs/guides/mcp.md).
+[Harnessed MCP guide](https://github.com/mathisarends/harnessed/blob/v0.16.0/docs/guides/mcp.md).
 
 Harnessed closes failed MCP transports, hides their tools, wakes pending
 calls and drains owned tasks. Failed operations are not retried automatically;
@@ -484,7 +489,7 @@ For standalone kernel compositions, call `await ctx.settle()` followed by
 ## Saving and restoring sessions
 
 Sessions stay in memory by default. To save conversations automatically and
-reopen them by application-owned ID, configure Harnessed 0.15.0's native store:
+reopen them by application-owned ID, configure Harnessed 0.16.0's native store:
 
 ```python
 from pathlib import Path
@@ -551,12 +556,12 @@ references; `session.assets.read(ref)` retrieves them. It holds no browser, plug
 state or event log: a restored session launches a fresh browser, and queued hints
 and activity intervals start empty. JavaScript tools remain blocked whenever
 the restored agent is configured with secrets.
-Conversation snapshots use format **2**; execution checkpoints and JSON store
-envelopes use format **3**, and audit envelopes use version **5**. Earlier formats,
+Conversation snapshots use format **3**; execution checkpoints and JSON store
+envelopes use format **3**, and audit envelopes use version **6**. Earlier formats,
 old JSONL stores and raw `SessionState` JSON cannot be opened as new store files.
 Keep legacy data separate;
 there is no automatic migration. See the
-[Harnessed sessions guide](https://github.com/mathisarends/harnessed/blob/v0.15.0/docs/guides/sessions.md)
+[Harnessed sessions guide](https://github.com/mathisarends/harnessed/blob/v0.16.0/docs/guides/sessions.md)
 for atomic repository adapters, recovery and storage details.
 
 Custom models expose immutable `GenerationSettings` from `harnessed.models`.

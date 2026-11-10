@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Upgrade Harnessed and every provider/MCP/OTel extra to 0.16.0. `TaskMemory`
+  accepts `llm`, replacement `prompt` factories, `keep_last_steps`, whole-input
+  targets and `max_summary_tokens`; custom summarizers now accept
+  `CompactionRequest` and return `Summary`. Older conversation states and audit
+  envelopes require their original application environment; start new stores.
+- Apply a shared GPT-6.1 Terra profile to regular agents and benchmarks: a
+  256,000-token application context limit, 8,192-token output reserve, two retained
+  steps, a 40% compaction target and an 8,192-token summary ceiling. Benchmark
+  result files record these settings. Other models retain their existing defaults.
+
 - Interleave visible text with controls in a typed `PageContent.content` tree.
   Paragraphs retain inline `[label][ref]` links, form guidance stays beside its
   fields, and code keeps its line breaks. Preserve frame insertion order,

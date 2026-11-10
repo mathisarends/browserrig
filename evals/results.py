@@ -80,6 +80,11 @@ class BenchmarkResult(BaseModel):
     upstream_version: str | None = None
     max_steps: int | None = None
     timeout: int | None = None
+    context_window: int | None = None
+    reserve_tokens: int | None = None
+    keep_last_steps: int | None = None
+    target_ratio: float | None = None
+    max_summary_tokens: int | None = None
     model: str
     # Snapshots written before subscription support used API keys.
     provider: Literal["openai", "openai-codex"] = "openai"

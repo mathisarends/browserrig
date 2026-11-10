@@ -104,7 +104,7 @@ async def test_terminal_reports_correlated_compaction_and_attempts_without_inven
     output = io.StringIO()
     agent = Agent(model=ScriptedModel(["ok"]), plugins=[TerminalEvents(output)])
     events = (
-        CompactionStartedEvent("compact-1"),
+        CompactionStartedEvent("compact-1", before_tokens=1000),
         ModelAttemptStartedEvent(request_id="request-1", retry_group_id="group-1"),
         ModelRetryScheduledEvent(
             request_id="request-1",
@@ -118,7 +118,7 @@ async def test_terminal_reports_correlated_compaction_and_attempts_without_inven
             retry_group_id="group-1",
             outcome="retrying",
         ),
-        CompactionFinishedEvent("compact-1", "discarded"),
+        CompactionFinishedEvent("compact-1", "discarded", before_tokens=1000),
     )
     async with agent.session() as session:
         for event in events:

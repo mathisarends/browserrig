@@ -6,6 +6,7 @@ import os
 
 from harnessed import PolicyDecision
 from harnessed.models import UserMessage
+from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
@@ -22,7 +23,9 @@ async def main() -> None:
     if not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY first")
     agent = Agent(
-        model=OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra")),
+        model=PydanticAIModel(
+            OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra"))
+        ),
         browser=Chrome.launch(url=args.url),
         plugins=[Approvals(default=PolicyDecision.ALLOW)],
     )

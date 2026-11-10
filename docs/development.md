@@ -134,9 +134,9 @@ version and tag. This setup PR creates no release or tag itself.
 
 ## Harnessed compatibility
 
-Harnessed and all provider extras are pinned to the published 0.15.0 release.
+Harnessed and all provider extras are pinned to the published 0.16.0 release.
 `session.append_message(UserMessage(...))` adds durable background without starting
-a turn. State format 2, checkpoint/store format 3 and audit envelope 5 reject older
+a turn. State format 3, checkpoint/store format 3 and audit envelope 6 reject older
 data; back up old application data and start fresh stores.
 
 `HumanHandoff.history` exposes typed, immutable receipts from session-owned state.

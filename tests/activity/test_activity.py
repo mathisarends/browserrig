@@ -338,8 +338,8 @@ async def test_compaction_activity_is_correlated_and_does_not_finish_model_reque
 ):
     session, activity = activity_session
     await session.emit(_request("model"))
-    await session.emit(CompactionStartedEvent("compact"))
-    await session.emit(CompactionFinishedEvent("compact", outcome))
+    await session.emit(CompactionStartedEvent("compact", before_tokens=1000))
+    await session.emit(CompactionFinishedEvent("compact", outcome, before_tokens=1000))
     intervals = activity.intervals()
     compaction = next(i for i in intervals if i.kind is ActivityKind.COMPACTION)
     model = next(i for i in intervals if i.kind is ActivityKind.LLM)

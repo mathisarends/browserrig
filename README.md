@@ -1,6 +1,6 @@
 # Browserrig
 
-Browserrig is an event-driven Chrome automation library for AI agents and Python applications. It combines direct browser access with a composable [Harnessed](https://github.com/mathisarends/harnessed/releases/tag/v0.15.0) agent, structured page observations, browser actions, and typed events.
+Browserrig is an event-driven Chrome automation library for AI agents and Python applications. It combines direct browser access with a composable [Harnessed](https://github.com/mathisarends/harnessed/releases/tag/v0.16.0) agent, structured page observations, browser actions, and typed events.
 
 Agents can navigate tabs, interact with DOM elements or screenshot coordinates, download and read files, and be paused or steered during a session. Chrome can be launched locally or connected through CDP.
 
@@ -39,10 +39,15 @@ python -m pip install "browserrig[openai,ocr]"    # document readers and OCR
 
 To run the examples from a source checkout instead (uv required):
 
-Harnessed and all provider extras are pinned to the published `0.15.0` release,
+Harnessed and all provider extras are pinned to the published `0.16.0` release,
 with native ordinary-message input and explicit stream contexts.
-Existing Harnessed 0.12 snapshots, stores and audit logs are incompatible; back up
+Existing pre-0.16 conversation states and audit logs are incompatible; back up
 old application data and start new stores. See the [upgrade notes](CHANGELOG.md).
+
+GPT-6.1 Terra uses a 256,000-token application context limit for both ordinary
+agents and benchmarks, with an 8,192-token output reserve and compaction at 80%.
+The shared profile retains two steps, targets 40% input occupancy after compaction
+and caps summary text at 8,192 tokens; see [task memory](docs/task-memory.md).
 
 ```powershell
 uv sync --locked --extra openai

@@ -85,6 +85,13 @@ uv run --no-sync python -m evals.run --tasks @retrieve --repeat 2
 Default authentication uses the existing subscription provider `openai-codex`,
 with model `gpt-6.1-terra`. Run `codex login` first. Explicit `--provider openai`
 uses `OPENAI_API_KEY` and optionally `OPENAI_MODEL`; `--model` overrides the model.
+
+GPT-6.1 Terra uses the same model profile as regular Browserrig agents: a
+256,000-token application context limit, 8,192-token output reserve, checkpoint
+at 70%, compaction at 80%, two retained steps, a 40% input target and an
+8,192-token summary ceiling. New result files record `context_window`,
+`reserve_tokens`, `keep_last_steps`, `target_ratio` and `max_summary_tokens`.
+Older baselines without these fields keep their original meaning.
 There is no automatic fallback between providers.
 
 Each attempt recreates its websites, signs into the public benchmark accounts,
