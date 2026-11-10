@@ -56,15 +56,15 @@ with only that group.
 `DownloadReceiving()` independently binds browser downloads to the workspace;
 removing tools does not stop download receiving.
 
-| Tool | Behavior |
-| --- | --- |
-| `list_files(path=".", offset=0, limit=100)` | List a directory; follow `next_offset` for more. |
+| Tool                                                                                                               | Behavior                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_files(path=".", offset=0, limit=100)`                                                                        | List a directory; follow `next_offset` for more.                                                                                                              |
 | `read_file(path, page_number=None, sheet=None, cell_range=None, member=None, ocr=None, offset=0, max_chars=20000)` | Read native document content, worksheet cells, archive members or OCR text. Returns structure, limitations, a saved extraction path and continuation offsets. |
-| `write_file(path, content, overwrite=False, append=False)` | Save UTF-8 text and create parent directories; overwriting requires an explicit flag. `append=True` adds to the end and creates a missing file. |
-| `edit_file(path, old_text, new_text, replace_all=False)` | Replace exact text in a UTF-8 file. `old_text` must match once unless `replace_all=True`. |
-| `list_downloads()` | List download IDs, status, saved paths, and file errors. |
-| `open_downloaded_file(download_id)` | Open a completed download in a new active tab. |
-| `open_file(path)` | Open a workspace/download file in a new active tab. |
+| `write_file(path, content, overwrite=False, append=False)`                                                         | Save UTF-8 text and create parent directories; overwriting requires an explicit flag. `append=True` adds to the end and creates a missing file.               |
+| `edit_file(path, old_text, new_text, replace_all=False)`                                                           | Replace exact text in a UTF-8 file. `old_text` must match once unless `replace_all=True`.                                                                     |
+| `list_downloads()`                                                                                                 | List download IDs, status, saved paths, and file errors.                                                                                                      |
+| `open_downloaded_file(download_id)`                                                                                | Open a completed download in a new active tab.                                                                                                                |
+| `open_file(path)`                                                                                                  | Open a workspace/download file in a new active tab.                                                                                                           |
 
 Pass paths returned by `list_files` or `list_downloads`, or paths relative to the
 workspace. Without extras, `read_file` reads plain text. Install
@@ -74,17 +74,17 @@ workspace. Without extras, `read_file` reads plain text. Install
 fall back to their raw text with status `partial`. Without OCR, images return
 metadata only and scanned PDF pages report that OCR is not installed.
 
-| Format | Content and selection |
-| --- | --- |
-| Text, Markdown, source code, JSON, XML, YAML, logs, subtitles | Text with encoding detection and character offsets. |
-| CSV, TSV; XLSX/XLSM/XLTX/XLTM, XLS, ODS | Worksheet names and cell addresses; choose `sheet` and an A1 `cell_range`. XLSX includes formulas, stored results, number formats, merged and hidden ranges. |
-| PDF | One page, defaulting to page 1; `page_count` exposes the remaining pages. Pages without native text use local OCR automatically. `ocr=True` explicitly requests full-page OCR; `ocr=False` disables it. |
-| PNG, JPEG, TIFF, GIF, BMP, WEBP, ICO | Image metadata and local OCR text; `page_number` selects a frame in a multi-frame image. |
-| DOCX, PPTX, ODT, ODP, RTF | Document text and tables; PPTX also exposes speaker notes and optional slide selection with `page_number`. |
-| HTML/XHTML/SVG, MHTML, EPUB | Readable text; EPUB follows chapter order. Embedded images and document-specific resources have explicit limitations. |
-| ZIP, TAR and compressed TAR; GZ, BZ2, XZ; EML, MBOX | Entry or attachment listings. Select `member="report.xlsx"`, `member="#1"`, or nested `member="bundle.zip!/report.xlsx"`; the same readers process the selected content. |
-| SQLite | Table names and values; select a table with `sheet`. Binary BLOBs are identified by size. |
-| Audio and video | Metadata only; no transcription or video understanding. |
+| Format                                                        | Content and selection                                                                                                                                                                                   |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Text, Markdown, source code, JSON, XML, YAML, logs, subtitles | Text with encoding detection and character offsets.                                                                                                                                                     |
+| CSV, TSV; XLSX/XLSM/XLTX/XLTM, XLS, ODS                       | Worksheet names and cell addresses; choose `sheet` and an A1 `cell_range`. XLSX includes formulas, stored results, number formats, merged and hidden ranges.                                            |
+| PDF                                                           | One page, defaulting to page 1; `page_count` exposes the remaining pages. Pages without native text use local OCR automatically. `ocr=True` explicitly requests full-page OCR; `ocr=False` disables it. |
+| PNG, JPEG, TIFF, GIF, BMP, WEBP, ICO                          | Image metadata and local OCR text; `page_number` selects a frame in a multi-frame image.                                                                                                                |
+| DOCX, PPTX, ODT, ODP, RTF                                     | Document text and tables; PPTX also exposes speaker notes and optional slide selection with `page_number`.                                                                                              |
+| HTML/XHTML/SVG, MHTML, EPUB                                   | Readable text; EPUB follows chapter order. Embedded images and document-specific resources have explicit limitations.                                                                                   |
+| ZIP, TAR and compressed TAR; GZ, BZ2, XZ; EML, MBOX           | Entry or attachment listings. Select `member="report.xlsx"`, `member="#1"`, or nested `member="bundle.zip!/report.xlsx"`; the same readers process the selected content.                                |
+| SQLite                                                        | Table names and values; select a table with `sheet`. Binary BLOBs are identified by size.                                                                                                               |
+| Audio and video                                               | Metadata only; no transcription or video understanding.                                                                                                                                                 |
 
 `max_chars` limits each response, independently of the saved extraction. Converted
 content is saved under the workspace's `.content/` directory and returned as
@@ -117,15 +117,15 @@ File tools report facts as durable `browser.files.*` events, registered by
 `FileTools` (`FILE_EVENTS` and `UPLOAD_EVENTS`). Presentation,
 such as a file drawer, is left to the viewer:
 
-| Event | Emitted by | Payload |
-| --- | --- | --- |
-| `FilesListedEvent` | `list_files` | Directory, entry count and pagination offsets |
-| `FileReadStartedEvent` | `read_file` | `read_id`, requested path and selectors |
-| `FileReadFinishedEvent` | `read_file` | `read_id`, path, format, status, character count, pages and offsets |
-| `FileReadFailedEvent` | `read_file` | `read_id`, requested path and reason, including cancellation |
-| `FileWrittenEvent` | `write_file`, `edit_file` | Path, size and whether the file was created |
-| `FileOpenedEvent` | `open_file`, `open_downloaded_file` | Path, `FileSource` and download ID; `target_id` is the new tab |
-| `FilesUploadedEvent` | `upload_files` | Paths and the file input reference |
+| Event                   | Emitted by                          | Payload                                                             |
+| ----------------------- | ----------------------------------- | ------------------------------------------------------------------- |
+| `FilesListedEvent`      | `list_files`                        | Directory, entry count and pagination offsets                       |
+| `FileReadStartedEvent`  | `read_file`                         | `read_id`, requested path and selectors                             |
+| `FileReadFinishedEvent` | `read_file`                         | `read_id`, path, format, status, character count, pages and offsets |
+| `FileReadFailedEvent`   | `read_file`                         | `read_id`, requested path and reason, including cancellation        |
+| `FileWrittenEvent`      | `write_file`, `edit_file`           | Path, size and whether the file was created                         |
+| `FileOpenedEvent`       | `open_file`, `open_downloaded_file` | Path, `FileSource` and download ID; `target_id` is the new tab      |
+| `FilesUploadedEvent`    | `upload_files`                      | Paths and the file input reference                                  |
 
 Reads can take seconds for OCR or large documents; `read_id` pairs the start with
 exactly one finished or failed event.
@@ -186,13 +186,13 @@ using `asyncio.run`.
 
 ### Workspaces, bridges and remote browsers
 
-Two interfaces separate *where the agent's files live* from *how Chrome reaches
-them*:
+Two interfaces separate _where the agent's files live_ from _how Chrome reaches
+them_:
 
-| Interface | Responsibility | Built in |
-| --- | --- | --- |
-| `Workspace` | Stores the agent's files: `stat`, `list`, `read_bytes`, `write_bytes`. Paths are workspace-relative `PurePosixPath`s. | `LocalWorkspace(directory)` |
-| `FileBridge` | Moves files between the workspace and the machine that runs Chrome: `download_directory`, `receive`, `send`. | `MountedWorkspace(browser_path=None)` |
+| Interface    | Responsibility                                                                                                        | Built in                              |
+| ------------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `Workspace`  | Stores the agent's files: `stat`, `list`, `read_bytes`, `write_bytes`. Paths are workspace-relative `PurePosixPath`s. | `LocalWorkspace(directory)`           |
+| `FileBridge` | Moves files between the workspace and the machine that runs Chrome: `download_directory`, `receive`, `send`.          | `MountedWorkspace(browser_path=None)` |
 
 Custom workspaces implement `write_bytes(path, data, *, overwrite=True)`.
 With `overwrite=False`, creation must atomically fail with `FileExistsError` if
@@ -206,14 +206,14 @@ Nothing is copied. Pass `browser_path` when Chrome sees the directory at another
 absolute path, for example `MountedWorkspace("/workspace")` for a container mount.
 A workspace the agent reaches only through an API needs its own `FileBridge`.
 
-| Setup | Configuration |
-| --- | --- |
-| Local Chrome (default) | `Chrome.launch()` with the default `Files()`: a fresh `LocalWorkspace`, mounted for Chrome |
-| Local Chrome, chosen directory | `Chrome.launch()` with `Files(LocalWorkspace("research"))` |
+| Setup                                | Configuration                                                                                                         |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Local Chrome (default)               | `Chrome.launch()` with the default `Files()`: a fresh `LocalWorkspace`, mounted for Chrome                            |
+| Local Chrome, chosen directory       | `Chrome.launch()` with `Files(LocalWorkspace("research"))`                                                            |
 | Chrome on a pod with a shared volume | `Chrome.connect(endpoint=endpoint, bridge=MountedWorkspace("/workspace"))` with `Files(LocalWorkspace("/mnt/agent"))` |
-| Cloud browser with a file API | `Chrome.connect(endpoint=endpoint, bridge=ProviderBridge(...))` |
-| Remote browser, no file transfer | `Chrome.connect(endpoint=endpoint)`: workspace tools only |
-| No files at all | `without=(Files, FileTools)` |
+| Cloud browser with a file API        | `Chrome.connect(endpoint=endpoint, bridge=ProviderBridge(...))`                                                       |
+| Remote browser, no file transfer     | `Chrome.connect(endpoint=endpoint)`: workspace tools only                                                             |
+| No files at all                      | `without=(Files, FileTools)`                                                                                          |
 
 `Chrome.launch` mounts the workspace for Chrome by default. `Chrome.connect` never
 assumes that the browser shares the agent's disk: without a bridge, downloads stay
@@ -379,3 +379,25 @@ modified by request hooks or compaction receive no receipt. `NudgeIncludedEvent.
 open; afterwards, read the `ObservationsIncludedEvent` from `result.events`.
 Screenshot coordinates also follow these final receipts, rather than provisional
 request content or SDK message-ID conventions.
+
+## Finding and searching saved content
+
+`glob(pattern="**/*", limit=200)` finds workspace files. `grep(query,
+pattern="**/*.md", limit=100)` searches literal text case-insensitively and returns
+`path:line` matches with bounded snippets and Unicode character offsets. Pass an
+offset to `read_file` to inspect more context around a match. It searches complete UTF-8 files,
+including text beyond `read_file` preview limits. Both operations use the existing
+workspace, including custom/remote workspaces; no shell is required. The results
+use Harnessed's `PathMatches` and `SearchResult` contracts.
+
+Hidden files and directories, including `.content` and pending download caches,
+are excluded unless `include_hidden=True`. Glob patterns are workspace-relative;
+absolute paths and traversal outside the workspace are rejected. Directory walks
+are bounded to 1,000 directories. Search checks at most 1,000 matching files and
+`max_expanded_bytes` input bytes in total. Oversized/unreadable files, match limits
+and incomplete walks are reported; a limited search is not proof of absence.
+
+When an associated `.extraction.json` or webpage `source.json` reports pending OCR
+or a partial extraction, search adds a coverage note even when there are no
+matches. It searches saved text and never starts OCR implicitly. Run `read_file`
+on the relevant source pages to extend the saved text before searching again.

@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from typing import Annotated
 from uuid import uuid4
 
+import harnessed.plugins.filesystem as filesystem
 from harnessed import (
     Inject,
     Instructions,
@@ -64,6 +65,51 @@ class WorkspaceIO(FileSystemObservation):
     _workspace = observes(FileSystem)
     _browser_events = observes(BrowserEvents)
     _log = needs(SessionLog)
+
+    @tool(
+        kind=ActionKind.GLOB,
+        enabled=_has_files,
+        readonly=True,
+        chainable=True,
+        description=(
+            "Find workspace files by a relative glob. Hidden caches are excluded unless "
+            "include_hidden=true. Check truncated."
+        ),
+    )
+    async def glob(
+        self,
+        pattern: str = "**/*",
+        limit: Annotated[int, Field(ge=1, le=1000)] = 200,
+        include_hidden: bool = False,
+    ) -> filesystem.PathMatches:
+        with file_errors():
+            return await self._files().glob(
+                pattern, limit=limit, include_hidden=include_hidden
+            )
+
+    @tool(
+        kind=ActionKind.GREP,
+        enabled=_has_files,
+        readonly=True,
+        chainable=True,
+        description=(
+            "Search saved workspace text for a literal string, case-insensitively. "
+            "Defaults to Markdown. Returns path:line matches with character offsets for "
+            "read_file, and notes about incomplete searches/extractions; pending OCR is "
+            "not searched. Hidden caches are excluded unless include_hidden=true."
+        ),
+    )
+    async def grep(
+        self,
+        query: Annotated[str, Field(min_length=1, max_length=1000)],
+        pattern: str = "**/*.md",
+        limit: Annotated[int, Field(ge=1, le=500)] = 100,
+        include_hidden: bool = False,
+    ) -> filesystem.SearchResult:
+        with file_errors():
+            return await self._files().grep(
+                query, pattern=pattern, limit=limit, include_hidden=include_hidden
+            )
 
     @tool(
         kind=ActionKind.LIST_FILES,
