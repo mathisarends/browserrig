@@ -17,9 +17,9 @@ if TYPE_CHECKING:
 
 from .content import ParsedContent, ReadContext
 from .extras import OCR_MISSING, ocr_installed
+from .preview import pdf_image
 
 _OCR_LOCK = Lock()
-_PDF_LOCK = Lock()
 
 
 def read_pdf(context: ReadContext) -> ParsedContent:
@@ -136,16 +136,5 @@ def _engine() -> RapidOCR:
 
 
 def _pdf_image(path: Path, number: int) -> Image.Image:
-    # PDFium is not thread-safe even for different documents.
-    pdfium = import_module("pypdfium2")
-    with _PDF_LOCK, pdfium.PdfDocument(str(path)) as document:
-        page = document[number - 1]
-        try:
-            scale = min(2, 4000 / max(page.get_size()))
-            bitmap = page.render(scale=scale)
-            try:
-                return bitmap.to_pil().copy()
-            finally:
-                bitmap.close()
-        finally:
-            page.close()
+    image, _ = pdf_image(path, number, max_dimension=4000)
+    return image

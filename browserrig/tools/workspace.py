@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import uuid4
 
 from harnessed import (
@@ -10,8 +10,10 @@ from harnessed import (
     SessionLog,
     SystemPrompt,
     ToolError,
+    ToolResult,
 )
 from harnessed.kernel import needs, observes
+from harnessed.models import ImagePart, TextPart
 from pydantic import Field
 
 from browserrig.browser import BrowserEvents
@@ -98,12 +100,15 @@ class WorkspaceIO(FileSystemObservation):
         readonly=True,
         description=(
             "Read workspace/download content without a browser preview: text, PDF (page 1 by "
-            "default), images with local OCR, Office/OpenDocument, CSV, EPUB, email, archives "
+            "default), images, Office/OpenDocument, CSV, EPUB, email, archives "
             "and SQLite. sheet selects a worksheet/database table; cell_range selects an A1 "
             "worksheet range. member selects a container entry or email attachment; use !/ "
             "between nested entries. page_number also selects a slide or image frame. "
             "ocr=true forces full-page PDF OCR. max_chars limits returned text, not the saved "
-            "extraction. Follow next_offset with identical selectors. Check status/limitations."
+            "extraction. view=auto shows images visually and reads other formats as text; "
+            "view=image renders a PDF page/image frame without OCR; view=text extracts text/OCR. "
+            "Follow next_offset with identical selectors, then next_page_number or next_sheet. "
+            "Check status/limitations."
         ),
     )
     async def read_file(
@@ -115,9 +120,10 @@ class WorkspaceIO(FileSystemObservation):
         cell_range: str | None = None,
         member: str | None = None,
         ocr: bool | None = None,
+        view: Literal["auto", "text", "image"] = "auto",
         offset: Annotated[int, Field(ge=0)] = 0,
         max_chars: Annotated[int, Field(ge=1, le=200000)] = 20000,
-    ) -> FileContent:
+    ) -> FileContent | ToolResult:
         files = self._files()
         read_id = uuid4().hex
         await self._emit_workspace(
@@ -141,6 +147,7 @@ class WorkspaceIO(FileSystemObservation):
                     cell_range=cell_range,
                     member=member,
                     ocr=ocr,
+                    view=view,
                     offset=offset,
                     max_chars=max_chars,
                 )
@@ -175,6 +182,13 @@ class WorkspaceIO(FileSystemObservation):
                 member=content.member,
             )
         )
+        if content.image is not None:
+            return ToolResult(
+                (
+                    TextPart(content.model_dump_json(exclude={"image"})),
+                    ImagePart(content.image),
+                )
+            )
         return content
 
     @tool(

@@ -36,6 +36,7 @@ otel = ["harnessed[otel]==0.15.0"]
 # Document, spreadsheet, PDF and media readers for `read_file`.
 files = [
     "pypdf>=6.21.4,<7",
+    "pypdfium2>=5.14,<6",
     "beautifulsoup4>=4.14,<5",
     "defusedxml>=0.7.1,<0.8",
     "markdownify>=1.2,<2",
@@ -53,7 +54,6 @@ ocr = [
     "rapidocr==3.9.2",
     "onnxruntime==1.30.0",
     "opencv-python>=4.13,<5",
-    "pypdfium2>=5.14,<6",
 ]
 
 [project.urls]
