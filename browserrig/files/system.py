@@ -5,7 +5,7 @@ import tempfile
 from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from pathlib import Path, PurePosixPath
 from types import TracebackType
-from typing import Self
+from typing import Literal, Self
 
 from harnessed.tracing import traced
 
@@ -95,6 +95,7 @@ class FileSystem:
         cell_range: str | None = None,
         member: str | None = None,
         ocr: bool | None = None,
+        view: Literal["auto", "text", "image"] = "text",
         offset: int = 0,
         max_chars: int = 20000,
     ) -> FileContent:
@@ -102,12 +103,15 @@ class FileSystem:
             raise ValueError("Use offset >= 0 and max_chars between 1 and 200000")
         if page_number is not None and page_number < 1:
             raise ValueError("page_number must be at least 1")
+        if view not in {"auto", "text", "image"}:
+            raise ValueError("view must be auto, text or image")
         request = ReadRequest(
             page_number=page_number,
             sheet=sheet,
             cell_range=cell_range,
             member=member,
             ocr=ocr,
+            view=view,
         )
         target = await self.file(path)
         if isinstance(self.workspace, LocalWorkspace):
@@ -123,6 +127,7 @@ class FileSystem:
             update={
                 "path": str(target.path),
                 "extracted_path": self._extracted_path(content.extracted_path),
+                **_continuation(content),
             }
         )
 
@@ -234,6 +239,22 @@ class FileSystem:
         if not path.is_relative_to(self.workspace.directory):
             return None
         return path.relative_to(self.workspace.directory).as_posix()
+
+
+def _continuation(content: FileContent) -> dict[str, int | str | None]:
+    page, sheet = None, None
+    if content.next_offset is None:
+        if (
+            content.page_number is not None
+            and content.page_count is not None
+            and content.page_number < content.page_count
+        ):
+            page = content.page_number + 1
+        if content.sheet is not None and content.sheet in content.sheets:
+            index = content.sheets.index(content.sheet)
+            if index + 1 < len(content.sheets):
+                sheet = content.sheets[index + 1]
+    return {"next_page_number": page, "next_sheet": sheet}
 
 
 def _entry(stat: FileStat) -> FileEntry:

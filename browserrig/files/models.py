@@ -66,6 +66,10 @@ class FileContent(Options):
     size: int | None = None
     encoding: str | None = None
     extracted_path: str | None = None
+    image: str | None = None
+    """A bounded PNG data URL for a visual read; absent for text reads."""
+    next_page_number: int | None = None
+    next_sheet: str | None = None
     sheet: str | None = None
     sheets: tuple[str, ...] = ()
     cell_range: str | None = None

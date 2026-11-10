@@ -67,8 +67,8 @@ async def test_recording_flushes_evidence_when_an_attempt_is_interrupted(
     assert any(entry["request"]["url"] == site + "/" for entry in entries)
 
 
-@pytest.fixture
-async def login_site():
+@pytest.fixture(name="login_site")
+async def _login_site():
     async def handle(reader, writer):
         try:
             headers = await reader.readuntil(b"\r\n\r\n")

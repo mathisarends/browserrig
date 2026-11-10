@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 from .config import FileOptions
 from .models import FileContent, FileReadStatus
@@ -13,6 +14,7 @@ class ReadRequest:
     cell_range: str | None = None
     member: str | None = None
     ocr: bool | None = None
+    view: Literal["auto", "text", "image"] = "text"
 
 
 @dataclass(frozen=True, slots=True)
