@@ -194,7 +194,7 @@ class Document:  # pylint: disable=too-many-public-methods
     def has_layout(self, index: int) -> bool:
         return index in self._layout
 
-    def text_runs(self) -> list[tuple[int, str, Rect]]:
+    def text_runs(self, *, raw: bool = False) -> list[tuple[int, str, Rect]]:
         """Every rendered, visible text node with its parent element and box."""
         runs: list[tuple[int, str, Rect]] = []
         for node, layout in self._layout.items():
@@ -205,12 +205,22 @@ class Document:  # pylint: disable=too-many-public-methods
                 continue
             if self.style(parent, Style.VISIBILITY) not in ("", "visible"):
                 continue
-            value = clean(self._strings[self._values[node]], 1000)
+            original = self._strings[self._values[node]]
+            value = original if raw else clean(original, 1000)
             x, y, width, height = self._bounds[layout]
             if value and width >= 1 and height >= 1:
                 runs.append((node, value, (x, y, x + width, y + height)))
         runs.sort()
         return runs
+
+    def text_gap(self, start: int, stop: int) -> str:
+        """Whitespace between emitted runs, including zero-width newlines in code."""
+        return "".join(
+            self._strings[self._values[node]]
+            for node in range(start + 1, stop)
+            if self._types[node] == _TEXT
+            and self._strings[self._values[node]].isspace()
+        )
 
     def style(self, index: int, style: Style) -> str:
         layout = self._layout.get(index)

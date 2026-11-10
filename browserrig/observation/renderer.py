@@ -34,7 +34,11 @@ class DomRenderer:
             "refs; screenshot it and point with click_at or drag_at. "
         )
         if self.max_text_chars:
-            text += "Observations include a bounded page-text excerpt. "
+            text += (
+                "Visible text appears in reading order beside its controls, within a bounded "
+                "text budget. Plain text has no action refs. A truncation marker applies "
+                "to text at that position; later controls are still listed. "
+            )
         elif self.sparse_text_chars:
             text += (
                 "When the viewport holds few controls, observations add its visible text; "
@@ -43,6 +47,10 @@ class DomRenderer:
         else:
             text += (
                 "Observations omit page text; use extract_content to read the page. "
+            )
+        if self.max_text_chars or self.sparse_text_chars:
+            text += (
+                "Links within prose use [label][ref]; pass that ref to element tools. "
             )
         text += (
             "Every observation includes a screenshot."

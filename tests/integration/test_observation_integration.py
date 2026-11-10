@@ -272,7 +272,8 @@ async def test_default_text_preserves_dense_page_guidance_with_an_explicit_opt_o
             "Your request was blocked." in sparse.text
             and "Below the fold" not in sparse.text
         )
-        assert "page text:" in render(sparse)
+        assert "text: Your request was blocked." in render(sparse)
+        assert "page text:" not in render(sparse)
         await evaluate(
             tab,
             "document.body.insertAdjacentHTML('beforeend', '<button>Go</button>'.repeat(5))",

@@ -104,7 +104,7 @@ async def test_nested_pack_instructions_follow_overrides_and_exclusions():
         rendered = await session.prompt.render()
         assert rendered.startswith("Before.")
         assert rendered.count("Each observation starts") == 1
-        assert "bounded page-text excerpt" in rendered
+        assert "reading order beside its controls" in rendered
         assert "labeled with its ref" not in rendered
         assert "The file system observation identifies" not in rendered
     selected = next(

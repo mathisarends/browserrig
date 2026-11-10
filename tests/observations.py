@@ -8,6 +8,7 @@ _ELEMENT = re.compile(
     r'^\s*(?P<new>\*?)\[(?P<ref>[^\]]+)\] (?P<role>[^\s\[]+)\S*(?: "(?P<name>[^"]*)")?'
 )
 _TAB = re.compile(r"^\s*\*(?P<id>\S+)")
+_INLINE = re.compile(r"(?P<new>\*?)\[(?P<name>(?:\\.|[^\]\\])*)\]\[(?P<ref>[^\]]+)\]")
 
 
 def is_observation(text: str) -> bool:
@@ -48,6 +49,16 @@ def parse(text: str) -> dict:
                     "role": match["role"],
                     "name": match["name"] or "",
                     "new": bool(match["new"]),
+                    "in_viewport": block == "in viewport",
+                }
+            )
+        for inline in _INLINE.finditer(line):
+            state["elements"].append(
+                {
+                    "ref": inline["ref"],
+                    "role": "link",
+                    "name": re.sub(r"\\(.)", r"\1", inline["name"]),
+                    "new": bool(inline["new"]),
                     "in_viewport": block == "in viewport",
                 }
             )

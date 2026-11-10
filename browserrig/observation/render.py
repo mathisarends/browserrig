@@ -11,6 +11,7 @@ from urllib.parse import unquote, urlsplit
 
 from browserrig.core import ReadinessStatus
 
+from .flow import render_flow
 from .models import CHECKABLE_ROLES, Canvas, ElementInfo, Heading, Snapshot
 from .redirects import unwrap_redirect
 
@@ -29,16 +30,52 @@ _FOOTNOTE = re.compile(r"\[\w[\w ]{0,7}\]")
 def render(snapshot: Snapshot) -> str:
     """List the viewport, nearby previews and explicit targets for inner scrolling."""
     lines = _header(snapshot)
-    if snapshot.elements or snapshot.headings or snapshot.cookie_banners:
+    if snapshot.content is not None:
+        lines.extend(_flow_body(snapshot))
+    elif snapshot.elements or snapshot.headings or snapshot.cookie_banners:
         lines.extend(_body(snapshot))
     if snapshot.canvases:
         lines.extend(_canvases(snapshot.canvases))
-    if snapshot.text:
+    if snapshot.text and snapshot.content is None:
         lines.extend(("", "page text:", snapshot.text))
     if snapshot.limitations:
         lines.append("")
         lines.extend(f"note: {limitation}" for limitation in snapshot.limitations)
     return "\n".join(lines)
+
+
+def _flow_body(snapshot: Snapshot) -> list[str]:
+    def format_element(element: ElementInfo) -> str:
+        return _element(element, snapshot.url)
+
+    body = render_flow(snapshot, None, format_element)
+    lines = ["", "in viewport:", *(body or ["  (no visible content)"])]
+    covered = [element for element in snapshot.elements if element.covered]
+    if covered:
+        lines.extend(("", f"covered by an overlay: {_summary(covered)}"))
+    for position in ("above", "below"):
+        preview = render_flow(snapshot, position, format_element)
+        if preview:
+            lines.extend(
+                (
+                    "",
+                    f"{position} viewport (preview; refs scroll into view before acting):",
+                )
+            )
+            lines.extend(preview)
+    uploads: list[ElementInfo | Heading] = [
+        element
+        for element in snapshot.elements
+        if element.input_type == "file"
+        and not element.in_viewport
+        and element.outside_viewport is None
+    ]
+    if uploads:
+        lines.extend(
+            ("", "file inputs outside view (upload_files accepts these refs):")
+        )
+        lines.extend(_blocks(uploads, snapshot.url))
+    return lines
 
 
 def _header(snapshot: Snapshot) -> list[str]:

@@ -8,6 +8,8 @@ from .images import ImageContext, ImageRetention, TrimInBatches, UntilCompaction
 from .models import (
     Canvas,
     CapturedImage,
+    ContentGroup,
+    ContentNode,
     CookieBanner,
     Element,
     ElementInfo,
@@ -19,6 +21,7 @@ from .models import (
     PageContent,
     ScrollInfo,
     Snapshot,
+    TextBlock,
 )
 from .plugin import BrowserPerception
 from .references import ElementHandle, References, ScrollableElement, ScrollStep
@@ -27,6 +30,9 @@ from .renderer import DomRenderer, Renderer
 
 __all__ = [
     "Canvas",
+    "ContentGroup",
+    "ContentNode",
+    "TextBlock",
     "Heading",
     "Modal",
     "Offscreen",

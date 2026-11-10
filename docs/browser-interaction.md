@@ -83,6 +83,21 @@ omit page-text excerpts. When the viewport holds fewer than five named controls,
 and confirmation pages, observations add up to `sparse_text_chars` (default `1500`)
 characters of visible text anyway. Every observation states where the mouse rests.
 
+Visible text is interleaved with controls in composed-document reading order,
+inside its actual landmarks, forms, paragraphs, lists and table cells. Paragraphs
+remain continuous: `text: Read [the guide][42], then continue.` embeds a link with
+ref `42` directly in the sentence. Pass the second bracket's ref to element tools.
+Links outside prose retain their ordinary `[42] link "name" -> /path` lines.
+Plain text has no refs. Code blocks retain line breaks and indentation.
+
+Labels already fully displayed on a control are omitted from the surrounding
+text by source identity; identical text at unrelated locations stays visible.
+Text-budget truncation is marked at the affected block and does not remove later
+controls. Above/below previews keep their own text with their controls. The
+representation preserves semantic reading order, rather than sorting unrelated
+columns by screen coordinates; structured text and container bounds retain their
+positions in main-viewport CSS pixels.
+
 Likely cookie consent banners have a separate `[COOKIE BANNER: name]` block with up
 to 600 characters of visible text and their ordinary element refs. This excerpt is
 independent of both page-text budgets, so it also appears on busy pages. Detection
@@ -120,10 +135,12 @@ in viewport:
     [12] link "Cart" -> /cart
   [MAIN]
     ## Shipping address
+    text: Use a delivery address where someone can receive your order.
     <form "Shipping">
       [48] textbox "Email" required placeholder="you@example.com"
       [51] combobox "Country" options=[Germany*, France, Spain]
       *[57] checkbox "Save address" unchecked
+      text: Read [delivery terms][59] before continuing.
     [60] button "Continue"
 ```
 

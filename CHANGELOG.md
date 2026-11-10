@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Interleave visible text with controls in a typed `PageContent.content` tree.
+  Paragraphs retain inline `[label][ref]` links, form guidance stays beside its
+  fields, and code keeps its line breaks. Preserve frame insertion order,
+  viewport previews and source-based label deduplication; mark text truncation
+  locally while retaining later controls. Existing flat capture backends remain
+  supported through `content=None`.
+
 - Replace the agent's `scroll` tool with `scroll_page` and `scroll_element(ref=...)`.
   Both scroll their named target directly, independently of the cursor, and report
   actual movement or a blocked/boundary result. Container scrolling never propagates

@@ -387,11 +387,30 @@ deriving the existing fingerprint from the redacted page and document identity.
 `Extraction` name remains an alias for it. DOM and non-DOM data can coexist in a
 snapshot and survive JSON round trips.
 
+`PageContent.content` and `Snapshot.content` optionally carry a mixed reading tree.
+`ContentGroup(id, role, name, bounds, children)` represents semantic containers;
+its children are `ContentGroup`, `TextBlock`, `Heading`, or `ElementRef` values.
+`TextBlock` retains whitespace boundaries for inline prose, optional preformatted
+text, truncation, viewport placement and bounds. Bounds use main-viewport CSS
+pixels, including within transformed frames. Group IDs distinguish containers
+even when their names repeat. Children remain in composed-document order.
+
+Control leaves use `ElementRef(ref=...)` to address `elements`, so current names,
+states and new-element markers have one authoritative value. The renderer places
+links inside prose as `[label][ref]` and emits form controls on separate lines.
+Link destinations remain available through `Snapshot.element(ref).href`.
+`headings` and the bounded `text` excerpt remain available to existing consumers.
+The DOM renderer uses the tree instead of appending a detached page-text footer.
+Custom backends that leave `content=None` retain the existing flat output.
+
 All capture data types are available from the observation facade, including the
 nested values needed for headings, modals, canvases and select options:
 
 ```python
-from browserrig.observation import Canvas, Heading, Modal, Offscreen, Option, PageContent
+from browserrig.observation import (
+    Canvas, ContentGroup, ContentNode, Heading, Modal, Offscreen, Option,
+    PageContent, TextBlock,
+)
 ```
 
 `PageContent` is capture data; `ExtractedContent` in the same facade is the separate

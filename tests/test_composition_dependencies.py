@@ -273,7 +273,9 @@ async def test_facade_renders_configured_observation_prompt(
         assert "## Workspace and downloads" in rendered
         assert "## Element references" in rendered
         assert ("labeled with its ref" in rendered) == capture.marks
-        assert ("bounded page-text excerpt" in rendered) == bool(capture.max_text_chars)
+        assert ("reading order beside its controls" in rendered) == bool(
+            capture.max_text_chars
+        )
         assert ("Every observation includes a screenshot" in rendered) == (
             trigger == ScreenshotTrigger.EACH_STEP
         )
