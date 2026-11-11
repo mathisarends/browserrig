@@ -108,7 +108,8 @@ async def test_select_options_replaces_exact_set_or_reports_atomic_failure(
     assert selected == expected and len(received) == events
     if error:
         assert reply.is_error and error in reply.text
-        assert ("dispatch was attempted" if events else "not dispatched") in reply.text
+        if events:
+            assert "Observed selection: []" in reply.text
     else:
         assert not reply.is_error
         assert f"Selected {len(expected)} option(s) and verified" in reply.text

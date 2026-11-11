@@ -1,5 +1,4 @@
 import json
-from functools import partial
 from typing import Annotated
 
 from harnessed import Plugin
@@ -22,7 +21,6 @@ class FormTools(Plugin):
 
     @tool(
         kind=ActionKind.SELECT,
-        dispatch_tracked=True,
         chainable=True,
         description="Select an exact option label or value in a native select element.",
     )
@@ -39,12 +37,11 @@ class FormTools(Plugin):
         if (current.x, current.y) != (point.x, point.y):
             await self._actions.browser.input.mouse.move_to(current)
         handle = await self._observe.dom_element(tab, ref)
-        await self._actions.dispatch(partial(handle.select, value))
+        await handle.select(value)
         return Effect("Option selected.", prepared_scroll=point.scrolled)
 
     @tool(
         kind=ActionKind.SELECT_OPTIONS,
-        dispatch_tracked=True,
         chainable=True,
         description=(
             "Replace the selected set of a native multiple select. Each value must "
@@ -68,7 +65,7 @@ class FormTools(Plugin):
             await self._actions.browser.input.mouse.move_to(current)
         handle = await self._observe.dom_element(tab, ref)
         await handle.validate_options(values)
-        result = await self._actions.dispatch(partial(handle.select_options, values))
+        result = await handle.select_options(values)
         selected = _selection(result)
         if not result.verified:
             raise BrowserError(
@@ -82,7 +79,6 @@ class FormTools(Plugin):
 
     @tool(
         kind=ActionKind.SET_DATE,
-        dispatch_tracked=True,
         chainable=True,
         description="Set a native date/time input in its HTML format, such as YYYY-MM-DD.",
     )
@@ -107,7 +103,7 @@ class FormTools(Plugin):
         if (current.x, current.y) != (point.x, point.y):
             await self._actions.browser.input.mouse.move_to(current)
         handle = await self._observe.dom_element(tab, ref)
-        await self._actions.dispatch(partial(handle.set_value, value))
+        await handle.set_value(value)
         return Effect(
             "Date/time value set and verified.", prepared_scroll=point.scrolled
         )

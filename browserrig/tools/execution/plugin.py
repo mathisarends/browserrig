@@ -105,17 +105,6 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
             settle=settle,
         )
 
-    async def dispatch[R](self, operation: Callable[[], Awaitable[R]]) -> R:
-        """Enter primary input after preparation; failures may now have side effects.
-
-        Used by tools declaring dispatch_tracked=True. Preparatory hover/scroll
-        must happen before this boundary. Outside a tool it simply runs operation.
-        """
-        action = self._invocation.context.current
-        if action is not None:
-            action.dispatched = True
-        return await operation()
-
     @traced
     async def stage[R](
         self, intent: Intent, tab: Tab, step: Callable[[], Awaitable[R]]
@@ -128,11 +117,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         context = self._mount.context
         assert context is not None
         performed = Perform(intent, tab, self.browser.input.action_id)
-
-        async def dispatch() -> R:
-            return await self.dispatch(step)
-
-        return cast(R, await context.dispatch(performed, default=dispatch))
+        return cast(R, await context.dispatch(performed, default=step))
 
     @traced
     async def page_change(

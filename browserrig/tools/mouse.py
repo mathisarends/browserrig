@@ -1,7 +1,6 @@
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from functools import partial
 from typing import Annotated, Literal
 
 from harnessed import (
@@ -68,7 +67,6 @@ class PointerTools(Plugin):
 
     @tool(
         kind=ActionKind.MOVE_MOUSE,
-        dispatch_tracked=True,
         description=(
             "Move the cursor without clicking, to hover menus or tooltips. "
             "Give an observed ref, or x and y in image or viewport coordinates."
@@ -87,21 +85,18 @@ class PointerTools(Plugin):
 
         if ref is not None:
             point = await self._actions.element_point(ref=ref)
-            await self._actions.dispatch(
-                partial(self._browser.input.mouse.move_to, point)
-            )
+            await self._browser.input.mouse.move_to(point)
             return Effect(
                 "Cursor moved onto the ref without clicking.",
                 prepared_scroll=point.scrolled,
             )
         assert x is not None and y is not None
         point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
-        await self._actions.dispatch(partial(self._browser.input.mouse.move_to, point))
+        await self._browser.input.mouse.move_to(point)
         return Effect("Cursor moved without clicking.")
 
     @tool(
         kind=ActionKind.CLICK_AT,
-        dispatch_tracked=True,
         description=(
             "Automatically move the cursor to image or viewport coordinates and click there; "
             "count=2 performs a native double click; button=right performs a right click. "
@@ -121,18 +116,10 @@ class PointerTools(Plugin):
         point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
         if new_tab:
             # Arrive first, so the key is held for the click alone.
-            await self._actions.dispatch(
-                partial(self._browser.input.mouse.move_to, point)
-            )
+            await self._browser.input.mouse.move_to(point)
         async with self._new_tab_keys(new_tab) as modifiers:
-            await self._actions.dispatch(
-                partial(
-                    self._browser.input.mouse.click,
-                    point,
-                    count=count,
-                    button=button,
-                    modifiers=modifiers,
-                )
+            await self._browser.input.mouse.click(
+                point, count=count, button=button, modifiers=modifiers
             )
         return Effect(
             _click_message(count, button, new_tab),
@@ -142,7 +129,6 @@ class PointerTools(Plugin):
 
     @tool(
         kind=ActionKind.SCROLL_PAGE,
-        dispatch_tracked=True,
         description=(
             "Scroll only the outer page, independently of the cursor and nested panels. "
             "delta_y is CSS pixels down (negative up); delta_x is right (negative left). "
@@ -157,13 +143,10 @@ class PointerTools(Plugin):
     ) -> Effect:
         if delta_y == 0 and delta_x == 0:
             raise ToolError("Provide a non-zero delta_y or delta_x")
-        return await self._actions.dispatch(
-            partial(scroll_page, self._actions.tab, delta_y=delta_y, delta_x=delta_x)
-        )
+        return await scroll_page(self._actions.tab, delta_y=delta_y, delta_x=delta_x)
 
     @tool(
         kind=ActionKind.SCROLL_ELEMENT,
-        dispatch_tracked=True,
         description=(
             "Scroll only the observed container ref marked scroll(...), independently "
             "of the cursor. delta_y is CSS pixels down (negative up); delta_x is right "
@@ -182,13 +165,10 @@ class PointerTools(Plugin):
             raise ToolError("Provide a non-zero delta_y or delta_x")
         tab = self._actions.tab
         handle = await self._observe.dom_element(tab, ref)
-        return await self._actions.dispatch(
-            partial(scroll_element, tab, handle, delta_y=delta_y, delta_x=delta_x)
-        )
+        return await scroll_element(tab, handle, delta_y=delta_y, delta_x=delta_x)
 
     @tool(
         kind=ActionKind.DRAG_AT,
-        dispatch_tracked=True,
         description="Drag between screenshot points.",
     )
     async def drag_at(
@@ -197,19 +177,15 @@ class PointerTools(Plugin):
         end: Point,
         duration: Annotated[float, Field(ge=0.05, le=5)] = 0.5,
     ) -> Effect:
-        await self._actions.dispatch(
-            partial(
-                self._browser.input.mouse.drag,
-                start=_image_point(self._observe.coordinate_source(), start),
-                end=_image_point(self._observe.coordinate_source(), end),
-                duration=duration,
-            )
+        await self._browser.input.mouse.drag(
+            start=_image_point(self._observe.coordinate_source(), start),
+            end=_image_point(self._observe.coordinate_source(), end),
+            duration=duration,
         )
         return Effect("Drag dispatched; inspect the destination.")
 
     @tool(
         kind=ActionKind.CLICK,
-        dispatch_tracked=True,
         chainable=True,
         description=(
             "Automatically move the cursor to a current observed ref and click it; "
@@ -228,7 +204,7 @@ class PointerTools(Plugin):
         _check_new_tab(new_tab, count, button)
 
         point = await self._actions.element_point(ref=ref)
-        await self._actions.dispatch(partial(self._browser.input.mouse.move_to, point))
+        await self._browser.input.mouse.move_to(point)
         if change := await self._actions.page_change(after_input=False):
             return Effect(
                 f"Hover changed the page: {change} The click was not dispatched. "
@@ -240,18 +216,10 @@ class PointerTools(Plugin):
         current = await self._actions.element_point(ref=ref, scroll=False)
         if new_tab:
             # Arrive first, so the key is held for the click alone.
-            await self._actions.dispatch(
-                partial(self._browser.input.mouse.move_to, current)
-            )
+            await self._browser.input.mouse.move_to(current)
         async with self._new_tab_keys(new_tab) as modifiers:
-            await self._actions.dispatch(
-                partial(
-                    self._browser.input.mouse.click,
-                    current,
-                    count=count,
-                    button=button,
-                    modifiers=modifiers,
-                )
+            await self._browser.input.mouse.click(
+                current, count=count, button=button, modifiers=modifiers
             )
         return Effect(
             _click_message(count, button, new_tab),
@@ -262,7 +230,6 @@ class PointerTools(Plugin):
 
     @tool(
         kind=ActionKind.DRAG,
-        dispatch_tracked=True,
         description=(
             "Drag between observed refs, scrolling them into view when supported. "
             "Both endpoints must fit in the viewport together."
@@ -282,11 +249,7 @@ class PointerTools(Plugin):
             self._actions.element_point(ref=source_ref, scroll=False),
             self._actions.element_point(ref=target_ref, scroll=False),
         )
-        await self._actions.dispatch(
-            partial(
-                self._browser.input.mouse.drag, start=start, end=end, duration=duration
-            )
-        )
+        await self._browser.input.mouse.drag(start=start, end=end, duration=duration)
         return Effect(
             "Drag dispatched; inspect the destination.",
             prepared_scroll=prepared.scrolled or target.scrolled,

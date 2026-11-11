@@ -24,7 +24,6 @@ class KeyboardTools(Plugin):
 
     @tool(
         kind=ActionKind.PRESS,
-        dispatch_tracked=True,
         chainable=True,
         description=(
             "Send keyboard input to the current page focus. Provide exactly one of "
@@ -49,15 +48,12 @@ class KeyboardTools(Plugin):
             raise ToolError("Modifier flags require key")
 
         if key is not None:
-            await self._actions.dispatch(
-                partial(
-                    self._browser.input.keyboard.press_key,
-                    key,
-                    hold_control=hold_control,
-                    hold_shift=hold_shift,
-                    hold_alt=hold_alt,
-                    hold_meta=hold_meta,
-                )
+            await self._browser.input.keyboard.press_key(
+                key,
+                hold_control=hold_control,
+                hold_shift=hold_shift,
+                hold_alt=hold_alt,
+                hold_meta=hold_meta,
             )
             return Effect("Key dispatched.")
         assert text is not None
@@ -66,19 +62,12 @@ class KeyboardTools(Plugin):
             entry = await secrets.prepare(text, browser=self._browser)
             if entry is not None:
                 return _secret_entered(
-                    await self._actions.dispatch(
-                        partial(secrets.enter, entry, self._browser.input.keyboard)
-                    )
+                    await secrets.enter(entry, self._browser.input.keyboard)
                 )
-        return _entered(
-            await self._actions.dispatch(
-                partial(self._browser.input.keyboard.type_text, text)
-            )
-        )
+        return _entered(await self._browser.input.keyboard.type_text(text))
 
     @tool(
         kind=ActionKind.TYPE,
-        dispatch_tracked=True,
         chainable=True,
         description="Type exact text into a DOM ref; clear replaces its value by default.",
     )
@@ -108,19 +97,13 @@ class KeyboardTools(Plugin):
         before = await field.text_state()
         # Backspace on an empty token input can select/remove its preceding chip.
         if clear and (before is None or before.value):
-            await self._actions.dispatch(
-                partial(self._browser.input.keyboard.press_key, "Backspace")
-            )
+            await self._browser.input.keyboard.press_key("Backspace")
         await guard()
         if entry is not None and secrets is not None:
             return _secret_entered(
-                await self._actions.dispatch(
-                    partial(secrets.enter, entry, self._browser.input.keyboard)
-                )
+                await secrets.enter(entry, self._browser.input.keyboard)
             )
-        typed = await self._actions.dispatch(
-            partial(self._browser.input.keyboard.type_text, text, guard=guard)
-        )
+        typed = await self._browser.input.keyboard.type_text(text, guard=guard)
         after = await field.text_state()
         expected = typed.entered if clear else None
         if (

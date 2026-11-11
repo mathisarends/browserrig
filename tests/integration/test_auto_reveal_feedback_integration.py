@@ -88,7 +88,7 @@ async def test_reveal_targets_container_and_reports_only_measured_movement(site,
     assert actual["wheels"] == 0
     if mode == "locked":
         assert actual["y"] == 0 and actual["value"] == ""
-        assert reply.is_error and "not dispatched" in reply.text
+        assert reply.is_error and "ELEMENT_BLOCKED" in reply.text
         assert "Auto-reveal" not in reply.text
     else:
         assert actual["y"] > 0
@@ -98,4 +98,4 @@ async def test_reveal_targets_container_and_reports_only_measured_movement(site,
             assert not reply.is_error and actual["value"] == "Hello"
         else:
             assert reply.is_error and actual["value"] == ""
-            assert "not dispatched" in reply.text and "ELEMENT_BLOCKED" in reply.text
+            assert "ELEMENT_BLOCKED" in reply.text

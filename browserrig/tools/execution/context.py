@@ -15,8 +15,6 @@ class ToolAction:
     tab: Tab | None = None
     action_id: str = ""
     started: bool = False
-    dispatch_tracked: bool = False
-    dispatched: bool = False
     preparation_notes: list[str] = field(default_factory=list)
     preparation_omitted: int = 0
     active: bool = True
@@ -50,10 +48,8 @@ class ActionContext:
         return action.tab
 
     @contextmanager
-    def activate(
-        self, kind: ActionKind, *, dispatch_tracked: bool = False
-    ) -> Generator[ToolAction, None, None]:
-        action = ToolAction(kind, dispatch_tracked=dispatch_tracked)
+    def activate(self, kind: ActionKind) -> Generator[ToolAction, None, None]:
+        action = ToolAction(kind)
         token = self._current.set(action)
         try:
             yield action

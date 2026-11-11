@@ -17,7 +17,6 @@ class BrowserToolMetadata:
 
     kind: ActionKind
     chainable: bool = False
-    dispatch_tracked: bool = False
 
 
 @dataclass(frozen=True)
@@ -35,15 +34,12 @@ def browser_tool[F: Callable[..., Awaitable[object]]](
     enabled: bool | Callable[..., bool] = True,
     readonly: bool = False,
     chainable: bool = False,
-    dispatch_tracked: bool = False,
 ) -> Callable[[F], F]:
     """Declare an async browser tool coordinated by the Actions plugin.
 
     Synchronous callbacks are rejected rather than bypassing browser coordination.
     """
-    metadata = BrowserToolMetadata(
-        chainable=chainable, kind=kind, dispatch_tracked=dispatch_tracked
-    )
+    metadata = BrowserToolMetadata(chainable=chainable, kind=kind)
     register = tool(
         description=description,
         enabled=enabled,
