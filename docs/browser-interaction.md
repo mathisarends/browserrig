@@ -1,21 +1,13 @@
 # Browser interaction
 
-[Back to README](../README.md)
-
-```mermaid
-flowchart LR
-    Page --> Observation[DOM observation or screenshot]
-    Observation --> Action[DOM ref or coordinates]
-    Action --> Page
-    Action --> Events
-```
+[Back to README](../README.md) · [Composition](browser-composition.md)
 
 ## Direct browser access
 
-Use the browser without an LLM inside an async function:
+Use Chrome without a model inside an async function:
 
 ```python
-from browserrig import ChromeBrowser, wait_for_page
+from browserrig import ChromeBrowser, Input, Point, wait_for_page
 from browserrig.browser import Launch
 from browserrig.scripts import PAGE_FACTS
 
@@ -23,9 +15,18 @@ async with ChromeBrowser(Launch(url="https://example.com")) as browser:
     tab = browser.active_tab
     await wait_for_page(tab)
     frame = await tab.main_frame()
-    facts = await frame.run(PAGE_FACTS)
-    print(facts.title)
+    print((await frame.run(PAGE_FACTS)).title)
+
+    devices = Input(browser.input_targets.focused)
+    await devices.mouse.resume()
+    await devices.mouse.move_to(Point(x=100, y=120))
 ```
+
+The browser owns tabs and CDP transport; `Input` owns devices. Direct callers
+synchronize devices after technical tab changes. Agent sessions get that wiring
+from `Runtime()` and `InputRuntime()` and resolve devices with `session.scope[Input]`.
+When mixing direct inputs with agent work, acquire
+`session.scope[BrowserCoordination].exclusive()` around the complete operation.
 
 Runnable examples:
 
@@ -34,607 +35,124 @@ uv run python -m examples.direct_browser --url https://example.com
 uv run python -m examples.connect_browser --endpoint http://127.0.0.1:9222
 ```
 
-Connecting creates an isolated context in the running browser. Use
-`--target-id TARGET` to explicitly select an existing tab. The external browser
-must already expose a CDP endpoint and stays running after disconnecting.
+`Chrome.launch(...)` owns a new process; `Chrome.connect(...)` leaves the external
+browser running on exit. Connecting normally creates an isolated context;
+`target_id=...` attaches to an existing tab and preserves its download policy.
+Set `executable=` or `BROWSERRIG_CHROME` to choose Chrome explicitly.
 
-Both `Launch` and `Connect` accept `session_setup=(setup, ...)`. Each setup
-implements `SessionSetup` from `browserrig`: `async apply(cdp, *, frame) -> None`.
-It runs once for each newly attached page (`frame=False`) or out-of-process frame
-(`frame=True`) session, after page, lifecycle and runtime are enabled. The browser
-applies the optional `viewport` metrics to pages first; custom setups then run in
-the supplied order. `Viewport` only holds configuration data. Same-process frames
-share their page's session.
+For CDP setup, pass `session_setup=(setup, ...)`. Each
+`SessionSetup.apply(cdp, *, frame)` runs after page/runtime initialization for a
+new page or out-of-process frame session. Viewport configuration is applied first.
 
-### Resizable windows
+## Observations and element references
 
-The viewport is not fixed. A headless launch pins `viewport` as device metrics,
-because nobody can resize it. A headed launch uses `viewport` only as the initial
-`--window-size` and lets pages follow the window, so a person can make it
-narrower, wider or shorter while the agent works. `Connect` pins metrics only
-when a `viewport` is passed; without one, pages follow the remote window.
-
-When a page resizes, browserrig drops cached frame geometry and treats earlier
-coordinates as outdated: `click_at`, `move_to` and coordinate drags fail with a
-stale-coordinates error until the agent observes again, and a screenshot whose
-viewport size differs from the current observation cannot supply coordinates.
-The next observation of that tab is complete rather than a list of changes, and
-with `Nudges` installed the agent receives a hint such as "The browser viewport
-was resized from 1280x800 to 960x720". Ref-based actions are unaffected, since
-they locate their target again before every input.
-
-## Element references and screenshot marks
-
-`DomCapture` reads every frame document with one `DOMSnapshot.captureSnapshot` call per
-CDP session and derives roles, names, states, visibility and landmark sections from
-that data in Python, without walking the DOM in the page. Normal observations include
-up to 3,000 characters of visible page text, along with nearby control previews,
-and do not capture new screenshots. Use `extract_content()` to save page content
-for targeted searches and file reads.
-The agent can call `screenshot()` to request the current view as an
-image in its next iteration. `ImageContext` keeps the latest screenshot by default,
-including during subsequent text-only steps until compaction removes its snapshot.
-`BrowserPerception.capture()` refreshes page state. Use
-`DomPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` to enable images
-on every step. Pass it in `plugins` of `Agent` or `browser_plugins()`; it replaces
-the default `DomPerception()`.
-`DomPerception(capture=DomCapture(max_text_chars=N))` sets the page-text budget;
-its default is `3000`. Set both `max_text_chars=0` and `sparse_text_chars=0` to
-omit page-text excerpts. When the viewport holds fewer than five named controls, as on error, challenge
-and confirmation pages, observations add up to `sparse_text_chars` (default `1500`)
-characters of visible text anyway. Every observation states where the mouse rests.
-
-Visible text is interleaved with controls in composed-document reading order,
-inside its actual landmarks, forms, paragraphs, lists and table cells. Paragraphs
-remain continuous: `text: Read [the guide][42], then continue.` embeds a link with
-ref `42` directly in the sentence. Pass the second bracket's ref to element tools.
-Links outside prose retain their ordinary `[42] link "name" -> /path` lines.
-Plain text has no refs. Code blocks retain line breaks and indentation.
-
-Labels already fully displayed on a control are omitted from the surrounding
-text by source identity; identical text at unrelated locations stays visible.
-Text-budget truncation is marked at the affected block and does not remove later
-controls. Above/below previews keep their own text with their controls. The
-representation preserves semantic reading order, rather than sorting unrelated
-columns by screen coordinates; structured text and container bounds retain their
-positions in main-viewport CSS pixels.
-
-Likely cookie consent banners have a separate `[COOKIE BANNER: name]` block with up
-to 600 characters of visible text and their ordinary element refs. This excerpt is
-independent of both page-text budgets, so it also appears on busy pages. Detection
-combines consent text and decision controls with dialog/overlay presentation,
-consent container metadata, or explicit acceptance and rejection choices. It works
-over the same composed snapshots, including shadow DOM and frame documents;
-hidden, offscreen and covered banners are omitted. Footer settings launchers and
-cookie-policy articles alone do not qualify. The header marks detection as heuristic:
-unusual layouts or languages can be missed. Recognition does not click, choose a
-consent policy or require the agent to stay on the page.
-
-For example, a detected banner is rendered as:
-
-```text
-cookie banners: 1 detected heuristically
-
-in viewport:
-  [COOKIE BANNER: Privacy choices]
-    text: "We use cookies for analytics. Accept all Reject all"
-    [41] button "Accept all"
-    [42] button "Reject all"
-```
-
-An observation looks like this:
+`DomPerception` captures DOM controls and page text, including shadow roots and
+nested/cross-origin frames. `TextContext` delivers full observations or deltas;
+`ImageContext` delivers screenshots. These are separate plugins. Capture
+configuration belongs in `DomPerception(capture=DomCapture(...))`.
 
 ```text
 # Checkout
 url: https://shop.example/checkout
-tab: 3F2A9C...
-viewport: 1280x800, scroll 0 of 2400px (0.0 pages above, 2.0 below)
-cursor: x=640 y=412 (viewport CSS pixels)
-
 in viewport:
-  [HEADER]
-    [12] link "Cart" -> /cart
   [MAIN]
-    ## Shipping address
-    text: Use a delivery address where someone can receive your order.
-    <form "Shipping">
-      [48] textbox "Email" required placeholder="you@example.com"
-      [51] combobox "Country" options=[Germany*, France, Spain]
-      *[57] checkbox "Save address" unchecked
-      text: Read [delivery terms][59] before continuing.
+    text: Read [delivery terms][59] before continuing.
+    [48] textbox "Email" required
+    [51] combobox "Country" options=[Germany*, France]
     [60] button "Continue"
 ```
 
-Only the elements and headings inside the viewport are listed and described; the
-header's scroll position says how much of the page lies above and below, and the
-agent scrolls to see more. A leading
-`*` marks elements that were not in the previous observation of the same document. There is no default element-count limit;
-`DomCapture(max_elements=N)` prioritizes detected banner controls, then keeps other
-elements nearest to the viewport, and reports
-the truncation. Hidden, inert and fully clipped controls are omitted. Controls behind
-a positioned overlay are reported as covered and are not listed individually.
+Pass refs such as `48` or `f1:93` to element tools. Refs identify objects in the
+current document; removed elements fail as stale. A leading `*` marks a newly
+observed control. Text and controls follow document reading order. Observations
+include nearby previews up to 1,000 CSS pixels beyond the viewport; set
+`viewport_expansion=0` for a strict viewport. Hidden, inert and clipped content is
+excluded. Cookie-banner detection is heuristic and makes no consent choice.
 
-DOM refs such as `482` or `f1:93` are CDP backend node ids, prefixed for out-of-process
-frames. They stay valid across observations as long as the element stays in the same
-document, and an action on a removed element fails with a stale-element error. Pass
-the ref to `click`, `type_text` and other element tools.
+`DomCapture(max_text_chars=...)` controls text excerpts; `max_elements=...` bounds
+controls. `marks=False` removes screenshot reference marks, and `cursor=True`
+adds a cursor marker. Unsupported frames and extraction limits are reported.
+Perspective-transformed frames remain unsupported.
 
-Other capture backends can supply opaque refs through `CaptureContent.references`
-and targets through `ElementInfo`, without DOM addresses. `click` and `drag` resolve
-their current viewport positions and use the same mouse input and motor. A custom
-target can be activated with pointer input and then receive `send_keys`. Native
-form tools and `type_text(ref)` require a `DomElementHandle`; a mismatched ref is
-rejected before input. See [reference contracts](browser-composition.md#references-from-other-capture-backends)
-for resolver lifetime, live hit testing and optional wheel plans.
+Custom captures supply opaque refs through `References`. Shared pointer tools
+resolve their live positions; DOM-specific typing/forms require `DomElements`.
+See [backend contracts](browser-composition.md#references-from-other-capture-backends).
 
-Requested DOM screenshots draw a labeled, colored dashed border around every element
-in the viewport; each label is the element's ref. Links use blue borders, buttons
-green, text inputs purple, and selection controls pink or orange. Screenshots use
-viewport CSS pixels even on HiDPI displays. Annotations are drawn on the image
-without changing the page. Use `DomPerception(capture=DomCapture(marks=False))` for plain screenshots.
+## Input tools
 
-Extraction follows the composed DOM, including slots, open and closed shadow roots,
-and CDP click-listener metadata. It checks viewport visibility, clipping and
-overlays without scrolling during observation. Nested same-origin and cross-origin
-frames use their own CDP sessions where needed. Frame transforms account for
-borders, scrolling, scaling and rotation; ancestor hit tests reject covered frames
-before clicking. Unreachable frames and content limits are reported as `note:`
-lines, while usable frames remain available. Frame discovery is bounded to 64
-frames and eight levels; perspective transforms are reported as unsupported.
+| Capability | Tools and behavior |
+| --- | --- |
+| `PointerTools` | `click(ref, count=2)`, `move_mouse`, `drag`, `click_at`, `drag_at`; refs or viewport/image coordinates |
+| `KeyboardTools` | `send_keys(text="Hello")` types text; `send_keys(key="Enter")` presses a key; modifier flags apply to keys |
+| `DomTypingTools` | `type_text(ref, text, clear=True)` focuses and replaces a DOM field; `clear=False` inserts at its selection |
+| `DomScrollTools` | `scroll_page(delta_y=..., delta_x=...)` moves the document; `scroll_element(ref=..., ...)` moves only that container |
+| `FormTools` | Native selects, exact multi-select sets and date fields |
+| `NavigationTools` / `TabTools` | Navigation, search, history and tab management |
+| `ScreenshotTools` | Request an image/crop at the next observation boundary |
+| `PageExtractionTools` | Save loaded page content as workspace Markdown |
 
-## JavaScript shell and forward navigation
+Ref-based input reveals and hit-tests the target before acting. DOM reveal
+scrolls exact containers, respecting overflow locks and embedding frames, and
+reports actual movement. Custom backends can provide reveal or wheel plans.
+Page/container scroll tools report their own movement without moving the cursor.
 
-`execute_javascript(code="1 + 1")` runs JavaScript through CDP's `Runtime.evaluate`
-in the active tab's main page context.
-The tool returns the last expression's value, supports top-level `await`, and keeps
-variables between calls until the page navigates. Use `await` for Promise results.
-Return plain objects and arrays
-for JSON results; `undefined`, `NaN`, infinities, and BigInts retain their JavaScript
-representation. JavaScript exceptions and execution timeouts become tool errors.
-`timeout` is in seconds, defaults to 10, and accepts up to 30. A timeout can leave
-asynchronous side effects pending; check the next observation before retrying.
+`click(..., button="right")` sends a native right click. `new_tab=True` opens a
+link with the platform modifier; newly opened tabs become active. Drag endpoints
+must fit together before the gesture begins. Held keys/buttons are released on
+failure or cancellation. Text-field focus is checked while typing; a lost focus
+can leave a prefix entered, so inspect before retrying.
 
-```javascript
-const heading = document.querySelector('h1');
-({ title: document.title, heading: heading?.textContent });
-```
+`select_options(ref="123", values=["General", "Wholesale"])` replaces a native
+multi-select's complete set; `values=[]` clears it. Values or displayed labels
+must identify options unambiguously. Invalid or disabled changes reject the
+whole request before mutation; the tool verifies the selected set afterward.
+Observation values, radio IDs and `selection_group` are raw page metadata.
 
-`go_forward()` navigates to the next browser history entry, complementing
-`go_back()`. Its tool result confirms `Navigated forward.` or reports
-`Cannot go forward: no next history entry` when no forward navigation is possible.
+## Coordinates and resizing
 
-Direct Python callers can use `await tab.evaluate("1 + 1")` for a rendered result,
-`await tab.can_go_forward()` to check availability, and `await tab.go_forward()`
-for a boolean indicating whether a history navigation was dispatched. Agent tools
-use the shared action lock, readiness checks, and action receipts.
+Coordinates use viewport CSS pixels unless mapped from a screenshot included in
+the model request. Text-only steps retain the latest included image's geometry.
+A screenshot from a different document cannot supply current coordinates.
 
-## Page content as Markdown
+Headed windows can be resized; headless launches pin viewport metrics. A resize
+invalidates cached coordinate geometry until the next observation. Ref actions
+locate targets again and remain available. Refresh the screenshot after layout
+changes. Model screenshots omit application overlays by default.
 
-The agent calls `extract_content(full_page=False)` to save the active page as
-structured Markdown in its workspace. It returns only `Saved`, `Source`, `Title`
-and actual extraction limitations. The Markdown body stays in the file; use `grep`
-for bounded matches and `read_file` with `offset` and `max_chars` for excerpts.
-Each call saves a new snapshot. The tool requires a workspace and has no inline
-fallback or `max_chars`/`offset` arguments.
-It reads already loaded content below the viewport without scrolling, navigating,
-or invalidating the current element references. Open and closed shadow roots and
-available same-origin and cross-origin frame documents are included.
+## Page content and search
 
-The saved snapshot contains headings, paragraphs, emphasis, lists, links, tables,
-quotes and code. Truncation, unavailable DOM
-metadata, and unavailable frames are explicit. Offscreen rendered frame documents
-are included. Scripts, styles, hidden content, and form field values are excluded.
-Lazy content must already be
-loaded; images contribute their alt text, and canvas pixels are not converted to
-text. Use `screenshot()` when visual inspection is needed.
+`extract_content(full_page=False)` saves loaded content to
+`pages/<id>/content.md`, with provenance in `source.json`. It returns a short
+receipt; use `grep` and bounded `read_file` calls to inspect the file. It requires
+a workspace and does not load lazy content or interpret canvas pixels. Each
+extraction is a separate snapshot. Access the latest typed result through
+`session.scope[PageExtractionTools].extracted_content`.
 
-The direct Python helper `browserrig.observation.content.extract_content(tab,
-max_chars=50000, full_page=False, offset=0)` still returns a typed Markdown result
-with continuation offsets. It does not require a workspace or change the agent
-tool's short receipt contract.
+`find_in_page(query, alternatives=(), match=1, max_results=10)` searches rendered
+text across frames, tolerating case, accents and whitespace differences. It
+scrolls the chosen match into view. Hidden text and form values are excluded.
 
-## Finding text on the page
+## JavaScript
 
-`find_in_page(query, alternatives=(), match=1, max_results=10)` works like the
-browser's find bar. It searches the rendered text of every frame, ignores case,
-accents and whitespace differences, and keeps each match within one text block.
-Up to four `alternatives` (synonyms, other spellings or languages) are searched in
-the same call; their matches share one numbering in page order, and where two
-overlap the earlier, then longer, one counts. The reply gives the number of matches
-per wording and lists up to `max_results` matches from `match` onward with their
-surrounding text and nearest heading.
+`execute_javascript(code=...)` evaluates in the active tab's main context, supports
+top-level `await`, and keeps variables until navigation. Return plain objects for
+JSON results. The timeout defaults to 10 seconds, with a maximum of 30; pending
+asynchronous effects can outlive a timeout. Inspect the page before retrying.
+`Secrets` and `AllowedDomains` disable this tool while mounted.
 
-Match number `match` is scrolled into view; a closed `<details>` or a
-`hidden="until-found"` section around it is opened first. Nothing is drawn on the
-page: viewers get the matches' viewport rectangles in `FindResultsEvent` and draw
-the find highlights themselves. Hidden text and form field values are not searched.
-
-## Double-clicks and dragging
-
-DOM interactions prepare the target's viewport automatically by scrolling exact
-DOM containers, including horizontal scrolling, nested scroll containers, and parent
-frames. Comfortable targets stay in place. Near-edge and offscreen targets are
-positioned with a 12% comfort margin and a preferred vertical anchor around one
-third of the viewport; fitting form groups and labels are kept together. Fixed
-and pinned sticky controls do not trigger document scrolling. Coordinates and
-ancestor hit tests are refreshed after scrolling and before dispatching input.
-Typing, selecting options, setting date inputs, and uploads use this preparation
-as well as clicks. Focus uses `preventScroll` to avoid an extra browser jump.
-
-`PointerTools` provides `click(ref=..., count=2)` and
-`drag(source_ref=..., target_ref=...)` when the capture has DOM refs. Both drag endpoints are prepared first and
-must fit in the viewport together before the gesture starts.
-
-It always provides `move_mouse(x=..., y=...)`,
-`scroll_page(delta_y=..., delta_x=...)`,
-`scroll_element(ref=..., delta_y=..., delta_x=...)`,
-`click_at(x=..., y=..., count=2)` and
-`drag_at(start=Point(...), end=Point(...))`.
-Both drag tools use the same mouse gesture. The browser handles pointer dragging
-and native HTML5 drag and drop, including `DataTransfer`, automatically.
-`move_mouse` moves the cursor without clicking and can reveal hover controls.
-`scroll_page` scrolls the outer document directly,
-independently of the cursor and any nested editor or panel under it. It reports
-the actual before/after position, or says that the page did not move at a boundary
-or because scrolling is disabled. Page scrolling respects CSS overflow locks and
-does not move the cursor or emit wheel input. `delta_x` scrolls sideways.
-`scroll_element(ref=...)` scrolls only the observed container marked `scroll(...)`,
-including a panel, list or horizontal carousel. It stops at that container's
-boundary without propagating to parents or the page, and reports actual movement.
-It does not reveal the container by scrolling ancestors, move the cursor or emit
-wheel input. A ref for an ordinary control is rejected instead of silently
-scrolling its parent. `move_mouse(ref=...)` still reveals and hovers its target.
-
-These two tools replace the old cursor-dependent `scroll` agent tool. Migrate
-no-ref page scrolling to `scroll_page`, and container refs to `scroll_element`.
-For custom wheel handlers, native wheel input remains available to applications
-through `devices.mouse.scroll(delta_y=..., point=Point(...))`.
-Both `click` and `click_at` accept `button="right"` for a native right click;
-the default is `button="left"`. Both tools automatically move the cursor to the
-target before clicking. Right clicks end the action chain so the agent can
-inspect the result before continuing.
-`new_tab=True` holds Ctrl (Cmd when Chrome runs on macOS) for a single left
-click, so a link opens in a new tab and the current page stays open. With
-`InputVisualization`, viewers see the key pressed on the keyboard. When any
-click, typed key or other page input opens a tab, whether through `new_tab`,
-`target=_blank` or `window.open`, the action switches to that tab like Chrome
-does, waits until its page is ready and names both tab IDs in its result, so
-`switch_tab` can return. A `new_tab` click that opens nothing reports that the
-input acted in the current tab.
-`wait(seconds=...)` pauses for 0–10 seconds (default: 1) and emits a transient
-`WaitingEvent` (`browser.waiting`) before the pause, with its requested duration,
-browser, tab, and document IDs for live UI display.
-The newest image shown to the model determines how crop coordinates map to the viewport;
-subsequent text-only observations retain that image's geometry.
-Model screenshots omit application overlays and the presentation cursor.
-Set `DomCapture(cursor=True)` to add a red cursor arrow after capture, with its tip
-at the exact input coordinate. This optional marker follows crop and zoom coordinates.
-All gestures use real CDP input and release mouse buttons even when interrupted.
-Workspace tools are hidden without the `Files` plugin, and previews and uploads
-are hidden when the browser has no file bridge; `list_downloads` remains
-available. See [Files and events](files-and-events.md#workspaces-bridges-and-remote-browsers).
+Direct callers use `await tab.evaluate(...)`, `tab.go_back()`, `tab.go_forward()`
+and `browser.tabs.list/open/activate/close`. Bare backend operations do not add
+agent action coordination, device synchronization or presentation.
 
 ## Input choreography
 
-The session owns one mouse and one keyboard through `InputRuntime()`.
-Obtain the devices with `session.scope[Input]` or declare `needs(Input)` in a plugin;
-use `devices.mouse` and `devices.keyboard`. Both act on the backend's focused input
-transport. The shared `ActionContext` supplies correlation independently of devices.
-`Actions` owns action transactions and readiness; `Runtime()` supplies their shared context.
-The session service `BrowserCoordination` serializes those transactions with
-step observations, content extraction, waits and human handoff.
-Tab management lives in `browser.tabs`: `list()`, `open(target)`,
-`activate(target_id)` and `close(target_id)`. `browser.tabs.active` and
-`browser.active_tab` return the focused document.
+`InputPacing` chooses how devices move and type; `InputVisualization` chooses how
+people see that activity. Both are optional and independently configurable.
+`devices.pace(motor)` and `devices.present(presenter)` return callbacks restoring
+the previous implementations. `Perform`, `TargetLocated` and `ChangeTab` provide
+hooks around intents, resolved targets and tab operations.
 
-JavaScript, navigation, frames, dialogs and element references stay on `Tab`.
-Its `input` adapter implements the `InputTarget` transport protocol and owns CDP
-dispatch, cursor probes and dialog-aware replies. Mouse and keyboard gestures
-resolve this adapter once when they start, so a click or drag stays on the same
-session; without an active tab, input raises `BrowserError`.
-
-How input is performed and how it looks to people watching are two separate,
-optional plugins. Tools and devices only describe what they do. `InputPacing` (from
-`browserrig.pacing`) types and moves the pointer like a person; `InputVisualization` (from
-`browserrig.choreography`) plays the gestures below and streams them as live events.
-`browser_plugins` and `Agent` include both by default; pass `without=(InputPacing,)` to work
-at full speed, `without=(InputVisualization,)` to emit no input events, or both. They build
-on the following seams, which other plugins can use the same way:
-
-- `devices.pace(motor)` installs a `Motor` that plans keystrokes, pointer
-  routes, where to aim on a target, how long a click holds the button, and landing
-  points. `InputPacing(motor)` installs one for a session; its
-  default is `HumanMotor()`. Both built-in motors land in the center of a new
-  tab. The default without a plugin, `Instant`, never pauses.
-- `devices.present(presenter)` installs a `Presenter` that plays tab-strip
-  gestures and reports each input event. The default, `Unseen`, reports nothing.
-  Both calls return a callback that restores the previous motor or presenter.
-- `Actions.stage(intent, tab, step)` dispatches a `Perform` waterfall around a tool
-  step. A hook that matches the intent (`FindIntent`, `NavigateIntent`, `WaitIntent`,
-  `OpenFileIntent`, `UploadIntent`) stages the step and calls `next_()` to run it.
-- `TargetLocated` is observed once a tool has resolved its target element.
-- `ChangeTab` wraps every requested backend tab operation. `InputRuntime` handles
-  device synchronization through it; the installed presenter stages the transition.
-  Tab lifecycle events restore or forget cursor state without making `Tabs` depend
-  on devices. Direct `ChromeBrowser` callers explicitly construct `Input` against
-  `browser.input_targets.focused` and manage device synchronization themselves.
-
-The mouse remembers where it last rested in each tab (`devices.mouse.position_in(tab.id)`)
-and returns there when that tab comes back to the front. The first time a tab
-receives the pointer, both built-in motors put it in the center of the actual
-viewport. A custom motor can choose another landing point. There is no animation
-from the top-left corner. With `InputVisualization`, opening, activating
-and closing tabs play a tab-strip gesture:
-
-1. `TabPressedEvent` (`browser.tab.pressed`) belongs to the tab the pointer
-   leaves. It carries `gesture` (`TabGesture.OPEN`, `ACTIVATE` or `CLOSE`), the
-   pressed `tab_id` (empty for the new-tab button), `from_position` and
-   `duration`. The harness waits `duration`, then switches tabs.
-2. `CursorEnteredEvent` (`browser.cursor.entered`) belongs to the new tab. The
-   pointer travels from the tab strip to `to_position`; the harness waits again.
-3. A native mouse move lands at that position, so hover in the new page is real,
-   followed by `browser.cursor.state`.
-
-The backend does not know the viewer's layout. A viewer places the tab chip
-itself, for example through a `data-target-id` attribute, and draws the gesture
-in an overlay spanning its tab strip and the viewport. The first tab of a
-session skips steps 1 and 2. `InputVisualization` publishes the current cursor state at
-each agent turn start, so live subscribers attached after browser setup can display
-it before the first model request or input action.
-Cursor movements follow `Motor.pointer_route(start, destination)`: one or more cubic strokes
-(`CursorPath`), each joined to the last and reported as its own
-`browser.cursor.moved`. A route that does not run unbroken from the pointer to its
-destination is refused before the pointer moves. The built-in motors move in one
-bounded stroke (`CursorPath.curved`), aim at the middle of a target and click
-without holding the button. A custom motor's aim is a pair of fractions of the
-target's visible box; if something covers that spot, the hit test falls back to the
-target's other visible points. Within one action, a target keeps its aim, so the
-re-check after hover lands on the same spot. Application-level native wheel
-input looks like Chrome's
-`scroll-behavior: smooth` but uses real wheel input: one trusted CDP wheel event
-per frame along Chrome's smooth scroll curve (`cubic-bezier(0.4, 0, 0, 1)`),
-lasting about one 60 Hz frame per square root of the distance (150 ms to 1.5 s).
-Chrome does not animate CDP wheel events itself, and `Input.synthesizeScrollGesture`
-moves at constant speed, so the harness paces the wheel events.
-With `InputPacing`, typing uses a fixed 50 ms interval
-(`browserrig.input.TYPING_INTERVAL_SECONDS`) and pointer paths take their
-time; without it, keys and moves are dispatched without pauses.
-
-`KeyboardTools` supplies `send_keys`. It addresses the current page
-focus and takes exactly one of `text` or `key`:
-
-- `send_keys(text="Hello world")` types literal text at the current selection.
-- `send_keys(text="Enter")` types the word Enter.
-- `send_keys(key="Enter")` presses Enter.
-- `send_keys(key="Escape")` presses Escape.
-- `send_keys(key="a", hold_control=True)` selects all text in the focused editor.
-- `send_keys(key="Tab", hold_shift=True)` moves focus backwards.
-
-`hold_control`, `hold_shift`, `hold_alt`, and `hold_meta` apply to `key`. All held
-modifiers are released after the key. Literal text uses `text` without modifier flags.
-
-`DomTypingTools` supplies `type_text(ref=..., text=...)` to focus and
-replace a referenced field. Use `clear=False` to type at its current selection.
-
-Keys and modifiers are released on failure or cancellation. The motor plans the
-keys for text as `KeyStroke(key, delay_after)`: characters, and `Backspace` to erase
-one it typed. The built-in motors dispatch each character once, without slips. A
-custom motor may slip and correct itself; the plan is checked before the first key,
-and `type_text` returns `TypedText(intended, entered)`. When a slip stays, the tools
-say so (without echoing text around a secret). Sensitive text refuses any plan
-that does not type it exactly. Empty replacement text
-clears the field. Direct Python callers can use `devices.keyboard.type_text(...)`,
-`devices.keyboard.press_key(...)`, `devices.mouse.move_to(Point(...))`, and
-`devices.mouse.scroll(delta_y=..., point=Point(...))`.
-When combining direct inputs with agent operations, inject the session's
-`BrowserCoordination` service and acquire `async with coordination.exclusive():`
-around the complete operation. The service is separate from `Browser`; nested
-readiness checks and captures share the outer operation's ownership.
-Standalone `ChromeBrowser` callers can create their own `BrowserCoordination`
-when they need to serialize concurrent operations.
-
-The choreography uses Harnessed's native transient event extension. `InputVisualization`
-registers the input events (`browserrig.events.INPUT_EVENTS`) and its scene events
-(`browserrig.choreography.SCENE_EVENTS`); `TabStrip` registers the tab updates
-(`browserrig.events.TAB_STRIP_EVENTS`), and `Chrome` registers download progress
-alongside its durable browser events:
-
-| Event | Payload |
-| --- | --- |
-| `CursorMovedEvent` | Start, destination, two control points, duration, easing |
-| `CursorStateEvent` | Actual cursor position and held mouse buttons |
-| `TabPressedEvent` | Tab-strip gesture, pressed tab ID, start position, duration |
-| `CursorEnteredEvent` | Landing position in the new tab, duration, easing |
-| `CursorStyleEvent` | CSS cursor under the pointer (`CursorStyle`, such as `pointer` or `text`) |
-| `PointerPressedEvent`, `PointerReleasedEvent` | Position, mouse button and native click count |
-| `KeyPressedEvent` | Key, modifiers, duration |
-| `KeyboardVisibilityEvent` | Keyboard presentation opened or closed |
-| `BarTypedEvent` | Browser bar (`address` or `find`), key, bar text after the key, duration |
-| `FindBarEvent` | Find bar opened or closed |
-| `FindResultsEvent` | Find bar text, match count, current match (0 for none), viewport rects of visible matches |
-| `ScrollStartedEvent` | Wheel origin, planned deltas and duration, emitted before native wheel dispatch |
-| `ScrolledEvent` | Wheel origin, dispatched deltas, duration |
-| `HighlightElementEvent` | DOM reference and viewport bounds |
-| `WaitingEvent` | Requested wait duration |
-| `FileTransferEvent` | `open` or `upload`, file paths, duration and the upload target point |
-| `WorkPresentedEvent` | Shared browser/Canvas work receipt: identity, typed phase, preview, result metadata, saved path and source capture geometry |
-| `DownloadProgressedEvent` | Download ID, received bytes and total bytes when known |
-| `TabUpdatedEvent` | URL, document title, `loading` flag and favicon as a `data:` URI |
-
-Coordinates use viewport CSS pixels; durations use seconds. Events carry
-`browser_id`, `target_id`, `document_id`, and `at`. Inputs inside an action also
-carry its `action_id`. `CursorMovedEvent` describes the path before execution;
-`CursorStateEvent` reports the actual endpoint, including after cancellation.
-Key and pointer receipts follow successful dispatch. Action failure events close
-interrupted sequences. Key events contain the dispatched key and modifiers.
-`ScrollStartedEvent` starts wheel feedback during native scrolling;
-`ScrolledEvent` reports the dispatched totals after it finishes or is interrupted.
-
-`InputVisualization` paces what it shows: events with a `duration` describe an
-animation the browser waits through before continuing. `open_file` and
-`open_downloaded_file` emit a `FileTransferEvent` in the current tab, wait for it,
-and only then open the new tab, which plays the tab-strip gesture. Uploads move the cursor onto the file input, emit
-the transfer with that point, wait, and then assign the files.
-`CursorStyleEvent` follows cursor movement and scrolling and is only emitted when
-the style changes. It reads the page's computed CSS cursor and treats text inputs,
-editable content and plain text as `text`; custom cursor images show `default`.
-The probe is best-effort and never delays input by more than 250 ms; it runs
-only while a presenter such as `InputVisualization`'s `Stage` asks for it, so unwatched
-input never probes.
-`DownloadProgressedEvent` is sent at most every 200 ms per download; completion,
-failure and cancellation remain durable events.
-
-`TabUpdatedEvent` lets a viewer draw its own tab strip. The `TabStrip` plugin
-(`browserrig.choreography`, on by default, `without=(TabStrip,)` to opt out) sends it
-whenever a field changes: `loading` follows the main frame, and the title and icon
-are read from the page once it stops loading. A newer title from Chrome replaces
-the one the document declared. The tab itself only reports that it changed,
-through the `TabChanged` hook event from `browserrig.browser`; without `TabStrip`
-no titles or icons are read. Icons are fetched through the browser without cookies,
-capped at 64 KiB, typed from their bytes and dropped otherwise. SVG icons are safe
-only when rendered through `<img>`. A loading tab keeps its previous icon.
-
-`navigate(url, new_tab=True)` opens the URL in a new tab; `open_tab` without a URL
-starts on DuckDuckGo. The durable `NavigationStartedEvent` carries `typed`, the text
-a person would enter in the address bar: the URL without `https://` (and without a
-bare trailing `/`), or the query for `search`. With `InputVisualization`, `BarTypedEvent`s show
-the text being typed into the address bar key by key, ending with `Enter`; nothing
-is typed into the page.
-
-With `InputVisualization`, `find_in_page` plays a person's Ctrl+F: a `KeyPressedEvent` for `f` with
-`Control`, `FindBarEvent(visible=True)`, one `BarTypedEvent` per key with a
-`FindResultsEvent` after each, then the final results with the current match in
-view, and finally `Escape` and `FindBarEvent(visible=False)`. `FindResultsEvent.marks`
-holds the visible matches numbered from 1 in page order, and `active` names the
-current one, so viewers can draw the familiar yellow and orange highlights over the
-screencast.
-
-Navigation, tab changes, downloads, and model/tool/readiness/pause intervals keep
-their existing typed events. Consumers can use those together with input events
-to present the session's choreography. Transient input events reach subscribers only; they
-stay out of `session.events`, run results, saved `SessionState` and model context.
-
-`TerminalEvents()` prints one JSON object per event to stderr using native hooks,
-without a background consumer task. It includes session lifecycle, model/tool
-metadata, browser actions, live input events, correlated compaction attempts and
-typed model retry activity. Tool records include `tool_status` and `break_chain`.
-Retry records retain `request_id`, `retry_group_id` and `retry_kind`; unknown
-attempt/retry counters remain JSON `null`. Provider attempts, context recovery and
-output correction have separate scopes. Prompts, tool arguments, model
-output, and screenshots are omitted. Pass `TerminalEvents(output=file)` to select
-another text stream.
-Page text, dialog messages and form value fields are omitted; URLs, filenames and
-dispatched key names remain diagnostic metadata.
-
-### Typing into fields with selected tokens
-
-`type_text(ref, text, clear=True)` replaces existing native text, but skips
-Backspace when the native field is already empty. This preserves selected chips
-in token inputs. Focus is checked after clearing and before every typed character;
-if it leaves the addressed field, the tool stops and reports that remaining text
-was not sent. Inspect the field before retrying because a prefix may be present.
-The same focus check covers embedding frames. `send_keys` continues to address
-the current page focus and does not acquire a target ref.
-
-Direct DOM users can call `await handle.is_focused()` to check the target and its
-embedding frame chain without refocusing it or reading its value.
-
-### Action acknowledgements and hit-test diagnostics
-
-The system prompt asks agents to verify the intended effect in the next
-observation before treating an action as successful or retrying it. A tool
-acknowledgement describes an attempted interaction; it does not prove that the
-application accepted it. Existing tool signatures and action-event semantics
-are unchanged.
-
-DOM hit-test failures include bounded, measured CSS/layout facts: target ref,
-frame-local bounds, display/visibility/pointer-events and the tag found at the
-visible center. They use the existing BrowserError type and do not copy arbitrary
-page text or field values into errors. Diagnostics have a 500 ms budget;
-stale/detached targets keep their original error when facts cannot be collected.
-
-Root overflow is clipped to the viewport during hit testing, rather than to the
-HTML element layout box. This keeps fixed-body applications actionable when the
-HTML layout height is zero, while native hit tests still reject actual overlays.
-
-
-### Automatic DOM reveal and scroll feedback
-
-Before ref-based input, the default DOM backend scrolls the exact containers
-needed to reveal the target, including embedding documents and nested containers.
-This avoids sending a wheel through an unrelated editor that can intercept it.
-CSS overflow locks and fixed/sticky ancestors are respected. Target hit testing
-and the existing hover checks still run before primary input.
-
-Each actual movement is reported in the tool receipt, for example:
-
-```text
-Auto-scrolled page to reveal [775] (y: 0 → 343).
-```
-
-Only changed axes are shown; horizontal movement uses x, and diagonal movement
-shows both x and y. Positions are container-local CSS pixels. Frame IDs and
-unchanged coordinates are omitted from the agent receipt. Feedback is
-limited to eight steps and an omitted-step count. It also accompanies failures
-after scrolling, so an input failure does not hide a changed viewport.
-No movement produces no positive scroll receipt. Automatic reveal remains bounded
-to 32 steps and 20 seconds.
-
-For direct Python integrations, `await handle.reveal_step()` applies one DOM scroll
-and returns `RevealStep(frame_id, container, before, after)`, or `None` when no
-further scroll is planned. `RevealStep.changed` reflects measured movement.
-`await handle.scroll_step()` remains a read-only wheel planner. Custom
-`ScrollableElement` backends retain the existing Mouse/Motor wheel path.
-Programmatic DOM scrolling does not emit synthetic native wheel events.
-Agent tool signatures are unchanged.
-
-
-### Selection metadata and exact native multi-selects
-
-Observations mark native multiple selects and explicit ARIA multi-select widgets
-with `multiple`. Options retain their labels, selected/disabled states and explicit
-HTML values (`Option.value` is null if the value attribute is absent). Selected
-entries have `*`; explicit values are shown when they differ from their labels.
-
-Native radios and checkboxes expose explicit values and IDs. Radios also expose
-their native name as `selection_group`; grouping remains local to the owning
-form/document. These are raw metadata, not interpreted scores. For example, the
-Magento widget recorded in task 116 provides:
-
-```text
-radio "★" unchecked value="20" id="Rating_5" selection_group="ratings[4]"
-radio "★" checked value="18" id="Rating_3" selection_group="ratings[4]"
-```
-
-The extractor does not turn value 20 into a twenty-star or five-star score.
-Existing ARIA descriptions take precedence over explicit control/label titles.
-Password values remain omitted. `ElementInfo` adds `multiple`, `control_id` and
-`selection_group`; default values preserve custom capture compatibility.
-
-The agent can replace a native multi-select's selected set in one call:
-
-```python
-select_options(ref="123", values=["General", "Wholesale"])
-select_options(ref="123", values=[])  # Clear the selected set.
-```
-
-Each item must identify exactly one option by its value or normalized displayed
-label. Duplicate requests for the same option are deduplicated. Ambiguous,
-missing or disabled changes reject the whole request before any selected flag
-changes or input/change event is emitted. Disabled optgroups and disabled selects
-are respected. All validation runs again immediately before mutation. Unchanged
-sets emit no events.
-
-After mutation, the tool verifies option identity and the full selected set after
-synchronous input/change handlers. If the page changes it or detaches the control,
-the result reports failure and a bounded observed selection instead of success.
-Success receipts show the selected count and at most ten label/value pairs.
-Asynchronous application changes remain subject to the normal next observation.
-
-Direct DOM integrations can use `await handle.validate_options(values)` for
-read-only validation and `await handle.select_options(values)` for the typed
-`SelectionResult(selected, verified, reason)`. Callers must check `verified`.
-The new durable action identity is `ActionKind.SELECT_OPTIONS` (`select_options`).
-Existing `select_option` behavior is unchanged. The new tool supports native
-`<select multiple>`; custom listboxes and chip inputs still use their ordinary
-controls. Selection option identity/state now participates in page fingerprints.
+Input receipts carry browser/tab/document identity and the current action ID.
+Viewers consume transient cursor, keyboard, scroll and work events; durable
+receipts record browser outcomes. See [events](files-and-events.md#event-streams)
+and the [choreography gallery](browser-choreography.md).
