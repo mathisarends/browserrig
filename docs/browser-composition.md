@@ -4,74 +4,115 @@ Harnessed `Agent` is the composition root. Browserrig plugins own session state,
 tools and hooks; ordinary Python strategies implement capture, rendering,
 readiness and action-chain decisions. Browserrig targets Harnessed 0.16.0.
 
-## A browser agent with screenshots
+## Explicit plugin composition
+
+List the observation backend, context policies, input behavior and model tools
+directly on Harnessed's `Agent`. No Browserrig pack is required:
 
 ```python
 from harnessed import Agent
 from browserrig import (
-    Actions,
-    Activity,
-    BrowserPerception,
-    Chrome,
-    DomCapture,
-    DomRenderer,
-    FormTools,
-    ImageContext,
-    KeyboardTools,
-    NavigationTools,
-    PointerTools,
-    Readiness,
-    Screenshots,
-    ScreenshotTrigger,
-    TabTools,
-    TrimInBatches,
+    Actions, Chrome, ContextCompaction, DomActionChains, DomPerception,
+    DomScrollTools, DomTypingTools, FormTools, ImageContext, InputPacing,
+    InputVisualization, KeyboardTools, NavigationTools, PointerTools, Readiness,
+    Screenshots, ScreenshotTools, ScreenshotTrigger, TextContext, TrimInBatches,
 )
 
 agent = Agent(
     model=model,
-    instructions="Complete the browser task.",
+    instructions="Complete the browser task using observed state.",
     plugins=[
         Chrome.launch(url=url),
         Readiness(),
-        BrowserPerception(
-            capture=DomCapture(),
-            renderer=DomRenderer(),
+        DomPerception(
             screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
         ),
-        ImageContext(TrimInBatches(max_images=6, min_images=3)),
+        TextContext(mode="delta"),
+        ImageContext(TrimInBatches(max_images=3), skip_unchanged=True),
+        ContextCompaction(),
+        Actions(chain_policy=DomActionChains()),
+        InputPacing(),
+        InputVisualization(),
         PointerTools(),
-        Actions(),
         KeyboardTools(),
+        DomTypingTools(),
+        DomScrollTools(),
         FormTools(),
         NavigationTools(),
-        TabTools(),
-        Activity(),
+        ScreenshotTools(),
     ],
 )
 ```
 
-Add `DialogTools`, `JavaScriptTools`, `FileTools` or `Nudges`
-from their packages as needed. `FileTools` includes uploads from the shared browser workspace. The same readiness checks apply to web pages and
-local document previews.
+`DomPerception` registers no tools. `KeyboardTools` sends native input to the
+current focus; `DomTypingTools` adds `type_text(ref=...)`. `PointerTools` clicks,
+hovers and drags by coordinates or published references. `DomScrollTools` adds
+the exact DOM page/container scrolling tools. `FormTools` handles native selects
+and date fields. These DOM tools require `DomElements`, supplied by `DomPerception`.
 
-Tool groups follow the input device, not the capture: `PointerTools` clicks and drags by
-screenshot or viewport coordinates and by ref, `KeyboardTools` sends keys to the current
-focus and types into a ref, and `FormTools` sets native form controls. `Actions()` uses `DomActionChains()`;
-`ObserveAfterInput()` requires a fresh observation after each input when selected
-explicitly.
+Automatic image capture is configured on perception; `ImageContext` delivers
+images, skips unchanged captures and controls retention. `ScreenshotTools`
+independently exposes the model's screenshot/crop request tool. Requests are
+fulfilled at the next observation boundary with matching references and geometry.
+`TextContext(mode="delta")` deduplicates text and uses deltas while the full base
+remains in model context; `mode="full"` publishes each full observation. Image
+observations always contain their matching full text. Without either context
+plugin, perception can capture state without publishing browser observations.
 
-## Browser perception
+Add workspace capabilities explicitly when needed:
 
-`BrowserPerception` provides the agent's current view of the browser before each
-model step: page structure, actionable element references and optional screenshots.
-Configure capture and rendering here; `Readiness` controls when the page is ready
-to inspect, and `ImageContext` separately controls image history.
+```python
+from browserrig import (
+    BrowserFileTools, DomUploadTools, DownloadReceiving, Files, FileTransfers,
+    PageExtractionTools, TaskMemory, WorkspaceTools,
+)
 
-The default recipe includes `BrowserPerception()`. Pass a configured instance in
-`plugins=[...]` to replace it, or include it directly in a manual composition.
-Replace existing `Observe` imports and uses with `BrowserPerception`; the old
-name has been removed. Plugin descriptions and dependency diagnostics also use
-`BrowserPerception`.
+workspace_plugins = [
+    Files(),
+    WorkspaceTools(),
+    FileTransfers(),
+    DownloadReceiving(),
+    DomUploadTools(),
+    PageExtractionTools(),
+    TaskMemory(),  # use in place of ordinary ContextCompaction
+]
+```
+
+`PageExtractionTools` saves loaded page content as workspace Markdown and returns
+its path and metadata. It requires `Files` or another `FileSystem` provider;
+missing dependencies fail composition before model use. The latest saved result
+is available as `session.scope[PageExtractionTools].extracted_content`.
+`DomUploadTools` separately assigns files to DOM inputs. Choose `BrowserFileTools`
+for download listing and file previews without workspace IO or DOM input tools.
+The existing `WorkspaceTools`, `BrowserFileTools` and combined `FileTools` occupy
+the same file-tool slot; choose `FileTools` when all three file capabilities are
+needed. Their legacy slot behavior is retained in this refactor.
+
+`Actions()` defaults to `ObserveAfterInput()`. Select `DomActionChains()` explicitly
+to allow verified DOM chains. The existing `browserrig.Agent`, `browser_pack` and
+`browser_plugins` convenience APIs retain the task-agent defaults, assembled from
+these individual plugins. They are not required for explicit composition.
+
+## Observation backends and migration
+
+`BrowserPerception` is the shared observation service and runner. It requires an
+explicit `capture` and `renderer`, has no DOM-resolver fallback and registers no
+model tools. `DomPerception` supplies DOM-specific capture/rendering defaults and
+provides that same `BrowserPerception` service. Consumers of backend-independent
+state continue to depend on `BrowserPerception`.
+
+For a custom capture, use `BrowserPerception(capture=backend, renderer=renderer)`
+and supply `CaptureContent.references` when it publishes actionable targets.
+Without a resolver, the capture grants no reference capabilities. A custom
+backend can implement the shared references and reveal contracts without DOM
+addresses. It does not automatically gain `DomElements` or native form tools.
+
+Migrate direct DOM constructions from `BrowserPerception(...)` to `DomPerception(...)`.
+Add `TextContext`, `ScreenshotTools`, `DomTypingTools`, `DomScrollTools` and
+`PageExtractionTools` only for the behavior and tools you want. `extract_content`
+and `screenshot` are no longer methods/tools of perception. DOM consumers use
+`session.scope[DomElements].resolve(tab, ref)` instead of `perception.dom_element`.
+When omitting `Files` from the legacy task defaults, also omit `PageExtractionTools`.
 
 ## Browser configuration
 
@@ -360,8 +401,8 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 | Contract | Implementation |
 | --- | --- |
 | `SessionSetup` | `async apply(cdp, *, frame) -> None`. Install ordered entries with `Chrome.launch(session_setup=(setup, ...))` or `Chrome.connect(session_setup=(setup, ...))`. Each new page or out-of-process frame session enables page, lifecycle and runtime first, then the browser applies viewport metrics to pages and runs each entry. `Viewport` only holds configuration data. |
-| `CaptureStrategy` | Implement `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent`. Return `PageContent` and optional per-observation `references`. Honor `screenshots=False`. Set `CaptureContent.fingerprint` to supply a comparison key; `None` keeps the DOM semantic fingerprint. The runner handles dialogs, document coherence and snapshots. |
-| `References` | `async resolve(tab, snapshot, ref) -> ElementHandle`. Resolve an opaque ref from the published observation without input. Supply a fresh resolver with each capture; `None` uses `DomReferences`. |
+| `CaptureStrategy` | Implement `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent`. Return `PageContent` and optional per-observation `references`. Honor `screenshots=False`. Set `CaptureContent.fingerprint` to supply a comparison key; `None` keeps the semantic fingerprint of the redacted PageContent. The runner handles dialogs, document coherence and snapshots. |
+| `References` | `async resolve(tab, snapshot, ref) -> ElementHandle`. Resolve an opaque ref from the published observation without input. Supply a fresh resolver with each capture; `None` uses `EmptyReferences` and rejects ref input. |
 | `ElementHandle` | `element: ElementInfo`; `async locate(*, aim=None) -> ElementPoint`. Validate the live target and return a hit-tested point and bounds in viewport CSS pixels. `aim` is a preferred pair of fractions within the visible target. Input runs through `Mouse`, `Keyboard` and their `Motor`. |
 | `ScrollableElement` | Optional `async scroll_step() -> ScrollStep | None`. Plan one wheel input with a viewport `point`, `delta_x`, `delta_y` and a `key` identifying the current plan. The shared runner sends ordinary mouse input and bounds retries. |
 | `Renderer` | `instructions(screenshots)`, `refs()` and `render(snapshot)`. Pure presentation, no browser input or waits. |
@@ -371,7 +412,7 @@ reusable configuration objects; mutable state belongs in each probe or plugin's
 | `CheckReadiness` | Native Harnessed `Waterfall[ReadinessCheck]`: call `await next_()` and compose application conditions around the selected policy. The shared deadline includes the middleware. |
 | `Motor` (`browserrig.input`) | `keystrokes(text, *, sensitive) -> Sequence[KeyStroke]`, `pointer_route(start, destination) -> Sequence[CursorPath]`, `aim_fractions(target_width, target_height) -> tuple[float, float]`, `press()` and `landing(viewport_width, viewport_height)`. How input is performed; install it with `InputPacing(motor)`. A plan types characters and may correct slips with `Backspace`; sensitive text must be typed exactly. A route's strokes join end to start. No events, no viewer concerns. |
 | `Presenter` (`browserrig.input`) | `shows_cursor_style()`, `async leave(..., *, action_id)`, `async enter(..., *, action_id)` and `async show(target, event)`. What viewers see of input; `InputVisualization` installs one. `Input` supplies the current action: as `action_id` for tab-strip gestures, already stamped on events passed to `show`. |
-| `ActionChainPolicy` (`browserrig.tools`) | `async check(observe, tab) -> str`: empty allows continuing; otherwise explain why a fresh observation is required. Failed comparison ends the chain without turning successful input into failed input. |
+| `ActionChainPolicy` (`browserrig.tools`) | `instructions() -> str` and `async check(observe, tab) -> str`: empty allows continuing; otherwise explain why a fresh observation is required. Failed comparison ends the chain without turning successful input into failed input. |
 
 `CaptureContent.fingerprint` is copied into the snapshot unchanged, including an
 empty string. A strategy can use it to reflect changes its extracted DOM fields
@@ -414,7 +455,7 @@ from browserrig.observation import (
 ```
 
 `PageContent` is capture data; `ExtractedContent` in the same facade is the separate
-Markdown extraction result returned by `BrowserPerception.extracted_content`.
+Markdown extraction result returned by `PageExtractionTools.extracted_content`.
 
 A custom strategy returns `CaptureContent(page=PageContent(...), references=resolver)`.
 Keep object bindings in that capture's resolver, not in reusable strategy configuration.
@@ -435,7 +476,7 @@ resolvers stay in session state.
 
 `DomElementHandle` supplies the additional DOM operations used by native form
 tools: focus, select, value setting, upload and scripts. Those tools call
-`BrowserPerception.dom_element(tab, ref)` and reject other handles before input, including in
+`DomElements.resolve(tab, ref)` and reject other handles before input, including in
 mixed captures. Existing native select/date/upload behavior is preserved.
 `KeyboardTools.type_text(ref, ...)` likewise requires a DOM handle; another backend
 can use pointer tools to activate its target and `send_keys` to type through the

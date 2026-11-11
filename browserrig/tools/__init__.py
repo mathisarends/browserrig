@@ -2,9 +2,11 @@ from browserrig.core import BrowserToolCall, BrowserToolMetadata, browser_tool
 
 from .chains import ActionChainPolicy, DomActionChains, ObserveAfterInput
 from .dialogs import DialogTools
+from .dom_scroll import DomScrollTools
 from .effects import Effect
 from .execution import Actions
-from .files import BrowserFileTools, FileTools
+from .extraction import PageContentExtracted, PageExtractionTools
+from .files import BrowserFileTools, DomUploadTools, FileTools
 from .find import FindTools
 from .forms import FormTools
 from .intents import (
@@ -21,10 +23,18 @@ from .javascript import JavaScriptTools
 from .keyboard import KeyboardTools
 from .mouse import PointerTools
 from .navigation import NavigationTools
+from .screenshots import ScreenshotTools
 from .tabs import TabTools
+from .typing import DomTypingTools
 from .workspace import WorkspaceTools
 
 __all__ = [
+    "DomUploadTools",
+    "DomTypingTools",
+    "DomScrollTools",
+    "PageExtractionTools",
+    "ScreenshotTools",
+    "PageContentExtracted",
     "PointerTools",
     "ActionChainPolicy",
     "DomActionChains",

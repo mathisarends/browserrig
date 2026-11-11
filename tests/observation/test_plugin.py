@@ -6,7 +6,7 @@ from harnessed.testing import ScriptedModel
 
 from browserrig import Actions, BrowserCoordination, BrowserPerception, Readiness
 from browserrig.core import ActionKind
-from browserrig.observation import CaptureContent, PageContent
+from browserrig.observation import CaptureContent, DomRenderer, PageContent
 from browserrig.tools.effects import Effect
 from tests.fakes import FakeChrome
 
@@ -41,7 +41,7 @@ async def test_step_observation_and_actions_share_session_control():
         plugins=[
             FakeChrome(holder),
             Readiness(),
-            BrowserPerception(capture=BlockingCapture()),
+            BrowserPerception(capture=BlockingCapture(), renderer=DomRenderer()),
             Actions(),
         ],
     )

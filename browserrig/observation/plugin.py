@@ -1,6 +1,3 @@
-import hashlib
-from typing import Annotated
-
 from harnessed import (
     Inject,
     Instructions,
@@ -8,45 +5,33 @@ from harnessed import (
     PluginState,
     SystemPrompt,
     ToolError,
-    ToolResult,
     hook,
 )
-from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.kernel import PluginScope, needs, observes
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import UserMessage
 from harnessed.tracing import traced
-from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
-    ActionKind,
     BrowserCoordination,
-    BrowserError,
     ReadinessPhase,
-    ReadinessStatus,
     Region,
     StaleElement,
 )
-from browserrig.core import browser_tool as tool
 from browserrig.events import (
     ObservationCapturedEvent,
 )
-from browserrig.files import FileSystem
 from browserrig.nudges import Nudges
 from browserrig.readiness import Readiness
 from browserrig.secrets import Secrets
 
-from .archive import save_content
-from .capture import CaptureStrategy, DomCapture, capture_observation
+from .capture import CaptureStrategy, capture_observation
 from .config import Screenshots, ScreenshotTrigger
-from .content import PageContent as ExtractedContent
-from .content import extract_document
-from .delta import delta, unmarked
-from .handle import DomElementHandle
+from .hooks import ProjectObservation
 from .models import CapturedImage, Snapshot
 from .references import ElementHandle, References
-from .renderer import DomRenderer, Renderer
+from .renderer import Renderer
 from .state import BrowserPerceptionState
 
 _TRUST = Instructions(
@@ -60,16 +45,12 @@ _TRUST = Instructions(
 )
 
 
-def _has_workspace(files: Inject[FileSystem | None]) -> bool:
-    return files is not None
-
-
 class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     """Provide the agent's current view of the browser before each model step.
 
-    Capture and render page structure, element references and optional screenshots.
-    Keep the live reference resolver for browser actions; `ImageContext` separately
-    controls image history. Resources and mutable state belong to each session.
+    Capture and render backend-provided state, references and optional screenshots.
+    TextContext and ImageContext independently publish observations to model context.
+    This plugin registers no model tools. Resources and mutable state belong to each session.
     """
 
     events = (ObservationCapturedEvent,)
@@ -78,37 +59,22 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
     _readiness = needs(Readiness)
-    _workspace = observes(FileSystem)
 
     def __init__(
         self,
         *,
-        capture: CaptureStrategy | None = None,
-        renderer: Renderer | None = None,
+        capture: CaptureStrategy,
+        renderer: Renderer,
         screenshots: Screenshots | None = None,
     ) -> None:
         super().__init__()
-        self.capture_strategy = capture if capture is not None else DomCapture()
-        if renderer is None:
-            if isinstance(self.capture_strategy, DomCapture):
-                renderer = DomRenderer(
-                    max_text_chars=self.capture_strategy.max_text_chars,
-                    sparse_text_chars=self.capture_strategy.sparse_text_chars,
-                    marks=self.capture_strategy.marks,
-                )
-            else:
-                renderer = DomRenderer()
+        self.capture_strategy = capture
         self.renderer = renderer
         self.screenshots = screenshots if screenshots is not None else Screenshots()
 
     async def setup(self, scope: PluginScope) -> None:
         # Secrets is looked up per capture, so it redacts wherever it sits in the plugins.
         self._state.context = scope
-
-    @property
-    def extracted_content(self) -> ExtractedContent | None:
-        """The latest successful extraction, retained separately from observations."""
-        return self._state.extracted_content
 
     def instructions(self) -> SystemPrompt:
         refs = self.renderer.refs()
@@ -136,9 +102,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         state = self._state
         state.screenshot_requested |= state.delivered_image is not None
         state.observation, state.delivered_image = None, None
-        state.sent_key, state.sent_ref, state.visible = None, None, False
-        state.bases.clear()
-        state.included = frozenset()
+        state.generation += 1
 
     @traced
     async def probe(self, tab: Tab) -> Snapshot:
@@ -229,45 +193,17 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             )
         return handle
 
-    async def dom_element(self, tab: Tab, ref: str) -> DomElementHandle:
-        """Require DOM capabilities before a native form tool performs input."""
-        handle = await self.element(tab, ref)
-        if not isinstance(handle, DomElementHandle):
-            raise BrowserError(
-                "This tool requires a DOM element; use pointer and keyboard tools"
-            )
-        return handle
+    @property
+    def generation(self) -> int:
+        """Invalidation generation for independently mounted context plugins."""
+        return self._state.generation
 
-    @tool(
-        kind=ActionKind.SCREENSHOT,
-        readonly=True,
-        description=(
-            "Request a screenshot of the active tab for visual inspection in your next iteration. "
-            "The next observation includes an image and matching page state. "
-            "Region limits the image to a viewport area in CSS pixels, such as a "
-            "listed canvas, and zoom magnifies it to read small details; "
-            "move_mouse, click_at and drag_at then take pixels of that image. "
-            "This does not enable automatic screenshots for later iterations."
-        ),
-    )
-    async def screenshot(
-        self,
-        region: Annotated[
-            Region | None,
-            Field(
-                description="Viewport area in CSS pixels; omit for the full viewport."
-            ),
-        ] = None,
-        zoom: Annotated[
-            float, Field(ge=1, le=4, description="Magnification of the region image.")
-        ] = 1,
-    ) -> ToolResult:
+    def request_screenshot(self, region: Region | None = None) -> None:
+        """Schedule an image at the next coherent observation boundary."""
         if self._browser.active_tab.dialog:
             raise ToolError(
                 "Screenshot unavailable; handle the open dialog before requesting an image"
             )
-        if region is None and zoom != 1:
-            raise ToolError("zoom needs a region; pass the viewport area to magnify")
         if region is not None:
             snapshot = self.snapshot
             if (
@@ -281,49 +217,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 )
         # Capture at the next step boundary so image marks and actionable refs stay in sync.
         self._state.screenshot_requested = True
-        self._state.screenshot_region, self._state.screenshot_zoom = region, zoom
-        target = "requested region" if region is not None else "current viewport"
-        return ToolResult(
-            f"Screenshot requested. Your next observation will show the {target}."
-        )
-
-    @tool(
-        kind=ActionKind.EXTRACT_CONTENT,
-        enabled=_has_workspace,
-        readonly=True,
-        chainable=True,
-        description=(
-            "Save the active page's loaded content as a Markdown snapshot in the workspace. "
-            "Returns only Saved, Source, Title and reported extraction limitations, not page text. "
-            "Use grep to find text in the saved path and read_file for bounded excerpts. "
-            "Includes loaded content below the viewport without navigating. "
-            "Uses the main region when available; full_page=true also includes site navigation. "
-            "Each call saves a new snapshot. Requires a workspace."
-        ),
-    )
-    async def extract_content(self, full_page: bool = False) -> ToolResult:
-        files = self._workspace
-        if files is None:
-            raise ToolError(
-                "Page extraction needs a workspace; configure Files() to save snapshots"
-            )
-        async with self._coordination.exclusive():
-            tab = self._browser.active_tab
-            report = await self._readiness.wait(tab)
-            if report.status == ReadinessStatus.BLOCKED:
-                raise ToolError(report.reason)
-            content = await extract_document(tab, full_page=full_page)
-            secrets = self._secrets()
-            if secrets is not None:
-                content = secrets.redact(content)
-            try:
-                saved = await save_content(files, content, full_page=full_page)
-            except (OSError, ValueError) as error:
-                raise ToolError(
-                    f"Page extraction could not be saved: {error}"
-                ) from error
-            self._state.extracted_content = saved
-            return ToolResult(saved.render_receipt())
+        self._state.screenshot_region = region
 
     def project(self, snapshot: Snapshot) -> UserMessage:
         """Build the redacted text snapshot shared by text and image delivery."""
@@ -382,19 +276,18 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 phase=ReadinessPhase.OBSERVATION,
                 screenshots=True if state.screenshot_requested else None,
                 region=state.screenshot_region,
-                zoom=state.screenshot_zoom,
             )
         state.screenshot_requested = False
-        state.screenshot_region, state.screenshot_zoom = None, 1
+        state.screenshot_region = None
         await self._track_viewport(snapshot, nudges)
         observations = []
-        key = self._page_key(snapshot)
-        # Text-only pages the model still sees are not repeated; images are always delivered.
-        if snapshot.image is not None or not (state.visible and state.sent_key == key):
-            observations.append(
-                (self._observation(snapshot), "browser", (snapshot.id,))
-            )
-            state.sent_key, state.sent_ref, state.visible = key, snapshot.id, False
+        context = state.context
+        assert context is not None
+        observation = await context.dispatch(
+            ProjectObservation(snapshot), default=_no_projection
+        )
+        if observation is not None:
+            observations.append((observation, "browser", (snapshot.id,)))
         if (
             nudges is not None
             and (hints := await nudges.observation(snapshot)) is not None
@@ -425,12 +318,8 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         state.viewports[snapshot.tab_id] = size
         if previous is None or previous == size:
             return
-        # Every position moved, so the next observation of this tab is complete, not a delta.
-        state.bases = {
-            page: base
-            for page, base in state.bases.items()
-            if page[0] != snapshot.tab_id
-        }
+        # Context policies must forget their old geometry even with a sparse renderer.
+        state.generation += 1
         if nudges is not None:
             await nudges.queue(
                 f"The browser viewport was resized from {previous[0]:.0f}x{previous[1]:.0f} "
@@ -442,51 +331,13 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 target_id=snapshot.tab_id,
             )
 
-    def _observation(self, snapshot: Snapshot) -> UserMessage:
-        """The snapshot, or only its changes while the last complete one is still in context."""
-        state = self._state
-        text = self._render(snapshot)
-        plain = unmarked(text)
-        page = (snapshot.tab_id, snapshot.document_id)
-        base = state.bases.get(page)
-        # Returning to a page, as after going back, also lists only its changes.
-        if snapshot.image is None and base is not None and base[1] in state.included:
-            changes = delta(base[0], plain)
-            # Many changes read better as a complete observation, which becomes the new base.
-            if len(changes) <= len(text) // 2:
-                observation = UserMessage(content=changes)
-                secrets = self._secrets()
-                return secrets.redact(observation) if secrets else observation
-        state.bases[page] = (plain, snapshot.id)
-        return self.project(snapshot)
-
-    @hook(ObservationsIncludedEvent)
-    async def _included(self, event: ObservationsIncludedEvent) -> None:
-        state = self._state
-        refs = {
-            ref
-            for item in event.observations
-            if item.source == "browser"
-            for ref in item.refs
-        }
-        state.visible = state.sent_ref in refs
-        state.included = frozenset(refs)
-        state.bases = {
-            page: base for page, base in state.bases.items() if base[1] in refs
-        }
-
-    def _page_key(self, snapshot: Snapshot) -> str:
-        # New-element marks depend on the previous capture, not on the page itself.
-        elements = tuple(
-            element.model_copy(update={"new": False}) if element.new else element
-            for element in snapshot.elements
-        )
-        text = self._render(snapshot.model_copy(update={"elements": elements}))
-        return hashlib.sha256(text.encode()).hexdigest()
-
     def _secrets(self) -> Secrets | None:
         ctx = self._state.context
         return ctx[Secrets] if ctx is not None and Secrets in ctx else None
 
     def _render(self, snapshot: Snapshot) -> str:
         return self.renderer.render(snapshot)
+
+
+async def _no_projection() -> UserMessage | None:
+    return None

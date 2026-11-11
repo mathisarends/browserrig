@@ -21,7 +21,7 @@ from browserrig.core import ActionKind
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent
 from browserrig.observation import Element, Snapshot, decision_change
 from browserrig.observation.models import Offscreen
-from browserrig.tools import Actions, BrowserToolMetadata, browser_tool
+from browserrig.tools import Actions, BrowserToolMetadata, DomActionChains, browser_tool
 from browserrig.tools.effects import Effect
 from tests.fakes import FakeServices, mounted
 
@@ -124,6 +124,9 @@ def _browser():
 class _UnchangedPage:
     """Synthetic chain tools have no DOM to compare; only explicit boundaries apply."""
 
+    def instructions(self):
+        return "Synthetic independent actions may be chained."
+
     async def check(self, _observe, _tab):
         return ""
 
@@ -219,7 +222,7 @@ async def test_browser_metadata_is_captured_for_review_without_reaching_the_mode
 
 async def test_failed_comparison_keeps_input_successful_and_breaks_the_chain():
     operation = AsyncMock(return_value=Effect("Entered once."))
-    async with mounted(Actions()) as (services, scope):
+    async with mounted(Actions(chain_policy=DomActionChains())) as (services, scope):
         tab = services.browser.active_tab
         services.observe.snapshot = _snapshot(
             tab_id=tab.id, document_id=tab.document_id

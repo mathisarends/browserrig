@@ -37,6 +37,7 @@ from browserrig import (
     InputVisualization,
     LocalWorkspace,
     MountedWorkspace,
+    PageExtractionTools,
     Readiness,
     Screenshots,
     ScreenshotTrigger,
@@ -45,6 +46,7 @@ from browserrig import (
 from browserrig.browser import BrowserEvents
 from browserrig.browser import plugin as plugin_module
 from browserrig.core import ActionKind
+from browserrig.observation import DomPerception
 from browserrig.tools import BrowserToolMetadata, DialogTools, KeyboardTools
 from tests.fakes import FakeBrowser
 
@@ -61,7 +63,7 @@ async def test_browser_perception_dependency_resolves_the_configured_plugin(
             perception = self._setup_perception
             received.append(perception)
 
-    perception = BrowserPerception(capture=DomCapture(marks=False))
+    perception = DomPerception(capture=DomCapture(marks=False))
     agent = browserrig.Agent(model=ScriptedModel([]), plugins=[perception, Consumer()])
     assert [item for item in agent.plugins if isinstance(item, BrowserPerception)] == [
         perception
@@ -132,7 +134,7 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
         plugins=[
             KeyboardTools(),
             Actions(),
-            BrowserPerception(),
+            DomPerception(),
             Readiness(),
             DialogTools(),
         ],
@@ -141,7 +143,7 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
         await agent.run("Inspect the page")
     missing = {issue.plugin.name: issue.missing for issue in caught.value.issues}
     assert missing == {
-        "KeyboardTools": (Actions, Browser, BrowserPerception),
+        "KeyboardTools": (Actions, Browser),
         "Actions": (
             Browser,
             BrowserCoordination,
@@ -149,7 +151,7 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
             Readiness,
             BrowserPerception,
         ),
-        "BrowserPerception": (Browser, BrowserCoordination, BrowserEvents, Readiness),
+        "DomPerception": (Browser, BrowserCoordination, BrowserEvents, Readiness),
         "Readiness": (BrowserEvents,),
         "DialogTools": (Browser,),
     }
@@ -159,9 +161,9 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
 async def test_browser_dependency_loss_and_replacement_restart_observation_state():
     async with Scope() as ctx:
         ctx.provide(ToolRegistry, ToolRegistry(ctx))
-        await ctx.install([BrowserPerception(), Readiness()], settle=True)
+        await ctx.install([DomPerception(), Readiness()], settle=True)
         assert {issue.plugin.name for issue in ctx.plugin_diagnostics()} == {
-            "BrowserPerception",
+            "DomPerception",
             "Readiness",
         }
 
@@ -198,7 +200,7 @@ async def test_browser_dependency_loss_and_replacement_restart_observation_state
         }
         assert missing == {
             "Readiness": (BrowserEvents,),
-            "BrowserPerception": (
+            "DomPerception": (
                 Browser,
                 BrowserCoordination,
                 BrowserEvents,
@@ -265,7 +267,7 @@ async def test_facade_renders_configured_observation_prompt(
         instructions="Custom role.",
         prompt=SystemPrompt.from_plugins(format=PromptFormat.MARKDOWN),
         plugins=[
-            BrowserPerception(capture=capture, screenshots=Screenshots(trigger=trigger))
+            DomPerception(capture=capture, screenshots=Screenshots(trigger=trigger))
         ],
     )
     async with agent.session() as session:
@@ -288,7 +290,7 @@ async def test_facade_renders_configured_observation_prompt(
 async def test_native_composition_can_replace_a_complete_browser_instruction_block(
     fake_chrome,
 ):
-    class CustomPerception(BrowserPerception):
+    class CustomPerception(DomPerception):
         def instructions(self) -> SystemPrompt:
             return SystemPrompt("Custom observation guidance.")
 
@@ -358,7 +360,9 @@ _WORKSPACE_TOOLS = {
 async def test_file_tools_follow_the_workspace_and_the_browser_bridge(
     fake_chrome, tmp_path
 ):
-    without_files = browserrig.Agent(model=ScriptedModel(["unused"]), without=(Files,))
+    without_files = browserrig.Agent(
+        model=ScriptedModel(["unused"]), without=(Files, PageExtractionTools)
+    )
     async with without_files.session() as session:
         tools = session.scope[ToolRegistry]
         names = {item.name for item in tools.definitions}
@@ -443,7 +447,9 @@ async def test_browser_services_are_isolated_between_sessions(fake_chrome):
 async def test_workspace_changes_replace_transfer_without_reopening_chrome(
     fake_chrome, tmp_path
 ):
-    agent = browserrig.Agent(model=ScriptedModel([]), without=(Files,))
+    agent = browserrig.Agent(
+        model=ScriptedModel([]), without=(Files, PageExtractionTools)
+    )
     async with agent.session() as session:
         scope = session.scope
         browser, coordination = scope[Browser], scope[BrowserCoordination]
@@ -493,9 +499,9 @@ async def test_runtime_browser_sections_need_explicit_context_delivery(fake_chro
     async with agent.session() as session:
         fixed_prompt = await session.prompt.render()
         with pytest.raises(ConfigError):
-            await session.mount(BrowserPerception())
+            await session.mount(DomPerception())
         handle = await session.mount(
-            BrowserPerception(), section_delivery=SectionDelivery.CONTEXT
+            DomPerception(), section_delivery=SectionDelivery.CONTEXT
         )
         request = ModelRequest(())
         mounted = await session.scope.dispatch(

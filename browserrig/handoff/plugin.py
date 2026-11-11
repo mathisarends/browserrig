@@ -144,19 +144,26 @@ class HumanHandoff(Plugin, provides=True):
             transfer.before = await self._capture()
 
     @tool(
-        description=(
-            "Hand browser control to a human and wait for completion, decline or timeout. "
-            "Describe what they should do and the expected visible result. Then inspect "
-            "the receipt and the next browser observation before continuing."
-        ),
+        description="Hand browser control to a human and wait for their response.",
         timeout_seconds=lambda plugin: plugin.timeout + 60,
         readonly=True,
         chain=ToolChain.STOP_AFTER,
     )
     async def request_human(
         self,
-        reason: Annotated[str, Field(min_length=1, max_length=2000)],
-        expected_state: Annotated[str, Field(max_length=1000)] = "",
+        reason: Annotated[
+            str,
+            Field(
+                min_length=1, max_length=2000, description="What the human should do."
+            ),
+        ],
+        expected_state: Annotated[
+            str,
+            Field(
+                max_length=1000,
+                description="Visible result expected after the human finishes.",
+            ),
+        ] = "",
         *,
         context: Inject[ToolContext],
         nudges: Inject[Nudges | None],

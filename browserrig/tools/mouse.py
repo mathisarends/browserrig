@@ -19,35 +19,25 @@ from browserrig.observation import BrowserPerception, CapturedImage, Snapshot
 
 from .effects import Effect
 from .execution import Actions
-from .scrolling import scroll_element, scroll_page
 
 type _ClickCount = Annotated[
     Literal[1, 2],
-    Field(description="2 = native double click (open, edit, select word)"),
+    Field(description="Use 2 for a native double click."),
 ]
-type _ClickButton = Annotated[
-    Literal["left", "right"], Field(description="Mouse button to press.")
-]
+type _ClickButton = Literal["left", "right"]
 type _NewTab = Annotated[
     bool,
-    Field(
-        description=(
-            "Ctrl+click (Cmd on macOS) to open a link in a new tab and switch to it, "
-            "keeping the current page open."
-        )
-    ),
+    Field(description="Open the link in a new tab and activate it."),
 ]
-type _ScrollDelta = Annotated[float, Field(ge=-10000, le=10000)]
 
 
 _INSTRUCTIONS = Instructions(
     title="Screenshot coordinates",
     text=(
-        "Coordinates are pixels from the top-left of the newest screenshot still in context, "
-        "including its crop and zoom; region and canvas images map back to the viewport "
-        "automatically. Without a screenshot in context, coordinates are viewport CSS pixels, "
-        "like cursor and canvas positions. A red marker shows the pointer at capture time. "
-        "After a tab or document change, take a fresh screenshot before pointing."
+        "Point in pixels from the top-left of the newest screenshot still in context; "
+        "crop and scale map back to the viewport. Without an image, use viewport CSS pixels. "
+        "After a tab or document change, request a fresh screenshot before pointing. "
+        "Clicks that open a new tab activate it."
     ),
 )
 
@@ -67,10 +57,7 @@ class PointerTools(Plugin):
 
     @tool(
         kind=ActionKind.MOVE_MOUSE,
-        description=(
-            "Move the cursor without clicking, to hover menus or tooltips. "
-            "Give an observed ref, or x and y in image or viewport coordinates."
-        ),
+        description="Hover without clicking; address a ref or both coordinates.",
     )
     async def move_mouse(
         self,
@@ -97,11 +84,7 @@ class PointerTools(Plugin):
 
     @tool(
         kind=ActionKind.CLICK_AT,
-        description=(
-            "Automatically move the cursor to image or viewport coordinates and click there; "
-            "count=2 performs a native double click; button=right performs a right click. "
-            "A click that opens a new tab switches to it."
-        ),
+        description="Click at screenshot or viewport coordinates.",
     )
     async def click_at(
         self,
@@ -128,46 +111,6 @@ class PointerTools(Plugin):
         )
 
     @tool(
-        kind=ActionKind.SCROLL_PAGE,
-        description=(
-            "Scroll only the outer page, independently of the cursor and nested panels. "
-            "delta_y is CSS pixels down (negative up); delta_x is right (negative left). "
-            "Reports actual movement or the page boundary/scroll lock. "
-            "Use scroll_element to move an inner list, panel or carousel."
-        ),
-    )
-    async def scroll_page(
-        self,
-        delta_y: _ScrollDelta = 0,
-        delta_x: _ScrollDelta = 0,
-    ) -> Effect:
-        if delta_y == 0 and delta_x == 0:
-            raise ToolError("Provide a non-zero delta_y or delta_x")
-        return await scroll_page(self._actions.tab, delta_y=delta_y, delta_x=delta_x)
-
-    @tool(
-        kind=ActionKind.SCROLL_ELEMENT,
-        description=(
-            "Scroll only the observed container ref marked scroll(...), independently "
-            "of the cursor. delta_y is CSS pixels down (negative up); delta_x is right "
-            "(negative left). Stops at its boundary without scrolling ancestors or the page. "
-            "Reports actual movement; a ref for a non-scrollable element is rejected. "
-            "Use scroll_page for the outer document."
-        ),
-    )
-    async def scroll_element(
-        self,
-        ref: str,
-        delta_y: _ScrollDelta = 0,
-        delta_x: _ScrollDelta = 0,
-    ) -> Effect:
-        if delta_y == 0 and delta_x == 0:
-            raise ToolError("Provide a non-zero delta_y or delta_x")
-        tab = self._actions.tab
-        handle = await self._observe.dom_element(tab, ref)
-        return await scroll_element(tab, handle, delta_y=delta_y, delta_x=delta_x)
-
-    @tool(
         kind=ActionKind.DRAG_AT,
         description="Drag between screenshot points.",
     )
@@ -175,7 +118,9 @@ class PointerTools(Plugin):
         self,
         start: Point,
         end: Point,
-        duration: Annotated[float, Field(ge=0.05, le=5)] = 0.5,
+        duration: Annotated[
+            float, Field(ge=0.05, le=5, description="Drag duration in seconds.")
+        ] = 0.5,
     ) -> Effect:
         await self._browser.input.mouse.drag(
             start=_image_point(self._observe.coordinate_source(), start),
@@ -187,12 +132,7 @@ class PointerTools(Plugin):
     @tool(
         kind=ActionKind.CLICK,
         chainable=True,
-        description=(
-            "Automatically move the cursor to a current observed ref and click it; "
-            "count=2 performs a native double click; "
-            "button=right performs a right click. "
-            "A click that opens a new tab switches to it."
-        ),
+        description="Click an observed ref, revealing it first when needed.",
     )
     async def click(
         self,
@@ -239,7 +179,9 @@ class PointerTools(Plugin):
         self,
         source_ref: str,
         target_ref: str,
-        duration: Annotated[float, Field(ge=0.05, le=5)] = 0.5,
+        duration: Annotated[
+            float, Field(ge=0.05, le=5, description="Drag duration in seconds.")
+        ] = 0.5,
     ) -> Effect:
         prepared = await self._actions.element_point(ref=source_ref)
         target = await self._actions.element_point(ref=target_ref)

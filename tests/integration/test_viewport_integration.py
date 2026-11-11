@@ -62,7 +62,7 @@ async def test_strict_viewport_controls_are_described_and_the_rest_are_known(sit
         assert any("truncated" in item for item in limited.limitations)
 
 
-async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_controls_still(
+async def test_dom_preparation_frames_forms_avoids_jitter_and_keeps_pinned_controls_still(
     site,
 ):
     holder = {}
@@ -140,7 +140,7 @@ async def test_wheel_preparation_frames_forms_avoids_jitter_and_keeps_pinned_con
         )
         wheels = await evaluate(tab, "wheels")
         clicks = await evaluate(tab, "clicks")
-        assert len(wheels) > 6 and all(event["trusted"] for event in wheels)
+        assert wheels == []
         assert [event["id"] for event in clicks] == ["pinned"]
         assert all(event["trusted"] for event in clicks)
         assert positions[1] > 100
@@ -299,7 +299,7 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(
         assert await evaluate(tab, "scrollY") > 0
 
 
-async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target(site):
+async def test_dom_preparation_reaches_target_despite_prevented_wheel(site):
     holder = {}
 
     class Prepare(Plugin, needs=(Actions,)):
@@ -328,7 +328,7 @@ async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target
             entry = _element(request, "Unreached")
             yield ModelChunk(tool_call=ToolCall("click", {"ref": entry["ref"]}))
         else:
-            yield ModelChunk(text="Blocked")
+            yield ModelChunk(text="Done")
 
     agent = Agent(
         model=CallbackModel(respond),
@@ -336,15 +336,17 @@ async def test_prevented_wheel_scroll_does_not_jump_or_click_an_unreached_target
         plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
     )
     async with agent.session() as session:
-        result = await session.run("Attempt the blocked scroll", max_steps=2)
+        result = await session.run(
+            "Reveal and click without routing wheel input", max_steps=2
+        )
         receipts = [
             event for event in result.events if isinstance(event, ToolCallFinishedEvent)
         ]
-        assert len(receipts) == 1 and receipts[0].result.is_error
-        assert "wheel input" in receipts[0].result.text
+        assert len(receipts) == 1 and not receipts[0].result.is_error
+        assert "Auto-scrolled page" in receipts[0].result.text
         tab = holder["actions"].browser.active_tab
-        assert await evaluate(tab, "scrollY") == 0
-        assert await evaluate(tab, "document.body.dataset.clicked") is None
+        assert await evaluate(tab, "scrollY") > 0
+        assert await evaluate(tab, "document.body.dataset.clicked") == "true"
 
 
 def _state(request):

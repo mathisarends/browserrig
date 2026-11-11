@@ -73,7 +73,7 @@ from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
     Agent,
-    BrowserPerception,
+    DomPerception,
     Chrome,
     ContextCompaction,
     ImageContext,
@@ -93,7 +93,7 @@ async def main():
         ),
         plugins=[
             Approvals(default=PolicyDecision.ALLOW),
-            BrowserPerception(
+            DomPerception(
                 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             ),
             ImageContext(UntilCompaction()),
@@ -133,6 +133,15 @@ Mount `plugins=[Todos()]` to add an optional [task todo list](docs/todos.md).
 Open plans are reminded after compaction or when they go stale, and survive
 session restoration. Completed steps are agent reports,
 not verified outcomes.
+
+## Explicit agent composition
+
+Use `harnessed.Agent` with individual Browserrig plugins to select perception,
+context management, input behavior and tools explicitly. `DomPerception`,
+`TextContext`, `ImageContext`, `KeyboardTools`, `DomTypingTools`, `DomScrollTools`,
+`ScreenshotTools` and `PageExtractionTools` can be chosen independently.
+See [explicit plugin composition](docs/browser-composition.md#explicit-plugin-composition).
+The existing `browserrig.Agent` convenience API retains the task-agent defaults.
 
 ## Session videos
 

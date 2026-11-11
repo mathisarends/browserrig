@@ -11,6 +11,7 @@ from browserrig import (
     TrimInBatches,
 )
 from browserrig.browser import Launch
+from browserrig.observation import DomPerception, DomRenderer
 from browserrig.tools import Actions, DomActionChains
 
 
@@ -21,13 +22,13 @@ from browserrig.tools import Actions, DomActionChains
         pytest.param(Readiness, "options", ReadinessOptions, id="readiness-options"),
         pytest.param(ImageContext, "retention", TrimInBatches, id="image-retention"),
         pytest.param(
-            lambda value: BrowserPerception(capture=value),
+            lambda value: BrowserPerception(capture=value, renderer=DomRenderer()),
             "capture_strategy",
             DomCapture,
             id="capture-strategy",
         ),
         pytest.param(
-            lambda value: BrowserPerception(screenshots=value),
+            lambda value: DomPerception(screenshots=value),
             "screenshots",
             Screenshots,
             id="screenshots",

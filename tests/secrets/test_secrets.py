@@ -25,7 +25,7 @@ from browserrig.core import ActionKind, Bounds, SecretError
 from browserrig.events import ActionFailedEvent, KeyPressedEvent, SecretEnteredEvent
 from browserrig.input import Input
 from browserrig.input import keyboard as keyboard_module
-from browserrig.observation import CaptureContent, Element, Snapshot
+from browserrig.observation import CaptureContent, DomPerception, Element, Snapshot
 from browserrig.observation.capture import _redact
 from browserrig.observation.extraction import Extraction
 from browserrig.observation.marks import blackout
@@ -461,7 +461,7 @@ async def test_observe_redacts_with_secrets_mounted_after_it():
         plugins=[
             FakeChrome(holder),
             Readiness(),
-            BrowserPerception(),
+            DomPerception(),
             Hold(),
             _secrets(),
         ],

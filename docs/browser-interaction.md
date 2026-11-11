@@ -75,10 +75,10 @@ The agent can call `screenshot()` to request the current view as an
 image in its next iteration. `ImageContext` keeps the latest screenshot by default,
 including during subsequent text-only steps until compaction removes its snapshot.
 `BrowserPerception.capture()` refreshes page state. Use
-`BrowserPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` to enable images
+`DomPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` to enable images
 on every step. Pass it in `plugins` of `Agent` or `browser_plugins()`; it replaces
-the default `BrowserPerception()`.
-`BrowserPerception(capture=DomCapture(max_text_chars=N))` sets the page-text budget;
+the default `DomPerception()`.
+`DomPerception(capture=DomCapture(max_text_chars=N))` sets the page-text budget;
 its default is `3000`. Set both `max_text_chars=0` and `sparse_text_chars=0` to
 omit page-text excerpts. When the viewport holds fewer than five named controls, as on error, challenge
 and confirmation pages, observations add up to `sparse_text_chars` (default `1500`)
@@ -171,7 +171,7 @@ Requested DOM screenshots draw a labeled, colored dashed border around every ele
 in the viewport; each label is the element's ref. Links use blue borders, buttons
 green, text inputs purple, and selection controls pink or orange. Screenshots use
 viewport CSS pixels even on HiDPI displays. Annotations are drawn on the image
-without changing the page. Use `BrowserPerception(capture=DomCapture(marks=False))` for plain screenshots.
+without changing the page. Use `DomPerception(capture=DomCapture(marks=False))` for plain screenshots.
 
 Extraction follows the composed DOM, including slots, open and closed shadow roots,
 and CDP click-listener metadata. It checks viewport visibility, clipping and
@@ -407,7 +407,7 @@ focus and takes exactly one of `text` or `key`:
 `hold_control`, `hold_shift`, `hold_alt`, and `hold_meta` apply to `key`. All held
 modifiers are released after the key. Literal text uses `text` without modifier flags.
 
-With DOM refs, `KeyboardTools` also supplies `type_text(ref=..., text=...)` to focus and
+`DomTypingTools` supplies `type_text(ref=..., text=...)` to focus and
 replace a referenced field. Use `clear=False` to type at its current selection.
 
 Keys and modifiers are released on failure or cancellation. The motor plans the

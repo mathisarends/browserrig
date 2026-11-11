@@ -101,12 +101,7 @@ class Done(Plugin, slot="completion"):
         return decision
 
     @tool(
-        description=(
-            "End browser work and move to the final answer. Call this tool alone, "
-            "after checking the last action's result. The next response must give the "
-            "final answer in the requested format, without further application tools. "
-            "Set success=false when the requested task could not be completed."
-        ),
+        description="End browser work and enter final-answer mode.",
         readonly=True,
         chain=ToolChain.STOP_AFTER,
     )

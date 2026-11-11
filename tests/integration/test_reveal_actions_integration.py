@@ -13,6 +13,7 @@ from browserrig import (
     Browser,
     BrowserPerception,
     Chrome,
+    DomElements,
     Files,
     LocalWorkspace,
     wait_for_page,
@@ -171,7 +172,7 @@ async def test_element_actions_reveal_scroll_containers_and_project_the_cursor(
                 "date": "input",
             }[operation]
         )
-        handle = await observe.dom_element(tab, target.ref)
+        handle = await session.scope[DomElements].resolve(tab, target.ref)
         leaf = handle.frame
         events = []
 
@@ -219,7 +220,7 @@ async def test_element_actions_reveal_scroll_containers_and_project_the_cursor(
         assert Bounds.model_validate(local["box"]).contains(*local["pointer"])
         await _assert_effect(operation, local, browser)
         # Receipt coordinates must be in the main viewport, not iframe-local pixels.
-        live = await observe.dom_element(tab, target.ref)
+        live = await session.scope[DomElements].resolve(tab, target.ref)
         viewport_box = live.frame.transform.bounds_to_viewport(
             Bounds.model_validate(local["box"])
         )
@@ -284,7 +285,7 @@ async def test_same_action_reprojects_after_programmatic_iframe_motion(site):
         result = await actions.run(kind=ActionKind.CLICK, operation=click)
         assert not result.is_error and points[1].x - points[0].x == pytest.approx(310)
         assert points[1].y - points[0].y == pytest.approx(100)
-        handle = await observe.dom_element(tab, ref)
+        handle = await session.scope[DomElements].resolve(tab, ref)
         assert (
             await evaluate(
                 handle.frame, "document.querySelector('button').dataset.clicked"

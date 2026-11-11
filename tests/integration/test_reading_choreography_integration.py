@@ -9,11 +9,11 @@ from harnessed.testing import ScriptedModel
 from browserrig import (
     Agent,
     Browser,
-    BrowserPerception,
     Chrome,
     Files,
     InputPacing,
     LocalWorkspace,
+    PageExtractionTools,
     Viewport,
 )
 from browserrig.browser import Frame
@@ -140,7 +140,7 @@ async def test_extract_content_sweeps_once_and_confirms_after_return(site, tmp_p
 
         async def on_sweep(event):
             assert event.work_id == f"tool:{call.id}"
-            assert session.scope[BrowserPerception].extracted_content is not None
+            assert session.scope[PageExtractionTools].extracted_content is not None
             assert (
                 await _surface(tab, "document.querySelector('#scan').dataset.state")
                 == "sweeping"
@@ -166,7 +166,7 @@ async def test_extract_content_sweeps_once_and_confirms_after_return(site, tmp_p
         assert returned["at"] - samples[peak]["at"] >= 200
         assert positions[-1] == 160
         assert await evaluate(tab, "Boolean(document.querySelector('#lazy'))")
-        extraction = session.scope[BrowserPerception].extracted_content
+        extraction = session.scope[PageExtractionTools].extracted_content
         assert "Original text" in extraction.markdown
         assert "LAZY_CONTENT_AFTER_EXTRACTION" not in extraction.markdown
         assert not any(isinstance(event, ReadingSweepEvent) for event in result.events)

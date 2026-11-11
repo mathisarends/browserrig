@@ -40,7 +40,9 @@ from browserrig import (
     ReadinessOptions,
     ReadinessStrategy,
     Screenshots,
+    ScreenshotTools,
     ScreenshotTrigger,
+    TextContext,
     TrimInBatches,
     UntilCompaction,
     browser_plugins,
@@ -57,10 +59,10 @@ from browserrig.core import (
 from browserrig.events import ObservationCapturedEvent, ReadinessStartedEvent
 from browserrig.files import Download
 from browserrig.nudges import Nudges
-from browserrig.observation import CaptureContent, Element, Snapshot
+from browserrig.observation import CaptureContent
 from browserrig.observation.delta import INTRO
 from browserrig.observation.extraction import Extraction
-from browserrig.tools import Actions, FileTools
+from browserrig.tools import Actions, BrowserFileTools, FileTools
 from browserrig.tools.mouse import _image_point
 from tests.fakes import FakeChrome
 from tests.observations import has_image, image_id
@@ -146,6 +148,8 @@ def _agent(
                 renderer=renderer or CustomRenderer(),
                 screenshots=Screenshots(trigger=trigger),
             ),
+            TextContext(),
+            ScreenshotTools(),
             ImageContext(
                 retention or TrimInBatches(max_images=2, min_images=2),
                 skip_unchanged=skip_unchanged,
@@ -570,7 +574,7 @@ async def test_file_state_is_resent_only_after_a_change():
         id="d1", filename="report.pdf", url="https://example.org/report.pdf"
     )
     agent, model, _capture, holder = _agent(
-        [*_steps(3), "Done"], after=(Actions(), FileTools())
+        [*_steps(3), "Done"], after=(Actions(), BrowserFileTools())
     )
     async with agent.session() as session:
         browser = _browser_ready(holder)
@@ -595,7 +599,7 @@ async def test_file_state_is_resent_when_compaction_removed_the_last_copy():
         keep_last_steps=1,
     )
     agent, model, _capture, holder = _agent(
-        [*_steps(4), "Done"], extra=(compaction,), after=(Actions(), FileTools())
+        [*_steps(4), "Done"], extra=(compaction,), after=(Actions(), BrowserFileTools())
     )
     async with agent.session() as session:
         _browser_ready(holder)
@@ -959,32 +963,3 @@ async def test_page_is_resent_with_a_screenshot_and_after_compaction():
             for request in model.requests
         ]
         assert visible[3] == 0 and visible[4] == 1
-
-
-def test_page_comparison_ignores_new_element_marks():
-    observe = BrowserPerception()
-    button = Element(
-        ref="e1", frame_id="f", backend_id=1, role="button", name="Go", tag="button"
-    )
-    snapshot = Snapshot(
-        id="obs-1",
-        tab_id="tab-1",
-        document_id="doc-1",
-        url="https://example.org/",
-        title="Example",
-        readiness="ready",
-        width=1280,
-        height=800,
-        scroll_y=0,
-        fingerprint="page",
-        elements=(button,),
-    )
-    marked = snapshot.model_copy(
-        update={"elements": (button.model_copy(update={"new": True}),)}
-    )
-    renamed = snapshot.model_copy(
-        update={"elements": (button.model_copy(update={"name": "Stop"}),)}
-    )
-    # pylint: disable=protected-access
-    assert observe._page_key(marked) == observe._page_key(snapshot)
-    assert observe._page_key(renamed) != observe._page_key(snapshot)

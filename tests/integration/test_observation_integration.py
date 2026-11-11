@@ -15,7 +15,6 @@ from PIL import Image
 from browserrig import (
     Agent,
     Browser,
-    BrowserPerception,
     Chrome,
     ChromeBrowser,
     DomCapture,
@@ -27,7 +26,7 @@ from browserrig import (
 from browserrig.browser import Launch
 from browserrig.core import Bounds, BrowserError, Geometry, Point, Region
 from browserrig.kinds import ElementOperation
-from browserrig.observation import capture, render
+from browserrig.observation import DomPerception, capture, render
 from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
 from tests.observations import has_image
@@ -217,7 +216,7 @@ async def test_model_cursor_marker_is_optional_after_movement_and_click(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site + "/canvas", viewport=Viewport(scale=2)),
         plugins=[
-            BrowserPerception(
+            DomPerception(
                 capture=DomCapture(cursor=show_cursor),
                 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             ),
@@ -382,7 +381,7 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
             assert image.size == (outside.width, outside.height)
 
 
-async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
+async def test_agent_clicks_canvas_through_region_screenshot(site):
     holder = {}
 
     class Access(Plugin, needs=(Browser,)):
@@ -401,9 +400,7 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
         if step == 0:
             assert any("x=100 y=150 400x200 center=300,250" in text for text in texts)
             region = {"x": 100, "y": 150, "width": 400, "height": 200}
-            yield ModelChunk(
-                tool_call=ToolCall("screenshot", {"region": region, "zoom": 2})
-            )
+            yield ModelChunk(tool_call=ToolCall("screenshot", {"region": region}))
         elif step == 1:
             captions.extend(
                 line
@@ -411,8 +408,8 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
                 for line in text.splitlines()
                 if line.startswith("Screenshot ")
             )
-            # Image pixel (100, 60) at 2x zoom is viewport (150, 180), canvas offset (50, 30).
-            yield ModelChunk(tool_call=ToolCall("click_at", {"x": 100, "y": 60}))
+            # Crop pixel (50, 30) is viewport (150, 180), canvas offset (50, 30).
+            yield ModelChunk(tool_call=ToolCall("click_at", {"x": 50, "y": 30}))
         else:
             yield ModelChunk(text="Done")
         step += 1
@@ -446,5 +443,5 @@ async def test_agent_clicks_canvas_through_zoomed_region_screenshot(site):
         "y": 150,
         "width": 400,
         "height": 200,
-        "scale": 2,
+        "scale": 1,
     }

@@ -13,7 +13,7 @@ from harnessed.testing import ScriptedModel, call
 
 from browserrig.core import BrowserError, ElementPoint
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent, ActionStartedEvent
-from browserrig.tools import Actions, PointerTools, TabTools
+from browserrig.tools import Actions, DomScrollTools, PointerTools, TabTools
 from tests.fakes import FakeServices
 
 
@@ -82,8 +82,8 @@ async def test_move_mouse_rejects_ambiguous_arguments_without_input(arguments):
 @pytest.mark.parametrize(
     "tool, arguments",
     [
-        (PointerTools.scroll_page, {}),
-        (PointerTools.scroll_element, {"ref": "button"}),
+        (DomScrollTools.scroll_page, {}),
+        (DomScrollTools.scroll_element, {"ref": "button"}),
     ],
 )
 async def test_scroll_tools_reject_zero_movement_before_input(tool, arguments):
@@ -212,6 +212,7 @@ async def _pointer_session(responses):
             FakeServices(),
             Actions(),
             _PointerTools(),
+            DomScrollTools(),
             TabTools(),
             Approvals(default=PolicyDecision.ALLOW),
         ],

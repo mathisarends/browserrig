@@ -20,10 +20,12 @@ from browserrig import (
     ElementInfo,
     PageContent,
     Readiness,
+    TextContext,
     wait_for_page,
 )
 from browserrig.browser import Launch
 from browserrig.core import Bounds, ElementPoint
+from browserrig.observation import DomRenderer
 from browserrig.tools import Actions, KeyboardTools, PointerTools
 from tests.javascript import evaluate
 
@@ -82,7 +84,8 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
         plugins=[
             Chrome(Launch(url=site)),
             Readiness(),
-            BrowserPerception(capture=_CanvasCapture()),
+            BrowserPerception(capture=_CanvasCapture(), renderer=DomRenderer()),
+            TextContext(),
             Actions(),
             PointerTools(),
             KeyboardTools(),

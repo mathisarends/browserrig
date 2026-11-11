@@ -16,7 +16,6 @@ from browserrig import (
     Agent,
     Browser,
     BrowserDownload,
-    BrowserPerception,
     Chrome,
     ChromeBrowser,
     Files,
@@ -34,7 +33,7 @@ from browserrig import (
 from browserrig.browser import DownloadState, Launch, screenshot
 from browserrig.core import BrowserError
 from browserrig.events import DownloadCompletedEvent, DownloadStartedEvent
-from browserrig.observation import DomCapture, DomReferences, capture
+from browserrig.observation import DomCapture, DomPerception, DomReferences, capture
 from tests.javascript import evaluate
 from tests.observations import all_states, has_image
 
@@ -501,9 +500,7 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
         browser=Chrome.launch(url=site + "/canvas"),
         plugins=[
             Files(LocalWorkspace(tmp_path)),
-            BrowserPerception(
-                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
-            ),
+            DomPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
             Readiness(options=ReadinessOptions(timeout=3)),
             Approvals(default=PolicyDecision.ALLOW),
         ],

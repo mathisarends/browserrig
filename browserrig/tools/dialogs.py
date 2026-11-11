@@ -11,9 +11,7 @@ class DialogTools(Plugin):
 
     @tool(
         kind=ActionKind.HANDLE_DIALOG,
-        description=(
-            "Accept or dismiss the active tab's JavaScript dialog, optionally answering a prompt."
-        ),
+        description="Accept or dismiss the active tab's JavaScript dialog.",
     )
     async def handle_dialog(self, accept: bool, prompt_text: str = "") -> str:
         tab = self._browser.active_tab

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Shorten agent-facing tool descriptions, move parameter details to their schema
+  and share file workflows through plugin instructions. Remove `zoom` from the
+  screenshot tool; cropped screenshots retain their coordinate mapping.
+
+- Separate observation, text/image context and tool capabilities for explicit
+  Harnessed compositions. Add DomPerception, TextContext, DomTypingTools,
+  DomScrollTools, DomUploadTools, ScreenshotTools and PageExtractionTools.
+  BrowserPerception now requires capture/renderer and exposes no tools; DOM tools
+  depend on the typed DomElements resolver. Actions defaults to observing after
+  input; legacy task defaults explicitly keep DOM chains and their existing tools.
+  Extraction presentation receives a typed redacted event instead of perception
+  state. See the composition guide for migration from direct plugin constructions.
+
 - Expose explicit radio values/IDs/groups, control title guidance, native option
   values and multi-select states. Add select_options to replace and verify an
   exact native multiple-selection set with whole-request validation.

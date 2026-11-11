@@ -70,8 +70,6 @@ def started(call: ToolCall, kind: ActionKind) -> WorkPresentedEvent:
             except ValidationError:
                 region = None
             detail = "Viewport" if region is None else "Selected viewport region"
-            if args.get("zoom", 1) != 1:
-                detail += f" · {args['zoom']}× zoom"
         case ActionKind.SELECT | ActionKind.SET_DATE:
             # The element highlight shows where; the caption names the value.
             detail = str(args.get("value", ""))

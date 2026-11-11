@@ -54,15 +54,19 @@ class NavigationTools(Plugin):
 
     @tool(
         kind=ActionKind.NAVIGATE,
-        description=(
-            "Navigate to an HTTP(S) URL in the active tab, or in a new tab with new_tab=true. "
-            "A path starting with / opens on the active page's site."
-        ),
+        description="Navigate to a known destination.",
     )
     async def navigate(
         self,
-        url: str,
-        new_tab: bool = False,
+        url: Annotated[
+            str,
+            Field(
+                description="HTTP(S) URL, or a path starting with / on the current site."
+            ),
+        ],
+        new_tab: Annotated[
+            bool, Field(description="Open and activate a new tab instead.")
+        ] = False,
     ) -> Effect:
         url = site_url(url, self._browser.active_tab.url)
         return await self._navigate(url, typed=typed_address(url), new_tab=new_tab)
@@ -90,10 +94,7 @@ class NavigationTools(Plugin):
 
     @tool(
         kind=ActionKind.GO_FORWARD,
-        description=(
-            "Go to the next browser history entry. Reports an error if forward navigation "
-            "is unavailable."
-        ),
+        description="Go to the next browser history entry.",
     )
     async def go_forward(self) -> Effect:
         tab = self._actions.tab
@@ -111,9 +112,7 @@ class NavigationTools(Plugin):
     @tool(
         kind=ActionKind.WAIT,
         readonly=True,
-        description=(
-            "Wait briefly for an expected asynchronous page update; the next observation shows it."
-        ),
+        description="Wait briefly for an expected asynchronous page update.",
     )
     async def wait(
         self,

@@ -159,22 +159,28 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
                     });""",
             )
 
-    # Exercise both a zoomed crop and viewport coordinates.
+    # Exercise both a crop and viewport coordinates.
     requests = (
         []
         if coordinates
         else [
             (
                 "screenshot",
-                {"region": {"x": 20, "y": 80, "width": 500, "height": 240}, "zoom": 2},
+                {"region": {"x": 20, "y": 80, "width": 500, "height": 240}},
             )
         ]
     )
     requests.extend(
         [
-            ("move_mouse", {"x": 70 if coordinates else 100, "y": 160}),
+            (
+                "move_mouse",
+                {"x": 70 if coordinates else 50, "y": 160 if coordinates else 80},
+            ),
             ("scroll_element", {"ref_name": "First panel", "delta_y": 300}),
-            ("move_mouse", {"x": 370 if coordinates else 700, "y": 160}),
+            (
+                "move_mouse",
+                {"x": 370 if coordinates else 350, "y": 160 if coordinates else 80},
+            ),
             ("scroll_element", {"ref_name": "Second panel", "delta_y": 180}),
         ]
     )

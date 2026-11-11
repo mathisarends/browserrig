@@ -19,7 +19,7 @@ from browserrig.observation import BrowserPerception
 from browserrig.readiness import Readiness
 from browserrig.tools.chains import (
     ActionChainPolicy,
-    DomActionChains,
+    ObserveAfterInput,
     probe_change,
     stop_on_failure,
 )
@@ -29,19 +29,6 @@ from browserrig.tools.targeting import Targeting
 
 from .invocation import ToolExecution
 from .transaction import ActionRunner
-
-_INSTRUCTIONS = Instructions(
-    title="Browser action chains",
-    text=(
-        "Send several ordered tool calls in one response when no intermediate observation "
-        "is needed, such as independent form fields with known refs and values; put "
-        "submission last. Navigation, tab changes, scrolling, drags, coordinates, JavaScript, "
-        "uploads, dialogs, waiting and screenshots end the remaining chain; send coordinate "
-        "actions alone. A navigation, new menu, suggestions, modal, alert or input failure "
-        "interrupts the remaining actions; skipped calls were not executed. Inspect the next "
-        "observation before continuing."
-    ),
-)
 
 
 @dataclass
@@ -66,7 +53,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     def __init__(self, *, chain_policy: ActionChainPolicy | None = None) -> None:
         super().__init__()
         self.chain_policy = (
-            chain_policy if chain_policy is not None else DomActionChains()
+            chain_policy if chain_policy is not None else ObserveAfterInput()
         )
 
     async def setup(self, scope: PluginScope) -> None:
@@ -83,7 +70,11 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         self._mount.invocation = ToolExecution(self._runner, self._coordination)
 
     def instructions(self) -> SystemPrompt:
-        return SystemPrompt(_INSTRUCTIONS)
+        return SystemPrompt(
+            Instructions(
+                title="Browser action chains", text=self.chain_policy.instructions()
+            )
+        )
 
     @traced
     async def run(

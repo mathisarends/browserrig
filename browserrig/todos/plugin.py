@@ -24,7 +24,9 @@ _INSTRUCTIONS = Instructions(
         "Use update_todos to plan multi-step work; skip it for simple tasks. Keep at "
         "most one step in_progress and update the list when a step starts, finishes or "
         "the plan changes. Todos track steps only; keep findings in your messages or "
-        "files. Use read_todos to recall the saved plan when needed."
+        "files. Keep IDs stable within a task and use a new task label for a new assignment. "
+        "Todo status is agent-reported progress, not verified success. "
+        "Use read_todos to recall the saved plan when needed."
     ),
 )
 
@@ -86,7 +88,7 @@ class Todos(Plugin, provides=True):
         )
 
     @tool(
-        description="Read the current task's saved todo list. Completion is agent-reported.",
+        description="Read the current task's saved todo list.",
         readonly=True,
     )
     async def read_todos(self) -> str:
@@ -94,18 +96,19 @@ class Todos(Plugin, provides=True):
         return current.render() if current is not None else "No todo list saved."
 
     @tool(
-        description=(
-            "Replace the current task's entire todo list. Include every step to keep; "
-            "omitted steps are removed. Keep IDs stable when updating the same task. "
-            "Use a new task label for a new assignment; todos=[] clears the steps. "
-            "This records your progress, not verified success."
-        ),
+        description="Replace the current task's entire todo list.",
         readonly=True,
     )
     async def update_todos(
         self,
         task: Annotated[str, Field(min_length=1, max_length=240, pattern=r"\S")],
-        todos: Annotated[list[Todo], Field(max_length=20)],
+        todos: Annotated[
+            list[Todo],
+            Field(
+                max_length=20,
+                description="All steps to retain; an empty list clears the plan.",
+            ),
+        ],
     ) -> str:
         try:
             updated = TodoList(task=task, todos=tuple(todos))

@@ -66,7 +66,7 @@ above allows actions automatically. The constructor does not open Chrome or file
 `Agent` and `browser_plugins()` share one rule:
 
 - A plugin that fills the same slot as a default
-  replaces it in place, such as `BrowserPerception(...)`, `Readiness(...)`, `ImageContext(...)`
+  replaces it in place, such as `DomPerception(...)`, `Readiness(...)`, `ImageContext(...)`
   or `ContextCompaction(...)`. Two plugins for the same default raise `PluginConflict`.
 - Any other plugin is added after the defaults.
 - `without=(...)` drops defaults by type; a type that is not a default raises
@@ -78,7 +78,7 @@ from browserrig import (
     Agent,
     InputVisualization,
     FileTools,
-    BrowserPerception,
+    DomPerception,
     InputPacing,
     Screenshots,
     ScreenshotTrigger,
@@ -87,7 +87,7 @@ from browserrig import (
 agent = Agent(
     model=model,
     plugins=[
-        BrowserPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+        DomPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
         handoff if interactive else None,
     ],
     without=(InputPacing, InputVisualization, FileTools),
@@ -136,7 +136,7 @@ replacements and removals; passing the original pack to `Agent` preserves those
 scopes in the agent's own description.
 
 See [composing browser agents](browser-composition.md) for the explicit plugin API:
-`Readiness(initial=..., ongoing=...)`, `BrowserPerception(capture=..., renderer=...,
+`Readiness(initial=..., ongoing=...)`, `DomPerception(capture=..., renderer=...,
 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP))` and
 `ImageContext(TrimInBatches(max_images=6, min_images=3))` or
 `ImageContext(UntilCompaction())`. Capture, rendering, image retention and
@@ -412,7 +412,7 @@ plugin blocks. `None` content parts and plugin entries are skipped. The outer
 document's format controls all nested content.
 For manual compositions, configure `BrowserPerception` independently of `Readiness` and add
 `ImageContext()` to deliver captured images. Configure DOM observation settings
-through `BrowserPerception(capture=DomCapture(...))`; readiness is configured separately.
+through `DomPerception(capture=DomCapture(...))`; readiness is configured separately.
 Use `await session.prompt.render()` to inspect the exact session system text.
 
 Plugins mounted through `session.use()` require an explicit choice when they declare

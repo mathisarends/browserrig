@@ -15,6 +15,7 @@ from harnessed.models import (
 
 from browserrig.events import ObservationCapturedEvent
 
+from .hooks import ProjectObservation
 from .models import CapturedImage
 from .plugin import BrowserPerception
 from .state import ImageState
@@ -123,7 +124,15 @@ class ImageContext(Plugin, slot="browserrig.images"):
     ) -> StepDecision:
         # Wrap capture regardless of plugin order; session.observe replaces its pending source.
         decision = await next_()
-        snapshot = self._observe.snapshot
+        self._note(event)
+        return decision
+
+    @hook(ProjectObservation)
+    async def _project(
+        self, event: ProjectObservation, next_: Next[UserMessage | None]
+    ) -> UserMessage | None:
+        message = await next_()
+        snapshot = event.snapshot
         image = next(
             (
                 image
@@ -134,20 +143,15 @@ class ImageContext(Plugin, slot="browserrig.images"):
         )
         if image is not None and snapshot is not None:
             observation = self._observe.project(snapshot)
-            event.session.observe(
-                replace(
-                    observation,
-                    content=(
-                        TextPart(observation.text),
-                        TextPart(_caption(image)),
-                        ImagePart(f"data:image/png;base64,{image.image}"),
-                    ),
+            return replace(
+                observation,
+                content=(
+                    TextPart(observation.text),
+                    TextPart(_caption(image)),
+                    ImagePart(f"data:image/png;base64,{image.image}"),
                 ),
-                source="browser",
-                refs=(snapshot.id,),
             )
-        self._note(event)
-        return decision
+        return message
 
     @hook(PrepareRequest)
     async def _prepare(

@@ -43,6 +43,8 @@ from .observation import (
     CaptureStrategy,
     DomCapture,
     DomElementHandle,
+    DomElements,
+    DomPerception,
     DomReferences,
     DomRenderer,
     ElementHandle,
@@ -57,6 +59,7 @@ from .observation import (
     ScreenshotTrigger,
     ScrollableElement,
     ScrollStep,
+    TextContext,
     TrimInBatches,
     UntilCompaction,
 )
@@ -84,6 +87,9 @@ from .tools import (
     BrowserFileTools,
     DialogTools,
     DomActionChains,
+    DomScrollTools,
+    DomTypingTools,
+    DomUploadTools,
     FileTools,
     FindTools,
     FormTools,
@@ -91,7 +97,9 @@ from .tools import (
     KeyboardTools,
     NavigationTools,
     ObserveAfterInput,
+    PageExtractionTools,
     PointerTools,
+    ScreenshotTools,
     TabTools,
     WorkspaceTools,
 )
@@ -99,6 +107,14 @@ from .tools import (
 __version__ = "0.2.0"
 
 __all__ = [
+    "DomUploadTools",
+    "DomPerception",
+    "DomElements",
+    "TextContext",
+    "DomTypingTools",
+    "DomScrollTools",
+    "PageExtractionTools",
+    "ScreenshotTools",
     "MemoryAction",
     "TaskMemory",
     "TaskMemoryEvent",

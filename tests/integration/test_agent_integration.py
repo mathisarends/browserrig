@@ -13,7 +13,6 @@ from harnessed.testing import CallbackModel, ScriptedModel, call
 
 from browserrig import (
     Browser,
-    BrowserPerception,
     Chrome,
     ImageContext,
     Readiness,
@@ -29,6 +28,7 @@ from browserrig.events import (
     NudgeQueuedEvent,
     ObservationCapturedEvent,
 )
+from browserrig.observation import DomPerception
 from tests.observations import all_states, has_image, latest
 
 pytestmark = pytest.mark.integration
@@ -87,7 +87,7 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
         states = all_states(request.messages)
         assert states
         assert all(len(state.get("text", "").strip()) <= 3000 for state in states)
-        assert "Email" in states[0]["text"]
+        assert any(element["name"] == "Email" for element in states[0]["elements"])
         assert all("never-echo-this" not in state.get("text", "") for state in states)
         images = [message for message in request.messages if has_image(message)]
         assert len(images) == (1 if index >= 1 else 0)
@@ -105,7 +105,8 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
         replies[1].text
         == "Wait completed; the next observation shows the current state."
     )
-    assert isinstance(replies[2].content, str) and "# Test form" in replies[2].text
+    assert replies[2].text.startswith("Saved: pages/")
+    assert "\nTitle: Test form" in replies[2].text
 
 
 async def test_model_tools_yaml_and_activity(site):
@@ -205,9 +206,7 @@ async def test_dom_screenshots_are_native_images(site):
             Chrome(),
             Start(),
             Readiness(),
-            BrowserPerception(
-                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
-            ),
+            DomPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
             ImageContext(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
