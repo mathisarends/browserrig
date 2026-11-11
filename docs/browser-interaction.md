@@ -251,8 +251,8 @@ the find highlights themselves. Hidden text and form field values are not search
 
 ## Double-clicks and dragging
 
-DOM interactions prepare the target's viewport automatically with native, eased
-wheel input, including horizontal scrolling, nested scroll containers, and parent
+DOM interactions prepare the target's viewport automatically by scrolling exact
+DOM containers, including horizontal scrolling, nested scroll containers, and parent
 frames. Comfortable targets stay in place. Near-edge and offscreen targets are
 positioned with a 12% comfort margin and a preferred vertical anchor around one
 third of the viewport; fitting form groups and labels are kept together. Fixed
@@ -383,7 +383,8 @@ bounded stroke (`CursorPath.curved`), aim at the middle of a target and click
 without holding the button. A custom motor's aim is a pair of fractions of the
 target's visible box; if something covers that spot, the hit test falls back to the
 target's other visible points. Within one action, a target keeps its aim, so the
-re-check after hover lands on the same spot. Scrolling looks like Chrome's
+re-check after hover lands on the same spot. Application-level native wheel
+input looks like Chrome's
 `scroll-behavior: smooth` but uses real wheel input: one trusted CDP wheel event
 per frame along Chrome's smooth scroll curve (`cubic-bezier(0.4, 0, 0, 1)`),
 lasting about one 60 Hz frame per square root of the distance (150 ms to 1.5 s).
@@ -549,3 +550,34 @@ stale/detached targets keep their original error when facts cannot be collected.
 Root overflow is clipped to the viewport during hit testing, rather than to the
 HTML element layout box. This keeps fixed-body applications actionable when the
 HTML layout height is zero, while native hit tests still reject actual overlays.
+
+
+### Automatic DOM reveal and scroll feedback
+
+Before ref-based input, the default DOM backend scrolls the exact containers
+needed to reveal the target, including embedding documents and nested containers.
+This avoids sending a wheel through an unrelated editor that can intercept it.
+CSS overflow locks and fixed/sticky ancestors are respected. Target hit testing
+and the existing hover checks still run before primary input.
+
+Each actual movement is reported in the tool receipt, for example:
+
+```text
+Auto-scrolled page to reveal [775] (y: 0 → 343).
+```
+
+Only changed axes are shown; horizontal movement uses x, and diagonal movement
+shows both x and y. Positions are container-local CSS pixels. Frame IDs and
+unchanged coordinates are omitted from the agent receipt. Feedback is
+limited to eight steps and an omitted-step count. It also accompanies failures
+after scrolling, so an input failure does not hide a changed viewport.
+No movement produces no positive scroll receipt. Automatic reveal remains bounded
+to 32 steps and 20 seconds.
+
+For direct Python integrations, `await handle.reveal_step()` applies one DOM scroll
+and returns `RevealStep(frame_id, container, before, after)`, or `None` when no
+further scroll is planned. `RevealStep.changed` reflects measured movement.
+`await handle.scroll_step()` remains a read-only wheel planner. Custom
+`ScrollableElement` backends retain the existing Mouse/Motor wheel path.
+Programmatic DOM scrolling does not emit synthetic native wheel events.
+Agent tool signatures are unchanged.

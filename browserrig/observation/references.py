@@ -40,6 +40,20 @@ class ScrollStep:
     key: str
 
 
+@dataclass(frozen=True, slots=True)
+class RevealStep:
+    """One applied DOM reveal step, measured in container-local CSS pixels."""
+
+    frame_id: str
+    container: str
+    before: Point
+    after: Point
+
+    @property
+    def changed(self) -> bool:
+        return self.before != self.after
+
+
 @runtime_checkable
 class ScrollableElement(Protocol):
     """Optional wheel planning; input remains with Mouse and its Motor."""

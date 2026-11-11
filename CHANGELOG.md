@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Reveal DOM input targets by scrolling their exact containers, avoiding unrelated
+  editor wheel interception. Report bounded, measured auto-scroll positions in
+  success and failure receipts. Keep custom backend wheel planning unchanged.
+
 - Fix false hit-test clipping for fixed-body pages with a zero-height HTML root.
   Report bounded hit-test layout diagnostics without page text or field values.
   Remind agents to verify intended effects in the next observation; tool

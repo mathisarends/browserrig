@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 
 from harnessed.tracing import traced
 
@@ -37,9 +38,16 @@ async def scroll_element(
 
 @traced
 async def prepare_element(
-    tab: Tab, handle: ElementHandle, mouse: Mouse, *, document_id: str
+    tab: Tab,
+    handle: ElementHandle,
+    mouse: Mouse,
+    *,
+    document_id: str,
+    report: Callable[[str], None] | None = None,
 ) -> bool:
-    """Execute a backend's wheel plan through normal mouse input, when supported."""
+    """Reveal DOM targets directly; preserve custom backends' wheel input protocol."""
+    if isinstance(handle, DomElementHandle):
+        return await _reveal_dom(tab, handle, report=report)
     if not isinstance(handle, ScrollableElement):
         return False
     scrolled = False
@@ -66,6 +74,42 @@ async def prepare_element(
             await asyncio.sleep(0.05)
     raise BrowserError(
         "Element could not be brought into view using wheel input; try another way to reach it"
+    )
+
+
+async def _reveal_dom(
+    tab: Tab, handle: DomElementHandle, *, report: Callable[[str], None] | None
+) -> bool:
+    scrolled = False
+    stalled = 0
+    async with asyncio.timeout(20):
+        for _ in range(32):
+            step = await handle.reveal_step()
+            if step is None:
+                return scrolled
+            if step.changed:
+                scrolled = True
+                stalled = 0
+                tab.layout_changed()
+                if report is not None:
+                    positions = ", ".join(
+                        f"{axis}: {getattr(step.before, axis):g} → "
+                        f"{getattr(step.after, axis):g}"
+                        for axis in ("x", "y")
+                        if getattr(step.before, axis) != getattr(step.after, axis)
+                    )
+                    report(
+                        f"Auto-scrolled {step.container} to reveal "
+                        f"[{handle.element.ref}] ({positions})."
+                    )
+            else:
+                stalled += 1
+                if stalled >= 2:
+                    break
+            await asyncio.sleep(0.05)
+    raise BrowserError(
+        "Automatic reveal stalled or exceeded its step limit; inspect the current "
+        "page and scroll the relevant container explicitly."
     )
 
 
