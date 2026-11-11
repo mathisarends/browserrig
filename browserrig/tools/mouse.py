@@ -22,30 +22,22 @@ from .execution import Actions
 
 type _ClickCount = Annotated[
     Literal[1, 2],
-    Field(description="2 = native double click (open, edit, select word)"),
+    Field(description="Use 2 for a native double click."),
 ]
-type _ClickButton = Annotated[
-    Literal["left", "right"], Field(description="Mouse button to press.")
-]
+type _ClickButton = Literal["left", "right"]
 type _NewTab = Annotated[
     bool,
-    Field(
-        description=(
-            "Ctrl+click (Cmd on macOS) to open a link in a new tab and switch to it, "
-            "keeping the current page open."
-        )
-    ),
+    Field(description="Open the link in a new tab and activate it."),
 ]
 
 
 _INSTRUCTIONS = Instructions(
     title="Screenshot coordinates",
     text=(
-        "Coordinates are pixels from the top-left of the newest screenshot still in context, "
-        "including its crop and zoom; region and canvas images map back to the viewport "
-        "automatically. Without a screenshot in context, coordinates are viewport CSS pixels, "
-        "like cursor and canvas positions. A red marker shows the pointer at capture time. "
-        "After a tab or document change, take a fresh screenshot before pointing."
+        "Point in pixels from the top-left of the newest screenshot still in context; "
+        "crop and scale map back to the viewport. Without an image, use viewport CSS pixels. "
+        "After a tab or document change, request a fresh screenshot before pointing. "
+        "Clicks that open a new tab activate it."
     ),
 )
 
@@ -65,10 +57,7 @@ class PointerTools(Plugin):
 
     @tool(
         kind=ActionKind.MOVE_MOUSE,
-        description=(
-            "Move the cursor without clicking, to hover menus or tooltips. "
-            "Give an observed ref, or x and y in image or viewport coordinates."
-        ),
+        description="Hover without clicking; address a ref or both coordinates.",
     )
     async def move_mouse(
         self,
@@ -95,11 +84,7 @@ class PointerTools(Plugin):
 
     @tool(
         kind=ActionKind.CLICK_AT,
-        description=(
-            "Automatically move the cursor to image or viewport coordinates and click there; "
-            "count=2 performs a native double click; button=right performs a right click. "
-            "A click that opens a new tab switches to it."
-        ),
+        description="Click at screenshot or viewport coordinates.",
     )
     async def click_at(
         self,
@@ -133,7 +118,9 @@ class PointerTools(Plugin):
         self,
         start: Point,
         end: Point,
-        duration: Annotated[float, Field(ge=0.05, le=5)] = 0.5,
+        duration: Annotated[
+            float, Field(ge=0.05, le=5, description="Drag duration in seconds.")
+        ] = 0.5,
     ) -> Effect:
         await self._browser.input.mouse.drag(
             start=_image_point(self._observe.coordinate_source(), start),
@@ -145,12 +132,7 @@ class PointerTools(Plugin):
     @tool(
         kind=ActionKind.CLICK,
         chainable=True,
-        description=(
-            "Automatically move the cursor to a current observed ref and click it; "
-            "count=2 performs a native double click; "
-            "button=right performs a right click. "
-            "A click that opens a new tab switches to it."
-        ),
+        description="Click an observed ref, revealing it first when needed.",
     )
     async def click(
         self,
@@ -197,7 +179,9 @@ class PointerTools(Plugin):
         self,
         source_ref: str,
         target_ref: str,
-        duration: Annotated[float, Field(ge=0.05, le=5)] = 0.5,
+        duration: Annotated[
+            float, Field(ge=0.05, le=5, description="Drag duration in seconds.")
+        ] = 0.5,
     ) -> Effect:
         prepared = await self._actions.element_point(ref=source_ref)
         target = await self._actions.element_point(ref=target_ref)

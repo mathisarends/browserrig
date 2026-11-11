@@ -1,5 +1,8 @@
+from typing import Annotated
+
 from harnessed import Plugin, ToolError
 from harnessed.kernel import needs, observes
+from pydantic import Field
 
 from browserrig.browser import Browser
 from browserrig.core import ActionKind
@@ -21,18 +24,18 @@ class KeyboardTools(Plugin):
     @tool(
         kind=ActionKind.PRESS,
         chainable=True,
-        description=(
-            "Send keyboard input to the current page focus. Provide exactly one of "
-            "text for literal text, or key for one character or a named key such as "
-            "Escape, Enter or Tab. Use hold_control, hold_shift, hold_alt and hold_meta "
-            "for shortcuts, e.g. key='a', hold_control=true selects all."
-        ),
+        description="Send text or a key to the current focus; choose exactly one.",
     )
     async def send_keys(
         self,
         *,
         text: str | None = None,
-        key: str | None = None,
+        key: Annotated[
+            str | None,
+            Field(
+                description="Character or named key, e.g. Enter or Tab. Modifiers apply only here."
+            ),
+        ] = None,
         hold_control: bool = False,
         hold_shift: bool = False,
         hold_alt: bool = False,

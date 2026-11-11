@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Shorten agent-facing tool descriptions, move parameter details to their schema
+  and share file workflows through plugin instructions. Remove `zoom` from the
+  screenshot tool; cropped screenshots retain their coordinate mapping.
+
 - Separate observation, text/image context and tool capabilities for explicit
   Harnessed compositions. Add DomPerception, TextContext, DomTypingTools,
   DomScrollTools, DomUploadTools, ScreenshotTools and PageExtractionTools.

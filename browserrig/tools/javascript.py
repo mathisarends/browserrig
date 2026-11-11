@@ -17,18 +17,20 @@ class JavaScriptTools(Plugin):
     @tool(
         kind=ActionKind.JAVASCRIPT,
         description=(
-            "Execute JavaScript in the active tab's main page context via Runtime.evaluate. "
-            "Supports top-level await and retains variables until navigation. Use await for "
-            "Promise results. Returns the last "
-            "expression's value as JSON, or a JavaScript value such as undefined or NaN. "
-            "Return serializable data when inspecting objects. Errors are reported in the tool "
-            "result. timeout is in seconds."
+            "Run JavaScript in the active page; variables persist until navigation."
         ),
     )
     async def execute_javascript(
         self,
-        code: str,
-        timeout: Annotated[float, Field(gt=0, le=30)] = 10,
+        code: Annotated[
+            str,
+            Field(
+                description="Supports top-level await; await promises and return serializable data."
+            ),
+        ],
+        timeout: Annotated[
+            float, Field(gt=0, le=30, description="Execution timeout in seconds.")
+        ] = 10,
     ) -> Effect:
         result = await self._actions.tab.evaluate(code, timeout=timeout)
         return Effect(f"JavaScript result:\n{result}")

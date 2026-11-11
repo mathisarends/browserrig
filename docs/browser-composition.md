@@ -52,7 +52,7 @@ and date fields. These DOM tools require `DomElements`, supplied by `DomPercepti
 
 Automatic image capture is configured on perception; `ImageContext` delivers
 images, skips unchanged captures and controls retention. `ScreenshotTools`
-independently exposes the model's screenshot/crop/zoom request tool. Requests are
+independently exposes the model's screenshot/crop request tool. Requests are
 fulfilled at the next observation boundary with matching references and geometry.
 `TextContext(mode="delta")` deduplicates text and uses deltas while the full base
 remains in model context; `mode="full"` publishes each full observation. Image

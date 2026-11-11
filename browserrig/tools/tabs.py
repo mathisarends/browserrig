@@ -26,7 +26,7 @@ class TabTools(Plugin, needs=(Actions,)):
 
     @tool(
         kind=ActionKind.OPEN_TAB,
-        description="Open and activate a new tab; without a URL it starts on DuckDuckGo.",
+        description="Open and activate a new tab.",
     )
     async def open_tab(
         self,
@@ -38,7 +38,7 @@ class TabTools(Plugin, needs=(Actions,)):
 
     @tool(
         kind=ActionKind.SWITCH_TAB,
-        description="Activate one listed tab by its stable target ID.",
+        description="Activate a listed tab.",
     )
     async def switch_tab(
         self,

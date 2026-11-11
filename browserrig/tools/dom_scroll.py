@@ -13,7 +13,14 @@ from browserrig.scripts import TARGET_SCROLL, TargetScrollArgs, TargetScrollResu
 from .effects import Effect
 from .execution import Actions
 
-type _ScrollDelta = Annotated[float, Field(ge=-10000, le=10000)]
+type _VerticalScroll = Annotated[
+    float,
+    Field(ge=-10000, le=10000, description="CSS pixels down; negative scrolls up."),
+]
+type _HorizontalScroll = Annotated[
+    float,
+    Field(ge=-10000, le=10000, description="CSS pixels right; negative scrolls left."),
+]
 
 
 class DomScrollTools(Plugin):
@@ -24,17 +31,12 @@ class DomScrollTools(Plugin):
 
     @tool(
         kind=ActionKind.SCROLL_PAGE,
-        description=(
-            "Scroll only the outer page, independently of the cursor and nested panels. "
-            "delta_y is CSS pixels down (negative up); delta_x is right (negative left). "
-            "Reports actual movement or the page boundary/scroll lock. "
-            "Use scroll_element to move an inner list, panel or carousel."
-        ),
+        description="Scroll the outer document without moving nested panels.",
     )
     async def scroll_page(
         self,
-        delta_y: _ScrollDelta = 0,
-        delta_x: _ScrollDelta = 0,
+        delta_y: _VerticalScroll = 0,
+        delta_x: _HorizontalScroll = 0,
     ) -> Effect:
         if delta_y == 0 and delta_x == 0:
             raise ToolError("Provide a non-zero delta_y or delta_x")
@@ -43,18 +45,16 @@ class DomScrollTools(Plugin):
     @tool(
         kind=ActionKind.SCROLL_ELEMENT,
         description=(
-            "Scroll only the observed container ref marked scroll(...), independently "
-            "of the cursor. delta_y is CSS pixels down (negative up); delta_x is right "
-            "(negative left). Stops at its boundary without scrolling ancestors or the page. "
-            "Reports actual movement; a ref for a non-scrollable element is rejected. "
-            "Use scroll_page for the outer document."
+            "Scroll a DOM container without moving its ancestors or the page."
         ),
     )
     async def scroll_element(
         self,
-        ref: str,
-        delta_y: _ScrollDelta = 0,
-        delta_x: _ScrollDelta = 0,
+        ref: Annotated[
+            str, Field(description="Scrollable container ref marked scroll(...).")
+        ],
+        delta_y: _VerticalScroll = 0,
+        delta_x: _HorizontalScroll = 0,
     ) -> Effect:
         if delta_y == 0 and delta_x == 0:
             raise ToolError("Provide a non-zero delta_y or delta_x")

@@ -17,14 +17,7 @@ class ScreenshotTools(Plugin):
     @tool(
         kind=ActionKind.SCREENSHOT,
         readonly=True,
-        description=(
-            "Request a screenshot of the active tab for visual inspection in your next iteration. "
-            "The next observation includes an image and matching page state. "
-            "Region limits the image to a viewport area in CSS pixels, such as a "
-            "listed canvas, and zoom magnifies it to read small details; "
-            "move_mouse, click_at and drag_at then take pixels of that image. "
-            "This does not enable automatic screenshots for later iterations."
-        ),
+        description="Include one screenshot in the next observation.",
     )
     async def screenshot(
         self,
@@ -34,11 +27,8 @@ class ScreenshotTools(Plugin):
                 description="Viewport area in CSS pixels; omit for the full viewport."
             ),
         ] = None,
-        zoom: Annotated[
-            float, Field(ge=1, le=4, description="Magnification of the region image.")
-        ] = 1,
     ) -> ToolResult:
-        self._observe.request_screenshot(region=region, zoom=zoom)
+        self._observe.request_screenshot(region=region)
         target = "requested region" if region is not None else "current viewport"
         return ToolResult(
             f"Screenshot requested. Your next observation will show the {target}."

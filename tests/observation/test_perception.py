@@ -1,5 +1,5 @@
 import pytest
-from harnessed import Agent
+from harnessed import Agent, ToolCall
 from harnessed.errors import PluginDependencyError
 from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel
@@ -53,6 +53,10 @@ async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
     agent = Agent(model=model, plugins=plugins)
     async with agent.session() as session:
         names = {tool.name for tool in session.scope[ToolRegistry].definitions}
+        if isinstance(extension, ScreenshotTools):
+            info = session.scope[ToolRegistry].plan(ToolCall("screenshot", {})).tool
+            assert set(info.definition.parameters["properties"]) == {"region"}
+            assert not info.definition.parameters.get("required")
         assert (
             names
             == {"send_keys", "click", "click_at", "move_mouse", "drag", "drag_at"}

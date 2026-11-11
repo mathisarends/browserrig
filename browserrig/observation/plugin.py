@@ -198,14 +198,12 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         """Invalidation generation for independently mounted context plugins."""
         return self._state.generation
 
-    def request_screenshot(self, region: Region | None = None, zoom: float = 1) -> None:
+    def request_screenshot(self, region: Region | None = None) -> None:
         """Schedule an image at the next coherent observation boundary."""
         if self._browser.active_tab.dialog:
             raise ToolError(
                 "Screenshot unavailable; handle the open dialog before requesting an image"
             )
-        if region is None and zoom != 1:
-            raise ToolError("zoom needs a region; pass the viewport area to magnify")
         if region is not None:
             snapshot = self.snapshot
             if (
@@ -219,7 +217,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 )
         # Capture at the next step boundary so image marks and actionable refs stay in sync.
         self._state.screenshot_requested = True
-        self._state.screenshot_region, self._state.screenshot_zoom = region, zoom
+        self._state.screenshot_region = region
 
     def project(self, snapshot: Snapshot) -> UserMessage:
         """Build the redacted text snapshot shared by text and image delivery."""
@@ -278,10 +276,9 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 phase=ReadinessPhase.OBSERVATION,
                 screenshots=True if state.screenshot_requested else None,
                 region=state.screenshot_region,
-                zoom=state.screenshot_zoom,
             )
         state.screenshot_requested = False
-        state.screenshot_region, state.screenshot_zoom = None, 1
+        state.screenshot_region = None
         await self._track_viewport(snapshot, nudges)
         observations = []
         context = state.context

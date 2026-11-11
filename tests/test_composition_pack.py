@@ -207,8 +207,8 @@ async def test_pack_prompt_follows_removals_and_replacements():
     assert "The file system observation identifies" not in rendered
     assert "Form filling" not in rendered
     assert (
-        rendered.index("Screenshots belong to")
-        < rendered.index("Coordinates are pixels")
+        rendered.index("Browser image history")
+        < rendered.index("Screenshot coordinates")
         < rendered.index("Browser action chains")
     )
 

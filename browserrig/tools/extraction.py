@@ -1,7 +1,9 @@
 from dataclasses import dataclass
+from typing import Annotated
 
 from harnessed import Plugin, PluginState, ToolError, ToolResult
 from harnessed.kernel import Event, PluginScope, needs, observes
+from pydantic import Field
 
 from browserrig.browser import Browser
 from browserrig.core import ActionKind, BrowserCoordination, ReadinessStatus
@@ -49,15 +51,16 @@ class PageExtractionTools(Plugin, provides=True):
         readonly=True,
         chainable=True,
         description=(
-            "Save the active page's loaded content as a Markdown snapshot in the workspace. "
-            "Returns only Saved, Source, Title and reported extraction limitations, not page text. "
-            "Use grep to find text in the saved path and read_file for bounded excerpts. "
-            "Includes loaded content below the viewport without navigating. "
-            "Uses the main region when available; full_page=true also includes site navigation. "
-            "Each call saves a new snapshot. Requires a workspace."
+            "Save loaded page content to a new workspace Markdown file; return its path."
         ),
     )
-    async def extract_content(self, full_page: bool = False) -> ToolResult:
+    async def extract_content(
+        self,
+        full_page: Annotated[
+            bool,
+            Field(description="Also include site header, navigation and footer."),
+        ] = False,
+    ) -> ToolResult:
         files = self._workspace
         if files is None:
             raise ToolError(

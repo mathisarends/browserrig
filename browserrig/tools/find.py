@@ -14,7 +14,14 @@ from .effects import Effect
 from .execution import Actions
 from .intents import FindIntent
 
-type _Query = Annotated[str, Field(min_length=1, max_length=200)]
+type _Query = Annotated[
+    str,
+    Field(
+        min_length=1,
+        max_length=200,
+        description="Text to match, ignoring case and accents.",
+    ),
+]
 
 
 class FindTools(Plugin):
@@ -25,12 +32,8 @@ class FindTools(Plugin):
     @tool(
         kind=ActionKind.FIND_IN_PAGE,
         description=(
-            "Find text on the page like Ctrl+F, ignoring case and accents, across frames and "
-            "collapsed sections. Lists matches with their context and nearest heading, and "
-            "scrolls match number `match` into view, opening a collapsed section around it. "
-            "Use it to locate something on a long page without reading all of it. Give "
-            "alternatives such as synonyms, other spellings or languages to search them in the "
-            "same call; their matches are numbered together in page order."
+            "Find page text across frames and collapsed sections; reveal the selected "
+            "match."
         ),
     )
     async def find_in_page(
@@ -42,7 +45,7 @@ class FindTools(Plugin):
                 max_length=4, description="Other wordings searched together with query."
             ),
         ] = (),
-        match: Annotated[int, Field(ge=1)] = 1,
+        match: Annotated[int, Field(ge=1, description="1-based match to reveal.")] = 1,
         max_results: Annotated[int, Field(ge=1, le=50)] = 10,
     ) -> Effect:
         queries = tuple(

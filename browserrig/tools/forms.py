@@ -22,12 +22,12 @@ class FormTools(Plugin):
     @tool(
         kind=ActionKind.SELECT,
         chainable=True,
-        description="Select an exact option label or value in a native select element.",
+        description="Select an option in a native single-select.",
     )
     async def select_option(
         self,
         ref: str,
-        value: str,
+        value: Annotated[str, Field(description="Exact option label or value.")],
     ) -> Effect:
         tab = self._actions.tab
         await self._elements.resolve(tab, ref)
@@ -43,17 +43,18 @@ class FormTools(Plugin):
     @tool(
         kind=ActionKind.SELECT_OPTIONS,
         chainable=True,
-        description=(
-            "Replace the selected set of a native multiple select. Each value must "
-            "match one exact option label or value unambiguously. Empty values clears "
-            "the selection. Validates the whole set before mutation and verifies it "
-            "after input/change handlers. Use select_option for single selects."
-        ),
+        description="Replace and verify a native multi-select's selection.",
     )
     async def select_options(
         self,
         ref: str,
-        values: Annotated[list[str], Field(max_length=1000)],
+        values: Annotated[
+            list[str],
+            Field(
+                max_length=1000,
+                description="Exact option labels or values; an empty list clears the selection.",
+            ),
+        ],
     ) -> Effect:
         tab = self._actions.tab
         handle = await self._elements.resolve(tab, ref)
@@ -80,12 +81,14 @@ class FormTools(Plugin):
     @tool(
         kind=ActionKind.SET_DATE,
         chainable=True,
-        description="Set a native date/time input in its HTML format, such as YYYY-MM-DD.",
+        description="Set and verify a native date/time field.",
     )
     async def set_date(
         self,
         ref: str,
-        value: str,
+        value: Annotated[
+            str, Field(description="HTML input value, e.g. YYYY-MM-DD for a date.")
+        ],
     ) -> Effect:
         tab = self._actions.tab
         handle = await self._elements.resolve(tab, ref)

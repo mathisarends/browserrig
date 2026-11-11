@@ -15,7 +15,6 @@ class BrowserPerceptionState:
     delivered_image: CapturedImage | None = None
     screenshot_requested: bool = False
     screenshot_region: Region | None = None
-    screenshot_zoom: float = 1
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     context: PluginScope | None = None
     generation: int = 0

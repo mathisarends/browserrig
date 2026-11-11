@@ -1,7 +1,9 @@
 from functools import partial
+from typing import Annotated
 
 from harnessed import Plugin
 from harnessed.kernel import needs, observes
+from pydantic import Field
 
 from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind, BrowserError
@@ -25,13 +27,15 @@ class DomTypingTools(Plugin):
     @tool(
         kind=ActionKind.TYPE,
         chainable=True,
-        description="Type exact text into a DOM ref; clear replaces its value by default.",
+        description="Type into an observed DOM field and verify its value.",
     )
     async def type_text(
         self,
         ref: str,
         text: str,
-        clear: bool = True,
+        clear: Annotated[
+            bool, Field(description="Replace the current field value before typing.")
+        ] = True,
     ) -> Effect:
         tab = self._actions.tab
         await self._elements.resolve(tab, ref)
