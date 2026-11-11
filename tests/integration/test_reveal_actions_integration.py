@@ -190,7 +190,7 @@ async def test_element_actions_reveal_scroll_containers_and_project_the_cursor(
             for event in result.events
             if isinstance(event, ToolExecutionFinishedEvent)
         ]
-        assert any("Auto-reveal" in receipt.text for receipt in receipts)
+        assert any("Auto-scrolled" in receipt.text for receipt in receipts)
         assert receipts and all(not receipt.is_error for receipt in receipts), (
             [receipt.text for receipt in receipts],
             await evaluate(

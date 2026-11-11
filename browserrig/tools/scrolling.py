@@ -92,11 +92,15 @@ async def _reveal_dom(
                 stalled = 0
                 tab.layout_changed()
                 if report is not None:
+                    positions = ", ".join(
+                        f"{axis}: {getattr(step.before, axis):g} → "
+                        f"{getattr(step.after, axis):g}"
+                        for axis in ("x", "y")
+                        if getattr(step.before, axis) != getattr(step.after, axis)
+                    )
                     report(
-                        f"Auto-reveal for ref {handle.element.ref}: {step.container} "
-                        f"in frame {step.frame_id} scrolled from "
-                        f"x={step.before.x:g}, y={step.before.y:g} to "
-                        f"x={step.after.x:g}, y={step.after.y:g} (CSS px)."
+                        f"Auto-scrolled {step.container} to reveal "
+                        f"[{handle.element.ref}] ({positions})."
                     )
             else:
                 stalled += 1
