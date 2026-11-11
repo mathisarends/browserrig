@@ -563,10 +563,12 @@ and the existing hover checks still run before primary input.
 Each actual movement is reported in the tool receipt, for example:
 
 ```text
-Auto-reveal for ref 123: page in frame ABC scrolled from x=0, y=0 to x=0, y=962 (CSS px).
+Auto-scrolled page to reveal [775] (y: 0 → 343).
 ```
 
-Positions are container-local CSS pixels, not cursor coordinates. Feedback is
+Only changed axes are shown; horizontal movement uses x, and diagonal movement
+shows both x and y. Positions are container-local CSS pixels. Frame IDs and
+unchanged coordinates are omitted from the agent receipt. Feedback is
 limited to eight steps and an omitted-step count. It also accompanies failures
 after scrolling, so an input failure does not hide a changed viewport.
 No movement produces no positive scroll receipt. Automatic reveal remains bounded

@@ -25,9 +25,10 @@ pytestmark = pytest.mark.integration
 async def test_reveal_targets_container_and_reports_only_measured_movement(site, mode):
     holder = {}
     called = False
+    target_ref = ""
 
     async def respond(_request):
-        nonlocal called
+        nonlocal called, target_ref
         if called:
             yield ModelChunk(text="Done")
             return
@@ -41,6 +42,7 @@ async def test_reveal_targets_container_and_reports_only_measured_movement(site,
             None,
         )
         assert target is not None
+        target_ref = target.ref
         yield ModelChunk(
             tool_call=ToolCall("type_text", {"ref": target.ref, "text": "Hello"})
         )
@@ -89,11 +91,14 @@ async def test_reveal_targets_container_and_reports_only_measured_movement(site,
     if mode == "locked":
         assert actual["y"] == 0 and actual["value"] == ""
         assert reply.is_error and "ELEMENT_BLOCKED" in reply.text
-        assert "Auto-reveal" not in reply.text
+        assert "Auto-scrolled" not in reply.text
     else:
         assert actual["y"] > 0
-        assert "Auto-reveal" in reply.text and "scrolled from x=0, y=0" in reply.text
-        assert "(CSS px)" in reply.text
+        assert (
+            f"Auto-scrolled page to reveal [{target_ref}] (y: 0 → {actual['y']:g})."
+            in reply.text
+        )
+        assert "in frame" not in reply.text and "(CSS px)" not in reply.text
         if mode == "editor":
             assert not reply.is_error and actual["value"] == "Hello"
         else:
