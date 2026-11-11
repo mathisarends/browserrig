@@ -462,3 +462,25 @@ modified by request hooks or compaction receive no receipt. `NudgeIncludedEvent.
 open; afterwards, read the `ObservationsIncludedEvent` from `result.events`.
 Screenshot coordinates also follow these final receipts, rather than provisional
 request content or SDK message-ID conventions.
+
+## Finding and searching saved content
+
+`glob(pattern="**/*", limit=200)` finds workspace files. `grep(query,
+pattern="**/*.md", limit=100)` searches literal text case-insensitively and returns
+`path:line` matches with bounded snippets and Unicode character offsets. Pass an
+offset to `read_file` to inspect more context around a match. It searches complete UTF-8 files,
+including text beyond `read_file` preview limits. Both operations use the existing
+workspace, including custom/remote workspaces; no shell is required. The results
+use Harnessed's `PathMatches` and `SearchResult` contracts.
+
+Hidden files and directories, including `.content` and pending download caches,
+are excluded unless `include_hidden=True`. Glob patterns are workspace-relative;
+absolute paths and traversal outside the workspace are rejected. Directory walks
+are bounded to 1,000 directories. Search checks at most 1,000 matching files and
+`max_expanded_bytes` input bytes in total. Oversized/unreadable files, match limits
+and incomplete walks are reported; a limited search is not proof of absence.
+
+When an associated `.extraction.json` or webpage `source.json` reports pending OCR
+or a partial extraction, search adds a coverage note even when there are no
+matches. It searches saved text and never starts OCR implicitly. Run `read_file`
+on the relevant source pages to extend the saved text before searching again.
