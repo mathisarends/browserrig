@@ -28,7 +28,7 @@ from browserrig import (
 from browserrig.browser import Launch
 from browserrig.core import Bounds, ElementPoint
 from browserrig.observation import DomRenderer
-from browserrig.tools import Actions, KeyboardTools, PointerTools
+from browserrig.tools import Actions, KeyboardTools, PointerTools, Targeting
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
@@ -91,6 +91,7 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
             BrowserPerception(capture=_CanvasCapture(), renderer=DomRenderer()),
             TextContext(),
             Actions(),
+            Targeting(),
             PointerTools(),
             KeyboardTools(),
             Prepare(),
