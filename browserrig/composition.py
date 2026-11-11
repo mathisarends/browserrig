@@ -54,7 +54,7 @@ def browser_plugins(
     A plugin that fills the same slot as a default
     replaces it in place, such as `BrowserPerception(...)`, `Readiness(...)` or
     `ContextCompaction(...)`; any other plugin is added. `without` drops defaults by type,
-    such as `(Files, FileTools)` for an agent without local files. `None`
+    such as `(Files, FileTools, PageExtractionTools)` for an agent without files. `None`
     entries are skipped, so optional plugins can be written inline.
     """
     pack = browser_pack(browser=browser).without(*without)

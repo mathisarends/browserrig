@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.3.0 (2026-11-11)
+
+### Breaking changes
+
 - Move input ownership from Chrome into explicit Runtime and InputRuntime plugins.
   Chrome provides input-target transports; devices, pacing and presentation use
   Input directly. Share task-local action correlation independently of devices.
@@ -11,9 +15,8 @@
   Manual compositions and low-level input callers must migrate as documented in
   docs/browser-composition.md.
 
-- Shorten agent-facing tool descriptions, move parameter details to their schema
-  and share file workflows through plugin instructions. Remove `zoom` from the
-  screenshot tool; cropped screenshots retain their coordinate mapping.
+- Remove `zoom` from the screenshot tool; cropped screenshots retain their
+  coordinate mapping. Lower-level Python screenshot APIs keep their zoom option.
 
 - Separate observation, text/image context and tool capabilities for explicit
   Harnessed compositions. Add DomPerception, TextContext, DomTypingTools,
@@ -24,33 +27,36 @@
   Extraction presentation receives a typed redacted event instead of perception
   state. See the composition guide for migration from direct plugin constructions.
 
-- Expose explicit radio values/IDs/groups, control title guidance, native option
-  values and multi-select states. Add select_options to replace and verify an
-  exact native multiple-selection set with whole-request validation.
-
-- Reveal DOM input targets by scrolling their exact containers, avoiding unrelated
-  editor wheel interception. Report bounded, measured auto-scroll positions in
-  success and failure receipts. Keep custom backend wheel planning unchanged.
-
-- Fix false hit-test clipping for fixed-body pages with a zero-height HTML root.
-  Report bounded hit-test layout diagnostics without page text or field values.
-  Remind agents to verify intended effects in the next observation; tool
-  acknowledgements describe attempted interactions, not application success.
-
-- Preserve selected chips when typing into an empty native text field. Skip the
-  empty-field Backspace and stop remaining text if focus leaves the addressed
-  field or its embedding frame.
-
 - Save agent `extract_content` results as workspace Markdown and return only
   `Saved`, `Source`, `Title` and actual extraction limitations. Remove its inline
-  body and `max_chars`/`offset` arguments; without a workspace the tool is disabled.
-  Add bounded workspace `grep` and `glob` tools for targeted reads. Direct Python
-  Markdown extraction and full typed presentation data remain available.
+  body and `max_chars`/`offset` arguments. `PageExtractionTools` requires a
+  workspace; to omit files from the default recipe, use
+  `without=(Files, FileTools, PageExtractionTools)`. Direct Python Markdown
+  extraction and full typed presentation data remain available.
 - Upgrade Harnessed and every provider/MCP/OTel extra to 0.16.0. `TaskMemory`
   accepts `llm`, replacement `prompt` factories, `keep_last_steps`, whole-input
   targets and `max_summary_tokens`; custom summarizers now accept
-  `CompactionRequest` and return `Summary`. Older conversation states and audit
-  envelopes require their original application environment; start new stores.
+  `CompactionRequest` and return `Summary`. State/checkpoint format 3 and audit
+  envelope 6 reject older data: start new stores and retain the original
+  application environment for older conversations and checkpoints.
+- Replace the agent's `scroll` tool with `scroll_page` and `scroll_element(ref=...)`.
+  Both scroll their named target directly, independently of the cursor, and report
+  actual movement or a blocked/boundary result. Container scrolling never propagates
+  to ancestors. Native wheel input remains available through the session's
+  `Input` service as `session.scope[Input].mouse.scroll(...)`; direct Python
+  callers construct `Input(browser.input_targets.focused)`.
+
+### Added and changed
+
+- Expose explicit radio values/IDs/groups, control title guidance, native option
+  values and multi-select states. Add `select_options` to replace and verify an
+  exact native multiple-selection set with whole-request validation.
+- Add bounded workspace `grep` and `glob` tools for targeted reads of saved
+  extractions. Workspace, browser-file and DOM-upload tools can be composed
+  independently through `WorkspaceTools`, `BrowserFileTools` and `DomUploadTools`.
+- Automatically create searchable Markdown sidecars for completed downloads,
+  with extraction status, source metadata and bounded OCR coverage. Add visual
+  `read_file` views for PDF pages and image frames without running OCR.
 - Apply a shared GPT-6.1 Terra profile to regular agents and benchmarks: a
   256,000-token application context limit, 8,192-token output reserve, two retained
   steps, a 40% compaction target and an 8,192-token summary ceiling. Benchmark
@@ -62,11 +68,6 @@
   viewport previews and source-based label deduplication; mark text truncation
   locally while retaining later controls. Existing flat capture backends remain
   supported through `content=None`.
-
-- Replace the agent's `scroll` tool with `scroll_page` and `scroll_element(ref=...)`.
-  Both scroll their named target directly, independently of the cursor, and report
-  actual movement or a blocked/boundary result. Container scrolling never propagates
-  to ancestors. Native wheel input remains available through `browser.input.mouse.scroll`.
 
 - Add `read_todos()` for explicit plan recall; stale-plan reminders now name the
   tools instead of repeating the list. Reads also refresh the reminder interval.
@@ -89,16 +90,30 @@
   left in context (e.g. after compaction) or the last one is `remind_after` steps
   old. Lists persist with the session's feature state.
 
-- Pin Harnessed and every provider/MCP/OTel extra to 0.15.0. `Done` defers
-  structured output through the session-scoped `PrepareOutput` hook instead of
-  patching Harnessed's global output handler. `browser_tool` attaches its
-  activation binding through the public `registration()` helper. Existing
-  Harnessed 0.14 conversations, checkpoints and stores need no migration.
+- `Done` defers structured output through the session-scoped `PrepareOutput`
+  hook instead of patching Harnessed's global output handler. `browser_tool`
+  attaches its activation binding through the public `registration()` helper.
 
-- Plugin instructions are about 45% shorter. Coordinate rules now live only in
+- Shorten agent-facing tool descriptions, move parameter details to their schema
+  and share file workflows through plugin instructions. Coordinate rules live in
   "Screenshot coordinates", form batching moved into "Browser action chains"
   (`FormTools` no longer adds a "Form filling" block), and details already
   shown by observation labels or tool descriptions were removed.
+
+### Fixed
+
+- Reveal DOM input targets by scrolling their exact containers, avoiding unrelated
+  editor wheel interception. Report bounded, measured auto-scroll positions in
+  success and failure receipts. Keep custom backend wheel planning unchanged.
+- Fix false hit-test clipping for fixed-body pages with a zero-height HTML root.
+  Report bounded hit-test layout diagnostics without page text or field values.
+  Remind agents to verify intended effects in the next observation; tool
+  acknowledgements describe attempted interactions, not application success.
+- Preserve selected chips when typing into an empty native text field. Skip the
+  empty-field Backspace and stop remaining text if focus leaves the addressed
+  field or its embedding frame.
+- Keep download receiving and cleanup independent of the exposed file tools and
+  tolerate browser closure before download cleanup.
 
 ## 0.2.0 (2026-11-09)
 
