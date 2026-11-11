@@ -27,7 +27,7 @@ from browserrig.scripts import (
 )
 
 from .models import Element, Snapshot
-from .references import ScrollStep
+from .references import RevealStep, ScrollStep
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,20 +97,8 @@ class DomElementHandle:
         return Bounds.model_validate(await self._run(ElementOperation.BOUNDS))
 
     async def scroll_step(self) -> ScrollStep | None:
-        await self.tab.sync_document()
-        if self.tab.document_id != self.snapshot.document_id:
-            raise StaleElement(
-                "Document changed while scrolling; use refs from the next observation"
-            )
-        frame = next(
-            (item for item in await self.tab.frames() if item.id == self.frame.id), None
-        )
-        if frame is None:
-            raise StaleElement(
-                "Element frame no longer exists; use refs from the next observation"
-            )
-        current = replace(self, frame=frame)
-        planned = await _plan(current)
+        """Plan one wheel input without scrolling."""
+        planned = await self._scroll_plan(apply=False)
         if planned is None:
             return None
         owner, plan = planned
@@ -122,6 +110,25 @@ class DomElementHandle:
             delta_y=plan.delta_y,
             key=f"{owner.id}:{plan.model_dump_json()}",
         )
+
+    async def reveal_step(self) -> RevealStep | None:
+        """Scroll one exact DOM container and return its measured before/after position."""
+        planned = await self._scroll_plan(apply=True)
+        if planned is None:
+            return None
+        owner, plan = planned
+        assert plan.after_x is not None and plan.after_y is not None
+        step = RevealStep(
+            frame_id=owner.id,
+            container="frame page"
+            if owner.parent is not None and plan.container == "page"
+            else plan.container,
+            before=Point(x=plan.scroll_x, y=plan.scroll_y),
+            after=Point(x=plan.after_x, y=plan.after_y),
+        )
+        if step.changed:
+            self.tab.layout_changed()
+        return step
 
     async def focus(self, *, select_all: bool) -> None:
         await self._run(ElementOperation.FOCUS, select_all)
@@ -164,6 +171,21 @@ class DomElementHandle:
             self.element.backend_id, script, args, user_gesture=user_gesture
         )
 
+    async def _scroll_plan(self, *, apply: bool) -> tuple[Frame, ScrollPlan] | None:
+        await self.tab.sync_document()
+        if self.tab.document_id != self.snapshot.document_id:
+            raise StaleElement(
+                "Document changed while scrolling; use refs from the next observation"
+            )
+        frame = next(
+            (item for item in await self.tab.frames() if item.id == self.frame.id), None
+        )
+        if frame is None:
+            raise StaleElement(
+                "Element frame no longer exists; use refs from the next observation"
+            )
+        return await _plan(replace(self, frame=frame), apply=apply)
+
     async def _run(
         self,
         operation: ElementOperation,
@@ -197,7 +219,9 @@ class DomReferences:
         )
 
 
-async def _plan(handle: DomElementHandle) -> tuple[Frame, ScrollPlan] | None:
+async def _plan(
+    handle: DomElementHandle, *, apply: bool
+) -> tuple[Frame, ScrollPlan] | None:
     frame = handle.frame
     ancestors: list[Frame] = []
     current = frame
@@ -214,10 +238,10 @@ async def _plan(handle: DomElementHandle) -> tuple[Frame, ScrollPlan] | None:
         assert target is not None
         local = parent.transform.bounds_to_local(target)
         raw = await child.run_on_owner(
-            SCROLL_OWNER, OwnerScrollArgs(clip=clip, target_bounds=local)
+            SCROLL_OWNER, OwnerScrollArgs(clip=clip, target_bounds=local, apply=apply)
         )
         if raw is not None:
             return parent, raw
     clip = frame.local_visible
-    raw = await handle.run(SCROLL, ScrollArgs(clip=clip))
+    raw = await handle.run(SCROLL, ScrollArgs(clip=clip, apply=apply))
     return (frame, raw) if raw is not None else None

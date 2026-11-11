@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from harnessed.kernel import PluginScope
 from harnessed.tracing import traced
 
@@ -22,8 +24,15 @@ class Targeting:
         self._aims: dict[str, tuple[float, float]] = {}
 
     @traced
-    async def locate(self, *, tab: Tab, ref: str, scroll: bool = True) -> ElementPoint:
-        """Reveal a ref with wheel input, then return a hit-tested point.
+    async def locate(
+        self,
+        *,
+        tab: Tab,
+        ref: str,
+        scroll: bool = True,
+        report: Callable[[str], None] | None = None,
+    ) -> ElementPoint:
+        """Reveal a ref, then return a hit-tested point.
 
         The point is where the motor aims on the target, unless something covers that
         spot. Plugins learn about the target through `TargetLocated`.
@@ -37,9 +46,13 @@ class Targeting:
         scrolled = False
         if scroll:
             scrolled = await prepare_element(
-                tab, handle, self.browser.input.mouse, document_id=tab.document_id
+                tab,
+                handle,
+                self.browser.input.mouse,
+                document_id=tab.document_id,
+                report=report,
             )
-            # Wheel input may have moved ancestor documents; refresh their transforms.
+            # Reveal may have moved ancestor documents; refresh their transforms.
             handle = await self.observe.element(tab, ref)
         point = await handle.locate(aim=self._aim(ref, handle.element.bounds))
         if point.bounds is not None:

@@ -117,7 +117,12 @@ class ActionRunner:
                     )
                 )
                 return await self._result(
-                    tab, kind, effect, followed=followed, note=note
+                    tab,
+                    kind,
+                    effect,
+                    followed=followed,
+                    note=note,
+                    preparation=_preparation(action),
                 )
             except asyncio.CancelledError:
                 if action is not None:
@@ -144,7 +149,7 @@ class ActionRunner:
                     else f"{type(error).__name__}: {error}"
                 )
                 await self._fail(tab, action_id, kind, dispatched, reason)
-                message = _failure(kind, reason, dispatched)
+                message = _failure(kind, reason, dispatched) + _preparation(action)
                 if isinstance(error, ToolActionError):
                     return error.result.with_text(message)
                 raise ToolError(message) from error
@@ -163,7 +168,14 @@ class ActionRunner:
         action.started = True
 
     async def _result(
-        self, tab: Tab, kind: ActionKind, effect: Effect, *, followed: str, note: str
+        self,
+        tab: Tab,
+        kind: ActionKind,
+        effect: Effect,
+        *,
+        followed: str,
+        note: str,
+        preparation: str,
     ) -> ToolResult:
         change = ""
         if (
@@ -174,7 +186,7 @@ class ActionRunner:
         ):
             change = await self._page_change(tab)
         result = ToolResult(
-            effect.text + followed + note,
+            effect.text + followed + note + preparation,
             break_chain=effect.break_chain
             or bool(note)
             or bool(followed)
@@ -248,6 +260,17 @@ class ActionRunner:
                 cancelled=cancelled,
             )
         )
+
+
+def _preparation(action: ToolAction | None) -> str:
+    if action is None or not action.preparation_notes:
+        return ""
+    notes = list(action.preparation_notes)
+    if action.preparation_omitted:
+        notes.append(
+            f"{action.preparation_omitted} additional auto-reveal steps omitted."
+        )
+    return "\n" + "\n".join(notes)
 
 
 def _failure(kind: ActionKind, reason: str, dispatched: bool) -> str:

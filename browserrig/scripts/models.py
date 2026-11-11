@@ -27,6 +27,7 @@ class ElementArgs(ScriptArgs):
 
 class ScrollArgs(ScriptArgs):
     clip: Bounds | None = None
+    apply: bool = False
 
 
 class TargetScrollArgs(ScriptArgs):
@@ -62,6 +63,7 @@ class TextState(Options):
 class OwnerScrollArgs(ScriptArgs):
     clip: Bounds | None = None
     target_bounds: Bounds
+    apply: bool = False
 
 
 class ContentArgs(ScriptArgs):
@@ -106,6 +108,9 @@ class ScrollPlan(Point):
     delta_y: float
     scroll_x: float
     scroll_y: float
+    after_x: float | None = None
+    after_y: float | None = None
+    container: str = "page"
 
 
 class DOMProbe(Options):

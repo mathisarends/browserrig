@@ -162,7 +162,9 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
             await self._runner.start(action)
         targeting = self._mount.targeting
         assert targeting is not None
-        return await targeting.locate(tab=tab, ref=ref, scroll=scroll)
+        return await targeting.locate(
+            tab=tab, ref=ref, scroll=scroll, report=self._record_preparation
+        )
 
     @property
     def tab(self) -> Tab:
@@ -179,6 +181,15 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     @hook(BrowserToolCall)
     async def _run_tool(self, event: BrowserToolCall, next_: Next[object]) -> object:
         return await self._invocation.run(event, next_)
+
+    def _record_preparation(self, note: str) -> None:
+        action = self._invocation.context.current
+        if action is None:
+            return
+        if len(action.preparation_notes) < 8:
+            action.preparation_notes.append(note)
+        else:
+            action.preparation_omitted += 1
 
     @property
     def _runner(self) -> ActionRunner:

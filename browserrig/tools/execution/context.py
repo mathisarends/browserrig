@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from harnessed import ToolError, ToolResult
 
@@ -17,6 +17,8 @@ class ToolAction:
     started: bool = False
     dispatch_tracked: bool = False
     dispatched: bool = False
+    preparation_notes: list[str] = field(default_factory=list)
+    preparation_omitted: int = 0
     active: bool = True
     result: ToolResult | None = None
 

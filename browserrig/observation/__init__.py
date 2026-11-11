@@ -24,7 +24,13 @@ from .models import (
     TextBlock,
 )
 from .plugin import BrowserPerception
-from .references import ElementHandle, References, ScrollableElement, ScrollStep
+from .references import (
+    ElementHandle,
+    References,
+    RevealStep,
+    ScrollableElement,
+    ScrollStep,
+)
 from .render import render
 from .renderer import DomRenderer, Renderer
 
@@ -65,6 +71,7 @@ __all__ = [
     "PageContent",
     "ElementRef",
     "References",
+    "RevealStep",
     "ScrollableElement",
     "ScrollStep",
     "Snapshot",

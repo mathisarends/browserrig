@@ -1,5 +1,5 @@
 /* global intersect, parentFor, closedRootsForDocument */
-function planScroll(el, {clip = null, targetBounds = null}) {
+function planScroll(el, {clip = null, targetBounds = null, apply = false}) {
   const root = document.scrollingElement;
   const closedRoots = closedRootsForDocument();
   const viewport = intersect(
@@ -213,14 +213,27 @@ function planScroll(el, {clip = null, targetBounds = null}) {
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
       continue;
     }
-    const point = wheelPoint(container, visible, dx, dy);
-    return {
+    const point = apply
+      ? {x: visible.x + visible.width / 2, y: visible.y + visible.height / 2}
+      : wheelPoint(container, visible, dx, dy);
+    const result = {
       ...point,
       delta_x: Math.max(-10000, Math.min(10000, dx)),
       delta_y: Math.max(-10000, Math.min(10000, dy)),
       scroll_x: container.scrollLeft,
       scroll_y: container.scrollTop,
+      container: container === root ? 'page' : '<' + container.localName + '>',
     };
+    if (apply) {
+      container.scrollTo({
+        left: result.scroll_x + result.delta_x,
+        top: result.scroll_y + result.delta_y,
+        behavior: 'instant',
+      });
+      result.after_x = container.scrollLeft;
+      result.after_y = container.scrollTop;
+    }
+    return result;
   }
   return null;
 }
