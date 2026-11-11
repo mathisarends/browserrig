@@ -2,7 +2,6 @@
 
 from .coordination import BrowserCoordination
 from .errors import (
-    BlockedElement,
     BrowserClosed,
     BrowserError,
     ReadinessError,
@@ -39,7 +38,6 @@ __all__ = [
     "ActionKind",
     "ActivityKind",
     "ActivityOutcome",
-    "BlockedElement",
     "Bounds",
     "BrowserBar",
     "BrowserClosed",

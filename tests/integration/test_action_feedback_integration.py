@@ -23,7 +23,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.parametrize("obstruction", ["overlay", "pointer_events"])
-async def test_click_reports_preflight_failure_and_layout_facts(site, obstruction):
+async def test_blocked_click_reports_measured_layout_facts(site, obstruction):
     holder = {}
     step = 0
 
@@ -73,8 +73,8 @@ async def test_click_reports_preflight_failure_and_layout_facts(site, obstructio
         for event in result.events
         if isinstance(event, ToolCallFinishedEvent)
     ]
-    assert reply.is_error and "Click not dispatched." in reply.text
-    assert "may have run" not in reply.text
+    assert reply.is_error
+    assert "not dispatched" not in reply.text
     assert "ELEMENT_BLOCKED" in reply.text and "bounds=" in reply.text
     assert (
         "reaches <div>" if obstruction == "overlay" else "pointer-events=none"

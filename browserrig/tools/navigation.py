@@ -54,7 +54,6 @@ class NavigationTools(Plugin):
 
     @tool(
         kind=ActionKind.NAVIGATE,
-        dispatch_tracked=True,
         description=(
             "Navigate to an HTTP(S) URL in the active tab, or in a new tab with new_tab=true. "
             "A path starting with / opens on the active page's site."
@@ -70,7 +69,6 @@ class NavigationTools(Plugin):
 
     @tool(
         kind=ActionKind.SEARCH,
-        dispatch_tracked=True,
         description="Search the web with DuckDuckGo in the active tab.",
     )
     async def search(
@@ -86,13 +84,12 @@ class NavigationTools(Plugin):
         kind=ActionKind.GO_BACK, description="Go to the previous browser history entry."
     )
     async def go_back(self) -> Effect:
-        if not await self._actions.dispatch(partial(self._actions.tab.go_back)):
+        if not await self._actions.tab.go_back():
             raise BrowserError("No previous history entry")
         return Effect("Navigated back.")
 
     @tool(
         kind=ActionKind.GO_FORWARD,
-        dispatch_tracked=True,
         description=(
             "Go to the next browser history entry. Reports an error if forward navigation "
             "is unavailable."
@@ -102,18 +99,17 @@ class NavigationTools(Plugin):
         tab = self._actions.tab
         if not await tab.can_go_forward():
             raise BrowserError("Cannot go forward: no next history entry")
-        if not await self._actions.dispatch(partial(tab.go_forward)):
+        if not await tab.go_forward():
             raise BrowserError("Cannot go forward: no next history entry")
         return Effect("Navigated forward.")
 
     @tool(kind=ActionKind.RELOAD, description="Reload the active tab.")
     async def reload(self) -> Effect:
-        await self._actions.dispatch(partial(self._actions.tab.reload))
+        await self._actions.tab.reload()
         return Effect("Reload executed.")
 
     @tool(
         kind=ActionKind.WAIT,
-        dispatch_tracked=True,
         readonly=True,
         description=(
             "Wait briefly for an expected asynchronous page update; the next observation shows it."

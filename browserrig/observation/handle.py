@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 from browserrig.browser import Frame, Tab
 from browserrig.core import (
-    BlockedElement,
     Bounds,
     BrowserError,
     ElementOperation,
@@ -71,7 +70,7 @@ class DomElementHandle:
                     )
             except (BrowserError, TimeoutError):
                 pass
-            raise BlockedElement(
+            raise BrowserError(
                 f"ELEMENT_BLOCKED: target ref {self.element.ref}. {details}"
             ) from error
         x, y = self.frame.transform.to_viewport(local.x, local.y)
@@ -80,7 +79,7 @@ class DomElementHandle:
         except BrowserError as error:
             if str(error) != "ELEMENT_BLOCKED":
                 raise
-            raise BlockedElement(
+            raise BrowserError(
                 f"ELEMENT_BLOCKED: target ref {self.element.ref} is hit-testable inside "
                 f"frame {self.frame.id}, but its viewport point ({x:g}, {y:g}) is "
                 "covered or clipped in an embedding document. Inspect the outer page."
