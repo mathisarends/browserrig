@@ -12,7 +12,12 @@ from harnessed.hooks import ExecuteTool, Next
 from harnessed.kernel import PluginScope, needs
 
 from browserrig.browser import Browser, BrowserEvents, TabChanged
-from browserrig.core import ActionKind, BrowserError, BrowserToolMetadata
+from browserrig.core import (
+    ActionKind,
+    BrowserCoordination,
+    BrowserError,
+    BrowserToolMetadata,
+)
 from browserrig.events import (
     INPUT_EVENTS,
     ActivityFinishedEvent,
@@ -41,7 +46,7 @@ from browserrig.tools import (
     WaitIntent,
 )
 
-from . import scenes, work
+from . import reading, scenes, work
 from .events import (
     SCENE_EVENTS,
     CaptureRegion,
@@ -84,6 +89,7 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
     _state = PluginState(_Presentation)
     _browser = needs(Browser)
     _events = needs(BrowserEvents)
+    _coordination = needs(BrowserCoordination)
 
     def __init__(self, *, renderer: IframeRenderer | None = _DEFAULT_RENDERER) -> None:
         super().__init__()
@@ -240,6 +246,14 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             if shown:
                 await self._emit_work(receipt)
             result = await next_()
+            if metadata.kind is ActionKind.EXTRACT_CONTENT and not result.is_error:
+                async with self._coordination.exclusive():
+                    if self._browser.active_tab.id == tab.id:
+                        await reading.sweep(
+                            tab,
+                            work_id=receipt.work_id,
+                            document_id=receipt.document_id,
+                        )
         except asyncio.CancelledError:
             await self._emit_work(
                 work.finished(

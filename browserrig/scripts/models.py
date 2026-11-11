@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ConfigDict
 from pydantic.alias_generators import to_camel
@@ -40,6 +40,13 @@ class TargetScrollResult(Options):
     after: Point
     blocked: bool = False
     scrollable: bool = True
+
+
+class ReadingScrollArgs(ScriptArgs):
+    operation: Literal["measure", "sweep", "cancel"]
+    down: float = 1.6
+    hold: float = 0.25
+    back: float = 0.7
 
 
 class UploadArgs(ScriptArgs):

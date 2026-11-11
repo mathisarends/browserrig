@@ -72,14 +72,20 @@ Work the pointer and keyboard cannot show plays where it happens on the page. A
 single caption at the bottom names it in one line: an icon, a title, a short
 detail and a state ring that turns into a check, warning or cross.
 
-- **Reading a page** sweeps a soft beam over the viewport, then narrows to the area
+- **Reading a page** starts a soft beam, scrolls once to the loaded page's bottom,
+  pauses briefly and returns to its original position before confirming the result.
+  The extraction is saved before this presentation pass; newly lazy-loaded content
+  does not silently enter the saved snapshot. The endpoint is fixed at the start,
+  and reduced motion skips the scroll. The beam then narrows to the area
   that was actually read and dims the rest. Without `full_page` that is the main
   landmark, so a viewer sees that header and navigation were left out. A partial
   read ends with an amber edge where reading stops.
 - **Screenshots** snap viewfinder corners onto the captured region with a brief
   flash; the caption icon becomes the thumbnail.
-- **Files** fly from the caption into the cursor when read and from the cursor into
-  the caption when written.
+- **Reading files** keeps the normal cursor and uses its existing status label:
+  `Reading report.pdf`. Successful reads need no extra card or file animation;
+  warnings and failures still appear in the caption. Written files fly from the
+  cursor into the caption.
 - **Back, forward and reload** show a short card in the middle of the page with the
   direction and the host being left.
 - **Failures** shake the cursor and show the reason in the caption.
@@ -105,7 +111,10 @@ download created by the animation.
 (`EventKind.WORK_PRESENTED`). It emits that same event whether the renderer is the
 default iframe or `None`; result semantics are not inferred by the JavaScript view.
 Existing cursor, keyboard, find, scrolling, tab and transfer events retain their
-contracts. Stream them together with activity and download events:
+contracts. `ReadingSweepEvent` marks the native reading pass, keyed by `work_id`,
+with `down`, `hold` and `back` durations in seconds. The work receipt completes
+after the return; cancellation stops the pass and restores its scroll position.
+Stream these together with activity and download events:
 
 ```python
 from dataclasses import asdict

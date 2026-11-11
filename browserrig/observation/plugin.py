@@ -294,7 +294,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             "Save the active page's loaded content as a Markdown snapshot in the workspace. "
             "Returns only Saved, Source, Title and reported extraction limitations, not page text. "
             "Use grep to find text in the saved path and read_file for bounded excerpts. "
-            "Includes loaded content below the viewport without scrolling or navigating. "
+            "Includes loaded content below the viewport without navigating. "
             "Uses the main region when available; full_page=true also includes site navigation. "
             "Each call saves a new snapshot. Requires a workspace."
         ),

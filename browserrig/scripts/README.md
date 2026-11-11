@@ -30,6 +30,8 @@ The isolated world's `globalThis.__browserrig` namespace holds:
 - `overlays` and `overlayNodes`: application-owned iframe surfaces and their DOM
   identities. Generic browser capture controls their visibility; readiness skips
   their activity. Choreography is one consumer of the surface API.
+- `readingSweep`: a cancellable, bounded native page-reading scroll. Completion,
+  cancellation or a hidden document restores its original position and clears it.
 
 Scripts throw only the fixed codes in `ScriptError`. Unexpected exception text
 is never returned to the model. ESLint and Prettier cover main files and helpers;

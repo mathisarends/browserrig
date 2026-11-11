@@ -6,6 +6,7 @@ function createChoreographyCursor(ui) {
   const activities = new Map();
   // Running JavaScript by work id, with the time it started.
   const scripts = new Map();
+  const readings = new Map();
   let point = [0, 0];
   let style = 'default';
   let nativeStyle = 'default';
@@ -43,12 +44,12 @@ function createChoreographyCursor(ui) {
   };
   const shape = () => {
     cursor.dataset.style = style;
-    cursor.dataset.code = String(scripts.size > 0 && !scrolling);
+    cursor.dataset.code = String(scripts.size > 0 && !readings.size && !scrolling);
     if (scrolling) {
       icon.innerHTML = wheel();
       return;
     }
-    if (scripts.size) {
+    if (scripts.size && !readings.size) {
       icon.innerHTML = braces();
       return;
     }
@@ -61,7 +62,9 @@ function createChoreographyCursor(ui) {
     const values = [...activities.values()];
     const activity = ui.options().activities || {};
     let value = ui.options().name;
-    if (scripts.size) {
+    if (readings.size) {
+      value = `Reading ${[...readings.values()].at(-1).name}`.trim();
+    } else if (scripts.size) {
       value = 'Executing JavaScript';
     } else if (values.includes(activity.LLM)) {
       value = 'Thinking';
@@ -73,7 +76,9 @@ function createChoreographyCursor(ui) {
       value += ' is waiting for you';
     }
     badge.textContent = value;
-    cursor.dataset.thinking = String(values.includes(activity.LLM));
+    cursor.dataset.thinking = String(
+      !readings.size && !scripts.size && values.includes(activity.LLM),
+    );
     const width = badge.getBoundingClientRect().width;
     const left = point[0] + width + 25 > innerWidth;
     const preferred = left ? -width - 12 : 17;
@@ -273,12 +278,46 @@ function createChoreographyCursor(ui) {
       Math.max(0, 1400 - (performance.now() - started)),
     );
   };
+  const reading = (id, path, active, completed = false) => {
+    ui.cancel(`reading:${id}`);
+    if (active) {
+      readings.set(id, {
+        name: (path || '').split(/[\\/]/).pop(),
+        started: readings.get(id)?.started ?? performance.now(),
+      });
+      shape();
+      label();
+      return;
+    }
+    const current = readings.get(id);
+    if (!current) {
+      return;
+    }
+    const clear = () => {
+      readings.delete(id);
+      shape();
+      label();
+    };
+    if (completed) {
+      ui.later(
+        `reading:${id}`,
+        clear,
+        Math.max(0, 1400 - (performance.now() - current.started)),
+      );
+    } else {
+      clear();
+    }
+  };
   const reset = () => {
     activities.clear();
     for (const id of scripts.keys()) {
       ui.cancel(`script:${id}`);
     }
     scripts.clear();
+    for (const id of readings.keys()) {
+      ui.cancel(`reading:${id}`);
+    }
+    readings.clear();
     shape();
     label();
   };
@@ -298,5 +337,5 @@ function createChoreographyCursor(ui) {
       {duration: 320, easing: 'ease-in-out'},
     );
   };
-  return {show, reset, shake, work, visible, point: () => point};
+  return {show, reset, shake, work, reading, visible, point: () => point};
 }
