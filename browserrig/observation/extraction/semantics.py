@@ -117,7 +117,10 @@ def description(document: Document, index: int) -> str:
         for element_id in described
         if (target := document.element_by_id(element_id)) is not None
     )
-    return clean(text or attributes.get("aria-description", ""), 250)
+    title = attributes.get("title", "") or " ".join(
+        document.attributes(label).get("title", "") for label in document.labels(index)
+    )
+    return clean(text or attributes.get("aria-description", "") or title, 250)
 
 
 def value(document: Document, index: int, element_role: str, kind: str) -> str | None:
@@ -134,7 +137,12 @@ def value(document: Document, index: int, element_role: str, kind: str) -> str |
         return ", ".join(chosen) or None
     if tag in ("input", "textarea"):
         if kind in _NO_VALUE_TYPES:
-            return None
+            explicit = attributes.get("value")
+            return (
+                clean(explicit, 200)
+                if kind in {"checkbox", "radio"} and explicit is not None
+                else None
+            )
         return clean(document.input_value(index) or "", 200) or None
     if editable(document, index) or element_role in (
         "textbox",
@@ -195,6 +203,7 @@ def options(document: Document, index: int) -> tuple[Option, ...]:
         result.append(
             Option(
                 label=clean(attributes.get("label", "")) or document.own_text(node, 80),
+                value=attributes.get("value"),
                 selected=node in document.selected,
                 disabled="disabled" in attributes or group_disabled,
             )

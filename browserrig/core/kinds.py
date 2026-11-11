@@ -63,6 +63,7 @@ class ActionKind(StrEnum):
     SCROLL_PAGE = "scroll_page"
     SCROLL_ELEMENT = "scroll_element"
     SELECT = "select"
+    SELECT_OPTIONS = "select_options"
     SET_DATE = "set_date"
     UPLOAD = "upload"
     OPEN_TAB = "open_tab"

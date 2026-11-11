@@ -29,6 +29,7 @@ SILENT_WORK = {
     ActionKind.GO_FORWARD: "Going forward",
     ActionKind.RELOAD: "Reloading page",
     ActionKind.SELECT: "Selecting option",
+    ActionKind.SELECT_OPTIONS: "Selecting options",
     ActionKind.SET_DATE: "Setting date / time",
     ActionKind.HANDLE_DIALOG: "Handling dialog",
 }
@@ -74,6 +75,12 @@ def started(call: ToolCall, kind: ActionKind) -> WorkPresentedEvent:
         case ActionKind.SELECT | ActionKind.SET_DATE:
             # The element highlight shows where; the caption names the value.
             detail = str(args.get("value", ""))
+        case ActionKind.SELECT_OPTIONS:
+            values = args.get("values")
+            if isinstance(values, list):
+                detail = ", ".join(str(value)[:100] for value in values[:10])
+                if not values:
+                    detail = "Empty selection"
         case ActionKind.HANDLE_DIALOG:
             detail = "Accepting dialog" if args.get("accept") else "Dismissing dialog"
     return WorkPresentedEvent(

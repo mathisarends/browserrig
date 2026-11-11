@@ -619,6 +619,17 @@ class _FrameExtractor:
             options=semantics.options(document, source)
             if document.tag(source) == "select"
             else (),
+            multiple=(
+                document.tag(source) == "select"
+                and "multiple" in document.attributes(source)
+            )
+            or document.attributes(source).get("aria-multiselectable") == "true",
+            control_id=clean(document.attributes(source).get("id", ""), 100)
+            if kind in {"radio", "checkbox"}
+            else "",
+            selection_group=clean(document.attributes(source).get("name", ""), 100)
+            if kind == "radio"
+            else "",
             section=section,
             group=group,
             in_viewport=area is not None and not covered,

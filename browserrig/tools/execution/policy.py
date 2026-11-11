@@ -19,6 +19,7 @@ CHAINABLE_KINDS = {
     ActionKind.TYPE,
     ActionKind.PRESS,
     ActionKind.SELECT,
+    ActionKind.SELECT_OPTIONS,
     ActionKind.SET_DATE,
 }
 TAB_KINDS = {
@@ -53,6 +54,7 @@ ACTION_KINDS = (
 PREFLIGHT_KINDS = {
     ActionKind.TYPE,
     ActionKind.SELECT,
+    ActionKind.SELECT_OPTIONS,
     ActionKind.SET_DATE,
     ActionKind.UPLOAD,
 }

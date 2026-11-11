@@ -17,11 +17,14 @@ from browserrig.scripts import (
     ELEMENT,
     SCROLL,
     SCROLL_OWNER,
+    SELECT_OPTIONS,
     ElementArgs,
     OwnerScrollArgs,
     Script,
     ScrollArgs,
     ScrollPlan,
+    SelectionResult,
+    SelectOptionsArgs,
     TextState,
 )
 
@@ -151,6 +154,14 @@ class DomElementHandle:
         """Choose a native select option by exact label or value."""
         await self._run(ElementOperation.SELECT, option)
 
+    async def validate_options(self, values: list[str]) -> None:
+        """Validate an exact native multi-select replacement without changing it."""
+        await self._selection(values, apply=False)
+
+    async def select_options(self, values: list[str]) -> SelectionResult:
+        """Replace a native multi-select set and verify after synchronous handlers."""
+        return await self._selection(values, apply=True)
+
     async def set_value(self, value: str) -> None:
         await self._run(ElementOperation.SET_VALUE, value)
 
@@ -169,6 +180,34 @@ class DomElementHandle:
         return await self.frame.run_on_node(
             self.element.backend_id, script, args, user_gesture=user_gesture
         )
+
+    async def _selection(self, values: list[str], *, apply: bool) -> SelectionResult:
+        try:
+            return await self.run(
+                SELECT_OPTIONS,
+                SelectOptionsArgs(values=tuple(values), apply=apply),
+                user_gesture=apply,
+            )
+        except BrowserError as error:
+            reason = {
+                "NOT_A_MULTI_SELECT": (
+                    "Expected a native <select multiple>; use select_option "
+                    "for a single select."
+                ),
+                "OPTION_NOT_FOUND": (
+                    "Requested option not found; inspect the available labels and values."
+                ),
+                "OPTION_AMBIGUOUS": (
+                    "Requested option is ambiguous; use an unambiguous label or value."
+                ),
+                "OPTION_DISABLED": (
+                    "Selection would change a disabled option or optgroup; "
+                    "no selection changed."
+                ),
+            }.get(str(error))
+            if reason is None:
+                raise
+            raise BrowserError(reason) from error
 
     async def _scroll_plan(self, *, apply: bool) -> tuple[Frame, ScrollPlan] | None:
         await self.tab.sync_document()

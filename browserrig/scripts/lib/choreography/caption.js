@@ -50,6 +50,7 @@ function createChoreographyCaption(ui) {
       [action.GO_FORWARD]: 'forward',
       [action.RELOAD]: 'reload',
       [action.SELECT]: 'select',
+      [action.SELECT_OPTIONS]: 'select',
       [action.SET_DATE]: 'date',
       [action.HANDLE_DIALOG]: 'dialog',
       [action.WAIT]: 'wait',
