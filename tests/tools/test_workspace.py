@@ -85,6 +85,30 @@ async def test_workspace_tools_run_without_browser_or_action_services(tmp_path):
     assert any(isinstance(event, FileReadFinishedEvent) for event in result.events)
 
 
+async def test_grep_tool_delivers_a_match_and_readable_character_offset(tmp_path):
+    (tmp_path / "note.md").write_text("Research sentinel", encoding="utf-8")
+    model = ScriptedModel([call("grep", query="sentinel"), "Found"])
+    agent = Agent(
+        model=model,
+        plugins=[
+            FakeServices(),
+            Actions(),
+            Files(LocalWorkspace(tmp_path)),
+            WorkspaceTools(),
+        ],
+    )
+    async with agent.session() as session:
+        result = await session.run("Find the research note")
+    (reply,) = [
+        event.result
+        for event in result.events
+        if isinstance(event, ToolCallFinishedEvent)
+    ]
+    assert (
+        not reply.is_error and "note.md:1:" in reply.text and "offset=0" in reply.text
+    )
+
+
 async def test_workspace_receipts_pass_through_the_browser_when_one_is_composed(
     tmp_path,
 ):
