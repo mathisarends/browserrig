@@ -518,3 +518,16 @@ output, and screenshots are omitted. Pass `TerminalEvents(output=file)` to selec
 another text stream.
 Page text, dialog messages and form value fields are omitted; URLs, filenames and
 dispatched key names remain diagnostic metadata.
+
+### Typing into fields with selected tokens
+
+`type_text(ref, text, clear=True)` replaces existing native text, but skips
+Backspace when the native field is already empty. This preserves selected chips
+in token inputs. Focus is checked after clearing and before every typed character;
+if it leaves the addressed field, the tool stops and reports that remaining text
+was not sent. Inspect the field before retrying because a prefix may be present.
+The same focus check covers embedding frames. `send_keys` continues to address
+the current page focus and does not acquire a target ref.
+
+Direct DOM users can call `await handle.is_focused()` to check the target and its
+embedding frame chain without refocusing it or reading its value.

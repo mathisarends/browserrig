@@ -90,6 +90,7 @@ class ElementOperation(StrEnum):
     POINT = "point"
     BOUNDS = "bounds"
     FOCUS = "focus"
+    FOCUSED = "focused"
     SELECT = "select"
     SET_VALUE = "set_value"
     TEXT_STATE = "text_state"

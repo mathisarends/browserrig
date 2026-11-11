@@ -68,6 +68,10 @@ function browserrigElement({operation, value, clip = null, aim = null}) {
   if (operation === 'focus') {
     return focus();
   }
+  if (operation === 'focused') {
+    const active = el.getRootNode().activeElement;
+    return active === el || (el.isContentEditable && el.contains(active));
+  }
   if (operation === 'text_state') {
     // Passwords, editors and non-text controls need their own value semantics.
     if (
