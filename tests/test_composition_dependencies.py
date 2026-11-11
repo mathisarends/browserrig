@@ -91,6 +91,7 @@ async def test_each_browser_tool_has_a_unique_stable_kind(fake_chrome):
         "type_text": ActionKind.TYPE,
         "send_keys": ActionKind.PRESS,
         "select_option": ActionKind.SELECT,
+        "select_options": ActionKind.SELECT_OPTIONS,
         "set_date": ActionKind.SET_DATE,
         "open_tab": ActionKind.OPEN_TAB,
         "switch_tab": ActionKind.SWITCH_TAB,

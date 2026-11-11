@@ -23,6 +23,7 @@ CHECKABLE_ROLES = frozenset(
 
 class Option(Options):
     label: str
+    value: str | None = None
     selected: bool = False
     disabled: bool = False
 
@@ -55,6 +56,9 @@ class ElementInfo(ElementRef):
     description: str = ""
     href: str = ""
     options: tuple[Option, ...] = ()
+    multiple: bool = False
+    control_id: str = ""
+    selection_group: str = ""
     section: str = ""
     group: str = ""
     in_viewport: bool = True
@@ -274,6 +278,8 @@ class CapturedImage:
 class ElementFingerprint(Options):
     role: str
     name: str
+    options: tuple[Option, ...] = ()
+    multiple: bool = False
     description: str = ""
     scroll: ScrollInfo | None = None
     in_viewport: bool = True

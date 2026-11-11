@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Expose explicit radio values/IDs/groups, control title guidance, native option
+  values and multi-select states. Add select_options to replace and verify an
+  exact native multiple-selection set with whole-request validation.
+
 - Reveal DOM input targets by scrolling their exact containers, avoiding unrelated
   editor wheel interception. Report bounded, measured auto-scroll positions in
   success and failure receipts. Keep custom backend wheel planning unchanged.

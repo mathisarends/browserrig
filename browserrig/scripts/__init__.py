@@ -32,6 +32,9 @@ from .models import (
     SecretFocus,
     SecretFocusArgs,
     SeedArgs,
+    SelectedOption,
+    SelectionResult,
+    SelectOptionsArgs,
     TabStrip,
     TargetScrollArgs,
     TargetScrollResult,
@@ -57,6 +60,7 @@ __all__ = [
     "RESET",
     "SCROLL",
     "SCROLL_OWNER",
+    "SELECT_OPTIONS",
     "SECRET_FIELD",
     "SECRET_FOCUS",
     "SEED",
@@ -81,6 +85,9 @@ __all__ = [
     "ScriptError",
     "ScrollArgs",
     "ScrollPlan",
+    "SelectOptionsArgs",
+    "SelectedOption",
+    "SelectionResult",
     "SecretField",
     "SecretFieldArgs",
     "SecretFocus",
@@ -102,6 +109,9 @@ class ScriptError(StrEnum):
     NOT_EDITABLE = "NOT_EDITABLE"
     OPTION_NOT_FOUND = "OPTION_NOT_FOUND"
     NOT_A_SELECT = "NOT_A_SELECT"
+    NOT_A_MULTI_SELECT = "NOT_A_MULTI_SELECT"
+    OPTION_AMBIGUOUS = "OPTION_AMBIGUOUS"
+    OPTION_DISABLED = "OPTION_DISABLED"
     INVALID_VALUE = "INVALID_VALUE"
     NOT_FILE_INPUT = "NOT_FILE_INPUT"
     FILE_INPUT_NOT_MULTIPLE = "FILE_INPUT_NOT_MULTIPLE"
@@ -190,6 +200,9 @@ CHOREOGRAPHY: Script[ScriptArgs, None] = Script.load(
         "choreography/caption",
         "choreography/work",
     ),
+)
+SELECT_OPTIONS: Script[SelectOptionsArgs, SelectionResult] = Script.load(
+    "select_options", SelectOptionsArgs, SelectionResult, uses=("elements",)
 )
 READING_SCROLL: Script[ReadingScrollArgs, bool] = Script.load(
     "reading_scroll", ReadingScrollArgs, bool

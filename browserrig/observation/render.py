@@ -12,13 +12,13 @@ from urllib.parse import unquote, urlsplit
 from browserrig.core import ReadinessStatus
 
 from .flow import render_flow
-from .models import CHECKABLE_ROLES, Canvas, ElementInfo, Heading, Snapshot
+from .models import CHECKABLE_ROLES, Canvas, ElementInfo, Heading, Option, Snapshot
 from .redirects import unwrap_redirect
 
 _PLAIN_TYPES = frozenset(
     {"", "text", "checkbox", "radio", "submit", "button", "search"}
 )
-_FLAGS = ("required", "readonly", "invalid", "focused", "draggable")
+_FLAGS = ("required", "readonly", "invalid", "focused", "draggable", "multiple")
 _MAX_NAME = 100
 _MAX_HREF = 80
 _MAX_OPTIONS = 10
@@ -297,12 +297,12 @@ def _element(element: ElementInfo, url: str) -> str:
         and not element.value
     ):
         parts.append(f"placeholder={_quote(element.placeholder, 60)}")
+    if element.control_id:
+        parts.append(f"id={_quote(element.control_id, 100)}")
+    if element.selection_group:
+        parts.append(f"selection_group={_quote(element.selection_group, 100)}")
     if element.options:
-        shown = [
-            f"{_cut(option.label, 40)}{'*' if option.selected else ''}"
-            f"{' (disabled)' if option.disabled else ''}"
-            for option in element.options[:_MAX_OPTIONS]
-        ]
+        shown = [_option(option) for option in element.options[:_MAX_OPTIONS]]
         if len(element.options) > _MAX_OPTIONS:
             shown.append(f"…+{len(element.options) - _MAX_OPTIONS}")
         parts.append(f"options=[{', '.join(shown)}]")
@@ -318,6 +318,17 @@ def _element(element: ElementInfo, url: str) -> str:
             f"x={bounds.x:.0f} y={bounds.y:.0f} {bounds.width:.0f}x{bounds.height:.0f}"
         )
     return " ".join(parts)
+
+
+def _option(option: Option) -> str:
+    text = _cut(option.label, 40)
+    if option.value is not None and option.value != option.label:
+        text += f" value={_quote(option.value, 40)}"
+    return (
+        text
+        + ("*" if option.selected else "")
+        + (" (disabled)" if option.disabled else "")
+    )
 
 
 def _states(element: ElementInfo) -> list[str]:

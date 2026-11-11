@@ -609,3 +609,54 @@ further scroll is planned. `RevealStep.changed` reflects measured movement.
 `ScrollableElement` backends retain the existing Mouse/Motor wheel path.
 Programmatic DOM scrolling does not emit synthetic native wheel events.
 Agent tool signatures are unchanged.
+
+
+### Selection metadata and exact native multi-selects
+
+Observations mark native multiple selects and explicit ARIA multi-select widgets
+with `multiple`. Options retain their labels, selected/disabled states and explicit
+HTML values (`Option.value` is null if the value attribute is absent). Selected
+entries have `*`; explicit values are shown when they differ from their labels.
+
+Native radios and checkboxes expose explicit values and IDs. Radios also expose
+their native name as `selection_group`; grouping remains local to the owning
+form/document. These are raw metadata, not interpreted scores. For example, the
+Magento widget recorded in task 116 provides:
+
+```text
+radio "★" unchecked value="20" id="Rating_5" selection_group="ratings[4]"
+radio "★" checked value="18" id="Rating_3" selection_group="ratings[4]"
+```
+
+The extractor does not turn value 20 into a twenty-star or five-star score.
+Existing ARIA descriptions take precedence over explicit control/label titles.
+Password values remain omitted. `ElementInfo` adds `multiple`, `control_id` and
+`selection_group`; default values preserve custom capture compatibility.
+
+The agent can replace a native multi-select's selected set in one call:
+
+```python
+select_options(ref="123", values=["General", "Wholesale"])
+select_options(ref="123", values=[])  # Clear the selected set.
+```
+
+Each item must identify exactly one option by its value or normalized displayed
+label. Duplicate requests for the same option are deduplicated. Ambiguous,
+missing or disabled changes reject the whole request before any selected flag
+changes or input/change event is emitted. Disabled optgroups and disabled selects
+are respected. All validation runs again immediately before mutation. Unchanged
+sets emit no events.
+
+After mutation, the tool verifies option identity and the full selected set after
+synchronous input/change handlers. If the page changes it or detaches the control,
+the result reports failure and a bounded observed selection instead of success.
+Success receipts show the selected count and at most ten label/value pairs.
+Asynchronous application changes remain subject to the normal next observation.
+
+Direct DOM integrations can use `await handle.validate_options(values)` for
+read-only validation and `await handle.select_options(values)` for the typed
+`SelectionResult(selected, verified, reason)`. Callers must check `verified`.
+The new durable action identity is `ActionKind.SELECT_OPTIONS` (`select_options`).
+Existing `select_option` behavior is unchanged. The new tool supports native
+`<select multiple>`; custom listboxes and chip inputs still use their ordinary
+controls. Selection option identity/state now participates in page fingerprints.

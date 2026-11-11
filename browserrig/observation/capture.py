@@ -462,6 +462,8 @@ def _fingerprint(page: PageContent, document_id: str) -> str:
                 in_viewport=element.in_viewport,
                 value=element.value,
                 description=element.description,
+                options=element.options,
+                multiple=element.multiple,
                 scroll=element.scroll,
                 disabled=element.disabled,
                 checked=element.checked,

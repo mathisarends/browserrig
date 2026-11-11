@@ -30,6 +30,22 @@ class ScrollArgs(ScriptArgs):
     apply: bool = False
 
 
+class SelectOptionsArgs(ScriptArgs):
+    values: tuple[str, ...]
+    apply: bool = False
+
+
+class SelectedOption(Options):
+    label: str
+    value: str
+
+
+class SelectionResult(Options):
+    selected: tuple[SelectedOption, ...]
+    verified: bool
+    reason: str = ""
+
+
 class TargetScrollArgs(ScriptArgs):
     delta_x: float = 0
     delta_y: float = 0

@@ -280,6 +280,7 @@ def _failure(kind: ActionKind, reason: str, dispatched: bool) -> str:
         ActionKind.TYPE: "Text input",
         ActionKind.PRESS: "Keyboard input",
         ActionKind.SELECT: "Selection",
+        ActionKind.SELECT_OPTIONS: "Selection",
         ActionKind.SET_DATE: "Date input",
         ActionKind.UPLOAD: "File assignment",
     }.get(kind, kind.value.replace("_", " ").capitalize())
