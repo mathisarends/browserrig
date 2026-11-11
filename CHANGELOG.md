@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Save agent `extract_content` results as workspace Markdown and return only
+  `Saved`, `Source`, `Title` and actual extraction limitations. Remove its inline
+  body and `max_chars`/`offset` arguments; without a workspace the tool is disabled.
+  Add bounded workspace `grep` and `glob` tools for targeted reads. Direct Python
+  Markdown extraction and full typed presentation data remain available.
 - Upgrade Harnessed and every provider/MCP/OTel extra to 0.16.0. `TaskMemory`
   accepts `llm`, replacement `prompt` factories, `keep_last_steps`, whole-input
   targets and `max_summary_tokens`; custom summarizers now accept

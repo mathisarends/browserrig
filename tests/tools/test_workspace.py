@@ -67,6 +67,8 @@ async def test_workspace_tools_run_without_browser_or_action_services(tmp_path):
             "read_file",
             "write_file",
             "edit_file",
+            "glob",
+            "grep",
         }
         result = await session.run("Save and read a note")
         assert (
@@ -96,6 +98,24 @@ async def test_workspace_receipts_pass_through_the_browser_when_one_is_composed(
     (written,) = services.events
     assert isinstance(written, FileWrittenEvent)
     assert written.browser_id == services.browser.id and written.path == "***"
+
+
+async def test_grep_tool_delivers_bounded_matches_with_readable_offsets(tmp_path):
+    (tmp_path / "note.md").write_text("Research sentinel", encoding="utf-8")
+    agent = Agent(
+        model=ScriptedModel([call("grep", query="sentinel"), "Found"]),
+        plugins=[Files(LocalWorkspace(tmp_path)), WorkspaceTools()],
+    )
+    async with agent.session() as session:
+        result = await session.run("Find the research note")
+    (reply,) = [
+        event.result
+        for event in result.events
+        if isinstance(event, ToolCallFinishedEvent)
+    ]
+    assert (
+        not reply.is_error and "note.md:1:" in reply.text and "offset=0" in reply.text
+    )
 
 
 @pytest.mark.parametrize("with_browser", [False, True])

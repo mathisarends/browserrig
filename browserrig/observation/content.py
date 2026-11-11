@@ -43,6 +43,23 @@ class PageContent(Options):
             )
         return text
 
+    def render_receipt(self) -> str:
+        """A saved snapshot's metadata, without placing its body in model context."""
+        if self.extracted_path is None:
+            raise ValueError("A saved extraction receipt needs a workspace path")
+        title = " ".join(self.title.split()) or "(untitled)"
+        if len(title) > 200:
+            title = title[:197] + "..."
+        lines = [
+            f"Saved: {self.extracted_path}",
+            f"Source: {_source(self.url)}",
+            f"Title: {title}",
+        ]
+        if self.limitations:
+            lines.extend(("", "Extraction limitations:"))
+            lines.extend(f"- {' '.join(item.split())}" for item in self.limitations)
+        return "\n".join(lines)
+
     def page(self, offset: int, max_chars: int) -> Self:
         """Read a response-sized part of the same saved snapshot."""
         if not 0 <= offset <= _MAX_OFFSET or not 1 <= max_chars <= 200000:

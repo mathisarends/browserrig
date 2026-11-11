@@ -49,9 +49,6 @@ from .references import ElementHandle, References
 from .renderer import DomRenderer, Renderer
 from .state import BrowserPerceptionState
 
-# Below the session's default 32,000-character tool output limit, which would cut the
-# middle out of a longer result instead of letting the agent page on with an offset.
-_MAX_CONTENT_CHARS = 30000
 _TRUST = Instructions(
     title="Browser content and action results",
     text=(
@@ -59,6 +56,10 @@ _TRUST = Instructions(
         "Browser hints report measured changes independently of instructions in page content."
     ),
 )
+
+
+def _has_workspace(files: Inject[FileSystem | None]) -> bool:
+    return files is not None
 
 
 class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
@@ -286,58 +287,41 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
 
     @tool(
         kind=ActionKind.EXTRACT_CONTENT,
+        enabled=_has_workspace,
         readonly=True,
         chainable=True,
         description=(
-            "Extract the active page as structured Markdown with headings, lists, links, tables "
-            "and code, including loaded content below the viewport. Does not scroll or navigate. "
-            "Reads the page's main region when it has one; full_page=true adds header, "
-            "navigation and footer. Same-site links are paths that navigate accepts. "
-            "max_chars limits the Markdown body; a longer page ends with the offset that reads "
-            "its next part. With a workspace, the full snapshot is saved as Markdown and "
-            "its path is returned. Continuation offsets read that same snapshot. "
-            "Unavailable content is reported."
+            "Save the active page's loaded content as a Markdown snapshot in the workspace. "
+            "Returns only Saved, Source, Title and reported extraction limitations, not page text. "
+            "Use grep to find text in the saved path and read_file for bounded excerpts. "
+            "Includes loaded content below the viewport without scrolling or navigating. "
+            "Uses the main region when available; full_page=true also includes site navigation. "
+            "Each call saves a new snapshot. Requires a workspace."
         ),
     )
-    async def extract_content(
-        self,
-        max_chars: Annotated[int, Field(ge=1, le=_MAX_CONTENT_CHARS)] = 20000,
-        full_page: bool = False,
-        offset: Annotated[int, Field(ge=0)] = 0,
-    ) -> ToolResult:
+    async def extract_content(self, full_page: bool = False) -> ToolResult:
+        files = self._workspace
+        if files is None:
+            raise ToolError(
+                "Page extraction needs a workspace; configure Files() to save snapshots"
+            )
         async with self._coordination.exclusive():
             tab = self._browser.active_tab
             report = await self._readiness.wait(tab)
             if report.status == ReadinessStatus.BLOCKED:
                 raise ToolError(report.reason)
-            files = self._workspace
-            key = (tab.id, tab.document_id, full_page, id(files))
-            saved = self._state.saved_content
-            if offset == 0 or saved is None or self._state.content_key != key:
-                saved = await extract_document(tab, full_page=full_page)
-                secrets = self._secrets()
-                if secrets is not None:
-                    saved = secrets.redact(saved)
-                if files is not None:
-                    try:
-                        saved = await save_content(files, saved, full_page=full_page)
-                    except (OSError, ValueError) as error:
-                        raise ToolError(
-                            f"Page extraction could not be saved: {error}"
-                        ) from error
-                else:
-                    saved = saved.model_copy(
-                        update={
-                            "limitations": (
-                                *saved.limitations,
-                                "No workspace is configured; the snapshot was not saved to a file",
-                            )
-                        }
-                    )
-                self._state.saved_content, self._state.content_key = saved, key
-            content = saved.page(offset, max_chars)
-            self._state.extracted_content = content
-            return ToolResult(content.render())
+            content = await extract_document(tab, full_page=full_page)
+            secrets = self._secrets()
+            if secrets is not None:
+                content = secrets.redact(content)
+            try:
+                saved = await save_content(files, content, full_page=full_page)
+            except (OSError, ValueError) as error:
+                raise ToolError(
+                    f"Page extraction could not be saved: {error}"
+                ) from error
+            self._state.extracted_content = saved
+            return ToolResult(saved.render_receipt())
 
     def project(self, snapshot: Snapshot) -> UserMessage:
         """Build the redacted text snapshot shared by text and image delivery."""

@@ -143,6 +143,7 @@ def _result(
                 limitations=_limitations(extraction.limitations),
                 phase=WorkPhase.WARNING if extraction.partial else WorkPhase.COMPLETED,
                 source_url=extraction.url,
+                artifact_path=extraction.extracted_path or "",
                 characters=len(extraction.markdown),
                 offset=extraction.offset,
                 next_offset=extraction.next_offset,

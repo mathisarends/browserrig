@@ -92,9 +92,10 @@ offsets, limitations and saved paths remain in the receipt for a Canvas detail
 view; the inert overlay never renders them as HTML or takes pointer or keyboard
 focus.
 
-`extract_content` still returns Markdown without writing a workspace file. Its latest
-successful typed result is available as `BrowserPerception.extracted_content`, with
-`next_offset` and `partial` metadata. File conversions keep their existing `.content/`
+`extract_content` saves a Markdown snapshot and returns only a short file receipt.
+Its latest successful full typed result is available as
+`BrowserPerception.extracted_content`, including its saved path and actual
+extraction limitations. File conversions keep their existing `.content/`
 artifacts. A visible saved path always refers to an existing file, not a fictional
 download created by the animation.
 

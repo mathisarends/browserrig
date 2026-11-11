@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath
 from types import TracebackType
 from typing import Literal, Self
 
+from harnessed.plugins.filesystem import PathMatches, SearchResult
 from harnessed.tracing import traced
 
 from .config import FileOptions
@@ -14,6 +15,7 @@ from .content import ReadRequest
 from .indexing import Indexing
 from .models import FileContent, FileEntry, FileExtraction, FileListing
 from .reading import FileReader
+from .search import Search
 from .workspace import FileStat, LocalWorkspace, Workspace, workspace_path
 
 
@@ -41,6 +43,7 @@ class FileSystem:
             if isinstance(workspace, LocalWorkspace)
             else None
         )
+        self._search = Search(workspace, self.options.max_expanded_bytes)
         self._exits = AsyncExitStack()
         self._copy_locks: dict[str, asyncio.Lock] = {}
         self._edit_locks: dict[str, asyncio.Lock] = {}
@@ -72,6 +75,27 @@ class FileSystem:
 
     async def exists(self, path: str) -> bool:
         return await self.workspace.stat(workspace_path(path)) is not None
+
+    async def glob(
+        self, pattern: str = "**/*", *, limit: int = 200, include_hidden: bool = False
+    ) -> PathMatches:
+        if not 1 <= limit <= 1000:
+            raise ValueError("Glob limit must be in [1, 1000]")
+        return await self._search.glob(
+            pattern, limit=limit, include_hidden=include_hidden
+        )
+
+    async def grep(
+        self,
+        query: str,
+        *,
+        pattern: str = "**/*.md",
+        limit: int = 100,
+        include_hidden: bool = False,
+    ) -> SearchResult:
+        return await self._search.grep(
+            query, pattern=pattern, limit=limit, include_hidden=include_hidden
+        )
 
     @traced
     async def list_files(

@@ -42,11 +42,12 @@ class DomRenderer:
         elif self.sparse_text_chars:
             text += (
                 "When the viewport holds few controls, observations add its visible text; "
-                "otherwise use extract_content to read the page. "
+                "otherwise extract_content saves it for targeted file reads. "
             )
         else:
             text += (
-                "Observations omit page text; use extract_content to read the page. "
+                "Observations omit page text; "
+                "extract_content saves it for targeted file reads. "
             )
         if self.max_text_chars or self.sparse_text_chars:
             text += (

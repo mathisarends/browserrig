@@ -101,6 +101,8 @@ async def test_each_browser_tool_has_a_unique_stable_kind(fake_chrome):
         "list_downloads": ActionKind.LIST_DOWNLOADS,
         "list_files": ActionKind.LIST_FILES,
         "read_file": ActionKind.READ_FILE,
+        "glob": ActionKind.GLOB,
+        "grep": ActionKind.GREP,
         "write_file": ActionKind.WRITE_FILE,
         "edit_file": ActionKind.EDIT_FILE,
         "open_file": ActionKind.OPEN_FILE,

@@ -69,7 +69,8 @@ they locate their target again before every input.
 CDP session and derives roles, names, states, visibility and landmark sections from
 that data in Python, without walking the DOM in the page. Normal observations include
 up to 3,000 characters of visible page text, along with nearby control previews,
-and do not capture new screenshots. Use `extract_content()` to read the full page.
+and do not capture new screenshots. Use `extract_content()` to save page content
+for targeted searches and file reads.
 The agent can call `screenshot()` to request the current view as an
 image in its next iteration. `ImageContext` keeps the latest screenshot by default,
 including during subsequent text-only steps until compaction removes its snapshot.
@@ -209,20 +210,28 @@ use the shared action lock, readiness checks, and action receipts.
 
 ## Page content as Markdown
 
-The agent can call `extract_content(max_chars=50000)` to read the active page as
-structured Markdown. The result includes the page title and source URL, headings,
-paragraphs, emphasis, lists, links with absolute URLs, tables, quotes, and code.
+The agent calls `extract_content(full_page=False)` to save the active page as
+structured Markdown in its workspace. It returns only `Saved`, `Source`, `Title`
+and actual extraction limitations. The Markdown body stays in the file; use `grep`
+for bounded matches and `read_file` with `offset` and `max_chars` for excerpts.
+Each call saves a new snapshot. The tool requires a workspace and has no inline
+fallback or `max_chars`/`offset` arguments.
 It reads already loaded content below the viewport without scrolling, navigating,
 or invalidating the current element references. Open and closed shadow roots and
 available same-origin and cross-origin frame documents are included.
 
-`max_chars` limits the Markdown body (1–200000 characters); the title, source URL,
-and extraction limitations are reported separately. Truncation, unavailable DOM
+The saved snapshot contains headings, paragraphs, emphasis, lists, links, tables,
+quotes and code. Truncation, unavailable DOM
 metadata, and unavailable frames are explicit. Offscreen rendered frame documents
 are included. Scripts, styles, hidden content, and form field values are excluded.
 Lazy content must already be
 loaded; images contribute their alt text, and canvas pixels are not converted to
 text. Use `screenshot()` when visual inspection is needed.
+
+The direct Python helper `browserrig.observation.content.extract_content(tab,
+max_chars=50000, full_page=False, offset=0)` still returns a typed Markdown result
+with continuation offsets. It does not require a workspace or change the agent
+tool's short receipt contract.
 
 ## Finding text on the page
 

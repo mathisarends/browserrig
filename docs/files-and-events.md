@@ -66,17 +66,40 @@ path such as `downloads/<id>/report.pdf` or `notes/summary.md`.
 
 ## Saved webpage extractions
 
-With `Files()` configured, every new `extract_content` snapshot is written to
-`pages/<unique-id>/content.md` with `source.json` recording the URL, title, capture
-time, extraction mode and limitations. The response names the saved path.
-`max_chars` bounds the tool response, independently of the saved Markdown.
-Subsequent `offset` calls read the same snapshot while the tab, document, extraction
-mode and workspace remain the same; `offset=0` captures a new version.
+With `Files()` configured, each `extract_content(full_page=False)` call writes a
+new snapshot to `pages/<unique-id>/content.md`. Adjacent `source.json` records the
+URL, title, capture time, extraction mode and reported limitations. The agent sees
+only a receipt, without the page body or a generated summary:
+
+```text
+Saved: pages/<unique-id>/content.md
+Source: https://example.org/report
+Title: Report
+```
+
+Actual extraction limitations follow the receipt when present. The tool infers no
+semantic contents or completeness claims. Use `grep(query, pattern=<saved-path>)`
+to find bounded matches and `read_file(path, offset=..., max_chars=4000)` to inspect
+an excerpt. The snapshot remains readable after navigating elsewhere; a later
+extraction saves a separate file. Agent-tool `max_chars` and `offset` parameters
+are removed: reading and pagination belong to the file tools.
 
 The snapshot covers loaded, extractable content and is bounded to 2,000,000
 characters plus DOM traversal limits. Missing or truncated content is reported.
-Without a workspace the tool still works and explicitly reports that no file was
-saved. Configured secret values are redacted before persistence.
+The agent tool is unavailable without a workspace and never falls back to inline
+page text. Configured secret values are redacted before persistence. The direct
+Python helper `browserrig.observation.content.extract_content(tab, ...)` still
+returns Markdown and supports `max_chars`/`offset` without requiring a workspace.
+
+`glob(pattern="**/*", limit=200)` finds workspace files. `grep(query,
+pattern="**/*.md", limit=20)` searches literal text case-insensitively and returns
+bounded `path:line` snippets with Unicode character offsets for `read_file`.
+Search reads complete UTF-8 files, including text beyond file-preview limits.
+Hidden directories and internal caches are excluded unless `include_hidden=True`.
+File counts, scanned bytes, directory walks and match counts are bounded; skipped
+files, partial extractions and incomplete searches are reported. At most 20 notes
+are returned, with an omitted count when needed. A limited search is not evidence
+that the requested text is absent.
 
 The default recipe's `Files` plugin gives each session a local workspace under
 `.browserrig/files/<unique-id>/`. Files remain available after the session ends.

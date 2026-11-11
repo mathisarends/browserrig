@@ -73,6 +73,8 @@ class ActionKind(StrEnum):
     LIST_DOWNLOADS = "list_downloads"
     LIST_FILES = "list_files"
     READ_FILE = "read_file"
+    GLOB = "glob"
+    GREP = "grep"
     WRITE_FILE = "write_file"
     EDIT_FILE = "edit_file"
     OPEN_FILE = "open_file"
