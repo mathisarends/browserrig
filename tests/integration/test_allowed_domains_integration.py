@@ -164,7 +164,9 @@ async def test_model_receives_blocked_navigation_error_and_can_continue(guarded_
 async def test_without_policy_browsing_is_unrestricted(guarded_site):
     _, denied, requests, _, _, _ = guarded_site
     async with ChromeBrowser(Launch(url=denied)) as browser:
-        assert await browser.active_tab.evaluate("location.hostname") == '"localhost"'
+        tab = browser.active_tab
+        await wait_for_page(tab)
+        assert await tab.evaluate("location.hostname") == '"localhost"'
     assert any("Host: localhost:" in request for request in requests)
 
 
@@ -199,6 +201,7 @@ async def test_connected_browser_cleans_up_guard_without_restricting_other_tabs(
     allowed, denied, _, _, _, _ = guarded_site
     async with ChromeBrowser(Launch(url=allowed)) as host:
         existing = host.active_tab
+        await wait_for_page(existing)
         options = Connect(
             endpoint=host.client.transport.url,
             target_id=existing.id if attach else None,
