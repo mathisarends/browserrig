@@ -11,11 +11,14 @@ from harnessed.testing import ScriptedModel
 from browserrig import (
     BrowserPerception,
     CaptureContent,
+    DomElements,
+    DomTypingTools,
     ElementInfo,
     ElementRef,
     PageContent,
     Readiness,
     ScrollStep,
+    TextContext,
 )
 from browserrig.core import Bounds, BrowserError, ElementPoint, Point, StaleElement
 from browserrig.events import ActionFailedEvent
@@ -24,6 +27,7 @@ from browserrig.kinds import MouseEventKind
 from browserrig.observation import (
     DomElementHandle,
     DomReferences,
+    DomRenderer,
     Element,
     Snapshot,
     render,
@@ -162,7 +166,7 @@ async def test_non_dom_data_needs_a_resolver_instead_of_invented_dom_addresses()
     backend = _Backend()
     backend.use_references = False
     async with _observed(backend) as env:
-        with pytest.raises(BrowserError, match="must supply References"):
+        with pytest.raises(BrowserError, match="no element references"):
             await env.observe.element(env.tab, "shape/a")
         env.tab.frames.assert_not_awaited()
 
@@ -183,11 +187,11 @@ async def test_dom_capabilities_are_checked_per_target_in_a_mixed_capture():
         frame = SimpleNamespace(id="native-frame")
         env.tab.frames.return_value = (frame,)
         env.tab.frames.side_effect = None
-        native = await env.observe.dom_element(env.tab, "native")
+        native = await env.scope[DomElements].resolve(env.tab, "native")
         assert isinstance(native, DomElementHandle)
         assert native.frame is frame and native.element.backend_id == 5
         with pytest.raises(BrowserError, match="requires a DOM element"):
-            await env.observe.dom_element(env.tab, "shape/a")
+            await env.scope[DomElements].resolve(env.tab, "shape/a")
         env.tab.frames.assert_awaited_once()
 
 
@@ -272,7 +276,7 @@ async def test_backend_refs_use_normal_mouse_and_keyboard_and_end_action_chains(
     async with _observed(_Backend()) as env:
         original = env.observe.snapshot
         click = await env.scope[_Pointer].click("shape/a")
-        typed = await env.scope[_Keys].send_keys(text="Hi")
+        typed = await env.scope[_NativeKeys].send_keys(text="Hi")
         events = env.tab.dispatch_mouse.await_args_list
         assert [
             call.args[0] for call in events if call.args[0] != MouseEventKind.MOVED
@@ -355,7 +359,11 @@ class _Forms(FormTools, provides=True):
     pass
 
 
-class _Keys(KeyboardTools, provides=True):
+class _Keys(DomTypingTools, provides=True):
+    pass
+
+
+class _NativeKeys(KeyboardTools, provides=True):
     pass
 
 
@@ -470,10 +478,12 @@ async def _observed(backend):
         plugins=[
             FakeChrome(holder),
             _Ready(),
-            BrowserPerception(capture=backend),
+            _MixedPerception(capture=backend, renderer=DomRenderer()),
+            TextContext(),
             Actions(),
             _Forms(),
             _Keys(),
+            _NativeKeys(),
             _Uploads(),
             _Pointer(),
         ],
@@ -504,3 +514,9 @@ async def _observed(backend):
             actions=session.scope[Actions],
             events=events,
         )
+
+
+class _MixedPerception(BrowserPerception, provides=BrowserPerception):
+    async def setup(self, scope):
+        await super().setup(scope)
+        scope.provide(DomElements, DomElements(self))

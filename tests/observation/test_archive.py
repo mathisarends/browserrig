@@ -14,14 +14,16 @@ from browserrig import (
     Files,
     FileSystem,
     LocalWorkspace,
+    PageExtractionTools,
     Readiness,
+    TextContext,
 )
-from browserrig.observation import CaptureContent
+from browserrig.observation import CaptureContent, DomPerception, DomRenderer
 from browserrig.observation import PageContent as CapturedPage
-from browserrig.observation import plugin as observation_plugin
 from browserrig.observation.archive import save_content
 from browserrig.observation.content import PageContent
 from browserrig.tools import WorkspaceTools
+from browserrig.tools import extraction as extraction_module
 from tests.fakes import FakeChrome
 
 
@@ -56,7 +58,7 @@ async def test_receipt_keeps_page_body_out_of_context_and_search_reads_the_saved
             markdown=body,
         )
     )
-    monkeypatch.setattr(observation_plugin, "extract_document", capture)
+    monkeypatch.setattr(extraction_module, "extract_document", capture)
     agent = Agent(
         model=(
             model := ScriptedModel(
@@ -71,12 +73,14 @@ async def test_receipt_keeps_page_body_out_of_context_and_search_reads_the_saved
             FakeChrome({}),
             Readiness(),
             Files(LocalWorkspace(tmp_path)),
-            BrowserPerception(capture=_Capture()),
+            BrowserPerception(capture=_Capture(), renderer=DomRenderer()),
+            PageExtractionTools(),
+            TextContext(),
             WorkspaceTools(),
         ],
     )
     async with agent.session() as session:
-        observe = session.scope[BrowserPerception]
+        observe = session.scope[PageExtractionTools]
         result = await session.run("Save the report, then find its final line")
         saved = observe.extracted_content
         assert saved is not None and saved.markdown == body
@@ -114,18 +118,20 @@ async def test_each_tool_call_saves_a_new_snapshot_without_changing_the_previous
             markdown="Original line\n" * 100,
         )
     )
-    monkeypatch.setattr(observation_plugin, "extract_document", capture)
+    monkeypatch.setattr(extraction_module, "extract_document", capture)
     agent = Agent(
         model=ScriptedModel(["Done"]),
         plugins=[
             FakeChrome({}),
             Readiness(),
             Files(LocalWorkspace(tmp_path)),
-            BrowserPerception(capture=_Capture()),
+            BrowserPerception(capture=_Capture(), renderer=DomRenderer()),
+            PageExtractionTools(),
+            TextContext(),
         ],
     )
     async with agent.session() as session:
-        observe = session.scope[BrowserPerception]
+        observe = session.scope[PageExtractionTools]
         await observe.extract_content()
         first = observe.extracted_content
         capture.return_value = PageContent(
@@ -147,7 +153,7 @@ async def test_each_tool_call_saves_a_new_snapshot_without_changing_the_previous
 async def test_extraction_is_unavailable_without_a_workspace():
     agent = Agent(
         model=ScriptedModel(["Done"]),
-        plugins=[FakeChrome({}), Readiness(), BrowserPerception()],
+        plugins=[FakeChrome({}), Readiness(), DomPerception()],
     )
     async with agent.session() as session:
         assert "extract_content" not in {
@@ -162,20 +168,22 @@ async def test_save_failure_does_not_return_inline_content(tmp_path, monkeypatch
         )
     )
     save = AsyncMock(side_effect=OSError("Storage unavailable"))
-    monkeypatch.setattr(observation_plugin, "extract_document", capture)
-    monkeypatch.setattr(observation_plugin, "save_content", save)
+    monkeypatch.setattr(extraction_module, "extract_document", capture)
+    monkeypatch.setattr(extraction_module, "save_content", save)
     agent = Agent(
         model=ScriptedModel([call("extract_content"), "Done"]),
         plugins=[
             FakeChrome({}),
             Readiness(),
             Files(LocalWorkspace(tmp_path)),
-            BrowserPerception(capture=_Capture()),
+            BrowserPerception(capture=_Capture(), renderer=DomRenderer()),
+            PageExtractionTools(),
+            TextContext(),
         ],
     )
     async with agent.session() as session:
         result = await session.run("Save the report")
-        assert session.scope[BrowserPerception].extracted_content is None
+        assert session.scope[PageExtractionTools].extracted_content is None
     (reply,) = [
         event.result
         for event in result.events

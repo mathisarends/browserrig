@@ -18,19 +18,24 @@ from .core import ModelProfile
 from .files import Files, FileTransfers
 from .memory import TaskMemory
 from .nudges import Nudges
-from .observation import BrowserPerception, ImageContext
+from .observation import DomPerception, ImageContext, TextContext
 from .pacing import InputPacing
 from .readiness import DownloadReadiness, Readiness
 from .tools import (
     Actions,
     DialogTools,
+    DomActionChains,
+    DomScrollTools,
+    DomTypingTools,
     FileTools,
     FindTools,
     FormTools,
     JavaScriptTools,
     KeyboardTools,
     NavigationTools,
+    PageExtractionTools,
     PointerTools,
+    ScreenshotTools,
     TabTools,
 )
 
@@ -83,15 +88,19 @@ def browser_pack(
             Readiness(),
             DownloadReadiness(),
             Nudges(),
-            BrowserPerception(),
+            DomPerception(),
+            TextContext(),
             ImageContext(),
             # Explain screenshot coordinates before the chains that refer to them.
             # Harnessed resolves setup dependencies independently of prompt order.
             PointerTools(),
-            Actions(),
+            Actions(chain_policy=DomActionChains()),
             NavigationTools(),
             JavaScriptTools(),
             KeyboardTools(),
+            DomTypingTools(),
+            DomScrollTools(),
+            ScreenshotTools(),
             FormTools(),
             TabTools(),
             DialogTools(),
@@ -101,6 +110,7 @@ def browser_pack(
             FileTransfers(),
             DownloadReceiving(),
             FileTools(),
+            PageExtractionTools(),
             TaskMemory(
                 trigger=WindowRatio(),
                 keep_last_steps=model_profile.keep_last_steps if model_profile else 2,

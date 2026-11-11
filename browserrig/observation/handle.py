@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -131,6 +132,40 @@ class DomElementHandle:
         if step.changed:
             self.tab.layout_changed()
         return step
+
+    async def reveal(self, *, report: Callable[[str], None] | None = None) -> bool:
+        """Reveal DOM geometry with exact container scrolling and measured receipts."""
+        scrolled = False
+        stalled = 0
+        async with asyncio.timeout(20):
+            for _ in range(32):
+                step = await self.reveal_step()
+                if step is None:
+                    return scrolled
+                if step.changed:
+                    scrolled = True
+                    stalled = 0
+                    self.tab.layout_changed()
+                    if report is not None:
+                        positions = ", ".join(
+                            f"{axis}: {getattr(step.before, axis):g} → "
+                            f"{getattr(step.after, axis):g}"
+                            for axis in ("x", "y")
+                            if getattr(step.before, axis) != getattr(step.after, axis)
+                        )
+                        report(
+                            f"Auto-scrolled {step.container} to reveal "
+                            f"[{self.element.ref}] ({positions})."
+                        )
+                else:
+                    stalled += 1
+                    if stalled >= 2:
+                        break
+                await asyncio.sleep(0.05)
+        raise BrowserError(
+            "Automatic reveal stalled or exceeded its step limit; inspect the current "
+            "page and scroll the relevant container explicitly."
+        )
 
     async def focus(self, *, select_all: bool) -> None:
         await self._run(ElementOperation.FOCUS, select_all)

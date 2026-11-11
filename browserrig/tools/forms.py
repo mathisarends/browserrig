@@ -7,7 +7,7 @@ from pydantic import Field
 
 from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
-from browserrig.observation import BrowserPerception
+from browserrig.observation import DomElements
 from browserrig.scripts import SelectionResult
 
 from .effects import Effect
@@ -16,7 +16,7 @@ from .execution import Actions
 
 class FormTools(Plugin):
     # Batching form fields is covered by the action-chain instructions of Actions.
-    _observe = needs(BrowserPerception)
+    _elements = needs(DomElements)
     _actions = needs(Actions)
 
     @tool(
@@ -30,13 +30,13 @@ class FormTools(Plugin):
         value: str,
     ) -> Effect:
         tab = self._actions.tab
-        await self._observe.dom_element(tab, ref)
+        await self._elements.resolve(tab, ref)
         point = await self._actions.element_point(ref=ref)
         await self._actions.browser.input.mouse.move_to(point)
         current = await self._actions.element_point(ref=ref, scroll=False)
         if (current.x, current.y) != (point.x, point.y):
             await self._actions.browser.input.mouse.move_to(current)
-        handle = await self._observe.dom_element(tab, ref)
+        handle = await self._elements.resolve(tab, ref)
         await handle.select(value)
         return Effect("Option selected.", prepared_scroll=point.scrolled)
 
@@ -56,14 +56,14 @@ class FormTools(Plugin):
         values: Annotated[list[str], Field(max_length=1000)],
     ) -> Effect:
         tab = self._actions.tab
-        handle = await self._observe.dom_element(tab, ref)
+        handle = await self._elements.resolve(tab, ref)
         await handle.validate_options(values)
         point = await self._actions.element_point(ref=ref)
         await self._actions.browser.input.mouse.move_to(point)
         current = await self._actions.element_point(ref=ref, scroll=False)
         if (current.x, current.y) != (point.x, point.y):
             await self._actions.browser.input.mouse.move_to(current)
-        handle = await self._observe.dom_element(tab, ref)
+        handle = await self._elements.resolve(tab, ref)
         await handle.validate_options(values)
         result = await handle.select_options(values)
         selected = _selection(result)
@@ -88,7 +88,7 @@ class FormTools(Plugin):
         value: str,
     ) -> Effect:
         tab = self._actions.tab
-        handle = await self._observe.dom_element(tab, ref)
+        handle = await self._elements.resolve(tab, ref)
         if handle.element.input_type not in {
             "date",
             "time",
@@ -102,7 +102,7 @@ class FormTools(Plugin):
         current = await self._actions.element_point(ref=ref, scroll=False)
         if (current.x, current.y) != (point.x, point.y):
             await self._actions.browser.input.mouse.move_to(current)
-        handle = await self._observe.dom_element(tab, ref)
+        handle = await self._elements.resolve(tab, ref)
         await handle.set_value(value)
         return Effect(
             "Date/time value set and verified.", prepared_scroll=point.scrolled

@@ -173,5 +173,4 @@ async def test_browser_file_tools_do_not_expose_workspace_io(tmp_path):
             "list_downloads",
             "open_file",
             "open_downloaded_file",
-            "upload_files",
         }

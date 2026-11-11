@@ -20,6 +20,7 @@ from browserrig.observation.models import ElementFingerprint, PageFingerprint
 from tests.fakes import FakeReadiness, FakeTab
 
 capture_module = import_module("browserrig.observation.capture")
+dom_capture_module = import_module("browserrig.observation.dom_capture")
 
 
 @pytest.mark.parametrize("fingerprint", ["canvas:revision-1", ""])
@@ -183,9 +184,9 @@ async def test_optional_screenshot_failure_retains_the_dom_and_cancels_stalled_w
         finally:
             cancelled = True
 
-    monkeypatch.setattr(capture_module, "extract", extracted)
-    monkeypatch.setattr(capture_module, "screenshot", screenshot)
-    monkeypatch.setattr(capture_module, "_SCREENSHOT_SECONDS", 0.02)
+    monkeypatch.setattr(dom_capture_module, "extract", extracted)
+    monkeypatch.setattr(dom_capture_module, "screenshot", screenshot)
+    monkeypatch.setattr(dom_capture_module, "_SCREENSHOT_SECONDS", 0.02)
     snapshot = await capture(tab, DomCapture(), report, screenshots=True)
     assert snapshot.text == "Example page" and snapshot.elements[0].ref == "1"
     assert (

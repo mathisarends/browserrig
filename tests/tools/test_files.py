@@ -13,11 +13,13 @@ from unittest.mock import AsyncMock
 import pytest
 from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
 from harnessed import Agent, ToolError
+from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel
 from pypdf import PdfReader, PdfWriter
 
 from browserrig import (
     BrowserDownload,
+    DomUploadTools,
     FileBridge,
     FileOptions,
     Files,
@@ -853,3 +855,15 @@ async def _started_download(tmp_path, bridge=_MOUNTED):
         )
     )
     return files, downloads, emit
+
+
+async def test_dom_uploads_can_be_selected_without_other_file_tools(tmp_path):
+    async with (
+        FileSystem(LocalWorkspace(tmp_path)) as files,
+        mounted(
+            Actions(), DomUploadTools(), files=files, bridge=MountedWorkspace()
+        ) as (_, scope),
+    ):
+        assert {tool.name for tool in scope[ToolRegistry].definitions} == {
+            "upload_files"
+        }

@@ -4,10 +4,10 @@ from pydantic import ValidationError
 from browserrig.browser import Connect, Launch
 from browserrig.core import Bounds, Geometry, Point, Region, StaleElement
 from browserrig.observation import (
-    BrowserPerception,
     Canvas,
     CookieBanner,
     DomCapture,
+    DomPerception,
     Element,
     Heading,
     Modal,
@@ -169,7 +169,7 @@ def test_cookie_context_has_its_own_block_and_leaves_navigation_available():
     assert '    <form "Consent">\n      [2] button "Reject all"' in text
     assert '[1] button "Continue"' in text and "[MAIN]" in text
     assert "interact with it first" not in text and not snapshot.text
-    observe = BrowserPerception()
+    observe = DomPerception()
     assert "choose whether to interact or navigate" in observe.renderer.instructions(
         observe.screenshots
     )
@@ -279,7 +279,7 @@ def test_capture_rejects_invalid_limits(settings):
 
 
 def test_default_observation_explains_context_without_enabling_screenshots():
-    observe = BrowserPerception()
+    observe = DomPerception()
     instructions = observe.renderer.instructions(observe.screenshots)
     assert "reading order beside its controls" in instructions
     assert "Plain text has no action refs" in instructions

@@ -9,13 +9,14 @@ from harnessed.testing import CallbackModel
 from browserrig import (
     Agent,
     Browser,
-    BrowserPerception,
     Chrome,
     DomCapture,
     Files,
     LocalWorkspace,
+    PageExtractionTools,
     wait_for_page,
 )
+from browserrig.observation import DomPerception
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
@@ -90,9 +91,7 @@ async def test_agent_extracts_searches_and_reads_only_the_requested_excerpt(
         browser=Chrome.launch(url=site),
         plugins=[
             Files(LocalWorkspace(tmp_path)),
-            BrowserPerception(
-                capture=DomCapture(max_text_chars=0, sparse_text_chars=0)
-            ),
+            DomPerception(capture=DomCapture(max_text_chars=0, sparse_text_chars=0)),
         ],
     )
     async with agent.session() as session:
@@ -109,7 +108,7 @@ async def test_agent_extracts_searches_and_reads_only_the_requested_excerpt(
             "Save the page and read the passage around RELEVANT_MARKER"
         )
         assert result.completed
-        extraction = session.scope[BrowserPerception].extracted_content
+        extraction = session.scope[PageExtractionTools].extracted_content
         assert extraction is not None and extraction.extracted_path == saved_path
         assert "RELEVANT_MARKER" in extraction.markdown
     assert step == 4

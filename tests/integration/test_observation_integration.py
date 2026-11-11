@@ -15,7 +15,6 @@ from PIL import Image
 from browserrig import (
     Agent,
     Browser,
-    BrowserPerception,
     Chrome,
     ChromeBrowser,
     DomCapture,
@@ -27,7 +26,7 @@ from browserrig import (
 from browserrig.browser import Launch
 from browserrig.core import Bounds, BrowserError, Geometry, Point, Region
 from browserrig.kinds import ElementOperation
-from browserrig.observation import capture, render
+from browserrig.observation import DomPerception, capture, render
 from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
 from tests.observations import has_image
@@ -217,7 +216,7 @@ async def test_model_cursor_marker_is_optional_after_movement_and_click(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site + "/canvas", viewport=Viewport(scale=2)),
         plugins=[
-            BrowserPerception(
+            DomPerception(
                 capture=DomCapture(cursor=show_cursor),
                 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             ),

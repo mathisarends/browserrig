@@ -35,6 +35,7 @@ from browserrig import (
     ReadinessOptions,
     Secret,
     Secrets,
+    TextContext,
     browser_plugins,
 )
 from browserrig.browser import TabInfo
@@ -48,7 +49,7 @@ from browserrig.events import (
     TabClosedEvent,
     TabOpenedEvent,
 )
-from browserrig.observation import CaptureContent, Element
+from browserrig.observation import CaptureContent, DomRenderer, Element
 from browserrig.observation.extraction import Extraction
 from tests.fakes import FakeChrome
 from tests.observations import latest
@@ -101,7 +102,8 @@ def _agent(responses, ask, *, extra=(), store=None, **options):
             FakeChrome(holder),
             Readiness(options=ReadinessOptions(navigation_min_ms=0)),
             *extra,
-            BrowserPerception(capture=_Capture()),
+            BrowserPerception(capture=_Capture(), renderer=DomRenderer()),
+            TextContext(),
             Nudges(),
             HumanHandoff(ask=ask, **options),
             _Step(),

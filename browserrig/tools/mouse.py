@@ -19,7 +19,6 @@ from browserrig.observation import BrowserPerception, CapturedImage, Snapshot
 
 from .effects import Effect
 from .execution import Actions
-from .scrolling import scroll_element, scroll_page
 
 type _ClickCount = Annotated[
     Literal[1, 2],
@@ -37,7 +36,6 @@ type _NewTab = Annotated[
         )
     ),
 ]
-type _ScrollDelta = Annotated[float, Field(ge=-10000, le=10000)]
 
 
 _INSTRUCTIONS = Instructions(
@@ -126,46 +124,6 @@ class PointerTools(Plugin):
             break_chain=button == "right",
             opens_tab=new_tab,
         )
-
-    @tool(
-        kind=ActionKind.SCROLL_PAGE,
-        description=(
-            "Scroll only the outer page, independently of the cursor and nested panels. "
-            "delta_y is CSS pixels down (negative up); delta_x is right (negative left). "
-            "Reports actual movement or the page boundary/scroll lock. "
-            "Use scroll_element to move an inner list, panel or carousel."
-        ),
-    )
-    async def scroll_page(
-        self,
-        delta_y: _ScrollDelta = 0,
-        delta_x: _ScrollDelta = 0,
-    ) -> Effect:
-        if delta_y == 0 and delta_x == 0:
-            raise ToolError("Provide a non-zero delta_y or delta_x")
-        return await scroll_page(self._actions.tab, delta_y=delta_y, delta_x=delta_x)
-
-    @tool(
-        kind=ActionKind.SCROLL_ELEMENT,
-        description=(
-            "Scroll only the observed container ref marked scroll(...), independently "
-            "of the cursor. delta_y is CSS pixels down (negative up); delta_x is right "
-            "(negative left). Stops at its boundary without scrolling ancestors or the page. "
-            "Reports actual movement; a ref for a non-scrollable element is rejected. "
-            "Use scroll_page for the outer document."
-        ),
-    )
-    async def scroll_element(
-        self,
-        ref: str,
-        delta_y: _ScrollDelta = 0,
-        delta_x: _ScrollDelta = 0,
-    ) -> Effect:
-        if delta_y == 0 and delta_x == 0:
-            raise ToolError("Provide a non-zero delta_y or delta_x")
-        tab = self._actions.tab
-        handle = await self._observe.dom_element(tab, ref)
-        return await scroll_element(tab, handle, delta_y=delta_y, delta_x=delta_x)
 
     @tool(
         kind=ActionKind.DRAG_AT,

@@ -5,6 +5,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from pydantic import SecretStr
 
 from browserrig.browser import ChromeBrowser, Connect
 from evals.environments import Environments
@@ -124,8 +125,7 @@ async def _login_site(login_delay):
 @pytest.mark.integration
 @pytest.mark.parametrize("login_delay", [1.5])
 async def test_slow_login_has_a_separate_wait_after_submission(login_site):
-    from playwright.async_api import async_playwright
-    from pydantic import SecretStr
+    async_playwright = pytest.importorskip("playwright.async_api").async_playwright
 
     _, tasks = load_tasks()
     task = tasks[0].model_copy(update={"sites": ("gitlab",)})
@@ -161,8 +161,6 @@ async def test_slow_login_has_a_separate_wait_after_submission(login_site):
 async def test_authenticated_state_is_transferred_without_recording_login(
     login_site, tmp_path
 ):
-    from pydantic import SecretStr  # pylint: disable=import-outside-toplevel
-
     _, tasks = load_tasks()
     task = tasks[0].model_copy(
         update={"start_urls": ("__GITLAB__/",), "sites": ("gitlab",)}

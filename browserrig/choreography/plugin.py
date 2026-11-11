@@ -34,12 +34,13 @@ from browserrig.events import (
     LiveEvent,
     ObservationCapturedEvent,
 )
-from browserrig.observation import BrowserPerception
+from browserrig.observation import BrowserPerception, ExtractedContent
 from browserrig.secrets import Secrets
 from browserrig.tools import (
     FindIntent,
     NavigateIntent,
     OpenFileIntent,
+    PageContentExtracted,
     Perform,
     TargetLocated,
     UploadIntent,
@@ -74,6 +75,7 @@ class _Presentation:
     screenshot: WorkPresentedEvent | None = None
     running: dict[str, WorkPresentedEvent] = field(default_factory=dict)
     handled: set[str] = field(default_factory=set)
+    extractions: dict[str, ExtractedContent] = field(default_factory=dict)
 
 
 class InputVisualization(Plugin, slot="browserrig.choreography"):
@@ -274,15 +276,8 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             raise
         finally:
             self._state.running.pop(event.call.id, None)
+            extraction = self._state.extractions.pop(event.call.id, None)
         if shown or result.is_error:
-            context = self._state.context
-            extraction = (
-                context[BrowserPerception].extracted_content
-                if metadata.kind is ActionKind.EXTRACT_CONTENT
-                and context is not None
-                and BrowserPerception in context
-                else None
-            )
             completed = work.finished(
                 receipt,
                 self._redact(result),
@@ -309,6 +304,16 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             if context is not None and Secrets in context
             else value
         )
+
+    @hook(PageContentExtracted)
+    async def _extracted(self, event: PageContentExtracted) -> None:
+        for call_id, active in self._state.running.items():
+            if (
+                active.kind is ActionKind.EXTRACT_CONTENT
+                and active.target_id == event.target_id
+                and active.document_id == event.document_id
+            ):
+                self._state.extractions[call_id] = event.content
 
     @hook(ToolCallFinishedEvent)
     async def _unexecuted(self, event: ToolCallFinishedEvent) -> None:

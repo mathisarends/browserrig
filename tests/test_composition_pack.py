@@ -24,6 +24,7 @@ from browserrig import (
     browser_pack,
     browser_plugins,
 )
+from browserrig.observation import DomPerception
 from browserrig.tools import FormTools
 from tests.fakes import FakeChrome
 
@@ -50,7 +51,7 @@ async def test_flat_plugins_omit_nested_pack_prompts_and_keep_explicit_prompt():
 
 
 def test_resolved_browser_pack_retains_replacements_and_removal_provenance():
-    observe = BrowserPerception(capture=DomCapture(marks=False))
+    observe = DomPerception(capture=DomCapture(marks=False))
     pack = PluginPack("application", [browser_pack().without(FileTools), observe])
     resolved = pack.resolve(prompt=PluginPackPromptPolicy.OMIT)
     assert observe in resolved.plugins
@@ -58,9 +59,7 @@ def test_resolved_browser_pack_retains_replacements_and_removal_provenance():
         isinstance(item, (FileTools, PromptRenderer)) for item in resolved.plugins
     )
     selected = next(
-        item
-        for item in resolved.description.plugins
-        if item.name == "BrowserPerception"
+        item for item in resolved.description.plugins if item.name == "DomPerception"
     )
     assert selected.pack_path == ("application",)
     assert selected.replaces[0].pack_path == ("application", "browserrig")
@@ -71,7 +70,7 @@ def test_facade_reports_kit_origins_replacements_and_exclusions_without_resource
     tmp_path,
 ):
     workspace = LocalWorkspace(tmp_path / "files")
-    observe = BrowserPerception(capture=DomCapture(marks=False))
+    observe = DomPerception(capture=DomCapture(marks=False))
     agent = browserrig.Agent(
         model=ScriptedModel([]),
         browser=Chrome.launch(),
@@ -80,7 +79,7 @@ def test_facade_reports_kit_origins_replacements_and_exclusions_without_resource
     )
     description = agent.describe()
     selected = next(
-        item for item in description.plugins if item.name == "BrowserPerception"
+        item for item in description.plugins if item.name == "DomPerception"
     )
     assert selected.pack_path == ()
     assert len(selected.replaces) == 1
@@ -93,7 +92,7 @@ def test_facade_reports_kit_origins_replacements_and_exclusions_without_resource
 
 async def test_nested_pack_instructions_follow_overrides_and_exclusions():
     browser = browser_pack().without(Chrome, FileTools)
-    observe = BrowserPerception(capture=DomCapture(max_text_chars=1000, marks=False))
+    observe = DomPerception(capture=DomCapture(max_text_chars=1000, marks=False))
     application = PluginPack("application", [browser, observe])
     agent = Agent(
         model=ScriptedModel([]),
@@ -108,7 +107,7 @@ async def test_nested_pack_instructions_follow_overrides_and_exclusions():
         assert "labeled with its ref" not in rendered
         assert "The file system observation identifies" not in rendered
     selected = next(
-        item for item in agent.describe().plugins if item.name == "BrowserPerception"
+        item for item in agent.describe().plugins if item.name == "DomPerception"
     )
     assert selected.pack_path == ("application",)
     assert selected.replaces[0].pack_path == ("application", "browserrig")
@@ -116,10 +115,10 @@ async def test_nested_pack_instructions_follow_overrides_and_exclusions():
 
 def test_sibling_kits_require_a_direct_slot_override():
     browser = browser_pack()
-    custom = PluginPack("custom", [BrowserPerception()])
+    custom = PluginPack("custom", [DomPerception()])
     with pytest.raises(PluginConflict, match="browserrig.observation"):
         browserrig.Agent(model=ScriptedModel([]), plugins=[custom])
-    selected = BrowserPerception(capture=DomCapture(marks=False))
+    selected = DomPerception(capture=DomCapture(marks=False))
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[browser, custom, selected],
@@ -195,7 +194,7 @@ async def test_facade_renders_complete_blocks_in_plugin_list_order(completion_la
 
 async def test_pack_prompt_follows_removals_and_replacements():
     browser = browser_pack().without(Chrome, FileTools, FormTools)
-    observe = BrowserPerception(capture=DomCapture(marks=False))
+    observe = DomPerception(capture=DomCapture(marks=False))
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[browser, observe, FakeChrome({})],
@@ -221,7 +220,7 @@ async def test_explicit_document_omits_plugin_blocks_and_reports_them():
     rendered = await agent.prompt.render()
     assert "Custom role." in rendered
     assert "Each observation starts" not in rendered
-    assert "BrowserPerception" in str(agent.prompt)
+    assert "DomPerception" in str(agent.prompt)
 
 
 async def test_explicit_prompt_overrides_kit_format_and_keeps_caller_text_first():
@@ -247,7 +246,7 @@ async def test_explicit_prompt_overrides_kit_format_and_keeps_caller_text_first(
 async def test_instruction_providers_only_run_for_selected_recipes_once_per_agent():
     calls = []
 
-    class CustomPerception(BrowserPerception):
+    class CustomPerception(DomPerception):
         def instructions(self) -> SystemPrompt:
             calls.append(self)
             return SystemPrompt("Custom observation guidance.")

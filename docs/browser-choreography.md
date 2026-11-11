@@ -100,7 +100,7 @@ focus.
 
 `extract_content` saves a Markdown snapshot and returns only a short file receipt.
 Its latest successful full typed result is available as
-`BrowserPerception.extracted_content`, including its saved path and actual
+the typed `PageContentExtracted` event from `PageExtractionTools`, including its saved path and actual
 extraction limitations. File conversions keep their existing `.content/`
 artifacts. A visible saved path always refers to an existing file, not a fictional
 download created by the animation.

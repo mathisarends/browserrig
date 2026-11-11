@@ -28,17 +28,6 @@
     {
       "code": "SMT420",
       "path": "tests/test_composition_browser.py",
-      "message": "test accesses private production name browserrig.BrowserPerception._page_key",
-      "fingerprints": [
-        "3d72ebed504c57bc0a22fc4e882a3902",
-        "3d72ebed504c57bc0a22fc4e882a3902",
-        "3d72ebed504c57bc0a22fc4e882a3902",
-        "3d72ebed504c57bc0a22fc4e882a3902"
-      ]
-    },
-    {
-      "code": "SMT420",
-      "path": "tests/test_composition_browser.py",
       "message": "test accesses private production name browserrig.tools.mouse._image_point",
       "fingerprints": [
         "8a6148a0e2a2cb6fc838671963c25345"
