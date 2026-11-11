@@ -16,8 +16,11 @@ from browserrig import (
     ChromeBrowser,
     DomCapture,
     IframeRenderer,
+    Input,
+    InputRuntime,
     InputVisualization,
     Point,
+    Runtime,
     VideoRecording,
     wait_for_page,
 )
@@ -44,6 +47,7 @@ _TICKER = Script(
 
 async def test_overlay_is_visible_click_through_and_absent_from_all_page_reads(site):
     async with ChromeBrowser(Launch(url=site)) as browser:
+        devices = Input(browser.input_targets.focused)
         tab = browser.active_tab
         await wait_for_page(tab)
         await evaluate(
@@ -78,7 +82,7 @@ async def test_overlay_is_visible_click_through_and_absent_from_all_page_reads(s
             element for element in snapshot.elements if element.name == "Submit"
         )
         point = submit.bounds
-        await browser.input.mouse.click(
+        await devices.mouse.click(
             Point(x=point.x + point.width / 2, y=point.y + point.height / 2)
         )
         assert (
@@ -124,13 +128,18 @@ async def test_input_visualization_renders_native_events_and_restores_after_navi
 ):
     agent = Agent(
         model=ScriptedModel([]),
-        plugins=[Chrome.launch(url=site), InputVisualization()],
+        plugins=[
+            Runtime(),
+            InputRuntime(),
+            Chrome.launch(url=site),
+            InputVisualization(),
+        ],
     )
     async with agent.session() as session:
         browser = session.scope[Browser]
         tab = browser.active_tab
         await wait_for_page(tab)
-        await browser.input.mouse.move_to(Point(x=300, y=200))
+        await session.scope[Input].mouse.move_to(Point(x=300, y=200))
         await tab.emit(KeyPressedEvent(key="a", modifiers=("Control",), duration=2))
         state = await evaluate(
             tab,
@@ -156,14 +165,14 @@ async def test_input_visualization_renders_native_events_and_restores_after_navi
             )
             == 1
         )
-        await browser.input.keyboard.type_text("private", sensitive=True)
+        await session.scope[Input].keyboard.type_text("private", sensitive=True)
         shown = await evaluate(
             tab, "document.querySelector('iframe').contentDocument.body.textContent"
         )
         assert "private" not in shown and "•" in shown
         await tab.navigate(site + "/other")
         await wait_for_page(tab)
-        await browser.input.mouse.move_to(Point(x=120, y=100))
+        await session.scope[Input].mouse.move_to(Point(x=120, y=100))
         assert (
             await evaluate(
                 tab,
@@ -177,11 +186,16 @@ async def test_input_visualization_renders_native_events_and_restores_after_navi
 async def test_event_only_visualization_has_no_iframe_or_observation_dependency(site):
     agent = Agent(
         model=ScriptedModel([]),
-        plugins=[Chrome.launch(url=site), InputVisualization(renderer=None)],
+        plugins=[
+            Runtime(),
+            InputRuntime(),
+            Chrome.launch(url=site),
+            InputVisualization(renderer=None),
+        ],
     )
     async with agent.session() as session:
         browser = session.scope[Browser]
-        await browser.input.mouse.move_to(Point(x=100, y=100))
+        await session.scope[Input].mouse.move_to(Point(x=100, y=100))
         assert not (await browser.active_tab.frame_tree()).child_frames
 
 
@@ -192,6 +206,8 @@ async def test_renderer_layout_remains_transparent_and_highlights_german_keys(
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
+            Runtime(),
+            InputRuntime(),
             Chrome.launch(url=site),
             InputVisualization(
                 renderer=IframeRenderer(
@@ -204,7 +220,7 @@ async def test_renderer_layout_remains_transparent_and_highlights_german_keys(
         browser = session.scope[Browser]
         tab = browser.active_tab
         await wait_for_page(tab)
-        await browser.input.mouse.move_to(Point(x=200, y=200))
+        await session.scope[Input].mouse.move_to(Point(x=200, y=200))
         await tab.emit(KeyPressedEvent(key="ä", duration=2))
         state = await evaluate(
             tab,
@@ -233,6 +249,8 @@ async def test_video_records_overlay_without_clean_screenshot_gaps(tmp_path, sit
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
+            Runtime(),
+            InputRuntime(),
             Activity(),
             Chrome.launch(url=site),
             VideoRecording(tmp_path, width=640, height=400, frame_rate=15),

@@ -7,6 +7,7 @@ from harnessed.tracing import record, traced
 
 from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
+    ActionContext,
     ActionKind,
     BrowserCoordination,
     BrowserError,
@@ -46,6 +47,7 @@ class ActionRunner:
         readiness: Readiness,
         observe: BrowserPerception,
         *,
+        actions: ActionContext,
         page_change: Callable[[Tab], Awaitable[str]],
     ) -> None:
         self._browser = browser
@@ -54,7 +56,7 @@ class ActionRunner:
         self._readiness = readiness
         self._observe = observe
         self._page_change = page_change
-        self._completion = Completion(browser, readiness)
+        self._completion = Completion(browser, readiness, actions)
 
     @traced
     async def run(

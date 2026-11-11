@@ -22,6 +22,7 @@ from browserrig.core import (
 from browserrig.events import (
     ObservationCapturedEvent,
 )
+from browserrig.input import Input
 from browserrig.nudges import Nudges
 from browserrig.readiness import Readiness
 from browserrig.secrets import Secrets
@@ -56,6 +57,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     events = (ObservationCapturedEvent,)
     _state = PluginState(BrowserPerceptionState)
     _browser = needs(Browser)
+    _input = needs(Input)
     _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
     _readiness = needs(Readiness)
@@ -142,7 +144,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 previous=self.snapshot,
                 region=region,
                 zoom=zoom,
-                cursor=browser.input.mouse.position_in(selected.id),
+                cursor=self._input.mouse.position_in(selected.id),
                 screenshots=(self.screenshots.trigger == ScreenshotTrigger.EACH_STEP)
                 if screenshots is None
                 else screenshots,

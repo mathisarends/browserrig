@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from contextlib import AsyncExitStack, suppress
 from pathlib import Path, PurePath, PureWindowsPath
 from typing import TYPE_CHECKING
@@ -20,14 +20,13 @@ from cdpify.domains.target import (
 )
 from harnessed.tracing import traced
 
-from browserrig.core import BrowserError, TabGesture, TargetId
+from browserrig.core import BrowserError, ChangeTab, TabDispatch, TabGesture, TargetId
 from browserrig.events import (
     TabActivatedEvent,
     TabClosedEvent,
     TabClosingEvent,
     TabOpenedEvent,
 )
-from browserrig.input import Input
 
 from .config import BrowserOptions
 from .frame import Frame
@@ -47,16 +46,18 @@ class Tabs:
     def __init__(
         self,
         options: BrowserOptions,
-        devices: Input,
         *,
         check: Callable[[], None],
         emit: EventSink,
         on_change: TabListener | None = None,
         guard: NavigationGuard | None = None,
+        current_action: Callable[[], str] = str,
+        change_tab: TabDispatch | None = None,
     ) -> None:
         self._options = options
         self._guard = guard
-        self._input = devices
+        self._current_action = current_action
+        self._change_tab = change_tab
         self._check = check
         self._emit = emit
         self._on_tab_change = on_change
@@ -94,7 +95,7 @@ class Tabs:
             await self.open(self._options.url)
             return
         tab = await self._attach(self._options.target_id)
-        await self._input.mouse.switch_tab(
+        await self._change(
             TabGesture.ACTIVATE, tab.id, lambda: self._focus(tab, front=False)
         )
 
@@ -148,7 +149,7 @@ class Tabs:
             opened.append(await self._create(url))
             await self._focus(opened[0], front=False)
 
-        await self._input.mouse.switch_tab(TabGesture.OPEN, "", open_new)
+        await self._change(TabGesture.OPEN, "", open_new)
         return opened[0]
 
     async def activate(self, target_id: str) -> Tab:
@@ -161,11 +162,8 @@ class Tabs:
             await self._emit(
                 TabActivatedEvent(target_id=tab.id, document_id=tab.document_id)
             )
-            await self._input.mouse.publish_cursor()
             return tab
-        await self._input.mouse.switch_tab(
-            TabGesture.ACTIVATE, tab.id, lambda: self._focus(tab)
-        )
+        await self._change(TabGesture.ACTIVATE, tab.id, lambda: self._focus(tab))
         return tab
 
     async def close(self, target_id: str) -> Tab:
@@ -184,7 +182,7 @@ class Tabs:
             else:
                 await self._focus(await self._create("about:blank"), front=False)
 
-        await self._input.mouse.switch_tab(TabGesture.CLOSE, target_id, close)
+        await self._change(TabGesture.CLOSE, target_id, close)
         return self.active
 
     @property
@@ -234,6 +232,17 @@ class Tabs:
         self._invalidate_contexts(event, session_id)
         if tab := self._tabs.get(self._sessions.get(session_id, "")):
             await tab.handle(event)
+
+    async def _change(
+        self,
+        gesture: TabGesture,
+        target_id: str,
+        operation: Callable[[], Awaitable[None]],
+    ) -> None:
+        if self._change_tab is None:
+            await operation()
+        else:
+            await self._change_tab(ChangeTab(gesture, target_id), operation)
 
     async def _create_context(self) -> None:
         options = self._options
@@ -305,7 +314,7 @@ class Tabs:
                     emit=self._emit,
                     worlds=self._worlds,
                     discover_frames=self._discover_frames,
-                    current_action=lambda: self._input.action_id,
+                    current_action=self._current_action,
                     on_change=self._on_tab_change,
                     guard=self._guard,
                 )
@@ -387,7 +396,6 @@ class Tabs:
                 self._worlds.invalidate(session_id=sid)
         if self._active == target_id:
             self._active = ""
-        self._input.mouse.forget(target_id)
         if tab is not None:
             await tab.discard()
             await self._emit(TabClosedEvent(target_id=target_id))

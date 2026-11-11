@@ -13,12 +13,13 @@ from harnessed.testing import ScriptedModel
 from browserrig import Browser, BrowserCoordination, FileSystem
 from browserrig.browser import BrowserEvents
 from browserrig.browser.network import NetworkActivity
-from browserrig.core import ReadinessStatus
+from browserrig.core import ActionContext, ReadinessStatus
 from browserrig.files import FileBridge, FileTransfers
-from browserrig.input import Input
+from browserrig.input import Input, InputTargets
 from browserrig.observation import BrowserPerception, DomElements, DomReferences
 from browserrig.readiness import Readiness, ReadinessReport
 from browserrig.scripts import DOMProbe
+from browserrig.tools import Actions, Targeting
 
 
 class FakeTab:
@@ -36,6 +37,12 @@ class FakeTab:
         self.probes = 0
         self.network = NetworkActivity()
         self.viewport_revision = 0
+
+    async def viewport_size(self):
+        return (1280, 800)
+
+    async def dispatch_mouse(self, *_args, **_kwargs):
+        pass
 
     async def sync_document(self):
         pass
@@ -81,7 +88,7 @@ class FakeBrowser:
         self.log = log
         self.receiving = None
         self.events = BrowserEvents(self.id, self._emit)
-        self.input = Input(lambda: self.active_tab.input)
+        self.input_targets = SimpleNamespace(focused=lambda: self.active_tab.input)
 
     async def downloads(self):
         return ()
@@ -107,6 +114,15 @@ class FakeChrome(Plugin, needs=(SessionLog,)):
         log = self._setup_log
         browser = FakeBrowser(log)
         self.holder["browser"] = browser
+        actions = ActionContext()
+        devices = Input(
+            browser.input_targets.focused, action_id=lambda: actions.action_id
+        )
+        ctx.provide(ActionContext, actions)
+        ctx.provide(Input, devices)
+        ctx.provide(InputTargets, browser.input_targets)
+        self.holder["input"] = devices
+        self.holder["actions"] = actions
         coordination = BrowserCoordination()
         self.holder["coordination"] = coordination
         ctx.provide(Browser, browser)
@@ -166,6 +182,11 @@ class FakeServices(Plugin, provides=True):
         self.browser = FakeBrowser(SimpleNamespace(emit=self.record))
         self.bridge = bridge
         self.coordination = BrowserCoordination()
+        self.correlation = ActionContext()
+        self.input = Input(
+            self.browser.input_targets.focused,
+            action_id=lambda: self.correlation.action_id,
+        )
         self.readiness = FakeReadiness()
         self.observe = FakeObserve()
 
@@ -173,6 +194,9 @@ class FakeServices(Plugin, provides=True):
         self.events.append(event)
 
     async def setup(self, ctx: PluginScope):
+        ctx.provide(ActionContext, self.correlation)
+        ctx.provide(Input, self.input)
+        ctx.provide(InputTargets, self.browser.input_targets)
         ctx.provide(Browser, self.browser)
         ctx.provide(BrowserEvents, self.browser.events)
         ctx.provide(BrowserCoordination, self.coordination)
@@ -201,10 +225,16 @@ async def mounted(*plugins, bridge=None, files=None):
     `files` becomes the session's workspace; `bridge` lets the fake browser reach it.
     """
     services = FakeServices(bridge)
+    targeting = (
+        (Targeting(),)
+        if any(isinstance(plugin, Actions) for plugin in plugins)
+        and not any(isinstance(plugin, Targeting) for plugin in plugins)
+        else ()
+    )
     workspace = () if files is None else (OpenFiles(files),)
     agent = Agent(
         model=ScriptedModel(["Done"]),
-        plugins=[services, *workspace, FileTransfers(), *plugins],
+        plugins=[services, *workspace, FileTransfers(), *targeting, *plugins],
     )
     async with agent.session() as session:
         yield session.scope[FakeServices], session.scope

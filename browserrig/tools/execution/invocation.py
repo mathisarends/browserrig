@@ -7,7 +7,7 @@ from browserrig.browser import Tab
 from browserrig.core import ActionKind, BrowserCoordination, BrowserToolCall
 from browserrig.tools.effects import Effect
 
-from .context import ActionContext, ToolActionError
+from .context import InvocationContext, ToolActionError
 from .policy import ACTION_KINDS, EXPECTED_CHANGES, NAVIGATION_KINDS, TAB_KINDS
 from .transaction import ActionRunner
 
@@ -18,7 +18,7 @@ class ToolExecution:
     def __init__(self, runner: ActionRunner, coordination: BrowserCoordination) -> None:
         self._runner = runner
         self._coordination = coordination
-        self.context = ActionContext()
+        self.context = InvocationContext()
 
     async def run(self, event: BrowserToolCall, next_: Next[object]) -> object:
         kind = event.metadata.kind

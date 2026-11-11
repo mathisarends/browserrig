@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from contextlib import contextmanager
 from dataclasses import replace
 
 from browserrig.events import InputEvent
@@ -12,14 +11,15 @@ from .target import Focus, InputTarget
 
 
 class Input:
-    """The browser's mouse and keyboard, aimed at whichever tab has focus.
+    """Session-owned mouse and keyboard, bound to a backend's focused target.
 
     The installed `Motor` decides how input is performed and the installed `Presenter`
-    what viewers see of it. Every input event is correlated with the action that caused it.
+    what viewers see of it. The runtime supplies action correlation through a reader;
+    devices never own or change the action context.
     """
 
-    def __init__(self, focus: Focus) -> None:
-        self._action_id = ""
+    def __init__(self, focus: Focus, *, action_id: Callable[[], str] = str) -> None:
+        self._action_id = action_id
         self._default_motor: Motor = Instant()
         self._default_presenter: Presenter = Unseen()
         self._motors: dict[object, Motor] = {}
@@ -29,21 +29,9 @@ class Input:
             emit=self._emit,
             motor=self.motor,
             presenter=self.presenter,
-            action_id=lambda: self._action_id,
+            action_id=action_id,
         )
         self.keyboard = Keyboard(focus, emit=self._emit, motor=self.motor)
-
-    @property
-    def action_id(self) -> str:
-        return self._action_id
-
-    @contextmanager
-    def action(self, action_id: str):
-        previous, self._action_id = self._action_id, action_id
-        try:
-            yield
-        finally:
-            self._action_id = previous
 
     def motor(self) -> Motor:
         return next(reversed(self._motors.values()), self._default_motor)
@@ -72,4 +60,4 @@ class Input:
         return restore
 
     async def _emit(self, target: InputTarget, event: InputEvent) -> None:
-        await self.presenter().show(target, replace(event, action_id=self._action_id))
+        await self.presenter().show(target, replace(event, action_id=self._action_id()))

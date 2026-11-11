@@ -39,6 +39,7 @@ from .effects import Effect
 from .execution import Actions
 from .file_observation import FileSystemObservation
 from .intents import OpenFileIntent, UploadIntent
+from .targeting import Targeting
 from .workspace import FILE_TOOLS_SLOT, WORKSPACE_GUIDANCE, WorkspaceIO, file_errors
 
 
@@ -161,6 +162,7 @@ class DomUploadTools(Plugin):
     _events = needs(BrowserEvents)
     _elements = needs(DomElements)
     _actions = needs(Actions)
+    _targets = needs(Targeting)
     events = UPLOAD_EVENTS
 
     @tool(
@@ -196,16 +198,8 @@ class DomUploadTools(Plugin):
             or target_ref != ref
         ):
             try:
-                point = await self._actions.element_point(ref=target_ref)
+                point = await self._targets.hover(ref=target_ref, tab=tab)
                 prepared_scroll = point.scrolled
-                await self._browser.input.mouse.move_to(point)
-                # Hover handlers can move the target or programmatically scroll a panel.
-                current = await self._actions.element_point(
-                    ref=target_ref, scroll=False
-                )
-                if (current.x, current.y) != (point.x, point.y):
-                    await self._browser.input.mouse.move_to(current)
-                point = current
             except BrowserError as error:
                 if str(error).partition(":")[0] != "ELEMENT_BLOCKED":
                     raise

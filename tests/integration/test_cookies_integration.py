@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, wait_for_page
+from browserrig import ChromeBrowser, DomCapture, Input, wait_for_page
 from browserrig.browser import Launch
 from browserrig.core import Point
 from browserrig.observation import capture, render
@@ -123,6 +123,7 @@ async def test_content_and_invisible_banners_are_not_reported(site, markup):
 
 async def test_banner_text_survives_busy_page_and_disappears_after_normal_click(site):
     async with ChromeBrowser(Launch(url=site)) as browser:
+        devices = Input(browser.input_targets.focused)
         tab = browser.active_tab
         await wait_for_page(tab)
         markup = "<nav>" + "<button>Navigation</button>" * 6 + "</nav>"
@@ -142,7 +143,7 @@ async def test_banner_text_survives_busy_page_and_disappears_after_normal_click(
         button = before.element(banner.refs[0])
         assert button.name == "Reject all" and button.bounds is not None
         bounds = button.bounds
-        await browser.input.mouse.click(
+        await devices.mouse.click(
             Point(x=bounds.x + bounds.width / 2, y=bounds.y + bounds.height / 2)
         )
         report = await wait_for_page(tab)

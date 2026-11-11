@@ -18,15 +18,17 @@ from browserrig import (
     CaptureContent,
     Chrome,
     ElementInfo,
+    InputRuntime,
     PageContent,
     Readiness,
+    Runtime,
     TextContext,
     wait_for_page,
 )
 from browserrig.browser import Launch
 from browserrig.core import Bounds, ElementPoint
 from browserrig.observation import DomRenderer
-from browserrig.tools import Actions, KeyboardTools, PointerTools
+from browserrig.tools import Actions, KeyboardTools, PointerTools, Targeting
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
@@ -82,11 +84,14 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
     agent = Agent(
         model=CallbackModel(respond),
         plugins=[
+            Runtime(),
+            InputRuntime(),
             Chrome(Launch(url=site)),
             Readiness(),
             BrowserPerception(capture=_CanvasCapture(), renderer=DomRenderer()),
             TextContext(),
             Actions(),
+            Targeting(),
             PointerTools(),
             KeyboardTools(),
             Prepare(),

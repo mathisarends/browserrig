@@ -2,12 +2,24 @@ import asyncio
 from urllib.parse import urlsplit
 
 import pytest
+from harnessed import Agent
+from harnessed.testing import ScriptedModel
 
-from browserrig import ChromeBrowser, Viewport, wait_for_page
+from browserrig import (
+    Browser,
+    Chrome,
+    ChromeBrowser,
+    Input,
+    InputRuntime,
+    InputVisualization,
+    Runtime,
+    Viewport,
+    wait_for_page,
+)
 from browserrig.browser import Connect, Launch
 from browserrig.choreography import CursorEnteredEvent, Stage, TabPressedEvent
 from browserrig.core import Point
-from browserrig.events import CursorStateEvent, TabOpenedEvent
+from browserrig.events import BrowserEvent, CursorStateEvent, InputEvent, TabOpenedEvent
 from browserrig.input import HumanMotor
 from browserrig.kinds import TabGesture
 from tests.javascript import evaluate
@@ -44,15 +56,28 @@ async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site
     async def emit(event):
         events.append(event)
 
-    async with ChromeBrowser(emit=emit) as browser:
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            Runtime(),
+            Chrome(),
+            InputRuntime(),
+            InputVisualization(renderer=None),
+        ],
+    )
+    async with agent.session() as session:
+        browser = session.scope[Browser]
+        devices = session.scope[Input]
+        session.scope.on(BrowserEvent, emit)
+        session.scope.on(InputEvent, emit)
         first = browser.active_tab
         # Unwatched, the cursor lands centered and nothing is reported.
         assert not any(isinstance(event, CursorStateEvent) for event in events)
         width, height = await first.viewport_size()
-        assert browser.input.mouse.position == Point(x=width / 2, y=height / 2)
-        browser.input.pace(HumanMotor())
-        browser.input.present(Stage())
-        await browser.input.mouse.move_to(Point(x=100, y=120))
+        assert devices.mouse.position == Point(x=width / 2, y=height / 2)
+        devices.pace(HumanMotor())
+        devices.present(Stage())
+        await devices.mouse.move_to(Point(x=100, y=120))
         second = await browser.tabs.open(site)
         assert (
             len(
@@ -65,7 +90,7 @@ async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site
             )
             == 1
         )
-        assert browser.input.mouse.position_in(second.id) is not None
+        assert devices.mouse.position_in(second.id) is not None
         opened = next(event for event in events if isinstance(event, TabPressedEvent))
         assert opened.gesture is TabGesture.OPEN and opened.target_id == first.id
         assert opened.from_position == (100, 120)

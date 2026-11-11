@@ -7,7 +7,7 @@ from pydantic import Field
 from browserrig.browser import Browser
 from browserrig.core import ActionKind
 from browserrig.core import browser_tool as tool
-from browserrig.input import TypedText
+from browserrig.input import Input, TypedText
 from browserrig.secrets import Secrets
 
 from .effects import Effect
@@ -19,6 +19,7 @@ class KeyboardTools(Plugin):
 
     _actions = needs(Actions)
     _browser = needs(Browser)
+    _input = needs(Input)
     _secrets = observes(Secrets)
 
     @tool(
@@ -47,7 +48,7 @@ class KeyboardTools(Plugin):
             raise ToolError("Modifier flags require key")
 
         if key is not None:
-            await self._browser.input.keyboard.press_key(
+            await self._input.keyboard.press_key(
                 key,
                 hold_control=hold_control,
                 hold_shift=hold_shift,
@@ -60,10 +61,8 @@ class KeyboardTools(Plugin):
         if secrets is not None:
             entry = await secrets.prepare(text, browser=self._browser)
             if entry is not None:
-                return _secret_entered(
-                    await secrets.enter(entry, self._browser.input.keyboard)
-                )
-        return _entered(await self._browser.input.keyboard.type_text(text))
+                return _secret_entered(await secrets.enter(entry, self._input.keyboard))
+        return _entered(await self._input.keyboard.type_text(text))
 
 
 def _entered(typed: TypedText) -> Effect:

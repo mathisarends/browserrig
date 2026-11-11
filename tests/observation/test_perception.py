@@ -17,6 +17,7 @@ from browserrig import (
     PointerTools,
     Readiness,
     ScreenshotTools,
+    Targeting,
     TextContext,
 )
 from browserrig.observation import DomCapture, DomRenderer
@@ -44,6 +45,7 @@ async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
         DomPerception(),
         TextContext(),
         Actions(),
+        Targeting(),
         KeyboardTools(),
         PointerTools(),
         Files(),
@@ -86,6 +88,7 @@ async def test_generic_perception_does_not_satisfy_dom_tool_dependencies():
             Readiness(),
             BrowserPerception(capture=DomCapture(), renderer=DomRenderer()),
             Actions(),
+            Targeting(),
             DomTypingTools(),
         ],
     )

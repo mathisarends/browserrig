@@ -17,7 +17,7 @@ from browserrig.events import (
 )
 from browserrig.input import Instant
 from browserrig.kinds import ActionKind, ReadinessPhase
-from browserrig.tools import Actions, FileTools
+from browserrig.tools import Actions, FileTools, Targeting
 from browserrig.tools.effects import Effect
 from tests.fakes import FakeServices, mounted
 
@@ -86,7 +86,7 @@ async def test_upload_rejects_invalid_selection_before_any_browser_input(
     async with _uploads(None if selection == "no_workspace" else files) as upload:
         with pytest.raises(ToolError):
             await upload.tools.upload_files("input", paths)
-    upload.actions.element_point.assert_not_awaited()
+    upload.targets.hover.assert_not_awaited()
     upload.handle.upload_files.assert_not_awaited()
     assert len(upload.services.events) == 1
     assert not _first(upload.services.events, ActionFailedEvent).dispatched
@@ -102,8 +102,9 @@ async def test_upload_sends_only_resolved_workspace_paths_to_chrome(tmp_path):
     upload.handle.upload_files.assert_awaited_once_with(
         [str(files.workspace.directory / "report.txt")]
     )
-    assert upload.actions.element_point.await_count == 2
-    assert upload.services.browser.input.mouse.position == Point(x=40, y=30)
+    upload.targets.hover.assert_awaited_once_with(
+        ref="input", tab=upload.services.browser.active_tab
+    )
     uploaded = _first(upload.services.events, FilesUploadedEvent)
     assert uploaded.paths == (saved.path,) and uploaded.ref == "input"
     assert uploaded.target_id == "tab"
@@ -119,17 +120,17 @@ async def test_upload_does_not_require_a_pointer_target(tmp_path, placement):
         upload.handle.element.bounds = (
             None if placement == "hidden" else Bounds(x=0, y=0, width=80, height=60)
         )
-        upload.actions.element_point.side_effect = BrowserError("ELEMENT_BLOCKED")
+        upload.targets.hover.side_effect = BrowserError("ELEMENT_BLOCKED")
         result = await upload.tools.upload_files("input", ["report.txt"])
     assert result.text == "Files assigned to input."
     upload.handle.upload_files.assert_awaited_once_with(
         [str(files.workspace.directory / "report.txt")]
     )
     if placement in {"blocked", "covered"}:
-        upload.actions.element_point.assert_awaited_once()
+        upload.targets.hover.assert_awaited_once()
     else:
-        upload.actions.element_point.assert_not_awaited()
-    assert upload.services.browser.input.mouse.position == Point(x=0, y=0)
+        upload.targets.hover.assert_not_awaited()
+    assert upload.services.input.mouse.position == Point(x=0, y=0)
     assert isinstance(upload.services.events[-1], ActionFinishedEvent)
 
 
@@ -205,7 +206,7 @@ async def test_an_action_aims_once_at_each_target():
         return ElementPoint(x=1, y=1)
 
     async with mounted(Actions()) as (services, ctx):
-        services.browser.input.pace(motor)
+        services.input.pace(motor)
         bounds = Bounds(x=0, y=0, width=80, height=20)
         services.observe.element = AsyncMock(
             return_value=SimpleNamespace(
@@ -213,12 +214,12 @@ async def test_an_action_aims_once_at_each_target():
             )
         )
         tab = services.browser.active_tab
-        with services.browser.input.action("first"):
-            await ctx[Actions].element_point(tab=tab, ref="e1", scroll=False)
+        with services.correlation.activate("first"):
+            await ctx[Targeting].locate(tab=tab, ref="e1", scroll=False)
             # The re-check after hover resolves the same spot.
-            await ctx[Actions].element_point(tab=tab, ref="e1", scroll=False)
-        with services.browser.input.action("second"):
-            await ctx[Actions].element_point(tab=tab, ref="e1", scroll=False)
+            await ctx[Targeting].locate(tab=tab, ref="e1", scroll=False)
+        with services.correlation.activate("second"):
+            await ctx[Targeting].locate(tab=tab, ref="e1", scroll=False)
     assert aims == [(0.2, 0.3), (0.2, 0.3), (0.7, 0.6)]
     assert motor.sizes == [(80, 20), (80, 20)]
 
@@ -229,7 +230,7 @@ class _FileTools(FileTools, provides=True):
 
 class _Upload(NamedTuple):
     services: FakeServices
-    actions: Actions
+    targets: Targeting
     tools: FileTools
     handle: SimpleNamespace
 
@@ -252,6 +253,6 @@ async def _uploads(files):
             upload_files=AsyncMock(),
         )
         services.observe.element = AsyncMock(return_value=handle)
-        actions = ctx[Actions]
-        actions.element_point = AsyncMock(return_value=ElementPoint(x=40, y=30))
-        yield _Upload(services, actions, ctx[_FileTools], handle)
+        targets = ctx[Targeting]
+        targets.hover = AsyncMock(return_value=ElementPoint(x=40, y=30))
+        yield _Upload(services, targets, ctx[_FileTools], handle)

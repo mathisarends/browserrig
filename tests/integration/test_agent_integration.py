@@ -15,8 +15,10 @@ from browserrig import (
     Browser,
     Chrome,
     ImageContext,
+    InputRuntime,
     Readiness,
     ReadinessOptions,
+    Runtime,
     Screenshots,
     ScreenshotTrigger,
     browser_plugins,
@@ -203,6 +205,8 @@ async def test_dom_screenshots_are_native_images(site):
     agent = Agent(
         model=model,
         plugins=[
+            Runtime(),
+            InputRuntime(),
             Chrome(),
             Start(),
             Readiness(),

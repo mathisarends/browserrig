@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Protocol
 
 from browserrig.events import BrowserEvent, LiveEvent
 from browserrig.files import Download, FileTransfer
-from browserrig.input import Input
 
 from .tab import Tab
 
@@ -46,8 +45,6 @@ class BrowserEvents:
 
 
 class Browser(Protocol):
-    # The browser's devices, pacing, presentation and action correlation.
-    input: Input
     tabs: Tabs
 
     @property

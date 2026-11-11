@@ -288,7 +288,7 @@ scrolling its parent. `move_mouse(ref=...)` still reveals and hovers its target.
 These two tools replace the old cursor-dependent `scroll` agent tool. Migrate
 no-ref page scrolling to `scroll_page`, and container refs to `scroll_element`.
 For custom wheel handlers, native wheel input remains available to applications
-through `browser.input.mouse.scroll(delta_y=..., point=Point(...))`.
+through `devices.mouse.scroll(delta_y=..., point=Point(...))`.
 Both `click` and `click_at` accept `button="right"` for a native right click;
 the default is `button="left"`. Both tools automatically move the cursor to the
 target before clicking. Right clicks end the action chain so the agent can
@@ -316,10 +316,11 @@ available. See [Files and events](files-and-events.md#workspaces-bridges-and-rem
 
 ## Input choreography
 
-The browser has one mouse and one keyboard, `browser.input.mouse` and
-`browser.input.keyboard`. Both act on the active tab. `browser.input` shares the
-action context and event correlation across both devices. Browser tools
-use these same devices; `Actions` owns action transactions and readiness.
+The session owns one mouse and one keyboard through `InputRuntime()`.
+Obtain the devices with `session.scope[Input]` or declare `needs(Input)` in a plugin;
+use `devices.mouse` and `devices.keyboard`. Both act on the backend's focused input
+transport. The shared `ActionContext` supplies correlation independently of devices.
+`Actions` owns action transactions and readiness; `Runtime()` supplies their shared context.
 The session service `BrowserCoordination` serializes those transactions with
 step observations, content extraction, waits and human handoff.
 Tab management lives in `browser.tabs`: `list()`, `open(target)`,
@@ -338,22 +339,27 @@ optional plugins. Tools and devices only describe what they do. `InputPacing` (f
 `browserrig.choreography`) plays the gestures below and streams them as live events.
 `browser_plugins` and `Agent` include both by default; pass `without=(InputPacing,)` to work
 at full speed, `without=(InputVisualization,)` to emit no input events, or both. They build
-on four seams, which other plugins can use the same way:
+on the following seams, which other plugins can use the same way:
 
-- `browser.input.pace(motor)` installs a `Motor` that plans keystrokes, pointer
+- `devices.pace(motor)` installs a `Motor` that plans keystrokes, pointer
   routes, where to aim on a target, how long a click holds the button, and landing
   points. `InputPacing(motor)` installs one for a session; its
   default is `HumanMotor()`. Both built-in motors land in the center of a new
   tab. The default without a plugin, `Instant`, never pauses.
-- `browser.input.present(presenter)` installs a `Presenter` that plays tab-strip
+- `devices.present(presenter)` installs a `Presenter` that plays tab-strip
   gestures and reports each input event. The default, `Unseen`, reports nothing.
   Both calls return a callback that restores the previous motor or presenter.
 - `Actions.stage(intent, tab, step)` dispatches a `Perform` waterfall around a tool
   step. A hook that matches the intent (`FindIntent`, `NavigateIntent`, `WaitIntent`,
   `OpenFileIntent`, `UploadIntent`) stages the step and calls `next_()` to run it.
 - `TargetLocated` is observed once a tool has resolved its target element.
+- `ChangeTab` wraps every requested backend tab operation. `InputRuntime` handles
+  device synchronization through it; the installed presenter stages the transition.
+  Tab lifecycle events restore or forget cursor state without making `Tabs` depend
+  on devices. Direct `ChromeBrowser` callers explicitly construct `Input` against
+  `browser.input_targets.focused` and manage device synchronization themselves.
 
-The mouse remembers where it last rested in each tab (`browser.input.mouse.position_in(tab.id)`)
+The mouse remembers where it last rested in each tab (`devices.mouse.position_in(tab.id)`)
 and returns there when that tab comes back to the front. The first time a tab
 receives the pointer, both built-in motors put it in the center of the actual
 viewport. A custom motor can choose another landing point. There is no animation
@@ -417,9 +423,9 @@ custom motor may slip and correct itself; the plan is checked before the first k
 and `type_text` returns `TypedText(intended, entered)`. When a slip stays, the tools
 say so (without echoing text around a secret). Sensitive text refuses any plan
 that does not type it exactly. Empty replacement text
-clears the field. Direct Python callers can use `browser.input.keyboard.type_text(...)`,
-`browser.input.keyboard.press_key(...)`, `browser.input.mouse.move_to(Point(...))`, and
-`browser.input.mouse.scroll(delta_y=..., point=Point(...))`.
+clears the field. Direct Python callers can use `devices.keyboard.type_text(...)`,
+`devices.keyboard.press_key(...)`, `devices.mouse.move_to(Point(...))`, and
+`devices.mouse.scroll(delta_y=..., point=Point(...))`.
 When combining direct inputs with agent operations, inject the session's
 `BrowserCoordination` service and acquire `async with coordination.exclusive():`
 around the complete operation. The service is separate from `Browser`; nested

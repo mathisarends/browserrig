@@ -14,7 +14,10 @@ from browserrig import (
     Actions,
     Agent,
     Browser,
+    BrowserPerception,
     Chrome,
+    Input,
+    Targeting,
     TerminalEvents,
 )
 from browserrig.events import CursorMovedEvent, CursorStateEvent, InputEvent
@@ -93,13 +96,13 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
         consumer = asyncio.create_task(_consume(session, streamed, ready))
         await asyncio.wait_for(ready.wait(), 30)
         tab = holder["browser"].active_tab
-        position = holder["browser"].input.mouse.position
+        position = session.scope[Input].mouse.position
         width, height = await evaluate(tab, "[innerWidth, innerHeight]")
         assert 0.35 * width <= position.x <= 0.65 * width
         assert 0.35 * height <= position.y <= 0.65 * height
         first = await session.run("Inspect without moving")
         second = await session.run("Continue without moving")
-        assert holder["browser"].input.mouse.position == position
+        assert session.scope[Input].mouse.position == position
         events = (*first.events, *second.events)
         assert not any(isinstance(event, InputEvent) for event in events)
     await asyncio.wait_for(consumer, 30)
@@ -208,8 +211,8 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
         assert state["second"] == pytest.approx(180, abs=1)
         assert state["page"] == 0 and state["clicks"] == 0
         assert {"first", "second"} <= set(state["hovered"])
-        assert holder["browser"].input.mouse.position.x == pytest.approx(370)
-        assert holder["browser"].input.mouse.position.y == pytest.approx(160)
+        assert session.scope[Input].mouse.position.x == pytest.approx(370)
+        assert session.scope[Input].mouse.position.y == pytest.approx(160)
 
 
 async def test_scroll_moves_a_carousel_horizontally(site):
@@ -344,11 +347,10 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
     )
     async with agent.session() as session:
         await session.run("Observe")
-        actions = holder["actions"]
-        tab = actions.browser.active_tab
+        tab = session.scope[Browser].active_tab
         ref = next(
             element.ref
-            for element in actions.observe.snapshot.elements
+            for element in session.scope[BrowserPerception].snapshot.elements
             if element.name == "Email"
         )
         await evaluate(
@@ -356,7 +358,7 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
             "Object.assign(document.querySelector('#email').style, "
             "{position:'absolute',top:'1800px',left:'30px'})",
         )
-        point = await actions.element_point(tab=tab, ref=ref)
+        point = await session.scope[Targeting].locate(tab=tab, ref=ref)
         actual = await evaluate(
             tab,
             "(() => { const r = document.querySelector('#email').getBoundingClientRect();"

@@ -13,7 +13,7 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
-from browserrig import Browser, Chrome, ChromeBrowser, browser_plugins
+from browserrig import Browser, Chrome, ChromeBrowser, Input, browser_plugins
 from browserrig.browser import Launch
 from browserrig.choreography import Stage
 from browserrig.core import Point
@@ -86,6 +86,7 @@ async def test_drag_pointer_and_html5_transfer(site, native, coordinates):
 @pytest.mark.parametrize("prevented", [False, True])
 async def test_drag_uses_browser_behavior_for_draggable_ancestor(site, prevented):
     async with ChromeBrowser(Launch(url=site + "/gestures")) as browser:
+        devices = Input(browser.input_targets.focused)
         tab = browser.active_tab
         await wait_for_page(tab)
         await evaluate(
@@ -104,7 +105,7 @@ async def test_drag_uses_browser_behavior_for_draggable_ancestor(site, prevented
         assert (
             await evaluate(tab, "document.elementFromPoint(70, 140).draggable") is False
         )
-        await browser.input.mouse.drag(
+        await devices.mouse.drag(
             start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1
         )
         assert await evaluate(tab, "window.dragStarts") == 1
@@ -127,8 +128,9 @@ async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site)
 
     async with ChromeBrowser(Launch(url=site + "/gestures"), emit=emit) as browser:
         # Paced and reported, so the drag can be held right at its target.
-        browser.input.pace(HumanMotor())
-        browser.input.present(Stage())
+        devices = Input(browser.input_targets.focused)
+        devices.pace(HumanMotor())
+        devices.present(Stage())
         tab = browser.active_tab
         await wait_for_page(tab)
         await evaluate(
@@ -139,7 +141,7 @@ async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site)
             });""",
         )
         task = asyncio.create_task(
-            browser.input.mouse.drag(
+            devices.mouse.drag(
                 start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1
             )
         )
@@ -151,7 +153,7 @@ async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site)
                 await asyncio.wait_for(task, 30)
         assert await evaluate(tab, "window.nativeDrop") == ""
         assert await evaluate(tab, "window.dragEnds") == ["none"]
-        await browser.input.mouse.click(Point(x=70, y=40))
+        await devices.mouse.click(Point(x=70, y=40))
         assert await evaluate(tab, "window.details") == [1]
 
 

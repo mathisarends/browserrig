@@ -4,7 +4,13 @@ from time import monotonic
 from harnessed.tracing import span, traced
 
 from browserrig.browser import Browser, Tab
-from browserrig.core import ActionKind, BrowserError, ReadinessPhase, ReadinessStatus
+from browserrig.core import (
+    ActionContext,
+    ActionKind,
+    BrowserError,
+    ReadinessPhase,
+    ReadinessStatus,
+)
 from browserrig.readiness import Readiness
 from browserrig.tools.effects import Effect
 
@@ -17,9 +23,12 @@ _TAB_OPEN_SECONDS = 3.0
 class Completion:
     """Dispatch input and wait for the page or tab it leads into."""
 
-    def __init__(self, browser: Browser, readiness: Readiness) -> None:
+    def __init__(
+        self, browser: Browser, readiness: Readiness, actions: ActionContext
+    ) -> None:
         self._browser = browser
         self._readiness = readiness
+        self._actions = actions
 
     async def dispatch(
         self,
@@ -36,7 +45,7 @@ class Completion:
         """
         started = monotonic()
         mark = self._browser.tabs.openings
-        with self._browser.input.action(action_id), span("browserrig.operation"):
+        with self._actions.activate(action_id), span("browserrig.operation"):
             effect = await operation(tab)
         settled = settle and not tab.closed
         note = (
@@ -46,7 +55,7 @@ class Completion:
         )
         if kind not in FOLLOWED_KINDS or tab.closed:
             return effect, note, ""
-        with self._browser.input.action(action_id):
+        with self._actions.activate(action_id):
             followed = await self._follow(tab, mark, expected=effect.opens_tab)
         if effect.opens_tab and not followed:
             # Nothing opened, so the input acted in this tab instead.
@@ -65,7 +74,7 @@ class Completion:
         effects: list[Effect] = []
 
         async def dispatch() -> None:
-            with self._browser.input.action(action_id), span("browserrig.operation"):
+            with self._actions.activate(action_id), span("browserrig.operation"):
                 effects.append(await operation(tab))
 
         report = await self._readiness.wait(

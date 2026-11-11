@@ -9,10 +9,10 @@ from harnessed.tracing import record, traced
 
 from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
+    ActionContext,
     ActionKind,
     BrowserCoordination,
     BrowserToolCall,
-    ElementPoint,
 )
 from browserrig.events import ACTION_EVENTS
 from browserrig.observation import BrowserPerception
@@ -25,7 +25,6 @@ from browserrig.tools.chains import (
 )
 from browserrig.tools.effects import Effect
 from browserrig.tools.intents import Intent, Perform
-from browserrig.tools.targeting import Targeting
 
 from .invocation import ToolExecution
 from .transaction import ActionRunner
@@ -34,7 +33,6 @@ from .transaction import ActionRunner
 @dataclass
 class _Mount:
     context: PluginScope | None = None
-    targeting: Targeting | None = None
     runner: ActionRunner | None = None
     invocation: ToolExecution | None = None
 
@@ -44,11 +42,12 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
 
     events = ACTION_EVENTS
     _mount = PluginState(_Mount)
-    browser = needs(Browser)
+    _browser = needs(Browser)
+    _actions = needs(ActionContext)
     _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
-    readiness = needs(Readiness)
-    observe = needs(BrowserPerception)
+    _readiness = needs(Readiness)
+    _observe = needs(BrowserPerception)
 
     def __init__(self, *, chain_policy: ActionChainPolicy | None = None) -> None:
         super().__init__()
@@ -58,13 +57,13 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
 
     async def setup(self, scope: PluginScope) -> None:
         self._mount.context = scope
-        self._mount.targeting = Targeting(self.browser, self.observe, scope)
         self._mount.runner = ActionRunner(
-            self.browser,
+            self._browser,
             self._coordination,
             self._events,
-            self.readiness,
-            self.observe,
+            self._readiness,
+            self._observe,
+            actions=self._actions,
             page_change=self.page_change,
         )
         self._mount.invocation = ToolExecution(self._runner, self._coordination)
@@ -107,7 +106,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
             await self._runner.start(action)
         context = self._mount.context
         assert context is not None
-        performed = Perform(intent, tab, self.browser.input.action_id)
+        performed = Perform(intent, tab, self._actions.action_id)
         return cast(R, await context.dispatch(performed, default=step))
 
     @traced
@@ -117,30 +116,31 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         """A comparison probe must never replace the refs or image the model acted on."""
         if tab is None:
             tab = self.tab
-        if tab.closed or self.browser.active_tab.id != tab.id:
+        if tab.closed or self._browser.active_tab.id != tab.id:
             return "The active tab changed."
         try:
             if not after_input:
-                return await probe_change(self.observe, tab)
-            return await self.chain_policy.check(self.observe, tab)
+                return await probe_change(self._observe, tab)
+            return await self.chain_policy.check(self._observe, tab)
         except Exception:  # pylint: disable=broad-exception-caught
             # Successful input remains successful even if comparison fails.
             return "The page could not be checked after input."
 
-    async def element_point(
-        self, *, ref: str, tab: Tab | None = None, scroll: bool = True
-    ) -> ElementPoint:
-        """Reveal a ref and return a hit-tested point with an action-scoped aim."""
+    async def begin_preparation(self) -> None:
+        """Mark an executing action as started before target preparation has effects."""
         action = self._invocation.context.current
-        if tab is None:
-            tab = self.tab
         if action is not None and not action.started:
             await self._runner.start(action)
-        targeting = self._mount.targeting
-        assert targeting is not None
-        return await targeting.locate(
-            tab=tab, ref=ref, scroll=scroll, report=self._record_preparation
-        )
+
+    def record_preparation(self, note: str) -> None:
+        """Include bounded target-preparation diagnostics in the action receipt."""
+        action = self._invocation.context.current
+        if action is None:
+            return
+        if len(action.preparation_notes) < 8:
+            action.preparation_notes.append(note)
+        else:
+            action.preparation_omitted += 1
 
     @property
     def tab(self) -> Tab:
@@ -157,15 +157,6 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     @hook(BrowserToolCall)
     async def _run_tool(self, event: BrowserToolCall, next_: Next[object]) -> object:
         return await self._invocation.run(event, next_)
-
-    def _record_preparation(self, note: str) -> None:
-        action = self._invocation.context.current
-        if action is None:
-            return
-        if len(action.preparation_notes) < 8:
-            action.preparation_notes.append(note)
-        else:
-            action.preparation_omitted += 1
 
     @property
     def _runner(self) -> ActionRunner:

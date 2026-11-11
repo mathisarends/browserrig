@@ -14,8 +14,9 @@ from harnessed.plugins import Compaction, ContextState
 from .activity import Activity
 from .browser import Chrome, DownloadReceiving
 from .choreography import InputVisualization, TabStrip
-from .core import ModelProfile
+from .core import ModelProfile, Runtime
 from .files import Files, FileTransfers
+from .input import InputRuntime
 from .memory import TaskMemory
 from .nudges import Nudges
 from .observation import DomPerception, ImageContext, TextContext
@@ -37,6 +38,7 @@ from .tools import (
     PointerTools,
     ScreenshotTools,
     TabTools,
+    Targeting,
 )
 
 ContextCompaction = Compaction
@@ -77,8 +79,11 @@ def browser_pack(
     return PluginPack(
         name="browserrig",
         plugins=[
+            Runtime(),
             Activity(),
             browser if browser is not None else Chrome(),
+            InputRuntime(),
+            Targeting(),
             # Types and moves the pointer at a person's pace.
             InputPacing(),
             # Streams input and browser UI for anyone watching the session.

@@ -25,10 +25,12 @@ from .mouse import PointerTools
 from .navigation import NavigationTools
 from .screenshots import ScreenshotTools
 from .tabs import TabTools
+from .targeting import Targeting
 from .typing import DomTypingTools
 from .workspace import WorkspaceTools
 
 __all__ = [
+    "Targeting",
     "DomUploadTools",
     "DomTypingTools",
     "DomScrollTools",

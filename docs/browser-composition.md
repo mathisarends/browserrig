@@ -14,15 +14,18 @@ from harnessed import Agent
 from browserrig import (
     Actions, Chrome, ContextCompaction, DomActionChains, DomPerception,
     DomScrollTools, DomTypingTools, FormTools, ImageContext, InputPacing,
-    InputVisualization, KeyboardTools, NavigationTools, PointerTools, Readiness,
-    Screenshots, ScreenshotTools, ScreenshotTrigger, TextContext, TrimInBatches,
+    InputRuntime, InputVisualization, KeyboardTools, NavigationTools, PointerTools,
+    Readiness, Runtime, Screenshots, ScreenshotTools, ScreenshotTrigger, Targeting,
+    TextContext, TrimInBatches,
 )
 
 agent = Agent(
     model=model,
     instructions="Complete the browser task using observed state.",
     plugins=[
+        Runtime(),
         Chrome.launch(url=url),
+        InputRuntime(),
         Readiness(),
         DomPerception(
             screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
@@ -31,6 +34,7 @@ agent = Agent(
         ImageContext(TrimInBatches(max_images=3), skip_unchanged=True),
         ContextCompaction(),
         Actions(chain_policy=DomActionChains()),
+        Targeting(),
         InputPacing(),
         InputVisualization(),
         PointerTools(),
@@ -92,6 +96,66 @@ needed. Their legacy slot behavior is retained in this refactor.
 to allow verified DOM chains. The existing `browserrig.Agent`, `browser_pack` and
 `browser_plugins` convenience APIs retain the task-agent defaults, assembled from
 these individual plugins. They are not required for explicit composition.
+
+## Runtime ownership and migration
+
+`Runtime()` provides session-local `ActionContext` and `BrowserCoordination`.
+`Chrome` provides `Browser`, `BrowserEvents` and the `InputTargets` contract.
+`InputRuntime()` constructs and owns the session's `Input` devices, binding them
+to `InputTargets.focused()`. Neither `ChromeBrowser` nor `Tabs` constructs devices.
+The input package has no browser or CDP dependency: custom providers can supply
+`InputTargets` without providing `Browser`.
+
+Tools, pacing and presentation depend on `Input` directly. Both the devices and
+Chrome read action correlation from the same `ActionContext`; devices do not own
+or mutate it. `ActionContext.activate(id)` scopes explicit operations, supports
+nested/concurrent tasks and expires inherited correlation when an operation ends.
+
+`Targeting()` provides `locate(ref=..., tab=..., scroll=True)` and
+`hover(ref=..., tab=...)`. Hover reveals a target, moves the pointer and rechecks
+geometry. It follows one target movement, rejects further movement, focus changes,
+document changes and blocked targets, and retains the initial reveal receipt.
+Targeting uses the mounted perception's references; DOM-specific field operations
+remain on `DomElements`.
+
+Tab operations dispatch `ChangeTab`, a waterfall around the backend operation.
+`InputRuntime` synchronizes cursor state through this hook and tab events; the
+presenter installed by `InputVisualization` supplies optional tab-strip staging.
+This also covers internal tab changes, such as following a newly opened tab.
+Already-focused initial tabs are synchronized when devices mount. Closing a tab
+forgets its cursor state. Bare `ChromeBrowser` calls remain technical operations
+without device movement or presentation.
+
+The task facade includes the new plugins. Update manual compositions explicitly:
+
+| Previous API | Replacement |
+| --- | --- |
+| `Chrome()` supplying coordination | Add `Runtime()`; Chrome consumes its action context. |
+| `browser.input` or `actions.browser.input` | Add `InputRuntime()` and declare `needs(Input)`, or use `session.scope[Input]`. |
+| `Actions.element_point(...)` | Add `Targeting()` and call `Targeting.locate(...)`. |
+| Repeated locate/move/recheck sequences | Use `Targeting.hover(...)`. |
+| `Input.action(id)` | Use the shared `ActionContext.activate(id)`. |
+| `Actions.browser`, `.observe`, `.readiness` | Declare `needs(Browser)`, `needs(BrowserPerception)` or `needs(Readiness)` directly. |
+
+For direct Python use without Harnessed, construct devices against the backend
+contract. Pass the same correlation reader to both components when needed:
+
+```python
+from browserrig import ActionContext, ChromeBrowser, Input, Point
+
+actions = ActionContext()
+async with ChromeBrowser(current_action=lambda: actions.action_id) as browser:
+    devices = Input(
+        browser.input_targets.focused,
+        action_id=lambda: actions.action_id,
+    )
+    await devices.mouse.resume()
+    with actions.activate("inspect"):
+        await devices.mouse.move_to(Point(x=100, y=120))
+```
+
+Direct callers own device synchronization after their technical tab operations;
+`InputRuntime` supplies this wiring in agent sessions.
 
 ## Observation backends and migration
 
@@ -327,11 +391,11 @@ the cache breakpoint before the newest observation.
 
 ## Extension contracts
 
-Custom browser providers publish `Browser`, `BrowserEvents` and one
-`BrowserCoordination` instance per session. Actions, step observations, content
+Custom browser providers publish `Browser`, `BrowserEvents` and `InputTargets`.
+`Runtime()` provides one `BrowserCoordination` instance per session. Actions, step observations, content
 extraction, waits and human handoff acquire `coordination.exclusive()` at their
-operation boundaries. Direct device calls use `browser.input.mouse` and
-`browser.input.keyboard`.
+operation boundaries. Device consumers declare `needs(Input)` and use
+`input.mouse` and `input.keyboard`.
 
 Async methods declared with `browser_tool` automatically enter the browser tool
 execution pipeline. Synchronous callbacks are rejected at declaration time.
@@ -348,26 +412,24 @@ Declare services once with `needs`, and write the operation directly in the tool
 from harnessed import Plugin
 from harnessed.kernel import needs
 
-from browserrig import ActionKind, Browser
-from browserrig.tools import Actions, Effect, browser_tool
+from browserrig import ActionKind, Targeting
+from browserrig.tools import Effect, browser_tool
 
 
 class HoverTools(Plugin):
-    _actions = needs(Actions)
-    _browser = needs(Browser)
+    _targets = needs(Targeting)
 
     @browser_tool(
         kind=ActionKind.MOVE_MOUSE,
         description="Hover an observed element without clicking.",
     )
     async def hover_ref(self, ref: str) -> Effect:
-        point = await self._actions.element_point(ref=ref)
-        await self._browser.input.mouse.move_to(point)
+        point = await self._targets.hover(ref=ref)
         return Effect("Hovered.", prepared_scroll=point.scrolled)
 ```
 
 `Actions.tab` is the tab fixed at the start of that input operation;
-`element_point(ref=...)` and `page_change()` use it implicitly. Explicit `tab=`
+`Targeting.locate(ref=...)`, `Targeting.hover(ref=...)` and `page_change()` use it implicitly. Explicit `tab=`
 arguments remain available. Input tool bodies do not call `Actions.run` or acquire
 the coordination lock themselves. Return `Effect` for input details such as
 prepared scrolling or a requested new tab. Text and `ToolResult` are also supported;
