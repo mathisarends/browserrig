@@ -1,11 +1,13 @@
+from functools import partial
+
 from harnessed import Plugin, ToolError
 from harnessed.kernel import needs, observes
 
-from browserrig.browser import Browser
-from browserrig.core import ActionKind
+from browserrig.browser import Browser, Tab
+from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
 from browserrig.input import TypedText
-from browserrig.observation import BrowserPerception
+from browserrig.observation import BrowserPerception, DomElementHandle
 from browserrig.secrets import Secrets
 
 from .effects import Effect
@@ -90,17 +92,26 @@ class KeyboardTools(Plugin):
             else None
         )
         await field.focus(select_all=clear)
-        before = await field.text_state() if not clear and entry is None else None
-        if clear:
+        guard = partial(_require_focus, self._browser, tab, field)
+        await guard()
+        before = await field.text_state()
+        # Backspace on an empty token input can select/remove its preceding chip.
+        if clear and (before is None or before.value):
             await self._browser.input.keyboard.press_key("Backspace")
+        await guard()
         if entry is not None and secrets is not None:
             return _secret_entered(
                 await secrets.enter(entry, self._browser.input.keyboard)
             )
-        typed = await self._browser.input.keyboard.type_text(text)
+        typed = await self._browser.input.keyboard.type_text(text, guard=guard)
         after = await field.text_state()
         expected = typed.entered if clear else None
-        if before is not None and before.start is not None and before.end is not None:
+        if (
+            not clear
+            and before is not None
+            and before.start is not None
+            and before.end is not None
+        ):
             expected = (
                 before.value[: before.start]
                 + typed.entered
@@ -113,6 +124,14 @@ class KeyboardTools(Plugin):
                 break_chain=True,
             )
         return _entered(typed)
+
+
+async def _require_focus(browser: Browser, tab: Tab, field: DomElementHandle) -> None:
+    if browser.active_tab is not tab or not await field.is_focused():
+        raise BrowserError(
+            "Typing stopped: the addressed field lost focus. Inspect the current "
+            "focus and field value before continuing; remaining text was not sent."
+        )
 
 
 def _entered(typed: TypedText) -> Effect:

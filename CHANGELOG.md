@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Preserve selected chips when typing into an empty native text field. Skip the
+  empty-field Backspace and stop remaining text if focus leaves the addressed
+  field or its embedding frame.
+
 - Save agent `extract_content` results as workspace Markdown and return only
   `Saved`, `Source`, `Title` and actual extraction limitations. Remove its inline
   body and `max_chars`/`offset` arguments; without a workspace the tool is disabled.
