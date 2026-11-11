@@ -12,7 +12,7 @@ from harnessed.plugins import Approvals
 from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel, call
 
-from browserrig.core import ActionKind, browser_tool
+from browserrig.core import ActionKind, BrowserError, browser_tool
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent
 from browserrig.tools import Actions, DialogTools
 from tests.fakes import FakeServices, mounted
@@ -144,3 +144,52 @@ def _agent(value, request, *, allow=True):
             Approvals(default=PolicyDecision.ALLOW if allow else PolicyDecision.DENY),
         ],
     )
+
+
+@pytest.mark.parametrize("dispatch", [False, True])
+async def test_tracked_input_distinguishes_preparation_from_primary_dispatch(dispatch):
+    agent = Agent(
+        model=ScriptedModel([call("tracked_input", dispatch=dispatch), "Done"]),
+        plugins=[
+            FakeServices(),
+            Actions(),
+            _TrackedInput(),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
+    )
+    async with agent.session() as session:
+        result = await session.run("Run tracked input")
+        services = session.scope[FakeServices]
+        assert session.scope[_TrackedInput].effects == int(dispatch)
+    (reply,) = [
+        event.result
+        for event in result.events
+        if isinstance(event, ToolCallFinishedEvent)
+    ]
+    (failure,) = [
+        event for event in services.events if isinstance(event, ActionFailedEvent)
+    ]
+    assert reply.is_error and failure.dispatched is dispatch
+    assert ("may have run" in reply.text) is dispatch
+    assert ("not dispatched" in reply.text) is not dispatch
+
+
+class _TrackedInput(Plugin, needs=(Actions,), provides=True):
+    actions = needs(Actions)
+
+    def __init__(self):
+        super().__init__()
+        self.effects = 0
+
+    @browser_tool(
+        kind=ActionKind.CLICK, description="Test tracked input.", dispatch_tracked=True
+    )
+    async def tracked_input(self, dispatch: bool):
+        if not dispatch:
+            raise BrowserError("Target unavailable before input")
+
+        async def mutate():
+            self.effects += 1
+            raise BrowserError("Failed after mutation")
+
+        await self.actions.dispatch(mutate)

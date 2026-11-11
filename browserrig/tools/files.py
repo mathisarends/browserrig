@@ -13,6 +13,7 @@ from pydantic import Field
 from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
     ActionKind,
+    BlockedElement,
     BrowserError,
     ElementPoint,
     FileSource,
@@ -130,6 +131,7 @@ class _BrowserFileActions(FileSystemObservation):
 
     @tool(
         kind=ActionKind.UPLOAD,
+        dispatch_tracked=True,
         enabled=_reaches_chrome,
         description=(
             "Set a file input or its associated HTML label to existing workspace files, "
@@ -169,7 +171,10 @@ class _BrowserFileActions(FileSystemObservation):
                     await self._browser.input.mouse.move_to(current)
                 point = current
             except BrowserError as error:
-                if str(error) != "ELEMENT_BLOCKED":
+                if (
+                    not isinstance(error, BlockedElement)
+                    and str(error) != "ELEMENT_BLOCKED"
+                ):
                     raise
                 point = None
 

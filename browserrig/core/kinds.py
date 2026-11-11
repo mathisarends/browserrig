@@ -91,6 +91,7 @@ class ElementOperation(StrEnum):
     BOUNDS = "bounds"
     FOCUS = "focus"
     FOCUSED = "focused"
+    DIAGNOSE = "diagnose"
     SELECT = "select"
     SET_VALUE = "set_value"
     TEXT_STATE = "text_state"

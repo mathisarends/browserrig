@@ -121,7 +121,9 @@ class ActionRunner:
                 )
             except asyncio.CancelledError:
                 if action is not None:
-                    dispatched = action.started
+                    dispatched = (
+                        action.dispatched if action.dispatch_tracked else action.started
+                    )
                 reason = (
                     "cancelled; side effects may already have occurred"
                     if dispatched
@@ -133,21 +135,19 @@ class ActionRunner:
                 raise
             except Exception as error:
                 if action is not None:
-                    dispatched = action.started
+                    dispatched = (
+                        action.dispatched if action.dispatch_tracked else action.started
+                    )
                 reason = (
                     str(error)
                     if isinstance(error, (BrowserError, ToolError))
                     else f"{type(error).__name__}: {error}"
                 )
                 await self._fail(tab, action_id, kind, dispatched, reason)
-                hint = (
-                    "; the action may have run. Observe before retrying."
-                    if dispatched
-                    else ""
-                )
+                message = _failure(kind, reason, dispatched)
                 if isinstance(error, ToolActionError):
-                    return error.result.with_note(hint) if hint else error.result
-                raise ToolError(reason + hint) from error
+                    return error.result.with_text(message)
+                raise ToolError(message) from error
 
     async def start(self, action: ToolAction) -> None:
         tab = action.tab
@@ -248,3 +248,21 @@ class ActionRunner:
                 cancelled=cancelled,
             )
         )
+
+
+def _failure(kind: ActionKind, reason: str, dispatched: bool) -> str:
+    action = {
+        ActionKind.CLICK: "Click",
+        ActionKind.CLICK_AT: "Click",
+        ActionKind.TYPE: "Text input",
+        ActionKind.PRESS: "Keyboard input",
+        ActionKind.SELECT: "Selection",
+        ActionKind.SET_DATE: "Date input",
+        ActionKind.UPLOAD: "File assignment",
+    }.get(kind, kind.value.replace("_", " ").capitalize())
+    if dispatched:
+        return (
+            f"{action} dispatch was attempted; the action may have run. "
+            f"Observe before retrying.\nReason: {reason}"
+        )
+    return f"{action} not dispatched.\nReason: {reason}"

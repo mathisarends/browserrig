@@ -28,7 +28,9 @@ class ToolExecution:
                     return await next_()
             return await next_()
 
-        with self.context.activate(kind) as action:
+        with self.context.activate(
+            kind, dispatch_tracked=event.metadata.dispatch_tracked
+        ) as action:
 
             async def perform(_tab: Tab) -> Effect:
                 value = await next_()

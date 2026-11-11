@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fix false hit-test clipping for fixed-body pages with a zero-height HTML root.
+  Distinguish tracked browser-tool preparation failures from native dispatch
+  attempts. Report bounded hit-test layout diagnostics without page text or
+  field values. Custom tools can opt in with dispatch_tracked and Actions.dispatch.
+
 - Preserve selected chips when typing into an empty native text field. Skip the
   empty-field Backspace and stop remaining text if focus leaves the addressed
   field or its embedding frame.

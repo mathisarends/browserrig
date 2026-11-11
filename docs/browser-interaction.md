@@ -531,3 +531,51 @@ the current page focus and does not acquire a target ref.
 
 Direct DOM users can call `await handle.is_focused()` to check the target and its
 embedding frame chain without refocusing it or reading its value.
+
+### Reporting action preparation and dispatch
+
+Built-in pointer, keyboard, form, navigation and upload tools distinguish failures
+before primary input from failures after entering native input. Preparation can
+move the cursor or scroll without clicking or typing. A preflight failure says
+`Click not dispatched.` (or the corresponding action) and includes its reason.
+After native dispatch was attempted, the result retains uncertainty and asks the
+agent to inspect the state before retrying. A dispatch attempt does not establish
+that the application completed the mutation.
+
+DOM hit-test failures include bounded, measured CSS/layout facts: target ref,
+frame-local bounds, display/visibility/pointer-events and the tag found at the
+visible center. They do not copy arbitrary page text or field values into errors.
+`browserrig.core.BlockedElement` is a `BrowserError` subtype for such failures.
+Diagnostics have a 500 ms budget; stale/detached targets keep their original error
+when additional facts cannot be collected.
+
+Custom tools can opt into this contract:
+
+```python
+from functools import partial
+from browserrig.core import ActionKind, browser_tool
+
+@browser_tool(
+    kind=ActionKind.CLICK,
+    description="Click the requested target.",
+    dispatch_tracked=True,
+)
+async def click_target(self, ref: str):
+    point = await self.actions.element_point(ref=ref)
+    await self.actions.dispatch(partial(self.browser.input.mouse.click, point))
+    return "Click dispatched."
+```
+
+`Actions.dispatch(operation)` marks the boundary immediately before running the
+primary input operation. Keep validation, target lookup, preparatory hover and
+scroll before that call. `Actions.stage(...)` marks its default operation at the
+same boundary; middleware replacing that operation must use `dispatch` for its
+own input. `ActionFailedEvent.dispatched` follows this boundary for opted-in tools.
+`ActionStartedEvent` still begins preparation and viewer staging.
+
+The new `dispatch_tracked` flag defaults to false, preserving conservative failure
+semantics for existing custom tools and direct `Actions.run` calls.
+
+Root overflow is clipped to the viewport during hit testing, rather than to the
+HTML element layout box. This keeps fixed-body applications actionable when the
+HTML layout height is zero, while native hit tests still reject actual overlays.
