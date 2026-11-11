@@ -531,3 +531,21 @@ the current page focus and does not acquire a target ref.
 
 Direct DOM users can call `await handle.is_focused()` to check the target and its
 embedding frame chain without refocusing it or reading its value.
+
+### Action acknowledgements and hit-test diagnostics
+
+The system prompt asks agents to verify the intended effect in the next
+observation before treating an action as successful or retrying it. A tool
+acknowledgement describes an attempted interaction; it does not prove that the
+application accepted it. Existing tool signatures and action-event semantics
+are unchanged.
+
+DOM hit-test failures include bounded, measured CSS/layout facts: target ref,
+frame-local bounds, display/visibility/pointer-events and the tag found at the
+visible center. They use the existing BrowserError type and do not copy arbitrary
+page text or field values into errors. Diagnostics have a 500 ms budget;
+stale/detached targets keep their original error when facts cannot be collected.
+
+Root overflow is clipped to the viewport during hit testing, rather than to the
+HTML element layout box. This keeps fixed-body applications actionable when the
+HTML layout height is zero, while native hit tests still reject actual overlays.

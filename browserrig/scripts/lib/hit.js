@@ -6,7 +6,9 @@ function visibleBounds(el, rect, viewport, styleFor = getComputedStyle) {
   let bounds = intersect(rect, viewport);
   for (let current = el; current; current = parentFor(current)) {
     const style = styleFor(current);
-    if (current === el) {
+    // Root overflow applies to the viewport, not the root layout box. A fixed
+    // body can be visible while html.getBoundingClientRect().height is zero.
+    if (current === el || current === document.documentElement) {
       continue;
     }
     const box = current.getBoundingClientRect();

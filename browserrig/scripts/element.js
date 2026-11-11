@@ -1,4 +1,4 @@
-/* global resolveElement, pointFor */
+/* global resolveElement, pointFor, intersect, visibleBounds */
 function browserrigElement({operation, value, clip = null, aim = null}) {
   const el = resolveElement(this);
   function selectOption() {
@@ -55,6 +55,56 @@ function browserrigElement({operation, value, clip = null, aim = null}) {
     return true;
   }
 
+  if (operation === 'diagnose') {
+    const box = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    const facts =
+      'display=' +
+      style.display +
+      ', visibility=' +
+      style.visibility +
+      ', pointer-events=' +
+      style.pointerEvents;
+    const bounds =
+      'frame-local bounds=(' +
+      [box.x, box.y, box.width, box.height]
+        .map((value) => Math.round(value))
+        .join(', ') +
+      ')';
+    const viewport = intersect(
+      {x: 0, y: 0, width: innerWidth, height: innerHeight},
+      clip,
+    );
+    const visible = visibleBounds(el, box, viewport);
+    if (!visible) {
+      return (
+        'No visible target area after viewport/ancestor clipping. ' +
+        bounds +
+        '; ' +
+        facts +
+        '.'
+      );
+    }
+    const x = visible.x + visible.width / 2;
+    const y = visible.y + visible.height / 2;
+    const hit = el.getRootNode().elementFromPoint(x, y);
+    const hitName = hit ? '<' + hit.localName + '>' : 'no element';
+    return (
+      'Frame-local visible-center hit test at (' +
+      Math.round(x) +
+      ', ' +
+      Math.round(y) +
+      ') reaches ' +
+      hitName +
+      '; target is <' +
+      el.localName +
+      '>. ' +
+      bounds +
+      '; ' +
+      facts +
+      '.'
+    );
+  }
   if (operation === 'bounds') {
     const box = el.getBoundingClientRect();
     return {x: box.x, y: box.y, width: box.width, height: box.height};

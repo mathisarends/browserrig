@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fix false hit-test clipping for fixed-body pages with a zero-height HTML root.
+  Report bounded hit-test layout diagnostics without page text or field values.
+  Remind agents to verify intended effects in the next observation; tool
+  acknowledgements describe attempted interactions, not application success.
+
 - Preserve selected chips when typing into an empty native text field. Skip the
   empty-field Backspace and stop remaining text if focus leaves the addressed
   field or its embedding frame.

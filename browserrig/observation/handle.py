@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -46,13 +47,43 @@ class DomElementHandle:
         `aim` is a preferred spot as fractions of the visible box; when something
         covers it, the point falls back to the middle or near a corner.
         """
-        local = ElementPoint.model_validate(
-            await self._run(
-                ElementOperation.POINT, clip=self.frame.local_visible, aim=aim
+        try:
+            local = ElementPoint.model_validate(
+                await self._run(
+                    ElementOperation.POINT, clip=self.frame.local_visible, aim=aim
+                )
             )
-        )
+        except BrowserError as error:
+            if str(error) != "ELEMENT_BLOCKED":
+                raise
+            details = (
+                "The target could not be hit-tested; layout diagnostics unavailable."
+            )
+            try:
+                async with asyncio.timeout(0.5):
+                    details = await self.run(
+                        ELEMENT,
+                        ElementArgs(
+                            operation=ElementOperation.DIAGNOSE,
+                            clip=self.frame.local_visible,
+                        ),
+                    )
+            except (BrowserError, TimeoutError):
+                pass
+            raise BrowserError(
+                f"ELEMENT_BLOCKED: target ref {self.element.ref}. {details}"
+            ) from error
         x, y = self.frame.transform.to_viewport(local.x, local.y)
-        await self.frame.check_point(x, y)
+        try:
+            await self.frame.check_point(x, y)
+        except BrowserError as error:
+            if str(error) != "ELEMENT_BLOCKED":
+                raise
+            raise BrowserError(
+                f"ELEMENT_BLOCKED: target ref {self.element.ref} is hit-testable inside "
+                f"frame {self.frame.id}, but its viewport point ({x:g}, {y:g}) is "
+                "covered or clipped in an embedding document. Inspect the outer page."
+            ) from error
         bounds = (
             self.frame.transform.bounds_to_viewport(local.bounds)
             if local.bounds is not None

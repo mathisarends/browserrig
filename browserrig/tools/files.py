@@ -169,7 +169,7 @@ class _BrowserFileActions(FileSystemObservation):
                     await self._browser.input.mouse.move_to(current)
                 point = current
             except BrowserError as error:
-                if str(error) != "ELEMENT_BLOCKED":
+                if str(error).partition(":")[0] != "ELEMENT_BLOCKED":
                     raise
                 point = None
 
