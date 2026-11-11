@@ -278,11 +278,7 @@ async def test_send_keys_rejects_ambiguous_arguments_before_dispatch(arguments):
 async def test_send_keys_distinguishes_literal_text_from_named_keys(monkeypatch):
     monkeypatch.setattr(keyboard_module.asyncio, "sleep", AsyncMock())
     devices, _tab, events, commands = _rig()
-    tools = SimpleNamespace(
-        _browser=SimpleNamespace(input=devices),
-        _secrets=None,
-        _actions=_DirectActions(),
-    )
+    tools = SimpleNamespace(_browser=SimpleNamespace(input=devices), _secrets=None)
     await KeyboardTools.send_keys(tools, text="Escape")
     assert [
         command["text"] for command in commands if command["type"] == "char"
@@ -842,11 +838,7 @@ async def test_send_keys_reports_a_slip_that_stayed():
     devices, _tab, _events, _commands = _rig()
     devices.pace(_Slipping("h", "e", "l", "o"))
 
-    tools = SimpleNamespace(
-        _browser=SimpleNamespace(input=devices),
-        _secrets=None,
-        _actions=_DirectActions(),
-    )
+    tools = SimpleNamespace(_browser=SimpleNamespace(input=devices), _secrets=None)
     reply = await KeyboardTools.send_keys(tools, text="hello")
     assert "typed 'helo' instead of 'hello'" in reply.text
 
@@ -875,10 +867,3 @@ async def test_a_plan_the_keyboard_cannot_follow_is_refused_before_any_key(
     with pytest.raises(BrowserError, match=message):
         await devices.keyboard.type_text("a")
     assert not commands
-
-
-class _DirectActions:
-    """Device tests execute input directly without a mounted action lifecycle."""
-
-    async def dispatch(self, operation):
-        return await operation()

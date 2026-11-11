@@ -2,10 +2,6 @@ class BrowserError(Exception):
     """An actionable browser failure, without endpoint credentials."""
 
 
-class BlockedElement(BrowserError):
-    """An element could not be hit-tested; the message contains bounded layout facts."""
-
-
 class BrowserClosed(BrowserError):
     pass
 

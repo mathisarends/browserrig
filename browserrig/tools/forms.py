@@ -1,5 +1,3 @@
-from functools import partial
-
 from harnessed import Plugin
 from harnessed.kernel import needs
 
@@ -18,7 +16,6 @@ class FormTools(Plugin):
 
     @tool(
         kind=ActionKind.SELECT,
-        dispatch_tracked=True,
         chainable=True,
         description="Select an exact option label or value in a native select element.",
     )
@@ -35,12 +32,11 @@ class FormTools(Plugin):
         if (current.x, current.y) != (point.x, point.y):
             await self._actions.browser.input.mouse.move_to(current)
         handle = await self._observe.dom_element(tab, ref)
-        await self._actions.dispatch(partial(handle.select, value))
+        await handle.select(value)
         return Effect("Option selected.", prepared_scroll=point.scrolled)
 
     @tool(
         kind=ActionKind.SET_DATE,
-        dispatch_tracked=True,
         chainable=True,
         description="Set a native date/time input in its HTML format, such as YYYY-MM-DD.",
     )
@@ -65,7 +61,7 @@ class FormTools(Plugin):
         if (current.x, current.y) != (point.x, point.y):
             await self._actions.browser.input.mouse.move_to(current)
         handle = await self._observe.dom_element(tab, ref)
-        await self._actions.dispatch(partial(handle.set_value, value))
+        await handle.set_value(value)
         return Effect(
             "Date/time value set and verified.", prepared_scroll=point.scrolled
         )
