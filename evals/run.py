@@ -13,6 +13,7 @@ from browserrig.core import MODEL_PROFILES
 
 from . import report
 from .environments import DEFAULT_CONFIG, DEFAULT_DATA, Environments
+from .freeze import SUBSETS
 from .results import BenchmarkResult, write_run
 from .runner import RunOptions, run_task
 from .task import Task, load_tasks, select
@@ -21,6 +22,12 @@ from .telemetry import DEFAULT_PROJECT, tracing_plugins
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--subset",
+        choices=tuple(SUBSETS),
+        default="local-v3",
+        help="Default: local-v3 (48 tasks on provisioned sites); original-v1 is historical",
+    )
     parser.add_argument(
         "--tasks",
         help="Frozen IDs or @site/@retrieve/@mutate/@navigate, comma-separated",
@@ -57,7 +64,7 @@ async def main() -> None:
     if args.parallel != 1:
         parser.error("WebArena shares mutable sites: --parallel must be 1")
     try:
-        manifest, frozen = load_tasks()
+        manifest, frozen = load_tasks(SUBSETS[args.subset])
         tasks = select(frozen, args.tasks)
     except ValueError as error:
         parser.error(str(error))

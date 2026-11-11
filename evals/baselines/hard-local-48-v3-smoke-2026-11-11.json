@@ -1,0 +1,151 @@
+{
+  "kind": "diagnostic-smoke-audit-not-a-full-benchmark-score",
+  "date": "2026-11-11",
+  "subset": "browserrig-webarena-verified-hard-local-48-v3",
+  "dataset_sha256": "0a0d80a525ee5d4d5d6ea54725a4518e0603cf0912faa1b47423504c8952bb35",
+  "upstream_version": "1.2.3",
+  "upstream_revision": "6473f72db5dcefc97b5725b59e734504edc28a21",
+  "agent_commit": "e40e0c075fc1d2b0a486cba7dab24d47def446e7",
+  "agent_source_sha256": "48cf180cb1f06ca9dec43b29dfb0793adab1fce7fa2c0c9e74966407f6fc0adb",
+  "model": "gpt-6.1-terra",
+  "provider": "openai-codex",
+  "max_steps": 50,
+  "agent_timeout_seconds": 300,
+  "planned_full_suite_tasks": 48,
+  "retained_original_tasks": 43,
+  "replacements": {
+    "267": 66,
+    "428": 709,
+    "558": 791,
+    "561": 491,
+    "760": 156
+  },
+  "selected_task_observations": [
+    {
+      "task_id": 66,
+      "run": "20261111-101519-146350-local-v3-smoke",
+      "official_status": "pass",
+      "completed": true,
+      "stop_reason": "end",
+      "seconds_including_setup": 104.5,
+      "tool_calls": 11,
+      "tool_errors": 0,
+      "task_definition_sha256": "db7f7a0d062724e912eb192385e8986834ff6d6cb533598ea6a4c724eb18c422",
+      "finding": "Official evaluator passed."
+    },
+    {
+      "task_id": 156,
+      "run": "20261111-101519-146350-local-v3-smoke",
+      "official_status": "pass",
+      "completed": true,
+      "stop_reason": "end",
+      "seconds_including_setup": 96.2,
+      "tool_calls": 4,
+      "tool_errors": 0,
+      "task_definition_sha256": "0f678a8cf8401b523c2864886f6a6908b51429b08216c58a10b4153af19d461d",
+      "finding": "Official evaluator passed."
+    },
+    {
+      "task_id": 491,
+      "run": "20261111-100136-460144-local-v2-smoke",
+      "official_status": "fail",
+      "completed": true,
+      "stop_reason": "end",
+      "seconds_including_setup": 151.8,
+      "tool_calls": 6,
+      "tool_errors": 1,
+      "task_definition_sha256": "9b0ef2ed35998782402a99de01f08437661f48f04175dd930df7191c7d6c85ce",
+      "finding": "Application rejected adding order history; agent returned UNKNOWN_ERROR instead of the expected ACTION_NOT_ALLOWED_ERROR."
+    },
+    {
+      "task_id": 709,
+      "run": "20261111-101519-146350-local-v3-smoke",
+      "official_status": "pass",
+      "completed": true,
+      "stop_reason": "end",
+      "seconds_including_setup": 86.7,
+      "tool_calls": 5,
+      "tool_errors": 0,
+      "task_definition_sha256": "8d5bf598f19b50d6e5c7d92822a46d5600787f5ca8ac7ab39fa5676fd31b17c3",
+      "finding": "Official evaluator passed."
+    },
+    {
+      "task_id": 791,
+      "run": "20261111-100136-460144-local-v2-smoke",
+      "official_status": "pass",
+      "completed": true,
+      "stop_reason": "end",
+      "seconds_including_setup": 132.5,
+      "tool_calls": 9,
+      "tool_errors": 0,
+      "task_definition_sha256": "c46685958493ab999213d812199b313e89adc311fec92557098f660cbdd382e7",
+      "finding": "Official evaluator passed."
+    }
+  ],
+  "interpretation": "All five final replacements reached and completed an agent session. Four passed and one failed. These smoke observations span a pilot and a follow-up with identical task definitions for retained replacements; they are not a single 48-task capability score. Historical baseline scores are unchanged.",
+  "pilot": {
+    "run": "20261111-100136-460144-local-v2-smoke",
+    "subset": "browserrig-webarena-verified-hard-local-48-v2",
+    "dataset_sha256": "abee5c05905d55809e48f6d654f720a591c9c6767e3e16aa112169d6cf559df2",
+    "attempts": [
+      {
+        "task_id": 68,
+        "status": "fail",
+        "error_phase": null,
+        "agent_started": true
+      },
+      {
+        "task_id": 156,
+        "status": "error",
+        "error_phase": "setup",
+        "agent_started": false
+      },
+      {
+        "task_id": 491,
+        "status": "fail",
+        "error_phase": null,
+        "agent_started": true
+      },
+      {
+        "task_id": 679,
+        "status": "fail",
+        "error_phase": null,
+        "agent_started": true
+      },
+      {
+        "task_id": 791,
+        "status": "pass",
+        "error_phase": null,
+        "agent_started": true
+      }
+    ],
+    "excluded_candidates": {
+      "68": "Reference contains null where its declared result schema type forbids it.",
+      "679": "Navigation evaluator filters out the Ajax-only target request."
+    },
+    "audit_evidence": {
+      "68": "Reference author=null conflicts with declared author:string. Official pilot failure is retained.",
+      "679": "HAR contains the successful GET sales_order_grid request with filters[status]=complete; pinned navigation grader selects only the last navigation event for GET, excluding this XHR. Official pilot failure is retained."
+    }
+  },
+  "followup": {
+    "run": "20261111-101519-146350-local-v3-smoke",
+    "subset": "browserrig-webarena-verified-hard-local-48-v3",
+    "dataset_sha256": "0a0d80a525ee5d4d5d6ea54725a4518e0603cf0912faa1b47423504c8952bb35",
+    "tasks": [
+      66,
+      156,
+      709
+    ]
+  },
+  "setup_corrections": [
+    "Docker Desktop stale socket directory was preserved by renaming it aside; Docker recreated its endpoint.",
+    "Authentication submits once with no_wait_after=True, then separately waits up to 60 seconds for the password field to disappear. The first GitLab setup failure remains in the pilot."
+  ],
+  "validation": {
+    "offline_regression_tests_passed": 58,
+    "chrome_recording_and_login_tests_passed": 5,
+    "lint_types_pylint_smelt": "passed",
+    "all_three_subsets_reproduce_byte_for_byte": true
+  }
+}

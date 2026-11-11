@@ -15,6 +15,7 @@ from urllib.parse import quote
 from pydantic import BaseModel, Field
 
 from . import analyze, network_evidence
+from .freeze import LOCAL_DATA, LOCAL_SUBSET, PILOT_DATA, PILOT_SUBSET
 from .network_evidence import DocumentVisit, NetworkRequest
 from .results import BenchmarkResult, TaskResult, ToolRecord, write_run
 from .task import Task, load_tasks
@@ -98,13 +99,14 @@ def build(
     *,
     refresh: bool = False,
 ) -> HtmlReport:
-    manifest, tasks = load_tasks()
     runs = [BenchmarkResult.model_validate_json(path.read_bytes()) for path in paths]
     if not runs:
         raise ValueError("No suite results available yet")
+    baseline = runs[0]
+    data = {LOCAL_SUBSET: LOCAL_DATA, PILOT_SUBSET: PILOT_DATA}.get(baseline.subset)
+    manifest, tasks = load_tasks(data) if data is not None else load_tasks()
     if set(blocked) - set(manifest.task_ids):
         raise ValueError("Blocked IDs must belong to the frozen subset")
-    baseline = runs[0]
     records: dict[int, TaskResult] = {}
     for run in runs:
         if run.dataset_sha256 != manifest.tasks_sha256 or (
@@ -584,7 +586,7 @@ def main() -> None:
     parser.add_argument("--blocked-reason", default="Environment unavailable")
     parser.add_argument("--revision", default="unknown")
     parser.add_argument("--watch", action="store_true")
-    parser.add_argument("--expected", type=int, default=43)
+    parser.add_argument("--expected", type=int)
     parser.add_argument("--refresh", action="store_true")
     args = parser.parse_args()
     blocked = {
@@ -602,7 +604,12 @@ def main() -> None:
         counts = Counter(task.status for task in report.tasks)
         print(f"Report: {args.output}; {dict(counts)}", flush=True)
         completed = sum(counts[status] for status in ("pass", "fail", "error"))
-        if not args.watch or completed >= args.expected:
+        expected = (
+            args.expected
+            if args.expected is not None
+            else len(report.tasks) - len(blocked)
+        )
+        if not args.watch or completed >= expected:
             return
         time.sleep(20)
 

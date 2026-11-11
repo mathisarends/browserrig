@@ -12,6 +12,20 @@ REVISION = "6473f72db5dcefc97b5725b59e734504edc28a21"
 SUBSET = "browserrig-webarena-verified-hard-48-v1"
 SEED = SUBSET
 DATA = Path(__file__).with_name("data")
+PILOT_DATA = DATA / "local-v2"
+PILOT_SUBSET = "browserrig-webarena-verified-hard-local-48-v2"
+LOCAL_DATA = DATA / "local-v3"
+LOCAL_SUBSET = "browserrig-webarena-verified-hard-local-48-v3"
+SUBSETS = {"original-v1": DATA, "local-v2": PILOT_DATA, "local-v3": LOCAL_DATA}
+# Preserve operation counts; add content extraction, filtered navigation,
+# cross-site structured editing, and an order workflow on provisioned sites.
+REPLACEMENT_SLOTS = {
+    267: ("reddit", "retrieve"),
+    428: ("shopping_admin", "navigate"),
+    558: ("gitlab+reddit", "mutate"),
+    561: ("shopping_admin", "mutate"),
+    760: ("gitlab", "navigate"),
+}
 QUOTAS = {
     "shopping": 10,
     "shopping_admin": 10,
@@ -25,7 +39,13 @@ QUOTAS = {
 }
 
 
-def freeze(checkout: Path, output: Path = DATA) -> None:
+def freeze(
+    checkout: Path,
+    output: Path | None = None,
+    *,
+    local: bool = False,
+    pilot: bool = False,
+) -> None:
     """Select by site, operation and template diversity, without using agent scores."""
     revision = subprocess.check_output(
         ["git", "-C", str(checkout), "rev-parse", "HEAD"], text=True
@@ -80,6 +100,49 @@ def freeze(checkout: Path, output: Path = DATA) -> None:
         "hard_source_sha256": hashlib.sha256(hard_source).hexdigest(),
         "tasks_sha256": hashlib.sha256(payload).hexdigest(),
     }
+    if local:
+        selected, replacements, exclusions = _replace_blocked(
+            tasks, hard_ids, selected, audit=not pilot
+        )
+        payload = (json.dumps(selected, indent=2, ensure_ascii=False) + "\n").encode(
+            "utf-8"
+        )
+        manifest.update(
+            name=PILOT_SUBSET if pilot else LOCAL_SUBSET,
+            seed=PILOT_SUBSET,
+            selection="Retain the original 43 provisioned tasks. Replace only the five "
+            "Map/Wikipedia-blocked slots using fixed site/operation strata; prefer "
+            "least-used intent templates, then SHA-256(seed:task_id). "
+            "No agent scores, reference answers or smoke outcomes are used.",
+            parent={"name": SUBSET, "tasks_sha256": manifest["tasks_sha256"]},
+            replacement_reason="Map storage unavailable; Wikipedia source unavailable.",
+            replacements=replacements,
+            replacement_strata={
+                str(task_id): {"sites": group.split("+"), "operation": operation}
+                for task_id, (group, operation) in REPLACEMENT_SLOTS.items()
+            },
+            quotas=dict(
+                sorted(Counter("+".join(sorted(t["sites"])) for t in selected).items())
+            ),
+            task_ids=[task["task_id"] for task in selected],
+            tasks_sha256=hashlib.sha256(payload).hexdigest(),
+        )
+        if not pilot:
+            manifest.update(
+                selection="Retain the original 43 provisioned tasks and the pilot's "
+                "site/operation strata and seed. Exclude replacement candidates "
+                "with reference nulls forbidden by their declared schema types, "
+                "or NAVIGATE targets at the Ajax-only /mui/index/render endpoint. "
+                "Prefer least-used intent templates, then SHA-256(seed:task_id). "
+                "No agent pass/fail outcomes are used as selection inputs.",
+                excluded_candidates=exclusions,
+                pilot_audit="The local-v2 smoke exposed two source-level evaluator "
+                "conflicts. Its definitions and all outcomes are retained separately. "
+                "The filters are static checks, not a complete evaluator audit.",
+            )
+    output = output or (
+        PILOT_DATA if local and pilot else LOCAL_DATA if local else DATA
+    )
     output.mkdir(parents=True, exist_ok=True)
     (output / "tasks.json").write_bytes(payload)
     (output / "manifest.json").write_text(
@@ -90,8 +153,96 @@ def freeze(checkout: Path, output: Path = DATA) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("checkout", type=Path, help=f"Upstream checkout at {REVISION}")
+    parser.add_argument(
+        "--local", action="store_true", help="Freeze the provisioned local-v3 subset"
+    )
+    parser.add_argument("--pilot", action="store_true", help="Reproduce local-v2 pilot")
     args = parser.parse_args()
-    freeze(args.checkout)
+    freeze(args.checkout, local=args.local or args.pilot, pilot=args.pilot)
+
+
+def _replace_blocked(
+    tasks: list[dict], hard_ids: set[int], original: list[dict], *, audit: bool
+) -> tuple[list[dict], dict[str, int], dict[str, str]]:
+    used = {task["task_id"] for task in original}
+    selected = [task for task in original if task["task_id"] not in REPLACEMENT_SLOTS]
+    templates = Counter(task["intent_template_id"] for task in selected)
+    replacements = {}
+    exclusions = {}
+    for old_id, (group, operation) in REPLACEMENT_SLOTS.items():
+        candidates = [
+            task
+            for task in tasks
+            if task["task_id"] in hard_ids - used
+            and "+".join(sorted(task["sites"])) == group
+            and task["eval"][0]["expected"]["task_type"] == operation
+        ]
+        issues = (
+            {
+                str(task["task_id"]): issue
+                for task in candidates
+                if (issue := _replacement_issue(task)) is not None
+            }
+            if audit
+            else {}
+        )
+        exclusions.update(issues)
+        candidates = [t for t in candidates if str(t["task_id"]) not in issues]
+        if not candidates:
+            raise ValueError(
+                f"No Hard replacement for slot {old_id}: {group}/{operation}"
+            )
+        replacement = min(
+            candidates,
+            key=lambda task: (
+                templates[task["intent_template_id"]],
+                hashlib.sha256(
+                    f"{PILOT_SUBSET}:{task['task_id']}".encode()
+                ).hexdigest(),
+            ),
+        )
+        selected.append(replacement)
+        used.add(replacement["task_id"])
+        templates[replacement["intent_template_id"]] += 1
+        replacements[str(old_id)] = replacement["task_id"]
+    return sorted(selected, key=lambda task: task["task_id"]), replacements, exclusions
+
+
+def _replacement_issue(task: dict) -> str | None:
+    response = task["eval"][0]
+    action = response["expected"]["task_type"]
+    if action == "retrieve" and _null_type_conflict(
+        response["expected"].get("retrieved_data"), response.get("results_schema") or {}
+    ):
+        return (
+            "Reference contains null where its declared result schema type forbids it."
+        )
+    if action == "navigate" and any(
+        "/mui/index/render" in str(item["expected"].get("url", ""))
+        and item["expected"].get("http_method", "GET") == "GET"
+        for item in task["eval"]
+        if item["evaluator"] == "NetworkEventEvaluator"
+    ):
+        return "Navigation evaluator filters out the Ajax-only target request."
+    return None
+
+
+def _null_type_conflict(value, schema: dict) -> bool:
+    # A deliberately narrow consistency screen, not a general JSON Schema validator.
+    types = schema.get("type", [])
+    if isinstance(types, str):
+        types = [types]
+    if value is None:
+        return bool(types) and "null" not in types
+    if isinstance(value, list):
+        return any(_null_type_conflict(item, schema.get("items", {})) for item in value)
+    if isinstance(value, dict):
+        properties = schema.get("properties", {})
+        return any(
+            _null_type_conflict(item, properties.get(key, {}))
+            for key, item in value.items()
+        )
+    return False
 
 
 def _sample(tasks: list[dict], count: int) -> list[dict]:

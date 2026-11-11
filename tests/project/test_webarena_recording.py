@@ -2,11 +2,13 @@
 
 import asyncio
 import json
+from types import SimpleNamespace
 
 import pytest
 
 from browserrig.browser import ChromeBrowser, Connect
 from evals.environments import Environments
+from evals.plugins.authentication import authenticate
 from evals.recording import recording_browser
 from evals.task import load_tasks
 
@@ -67,8 +69,13 @@ async def test_recording_flushes_evidence_when_an_attempt_is_interrupted(
     assert any(entry["request"]["url"] == site + "/" for entry in entries)
 
 
+@pytest.fixture(name="login_delay")
+def _login_delay():
+    return 0
+
+
 @pytest.fixture(name="login_site")
-async def _login_site():
+async def _login_site(login_delay):
     async def handle(reader, writer):
         try:
             headers = await reader.readuntil(b"\r\n\r\n")
@@ -91,6 +98,7 @@ async def _login_site():
                     <button>Sign in</button></form>"""
             else:
                 if path == b"/session":
+                    await asyncio.sleep(login_delay)
                     extra = "Set-Cookie: session=authenticated; Path=/\r\n"
                 signed_in = path == b"/session" or b"session=authenticated" in headers
                 body = b"Signed in" if signed_in else b"Signed out"
@@ -111,6 +119,42 @@ async def _login_site():
     server = await asyncio.start_server(handle, "127.0.0.1", 0)
     async with server:
         yield f"http://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("login_delay", [1.5])
+async def test_slow_login_has_a_separate_wait_after_submission(login_site):
+    from playwright.async_api import async_playwright
+    from pydantic import SecretStr
+
+    _, tasks = load_tasks()
+    task = tasks[0].model_copy(update={"sites": ("gitlab",)})
+    environments = Environments()
+    environments.sites["gitlab"] = environments.sites["gitlab"].model_copy(
+        update={
+            "url": login_site,
+            "username": "smoke-user",
+            "password": SecretStr("smoke-password"),
+        }
+    )
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+
+            async def new_context(**options):
+                context = await browser.new_context(**options)
+                context.set_default_timeout(1000)
+                return context
+
+            storage = await authenticate(
+                SimpleNamespace(new_context=new_context), task, environments
+            )
+            assert any(
+                cookie["name"] == "session" and cookie["value"] == "authenticated"
+                for cookie in storage["cookies"]
+            )
+        finally:
+            await browser.close()
 
 
 @pytest.mark.integration

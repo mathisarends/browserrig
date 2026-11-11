@@ -56,9 +56,13 @@ async def _login(context: BrowserContext, name: str, site: Site) -> None:
         await page.get_by_label(password, exact=True).fill(
             site.password.get_secret_value()
         )
-        await page.get_by_role("button", name=submit, exact=True).click()
+        # Cold GitLab redirects can outlive the click's implicit navigation wait.
+        # Submit once, then give the authenticated page its own bounded wait.
+        await page.get_by_role("button", name=submit, exact=True).click(
+            no_wait_after=True
+        )
         await page.wait_for_function(
-            "!document.querySelector('input[type=password]')", timeout=20_000
+            "!document.querySelector('input[type=password]')", timeout=60_000
         )
     finally:
         await page.close()

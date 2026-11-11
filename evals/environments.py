@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, Field, SecretStr
 
 from . import upstream
+from .freeze import SUBSETS
 from .task import load_tasks
 
 DEFAULT_CONFIG = Path(__file__).with_name("environments.json")
@@ -182,6 +183,7 @@ class Environments:
 async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("check", "prepare"))
+    parser.add_argument("--subset", choices=tuple(SUBSETS), default="local-v3")
     parser.add_argument(
         "--sites", help="Comma-separated sites; default: frozen subset's sites"
     )
@@ -189,7 +191,7 @@ async def main() -> None:
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA)
     args = parser.parse_args()
     environments = Environments(args.config, args.data_dir)
-    _, tasks = load_tasks()
+    _, tasks = load_tasks(SUBSETS[args.subset])
     sites = (
         set(args.sites.split(","))
         if args.sites

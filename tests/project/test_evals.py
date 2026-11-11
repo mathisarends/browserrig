@@ -14,7 +14,15 @@ from harnessed.events import ToolCallFinishedEvent
 from evals import analyze, evaluate, report, run, runner
 from evals.environments import Environments
 from evals.evaluate import Grade
-from evals.freeze import DATA, QUOTAS, SUBSET, VERSION
+from evals.freeze import (
+    DATA,
+    LOCAL_DATA,
+    LOCAL_SUBSET,
+    QUOTAS,
+    REPLACEMENT_SLOTS,
+    SUBSET,
+    VERSION,
+)
 from evals.results import (
     AgentResponse,
     BenchmarkResult,
@@ -92,6 +100,54 @@ def test_frozen_subset_has_the_exact_hard_membership_and_coverage():
         "retrieve": 13,
         "navigate": 6,
     }
+
+
+def test_local_subset_replaces_only_infrastructure_blocked_tasks():
+    original, original_tasks = load_tasks()
+    manifest, tasks = load_tasks(LOCAL_DATA)
+    before = {task.task_id: task for task in original_tasks}
+    after = {task.task_id: task for task in tasks}
+    blocked = set(REPLACEMENT_SLOTS)
+
+    assert manifest.name == LOCAL_SUBSET
+    assert len(after) == 48
+    assert set(before) - set(after) == blocked
+    assert manifest.replacements == {
+        "267": 66,
+        "428": 709,
+        "558": 791,
+        "561": 491,
+        "760": 156,
+    }
+    assert set(after) - set(before) == set(manifest.replacements.values())
+    assert set(manifest.excluded_candidates) == {"68", "679"}
+    assert all(after[task_id] == before[task_id] for task_id in set(before) - blocked)
+    assert set(after) <= set(original.hard_task_ids)
+    assert {site for task in tasks for site in task.sites} == {
+        "shopping",
+        "shopping_admin",
+        "gitlab",
+        "reddit",
+    }
+    assert Counter(task.action for task in tasks) == Counter(
+        task.action for task in original_tasks
+    )
+    retained_templates = {
+        task.intent_template_id
+        for task in original_tasks
+        if task.task_id not in blocked
+    }
+    added = [after[task_id] for task_id in manifest.replacements.values()]
+    assert len({task.intent_template_id for task in added} - retained_templates) == 5
+
+
+def test_unrecognized_subset_name_is_rejected(tmp_path):
+    manifest = json.loads((LOCAL_DATA / "manifest.json").read_bytes())
+    manifest["name"] = "unversioned-replacement"
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (tmp_path / "tasks.json").write_bytes((LOCAL_DATA / "tasks.json").read_bytes())
+    with pytest.raises(ValueError, match="Unexpected WebArena subset"):
+        load_tasks(tmp_path)
 
 
 def test_tampered_dataset_is_rejected(tmp_path):
@@ -448,6 +504,7 @@ def prepared_benchmark_cli(tmp_path, monkeypatch):
 
     monkeypatch.setattr(run, "preflight", preflight)
     monkeypatch.setattr(report, "RESULTS", tmp_path / "results")
+    monkeypatch.setattr(run, "DEFAULT_DATA", tmp_path / "webarena-data")
     return captured
 
 
@@ -472,6 +529,7 @@ async def test_cli_defaults_to_subscription_and_terra(
     assert saved["keep_last_steps"] == 2
     assert saved["target_ratio"] == 0.4
     assert saved["max_summary_tokens"] == 8192
+    assert saved["subset"] == LOCAL_SUBSET
 
 
 @pytest.mark.parametrize(
@@ -544,6 +602,18 @@ async def test_cli_lists_tasks_without_credentials(
 
     assert "48 tasks" in capsys.readouterr().out
     assert not benchmark_cli
+
+
+async def test_cli_can_still_list_the_original_blocked_tasks(monkeypatch, capsys):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["evals.run", "--subset", "original-v1", "--tasks", "267", "--list"],
+    )
+    await run.main()
+    output = capsys.readouterr().out
+    assert "Stephen King" in output
+    assert SUBSET in output
 
 
 def test_legacy_results_default_to_api_provider():

@@ -7,17 +7,62 @@ from [ServiceNow/WebArena-Verified](https://github.com/ServiceNow/webarena-verif
 
 ## Frozen dataset
 
-[The manifest](data/manifest.json) records exact IDs, source hashes, subset hash,
-selection seed and algorithm. The sample has 10 tasks each for Shopping, Shopping
-Admin, GitLab and Reddit, plus 8 cross-site tasks. Those include Map and Wikipedia.
-There are 29 mutation, 13 retrieval and 6 navigation tasks.
+[The default local-v3 manifest](data/local-v3/manifest.json) records exact IDs,
+source hashes, subset hash, selection seed and algorithm. It retains all 43
+provisioned tasks from the original sample and replaces only its five
+Map/Wikipedia-blocked slots. It needs Shopping, Shopping Admin, GitLab and Reddit,
+with 11, 12, 14 and 15 task appearances respectively (cross-site tasks count toward
+both sites). There are 29 mutation, 13 retrieval and 6 navigation tasks.
+
+Within fixed site/operation strata, selection prefers least-used intent templates,
+with SHA-256(seed:task_id) breaking ties. All five add a previously absent intent
+template. Agent scores are not selection inputs:
+
+| Blocked ID | Replacement | Added interaction coverage |
+| --- | --- | --- |
+| 267 | 66 | Read the ten hottest Books posts; select titles of posts recommending exactly one book |
+| 428 | 709 | Set a date range from May 1, 2021 to March 31, 2022 in the admin orders report |
+| 558 | 791 | Collect five Reddit URLs, preserve order, create a folder and JSON file in GitLab Web IDE, commit |
+| 561 | 491 | Find a customer's latest pending order, use its message form and classify the application's rejection |
+| 760 | 156 | Navigate to merge requests assigned to the current user |
+
+This is an infrastructure-conditioned development sample. It does not measure
+Map or Wikipedia capability. The [original-v1 manifest](data/manifest.json), task
+definitions and historical results remain available; select them explicitly with
+`--subset original-v1`.
+
+The [local-v2 pilot](data/local-v2/manifest.json) and its smoke outcomes are retained.
+That pilot exposed two independently checkable evaluator conflicts: task 68's
+reference has `author: null` while its schema declares a string, and task 679
+expects an Ajax filter request that the navigation grader excludes even when
+present in the HAR. Local-v3 applies two narrow static screens to all replacement
+candidates: reject reference null/type contradictions and NAVIGATE targets at
+the Ajax-only `/mui/index/render` endpoint. These are not a complete schema or
+evaluator audit. The original 43 tasks are unchanged. The same seed and strata
+are retained, so only 68 and 679 change to 66 and 709. Failed agent attempts are
+retained; task 491 remains selected despite its pilot failure.
 
 Selection uses site quotas, proportional operation quotas and template diversity,
 with SHA-256 tie-breaking. It uses no agent scores and never resamples at runtime.
 This is a deliberately balanced development subset, not an unbiased estimate of
-all 258 Hard tasks. Report it as **browserrig-webarena-verified-hard-48-v1**,
+all 258 Hard tasks. Report the default as
+**browserrig-webarena-verified-hard-local-48-v3**,
 not as a full WebArena-Verified Hard score. Keep separate tasks for final evaluation
 if you repeatedly tune against these 48.
+
+The original sample is **browserrig-webarena-verified-hard-48-v1**. Its 29/43
+historical result must not be combined with new runs to claim a current 48-task
+score: the dataset and agent have changed. Compare the shared 43 tasks separately,
+or execute all 48 under one recorded agent revision and budget.
+
+The [2026-11-11 smoke audit](baselines/hard-local-48-v3-smoke-2026-11-11.json)
+confirms that all five final replacements reached and completed an agent session.
+Tasks 66, 156, 709 and 791 passed; 491 returned `UNKNOWN_ERROR` instead of the
+expected `ACTION_NOT_ALLOWED_ERROR` after the application rejected its order
+message. The observations span the pilot and follow-up, with identical definitions
+for retained tasks, and are not a full-suite score. The pilot's initial GitLab
+login failure is preserved; its follow-up passed after separating form submission
+from the bounded post-login wait.
 
 The original JSON definitions and evaluators are retained. Only concrete site URL
 placeholders are resolved. Expected answers, evaluation rules, HARs and evaluator
@@ -76,6 +121,12 @@ uv run --no-sync python -m evals.run --tasks 29 --max-steps 30 --timeout 180
 
 # All 48 tasks, with fixed default budgets: 50 steps and 300 agent seconds each.
 uv run --no-sync python -m evals.run --trace --label baseline
+
+# Smoke the five frozen replacements; retain failures as diagnostic evidence.
+uv run --no-sync python -m evals.run --tasks 66,156,491,709,791 --label local-v3-smoke
+
+# Reproduce membership of the historical version, including Map/Wikipedia.
+uv run --no-sync python -m evals.run --subset original-v1 --list
 
 # Select frozen IDs or filter by site / operation.
 uv run --no-sync python -m evals.run --tasks 29,106,116 --headed
@@ -166,7 +217,9 @@ Compatible suite shards can be combined into a standalone HTML report:
 uv run --no-sync python -m evals.html_report --glob '20261110-*suite-*.json' --output evals/results/webarena-hard-48-report.html --revision <agent-commit>
 ```
 
-The report includes all 48 frozen IDs. Missing results remain pending; use
+The report chooses the frozen version recorded in its input runs and includes
+all 48 corresponding IDs. It rejects mixtures of original-v1, local-v2 and local-v3.
+Missing results remain pending; for historical original-v1 reports use
 `--blocked 267,428,558,561,760 --blocked-reason "..."` for infrastructure that
 could not be provisioned. Blocked and pending tasks never receive invented scores.
 `--watch --expected 43` updates the report as those 43 tasks finish. It rejects
@@ -198,6 +251,8 @@ model usage. Actual agent failures must remain in the scored suite.
 git clone https://github.com/ServiceNow/webarena-verified.git .browserrig/webarena-verified-upstream
 git -C .browserrig/webarena-verified-upstream checkout 6473f72db5dcefc97b5725b59e734504edc28a21
 uv run --no-sync python -m evals.freeze .browserrig/webarena-verified-upstream
+uv run --no-sync python -m evals.freeze .browserrig/webarena-verified-upstream --pilot
+uv run --no-sync python -m evals.freeze .browserrig/webarena-verified-upstream --local
 ```
 
 Do not regenerate during normal evaluation. Intentional changes require a new

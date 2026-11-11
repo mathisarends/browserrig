@@ -2,3 +2,5 @@
 *.mjs text eol=lf
 *.sh text eol=lf
 evals/data/*.json text eol=lf
+evals/data/local-v2/*.json text eol=lf
+evals/data/local-v3/*.json text eol=lf

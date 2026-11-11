@@ -10,6 +10,15 @@ from assets/dataset/webarena-verified.json. Browserrig selected and reformatted
 this subset; the task IDs, instructions, revisions and evaluation rules are
 unchanged. manifest.json records selection and provenance.
 
+local-v2/tasks.json and local-v3/tasks.json are separately versioned,
+infrastructure-conditioned subsets.
+It retains 43 original definitions and replaces the five Map/Wikipedia-dependent
+tasks with unmodified Hard tasks on Shopping, Shopping Admin, GitLab and Reddit.
+Their manifests record the parent checksum, deterministic selection seed,
+replacement mapping and provenance. Local-v3 also records narrow static evaluator
+consistency screens; local-v2 is retained as the initial pilot. The same source
+license and citation apply.
+
 Citation:
 Amine El hattami, Megh Thakkar, Nicolas Chapados, Christopher Pal.
 WebArena Verified: Reliable Evaluation for Web Agents.

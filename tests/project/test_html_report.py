@@ -7,6 +7,7 @@ from collections import Counter
 import pytest
 
 from evals import analyze
+from evals.freeze import LOCAL_DATA
 from evals.html_report import build
 from evals.network_evidence import differences, requests
 from evals.results import BenchmarkResult, TaskResult, ToolRecord, Usage, write_run
@@ -40,6 +41,24 @@ def test_report_rejects_duplicate_attempts_instead_of_picking_the_best(tmp_path)
 
     with pytest.raises(ValueError, match="Duplicate task 29"):
         build(paths, tmp_path / "report.html", {}, "revision")
+
+
+def test_report_uses_local_membership_and_rejects_mixed_subsets(tmp_path):
+    manifest, _ = load_tasks(LOCAL_DATA)
+    local = _run([_record(66)]).model_copy(
+        update={"subset": manifest.name, "dataset_sha256": manifest.tasks_sha256}
+    )
+    path = tmp_path / "local.json"
+    write_run(path, local)
+    report = build([path], tmp_path / "local.html", {}, "revision")
+
+    assert len(report.tasks) == 48
+    assert {task.task_id for task in report.tasks} == set(manifest.task_ids)
+    assert next(task for task in report.tasks if task.task_id == 66).status == "pass"
+    original = tmp_path / "original.json"
+    write_run(original, _run([_record(29)]))
+    with pytest.raises(ValueError, match="different datasets"):
+        build([path, original], tmp_path / "mixed.html", {}, "revision")
 
 
 def test_report_rejects_incompatible_budgets(tmp_path):

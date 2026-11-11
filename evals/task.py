@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
-from .freeze import DATA, REVISION, SUBSET, VERSION
+from .freeze import DATA, LOCAL_SUBSET, PILOT_SUBSET, REVISION, SUBSET, VERSION
 
 
 class EvaluationSpec(BaseModel):
@@ -61,17 +61,19 @@ class Manifest(BaseModel):
     source_sha256: str
     hard_source_sha256: str
     tasks_sha256: str
+    replacements: dict[str, int] = Field(default_factory=dict)
+    replacement_reason: str | None = None
+    excluded_candidates: dict[str, str] = Field(default_factory=dict)
 
 
 def load_tasks(data: Path = DATA) -> tuple[Manifest, list[Task]]:
     """Fail closed when the checked-in benchmark or its provenance changes."""
     manifest = Manifest.model_validate_json((data / "manifest.json").read_bytes())
     payload = (data / "tasks.json").read_bytes()
-    if (manifest.name, manifest.version, manifest.revision) != (
-        SUBSET,
-        VERSION,
-        REVISION,
-    ):
+    if manifest.name not in {SUBSET, PILOT_SUBSET, LOCAL_SUBSET} or (
+        manifest.version,
+        manifest.revision,
+    ) != (VERSION, REVISION):
         raise ValueError("Unexpected WebArena subset or upstream revision")
     if hashlib.sha256(payload).hexdigest() != manifest.tasks_sha256:
         raise ValueError("Frozen WebArena task checksum mismatch")
