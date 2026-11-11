@@ -1,10 +1,10 @@
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 
-from harnessed.core.compaction import Summarizer, Summary, SummaryError
+from harnessed.core.compaction import ModelSummarizer, SummaryError
 from harnessed.core.tokens import TokenCounter
-from harnessed.models import Message
 from harnessed.plugins import ContextState
+from harnessed.services import CompactionContext, CompactionRequest, Summarizer, Summary
 from harnessed.tracing import span
 from pydantic import ConfigDict, TypeAdapter
 
@@ -47,10 +47,9 @@ class MemorySummarizer:
     counter: TokenCounter
     path: str
     runtime: MemoryRuntime
+    _retry: tuple[CompactionContext, int] | None = field(default=None, init=False)
 
-    async def summarize(
-        self, messages: tuple[Message, ...], *, max_tokens: int
-    ) -> Summary:
+    async def summarize(self, request: CompactionRequest) -> Summary:
         # The prefix reaches the first compacted request, rather than a later hook.
         prefix = (
             f'Task memory handover: read_file(path="{self.path}") before continuing. '
@@ -60,15 +59,35 @@ class MemorySummarizer:
         )
         reserve = self.counter.count_text(prefix) + 8
         self.runtime.inline_restore = (
-            self.runtime.can_read and max_tokens > reserve + 64
+            self.runtime.can_read and request.max_summary_tokens > reserve + 64
         )
-        result = await self.summarizer.summarize(
-            messages,
-            max_tokens=max_tokens - reserve
+        bounded = (
+            replace(request, max_summary_tokens=request.max_summary_tokens - reserve)
             if self.runtime.inline_restore
-            else max_tokens,
+            else request
         )
-        summary = result if isinstance(result, Summary) else Summary(result)
+        summarizer = self.summarizer
+        if isinstance(summarizer, ModelSummarizer) and self._retry is not None:
+            context, allowance = self._retry
+            if context is request.context:
+                summarizer = ModelSummarizer(
+                    summarizer.model,
+                    prompt=summarizer.prompt,
+                    counter=self.counter,
+                    generation_allowance=allowance,
+                )
+        self._retry = None
+        try:
+            result = await summarizer.summarize(bounded)
+        except SummaryError as error:
+            # Harnessed owns the one retry and usage accounting. Preserve its
+            # larger generation allowance after provider-truncated reasoning.
+            if error.truncated and isinstance(summarizer, ModelSummarizer):
+                self._retry = (request.context, bounded.max_summary_tokens * 2)
+            raise
+        if not isinstance(result, Summary):
+            raise TypeError("Summarizer must return Summary")
+        summary = result
         if not summary.text.strip():
             if summary.usage is not None:
                 raise SummaryError(

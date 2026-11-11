@@ -467,6 +467,11 @@ async def test_cli_defaults_to_subscription_and_terra(
     saved = json.loads(benchmark_cli["output"].read_text(encoding="utf-8"))
     assert saved["provider"] == "openai-codex"
     assert saved["model"] == "gpt-6.1-terra"
+    assert saved["context_window"] == 256_000
+    assert saved["reserve_tokens"] == 8192
+    assert saved["keep_last_steps"] == 2
+    assert saved["target_ratio"] == 0.4
+    assert saved["max_summary_tokens"] == 8192
 
 
 @pytest.mark.parametrize(

@@ -10,6 +10,7 @@ import re
 from difflib import SequenceMatcher
 
 _NEW_MARK = re.compile(r"^(\s*(?:#+ )?)\*\[")
+_INLINE_NEW = re.compile(r"\*(?=\[(?:\\.|[^\]\\])*\]\[[^\]]+\])")
 _CONTEXT = re.compile(
     r"^(?:\s*(?:\[[A-Z][A-Z_ ]*(?:: .*)?\]|<.*>)|"
     r"(?:in viewport|(?:above|below) viewport.*|file inputs outside view.*|"
@@ -24,7 +25,9 @@ INTRO = (
 
 def unmarked(text: str) -> str:
     """Drop new-element marks, which depend on the previous capture rather than the page."""
-    return "\n".join(_NEW_MARK.sub(r"\1[", line) for line in text.split("\n"))
+    return "\n".join(
+        _INLINE_NEW.sub("", _NEW_MARK.sub(r"\1[", line)) for line in text.split("\n")
+    )
 
 
 def delta(base: str, current: str) -> str:

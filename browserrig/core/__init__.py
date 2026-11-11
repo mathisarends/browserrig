@@ -26,10 +26,13 @@ from .kinds import (
     ReadinessStatus,
     TabGesture,
 )
+from .model_profiles import MODEL_PROFILES, ModelProfile
 from .options import Options
 from .tools import BrowserToolCall, BrowserToolMetadata, browser_tool
 
 __all__ = [
+    "MODEL_PROFILES",
+    "ModelProfile",
     "BrowserCoordination",
     "ActionId",
     "ActionKind",

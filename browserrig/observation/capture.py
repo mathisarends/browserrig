@@ -24,6 +24,7 @@ from browserrig.core import (
 from browserrig.readiness import ReadinessReport
 
 from .extraction import extract
+from .flow import semantic_text
 from .handle import DomReferences
 from .marks import annotate, blackout
 from .models import (
@@ -186,6 +187,7 @@ async def capture_observation(
         else _fingerprint(page, document_id),
         tabs=tabs,
         text=page.text,
+        content=page.content,
         elements=elements,
         offscreen=page.offscreen,
         headings=page.headings,
@@ -449,7 +451,9 @@ def _fingerprint(page: PageContent, document_id: str) -> str:
     fingerprint = PageFingerprint(
         url=page.url,
         document_id=document_id,
-        text=(page.text,) if page.text else (),
+        text=semantic_text(page.content)
+        if page.content is not None
+        else ((page.text,) if page.text else ()),
         scroll_y=page.scroll_y,
         elements=tuple(
             ElementFingerprint(

@@ -9,7 +9,6 @@ from harnessed.kernel import needs
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel
-from harnessed.testing import call as scripted_call
 
 from browserrig import (
     Actions,
@@ -149,8 +148,10 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
                     #first{left:20px}#second{left:320px}
                     .content{height:1600px;
                         background:repeating-linear-gradient(white 0 40px,steelblue 40px 80px)}
-                    </style><div id=first class=panel><div class=content>First</div></div>
-                    <div id=second class=panel><div class=content>Second</div></div>`;
+                    </style><div id=first class=panel role=region aria-label="First panel">
+                    <div class=content>First</div></div>
+                    <div id=second class=panel role=region aria-label="Second panel">
+                    <div class=content>Second</div></div>`;
                     window.clicks=0;window.hovered=[];
                     document.addEventListener('click',()=>window.clicks++);
                     document.querySelectorAll('.panel').forEach(panel=>{
@@ -163,24 +164,22 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
         []
         if coordinates
         else [
-            scripted_call(
+            (
                 "screenshot",
-                region={"x": 20, "y": 80, "width": 500, "height": 240},
-                zoom=2,
+                {"region": {"x": 20, "y": 80, "width": 500, "height": 240}, "zoom": 2},
             )
         ]
     )
     requests.extend(
         [
-            scripted_call("move_mouse", x=70 if coordinates else 100, y=160),
-            scripted_call("scroll", delta_y=300),
-            scripted_call("move_mouse", x=370 if coordinates else 700, y=160),
-            scripted_call("scroll", delta_y=180),
-            "Done",
+            ("move_mouse", {"x": 70 if coordinates else 100, "y": 160}),
+            ("scroll_element", {"ref_name": "First panel", "delta_y": 300}),
+            ("move_mouse", {"x": 370 if coordinates else 700, "y": 160}),
+            ("scroll_element", {"ref_name": "Second panel", "delta_y": 180}),
         ]
     )
     agent = Agent(
-        model=ScriptedModel(requests),
+        model=_ref_model(requests),
         browser=Chrome.launch(url=site),
         plugins=[Approvals(default=PolicyDecision.ALLOW), Panels()],
     )
@@ -222,15 +221,15 @@ async def test_scroll_moves_a_carousel_horizontally(site):
                     #track{position:absolute;top:80px;left:20px;width:400px;height:200px;
                         overflow-x:auto;overflow-y:hidden;white-space:nowrap}
                     .slide{display:inline-block;width:400px;height:180px}
-                    </style><div id=track>${'<div class=slide>Slide</div>'.repeat(5)}</div>`;""",
+                    </style><div id=track role=region aria-label="Carousel">
+                    ${'<div class=slide>Slide</div>'.repeat(5)}</div>`;""",
             )
 
     agent = Agent(
-        model=ScriptedModel(
+        model=_ref_model(
             [
-                scripted_call("move_mouse", x=200, y=160),
-                scripted_call("scroll", delta_x=240),
-                "Done",
+                ("move_mouse", {"x": 200, "y": 160}),
+                ("scroll_element", {"ref_name": "Carousel", "delta_x": 240}),
             ]
         ),
         browser=Chrome.launch(url=site),
@@ -269,7 +268,8 @@ async def test_scroll_and_hover_by_ref_target_the_element_not_the_cursor(site):
                     </style>
                     <div id=first class=panel><div class=content>
                         <button>First item</button></div></div>
-                    <div id=second class=panel><div class=content>
+                    <div id=second class=panel role=region aria-label="Second panel">
+                    <div class=content>
                         <button>Second item</button></div></div>`;
                     window.clicks=0;window.hovered=[];
                     document.addEventListener('click',()=>window.clicks++);
@@ -285,8 +285,10 @@ async def test_scroll_and_hover_by_ref_target_the_element_not_the_cursor(site):
         nonlocal step
         step += 1
         if step == 1:
-            ref = _ref(request, "Second item", role="button")
-            yield ModelChunk(tool_call=ToolCall("scroll", {"ref": ref, "delta_y": 180}))
+            ref = _ref(request, "Second panel", role="region")
+            yield ModelChunk(
+                tool_call=ToolCall("scroll_element", {"ref": ref, "delta_y": 180})
+            )
         elif step == 2:
             ref = _ref(request, "First item", role="button")
             yield ModelChunk(tool_call=ToolCall("move_mouse", {"ref": ref}))
@@ -361,6 +363,24 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
         record for record in records if record["type"] == "browser.element.highlight"
     )
     assert {key: highlight[key] for key in actual} == actual
+
+
+def _ref_model(actions):
+    pending = iter(actions)
+
+    async def respond(request):
+        action = next(pending, None)
+        if action is None:
+            yield ModelChunk(text="Done")
+            return
+        tool_name, arguments = action
+        arguments = dict(arguments)
+        ref_name = arguments.pop("ref_name", None)
+        if ref_name is not None:
+            arguments["ref"] = _ref(request, ref_name, role="region")
+        yield ModelChunk(tool_call=ToolCall(tool_name, arguments))
+
+    return CallbackModel(respond)
 
 
 def _typing_model(holder, coordinates):

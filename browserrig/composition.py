@@ -14,6 +14,7 @@ from harnessed.plugins import Compaction, ContextState
 from .activity import Activity
 from .browser import Chrome, DownloadReceiving
 from .choreography import InputVisualization, TabStrip
+from .core import ModelProfile
 from .files import Files, FileTransfers
 from .memory import TaskMemory
 from .nudges import Nudges
@@ -55,7 +56,9 @@ def browser_plugins(
     return list(composition.resolve(prompt=PluginPackPromptPolicy.OMIT).plugins)
 
 
-def browser_pack(*, browser: Chrome | None = None) -> PluginPack:
+def browser_pack(
+    *, browser: Chrome | None = None, model_profile: ModelProfile | None = None
+) -> PluginPack:
     """Browser defaults with Markdown instructions in configured plugin-list order.
 
     Pass a configured `Chrome` plugin, such as `Chrome.launch(url=...)` or
@@ -98,7 +101,14 @@ def browser_pack(*, browser: Chrome | None = None) -> PluginPack:
             FileTransfers(),
             DownloadReceiving(),
             FileTools(),
-            TaskMemory(trigger=WindowRatio()),
+            TaskMemory(
+                trigger=WindowRatio(),
+                keep_last_steps=model_profile.keep_last_steps if model_profile else 2,
+                target_ratio=model_profile.target_ratio if model_profile else None,
+                max_summary_tokens=(
+                    model_profile.max_summary_tokens if model_profile else None
+                ),
+            ),
         ],
         prompt=SystemPrompt.from_plugins(
             format=PromptFormat.MARKDOWN,

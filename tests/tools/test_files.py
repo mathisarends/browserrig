@@ -458,20 +458,26 @@ async def test_remote_workspace_and_cloud_bridge_handle_reads_downloads_and_uplo
         assert workspace.files[PurePosixPath(path)] == pdf_document
         assert bridge.received[0].url == "https://example.org/report.pdf"
 
-        # Remote files are parsed from a local copy; the extraction stays local.
+        # The raw source is fetched once; durable Markdown is also published remotely.
         document = await files.read_file(path, page_number=2)
         assert "Second page: Voyager 2" in document.text
         assert document.path == path and document.extracted_path is None
-        assert len(workspace.reads) == 1
+        assert workspace.reads.count(PurePosixPath(path)) == 1
         await files.read_file(path, page_number=1)
-        assert len(workspace.reads) == 1
+        assert workspace.reads.count(PurePosixPath(path)) == 1
+        assert document.document_path == path + ".md"
+        assert b"Second page: Voyager 2" in workspace.files[PurePosixPath(path + ".md")]
 
         staged = await transfer.stage([path])
         assert staged.browser_paths == (PurePosixPath("/cloud/uploads/report.pdf"),)
         assert bridge.uploaded == {"report.pdf": pdf_document}
 
         listing = await files.list_files("downloads/dl-1")
-        assert [entry.path for entry in listing.entries] == [path]
+        assert [entry.path for entry in listing.entries] == [
+            path,
+            path + ".extraction.json",
+            path + ".md",
+        ]
         # Only a workspace on this machine can be mounted for Chrome.
         with pytest.raises(ValueError, match="LocalWorkspace"):
             await FileTransfer(files, MountedWorkspace("/w")).download_directory()

@@ -4,8 +4,15 @@ import pytest
 from harnessed import Agent, PolicyDecision, SessionState
 from harnessed.events import CompactionAppliedEvent
 from harnessed.integrations.json import JsonSessionStore
-from harnessed.models import ModelInfo
+from harnessed.models import (
+    AssistantMessage,
+    ModelInfo,
+    ModelResponse,
+    ModelUsage,
+    StopReason,
+)
 from harnessed.plugins import Approvals
+from harnessed.services import Summary
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import (
@@ -25,9 +32,9 @@ class _Summary:
     def __init__(self):
         self.budgets = []
 
-    async def summarize(self, _messages, *, max_tokens):
-        self.budgets.append(max_tokens)
-        return "Earlier work: candidates examined, purchase still unconfirmed."
+    async def summarize(self, request):
+        self.budgets.append(request.max_summary_tokens)
+        return Summary("Earlier work: candidates examined, purchase still unconfirmed.")
 
 
 def _plugins(tmp_path, memory):
@@ -61,8 +68,8 @@ async def test_checkpoint_defers_once_then_first_compacted_request_prompts_a_rea
         trigger=lambda state: state.input_tokens >= 5000,
         fallback_tokens=5000,
         summarizer=summary,
-        keep_turns=0,
-        keep_steps=1,
+        keep_last_steps=1,
+        max_summary_tokens=2048,
     )
     async with Agent(
         model=model, plugins=_plugins(tmp_path, memory)
@@ -106,6 +113,64 @@ async def test_no_file_tools_means_no_checkpoint_or_restore_injection():
     )
 
 
+async def test_separate_llm_and_async_prompt_preserve_native_retry_and_usage(tmp_path):
+    seen = []
+    fire = iter([False, False, True, *[False] * 10])
+
+    async def prompt(context):
+        seen.append(context)
+        return "Preserve source URLs and unconfirmed actions."
+
+    summary = ScriptedModel(
+        [
+            ModelResponse(
+                AssistantMessage("Partial"), ModelUsage(100, 512), StopReason.MAX_TOKENS
+            ),
+            ModelResponse(AssistantMessage("Earlier findings."), ModelUsage(100, 20)),
+        ]
+    )
+    model = ScriptedModel(
+        [
+            call("write_file", path="scratch.txt", content="old " * 2000),
+            _save(),
+            call("read_file", path=_PATH),
+            "Finished",
+        ]
+    )
+    memory = TaskMemory(
+        trigger=lambda _state: next(fire),
+        fallback_tokens=1,
+        llm=summary,
+        prompt=prompt,
+        keep_last_steps=1,
+        target_tokens=8000,
+        max_summary_tokens=512,
+    )
+    async with Agent(
+        model=model, plugins=_plugins(tmp_path, memory)
+    ).session() as session:
+        result = await session.run("Compare products", max_steps=8)
+    assert result.text == "Finished"
+    applied = [e for e in result.events if isinstance(e, CompactionAppliedEvent)]
+    assert len(applied) == 1
+    assert "Task memory handover:" in applied[0].summary
+    assert "Partial" not in applied[0].summary
+    assert len(summary.requests) == len(seen) == 2
+    assert seen[0] is seen[1]
+    assert seen[0].history_to_compact and seen[0].retained_context
+    assert seen[0].instructions and seen[0].target_tokens == 8000
+    assert (
+        summary.requests[0].messages[0].text
+        == "Preserve source URLs and unconfirmed actions."
+    )
+    assert (
+        summary.requests[1].settings.max_tokens
+        == 2 * summary.requests[0].settings.max_tokens
+    )
+    assert result.usage.input_tokens == 200
+    assert result.usage.output_tokens == 532
+
+
 async def test_checkpoint_is_not_requested_on_the_last_available_steps(tmp_path):
     model = ScriptedModel(["Unfinished"])
     async with Agent(
@@ -131,8 +196,8 @@ async def test_missing_checkpoint_is_visible_and_does_not_stop_compaction(tmp_pa
         trigger=lambda _state: True,
         fallback_tokens=1,
         summarizer=_Summary(),
-        keep_turns=0,
-        keep_steps=1,
+        keep_last_steps=1,
+        max_summary_tokens=2048,
     )
     async with Agent(
         model=model, plugins=_plugins(tmp_path, memory)
@@ -165,8 +230,8 @@ async def test_pending_read_survives_snapshot_and_store_reopen_without_copying_n
         trigger=lambda _state: True,
         fallback_tokens=1,
         summarizer=_Summary(),
-        keep_turns=0,
-        keep_steps=1,
+        keep_last_steps=1,
+        max_summary_tokens=2048,
     )
     async with Agent(
         model=model, plugins=_plugins(workspace, memory), store=store
@@ -209,8 +274,8 @@ async def test_partial_read_does_not_acknowledge_restoration(tmp_path, read_args
         trigger=lambda _state: True,
         fallback_tokens=1,
         summarizer=_Summary(),
-        keep_turns=0,
-        keep_steps=1,
+        keep_last_steps=1,
+        max_summary_tokens=2048,
     )
     async with Agent(
         model=model, plugins=_plugins(tmp_path, memory)

@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+- Preserve selected chips when typing into an empty native text field. Skip the
+  empty-field Backspace and stop remaining text if focus leaves the addressed
+  field or its embedding frame.
+
+- Save agent `extract_content` results as workspace Markdown and return only
+  `Saved`, `Source`, `Title` and actual extraction limitations. Remove its inline
+  body and `max_chars`/`offset` arguments; without a workspace the tool is disabled.
+  Add bounded workspace `grep` and `glob` tools for targeted reads. Direct Python
+  Markdown extraction and full typed presentation data remain available.
+- Upgrade Harnessed and every provider/MCP/OTel extra to 0.16.0. `TaskMemory`
+  accepts `llm`, replacement `prompt` factories, `keep_last_steps`, whole-input
+  targets and `max_summary_tokens`; custom summarizers now accept
+  `CompactionRequest` and return `Summary`. Older conversation states and audit
+  envelopes require their original application environment; start new stores.
+- Apply a shared GPT-6.1 Terra profile to regular agents and benchmarks: a
+  256,000-token application context limit, 8,192-token output reserve, two retained
+  steps, a 40% compaction target and an 8,192-token summary ceiling. Benchmark
+  result files record these settings. Other models retain their existing defaults.
+
+- Interleave visible text with controls in a typed `PageContent.content` tree.
+  Paragraphs retain inline `[label][ref]` links, form guidance stays beside its
+  fields, and code keeps its line breaks. Preserve frame insertion order,
+  viewport previews and source-based label deduplication; mark text truncation
+  locally while retaining later controls. Existing flat capture backends remain
+  supported through `content=None`.
+
+- Replace the agent's `scroll` tool with `scroll_page` and `scroll_element(ref=...)`.
+  Both scroll their named target directly, independently of the cursor, and report
+  actual movement or a blocked/boundary result. Container scrolling never propagates
+  to ancestors. Native wheel input remains available through `browser.input.mouse.scroll`.
+
 - Add `read_todos()` for explicit plan recall; stale-plan reminders now name the
   tools instead of repeating the list. Reads also refresh the reminder interval.
 - Use `TaskMemory` in the default browser pack: working notes remain in

@@ -23,6 +23,7 @@ from .models import (
     OwnerHitsArgs,
     OwnerScrollArgs,
     PageFacts,
+    ReadingScrollArgs,
     ScriptArgs,
     ScrollArgs,
     ScrollPlan,
@@ -32,6 +33,8 @@ from .models import (
     SecretFocusArgs,
     SeedArgs,
     TabStrip,
+    TargetScrollArgs,
+    TargetScrollResult,
     TextState,
     UploadArgs,
 )
@@ -49,6 +52,8 @@ __all__ = [
     "OVERLAY_STYLES",
     "OWNER_SIZE",
     "PAGE_FACTS",
+    "READING_SCROLL",
+    "TARGET_SCROLL",
     "RESET",
     "SCROLL",
     "SCROLL_OWNER",
@@ -70,6 +75,7 @@ __all__ = [
     "OwnerScrollArgs",
     "OverlayArgs",
     "PageFacts",
+    "ReadingScrollArgs",
     "Script",
     "ScriptArgs",
     "ScriptError",
@@ -81,6 +87,8 @@ __all__ = [
     "SecretFocusArgs",
     "SeedArgs",
     "TabStrip",
+    "TargetScrollArgs",
+    "TargetScrollResult",
     "TextState",
     "UploadArgs",
     "failure",
@@ -147,6 +155,9 @@ SCROLL_OWNER: Script[OwnerScrollArgs, ScrollPlan | None] = Script.load(
     ScrollPlan | None,
     uses=("geometry", "composed", "elements", "scroll"),
 )
+TARGET_SCROLL: Script[TargetScrollArgs, TargetScrollResult] = Script.load(
+    "target_scroll", TargetScrollArgs, TargetScrollResult, uses=("elements",)
+)
 CONTENT: Script[ContentArgs, ContentExtraction] = Script.load(
     "content",
     ContentArgs,
@@ -179,6 +190,9 @@ CHOREOGRAPHY: Script[ScriptArgs, None] = Script.load(
         "choreography/caption",
         "choreography/work",
     ),
+)
+READING_SCROLL: Script[ReadingScrollArgs, bool] = Script.load(
+    "reading_scroll", ReadingScrollArgs, bool
 )
 SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))
 RESET: Script[ScriptArgs, None] = Script.load("reset", ScriptArgs, type(None))

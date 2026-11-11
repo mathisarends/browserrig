@@ -41,9 +41,8 @@ async def test_memory_handover_exports_correlated_metadata_without_note_contents
                 TaskMemory(
                     trigger=lambda state: state.input_tokens >= 5000,
                     fallback_tokens=5000,
-                    summarizer=summary,
-                    keep_turns=0,
-                    keep_steps=1,
+                    llm=summary,
+                    keep_last_steps=1,
                 ),
                 Approvals(default=PolicyDecision.ALLOW),
             ],

@@ -27,21 +27,31 @@ class DomRenderer:
             'landmarks like [MAIN] and groups like <form "Login">. A leading * marks elements '
             "new since the previous observation. Inside iframes, above/below previews refer to "
             "the frame's viewport. An element with scroll(up=..., down=...) is an inner scroll "
-            "container; scroll it by ref to move that panel instead of the page. Modal dialogs "
-            "can block controls outside them. [COOKIE BANNER] detection is heuristic; choose "
-            "whether to interact or navigate according to the task. Canvas content has no "
+            "container; use scroll_element(ref=...) for that panel and scroll_page for the page. "
+            "Modal dialogs can block controls outside them. [COOKIE BANNER] detection is "
+            "heuristic; choose whether to interact or navigate according to the task. "
+            "Canvas content has no "
             "refs; screenshot it and point with click_at or drag_at. "
         )
         if self.max_text_chars:
-            text += "Observations include a bounded page-text excerpt. "
+            text += (
+                "Visible text appears in reading order beside its controls, within a bounded "
+                "text budget. Plain text has no action refs. A truncation marker applies "
+                "to text at that position; later controls are still listed. "
+            )
         elif self.sparse_text_chars:
             text += (
                 "When the viewport holds few controls, observations add its visible text; "
-                "otherwise use extract_content to read the page. "
+                "otherwise extract_content saves it for targeted file reads. "
             )
         else:
             text += (
-                "Observations omit page text; use extract_content to read the page. "
+                "Observations omit page text; "
+                "extract_content saves it for targeted file reads. "
+            )
+        if self.max_text_chars or self.sparse_text_chars:
+            text += (
+                "Links within prose use [label][ref]; pass that ref to element tools. "
             )
         text += (
             "Every observation includes a screenshot."

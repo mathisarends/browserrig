@@ -13,6 +13,7 @@ from .workspace import FileStat, LocalWorkspace, Workspace, workspace_path
 
 _MAX_DIRECTORIES = 1000
 _MAX_FILES = 1000
+_MAX_NOTES = 20
 
 
 class Search:
@@ -72,6 +73,11 @@ class Search:
                     "Match limit reached; narrow the query or pattern. Search is incomplete."
                 )
                 break
+        if len(notes) > _MAX_NOTES:
+            omitted = len(notes) - _MAX_NOTES
+            notes = notes[:_MAX_NOTES] + [
+                f"{omitted} additional search notes omitted; narrow the pattern."
+            ]
         return SearchResult(tuple(matches), scanned, tuple(notes))
 
     async def _paths(
@@ -122,7 +128,7 @@ class Search:
         if len(data) > budget:
             raise ValueError("Remote file grew beyond the remaining search byte budget")
         found, clipped = _scan_lines(
-            StringIO(data.decode("utf-8")), expression, limit, budget
+            StringIO(data.decode("utf-8-sig")), expression, limit, budget
         )
         return found, clipped, len(data)
 
@@ -162,10 +168,8 @@ class Search:
         if status not in {"complete", "partial", "processing", "failed"}:
             status = "unknown"
         if status != "complete" or pending or details.get("partial"):
-            return (
-                f"{path}: extraction is {status}; {len(pending)} page(s) await OCR. "
-                "Search covers saved text only."
-            )
+            waiting = f"; {len(pending)} page(s) await OCR" if pending else ""
+            return f"{path}: extraction is {status}{waiting}. Search covers saved text only."
         return None
 
 
@@ -186,7 +190,7 @@ def _scan_file(path: Path, expression: re.Pattern[str], limit: int, budget: int)
     before = path.stat()
     if before.st_size > budget:
         raise ValueError("File grew beyond the remaining search byte budget")
-    with path.open(encoding="utf-8", newline="") as stream:
+    with path.open(encoding="utf-8-sig", newline="") as stream:
         found, clipped = _scan_lines(stream, expression, limit, budget)
     after = path.stat()
     if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):

@@ -24,7 +24,7 @@ PATTERNS = {
     "Klicken / Zielauswahl": {"click", "click_at", "move_mouse"},
     "Formulare / Texteingabe": {"type_text", "send_keys", "set_date"},
     "Dropdowns": {"select_option"},
-    "Scrollen": {"scroll"},
+    "Scrollen": {"scroll", "scroll_page", "scroll_element"},
     "Navigation / Suche": {
         "navigate",
         "search",
@@ -456,7 +456,8 @@ def _findings(view: ReportTask) -> list[Finding]:
     counts = Counter(
         (tool.name, json.dumps(tool.args, sort_keys=True))
         for tool in view.tools
-        if tool.name not in {"wait", "scroll", "list_tabs"}
+        if tool.name
+        not in {"wait", "scroll", "scroll_page", "scroll_element", "list_tabs"}
     )
     repetitions = [
         f"{name} {arguments[:220]}: {count} Aufrufe"

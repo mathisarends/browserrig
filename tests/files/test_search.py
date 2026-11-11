@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 
@@ -66,6 +67,34 @@ async def test_search_reports_match_and_byte_budgets(tmp_path):
         assert not result.matches and any(
             "byte budget" in note for note in result.notes
         )
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-8-sig"])
+async def test_search_offsets_read_the_same_unicode_and_crlf_excerpt(
+    tmp_path, encoding
+):
+    (tmp_path / "report.md").write_bytes(
+        ("Überblick\r\n" + "🙂" * 400 + "needle\r\n").encode(encoding)
+    )
+    async with FileSystem(LocalWorkspace(tmp_path)) as files:
+        result = await files.grep("needle")
+        match = re.search(r"offset=(\d+)", result.matches[0])
+        assert match is not None
+        excerpt = await files.read_file(
+            "report.md", offset=int(match[1]), max_chars=206
+        )
+    assert excerpt.text == "🙂" * 200 + "needle"
+
+
+async def test_search_bounds_notes_when_many_files_cannot_be_searched(tmp_path):
+    for index in range(30):
+        (tmp_path / f"report{index}.md").write_text("too large", encoding="utf-8")
+    async with FileSystem(
+        LocalWorkspace(tmp_path), FileOptions(max_expanded_bytes=2)
+    ) as files:
+        result = await files.grep("needle")
+    assert not result.matches and len(result.notes) == 21
+    assert "10 additional search notes omitted" in result.notes[-1]
 
 
 async def test_search_rejects_escaping_patterns_without_reading_outside(tmp_path):

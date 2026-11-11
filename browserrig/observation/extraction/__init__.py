@@ -17,10 +17,14 @@ from browserrig.browser import Frame
 from browserrig.core import BrowserError, StaleElement
 from browserrig.observation.models import (
     Canvas,
+    ContentGroup,
+    ContentNode,
     CookieBanner,
     Element,
+    ElementRef,
     Heading,
     Modal,
+    TextBlock,
 )
 from browserrig.observation.models import PageContent as Extraction
 from browserrig.scripts import FOCUSED
@@ -28,6 +32,7 @@ from browserrig.scripts import FOCUSED
 from .accessibility import chrome_names, preferred
 from .document import Document
 from .elements import FrameExtraction, extract_frame
+from .flow import compose
 from .styles import STYLES
 
 __all__ = ["Extraction", "extract"]
@@ -124,6 +129,7 @@ class _Assembler:
         self._results: dict[str, FrameExtraction] = {}
         self._keys: dict[str, tuple[int, ...]] = {}
         self._covered: set[str] = set()
+        self._orders: dict[tuple[str, int], int] = {}
 
     @traced
     def run(
@@ -142,12 +148,9 @@ class _Assembler:
         shown = sum(element.in_viewport and bool(element.name) for element in elements)
         limit = max_text if shown >= SPARSE_CONTROLS else max(max_text, sparse_text)
         if len(text) > limit:
-            if limit:
-                self._limitations.append(
-                    f"Page text truncated to {limit} characters; extract_content reads it all"
-                )
             text = text[:limit]
         elements = self._limit(elements, max_elements)
+        content = self._content(elements, limit)
         visible = main.visible
         return Extraction(
             url=document.url,
@@ -174,6 +177,7 @@ class _Assembler:
             cookie_banners=self._cookie_banners(elements),
             canvases=self._canvases(),
             text=text,
+            content=content,
             limitations=tuple(dict.fromkeys(self._limitations)),
         )
 
@@ -224,6 +228,7 @@ class _Assembler:
             ]
             result.headings = []
             result.text = ""
+            result.texts = []
             result.alerts = []
         self._results[frame.id] = result
         self._keys[frame.id] = key
@@ -238,7 +243,7 @@ class _Assembler:
         return self._prefixes[session_id]
 
     def _merge(self) -> tuple[list[Element], list[Heading], str]:
-        ordered: list[tuple[tuple[int, ...], Element | Heading]] = []
+        ordered: list[tuple[tuple[int, ...], Element | Heading | TextBlock]] = []
         texts: list[str] = []
         for frame in self._frames:
             result = self._results.get(frame.id)
@@ -251,17 +256,107 @@ class _Assembler:
             ordered.extend(
                 ((*key, index), heading) for index, heading in result.headings
             )
+            ordered.extend(((*key, index), text) for index, text in result.texts)
             if result.text:
                 texts.append(result.text)
         ordered.sort(key=lambda item: item[0])
         elements: list[Element] = []
         headings: list[Heading] = []
-        for order, (_, item) in enumerate(ordered):
+        for order, (key, item) in enumerate(ordered):
+            self._orders[item.frame_id, key[-1]] = order
             if isinstance(item, Element):
                 elements.append(item.model_copy(update={"order": order}))
-            else:
+            elif isinstance(item, Heading):
                 headings.append(item.model_copy(update={"order": order}))
         return elements, headings, "\n".join(texts)
+
+    def _content(self, elements: list[Element], limit: int) -> tuple[ContentNode, ...]:
+        texts: dict[tuple[str, int], TextBlock] = {}
+        remaining = limit
+        markers: set[str] = set()
+        candidates = sorted(
+            (
+                (frame_id, index, block)
+                for frame_id, result in self._results.items()
+                for index, block in result.texts
+            ),
+            key=lambda item: (
+                not item[2].in_viewport,
+                self._orders[item[0], item[1]],
+            ),
+        )
+        for frame_id, index, block in candidates:
+            position = block.outside_viewport or "visible"
+            if remaining <= 0 and position in markers:
+                continue
+            value = block.text[:remaining].rstrip()
+            truncated = block.truncated or len(block.text) > remaining
+            if truncated:
+                markers.add(position)
+            texts[frame_id, index] = block.model_copy(
+                update={
+                    "text": value,
+                    "truncated": truncated,
+                    "order": self._orders[frame_id, index],
+                }
+            )
+            remaining -= len(value)
+        if markers:
+            self._limitations.append(
+                f"Page text truncated to {limit} characters; extract_content reads it all"
+            )
+        return self._frame_content(
+            self._frames[0], {el.ref: el for el in elements}, texts
+        )
+
+    def _frame_content(
+        self,
+        frame: Frame,
+        elements: dict[str, Element],
+        texts: dict[tuple[str, int], TextBlock],
+    ) -> tuple[ContentNode, ...]:
+        result = self._results.get(frame.id)
+        if result is None or frame.id in self._covered:
+            return ()
+        entries: list[tuple[int, ContentNode]] = [
+            (index, ElementRef(ref=element.ref))
+            for index, element in result.elements
+            if element.ref in elements and not element.covered
+        ]
+        entries.extend(
+            (index, heading.model_copy(update={"order": self._orders[frame.id, index]}))
+            for index, heading in result.headings
+        )
+        entries.extend(
+            (index, texts[frame.id, index])
+            for index, _ in result.texts
+            if (frame.id, index) in texts
+        )
+        for child in self._frames:
+            if child.parent is None or child.parent.id != frame.id:
+                continue
+            owner = _index_of(result.document, child.owner_id)
+            content = self._frame_content(child, elements, texts)
+            if owner is not None and content:
+                entries.append(
+                    (
+                        owner,
+                        ContentGroup(
+                            id=f"frame:{child.id}",
+                            role="iframe",
+                            children=content,
+                        ),
+                    )
+                )
+        return compose(
+            result.document,
+            frame.id,
+            entries,
+            frame.transform,
+            frozenset(
+                ref for ref, element in elements.items() if element.role == "link"
+            ),
+        )
 
     def _limit(
         self, elements: list[Element], max_elements: int | None

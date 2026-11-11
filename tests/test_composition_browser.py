@@ -27,6 +27,7 @@ from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
 from harnessed.models import ImagePart, ImageReference, ModelRequest, ToolMessage
 from harnessed.plugins import Approvals, LatestObservationOnly
 from harnessed.plugins.compaction import Compaction
+from harnessed.services import Summary
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import (
@@ -392,8 +393,8 @@ async def test_same_pixels_with_other_geometry_or_disabled_skipping_are_added():
 
 
 class _Summary:
-    async def summarize(self, messages, *, max_tokens):  # pylint: disable=unused-argument
-        return "summary"
+    async def summarize(self, request):  # pylint: disable=unused-argument
+        return Summary("summary")
 
 
 async def test_until_compaction_keeps_images_until_their_steps_are_summarized():
@@ -401,8 +402,7 @@ async def test_until_compaction_keeps_images_until_their_steps_are_summarized():
     compaction = Compaction(
         trigger=lambda _state: next(fire),
         summarizer=_Summary(),
-        keep_turns=0,
-        keep_steps=1,
+        keep_last_steps=1,
     )
     agent, model, _capture, holder = _agent(
         [*_steps(5), "Done"],
@@ -519,8 +519,7 @@ async def test_compaction_removes_last_screenshot_on_a_text_only_step():
     compaction = Compaction(
         trigger=lambda _state: next(fire),
         summarizer=_Summary(),
-        keep_turns=0,
-        keep_steps=1,
+        keep_last_steps=1,
     )
     agent, model, _capture, holder = _agent(
         [call("screenshot"), *_steps(2), "Done"],
@@ -593,8 +592,7 @@ async def test_file_state_is_resent_when_compaction_removed_the_last_copy():
     compaction = Compaction(
         trigger=lambda _state: next(fire),
         summarizer=_Summary(),
-        keep_turns=0,
-        keep_steps=1,
+        keep_last_steps=1,
     )
     agent, model, _capture, holder = _agent(
         [*_steps(4), "Done"], extra=(compaction,), after=(Actions(), FileTools())
@@ -944,8 +942,7 @@ async def test_page_is_resent_with_a_screenshot_and_after_compaction():
     compaction = Compaction(
         trigger=lambda _state: next(fire),
         summarizer=_Summary(),
-        keep_turns=0,
-        keep_steps=1,
+        keep_last_steps=1,
     )
     agent, model, _capture, holder = _agent(
         [call("screenshot"), *_steps(3), "Done"],

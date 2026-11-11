@@ -3,6 +3,7 @@ from harnessed import Agent, SessionState, ToolStatus
 from harnessed.events import CompactionAppliedEvent, ToolCallFinishedEvent
 from harnessed.integrations.json import JsonSessionStore
 from harnessed.plugins import Compaction
+from harnessed.services import Summary
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import Todo, TodoList, Todos, browser_plugins
@@ -12,9 +13,9 @@ _BUY = {"id": "buy", "title": "Purchase and inspect confirmation"}
 
 
 class _Summary:
-    async def summarize(self, _messages, *, max_tokens):
-        assert max_tokens > 0
-        return "Earlier browser work summarized."
+    async def summarize(self, request):
+        assert request.max_summary_tokens > 0
+        return Summary("Earlier browser work summarized.")
 
 
 def _update(*todos, task="Buy shoes"):
@@ -157,8 +158,7 @@ async def test_list_is_reminded_after_compaction_restore_and_store_reopen(tmp_pa
             Compaction(
                 trigger=lambda _state: next(fire),
                 summarizer=_Summary(),
-                keep_turns=0,
-                keep_steps=1,
+                keep_last_steps=1,
             ),
         ],
         store=JsonSessionStore(root=tmp_path),

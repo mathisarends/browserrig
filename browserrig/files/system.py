@@ -5,14 +5,15 @@ import tempfile
 from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from pathlib import Path, PurePosixPath
 from types import TracebackType
-from typing import Self
+from typing import Literal, Self
 
 from harnessed.plugins.filesystem import PathMatches, SearchResult
 from harnessed.tracing import traced
 
 from .config import FileOptions
 from .content import ReadRequest
-from .models import FileContent, FileEntry, FileListing
+from .indexing import Indexing
+from .models import FileContent, FileEntry, FileExtraction, FileListing
 from .reading import FileReader
 from .search import Search
 from .workspace import FileStat, LocalWorkspace, Workspace, workspace_path
@@ -32,6 +33,9 @@ class FileSystem:
     ) -> None:
         self.workspace = workspace
         self.options = options if options is not None else FileOptions()
+        self._indexing = Indexing(
+            workspace, self.options, read=self._index_read, source=self._index_source
+        )
         # Remote files are copied here to be parsed; local files are parsed in place.
         self._cache: tempfile.TemporaryDirectory[str] | None = None
         self._reader: FileReader | None = (
@@ -60,6 +64,7 @@ class FileSystem:
     async def aclose(self) -> None:
         """Remove local copies of remote files; the workspace itself is kept."""
         try:
+            await self._indexing.close()
             if self._cache is not None:
                 cache = self._cache
                 self._cache = None
@@ -109,6 +114,13 @@ class FileSystem:
             next_offset=offset + limit if offset + limit < len(children) else None,
         )
 
+    async def start_extraction(self, path: str, *, url: str = "") -> None:
+        """Create a Markdown sidecar and start bounded background document indexing."""
+        await self._indexing.start(str(workspace_path(path)), url=url)
+
+    def extraction(self, path: str) -> FileExtraction | None:
+        return self._indexing.state(str(workspace_path(path)))
+
     @traced
     async def read_file(
         self,
@@ -119,6 +131,7 @@ class FileSystem:
         cell_range: str | None = None,
         member: str | None = None,
         ocr: bool | None = None,
+        view: Literal["auto", "text", "image"] = "text",
         offset: int = 0,
         max_chars: int = 20000,
     ) -> FileContent:
@@ -126,12 +139,15 @@ class FileSystem:
             raise ValueError("Use offset >= 0 and max_chars between 1 and 200000")
         if page_number is not None and page_number < 1:
             raise ValueError("page_number must be at least 1")
+        if view not in {"auto", "text", "image"}:
+            raise ValueError("view must be auto, text or image")
         request = ReadRequest(
             page_number=page_number,
             sheet=sheet,
             cell_range=cell_range,
             member=member,
             ocr=ocr,
+            view=view,
         )
         target = await self.file(path)
         if isinstance(self.workspace, LocalWorkspace):
@@ -143,10 +159,29 @@ class FileSystem:
         content = await asyncio.to_thread(
             reader.read, source, request, offset, max_chars
         )
+        document_path = None
+        try:
+            document_path = await self._indexing.record(
+                content.model_copy(update={"path": str(target.path)}), source=target
+            )
+        except (OSError, ValueError) as error:
+            content = content.model_copy(
+                update={
+                    "status": "partial"
+                    if content.status == "complete"
+                    else content.status,
+                    "limitations": (
+                        *content.limitations,
+                        f"Markdown sidecar could not be updated: {error}",
+                    ),
+                }
+            )
+        content = content.model_copy(update={"document_path": document_path})
         return content.model_copy(
             update={
                 "path": str(target.path),
                 "extracted_path": self._extracted_path(content.extracted_path),
+                **_continuation(content),
             }
         )
 
@@ -250,6 +285,21 @@ class FileSystem:
                 await asyncio.to_thread(_write_atomically, copy, data)
         return copy
 
+    async def _index_source(self, path: str) -> Path:
+        target = await self.file(path)
+        if isinstance(self.workspace, LocalWorkspace):
+            return self.workspace.host_path(target.path)
+        return await self._local_copy(target)
+
+    async def _index_read(self, path: str, **selectors) -> FileContent:
+        source = await self._index_source(path)
+        reader = self._reader
+        assert reader is not None
+        content = await asyncio.to_thread(
+            reader.read, source, ReadRequest(**selectors), 0, 200000
+        )
+        return content.model_copy(update={"path": path})
+
     def _extracted_path(self, extracted: str | None) -> str | None:
         """Report a saved extraction only when the agent can read it in the workspace."""
         if extracted is None or not isinstance(self.workspace, LocalWorkspace):
@@ -258,6 +308,22 @@ class FileSystem:
         if not path.is_relative_to(self.workspace.directory):
             return None
         return path.relative_to(self.workspace.directory).as_posix()
+
+
+def _continuation(content: FileContent) -> dict[str, int | str | None]:
+    page, sheet = None, None
+    if content.next_offset is None:
+        if (
+            content.page_number is not None
+            and content.page_count is not None
+            and content.page_number < content.page_count
+        ):
+            page = content.page_number + 1
+        if content.sheet is not None and content.sheet in content.sheets:
+            index = content.sheets.index(content.sheet)
+            if index + 1 < len(content.sheets):
+                sheet = content.sheets[index + 1]
+    return {"next_page_number": page, "next_sheet": sheet}
 
 
 def _entry(stat: FileStat) -> FileEntry:

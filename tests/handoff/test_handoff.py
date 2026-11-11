@@ -18,6 +18,7 @@ from harnessed.events import (
 from harnessed.integrations.json import JsonSessionStore
 from harnessed.models import ModelChunk, ToolMessage
 from harnessed.plugins import AgentLoop, Approvals, Compaction
+from harnessed.services import Summary
 from harnessed.testing import ScriptedModel, call
 from pydantic import ValidationError
 
@@ -364,8 +365,8 @@ async def test_running_pause_cannot_lose_a_resume_while_a_probe_is_slow(monkeypa
 
 
 class _Summary:
-    async def summarize(self, _messages, *, max_tokens):  # pylint: disable=unused-argument
-        return "Earlier work summarized, without login details."
+    async def summarize(self, request):  # pylint: disable=unused-argument
+        return Summary("Earlier work summarized, without login details.")
 
 
 async def test_handoff_context_survives_compaction_and_session_restore():
@@ -374,8 +375,7 @@ async def test_handoff_context_survives_compaction_and_session_restore():
     compaction = Compaction(
         trigger=lambda _state: next(fire),
         summarizer=_Summary(),
-        keep_turns=0,
-        keep_steps=1,
+        keep_last_steps=1,
     )
     agent, model, holder = _agent(
         [_request(), call("step"), call("step"), call("step"), "Done", "Restored"],

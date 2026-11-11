@@ -7,12 +7,15 @@ from harnessed import (
     PluginValidation,
     SystemPrompt,
 )
+from harnessed.core.budget import ContextBudget
 from harnessed.kernel import PluginLike
-from harnessed.models import Model
+from harnessed.models import Model, PydanticAIModel
+from harnessed.plugins import Service
 from harnessed.sessions import SessionStore
 
 from .browser import Chrome
 from .composition import browser_pack
+from .core import MODEL_PROFILES
 
 DEFAULT_PROMPT = "Complete the requested browser task using the observed page state."
 
@@ -27,7 +30,8 @@ class Agent(harnessed.Agent):
     Conversations stay in memory by default; pass `store`
     to reopen them by ID, or continue with an explicit `SessionState`. Long runs
     summarize older steps once the request fills 80% of the model's context window,
-    or 100k tokens when the model reports none. Pass `without=(ContextCompaction,)`
+    with a 256k application limit for GPT-6.1 Terra, or 100k tokens for other models
+    when no window is known. Pass `without=(ContextCompaction,)`
     to keep everything, or a configured `ContextCompaction`. Input is paced like a
     person and streamed for people
     watching; pass `without=(InputPacing, InputVisualization)` to work at full speed unseen.
@@ -49,13 +53,32 @@ class Agent(harnessed.Agent):
         store: SessionStore | None = None,
         plugin_validation: PluginValidation = PluginValidation.ERROR,
     ) -> None:
-        pack = browser_pack(browser=browser)
+        name = (
+            model.rsplit(":", 1)[-1]
+            if isinstance(model, str)
+            else (model.info.name if isinstance(model, Model) else "")
+        )
+        profile = MODEL_PROFILES.get(name)
+        if isinstance(model, str) and profile is not None:
+            model = PydanticAIModel(model, context_window=profile.context_window)
+        defaults: list[PluginLike] = []
+        if profile is not None:
+            defaults.append(
+                Service(
+                    ContextBudget,
+                    ContextBudget(
+                        limit=profile.context_window,
+                        reserve_tokens=profile.reserve_tokens,
+                    ),
+                )
+            )
+        pack = browser_pack(browser=browser, model_profile=profile)
         pack = pack.without(*without)
         super().__init__(
             model=model,
             instructions=instructions,
             prompt=prompt,
-            plugins=[pack, *plugins],
+            plugins=[pack, *defaults, *plugins],
             store=store,
             plugin_validation=plugin_validation,
         )

@@ -18,6 +18,7 @@ from .extras import FILES_MISSING, ocr_installed
 from .formats import READERS, signature_format
 from .kinds import FileExtension as Ext
 from .models import FileContent
+from .preview import render_image
 from .text import read_text, text_encoding, text_result
 
 _UNSUPPORTED = {
@@ -82,23 +83,31 @@ class FileReader:
                 path, format_, request, offset=offset, max_chars=max_chars, depth=depth
             )
         _validate_selection(format_, request)
-        if format_ == "text":
-            encoding = text_encoding(sample)
-            if encoding is not None:
-                result = text_result(path, encoding, offset, max_chars)
-                return result.model_copy(
-                    update={
-                        "media_type": mimetypes.guess_type(path.name)[0]
-                        or "text/plain",
-                    }
+        image_formats = {
+            Ext.PNG,
+            Ext.JPEG,
+            Ext.JPG,
+            Ext.TIFF,
+            Ext.TIF,
+            Ext.GIF,
+            Ext.BMP,
+            Ext.WEBP,
+            Ext.ICO,
+        }
+        if request.view == "image" or (
+            request.view == "auto" and format_ in image_formats
+        ):
+            if format_ not in image_formats | {Ext.PDF}:
+                raise ValueError(
+                    "Image views support PDF pages and supported image files"
                 )
-            return _unsupported(
-                path,
-                format_,
-                "The file contains binary data or an unrecognized text encoding",
-                offset,
-                max_chars,
-            )
+            if request.sheet is not None or request.cell_range is not None:
+                raise ValueError("Image views do not accept sheet or cell_range")
+            if offset:
+                raise ValueError("Image views do not accept a text offset")
+            return render_image(ReadContext(path, format_, request, self.options))
+        if format_ == "text":
+            return _plain_text(path, sample, offset, max_chars)
         if format_ in _UNSUPPORTED or format_ == "binary":
             return _unsupported(
                 path,
@@ -296,6 +305,24 @@ class FileReader:
         if spec is None:
             raise ValueError(f"No content reader for {format_}")
         return spec.load()(ReadContext(path, format_, request, self.options))
+
+
+def _plain_text(path: Path, sample: bytes, offset: int, max_chars: int) -> FileContent:
+    encoding = text_encoding(sample)
+    if encoding is not None:
+        result = text_result(path, encoding, offset, max_chars)
+        return result.model_copy(
+            update={
+                "media_type": mimetypes.guess_type(path.name)[0] or "text/plain",
+            }
+        )
+    return _unsupported(
+        path,
+        "text",
+        "The file contains binary data or an unrecognized text encoding",
+        offset,
+        max_chars,
+    )
 
 
 def _write_block(stream: IO[str], block: str, limit: int) -> None:

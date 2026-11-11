@@ -89,7 +89,7 @@
       () => {
         scan.dataset.state = 'hidden';
       },
-      event.region ? 3000 : 0,
+      event.region ? 700 : 0,
     );
   };
   const capture = (region) => {
@@ -133,11 +133,6 @@
           panels.press(control, event.source_url);
         }
         break;
-      case action.READ_FILE:
-        if (event.phase === phase.RUNNING && cursor.visible() && once(event, 'fly')) {
-          ui.fly(caption.anchor(), cursor.point());
-        }
-        break;
       case action.WRITE_FILE:
       case action.EDIT_FILE:
         if (finished && cursor.visible() && once(event, 'fly')) {
@@ -156,22 +151,32 @@
     !ui.reduced() &&
     event.target_id === ui.options().target_id &&
     event.document_id === ui.options().document_id;
-  // While JavaScript runs the cursor itself says so; the caption is left for problems
+  // File reading and JavaScript use the cursor label; the caption is left for problems
   // and for runs it already started to show, such as before the cursor appeared.
   const captioned = new Set();
-  const scripted = (event) => {
+  const atCursor = (event) => {
     const {phases: phase, actions: action} = ui.options();
     if (
-      event.kind !== action.JAVASCRIPT ||
+      ![action.JAVASCRIPT, action.READ_FILE].includes(event.kind) ||
       event.target_id !== ui.options().target_id
     ) {
       return false;
     }
-    cursor.work(event.work_id, event.phase === phase.RUNNING);
+    if (event.kind === action.READ_FILE) {
+      cursor.reading(
+        event.work_id,
+        event.source_path,
+        event.phase === phase.RUNNING,
+        event.phase === phase.COMPLETED,
+      );
+    } else {
+      cursor.work(event.work_id, event.phase === phase.RUNNING);
+    }
     const quiet =
       !captioned.has(event.work_id) &&
       cursor.visible() &&
       event.phase !== phase.FAILED &&
+      event.phase !== phase.WARNING &&
       event.phase !== phase.CANCELLED;
     if (!quiet) {
       if (captioned.size > 64) {
@@ -185,7 +190,7 @@
     const kinds = ui.options().events;
     switch (event.type) {
       case kinds.WORK_PRESENTED:
-        if (scripted(event)) {
+        if (atCursor(event)) {
           break;
         }
         caption.put(
@@ -201,6 +206,13 @@
         );
         if (visibleHere(event)) {
           effects(event);
+        }
+        break;
+      case kinds.READING_SWEEP:
+        if (visibleHere(event)) {
+          ui.cancel('scan');
+          ui.bounds(scan, 0, 0, innerWidth, innerHeight);
+          scan.dataset.state = 'sweeping';
         }
         break;
       case kinds.ACTIVITY_STARTED:

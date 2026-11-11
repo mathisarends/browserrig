@@ -142,6 +142,7 @@ files = [
     { name = "odfpy" },
     { name = "openpyxl" },
     { name = "pypdf" },
+    { name = "pypdfium2" },
     { name = "python-docx" },
     { name = "python-pptx" },
     { name = "striprtf" },
@@ -198,11 +199,11 @@ requires-dist = [
     { name = "cdpify", extras = ["websocket"], specifier = "==0.5.0" },
     { name = "charset-normalizer", specifier = ">=3.4,<4" },
     { name = "defusedxml", marker = "extra == 'files'", specifier = ">=0.7.1,<0.8" },
-    { name = "harnessed", specifier = "==0.15.0" },
-    { name = "harnessed", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = "==0.15.0" },
-    { name = "harnessed", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==0.15.0" },
-    { name = "harnessed", extras = ["openai"], marker = "extra == 'openai'", specifier = "==0.15.0" },
-    { name = "harnessed", extras = ["otel"], marker = "extra == 'otel'", specifier = "==0.15.0" },
+    { name = "harnessed", specifier = "==0.16.0" },
+    { name = "harnessed", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = "==0.16.0" },
+    { name = "harnessed", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==0.16.0" },
+    { name = "harnessed", extras = ["openai"], marker = "extra == 'openai'", specifier = "==0.16.0" },
+    { name = "harnessed", extras = ["otel"], marker = "extra == 'otel'", specifier = "==0.16.0" },
     { name = "httpx2", specifier = ">=2.16,<3" },
     { name = "markdownify", marker = "extra == 'files'", specifier = ">=1.2,<2" },
     { name = "mutagen", marker = "extra == 'files'", specifier = ">=1.47,<2" },
@@ -214,7 +215,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.12,<3" },
     { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'openai'", specifier = ">=2.66,<3" },
     { name = "pypdf", marker = "extra == 'files'", specifier = ">=6.21.4,<7" },
-    { name = "pypdfium2", marker = "extra == 'ocr'", specifier = ">=5.14,<6" },
+    { name = "pypdfium2", marker = "extra == 'files'", specifier = ">=5.14,<6" },
     { name = "python-docx", marker = "extra == 'files'", specifier = ">=1.2,<2" },
     { name = "python-pptx", marker = "extra == 'files'", specifier = ">=1.0.2,<2" },
     { name = "pyyaml", specifier = ">=6,<7" },
@@ -964,14 +965,14 @@ wheels = [
 
 [[package]]
 name = "harnessed"
-version = "0.15.0"
+version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d6/24/fa478205b6bc327d38b57fab5cfbb4414e1aa50ee5702450adc8253f02b0/harnessed-0.15.0.tar.gz", hash = "sha256:b406e7fee026b131317ccfaab2a644ddb7c9d5f7049e300704508018ebb67cf9", size = 220328, upload-time = "2026-11-09T23:14:03.934Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/66/19/58a41f4a8edce843a1c3600dff17b08dcf984de4ec08aa264818a6775588/harnessed-0.16.0.tar.gz", hash = "sha256:f2d92aa02314f1902b8da2d0a33717c71562404cf75c559adb048b30957859de", size = 222929, upload-time = "2026-11-10T16:56:04.529Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/31/57/423977881a80285f79c9f21948f893bb8ede0dab56fbb8fa8d92c2800f83/harnessed-0.15.0-py3-none-any.whl", hash = "sha256:0fb95329737d9a2cb98308ae4d503db8e58738beb20fa794ee30c5a5ffa7c0ae", size = 272268, upload-time = "2026-11-09T23:14:02.58Z" },
+    { url = "https://files.pythonhosted.org/packages/a5/c4/65293cdea270b726e84bbfac763e9d18bf23a33020c31bc95bf3445a04e5/harnessed-0.16.0-py3-none-any.whl", hash = "sha256:53e3d31a4da4fcec8c19e7a680e360cad9c34d64908b6f3dccfd786d88772181", size = 275084, upload-time = "2026-11-10T16:56:03.191Z" },
 ]
 
 [package.optional-dependencies]

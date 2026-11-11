@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ConfigDict
 from pydantic.alias_generators import to_camel
@@ -27,6 +27,26 @@ class ElementArgs(ScriptArgs):
 
 class ScrollArgs(ScriptArgs):
     clip: Bounds | None = None
+
+
+class TargetScrollArgs(ScriptArgs):
+    delta_x: float = 0
+    delta_y: float = 0
+    page: bool = False
+
+
+class TargetScrollResult(Options):
+    before: Point
+    after: Point
+    blocked: bool = False
+    scrollable: bool = True
+
+
+class ReadingScrollArgs(ScriptArgs):
+    operation: Literal["measure", "sweep", "cancel"]
+    down: float = 1.6
+    hold: float = 0.25
+    back: float = 0.7
 
 
 class UploadArgs(ScriptArgs):

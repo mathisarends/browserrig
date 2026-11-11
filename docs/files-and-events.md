@@ -12,11 +12,94 @@ flowchart LR
     Chrome --> Events
 ```
 
+## Visual file reads
+
+The existing `read_file` tool accepts `view="auto"` (default), `"text"`, or
+`"image"`. Auto shows image files as visual model content and reads other formats
+as text. Select `view="image", page_number=12` to inspect a PDF page, or select an
+image frame with the same `page_number` selector. Visual reads run no OCR, preserve
+the source, and return a PNG preview bounded to 2048 pixels on its longest edge.
+PDF rendering requires `pypdfium2`, included in `browserrig[files]`; image previews
+need only the base installation. The selected model must support image inputs.
+
+Use `view="text"` for image OCR. Direct Python `FileSystem.read_file` calls retain
+their default text view; they expose a visual read as `FileContent.image` when
+explicitly requested. The model tool delivers that field as an image content part,
+without embedding Base64 data in its text response. `open_file` still opens a
+browser preview independently.
+
+Finish the current selection using `next_offset` before moving to
+`next_page_number` or `next_sheet`. These continuation fields are supplied only
+after the current text selection ends; pass the same view and other selectors.
+
 ## Downloads and events
+
+Completed downloads automatically retain the original and create adjacent
+`<filename>.md` and `<filename>.extraction.json` files. Indexing runs in the
+background; `list_downloads` includes the extraction path, processing status,
+indexed pages, pending OCR pages and any error independently of download status.
+The file system waits for its indexing jobs before closing the workspace.
+
+PDFs are scanned once for native text across all pages, within `max_file_bytes`,
+`max_expanded_bytes` and `max_index_pages` (default 2,000). Up to
+`auto_ocr_pages` (default 3) pages without native text then use local OCR when it
+is enabled and installed. Set this budget to 0 to defer automatic OCR entirely,
+or set `auto_extract=False` to disable automatic sidecars. The page budget limits
+automatic work, not latency; OCR time depends on page resolution and hardware.
+
+Workbook indexing visits all sheets while retaining the readers' explicit limits
+for large/sparse ranges. Unsupported formats and failed conversions remain
+inspectable beside the raw file. Searchable text is not a complete interpretation
+of drawings, images, charts or document annotations.
+
+An explicit `read_file` of an indexed source adds its full selected page/sheet to
+the sidecar, regardless of `max_chars`. Use `page_number` and `ocr=True` to recognize
+pending PDF pages on demand; the per-page cache avoids repeating unchanged OCR.
+The returned `document_path` names the sidecar; `extracted_path` continues to name
+the complete selected extraction. Source changes invalidate the document index.
+Unmanaged Markdown files are never overwritten. Internal index chunks stay under
+`.content/index/` and the adjacent Markdown is the canonical search surface.
 
 The agent works in one **workspace**. Downloads land in its `downloads/` folder,
 so everything the agent can read, write, open or upload has a workspace-relative
 path such as `downloads/<id>/report.pdf` or `notes/summary.md`.
+
+## Saved webpage extractions
+
+With `Files()` configured, each `extract_content(full_page=False)` call writes a
+new snapshot to `pages/<unique-id>/content.md`. Adjacent `source.json` records the
+URL, title, capture time, extraction mode and reported limitations. The agent sees
+only a receipt, without the page body or a generated summary:
+
+```text
+Saved: pages/<unique-id>/content.md
+Source: https://example.org/report
+Title: Report
+```
+
+Actual extraction limitations follow the receipt when present. The tool infers no
+semantic contents or completeness claims. Use `grep(query, pattern=<saved-path>)`
+to find bounded matches and `read_file(path, offset=..., max_chars=4000)` to inspect
+an excerpt. The snapshot remains readable after navigating elsewhere; a later
+extraction saves a separate file. Agent-tool `max_chars` and `offset` parameters
+are removed: reading and pagination belong to the file tools.
+
+The snapshot covers loaded, extractable content and is bounded to 2,000,000
+characters plus DOM traversal limits. Missing or truncated content is reported.
+The agent tool is unavailable without a workspace and never falls back to inline
+page text. Configured secret values are redacted before persistence. The direct
+Python helper `browserrig.observation.content.extract_content(tab, ...)` still
+returns Markdown and supports `max_chars`/`offset` without requiring a workspace.
+
+`glob(pattern="**/*", limit=200)` finds workspace files. `grep(query,
+pattern="**/*.md", limit=20)` searches literal text case-insensitively and returns
+bounded `path:line` snippets with Unicode character offsets for `read_file`.
+Search reads complete UTF-8 files, including text beyond file-preview limits.
+Hidden directories and internal caches are excluded unless `include_hidden=True`.
+File counts, scanned bytes, directory walks and match counts are bounded; skipped
+files, partial extractions and incomplete searches are reported. At most 20 notes
+are returned, with an omitted count when needed. A limited search is not evidence
+that the requested text is absent.
 
 The default recipe's `Files` plugin gives each session a local workspace under
 `.browserrig/files/<unique-id>/`. Files remain available after the session ends.

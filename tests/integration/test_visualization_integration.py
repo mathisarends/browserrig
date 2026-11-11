@@ -200,7 +200,9 @@ async def test_work_stream_is_complete_with_and_without_local_rendering(
         extraction = [
             receipt for receipt in receipts if receipt.call_id == calls[3].id
         ][-1]
-        assert "Download PDF" in extraction.preview and not extraction.artifact_path
+        assert "Download PDF" in extraction.preview
+        saved = tmp_path / extraction.artifact_path
+        assert saved.is_file() and "Download PDF" in saved.read_text(encoding="utf-8")
         assert extraction.region is not None and extraction.region.width > 0
         capture = [receipt for receipt in receipts if receipt.call_id == calls[-1].id][
             -1

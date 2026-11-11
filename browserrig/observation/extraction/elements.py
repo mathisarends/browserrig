@@ -16,11 +16,13 @@ from browserrig.observation.models import (
     Modal,
     Offscreen,
     ScrollInfo,
+    TextBlock,
 )
 
 from . import semantics
 from .cookies import cookie_banners
 from .document import Document, Rect, clean
+from .flow import TextCollector
 from .styles import Style
 from .visibility import Occlusion, hidden, visible_area
 
@@ -122,6 +124,7 @@ class FrameExtraction:
     modal: tuple[int, Modal] | None = None
     cookie_banners: tuple[CookieBanner, ...] = ()
     text: str = ""
+    texts: list[tuple[int, TextBlock]] = field(default_factory=list)
     _context: Callable[[int], Context] = field(
         default=lambda _index: ("", ""), repr=False
     )
@@ -227,7 +230,7 @@ class _FrameExtractor:
         result.headings, result.alerts = self._headings_and_alerts()
         result.canvases = self._canvases({index for index, _ in result.elements})
         if text_limit > 0:
-            result.text = self._text(text_limit)
+            result.text, result.texts = self._text(text_limit, result)
         return result
 
     # Elements
@@ -506,28 +509,46 @@ class _FrameExtractor:
                 )
         return headings, list(dict.fromkeys(alerts))
 
-    def _text(self, limit: int) -> str:
+    def _text(
+        self, limit: int, result: FrameExtraction
+    ) -> tuple[str, list[tuple[int, TextBlock]]]:
         document = self._document
+        collector = TextCollector(document, result.elements, result.headings, limit)
         parts: dict[str, list[str]] = {"visible": [], "above": [], "below": []}
         lengths = dict.fromkeys(parts, 0)
-        for node, value, rect in document.text_runs():
+        for node, raw, rect in document.text_runs(raw=True):
+            value = clean(raw, 1000)
             parent = document.parent(node)
+            if hidden(document, parent, rect):
+                continue
             area = visible_area(document, parent, rect, self._viewport)
             # Text under an overlay is not what the page shows.
             preview = visible_area(document, parent, rect, self._preview)
             if preview is None or area is not None and self._occluded(parent, area):
                 continue
             position = "visible" if area is not None else self._outside(rect)
-            if position is None or lengths[position] > limit:
+            if position is None:
                 continue
-            parts[position].append(value)
-            lengths[position] += len(value) + 1
+            collector.add(
+                node,
+                raw,
+                TextBlock(
+                    text="",
+                    frame_id=self._frame_id,
+                    bounds=self._bounds(rect, area),
+                    in_viewport=area is not None,
+                    outside_viewport=self._outside(rect) if area is None else None,
+                ),
+            )
+            if lengths[position] <= limit:
+                parts[position].append(value)
+                lengths[position] += len(value) + 1
         text = " ".join(parts["visible"])
         for position in ("above", "below"):
             if parts[position]:
                 text += f"\n[{position} viewport] " + " ".join(parts[position])
         # One extra character lets the caller detect truncation.
-        return text.strip()[: limit + 1]
+        return text.strip()[: limit + 1], collector.finish()
 
     def _occluded(self, index: int, area: Rect) -> bool:
         if self._occlusion is None:

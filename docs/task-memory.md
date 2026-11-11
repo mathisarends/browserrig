@@ -25,7 +25,7 @@ or a mechanical guarantee of task completion.
    the ordinary compaction policy even if the agent ignored the checkpoint. Native
    emergency compaction always takes precedence. Checkpoint work consumes the
    existing step, token and timeout budgets; it adds no nested agent run.
-3. The ordinary summarizer runs once, with part of its existing output allowance
+3. The ordinary summarizer runs, with part of its existing output allowance
    reserved for a short handover prefix. This prefix tells the agent to call
    `read_file` on the memory file and reaches the **first compacted request**.
    The file itself is not loaded into the summary. Linked artifacts are read only
@@ -50,7 +50,14 @@ agent's notes. Treat notes as historical data; current observations take precede
 ## Configuration and persistence
 
 `TaskMemory` fills the same slot as native `ContextCompaction` and supports its
-retention, trigger, summarizer, focus and summary-token options:
+`trigger`, `llm`, replacement `prompt` (string or sync/async factory), custom
+`summarizer`, `keep_last_steps`, `target_ratio` or `target_tokens`, and optional
+`max_summary_tokens` options. Custom summarizers accept a `CompactionRequest` and
+return `Summary`; `summarizer` cannot be combined with `llm` or `prompt`.
+The default retains the last two complete model/tool steps across turns. Summary
+budgets are derived automatically unless an explicit ceiling is configured.
+Complete output is never sliced; Harnessed may make one further summarization
+attempt and accounts for usage from rejected candidates too.
 
 ```python
 from browserrig import Agent, Files, LocalWorkspace, TaskMemory, Todos, WindowRatio
@@ -65,7 +72,7 @@ agent = Agent(
             warn_at=0.65,
             fallback_tokens=60_000,
             trigger=WindowRatio(0.8),
-            keep_steps=4,
+            keep_last_steps=4,
         ),
     ],
 )
@@ -114,6 +121,19 @@ they do not prove that the model used or understood the facts. Compare benchmark
 success, token use and repeated work in separately labeled runs before claiming an
 improvement. No new paid evaluation is required to enable the protocol.
 
+`browserrig.Agent` applies the shared GPT-6.1 Terra application profile for both
+OpenAI API and Codex subscription models, including prewrapped models: 256,000
+tokens of context, an 8,192-token output reserve, two retained steps, a 40% target
+and an 8,192-token summary ceiling. With this profile the checkpoint starts at
+179,200 tokens and compaction at 204,800 tokens, both including reserved output.
+The post-compaction input target is 102,400 tokens and is best effort. Explicit
+budget services and compaction plugins override the defaults. Benchmarks use
+the same agent path and record the profile in each result file.
+
+Harnessed 0.16 uses conversation state format 3 and audit envelope version 6.
+Older states and audit logs cannot be loaded directly; retain the original
+application environment to read them and use new stores for this version.
+
 The integration wraps the compaction policy and summarizer of pinned Harnessed
-0.15.0. This narrow internal boundary is covered by real compaction, recovery,
+0.16.0. This narrow internal boundary is covered by real compaction, recovery,
 budget and session-store tests; review it when upgrading Harnessed.

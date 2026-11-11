@@ -3,10 +3,13 @@
 import argparse
 import asyncio
 import os
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+from browserrig.core import MODEL_PROFILES
 
 from . import report
 from .environments import DEFAULT_CONFIG, DEFAULT_DATA, Environments
@@ -95,6 +98,7 @@ async def main() -> None:
             stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S-%f")
             run_name = f"{stamp}{'-' + args.label if args.label else ''}"
             project = os.getenv("PHOENIX_PROJECT_NAME", DEFAULT_PROJECT)
+            profile = MODEL_PROFILES.get(model_name)
             benchmark = BenchmarkResult(
                 run=run_name,
                 model=model_name,
@@ -109,6 +113,7 @@ async def main() -> None:
                 max_steps=args.max_steps,
                 timeout=args.timeout,
                 tasks=[],
+                **(asdict(profile) if profile is not None else {}),
             )
             output = report.RESULTS / f"{run_name}.json"
             write_run(output, benchmark)

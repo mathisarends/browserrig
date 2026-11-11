@@ -82,6 +82,7 @@ class EventKind(StrEnum):
     PAGE_CAPTURE_STARTED = "browser.page.capture.started"
     PAGE_CAPTURE_FINISHED = "browser.page.capture.finished"
     WORK_PRESENTED = "browser.work.presented"
+    READING_SWEEP = "browser.reading.sweep"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

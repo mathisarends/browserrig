@@ -5,7 +5,13 @@ import subprocess
 
 import pytest
 from harnessed import Agent
-from harnessed.events import AssistantMessageEvent, ModelRequestedEvent
+from harnessed.events import (
+    AssistantMessageEvent,
+    CompactionFinishedEvent,
+    CompactionOutcome,
+    CompactionStartedEvent,
+    ModelRequestedEvent,
+)
 from harnessed.models import AssistantMessage, ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
@@ -22,8 +28,9 @@ pytestmark = [
 ]
 
 
-async def test_native_recording_cuts_model_waits_across_tabs_and_closure(
-    tmp_path, site
+@pytest.mark.parametrize("compacting", [False, True], ids=["model", "compaction"])
+async def test_native_recording_cuts_waits_across_tabs_and_closure(
+    tmp_path, site, compacting
 ):
     agent = Agent(
         model=ScriptedModel([]),
@@ -40,7 +47,9 @@ async def test_native_recording_cuts_model_waits_across_tabs_and_closure(
         await evaluate(first, "document.body.style.background='lime'")
         await asyncio.sleep(0.5)
         await session.emit(
-            ModelRequestedEvent(
+            CompactionStartedEvent("wait", before_tokens=1000)
+            if compacting
+            else ModelRequestedEvent(
                 request=ModelRequest(messages=()),
                 model=ModelInfo(name="test"),
                 request_id="wait",
@@ -50,7 +59,11 @@ async def test_native_recording_cuts_model_waits_across_tabs_and_closure(
         await asyncio.sleep(1.5)
         await evaluate(first, "document.body.style.background='lime'")
         await session.emit(
-            AssistantMessageEvent(AssistantMessage("continue"), request_id="wait")
+            CompactionFinishedEvent(
+                "wait", CompactionOutcome.APPLIED, before_tokens=1000
+            )
+            if compacting
+            else AssistantMessageEvent(AssistantMessage("continue"), request_id="wait")
         )
         await asyncio.sleep(0.5)
         second = await browser.tabs.open(site + "/other")
@@ -109,7 +122,7 @@ async def test_native_recording_cuts_model_waits_across_tabs_and_closure(
     assert (
         sum(red > 180 and green < 60 and blue < 60 for red, green, blue in colors) <= 3
     )
-    # The uncut film keeps the model wait that the edited video removes.
+    # The uncut film keeps the wait that the edited video removes.
     original = await _duration(result.original_path)
     assert original == pytest.approx(result.original_duration, abs=0.3)
     assert original > float(metadata["format"]["duration"]) + 1

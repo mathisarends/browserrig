@@ -105,6 +105,43 @@ class Heading(Options):
     section: str = ""
 
 
+class TextBlock(Options):
+    """Rendered text at its reading position, without an action reference.
+
+    Bounds use the main viewport's CSS pixels, including for embedded frames.
+    """
+
+    text: str
+    frame_id: str
+    order: int = 0
+    bounds: Bounds | None = None
+    in_viewport: bool = True
+    outside_viewport: Literal["above", "below"] | None = None
+    truncated: bool = False
+    leading_space: bool = False
+    trailing_space: bool = False
+    preformatted: bool = False
+    # Visible text owned by a control whose accessible name may differ.
+    control: ElementRef | None = None
+
+
+class ContentGroup(Options):
+    """A semantic container; children retain composed-document reading order.
+
+    ElementRef leaves address the current element index, so names, states and
+    new-element markers have one source of truth.
+    """
+
+    id: str
+    role: str
+    name: str = ""
+    bounds: Bounds | None = None
+    children: tuple["ContentGroup | TextBlock | Heading | ElementRef", ...] = ()
+
+
+type ContentNode = ContentGroup | TextBlock | Heading | ElementRef
+
+
 class Modal(Options):
     role: str
     name: str
@@ -150,6 +187,8 @@ class PageContent:
     modal: Modal | None = None
     canvases: tuple[Canvas, ...] = ()
     text: str = ""
+    # None lets existing capture backends keep their flat rendering contract.
+    content: tuple[ContentNode, ...] | None = None
     limitations: tuple[str, ...] = ()
     cookie_banners: tuple[CookieBanner, ...] = ()
 
@@ -169,6 +208,7 @@ class Snapshot(Options):
     fingerprint: str
     tabs: tuple[TabInfo, ...] = ()
     text: str = ""
+    content: tuple[ContentNode, ...] | None = None
     # Visible controls and nearby previews are described; distant controls keep identities.
     elements: tuple[Element | ElementInfo, ...] = ()
     offscreen: tuple[Offscreen | ElementRef, ...] = Field(default=(), repr=False)

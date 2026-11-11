@@ -62,6 +62,7 @@ function createChoreographyCaption(ui) {
       '0 0 20 20',
     );
   const paint = (item) => {
+    icon.hidden = item.kind === ui.options().actions.READ_FILE;
     // Only owned inline screenshot thumbnails become images; all text stays text.
     const image = /^data:image\/(png|jpeg|webp);base64,/.test(item.image || '')
       ? item.image

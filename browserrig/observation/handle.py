@@ -94,6 +94,21 @@ class DomElementHandle:
     async def focus(self, *, select_all: bool) -> None:
         await self._run(ElementOperation.FOCUS, select_all)
 
+    async def is_focused(self) -> bool:
+        """Whether this target retains focus, including its embedding frame chain."""
+        if self.tab.document_id != self.snapshot.document_id:
+            return False
+        if not await self.run(ELEMENT, ElementArgs(operation=ElementOperation.FOCUSED)):
+            return False
+        frame = self.frame
+        while frame.parent is not None:
+            if not await frame.run_on_owner(
+                ELEMENT, ElementArgs(operation=ElementOperation.FOCUSED)
+            ):
+                return False
+            frame = frame.parent
+        return True
+
     async def select(self, option: str) -> None:
         """Choose a native select option by exact label or value."""
         await self._run(ElementOperation.SELECT, option)

@@ -69,7 +69,8 @@ they locate their target again before every input.
 CDP session and derives roles, names, states, visibility and landmark sections from
 that data in Python, without walking the DOM in the page. Normal observations include
 up to 3,000 characters of visible page text, along with nearby control previews,
-and do not capture new screenshots. Use `extract_content()` to read the full page.
+and do not capture new screenshots. Use `extract_content()` to save page content
+for targeted searches and file reads.
 The agent can call `screenshot()` to request the current view as an
 image in its next iteration. `ImageContext` keeps the latest screenshot by default,
 including during subsequent text-only steps until compaction removes its snapshot.
@@ -82,6 +83,21 @@ its default is `3000`. Set both `max_text_chars=0` and `sparse_text_chars=0` to
 omit page-text excerpts. When the viewport holds fewer than five named controls, as on error, challenge
 and confirmation pages, observations add up to `sparse_text_chars` (default `1500`)
 characters of visible text anyway. Every observation states where the mouse rests.
+
+Visible text is interleaved with controls in composed-document reading order,
+inside its actual landmarks, forms, paragraphs, lists and table cells. Paragraphs
+remain continuous: `text: Read [the guide][42], then continue.` embeds a link with
+ref `42` directly in the sentence. Pass the second bracket's ref to element tools.
+Links outside prose retain their ordinary `[42] link "name" -> /path` lines.
+Plain text has no refs. Code blocks retain line breaks and indentation.
+
+Labels already fully displayed on a control are omitted from the surrounding
+text by source identity; identical text at unrelated locations stays visible.
+Text-budget truncation is marked at the affected block and does not remove later
+controls. Above/below previews keep their own text with their controls. The
+representation preserves semantic reading order, rather than sorting unrelated
+columns by screen coordinates; structured text and container bounds retain their
+positions in main-viewport CSS pixels.
 
 Likely cookie consent banners have a separate `[COOKIE BANNER: name]` block with up
 to 600 characters of visible text and their ordinary element refs. This excerpt is
@@ -120,10 +136,12 @@ in viewport:
     [12] link "Cart" -> /cart
   [MAIN]
     ## Shipping address
+    text: Use a delivery address where someone can receive your order.
     <form "Shipping">
       [48] textbox "Email" required placeholder="you@example.com"
       [51] combobox "Country" options=[Germany*, France, Spain]
       *[57] checkbox "Save address" unchecked
+      text: Read [delivery terms][59] before continuing.
     [60] button "Continue"
 ```
 
@@ -192,20 +210,28 @@ use the shared action lock, readiness checks, and action receipts.
 
 ## Page content as Markdown
 
-The agent can call `extract_content(max_chars=50000)` to read the active page as
-structured Markdown. The result includes the page title and source URL, headings,
-paragraphs, emphasis, lists, links with absolute URLs, tables, quotes, and code.
+The agent calls `extract_content(full_page=False)` to save the active page as
+structured Markdown in its workspace. It returns only `Saved`, `Source`, `Title`
+and actual extraction limitations. The Markdown body stays in the file; use `grep`
+for bounded matches and `read_file` with `offset` and `max_chars` for excerpts.
+Each call saves a new snapshot. The tool requires a workspace and has no inline
+fallback or `max_chars`/`offset` arguments.
 It reads already loaded content below the viewport without scrolling, navigating,
 or invalidating the current element references. Open and closed shadow roots and
 available same-origin and cross-origin frame documents are included.
 
-`max_chars` limits the Markdown body (1–200000 characters); the title, source URL,
-and extraction limitations are reported separately. Truncation, unavailable DOM
+The saved snapshot contains headings, paragraphs, emphasis, lists, links, tables,
+quotes and code. Truncation, unavailable DOM
 metadata, and unavailable frames are explicit. Offscreen rendered frame documents
 are included. Scripts, styles, hidden content, and form field values are excluded.
 Lazy content must already be
 loaded; images contribute their alt text, and canvas pixels are not converted to
 text. Use `screenshot()` when visual inspection is needed.
+
+The direct Python helper `browserrig.observation.content.extract_content(tab,
+max_chars=50000, full_page=False, offset=0)` still returns a typed Markdown result
+with continuation offsets. It does not require a workspace or change the agent
+tool's short receipt contract.
 
 ## Finding text on the page
 
@@ -240,19 +266,29 @@ as well as clicks. Focus uses `preventScroll` to avoid an extra browser jump.
 must fit in the viewport together before the gesture starts.
 
 It always provides `move_mouse(x=..., y=...)`,
-`scroll(delta_y=..., delta_x=...)`,
+`scroll_page(delta_y=..., delta_x=...)`,
+`scroll_element(ref=..., delta_y=..., delta_x=...)`,
 `click_at(x=..., y=..., count=2)` and
 `drag_at(start=Point(...), end=Point(...))`.
 Both drag tools use the same mouse gesture. The browser handles pointer dragging
 and native HTML5 drag and drop, including `DataTransfer`, automatically.
 `move_mouse` moves the cursor without clicking and can reveal hover controls.
-`scroll` sends wheel input at the current cursor position: move over a sidebar,
-panel, or other scrollable area first to scroll that area. `delta_x` scrolls
-sideways, for example through a carousel or a wide table.
-Both also take an observed `ref` instead of coordinates: `move_mouse(ref=...)`
-hovers that element, and `scroll(ref=..., delta_y=...)` turns the wheel over it,
-so a list inside a modal or sidebar scrolls without a screenshot. The ref is
-revealed first, like a click target.
+`scroll_page` scrolls the outer document directly,
+independently of the cursor and any nested editor or panel under it. It reports
+the actual before/after position, or says that the page did not move at a boundary
+or because scrolling is disabled. Page scrolling respects CSS overflow locks and
+does not move the cursor or emit wheel input. `delta_x` scrolls sideways.
+`scroll_element(ref=...)` scrolls only the observed container marked `scroll(...)`,
+including a panel, list or horizontal carousel. It stops at that container's
+boundary without propagating to parents or the page, and reports actual movement.
+It does not reveal the container by scrolling ancestors, move the cursor or emit
+wheel input. A ref for an ordinary control is rejected instead of silently
+scrolling its parent. `move_mouse(ref=...)` still reveals and hovers its target.
+
+These two tools replace the old cursor-dependent `scroll` agent tool. Migrate
+no-ref page scrolling to `scroll_page`, and container refs to `scroll_element`.
+For custom wheel handlers, native wheel input remains available to applications
+through `browser.input.mouse.scroll(delta_y=..., point=Point(...))`.
 Both `click` and `click_at` accept `button="right"` for a native right click;
 the default is `button="left"`. Both tools automatically move the cursor to the
 target before clicking. Right clicks end the action chain so the agent can
@@ -482,3 +518,16 @@ output, and screenshots are omitted. Pass `TerminalEvents(output=file)` to selec
 another text stream.
 Page text, dialog messages and form value fields are omitted; URLs, filenames and
 dispatched key names remain diagnostic metadata.
+
+### Typing into fields with selected tokens
+
+`type_text(ref, text, clear=True)` replaces existing native text, but skips
+Backspace when the native field is already empty. This preserves selected chips
+in token inputs. Focus is checked after clearing and before every typed character;
+if it leaves the addressed field, the tool stops and reports that remaining text
+was not sent. Inspect the field before retrying because a prefix may be present.
+The same focus check covers embedding frames. `send_keys` continues to address
+the current page focus and does not acquire a target ref.
+
+Direct DOM users can call `await handle.is_focused()` to check the target and its
+embedding frame chain without refocusing it or reading its value.

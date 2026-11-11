@@ -79,6 +79,31 @@ async def test_move_mouse_rejects_ambiguous_arguments_without_input(arguments):
     assert not services.coordination.busy
 
 
+@pytest.mark.parametrize(
+    "tool, arguments",
+    [
+        (PointerTools.scroll_page, {}),
+        (PointerTools.scroll_element, {"ref": "button"}),
+    ],
+)
+async def test_scroll_tools_reject_zero_movement_before_input(tool, arguments):
+    async with _pointer_session([call(tool, **arguments), "Done"]) as (
+        session,
+        services,
+        moved,
+    ):
+        result = await session.run("Scroll")
+
+    moved.assert_not_awaited()
+    services.observe.element.assert_not_awaited()
+    reply = next(
+        e.result for e in result.events if isinstance(e, ToolCallFinishedEvent)
+    )
+    assert reply.status is ToolStatus.ERROR and reply.break_chain
+    assert "non-zero" in reply.text
+    assert not services.coordination.busy
+
+
 async def test_move_mouse_keeps_input_failure_and_releases_the_action_context():
     responses = [
         call(PointerTools.move_mouse, x=40, y=30),
