@@ -18,8 +18,10 @@ from browserrig import (
     CaptureContent,
     Chrome,
     ElementInfo,
+    InputRuntime,
     PageContent,
     Readiness,
+    Runtime,
     TextContext,
     wait_for_page,
 )
@@ -82,6 +84,8 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
     agent = Agent(
         model=CallbackModel(respond),
         plugins=[
+            Runtime(),
+            InputRuntime(),
             Chrome(Launch(url=site)),
             Readiness(),
             BrowserPerception(capture=_CanvasCapture(), renderer=DomRenderer()),

@@ -13,7 +13,7 @@ from harnessed.testing import ScriptedModel, call
 
 from browserrig.core import BrowserError, ElementPoint
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent, ActionStartedEvent
-from browserrig.tools import Actions, DomScrollTools, PointerTools, TabTools
+from browserrig.tools import Actions, DomScrollTools, PointerTools, TabTools, Targeting
 from tests.fakes import FakeServices
 
 
@@ -29,11 +29,11 @@ async def test_move_mouse_runs_as_an_action_and_stops_the_native_chain(arguments
     async with _pointer_session([batch, "Done"]) as (session, services, moved):
         action_ids = []
         moved.side_effect = lambda _point: action_ids.append(
-            services.browser.input.action_id
+            services.correlation.action_id
         )
         result = await session.run("Hover the target")
         with pytest.raises(RuntimeError, match="executing action tool"):
-            await session.scope[Actions].element_point(ref="button")
+            await session.scope[Targeting].locate(ref="button")
 
     moved.assert_awaited_once()
     assert moved.await_args.args[0].x == 40
@@ -211,6 +211,7 @@ async def _pointer_session(responses):
         plugins=[
             FakeServices(),
             Actions(),
+            Targeting(),
             _PointerTools(),
             DomScrollTools(),
             TabTools(),
@@ -219,7 +220,7 @@ async def _pointer_session(responses):
     )
     async with agent.session() as session:
         services = session.scope[FakeServices]
-        moved = services.browser.input.mouse.move_to = AsyncMock()
+        moved = services.input.mouse.move_to = AsyncMock()
         services.observe.coordinate_source = lambda: SimpleNamespace(
             geometry=None, width=800, height=600
         )

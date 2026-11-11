@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
@@ -7,9 +7,10 @@ from harnessed import Plugin, SessionLog
 from harnessed.kernel import Event, PluginScope, needs, observes
 from pydantic import SecretStr
 
-from browserrig.core import BrowserCoordination, TargetId
+from browserrig.core import ActionContext, ChangeTab, TargetId
 from browserrig.events import BROWSER_EVENTS
 from browserrig.files import FileBridge, MountedWorkspace
+from browserrig.input import InputTargets
 
 from .base import Browser, BrowserEvents
 from .chrome import ChromeBrowser
@@ -25,6 +26,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
     events = BROWSER_EVENTS
     _log = needs(SessionLog)
     _navigation = observes(NavigationPolicy)
+    _actions = needs(ActionContext)
 
     def __init__(self, options: BrowserOptions | None = None) -> None:
         super().__init__()
@@ -105,17 +107,24 @@ class Chrome(Plugin, slot="browserrig.browser"):
         async def tab_changed(tab: Tab, settled: bool) -> None:
             await scope.dispatch(TabChanged(tab, settled))
 
+        async def change_tab(
+            event: ChangeTab, operation: Callable[[], Awaitable[None]]
+        ) -> None:
+            await scope.dispatch(event, default=operation)
+
         browser = await scope.enter(
             ChromeBrowser(
                 self.options,
                 emit=self._log.emit,
                 on_tab_change=tab_changed,
                 navigation_policy=self._navigation,
+                current_action=lambda: self._actions.action_id,
+                change_tab=change_tab,
             )
         )
         scope.provide(Browser, browser)
         scope.provide(BrowserEvents, browser.events)
-        scope.provide(BrowserCoordination, BrowserCoordination())
+        scope.provide(InputTargets, browser.input_targets)
         if self.options.bridge is not None:
             scope.provide(FileBridge, self.options.bridge)
 

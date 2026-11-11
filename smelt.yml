@@ -64,13 +64,16 @@ architecture:
     core: {path: core}
     scripts: {path: scripts, may_depend_on: [core]}
     files: {path: files, may_depend_on: [core]}
-    input: {path: input, may_depend_on: [core]}
+    input:
+      path: input
+      may_depend_on: [core]
+      third_party: {deny: [cdpify]}
     browser: {path: browser, may_depend_on: [core, scripts, files, input]}
     guardrails: {path: guardrails, may_depend_on: [core, browser]}
     readiness: {path: readiness, may_depend_on: [core, scripts, files, browser]}
     observation:
       path: observation
-      may_depend_on: [core, scripts, files, browser, readiness, nudges, secrets]
+      may_depend_on: [core, scripts, files, input, browser, readiness, nudges, secrets]
     nudges: {path: nudges, may_depend_on: [core, browser]}
     # Observation redacts with secrets; the way back is recorded debt.
     secrets: {path: secrets, may_depend_on: [core, scripts, input, browser]}
@@ -83,8 +86,8 @@ architecture:
     handoff:
       path: handoff
       may_depend_on: [core, browser, nudges, observation, secrets]
-    # How input is performed is optional: it builds on the browser, nothing builds on it.
-    pacing: {path: pacing, may_depend_on: [core, input, browser]}
+    # Input behavior depends on the devices, independently of the browser backend.
+    pacing: {path: pacing, may_depend_on: [core, input]}
     # Staging for viewers is optional: it builds on the rest, nothing builds on it.
     choreography:
       path: choreography

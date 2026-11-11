@@ -34,6 +34,7 @@ from browserrig.events import (
     LiveEvent,
     ObservationCapturedEvent,
 )
+from browserrig.input import Input
 from browserrig.observation import BrowserPerception, ExtractedContent
 from browserrig.secrets import Secrets
 from browserrig.tools import (
@@ -90,6 +91,7 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
     events = INPUT_EVENTS + SCENE_EVENTS
     _state = PluginState(_Presentation)
     _browser = needs(Browser)
+    _input = needs(Input)
     _events = needs(BrowserEvents)
     _coordination = needs(BrowserCoordination)
 
@@ -101,7 +103,7 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
         self._state.context = scope
         scope.on(BrowserEvent, self._browser_event)
         # Each call installs now and registers its undo for teardown.
-        scope.effect(self._browser.input.present(Stage()))
+        scope.effect(self._input.present(Stage()))
         if self.renderer is not None:
             view = self._state.view = self.renderer.create()
             scope.effect(view.close)
@@ -110,7 +112,7 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
 
         async def publish_cursor(_event: TurnStartedEvent) -> None:
             # Live subscribers often attach late, so seed their cursor at turn start.
-            await self._browser.input.mouse.publish_cursor()
+            await self._input.mouse.publish_cursor()
 
         scope.on(TurnStartedEvent, publish_cursor)
 
@@ -120,7 +122,7 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             return
         if event.tab.id != self._browser.active_tab.id:
             return
-        point = self._browser.input.mouse.position_in(event.tab.id)
+        point = self._input.mouse.position_in(event.tab.id)
         if point is not None:
             await self._render(
                 CursorStateEvent(x=point.x, y=point.y, target_id=event.tab.id)

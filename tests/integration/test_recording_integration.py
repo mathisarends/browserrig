@@ -15,7 +15,7 @@ from harnessed.events import (
 from harnessed.models import AssistantMessage, ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
-from browserrig import Activity, Browser, Chrome, VideoRecording
+from browserrig import Activity, Browser, Chrome, InputRuntime, Runtime, VideoRecording
 from browserrig.recording import capture as capture_module
 from tests.javascript import evaluate
 
@@ -35,6 +35,8 @@ async def test_native_recording_cuts_waits_across_tabs_and_closure(
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
+            Runtime(),
+            InputRuntime(),
             Activity(),
             Chrome.launch(url=site),
             VideoRecording(tmp_path, width=640, height=480, frame_rate=15, padding=0),
@@ -134,6 +136,8 @@ async def test_recording_follows_repeated_activation_of_existing_tabs(tmp_path, 
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
+            Runtime(),
+            InputRuntime(),
             Activity(),
             Chrome.launch(url=site),
             VideoRecording(tmp_path, width=640, height=480, frame_rate=15, padding=0),
@@ -186,6 +190,8 @@ async def test_immediate_session_exit_still_produces_a_video(
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
+            Runtime(),
+            InputRuntime(),
             Activity(),
             Chrome.launch(),
             VideoRecording(tmp_path, width=320, height=240, frame_rate=15, padding=0),

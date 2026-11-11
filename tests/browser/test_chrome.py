@@ -1,6 +1,5 @@
 # Listener and target ownership are verified through internal lifecycle methods.
 # pylint: disable=protected-access
-
 import asyncio
 from contextlib import AsyncExitStack
 from types import SimpleNamespace
@@ -20,6 +19,7 @@ from pydantic import ValidationError
 from browserrig import ChromeBrowser, SessionSetup, Viewport
 from browserrig.browser import Connect, Launch, Tab
 from browserrig.browser import tabs as tabs_module
+from browserrig.core import ActionContext
 from browserrig.events import (
     DialogOpenedEvent,
     DisconnectedEvent,
@@ -209,11 +209,11 @@ async def test_close_forgets_sessions_and_ignores_stale_target_listing(monkeypat
     browser.tabs._tabs[remaining.id] = remaining
     gestures = []
 
-    async def switch_tab(gesture, tab_id, switch):
-        gestures.append((gesture, tab_id))
+    async def switch_tab(event, switch):
+        gestures.append((event.gesture, event.target_id))
         await switch()
 
-    monkeypatch.setattr(browser.input.mouse, "switch_tab", switch_tab)
+    monkeypatch.setattr(browser.tabs, "_change_tab", switch_tab)
     assert await browser.tabs.close(closed.id) is remaining
     assert gestures == [(TabGesture.CLOSE, "closing")]
     remaining.cdp.page.bring_to_front.assert_awaited_once_with()
@@ -233,12 +233,13 @@ async def test_failed_startup_does_not_emit_disconnected():
 async def test_frame_cache_is_action_scoped_and_invalidated_by_layout_and_document(
     monkeypatch,
 ):
-    browser, _ = _browser()
+    actions = ActionContext()
+    browser, _ = _browser(actions=actions)
     tab = await browser.tabs._attach("tab")
     browser.client.target.get_targets.return_value = SimpleNamespace(target_infos=[])
     discover = AsyncMock(return_value=((), ()))
     monkeypatch.setattr(tabs_module, "discover_frames", discover)
-    with browser.input.action("action"):
+    with actions.activate("action"):
         await tab.frames()
         await tab.frames()
         assert discover.await_count == 1
@@ -302,11 +303,12 @@ class _RecordingSetup:
         self.calls.append((self.name, cdp, frame, metrics))
 
 
-def _browser(options=None):
+def _browser(options=None, *, actions=None):
     events = []
     browser = ChromeBrowser(
         options or Connect(endpoint="ws://localhost/devtools/browser/test"),
         emit=AsyncMock(side_effect=events.append),
+        current_action=str if actions is None else lambda: actions.action_id,
     )
     stack = AsyncExitStack()
     browser._stack = stack

@@ -13,10 +13,13 @@ from browserrig import (
     Chrome,
     Files,
     IframeRenderer,
+    Input,
     InputPacing,
+    InputRuntime,
     InputVisualization,
     LocalWorkspace,
     Point,
+    Runtime,
     Viewport,
     wait_for_page,
 )
@@ -46,7 +49,13 @@ class _UploadReceipts(Plugin):
 async def test_file_cards_wait_for_explicit_completion_receipts(site):
     agent = Agent(
         model=ScriptedModel([]),
-        plugins=[Chrome.launch(url=site), InputVisualization(), _UploadReceipts()],
+        plugins=[
+            Runtime(),
+            InputRuntime(),
+            Chrome.launch(url=site),
+            InputVisualization(),
+            _UploadReceipts(),
+        ],
     )
     async with agent.session() as session:
         tab = session.scope[Browser].active_tab
@@ -88,7 +97,13 @@ async def test_file_cards_wait_for_explicit_completion_receipts(site):
 
 async def test_scroll_feedback_is_visible_during_native_wheel_input(site):
     agent = Agent(
-        model=ScriptedModel([]), plugins=[Chrome.launch(url=site), InputVisualization()]
+        model=ScriptedModel([]),
+        plugins=[
+            Runtime(),
+            InputRuntime(),
+            Chrome.launch(url=site),
+            InputVisualization(),
+        ],
     )
     async with agent.session() as session:
         browser = session.scope[Browser]
@@ -105,7 +120,7 @@ async def test_scroll_feedback_is_visible_during_native_wheel_input(site):
             )
 
         session.scope.on(ScrollStartedEvent, started, priority=10)
-        await browser.input.mouse.scroll(delta_y=500, point=Point(x=500, y=400))
+        await session.scope[Input].mouse.scroll(delta_y=500, point=Point(x=500, y=400))
         assert observed == [0]
         assert await evaluate(tab, "scrollY") > 450
 
@@ -114,6 +129,8 @@ async def test_keyboard_fits_a_compact_viewport_and_keeps_secret_keys_private(si
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
+            Runtime(),
+            InputRuntime(),
             Chrome.launch(url=site, viewport=Viewport(width=360, height=640)),
             InputVisualization(renderer=IframeRenderer(keyboard_layout="de")),
         ],
@@ -121,7 +138,7 @@ async def test_keyboard_fits_a_compact_viewport_and_keeps_secret_keys_private(si
     async with agent.session() as session:
         browser = session.scope[Browser]
         tab = browser.active_tab
-        await browser.input.mouse.move_to(Point(x=300, y=600))
+        await session.scope[Input].mouse.move_to(Point(x=300, y=600))
         await tab.emit(KeyPressedEvent(key="•", duration=2))
         result = await _surface(
             tab,
@@ -141,6 +158,8 @@ async def test_long_cursor_badge_stays_inside_a_compact_viewport(site):
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
+            Runtime(),
+            InputRuntime(),
             Chrome.launch(url=site, viewport=Viewport(width=360, height=640)),
             InputVisualization(renderer=IframeRenderer(name="W" * 40)),
         ],
@@ -249,7 +268,13 @@ async def test_work_caption_is_inert_text_and_is_excluded_from_extraction(site):
 
 async def test_simultaneous_downloads_keep_independent_progress_and_outcomes(site):
     agent = Agent(
-        model=ScriptedModel([]), plugins=[Chrome.launch(url=site), InputVisualization()]
+        model=ScriptedModel([]),
+        plugins=[
+            Runtime(),
+            InputRuntime(),
+            Chrome.launch(url=site),
+            InputVisualization(),
+        ],
     )
     async with agent.session() as session:
         tab = session.scope[Browser].active_tab
@@ -291,6 +316,8 @@ async def test_work_and_transfers_fit_the_viewport(site, tmp_path, theme, width)
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
+            Runtime(),
+            InputRuntime(),
             Chrome.launch(url=site, viewport=Viewport(width=width, height=740)),
             InputVisualization(renderer=IframeRenderer(theme=theme)),
         ],
@@ -336,7 +363,13 @@ async def test_work_and_transfers_fit_the_viewport(site, tmp_path, theme, width)
 
 async def test_running_work_restores_after_navigation_without_pointer_input(site):
     agent = Agent(
-        model=ScriptedModel([]), plugins=[Chrome.launch(url=site), InputVisualization()]
+        model=ScriptedModel([]),
+        plugins=[
+            Runtime(),
+            InputRuntime(),
+            Chrome.launch(url=site),
+            InputVisualization(),
+        ],
     )
     async with agent.session() as session:
         tab = session.scope[Browser].active_tab

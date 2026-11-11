@@ -1,5 +1,6 @@
 """Shared values, configuration and coordination, independent of browser backends."""
 
+from .actions import ActionContext
 from .coordination import BrowserCoordination
 from .errors import (
     BrowserClosed,
@@ -28,9 +29,15 @@ from .kinds import (
 )
 from .model_profiles import MODEL_PROFILES, ModelProfile
 from .options import Options
+from .runtime import Runtime
+from .tabs import ChangeTab, TabDispatch
 from .tools import BrowserToolCall, BrowserToolMetadata, browser_tool
 
 __all__ = [
+    "ActionContext",
+    "Runtime",
+    "ChangeTab",
+    "TabDispatch",
     "MODEL_PROFILES",
     "ModelProfile",
     "BrowserCoordination",

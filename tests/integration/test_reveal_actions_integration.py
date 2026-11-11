@@ -15,7 +15,9 @@ from browserrig import (
     Chrome,
     DomElements,
     Files,
+    Input,
     LocalWorkspace,
+    Targeting,
     wait_for_page,
 )
 from browserrig.browser import BrowserEvents
@@ -273,13 +275,15 @@ async def test_same_action_reprojects_after_programmatic_iframe_motion(site):
         points = []
 
         async def click(_tab):
-            points.append(await actions.element_point(tab=tab, ref=ref))
+            points.append(await session.scope[Targeting].locate(tab=tab, ref=ref))
             await evaluate(
                 tab,
                 "document.querySelector('iframe').style.left='350px';document.querySelector('iframe').style.top='160px'",
             )
-            points.append(await actions.element_point(tab=tab, ref=ref, scroll=False))
-            await browser.input.mouse.click(points[-1])
+            points.append(
+                await session.scope[Targeting].locate(tab=tab, ref=ref, scroll=False)
+            )
+            await session.scope[Input].mouse.click(points[-1])
             return Effect("Clicked")
 
         result = await actions.run(kind=ActionKind.CLICK, operation=click)

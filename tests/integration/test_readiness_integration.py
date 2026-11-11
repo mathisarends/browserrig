@@ -12,6 +12,7 @@ from browserrig import (
     Chrome,
     ChromeBrowser,
     FileTools,
+    Input,
     Point,
     Readiness,
     ReadinessOptions,
@@ -92,11 +93,11 @@ async def test_delayed_click_navigation_settles_the_destination(readiness_site):
         ),
     )
     async with agent.session() as session:
-        browser, observe = session.scope[Browser], session.scope[BrowserPerception]
+        observe = session.scope[BrowserPerception]
         await observe.capture()
 
         async def click(_tab):
-            await browser.input.mouse.click(Point(x=60, y=30))
+            await session.scope[Input].mouse.click(Point(x=60, y=30))
             return Effect("Clicked.")
 
         await session.scope[Actions].run(kind=ActionKind.CLICK, operation=click)
@@ -247,7 +248,7 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
         ),
     )
     async with agent.session() as session:
-        browser, observe = session.scope[Browser], session.scope[BrowserPerception]
+        observe = session.scope[BrowserPerception]
         await observe.capture()
 
         async def start_ticker(tab):
@@ -284,8 +285,11 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
             kind=ActionKind.CLICK, operation=interact
         )
         assert result.break_chain
-        assert await browser.active_tab.evaluate("box.dataset.clicked") == '"yes"'
-        await browser.active_tab.evaluate("clearInterval(ticker)")
+        assert (
+            await session.scope[Browser].active_tab.evaluate("box.dataset.clicked")
+            == '"yes"'
+        )
+        await session.scope[Browser].active_tab.evaluate("clearInterval(ticker)")
 
 
 def _options(**kwargs):

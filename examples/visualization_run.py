@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 
 from harnessed.kernel import Scope
 
-from browserrig import Browser, Point, wait_for_page
+from browserrig import Browser, Input, Point, wait_for_page
 from browserrig.browser import Tab, screenshot
 from browserrig.choreography import BarTypedEvent, HighlightElementEvent, scenes
 from browserrig.core import ActivityKind, ActivityOutcome, BrowserBar
@@ -27,6 +27,7 @@ class VisualWalkthrough:
     def __init__(self, browser: Browser, ctx: Scope, directory: Path, url: str):
         self.browser = browser
         self.scope = ctx
+        self.input = ctx[Input]
         self.directory = directory
         self.url = url
         self.shots: list[dict[str, str | float]] = []
@@ -67,9 +68,9 @@ class VisualWalkthrough:
     async def compact(self) -> None:
         await wait_for_page(self.tab)
         point, _ = await self._target("#query")
-        await self.browser.input.mouse.click(point)
-        await self.browser.input.keyboard.type_text("Präzision")
-        await self.browser.input.keyboard.press_key("a", hold_control=True)
+        await self.input.mouse.click(point)
+        await self.input.keyboard.type_text("Präzision")
+        await self.input.keyboard.press_key("a", hold_control=True)
         await self.capture("compact", "Compact · complete German keyboard")
 
     async def _target(self, selector: str):
@@ -97,9 +98,9 @@ class VisualWalkthrough:
 
     async def _pointer(self) -> None:
         point = await self._highlight("#open")
-        await self.browser.input.mouse.move_to(point)
+        await self.input.mouse.move_to(point)
         await self.capture("pointer", "Pointer · precise target corners")
-        await self.browser.input.mouse.click(point)
+        await self.input.mouse.click(point)
         assert (
             json.loads(
                 await self.tab.evaluate("document.querySelector('#open').textContent")
@@ -109,9 +110,9 @@ class VisualWalkthrough:
 
     async def _keyboard(self) -> None:
         point = await self._highlight("#query")
-        await self.browser.input.mouse.click(point)
-        await self.browser.input.keyboard.type_text("Präzise Browser-Eingaben")
-        await self.browser.input.keyboard.press_key("a", hold_control=True)
+        await self.input.mouse.click(point)
+        await self.input.keyboard.type_text("Präzise Browser-Eingaben")
+        await self.input.keyboard.press_key("a", hold_control=True)
         await self.capture("keyboard", "German keyboard · native Ctrl + A")
         assert (
             json.loads(
@@ -122,9 +123,9 @@ class VisualWalkthrough:
 
     async def _scroll(self) -> None:
         point = Point(x=950, y=480)
-        await self.browser.input.mouse.move_to(point)
+        await self.input.mouse.move_to(point)
         await self._during(
-            self.browser.input.mouse.scroll(delta_y=580, point=point),
+            self.input.mouse.scroll(delta_y=580, point=point),
             "scroll",
             "Scroll · direction and wheel",
             0.08,
@@ -146,7 +147,7 @@ class VisualWalkthrough:
         )
 
     async def _files(self) -> None:
-        await self.browser.input.mouse.scroll(delta_y=-1800, point=Point(x=950, y=480))
+        await self.input.mouse.scroll(delta_y=-1800, point=Point(x=950, y=480))
         completed = asyncio.get_running_loop().create_future()
 
         async def received(event: DownloadCompletedEvent):
@@ -156,9 +157,9 @@ class VisualWalkthrough:
         remove = self.scope.on(DownloadCompletedEvent, received)
         try:
             download, _ = await self._target("#download")
-            await self.browser.input.mouse.click(download)
+            await self.input.mouse.click(download)
             upload = await self._highlight("#upload")
-            await self.browser.input.mouse.click(upload)
+            await self.input.mouse.click(upload)
             path = self.directory / "session-notes.txt"
             path.write_text("Browserrig native upload proof.\n", encoding="utf-8")
             intent = UploadIntent(paths=(str(path.resolve()),), point=upload)
@@ -227,7 +228,7 @@ class VisualWalkthrough:
         await self.browser.tabs.close(current)
 
     async def _thinking(self) -> None:
-        await self.browser.input.mouse.move_to(Point(x=840, y=230))
+        await self.input.mouse.move_to(Point(x=840, y=230))
         started = monotonic()
         await self.tab.emit(
             ActivityStartedEvent(

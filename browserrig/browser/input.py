@@ -4,18 +4,30 @@ import asyncio
 from collections.abc import Coroutine
 from typing import TYPE_CHECKING, Any, Literal
 
-from cdpify.domains.input import MouseButton
+from cdpify.domains.input import MouseButton as CdpMouseButton
 
 from browserrig.core import CursorStyle, MouseEventKind, Point
 from browserrig.events import InputEvent
-from browserrig.input import KeyEventType
+from browserrig.input import InputTarget, KeyEventType, MouseButton
 from browserrig.scripts import CURSOR, CursorArgs
 
 if TYPE_CHECKING:
     from .tab import Tab
+    from .tabs import Tabs
 
 # A cursor shape is presentation only and must never hold up input.
 _CURSOR_PROBE_SECONDS = 0.25
+
+
+class ChromeInputTargets:
+    """Expose Chrome's focused transport without owning the input devices."""
+
+    def __init__(self, tabs: Tabs) -> None:
+        self._tabs = tabs
+
+    def focused(self) -> InputTarget | None:
+        tab = self._tabs.focused()
+        return None if tab is None else tab.input
 
 
 class CdpInput:
@@ -73,7 +85,7 @@ class CdpInput:
                 x=point.x,
                 y=point.y,
                 modifiers=modifiers,
-                button=button,
+                button=CdpMouseButton(button),
                 buttons=buttons,
                 click_count=click_count,
             )

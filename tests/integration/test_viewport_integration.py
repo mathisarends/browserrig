@@ -12,6 +12,8 @@ from harnessed.testing import CallbackModel
 from browserrig import (
     Actions,
     Agent,
+    Browser,
+    BrowserPerception,
     Chrome,
     ChromeBrowser,
     DomCapture,
@@ -77,12 +79,12 @@ async def test_dom_preparation_frames_forms_avoids_jitter_and_keeps_pinned_contr
         <button id=pinned>Pinned</button>"""
 
     class Prepare(Plugin, needs=(Actions,)):
-        _setup_actions = needs(Actions)
+        _setup_browser = needs(Browser)
 
         async def setup(self, _scope):
-            actions = self._setup_actions
-            holder["actions"] = actions
-            tab = actions.browser.active_tab
+            browser = self._setup_browser
+            holder["browser"] = browser
+            tab = browser.active_tab
             await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
             await evaluate(
                 tab,
@@ -109,7 +111,7 @@ async def test_dom_preparation_frames_forms_avoids_jitter_and_keeps_pinned_contr
     ]
 
     async def respond(request):
-        tab = holder["actions"].browser.active_tab
+        tab = holder["browser"].active_tab
         positions.append(await evaluate(tab, "scrollY"))
         index = len(positions) - 1
         if index == len(calls):
@@ -130,7 +132,7 @@ async def test_dom_preparation_frames_forms_avoids_jitter_and_keeps_pinned_contr
         )
         assert result.text == "Done"
         _assert_tools_succeeded(result)
-        tab = holder["actions"].browser.active_tab
+        tab = holder["browser"].active_tab
         assert (
             await evaluate(tab, "document.querySelector('#field').value") == "Prepared"
         )
@@ -168,18 +170,18 @@ async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
         Nested target</button></div></div>"""
 
     class Prepare(Plugin, needs=(Actions,)):
-        _setup_actions = needs(Actions)
+        _setup_browser = needs(Browser)
 
         async def setup(self, _scope):
-            actions = self._setup_actions
-            holder["actions"] = actions
+            browser = self._setup_browser
+            holder["browser"] = browser
             await evaluate(
-                actions.browser.active_tab,
+                browser.active_tab,
                 f"document.body.innerHTML = {json.dumps(markup)}",
             )
             if modal:
                 await evaluate(
-                    actions.browser.active_tab,
+                    browser.active_tab,
                     """
                     document.documentElement.style.overflow = 'hidden';
                     document.body.style.cssText = 'margin:0;height:100vh;overflow:hidden';
@@ -190,7 +192,7 @@ async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
                 )
             if horizontal_only:
                 await evaluate(
-                    actions.browser.active_tab,
+                    browser.active_tab,
                     """
                     document.querySelector('#outer').style.overflowY = 'hidden';
                     document.querySelector('button').style.top = '100px';
@@ -218,7 +220,7 @@ async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
         result = await session.run("Click the clipped nested target", max_steps=2)
         assert result.text == "Done"
         _assert_tools_succeeded(result)
-        tab = holder["actions"].browser.active_tab
+        tab = holder["browser"].active_tab
         assert await evaluate(tab, "document.body.dataset.clicked") == "true"
         inner_y = await evaluate(tab, "document.querySelector('#outer').scrollTop")
         assert inner_y > 0 if modal and not horizontal_only else inner_y == 0
@@ -237,14 +239,14 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(
     holder = {}
 
     class Prepare(Plugin, needs=(Actions,)):
-        _setup_actions = needs(Actions)
+        _setup_browser = needs(Browser)
 
         async def setup(self, _scope):
-            actions = self._setup_actions
-            holder["actions"] = actions
+            browser = self._setup_browser
+            holder["browser"] = browser
             origin = site.replace("127.0.0.1", "localhost") if cross_origin else site
             await evaluate(
-                actions.browser.active_tab,
+                browser.active_tab,
                 "document.body.style.height='5000px';"
                 "document.querySelector('iframe').style.cssText="
                 "'position:absolute;top:calc(100vh - 80px);left:100px;width:600px;height:240px';"
@@ -254,14 +256,14 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(
             )
             if oversized:
                 await evaluate(
-                    actions.browser.active_tab,
+                    browser.active_tab,
                     """
                     document.querySelector('iframe').style.cssText =
                         'position:absolute;top:100px;left:0;width:100vw;height:2400px;border:0';
                 """,
                 )
-                height = await evaluate(actions.browser.active_tab, "innerHeight")
-                frames = await actions.browser.active_tab.frames()
+                height = await evaluate(browser.active_tab, "innerHeight")
+                frames = await browser.active_tab.frames()
                 child = next(frame for frame in frames if frame.parent is not None)
                 await evaluate(
                     child,
@@ -289,12 +291,13 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(
         result = await session.run("Click the target in an edge frame", max_steps=2)
         assert result.text == "Done"
         _assert_tools_succeeded(result)
-        actions = holder["actions"]
-        tab = actions.browser.active_tab
+        browser = holder["browser"]
+        observe = session.scope[BrowserPerception]
+        tab = browser.active_tab
         element = next(
-            el for el in actions.observe.snapshot.elements if el.name == "Frame button"
+            el for el in observe.snapshot.elements if el.name == "Frame button"
         )
-        frame = (await actions.observe.element(tab, element.ref)).frame
+        frame = (await observe.element(tab, element.ref)).frame
         assert await evaluate(frame, "document.body.dataset.clicked") == "true"
         assert await evaluate(tab, "scrollY") > 0
 
@@ -303,13 +306,13 @@ async def test_dom_preparation_reaches_target_despite_prevented_wheel(site):
     holder = {}
 
     class Prepare(Plugin, needs=(Actions,)):
-        _setup_actions = needs(Actions)
+        _setup_browser = needs(Browser)
 
         async def setup(self, _scope):
-            actions = self._setup_actions
-            holder["actions"] = actions
+            browser = self._setup_browser
+            holder["browser"] = browser
             await evaluate(
-                actions.browser.active_tab,
+                browser.active_tab,
                 """
                 document.body.innerHTML =
                     '<button style="position:absolute;top:calc(100vh - 6px)" ' +
@@ -344,7 +347,7 @@ async def test_dom_preparation_reaches_target_despite_prevented_wheel(site):
         ]
         assert len(receipts) == 1 and not receipts[0].result.is_error
         assert "Auto-scrolled page" in receipts[0].result.text
-        tab = holder["actions"].browser.active_tab
+        tab = holder["browser"].active_tab
         assert await evaluate(tab, "scrollY") > 0
         assert await evaluate(tab, "document.body.dataset.clicked") == "true"
 

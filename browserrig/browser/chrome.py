@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections.abc import Callable
 from contextlib import AsyncExitStack
 from typing import Any, Self
 from uuid import uuid4
@@ -32,18 +33,19 @@ from cdpify.domains.target import (
     TargetInfoChangedEvent,
 )
 
-from browserrig.core import BrowserClosed, BrowserError
+from browserrig.core import BrowserClosed, BrowserError, TabDispatch
 from browserrig.events import (
     ConnectedEvent,
     DisconnectedEvent,
 )
 from browserrig.files import Download, FileTransfer
-from browserrig.input import Input, InputTarget
+from browserrig.input import InputTargets
 
 from .base import BrowserEvents, EventSink, _discard
 from .config import BrowserOptions, CdpEndpoint, Launch
 from .downloads import Downloads
 from .guard import NavigationGuard
+from .input import ChromeInputTargets
 from .policy import NavigationPolicy
 from .tab import Tab, TabListener
 from .tabs import Tabs
@@ -81,6 +83,8 @@ class ChromeBrowser:
         emit: EventSink = _discard,
         on_tab_change: TabListener | None = None,
         navigation_policy: NavigationPolicy | None = None,
+        current_action: Callable[[], str] = str,
+        change_tab: TabDispatch | None = None,
     ) -> None:
         self._options = options if options is not None else Launch()
         self.id = uuid4().hex
@@ -96,16 +100,16 @@ class ChromeBrowser:
         self._tasks: list[asyncio.Task[None]] = []
         self._failure: Exception | None = None
         self._connected = False
-        # One mouse and keyboard for the whole browser, aimed at the active tab.
-        self.input = Input(self._focused_input)
         self.tabs = Tabs(
             self._options,
-            self.input,
             check=self._check,
             emit=self.events.emit,
             on_change=on_tab_change,
             guard=self._guard,
+            current_action=current_action,
+            change_tab=change_tab,
         )
+        self.input_targets: InputTargets = ChromeInputTargets(self.tabs)
         self._close_task: asyncio.Task[None] | None = None
         self.client: CdpClient
 
@@ -199,10 +203,6 @@ class ChromeBrowser:
             raise BrowserError(
                 "Browser event listener failed; reconnect before continuing"
             ) from self._failure
-
-    def _focused_input(self) -> InputTarget | None:
-        tab = self.tabs.focused()
-        return None if tab is None else tab.input
 
     def _start_listeners(self) -> None:
         for event_type in _EVENTS:

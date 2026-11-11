@@ -12,12 +12,14 @@ from browserrig.scripts import SelectionResult
 
 from .effects import Effect
 from .execution import Actions
+from .targeting import Targeting
 
 
 class FormTools(Plugin):
     # Batching form fields is covered by the action-chain instructions of Actions.
     _elements = needs(DomElements)
     _actions = needs(Actions)
+    _targets = needs(Targeting)
 
     @tool(
         kind=ActionKind.SELECT,
@@ -31,11 +33,7 @@ class FormTools(Plugin):
     ) -> Effect:
         tab = self._actions.tab
         await self._elements.resolve(tab, ref)
-        point = await self._actions.element_point(ref=ref)
-        await self._actions.browser.input.mouse.move_to(point)
-        current = await self._actions.element_point(ref=ref, scroll=False)
-        if (current.x, current.y) != (point.x, point.y):
-            await self._actions.browser.input.mouse.move_to(current)
+        point = await self._targets.hover(ref=ref, tab=tab)
         handle = await self._elements.resolve(tab, ref)
         await handle.select(value)
         return Effect("Option selected.", prepared_scroll=point.scrolled)
@@ -59,11 +57,7 @@ class FormTools(Plugin):
         tab = self._actions.tab
         handle = await self._elements.resolve(tab, ref)
         await handle.validate_options(values)
-        point = await self._actions.element_point(ref=ref)
-        await self._actions.browser.input.mouse.move_to(point)
-        current = await self._actions.element_point(ref=ref, scroll=False)
-        if (current.x, current.y) != (point.x, point.y):
-            await self._actions.browser.input.mouse.move_to(current)
+        point = await self._targets.hover(ref=ref, tab=tab)
         handle = await self._elements.resolve(tab, ref)
         await handle.validate_options(values)
         result = await handle.select_options(values)
@@ -100,11 +94,7 @@ class FormTools(Plugin):
             "week",
         }:
             raise BrowserError("Element is not a native date/time input")
-        point = await self._actions.element_point(ref=ref)
-        await self._actions.browser.input.mouse.move_to(point)
-        current = await self._actions.element_point(ref=ref, scroll=False)
-        if (current.x, current.y) != (point.x, point.y):
-            await self._actions.browser.input.mouse.move_to(current)
+        point = await self._targets.hover(ref=ref, tab=tab)
         handle = await self._elements.resolve(tab, ref)
         await handle.set_value(value)
         return Effect(

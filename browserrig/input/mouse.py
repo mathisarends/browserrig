@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from time import monotonic
 from typing import Literal
 
-from cdpify.domains.input import MouseButton
 from harnessed.tracing import traced
 
 from browserrig.core import BrowserError, CursorStyle, MouseEventKind, Point, TabGesture
@@ -23,7 +22,7 @@ from browserrig.events import (
 from .motor import Motor
 from .pointer import CursorPath
 from .presenter import Presenter
-from .target import Focus, InputTarget, focused
+from .target import Focus, InputTarget, MouseButton, focused
 from .wheel import FRAME_SECONDS, wheel_duration, wheel_progress
 
 type Emit = Callable[[InputTarget, InputEvent], Awaitable[None]]
@@ -96,14 +95,20 @@ class Mouse:
                 action_id=action_id,
             )
         await switch()
+        await self.resume(enter=source is not None)
+
+    async def resume(self, *, enter: bool = False) -> None:
+        """Restore the pointer in the focused target, landing once in new targets."""
         target = focused(self._focus)
         rest = self._rest(target)
         if not rest.placed:
             motor = self._motor()
             width, height = await target.viewport_size()
             rest.position = motor.landing(width, height)
-        if source is not None:
-            await presenter.enter(target, rest.position, action_id=action_id)
+        if enter:
+            await self._presenter().enter(
+                target, rest.position, action_id=self._action_id()
+            )
         # The renderer learns where the pointer is, so hover state matches the viewer.
         await self._dispatch(target, MouseEventKind.MOVED, rest.position)
         rest.placed = True
@@ -131,7 +136,6 @@ class Mouse:
         """Click at `point`; `modifiers` are the flags of keys held meanwhile."""
         target = focused(self._focus)
         await self._move(target, point)
-        mouse_button = MouseButton(button)
         buttons = 2 if button == "right" else 1
         motor = self._motor()
         for click_count in range(1, count + 1):
@@ -141,7 +145,7 @@ class Mouse:
                     target,
                     MouseEventKind.PRESSED,
                     point,
-                    button=mouse_button,
+                    button=button,
                     buttons=buttons,
                     click_count=click_count,
                     modifiers=modifiers,
@@ -153,7 +157,7 @@ class Mouse:
                     target,
                     MouseEventKind.RELEASED,
                     point,
-                    button=mouse_button,
+                    button=button,
                     buttons=0,
                     click_count=click_count,
                     modifiers=modifiers,
@@ -328,7 +332,7 @@ class Mouse:
         ],
         point: Point,
         *,
-        button: MouseButton = MouseButton.LEFT,
+        button: MouseButton = "left",
         buttons: int = 0,
         click_count: int = 0,
         modifiers: int = 0,
@@ -336,9 +340,7 @@ class Mouse:
         await target.dispatch_mouse(
             kind,
             point,
-            button=button
-            if buttons or kind is MouseEventKind.RELEASED
-            else MouseButton.NONE,
+            button=button if buttons or kind is MouseEventKind.RELEASED else "none",
             buttons=buttons,
             click_count=click_count,
             modifiers=modifiers,
@@ -360,9 +362,7 @@ class Mouse:
         )
         await self._emit(
             target,
-            event_type(
-                x=point.x, y=point.y, click_count=click_count, button=button.value
-            ),
+            event_type(x=point.x, y=point.y, click_count=click_count, button=button),
         )
 
     def _rest(self, target: InputTarget) -> _Rest:

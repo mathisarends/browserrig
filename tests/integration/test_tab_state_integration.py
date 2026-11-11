@@ -8,7 +8,7 @@ from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Chrome, browser_plugins
+from browserrig import Chrome, InputRuntime, Runtime, browser_plugins
 from browserrig.browser import Browser, Launch
 from browserrig.choreography import TabStrip
 from browserrig.events import NavigationStartedEvent, TabOpenedEvent, TabUpdatedEvent
@@ -70,7 +70,10 @@ async def icon_site_fixture() -> AsyncIterator[str]:
 
 
 async def test_tab_updates_carry_loading_title_and_icons(icon_site):
-    agent = Agent(model=ScriptedModel(["Done"]), plugins=[Chrome(Launch()), TabStrip()])
+    agent = Agent(
+        model=ScriptedModel(["Done"]),
+        plugins=[Runtime(), InputRuntime(), Chrome(Launch()), TabStrip()],
+    )
     events: list[TabUpdatedEvent] = []
     async with agent.session() as session:
 

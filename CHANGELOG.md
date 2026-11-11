@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Move input ownership from Chrome into explicit Runtime and InputRuntime plugins.
+  Chrome provides input-target transports; devices, pacing and presentation use
+  Input directly. Share task-local action correlation independently of devices.
+  Decouple tab operations through ChangeTab hooks and lifecycle events, including
+  cursor restoration and cleanup. Add Targeting for reference location and bounded
+  hover preparation; remove Actions' browser/perception/readiness forwarding.
+  Manual compositions and low-level input callers must migrate as documented in
+  docs/browser-composition.md.
+
 - Shorten agent-facing tool descriptions, move parameter details to their schema
   and share file workflows through plugin instructions. Remove `zoom` from the
   screenshot tool; cropped screenshots retain their coordinate mapping.

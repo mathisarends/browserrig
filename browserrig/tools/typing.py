@@ -8,19 +8,22 @@ from pydantic import Field
 from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
-from browserrig.input import TypedText
+from browserrig.input import Input, TypedText
 from browserrig.observation import DomElementHandle, DomElements
 from browserrig.secrets import Secrets
 
 from .effects import Effect
 from .execution import Actions
+from .targeting import Targeting
 
 
 class DomTypingTools(Plugin):
     """Address and verify DOM fields using the shared keyboard and motor."""
 
     _actions = needs(Actions)
+    _targets = needs(Targeting)
     _browser = needs(Browser)
+    _input = needs(Input)
     _elements = needs(DomElements)
     _secrets = observes(Secrets)
 
@@ -39,10 +42,7 @@ class DomTypingTools(Plugin):
     ) -> Effect:
         tab = self._actions.tab
         await self._elements.resolve(tab, ref)
-        point = await self._actions.element_point(ref=ref)
-        await self._browser.input.mouse.move_to(point)
-        # Hover may reveal an overlay over the field; hit-test before focusing it.
-        await self._actions.element_point(ref=ref, scroll=False)
+        await self._targets.hover(ref=ref, tab=tab)
         field = await self._elements.resolve(tab, ref)
         secrets = self._secrets
         # Check the secrets' domains before the field is touched.
@@ -57,13 +57,11 @@ class DomTypingTools(Plugin):
         before = await field.text_state()
         # Backspace on an empty token input can select/remove its preceding chip.
         if clear and (before is None or before.value):
-            await self._browser.input.keyboard.press_key("Backspace")
+            await self._input.keyboard.press_key("Backspace")
         await guard()
         if entry is not None and secrets is not None:
-            return _secret_entered(
-                await secrets.enter(entry, self._browser.input.keyboard)
-            )
-        typed = await self._browser.input.keyboard.type_text(text, guard=guard)
+            return _secret_entered(await secrets.enter(entry, self._input.keyboard))
+        typed = await self._input.keyboard.type_text(text, guard=guard)
         after = await field.text_state()
         expected = typed.entered if clear else None
         if (

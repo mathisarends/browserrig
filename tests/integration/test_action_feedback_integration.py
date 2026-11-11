@@ -12,6 +12,7 @@ from browserrig import (
     Browser,
     BrowserPerception,
     Chrome,
+    Input,
     InputPacing,
     InputVisualization,
     wait_for_page,
@@ -115,13 +116,13 @@ async def test_click_failure_after_native_input_keeps_uncertainty(site, monkeypa
                 "licked=0;target.onclick=()=>window.clicked++"
             ),
         )
-        click = browser.input.mouse.click
+        click = session.scope[Input].mouse.click
 
         async def click_then_fail(*args, **kwargs):
             await click(*args, **kwargs)
             raise BrowserError("Follow-up failed after native click")
 
-        monkeypatch.setattr(browser.input.mouse, "click", click_then_fail)
+        monkeypatch.setattr(session.scope[Input].mouse, "click", click_then_fail)
         result = await session.run("Click Target")
         assert await evaluate(tab, "window.clicked") == 1
     (reply,) = [

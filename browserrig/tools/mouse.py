@@ -15,10 +15,12 @@ from pydantic import Field
 from browserrig.browser import Browser
 from browserrig.core import ActionKind, BrowserError, Point
 from browserrig.core import browser_tool as tool
+from browserrig.input import Input
 from browserrig.observation import BrowserPerception, CapturedImage, Snapshot
 
 from .effects import Effect
 from .execution import Actions
+from .targeting import Targeting
 
 type _ClickCount = Annotated[
     Literal[1, 2],
@@ -49,8 +51,10 @@ class PointerTools(Plugin):
     """
 
     _browser = needs(Browser)
+    _input = needs(Input)
     _observe = needs(BrowserPerception)
     _actions = needs(Actions)
+    _targets = needs(Targeting)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
@@ -71,15 +75,15 @@ class PointerTools(Plugin):
             raise ToolError("Provide ref, or both x and y")
 
         if ref is not None:
-            point = await self._actions.element_point(ref=ref)
-            await self._browser.input.mouse.move_to(point)
+            point = await self._targets.locate(ref=ref)
+            await self._input.mouse.move_to(point)
             return Effect(
                 "Cursor moved onto the ref without clicking.",
                 prepared_scroll=point.scrolled,
             )
         assert x is not None and y is not None
         point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
-        await self._browser.input.mouse.move_to(point)
+        await self._input.mouse.move_to(point)
         return Effect("Cursor moved without clicking.")
 
     @tool(
@@ -99,9 +103,9 @@ class PointerTools(Plugin):
         point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
         if new_tab:
             # Arrive first, so the key is held for the click alone.
-            await self._browser.input.mouse.move_to(point)
+            await self._input.mouse.move_to(point)
         async with self._new_tab_keys(new_tab) as modifiers:
-            await self._browser.input.mouse.click(
+            await self._input.mouse.click(
                 point, count=count, button=button, modifiers=modifiers
             )
         return Effect(
@@ -122,7 +126,7 @@ class PointerTools(Plugin):
             float, Field(ge=0.05, le=5, description="Drag duration in seconds.")
         ] = 0.5,
     ) -> Effect:
-        await self._browser.input.mouse.drag(
+        await self._input.mouse.drag(
             start=_image_point(self._observe.coordinate_source(), start),
             end=_image_point(self._observe.coordinate_source(), end),
             duration=duration,
@@ -143,8 +147,8 @@ class PointerTools(Plugin):
     ) -> Effect:
         _check_new_tab(new_tab, count, button)
 
-        point = await self._actions.element_point(ref=ref)
-        await self._browser.input.mouse.move_to(point)
+        point = await self._targets.locate(ref=ref)
+        await self._input.mouse.move_to(point)
         if change := await self._actions.page_change(after_input=False):
             return Effect(
                 f"Hover changed the page: {change} The click was not dispatched. "
@@ -153,12 +157,12 @@ class PointerTools(Plugin):
                 break_chain=True,
             )
         # Hover may reveal an overlay or move the target; hit-test again.
-        current = await self._actions.element_point(ref=ref, scroll=False)
+        current = await self._targets.locate(ref=ref, scroll=False)
         if new_tab:
             # Arrive first, so the key is held for the click alone.
-            await self._browser.input.mouse.move_to(current)
+            await self._input.mouse.move_to(current)
         async with self._new_tab_keys(new_tab) as modifiers:
-            await self._browser.input.mouse.click(
+            await self._input.mouse.click(
                 current, count=count, button=button, modifiers=modifiers
             )
         return Effect(
@@ -183,15 +187,15 @@ class PointerTools(Plugin):
             float, Field(ge=0.05, le=5, description="Drag duration in seconds.")
         ] = 0.5,
     ) -> Effect:
-        prepared = await self._actions.element_point(ref=source_ref)
-        target = await self._actions.element_point(ref=target_ref)
+        prepared = await self._targets.locate(ref=source_ref)
+        target = await self._targets.locate(ref=target_ref)
         # Revealing is sequential (the second scroll may move the first ref);
         # the final hit-tests are independent.
         start, end = await asyncio.gather(
-            self._actions.element_point(ref=source_ref, scroll=False),
-            self._actions.element_point(ref=target_ref, scroll=False),
+            self._targets.locate(ref=source_ref, scroll=False),
+            self._targets.locate(ref=target_ref, scroll=False),
         )
-        await self._browser.input.mouse.drag(start=start, end=end, duration=duration)
+        await self._input.mouse.drag(start=start, end=end, duration=duration)
         return Effect(
             "Drag dispatched; inspect the destination.",
             prepared_scroll=prepared.scrolled or target.scrolled,
@@ -204,7 +208,7 @@ class PointerTools(Plugin):
             yield 0
             return
         key = await self._browser.tabs.link_modifier()
-        async with self._browser.input.keyboard.hold(key) as modifiers:
+        async with self._input.keyboard.hold(key) as modifiers:
             yield modifiers
 
 

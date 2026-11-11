@@ -11,7 +11,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel
 
-from browserrig import Agent, Browser, Chrome, ChromeBrowser, Done
+from browserrig import Agent, Browser, Chrome, ChromeBrowser, Done, Runtime
 from browserrig.events import ActionStartedEvent, ActivityStartedEvent
 from browserrig.kinds import ActivityKind
 
@@ -40,7 +40,7 @@ async def test_connect_plugin_disconnects_without_stopping_external_browser(
         )
         model = ScriptedModel([])
         agent = (
-            HarnessedAgent(model=model, plugins=[plugin, Access()])
+            HarnessedAgent(model=model, plugins=[Runtime(), plugin, Access()])
             if manual
             else Agent(model=model, browser=plugin, plugins=[Access()])
         )

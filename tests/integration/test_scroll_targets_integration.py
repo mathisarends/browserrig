@@ -12,6 +12,7 @@ from browserrig import (
     Agent,
     Browser,
     Chrome,
+    Input,
     InputPacing,
     InputVisualization,
     wait_for_page,
@@ -50,7 +51,7 @@ async def test_page_scroll_ignores_editor_under_cursor_and_allows_branch_input(
         elif step == 2:
             state = await _positions(tab)
             assert state == {"page_x": 120, "page_y": 650, "editor_x": 0, "editor_y": 0}
-            assert browser.input.mouse.position == Point(x=400, y=250)
+            assert session.scope[Input].mouse.position == Point(x=400, y=250)
             assert await evaluate(tab, "window.wheels") == []
             ref = _ref(request, "Target Branch")
             yield ModelChunk(
@@ -59,7 +60,11 @@ async def test_page_scroll_ignores_editor_under_cursor_and_allows_branch_input(
         else:
             yield ModelChunk(text="Done")
 
-    async with _editor_session(site, CallbackModel(respond)) as (session, browser, tab):
+    async with _editor_session(site, CallbackModel(respond)) as (
+        session,
+        _browser,
+        tab,
+    ):
         result = await session.run("Scroll the page and enter the branch", max_steps=3)
         receipts = _receipts(result)
         assert result.text == "Done" and len(receipts) == 2
@@ -89,7 +94,7 @@ async def test_element_scroll_moves_only_container_and_preserves_cursor(site):
 
     async with _editor_session(site, CallbackModel(respond)) as (
         session,
-        browser,
+        _browser,
         tab,
     ):
         result = await session.run("Scroll the editor", max_steps=2)
@@ -101,7 +106,7 @@ async def test_element_scroll_moves_only_container_and_preserves_cursor(site):
         assert state["editor_x"] == 120
         assert state["editor_y"] == pytest.approx(180, abs=1)
         assert "Element scrolled from x=0, y=0 to x=120, y=180" in receipts[0].text
-        assert browser.input.mouse.position == Point(x=400, y=250)
+        assert session.scope[Input].mouse.position == Point(x=400, y=250)
         assert await evaluate(tab, "window.wheels") == []
 
 
@@ -243,7 +248,7 @@ async def test_page_scroll_respects_page_scroll_locks(site, overflow):
 async def test_page_scroll_does_not_scroll_iframe_under_cursor(site):
     async with _editor_session(
         site, ScriptedModel([call("scroll_page", delta_y=400), "Done"])
-    ) as (session, browser, tab):
+    ) as (session, _browser, tab):
         await evaluate(
             tab,
             """document.querySelector('#editor').remove();
@@ -253,7 +258,7 @@ async def test_page_scroll_does_not_scroll_iframe_under_cursor(site):
             document.body.appendChild(frame);""",
         )
         await wait_for_page(tab)
-        await browser.input.mouse.move_to(Point(x=400, y=250))
+        await session.scope[Input].mouse.move_to(Point(x=400, y=250))
         result = await session.run("Scroll the outer page", max_steps=2)
         receipts = _receipts(result)
         assert len(receipts) == 1 and not receipts[0].is_error
@@ -319,7 +324,7 @@ async def _editor_session(site, model):
         await wait_for_page(tab)
         await evaluate(tab, f"document.body.innerHTML={json.dumps(_EDITOR)}")
         await wait_for_page(tab)
-        await browser.input.mouse.move_to(Point(x=400, y=250))
+        await session.scope[Input].mouse.move_to(Point(x=400, y=250))
         await evaluate(
             tab,
             "window.wheels=[];document.addEventListener('wheel',e=>window.wheels.push(e.isTrusted))",

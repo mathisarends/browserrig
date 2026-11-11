@@ -1,12 +1,11 @@
 from collections.abc import Callable
 from typing import Literal, Protocol
 
-from cdpify.domains.input import MouseButton
-
 from browserrig.core import BrowserError, CursorStyle, MouseEventKind, Point
 from browserrig.events import InputEvent
 
 type KeyEventType = Literal["keyDown", "keyUp", "rawKeyDown", "char"]
+type MouseButton = Literal["none", "left", "middle", "right", "back", "forward"]
 
 
 class InputTarget(Protocol):
@@ -59,6 +58,12 @@ class InputTarget(Protocol):
 
 # Transport for the browser's currently focused tab, or None while none has focus.
 type Focus = Callable[[], InputTarget | None]
+
+
+class InputTargets(Protocol):
+    """The backend's focused input transport, independent of its browser API."""
+
+    def focused(self) -> InputTarget | None: ...
 
 
 def focused(focus: Focus) -> InputTarget:

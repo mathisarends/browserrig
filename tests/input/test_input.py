@@ -23,7 +23,7 @@ from browserrig.choreography import (
     scenes,
 )
 from browserrig.choreography.scenes import Scene
-from browserrig.core import BrowserError, Point
+from browserrig.core import ActionContext, BrowserError, Point
 from browserrig.events import (
     INPUT_EVENTS,
     CursorMovedEvent,
@@ -57,15 +57,16 @@ async def test_mouse_and_keyboard_share_action_correlation_without_sharing_curso
     monkeypatch,
 ):
     monkeypatch.setattr(mouse_module.asyncio, "sleep", AsyncMock())
-    devices, _tab, events, _ = _rig()
-    with devices.action("shared-action"):
+    actions = ActionContext()
+    devices, _tab, events, _ = _rig(actions=actions)
+    with actions.activate("shared-action"):
         await devices.mouse.click(Point(x=120, y=80))
         await devices.keyboard.type_text("x")
     assert devices.mouse.position == Point(x=120, y=80)
     assert any(isinstance(event, PointerPressedEvent) for event in events)
     assert any(isinstance(event, KeyPressedEvent) for event in events)
     assert all(event.action_id == "shared-action" for event in events)
-    assert devices._action_id == ""
+    assert actions.action_id == ""
 
 
 @pytest.mark.parametrize("button,mask", [("left", 1), ("right", 2)])
@@ -138,9 +139,10 @@ async def test_exact_typing_emits_ordered_correlated_keys_without_persistable_te
 ):
     sleep = AsyncMock()
     monkeypatch.setattr(keyboard_module.asyncio, "sleep", sleep)
-    devices, tab, events, commands = _rig()
+    actions = ActionContext()
+    devices, tab, events, commands = _rig(actions=actions)
     tab.document_id = "document-1"
-    with devices.action("action-1"):
+    with actions.activate("action-1"):
         await devices.keyboard.type_text("A+ä🙂\t")
     assert [
         command["text"] for command in commands if command["type"] == "char"
@@ -153,7 +155,7 @@ async def test_exact_typing_emits_ordered_correlated_keys_without_persistable_te
         for event in events
     )
     assert all(event.action_id == "action-1" for event in events)
-    assert devices._action_id == ""
+    assert actions.action_id == ""
     assert sleep.await_count == len(keys)
     assert all(call.args == (0.05,) for call in sleep.await_args_list)
     assert isinstance(events[0], KeyboardVisibilityEvent) and events[0].visible
@@ -278,7 +280,7 @@ async def test_send_keys_rejects_ambiguous_arguments_before_dispatch(arguments):
 async def test_send_keys_distinguishes_literal_text_from_named_keys(monkeypatch):
     monkeypatch.setattr(keyboard_module.asyncio, "sleep", AsyncMock())
     devices, _tab, events, commands = _rig()
-    tools = SimpleNamespace(_browser=SimpleNamespace(input=devices), _secrets=None)
+    tools = SimpleNamespace(_input=devices, _secrets=None)
     await KeyboardTools.send_keys(tools, text="Escape")
     assert [
         command["text"] for command in commands if command["type"] == "char"
@@ -396,17 +398,20 @@ def _rest(devices, tab, point):
     rest.position, rest.placed = point, True
 
 
-def _devices(focus: Callable[[], Tab | None]) -> Input:
+def _devices(focus: Callable[[], Tab | None], *, actions=None) -> Input:
     """Input paced like a person and watched by people, so it is reported."""
-    devices = Input(lambda: None if (tab := focus()) is None else tab.input)
+    devices = Input(
+        lambda: None if (tab := focus()) is None else tab.input,
+        action_id=str if actions is None else lambda: actions.action_id,
+    )
     devices.pace(HumanMotor())
     devices.present(Stage())
     return devices
 
 
-def _rig(*, dispatch=None):
+def _rig(*, dispatch=None, actions=None):
     tab, events, commands = _tab(dispatch=dispatch)
-    return _devices(lambda: tab), tab, events, commands
+    return _devices(lambda: tab, actions=actions), tab, events, commands
 
 
 def _tab(target_id="tab-1", *, dispatch=None, events=None, viewport=(1000, 600)):
@@ -468,14 +473,15 @@ async def test_tab_switch_presses_the_tab_then_enters_the_new_page(monkeypatch):
     first, _, first_commands = _tab("first", events=events)
     second, _, second_commands = _tab("second", events=events)
     focus = {"tab": first}
-    devices = _devices(lambda: focus["tab"])
+    actions = ActionContext()
+    devices = _devices(lambda: focus["tab"], actions=actions)
     _rest(devices, first, Point(x=100, y=80))
 
     async def switch():
         events.append("switched")
         focus["tab"] = second
 
-    with devices.action("switch-1"):
+    with actions.activate("switch-1"):
         await devices.mouse.switch_tab(TabGesture.ACTIVATE, "second", switch)
     assert len(events) == 4
     pressed, switched, entered, landed = events[0], events[1], events[2], events[3]
@@ -838,7 +844,7 @@ async def test_send_keys_reports_a_slip_that_stayed():
     devices, _tab, _events, _commands = _rig()
     devices.pace(_Slipping("h", "e", "l", "o"))
 
-    tools = SimpleNamespace(_browser=SimpleNamespace(input=devices), _secrets=None)
+    tools = SimpleNamespace(_input=devices, _secrets=None)
     reply = await KeyboardTools.send_keys(tools, text="hello")
     assert "typed 'helo' instead of 'hello'" in reply.text
 

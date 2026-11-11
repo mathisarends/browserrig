@@ -9,11 +9,15 @@ from .motor import (
     Motor,
 )
 from .mouse import Mouse
+from .plugin import InputRuntime
 from .pointer import ControlPoint, CursorPath, movement
 from .presenter import Presenter, Unseen
-from .target import Focus, InputTarget, KeyEventType
+from .target import Focus, InputTarget, InputTargets, KeyEventType, MouseButton
 
 __all__ = [
+    "InputRuntime",
+    "InputTargets",
+    "MouseButton",
     "CENTER",
     "TYPING_INTERVAL_SECONDS",
     "ControlPoint",

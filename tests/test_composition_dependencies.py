@@ -24,6 +24,7 @@ from harnessed.testing import ScriptedModel
 
 import browserrig
 from browserrig import (
+    ActionContext,
     Actions,
     Browser,
     BrowserCoordination,
@@ -34,11 +35,14 @@ from browserrig import (
     FileSystem,
     FileTools,
     FileTransfer,
+    Input,
+    InputRuntime,
     InputVisualization,
     LocalWorkspace,
     MountedWorkspace,
     PageExtractionTools,
     Readiness,
+    Runtime,
     Screenshots,
     ScreenshotTrigger,
     browser_plugins,
@@ -143,15 +147,22 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
         await agent.run("Inspect the page")
     missing = {issue.plugin.name: issue.missing for issue in caught.value.issues}
     assert missing == {
-        "KeyboardTools": (Actions, Browser),
+        "KeyboardTools": (Actions, Browser, Input),
         "Actions": (
             Browser,
+            ActionContext,
             BrowserCoordination,
             BrowserEvents,
             Readiness,
             BrowserPerception,
         ),
-        "DomPerception": (Browser, BrowserCoordination, BrowserEvents, Readiness),
+        "DomPerception": (
+            Browser,
+            Input,
+            BrowserCoordination,
+            BrowserEvents,
+            Readiness,
+        ),
         "Readiness": (BrowserEvents,),
         "DialogTools": (Browser,),
     }
@@ -202,6 +213,7 @@ async def test_browser_dependency_loss_and_replacement_restart_observation_state
             "Readiness": (BrowserEvents,),
             "DomPerception": (
                 Browser,
+                Input,
                 BrowserCoordination,
                 BrowserEvents,
                 Readiness,
@@ -494,7 +506,7 @@ async def test_workspace_changes_replace_transfer_without_reopening_chrome(
 async def test_runtime_browser_sections_need_explicit_context_delivery(fake_chrome):
     agent = Agent(
         model=ScriptedModel(["Mounted", "Unmounted"]),
-        plugins=[Chrome(), Readiness()],
+        plugins=[Runtime(), Chrome(), InputRuntime(), Readiness()],
     )
     async with agent.session() as session:
         fixed_prompt = await session.prompt.render()
@@ -563,6 +575,7 @@ async def test_facade_owns_a_fresh_mcp_stdio_server_per_session(fake_chrome, tmp
 def _provide(ctx, browser):
     removals = (
         ctx.provide(Browser, browser),
+        ctx.provide(Input, Input(browser.input_targets.focused)),
         ctx.provide(BrowserEvents, browser.events),
         ctx.provide(BrowserCoordination, BrowserCoordination()),
     )

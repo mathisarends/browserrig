@@ -84,6 +84,9 @@ class _Tab:
         self._timeline = timeline
         self._frame = _Frame(timeline)
 
+    async def sync_document(self):
+        pass
+
     async def frames(self):
         return (self._frame,)
 
@@ -155,7 +158,7 @@ async def _staged(timeline, *plugins, staging=STAGING, files=None):
             async def show() -> None:
                 browser.active_tab = tab
 
-            await browser.input.mouse.switch_tab(TabGesture.OPEN, "", show)
+            await services.input.mouse.switch_tab(TabGesture.OPEN, "", show)
             return tab
 
         browser.tabs.open = open_tab
@@ -386,7 +389,7 @@ async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
     async with _staged(timeline, _FileTools(), files=files) as (services, ctx):
         services.observe.element = element
         # Already resting on the input, so the pointer does not travel.
-        await services.browser.input.mouse.move_to(Point(x=40, y=30))
+        await services.input.mouse.move_to(Point(x=40, y=30))
         timeline.clear()
         await ctx[_FileTools].upload_files("input", ["report.txt"])
     assert _shown(timeline) == [
@@ -408,14 +411,14 @@ async def test_switching_back_returns_to_where_the_pointer_rested(timeline):
     async with _staged(timeline) as (services, _):
         browser = services.browser
         first = browser.active_tab
-        await browser.input.mouse.move_to(Point(x=10, y=0))
+        await services.input.mouse.move_to(Point(x=10, y=0))
         await browser.tabs.open()
         timeline.clear()
 
         async def back() -> None:
             browser.active_tab = first
 
-        await browser.input.mouse.switch_tab(TabGesture.ACTIVATE, first.id, back)
+        await services.input.mouse.switch_tab(TabGesture.ACTIVATE, first.id, back)
     assert _shown(timeline) == [
         "tab activate 'tab-1' from tab-2 0.45",
         "sleep 0.45",
@@ -428,7 +431,7 @@ async def test_switching_back_returns_to_where_the_pointer_rested(timeline):
 
 async def test_typing_paces_each_key(timeline):
     async with _staged(timeline) as (services, _):
-        await services.browser.input.keyboard.type_text("aB")
+        await services.input.keyboard.type_text("aB")
     assert _shown(timeline) == [
         "keyboard shown",
         "key rawKeyDown a",
@@ -449,7 +452,7 @@ async def test_typing_paces_each_key(timeline):
 
 async def test_pointer_travels_along_an_eased_path(timeline):
     async with _staged(timeline) as (services, _):
-        await services.browser.input.mouse.move_to(Point(x=300, y=0))
+        await services.input.mouse.move_to(Point(x=300, y=0))
     moved, *steps, rested = _shown(timeline)
     # 300 px take 0.05 + 0.075 * log2(16) seconds, at 60 steps per second.
     assert moved == "cursor moves to 300,0 0.35"
@@ -492,8 +495,8 @@ async def test_unstaged_wait_only_waits(timeline):
 
 async def test_unstaged_input_types_and_moves_without_pauses(timeline):
     async with _staged(timeline, staging=()) as (services, _):
-        await services.browser.input.keyboard.type_text("a")
-        await services.browser.input.mouse.move_to(Point(x=300, y=0))
+        await services.input.keyboard.type_text("a")
+        await services.input.mouse.move_to(Point(x=300, y=0))
     assert _shown(timeline) == [
         "key rawKeyDown a",
         "key char a",

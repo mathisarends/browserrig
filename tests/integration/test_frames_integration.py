@@ -17,6 +17,7 @@ from harnessed.testing import CallbackModel
 from browserrig import (
     Actions,
     Browser,
+    BrowserPerception,
     Chrome,
     ChromeBrowser,
     DomCapture,
@@ -163,11 +164,10 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
         assert len(receipts) == 2 and all(
             not event.result.is_error for event in receipts
         )
-        browser, actions = holder["browser"], holder["actions"]
-        entry = next(
-            e for e in actions.observe.snapshot.elements if e.name == "Frame button"
-        )
-        frame = (await actions.observe.element(browser.active_tab, entry.ref)).frame
+        browser = holder["browser"]
+        observe = session.scope[BrowserPerception]
+        entry = next(e for e in observe.snapshot.elements if e.name == "Frame button")
+        frame = (await observe.element(browser.active_tab, entry.ref)).frame
         assert (
             await evaluate(frame, "document.querySelector('input').value")
             == "Across frames"

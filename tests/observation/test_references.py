@@ -18,6 +18,7 @@ from browserrig import (
     PageContent,
     Readiness,
     ScrollStep,
+    Targeting,
     TextContext,
 )
 from browserrig.core import Bounds, BrowserError, ElementPoint, Point, StaleElement
@@ -80,13 +81,11 @@ async def test_backend_locates_live_geometry_and_uses_the_common_motor_aim():
     backend = _Backend()
     motor = _Aiming()
     async with _observed(backend) as env:
-        env.browser.input.pace(motor)
+        env.input.pace(motor)
         backend.objects["shape/a"] = Bounds(x=200, y=100, width=100, height=40)
-        with env.browser.input.action("aim"):
-            point = await env.actions.element_point(tab=env.tab, ref="shape/a")
-            again = await env.actions.element_point(
-                tab=env.tab, ref="shape/a", scroll=False
-            )
+        with env.correlation.activate("aim"):
+            point = await env.targets.locate(tab=env.tab, ref="shape/a")
+            again = await env.targets.locate(tab=env.tab, ref="shape/a", scroll=False)
         assert (point.x, point.y) == (225, 130)
         assert again == point
         assert motor.sizes == [(100, 40)]
@@ -322,7 +321,7 @@ async def test_optional_backend_scroll_plan_runs_through_mouse_wheel_input():
     handle = SimpleNamespace(scroll_step=AsyncMock(side_effect=[step, None]))
     async with _observed(_Backend()) as env:
         scrolled = await prepare_element(
-            env.tab, handle, env.browser.input.mouse, document_id=env.tab.document_id
+            env.tab, handle, env.input.mouse, document_id=env.tab.document_id
         )
         assert scrolled and handle.scroll_step.await_count == 2
         calls = env.tab.dispatch_wheel.await_args_list
@@ -335,9 +334,7 @@ async def test_scroll_plan_is_not_executed_after_navigation():
     handle = SimpleNamespace(scroll_step=AsyncMock())
     async with _observed(_Backend()) as env:
         with pytest.raises(StaleElement, match="Document changed"):
-            await prepare_element(
-                env.tab, handle, env.browser.input.mouse, document_id="old"
-            )
+            await prepare_element(env.tab, handle, env.input.mouse, document_id="old")
         handle.scroll_step.assert_not_awaited()
         env.tab.dispatch_wheel.assert_not_awaited()
 
@@ -481,6 +478,7 @@ async def _observed(backend):
             _MixedPerception(capture=backend, renderer=DomRenderer()),
             TextContext(),
             Actions(),
+            Targeting(),
             _Forms(),
             _Keys(),
             _NativeKeys(),
@@ -512,6 +510,9 @@ async def _observed(backend):
             observe=observe,
             scope=session.scope,
             actions=session.scope[Actions],
+            input=holder["input"],
+            correlation=holder["actions"],
+            targets=session.scope[Targeting],
             events=events,
         )
 

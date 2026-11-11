@@ -27,7 +27,7 @@ class ToolActionError(ToolError):
         self.result = result
 
 
-class ActionContext:
+class InvocationContext:
     """Bind one addressed action to its task and invalidate inherited copies on exit."""
 
     def __init__(self) -> None:

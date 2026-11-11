@@ -19,7 +19,15 @@ from .composition import (  # smelt: ignore[SMT106] -- public facade
     browser_pack,
     browser_plugins,
 )
-from .core import ActionKind, BrowserCoordination, HandoffStatus, Point
+from .core import (
+    ActionContext,
+    ActionKind,
+    BrowserCoordination,
+    ChangeTab,
+    HandoffStatus,
+    Point,
+    Runtime,
+)
 from .files import (
     BrowserDownload,
     FileBridge,
@@ -34,6 +42,7 @@ from .files import (
 )
 from .guardrails import AllowedDomains
 from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanResponse
+from .input import Input, InputRuntime, InputTarget, InputTargets
 from .kinds import MouseEventKind
 from .memory import MemoryAction, TaskMemory, TaskMemoryEvent, TaskMemoryState
 from .nudges import Nudges
@@ -101,12 +110,21 @@ from .tools import (
     PointerTools,
     ScreenshotTools,
     TabTools,
+    Targeting,
     WorkspaceTools,
 )
 
 __version__ = "0.2.0"
 
 __all__ = [
+    "Runtime",
+    "ActionContext",
+    "ChangeTab",
+    "Input",
+    "InputRuntime",
+    "InputTarget",
+    "InputTargets",
+    "Targeting",
     "DomUploadTools",
     "DomPerception",
     "DomElements",
