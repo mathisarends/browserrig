@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add `search_page`, a read-only page search that returns matching table rows
+  with their column headers, list items and paragraphs, including links, without
+  scrolling or saving the page.
 - Add an optional `name` to `extract_content` that saves to
   `pages/<name>/content.md` and replaces an earlier save with that name, so
   `grep` can search the snapshot in the same tool batch.

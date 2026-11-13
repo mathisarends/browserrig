@@ -24,6 +24,7 @@ from .keyboard import KeyboardTools
 from .mouse import PointerTools
 from .navigation import NavigationTools
 from .screenshots import ScreenshotTools
+from .search import PageSearchTools
 from .tabs import TabTools
 from .targeting import Targeting
 from .typing import DomTypingTools
@@ -35,6 +36,7 @@ __all__ = [
     "DomTypingTools",
     "DomScrollTools",
     "PageExtractionTools",
+    "PageSearchTools",
     "ScreenshotTools",
     "PageContentExtracted",
     "PointerTools",

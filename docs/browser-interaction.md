@@ -121,6 +121,14 @@ changes. Model screenshots omit application overlays by default.
 
 ## Page content and search
 
+`search_page(query, alternatives=(), full_page=False, start=0, max_results=20)`
+searches the loaded page text without scrolling or changing it, ignoring case and
+accents. It returns whole records: table rows under their column header, innermost
+list items and paragraphs, grouped by section heading and with their links. The
+first line gives the total; continue with `start` when more records match. Searches
+are read-only, so several can run in one response. Like extraction, it does not
+load lazy content or read canvas pixels, and secrets are redacted before matching.
+
 `extract_content(full_page=False, name=None)` saves loaded content to
 `pages/<id>/content.md`, with provenance in `source.json`. With `name`, it saves to
 `pages/<name>/content.md` and replaces an earlier save with that name, so a `grep`

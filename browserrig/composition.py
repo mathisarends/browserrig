@@ -35,6 +35,7 @@ from .tools import (
     KeyboardTools,
     NavigationTools,
     PageExtractionTools,
+    PageSearchTools,
     PointerTools,
     ScreenshotTools,
     TabTools,
@@ -110,6 +111,7 @@ def browser_pack(
             TabTools(),
             DialogTools(),
             FindTools(),
+            PageSearchTools(),
             # The agent's workspace, independent of the browser.
             Files(),
             FileTransfers(),

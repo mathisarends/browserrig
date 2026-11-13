@@ -83,6 +83,7 @@ class ActionKind(StrEnum):
     SCREENSHOT = "screenshot"
     EXTRACT_CONTENT = "extract_content"
     FIND_IN_PAGE = "find_in_page"
+    SEARCH_PAGE = "search_page"
     # Kept readable in existing persisted action receipts.
     TAB = "tab"
 

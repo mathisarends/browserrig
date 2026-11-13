@@ -40,6 +40,7 @@ from .references import (
 )
 from .render import render
 from .renderer import DomRenderer, Renderer
+from .search import PageSearch, search_content
 from .text import TextContext
 
 __all__ = [
@@ -51,6 +52,8 @@ __all__ = [
     "RevealableElement",
     "extract_document",
     "save_content",
+    "search_content",
+    "PageSearch",
     "SNAPSHOT_NAME",
     "Canvas",
     "ContentGroup",
