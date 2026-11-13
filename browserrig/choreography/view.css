@@ -436,9 +436,21 @@ body {
   outline: 1px solid #f3bf5377;
   border-radius: 2px;
 }
-.match.active {
-  background: #ff9d5c77;
-  outline: 1.5px solid #ff9d5c;
+#ticks {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 10px;
+}
+#ticks i {
+  position: absolute;
+  right: 1px;
+  width: 8px;
+  height: 3px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background: #f3a33a;
 }
 .click {
   position: absolute;

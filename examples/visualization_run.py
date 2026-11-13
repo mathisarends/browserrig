@@ -19,8 +19,8 @@ from browserrig.events import (
     DownloadCompletedEvent,
     FilesUploadedEvent,
 )
-from browserrig.observation import find_text
-from browserrig.tools import FindIntent, NavigateIntent, UploadIntent
+from browserrig.observation import extract_document, search_content
+from browserrig.tools import NavigateIntent, SearchIntent, UploadIntent
 
 
 class VisualWalkthrough:
@@ -132,17 +132,16 @@ class VisualWalkthrough:
         )
 
     async def _find(self) -> None:
-        intent = FindIntent(queries=("trace",), match=1, session="visual-proof")
+        intent = SearchIntent(queries=("trace",))
 
         async def step():
-            return await find_text(
-                self.tab, intent.queries, session=intent.session, reveal=True
-            )
+            content = await extract_document(self.tab, full_page=False)
+            return search_content(content, intent.queries, start=0, count=20)
 
         await self._during(
-            scenes.find(scenes.Scene(self.tab, "proof-find"), intent, step),
+            scenes.search(scenes.Scene(self.tab, "proof-find"), intent, step),
             "find",
-            "Find · matching page text",
+            "Search · matching page records",
             0.45,
         )
 

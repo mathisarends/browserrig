@@ -16,6 +16,7 @@ from .events import CaptureRegion, WorkPhase, WorkPresentedEvent
 # Native input already explains other operations. Their failures still get a receipt.
 SILENT_WORK = {
     ActionKind.READ_FILE: "Reading file",
+    ActionKind.SEARCH_PAGE: "Searching page",
     ActionKind.WRITE_FILE: "Saving file",
     ActionKind.EDIT_FILE: "Editing file",
     ActionKind.LIST_FILES: "Listing files",
@@ -42,6 +43,9 @@ def started(call: ToolCall, kind: ActionKind) -> WorkPresentedEvent:
     preview = ""
     region = None
     match kind:
+        case ActionKind.SEARCH_PAGE:
+            queries = [args.get("query"), *(args.get("alternatives") or ())]
+            detail = " | ".join(f'"{query}"' for query in queries if query)
         case ActionKind.JAVASCRIPT:
             preview = clipped(str(args.get("code", "")))
         case ActionKind.WRITE_FILE | ActionKind.EDIT_FILE:
@@ -123,6 +127,14 @@ def _result(event: WorkPresentedEvent, result: ToolResult) -> WorkPresentedEvent
             )
         case ActionKind.LIST_FILES | ActionKind.LIST_TABS | ActionKind.LIST_DOWNLOADS:
             event = _listing(event, result)
+        case ActionKind.SEARCH_PAGE:
+            # The first line counts the records; the rest is what the model reads.
+            summary, _, records = result.text.partition("\n")
+            event = replace(
+                event,
+                detail=clipped(summary, 300),
+                preview=clipped(records.strip()),
+            )
         case ActionKind.SCREENSHOT:
             event = replace(
                 event,

@@ -32,7 +32,7 @@ PATTERNS = {
         "go_back",
         "go_forward",
         "reload",
-        "find_in_page",
+        "search_page",
     },
     "Tabs": {"open_tab", "switch_tab", "close_tab", "list_tabs"},
     "Dialoge": {"handle_dialog"},

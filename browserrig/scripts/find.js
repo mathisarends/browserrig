@@ -1,10 +1,20 @@
 /* global parentFor, closedRootsForDocument, childrenFor */
-function browserrigFind({queries, session, active, start, count, reveal, clip, close}) {
+function browserrigFind({
+  queries,
+  session,
+  active,
+  start,
+  count,
+  reveal,
+  clip,
+  close,
+  ticks: wantTicks,
+}) {
   const state = (globalThis.__browserrig ||= {});
   if (close) {
     // The find bar closes: drop the cached page text.
     state.findIndex = null;
-    return {total: 0, counts: [], items: [], marks: [], scrolled: false};
+    return {total: 0, counts: [], items: [], marks: [], ticks: [], scrolled: false};
   }
   const closedRoots = closedRootsForDocument();
   const skipped = new Set([
@@ -331,6 +341,21 @@ function browserrigFind({queries, session, active, start, count, reveal, clip, c
     }
   });
 
+  // Where the matches lie along the document, as fractions of its height, like the
+  // marks Chrome's find bar puts on the scrollbar.
+  function tickPositions() {
+    const height = Math.max(1, document.documentElement.scrollHeight);
+    const positions = matches
+      .map((match) => rectsOf(match)[0])
+      .filter(Boolean)
+      .map(
+        ([, y]) =>
+          Math.round(Math.min(1, Math.max(0, (y + scrollY) / height)) * 400) / 400,
+      );
+    return [...new Set(positions)];
+  }
+  const ticks = wantTicks ? tickPositions() : [];
+
   function context(from, to) {
     return chars.slice(from, to).join('').replace(/\s+/g, ' ');
   }
@@ -373,5 +398,5 @@ function browserrigFind({queries, session, active, start, count, reveal, clip, c
     collapsed: collapsedMatch(match),
   }));
 
-  return {total, counts, items, marks, scrolled};
+  return {total, counts, items, marks, ticks, scrolled};
 }

@@ -97,6 +97,8 @@ class FindArgs(ScriptArgs):
     clip: Bounds | None = None
     # Remove the find markers.
     close: bool = False
+    # Also report where every match lies along the document.
+    ticks: bool = False
 
 
 class OwnerHitsArgs(ScriptArgs):
@@ -170,6 +172,8 @@ class FindResult(Options):
     counts: tuple[int, ...] = ()
     items: tuple[FoundText, ...] = ()
     marks: tuple[FoundMark, ...] = ()
+    # Match positions as fractions of the document height, in page order.
+    ticks: tuple[float, ...] = ()
     scrolled: bool = False
 
 

@@ -38,10 +38,10 @@ from browserrig.input import Input
 from browserrig.observation import BrowserPerception
 from browserrig.secrets import Secrets
 from browserrig.tools import (
-    FindIntent,
     NavigateIntent,
     OpenFileIntent,
     Perform,
+    SearchIntent,
     TargetLocated,
     UploadIntent,
     WaitIntent,
@@ -230,6 +230,7 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
         tab = self._browser.active_tab
         receipt = replace(receipt, target_id=tab.id, document_id=tab.document_id)
         if metadata.kind in {
+            ActionKind.SEARCH_PAGE,
             ActionKind.JAVASCRIPT,
             ActionKind.SCREENSHOT,
             ActionKind.GO_BACK,
@@ -369,8 +370,8 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
     async def _stage(self, event: Perform, next_: Next[Any]) -> Any:
         scene = scenes.Scene(event.tab, event.action_id)
         match event.intent:
-            case FindIntent() as intent:
-                return await scenes.find(scene, intent, next_)
+            case SearchIntent() as intent:
+                return await scenes.search(scene, intent, next_)
             case NavigateIntent() as intent:
                 return await scenes.navigate(scene, intent, next_)
             case WaitIntent() as intent:

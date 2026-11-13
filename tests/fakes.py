@@ -13,7 +13,7 @@ from harnessed.testing import ScriptedModel
 from browserrig import Browser, BrowserCoordination, FileSystem
 from browserrig.browser import BrowserEvents
 from browserrig.browser.network import NetworkActivity
-from browserrig.core import ActionContext, ReadinessStatus
+from browserrig.core import ActionContext, ReadinessPhase, ReadinessStatus
 from browserrig.files import FileBridge, FileTransfers
 from browserrig.input import Input, InputTargets
 from browserrig.observation import BrowserPerception, DomElements, DomReferences
@@ -136,7 +136,9 @@ class FakeReadiness:
     def __init__(self):
         self.phases = []
 
-    async def wait(self, tab, *, phase, dispatch=None, since=None):  # pylint: disable=unused-argument
+    async def wait(  # pylint: disable=unused-argument
+        self, tab, *, phase=ReadinessPhase.OBSERVATION, dispatch=None, since=None
+    ):
         self.phases.append(phase)
         if dispatch is not None:
             await dispatch()

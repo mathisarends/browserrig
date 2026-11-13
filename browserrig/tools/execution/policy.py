@@ -48,7 +48,6 @@ ACTION_KINDS = (
         ActionKind.SCROLL_ELEMENT,
         ActionKind.JAVASCRIPT,
         ActionKind.UPLOAD,
-        ActionKind.FIND_IN_PAGE,
     }
 )
 PREFLIGHT_KINDS = {

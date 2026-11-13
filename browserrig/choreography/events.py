@@ -63,18 +63,20 @@ class FindBarEvent(InputEvent):
 
 @dataclass(frozen=True, slots=True)
 class FindResultsEvent(InputEvent):
-    """Matches for the find bar's text, updated after each key and after scrolling to one.
+    """Matches for the find bar's text, updated after each key and with the final results.
 
-    `active` numbers the current match from 1, or is 0 without one, of `total`. `marks`
-    covers the matches in the viewport, in viewport CSS pixels: viewers draw them like a
-    browser's find highlights, the active one distinct. They hold until the next results
-    event or until the find bar closes; the page shows the same markers meanwhile.
+    `label` is the count the find bar shows. `marks` covers the text matches in the
+    viewport, in viewport CSS pixels, and `ticks` where all of them lie as fractions of
+    the document height: viewers draw them like a browser's find highlights and
+    scrollbar marks. They hold until the next results event or until the find bar
+    closes. Nothing is drawn into the page itself.
     """
 
     query: str
     total: int
-    active: int
+    label: str
     marks: tuple[FindMark, ...] = ()
+    ticks: tuple[float, ...] = ()
     type: Literal[EventKind.FIND_RESULTS] = field(
         default=EventKind.FIND_RESULTS, kw_only=True
     )

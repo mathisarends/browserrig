@@ -25,14 +25,21 @@ function createChoreographyPanels(ui, caption) {
     const nodes = (event.marks || []).flatMap((mark) =>
       mark.rects.map((rect) => {
         const node = document.createElement('div');
-        node.className = 'match' + (mark.index === event.active ? ' active' : '');
+        node.className = 'match';
         ui.bounds(node, ...rect);
         return node;
       }),
     );
     ui.node('matches').replaceChildren(...nodes);
+    // Like the find marks on Chrome's scrollbar: where matches lie beyond the viewport.
+    const ticks = (event.ticks || []).map((at) => {
+      const tick = document.createElement('i');
+      tick.style.top = `${(at * 100).toFixed(2)}%`;
+      return tick;
+    });
+    ui.node('ticks').replaceChildren(...ticks);
     ui.node('find-text').textContent = event.query;
-    ui.node('find-count').textContent = `${event.active} / ${event.total}`;
+    ui.node('find-count').textContent = event.label;
   };
   const tab = (event) => {
     ui.node('navigation-icon').textContent =
@@ -103,6 +110,7 @@ function createChoreographyPanels(ui, caption) {
         ui.panel('find', event.visible);
         if (!event.visible) {
           ui.node('matches').replaceChildren();
+          ui.node('ticks').replaceChildren();
         }
         break;
       case kinds.FIND_RESULTS:

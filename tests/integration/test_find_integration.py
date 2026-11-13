@@ -2,15 +2,15 @@ import asyncio
 import json
 
 import pytest
-from harnessed import Agent, PolicyDecision
-from harnessed.models import ToolMessage
+from harnessed import Agent, PolicyDecision, ToolCall
+from harnessed.models import ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Chrome, ChromeBrowser, browser_plugins
+from browserrig import Browser, Chrome, ChromeBrowser, browser_plugins
 from browserrig.browser import Launch
 from browserrig.choreography import BarTypedEvent, FindBarEvent, FindResultsEvent
-from browserrig.events import KeyPressedEvent, NavigationStartedEvent
+from browserrig.events import KeyPressedEvent
 from browserrig.kinds import BrowserBar
 from browserrig.observation import close_find, find_text
 from tests.javascript import evaluate
@@ -95,7 +95,7 @@ async def test_find_numbers_matches_across_frames_in_page_order(site):
         assert main.parent is None
 
 
-async def test_find_tool_types_into_the_find_bar_and_reports_matches(site):
+async def test_search_page_shows_the_find_bar_marks_and_ticks_without_scrolling(site):
     model = ScriptedModel(
         [
             call("navigate", url=site + "/other"),
@@ -103,11 +103,15 @@ async def test_find_tool_types_into_the_find_bar_and_reports_matches(site):
                 "execute_javascript",
                 code=f"document.body.innerHTML = {json.dumps(_GUIDE)}",
             ),
-            call("find_in_page", query="widget", match=4, max_results=2),
-            call("find_in_page", query="nowhere to be found"),
-            call(
-                "find_in_page", query="widget", alternatives=["final widget", "gizmo"]
-            ),
+            [
+                ModelChunk(tool_call=ToolCall("search_page", {"query": "widget"})),
+                ModelChunk(
+                    tool_call=ToolCall(
+                        "search_page",
+                        {"query": "nowhere", "alternatives": ["final widget"]},
+                    )
+                ),
+            ],
             "Done",
         ]
     )
@@ -129,62 +133,43 @@ async def test_find_tool_types_into_the_find_bar_and_reports_matches(site):
     async with agent.session() as session:
         consumer = asyncio.create_task(consume(session))
         await asyncio.wait_for(ready.wait(), 30)
-        result = await session.run("Find the widget", max_steps=6)
+        result = await session.run("Search the guide", max_steps=6)
+        tab = session.scope[Browser].active_tab
+        scroll = await evaluate(tab, "scrollY")
     await asyncio.wait_for(consumer, 30)
     assert result.text == "Done"
     replies = [
         msg for msg in model.requests[-1].messages if isinstance(msg, ToolMessage)
     ]
-    assert not any(reply.is_error for reply in replies), [
-        reply.text for reply in replies
-    ]
-    found, missing, either = replies[2].text, replies[3].text, replies[4].text
-    assert found.startswith('4 matches for "widget"; match 4 is scrolled into view.')
-    # Context stays within the match's paragraph.
-    assert found.endswith("\n4. [Late] A final **WIDGET** note.")
-    assert "match=" not in found
-    assert missing.startswith('No matches for "nowhere to be found"')
-    # Alternatives share one numbering; of overlapping matches the earlier one counts.
-    assert either.startswith(
-        '4 matches for "widget" (3), "final widget" (1) or "gizmo" (0); '
-        "match 1 is scrolled into view."
-    )
-    assert "\n4. [Late] A **final WIDGET** note." in either
-
-    # Live events stream to viewers and stay out of the saved conversation.
-    assert not any(isinstance(event, BarTypedEvent) for event in result.events)
-    events = streamed
-    address = [
-        e for e in events if isinstance(e, BarTypedEvent) and e.browser_bar == "address"
-    ]
-    assert address[-1].key == "Enter" and address[-1].text == address[-2].text
-    started = next(
-        i for i, e in enumerate(events) if isinstance(e, NavigationStartedEvent)
-    )
-    assert events.index(address[-1]) < started
+    assert not any(reply.is_error for reply in replies)
+    found, either = replies[2].text, replies[3].text
+    # The closed section counts; hidden text and form values do not.
+    assert found.startswith('4 records match "widget"')
+    assert "A final WIDGET note." in found and "invisible" not in found
+    assert either.startswith('1 record matches "nowhere" | "final widget"')
+    # Searching never scrolls the page, even to matches far below.
+    assert scroll == 0
 
     shown = [
         event
-        for event in events
+        for event in streamed
         if isinstance(
             event, (KeyPressedEvent, FindBarEvent, BarTypedEvent, FindResultsEvent)
         )
         and getattr(event, "browser_bar", BrowserBar.FIND) == BrowserBar.FIND
     ]
     keys = [(e.key, e.modifiers) for e in shown if isinstance(e, KeyPressedEvent)]
-    assert keys == [("f", ("Control",)), ("Escape", ())] * 3
+    assert keys == [("f", ("Control",)), ("Escape", ())] * 2
+    assert [e.visible for e in shown if isinstance(e, FindBarEvent)] == [
+        True,
+        False,
+    ] * 2
     typed = [e.text for e in shown if isinstance(e, BarTypedEvent)][:6]
     assert typed == ["w", "wi", "wid", "widg", "widge", "widget"]
-    results = [
-        e for e in shown if isinstance(e, FindResultsEvent) and e.query == "widget"
-    ]
-    # One update for the last key, then the final one with match 4 scrolled into view.
-    assert [(e.total, e.active) for e in results][:2] == [(4, 1), (4, 4)]
-    assert 4 in [mark.index for mark in results[1].marks]
-    bars = [e.visible for e in shown if isinstance(e, FindBarEvent)]
-    assert bars == [True, False] * 3
-    bar_text = [e.text for e in shown if isinstance(e, BarTypedEvent)][-1]
-    assert bar_text == "widget | final widget | gizmo"
-    final = [e for e in shown if isinstance(e, FindResultsEvent)][-1]
-    assert (final.query, final.total, final.active) == (bar_text, 4, 1)
-    assert all(e.action_id for e in shown)
+    results = [e for e in shown if isinstance(e, FindResultsEvent)]
+    first = [e for e in results if e.query == "widget"]
+    # Live text matches while typing, then the records the tool returned.
+    assert first[-2].label == "4 matches" and first[-1].label == "4 records"
+    assert first[-1].marks and max(first[-1].ticks) > 0.8
+    assert results[-1].query == "nowhere | final widget"
+    assert results[-1].label == "1 record"

@@ -5,16 +5,19 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from time import monotonic
 from typing import Any
+from uuid import uuid4
+
+from cdpify import CDPCommandError
 
 from browserrig.browser import Tab
-from browserrig.core import BrowserBar, FileTransferDirection, Point
+from browserrig.core import BrowserBar, BrowserError, FileTransferDirection, Point
 from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
 from browserrig.input import TYPING_INTERVAL_SECONDS
-from browserrig.observation import PageMatches, find_text
+from browserrig.observation import PageSearch, close_find, find_text
 from browserrig.tools import (
-    FindIntent,
     NavigateIntent,
     OpenFileIntent,
+    SearchIntent,
     UploadIntent,
     WaitIntent,
 )
@@ -50,27 +53,47 @@ class Scene:
         await self.tab.emit(replace(event, action_id=self.action_id))
 
 
-async def find(scene: Scene, intent: FindIntent, step: Step) -> PageMatches:
-    """Ctrl+F, the queries typed into the find bar with live results, then Escape."""
+async def search(scene: Scene, intent: SearchIntent, step: Step) -> PageSearch:
+    """Ctrl+F with the queries typed and their text marked live, then the records found.
+
+    Marks and counts are drawn over the page; the page itself never scrolls or changes.
+    """
     shown = _OR.join(intent.queries)
+    session = uuid4().hex
+
+    async def results(text: str, queries: tuple[str, ...], label: str = "") -> None:
+        try:
+            found = await find_text(scene.tab, queries, session=session, ticks=True)
+        except (CDPCommandError, BrowserError, TimeoutError):
+            # Presentation must never fail the search itself.
+            return
+        await scene.show(
+            FindResultsEvent(
+                query=text,
+                total=found.total,
+                label=label or _count(found.total, "match", "matches"),
+                marks=found.marks,
+                ticks=found.ticks,
+            )
+        )
 
     async def preview(typed: str) -> None:
         # Like a browser's find bar: results follow each key, without scrolling.
         if typing := _typed(intent.queries, len(typed)):
-            found = await find_text(scene.tab, typing, session=intent.session)
-            await scene.show(_results(typed, found, current=1))
+            await results(typed, typing)
 
     await scene.show(KeyPressedEvent(key="f", modifiers=("Control",)))
     await scene.show(FindBarEvent(visible=True))
     try:
         await _type_in_bar(scene, BrowserBar.FIND, shown, after_key=preview)
-        found: PageMatches = await step()
-        await scene.show(_results(shown, found, current=intent.match))
+        found: PageSearch = await step()
+        await results(shown, intent.queries, _count(found.total, "record", "records"))
         await asyncio.sleep(_FIND_HOLD_SECONDS)
         return found
     finally:
         await scene.show(KeyPressedEvent(key="Escape"))
         await scene.show(FindBarEvent(visible=False))
+        await close_find(scene.tab)
 
 
 async def navigate(scene: Scene, intent: NavigateIntent, step: Step) -> Any:
@@ -146,13 +169,8 @@ async def _transfer(
     await asyncio.sleep(_TRANSFER_SECONDS)
 
 
-def _results(query: str, found: PageMatches, *, current: int) -> FindResultsEvent:
-    return FindResultsEvent(
-        query=query,
-        total=found.total,
-        active=current if current <= found.total else 0,
-        marks=found.marks,
-    )
+def _count(total: int, one: str, many: str) -> str:
+    return f"{total} {one if total == 1 else many}"
 
 
 def _typed(queries: tuple[str, ...], length: int) -> tuple[str, ...]:

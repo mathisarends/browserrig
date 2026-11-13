@@ -170,7 +170,7 @@ operation in `coordination.exclusive()` when mixing it with agent work.
 | `ChangeTab` | Waterfall around a tab operation | Synchronize devices or stage a transition |
 | `SelectReadiness` | Bail: first non-`None` policy wins | Choose readiness for a page or application |
 | `CheckReadiness` | Waterfall returning `ReadinessCheck` | Add a condition around a readiness probe |
-| `Perform` | Waterfall around an intent's step | Stage navigation, find, wait, preview or upload work |
+| `Perform` | Waterfall around an intent's step | Stage navigation, page search, wait, preview or upload work |
 | `TargetLocated` | Event | Highlight a resolved input target |
 | `ObservationsIncludedEvent` | Event | Track the final observations sent to the model |
 

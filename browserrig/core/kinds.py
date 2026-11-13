@@ -81,11 +81,11 @@ class ActionKind(StrEnum):
     OPEN_FILE = "open_file"
     OPEN_DOWNLOADED_FILE = "open_downloaded_file"
     SCREENSHOT = "screenshot"
-    FIND_IN_PAGE = "find_in_page"
     SEARCH_PAGE = "search_page"
     # Kept readable in existing persisted action receipts.
     TAB = "tab"
     EXTRACT_CONTENT = "extract_content"
+    FIND_IN_PAGE = "find_in_page"
 
 
 class ElementOperation(StrEnum):

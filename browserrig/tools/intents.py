@@ -14,16 +14,13 @@ from browserrig.core import Bounds, Point
 
 
 @dataclass(frozen=True, slots=True)
-class FindIntent:
-    """Search the page for `queries`, then show match number `match`.
+class SearchIntent:
+    """Search the loaded page for `queries` without changing it.
 
-    The step returns the final `PageMatches`. Searches sharing `session` reuse the page
-    text; the tool closes the session afterwards.
+    The step returns the `PageSearch` with the matching records.
     """
 
     queries: tuple[str, ...]
-    match: int
-    session: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,7 +53,7 @@ class WaitIntent:
     seconds: float
 
 
-type Intent = FindIntent | NavigateIntent | OpenFileIntent | UploadIntent | WaitIntent
+type Intent = NavigateIntent | OpenFileIntent | SearchIntent | UploadIntent | WaitIntent
 
 
 @dataclass(frozen=True)

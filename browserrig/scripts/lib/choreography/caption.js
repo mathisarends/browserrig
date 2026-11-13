@@ -7,7 +7,7 @@ function createChoreographyCaption(ui) {
   let shown = '';
   let drawn = '';
   const glyphs = {
-    page: 'M4 5h12M4 8.5h12M4 12h12M4 15.5h7',
+    search: 'M8.5 3.5a5 5 0 1 0 0 10a5 5 0 1 0 0-10 M12.25 12.25 16.5 16.5',
     file: 'M5 2.5h7l3 3v12H5Z M12 2.5v3h3 M7.5 10h5 M7.5 13h3.5',
     write: 'M5 2.5h7l3 3v12H5Z M12 2.5v3h3 M10 9v5.5 M7.25 11.75h5.5',
     folder:
@@ -35,6 +35,7 @@ function createChoreographyCaption(ui) {
   const glyph = (item) => {
     const action = ui.options().actions;
     const named = {
+      [action.SEARCH_PAGE]: 'search',
       [action.READ_FILE]: 'file',
       [action.OPEN_FILE]: 'file',
       [action.OPEN_DOWNLOADED_FILE]: 'file',

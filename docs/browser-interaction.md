@@ -133,10 +133,6 @@ redacted before matching. To collect findings across pages, write them to worksp
 notes. The Python helper `browserrig.observation.content.extract_content(tab, ...)`
 returns the page as typed Markdown.
 
-`find_in_page(query, alternatives=(), match=1, max_results=10)` searches rendered
-text across frames, tolerating case, accents and whitespace differences. It
-scrolls the chosen match into view. Hidden text and form values are excluded.
-
 ## JavaScript
 
 `execute_javascript(code=...)` evaluates in the active tab's main context, supports

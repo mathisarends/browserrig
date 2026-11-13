@@ -1,15 +1,19 @@
+from functools import partial
 from typing import Annotated
 
 from harnessed import Plugin, ToolError, ToolResult
 from harnessed.kernel import needs, observes
 from pydantic import Field
 
-from browserrig.browser import Browser
+from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind, BrowserCoordination, ReadinessStatus
 from browserrig.core import browser_tool as tool
-from browserrig.observation import extract_document, search_content
+from browserrig.observation import PageSearch, extract_document, search_content
 from browserrig.readiness import Readiness
 from browserrig.secrets import Secrets
+
+from .execution import Actions
+from .intents import SearchIntent
 
 type _Query = Annotated[
     str,
@@ -28,6 +32,8 @@ class PageSearchTools(Plugin):
     _coordination = needs(BrowserCoordination)
     _readiness = needs(Readiness)
     _secrets = observes(Secrets)
+    # Lets viewers watch the search in the find bar.
+    _actions = observes(Actions)
 
     @tool(
         kind=ActionKind.SEARCH_PAGE,
@@ -56,8 +62,34 @@ class PageSearchTools(Plugin):
         queries = tuple(
             dict.fromkeys(" ".join(text.split()) for text in (query, *alternatives))
         )
+        if not all(queries):
+            raise ToolError("query and alternatives must contain visible text")
+        tab = self._browser.active_tab
+        step = partial(
+            self._search,
+            tab,
+            queries,
+            full_page=full_page,
+            start=start,
+            count=max_results,
+        )
+        actions = self._actions
+        if actions is None:
+            found = await step()
+        else:
+            found = await actions.stage(SearchIntent(queries), tab, step)
+        return ToolResult(found.render())
+
+    async def _search(
+        self,
+        tab: Tab,
+        queries: tuple[str, ...],
+        *,
+        full_page: bool,
+        start: int,
+        count: int,
+    ) -> PageSearch:
         async with self._coordination.exclusive():
-            tab = self._browser.active_tab
             report = await self._readiness.wait(tab)
             if report.status == ReadinessStatus.BLOCKED:
                 raise ToolError(report.reason)
@@ -65,7 +97,6 @@ class PageSearchTools(Plugin):
         if (secrets := self._secrets) is not None:
             content = secrets.redact(content)
         try:
-            found = search_content(content, queries, start=start, count=max_results)
+            return search_content(content, queries, start=start, count=count)
         except ValueError as error:
             raise ToolError(str(error)) from error
-        return ToolResult(found.render())

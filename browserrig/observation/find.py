@@ -34,6 +34,8 @@ class PageMatches:
     matches: tuple[FoundMatch, ...] = ()
     # Matches in the viewport, numbered from 1, in viewport CSS pixels.
     marks: tuple[FindMark, ...] = ()
+    # Positions of the main document's matches as fractions of its height.
+    ticks: tuple[float, ...] = ()
     scrolled: bool = False
     limitations: tuple[str, ...] = ()
 
@@ -47,6 +49,7 @@ async def find_text(
     start: int = 0,
     count: int = 0,
     reveal: bool = False,
+    ticks: bool = False,
 ) -> PageMatches:
     """Find `queries` in the rendered text of every frame, in page order.
 
@@ -54,8 +57,9 @@ async def find_text(
     the earlier, then longer, one counts. Matching ignores case, accents and whitespace
     differences but stays within one text block. `active` is the current match, from 0,
     and `reveal` opens collapsed sections around it and scrolls it into view. `start` and
-    `count` select the matches returned with their context. Calls sharing `session` reuse
-    the page text while it is unchanged.
+    `count` select the matches returned with their context, and `ticks` where the main
+    document's matches lie. Calls sharing `session` reuse the page text while it is
+    unchanged.
     """
     if tab.dialog:
         raise BrowserError("Handle the open dialog before searching the page")
@@ -65,6 +69,7 @@ async def find_text(
     counts = [0] * len(queries)
     matches: list[FoundMatch] = []
     marks: list[FindMark] = []
+    positions: tuple[float, ...] = ()
     scrolled = False
     for frame in frames:
         local_start = max(0, start - total)
@@ -76,6 +81,7 @@ async def find_text(
             count=max(0, start + count - total - local_start),
             reveal=reveal,
             clip=frame.local_visible,
+            ticks=ticks and frame.parent is None,
         )
         try:
             result = await frame.run(FIND, args)
@@ -94,6 +100,8 @@ async def find_text(
         )
         marks += _viewport_marks(frame, result.marks, first=total + 1)
         scrolled = scrolled or result.scrolled
+        if frame.parent is None:
+            positions = result.ticks
         total += result.total
         counts = [
             mine + theirs for mine, theirs in zip(counts, result.counts, strict=True)
@@ -109,6 +117,7 @@ async def find_text(
         counts=tuple(counts),
         matches=tuple(matches),
         marks=tuple(marks),
+        ticks=positions,
         scrolled=scrolled,
         limitations=tuple(dict.fromkeys(limitations)),
     )

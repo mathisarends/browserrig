@@ -155,16 +155,19 @@ async def test_input_visualization_renders_native_events_and_restores_after_navi
         await tab.emit(FindBarEvent(visible=True))
         await tab.emit(
             FindResultsEvent(
-                query="Submit", total=found.total, active=1, marks=found.marks
+                query="Submit",
+                total=found.total,
+                label="1 match",
+                marks=found.marks,
+                ticks=(0.5,),
             )
         )
-        assert (
-            await evaluate(
-                tab,
-                "document.querySelector('iframe').contentDocument.querySelectorAll('.match.active').length",
-            )
-            == 1
-        )
+        assert await evaluate(
+            tab,
+            "[...['.match', '#ticks i', '#find-count']].map(selector => "
+            "document.querySelector('iframe').contentDocument.querySelectorAll(selector))"
+            ".map(nodes => nodes.length)",
+        ) == [1, 1, 1]
         await session.scope[Input].keyboard.type_text("private", sensitive=True)
         shown = await evaluate(
             tab, "document.querySelector('iframe').contentDocument.body.textContent"

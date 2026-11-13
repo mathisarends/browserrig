@@ -6,14 +6,13 @@ from .dom_scroll import DomScrollTools
 from .effects import Effect
 from .execution import Actions
 from .files import BrowserFileTools, DomUploadTools, FileTools
-from .find import FindTools
 from .forms import FormTools
 from .intents import (
-    FindIntent,
     Intent,
     NavigateIntent,
     OpenFileIntent,
     Perform,
+    SearchIntent,
     TargetLocated,
     UploadIntent,
     WaitIntent,
@@ -49,8 +48,7 @@ __all__ = [
     "FileTools",
     "BrowserFileTools",
     "WorkspaceTools",
-    "FindIntent",
-    "FindTools",
+    "SearchIntent",
     "Intent",
     "NavigateIntent",
     "OpenFileIntent",

@@ -39,9 +39,11 @@ from browserrig.events import (
 )
 from browserrig.files import FileSystem, LocalWorkspace, MountedWorkspace
 from browserrig.input import mouse as mouse_module
+from browserrig.observation.content import PageContent
 from browserrig.pacing import InputPacing
 from browserrig.scripts import FindResult
-from browserrig.tools import Actions, FileTools, FindTools, NavigationTools
+from browserrig.tools import Actions, FileTools, NavigationTools, PageSearchTools
+from browserrig.tools import search as search_module
 from browserrig.tools import targeting as targeting_module
 from tests.fakes import mounted
 
@@ -63,9 +65,9 @@ class _Frame:
             self._timeline.append("find closed")
             return None
         self._timeline.append(
-            f"find {'|'.join(args.queries)} active={args.active} reveal={args.reveal}"
+            f"find {'|'.join(args.queries)} reveal={args.reveal} ticks={args.ticks}"
         )
-        return FindResult(total=3, counts=(3,) * len(args.queries))
+        return FindResult(total=3, counts=(3,) * len(args.queries), ticks=(0.1, 0.9))
 
 
 class _Tab:
@@ -194,8 +196,8 @@ def _describe(event) -> str:  # pylint: disable=too-many-return-statements,too-m
             return f"{where} bar {key} -> {text!r} {duration:.2f}"
         case FindBarEvent(visible=visible):
             return "find bar open" if visible else "find bar closed"
-        case FindResultsEvent(query=query, active=active, total=total):
-            return f"results {query!r} {active}/{total}"
+        case FindResultsEvent(query=query, label=label, ticks=ticks):
+            return f"results {query!r} {label} ticks={list(ticks)}"
         case WaitingEvent(duration=duration):
             return f"waiting {duration:g}"
         case FileTransferEvent(direction=direction, x=x, y=y, duration=duration):
@@ -219,7 +221,7 @@ def _describe(event) -> str:  # pylint: disable=too-many-return-statements,too-m
     raise AssertionError(f"No description for {event}")
 
 
-class _FindTools(FindTools, provides=True):
+class _SearchTools(PageSearchTools, provides=True):
     """Expose the mounted plugin, so tests can call its tool directly."""
 
 
@@ -231,47 +233,58 @@ class _FileTools(FileTools, provides=True):
     pass
 
 
-async def test_find_in_page_shows_ctrl_f_typing_results_and_escape(timeline):
-    async with _staged(timeline, _FindTools()) as (_, ctx):
-        await ctx[_FindTools].find_in_page("ab", ("c",))
+async def test_search_page_types_into_the_find_bar_and_shows_records_without_scrolling(
+    timeline, monkeypatch
+):
+    _page(monkeypatch, timeline)
+    async with _staged(timeline, _SearchTools()) as (_, ctx):
+        result = await ctx[_SearchTools].search_page("ab", ("c",))
+    assert result.text.startswith('1 record matches "ab" | "c"')
     assert _shown(timeline) == [
-        "find_in_page started",
         "shows key Control+f 0.00",
         "find bar open",
         "keyboard shown",
         "find bar a -> 'a' 0.05",
-        "find a active=0 reveal=False",
-        "results 'a' 1/3",
+        "find a reveal=False ticks=True",
+        "results 'a' 3 matches ticks=[0.1, 0.9]",
         "sleep 0.05",
         "find bar b -> 'ab' 0.05",
-        "find ab active=0 reveal=False",
-        "results 'ab' 1/3",
+        "find ab reveal=False ticks=True",
+        "results 'ab' 3 matches ticks=[0.1, 0.9]",
         "sleep 0.05",
         "find bar   -> 'ab ' 0.05",
-        "find ab active=0 reveal=False",
-        "results 'ab ' 1/3",
+        "find ab reveal=False ticks=True",
+        "results 'ab ' 3 matches ticks=[0.1, 0.9]",
         "sleep 0.05",
         "find bar | -> 'ab |' 0.05",
-        "find ab active=0 reveal=False",
-        "results 'ab |' 1/3",
+        "find ab reveal=False ticks=True",
+        "results 'ab |' 3 matches ticks=[0.1, 0.9]",
         "sleep 0.05",
         "find bar   -> 'ab | ' 0.05",
-        "find ab active=0 reveal=False",
-        "results 'ab | ' 1/3",
+        "find ab reveal=False ticks=True",
+        "results 'ab | ' 3 matches ticks=[0.1, 0.9]",
         "sleep 0.05",
         "find bar c -> 'ab | c' 0.05",
-        "find ab|c active=0 reveal=False",
-        "results 'ab | c' 1/3",
+        "find ab|c reveal=False ticks=True",
+        "results 'ab | c' 3 matches ticks=[0.1, 0.9]",
         "sleep 0.05",
         "keyboard hidden",
-        "find ab|c active=0 reveal=True",
-        "results 'ab | c' 1/3",
+        "page read",
+        "find ab|c reveal=False ticks=True",
+        "results 'ab | c' 1 record ticks=[0.1, 0.9]",
         "sleep 0.60",
         "shows key Escape 0.00",
         "find bar closed",
         "find closed",
-        "find_in_page finished",
     ]
+
+
+def _page(monkeypatch, timeline):
+    async def extract(_tab, *, full_page):  # pylint: disable=unused-argument
+        timeline.append("page read")
+        return PageContent(url="https://example.org/", title="Example", markdown="ab")
+
+    monkeypatch.setattr(search_module, "extract_document", extract)
 
 
 async def test_navigate_types_the_address_before_the_page_loads(timeline):
@@ -464,15 +477,11 @@ async def test_pointer_travels_along_an_eased_path(timeline):
 # Without staging, tools and devices do the same work at full speed and show nothing.
 
 
-async def test_unstaged_find_only_searches_and_closes(timeline):
-    async with _staged(timeline, _FindTools(), staging=()) as (_, ctx):
-        await ctx[_FindTools].find_in_page("ab", ("c",))
-    assert _shown(timeline) == [
-        "find_in_page started",
-        "find ab|c active=0 reveal=True",
-        "find closed",
-        "find_in_page finished",
-    ]
+async def test_unstaged_search_only_reads_the_page(timeline, monkeypatch):
+    _page(monkeypatch, timeline)
+    async with _staged(timeline, _SearchTools(), staging=()) as (_, ctx):
+        await ctx[_SearchTools].search_page("ab", ("c",))
+    assert _shown(timeline) == ["page read"]
 
 
 async def test_unstaged_navigate_loads_right_away(timeline):

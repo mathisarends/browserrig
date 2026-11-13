@@ -29,7 +29,6 @@ from .tools import (
     DomScrollTools,
     DomTypingTools,
     FileTools,
-    FindTools,
     FormTools,
     JavaScriptTools,
     KeyboardTools,
@@ -109,7 +108,6 @@ def browser_pack(
             FormTools(),
             TabTools(),
             DialogTools(),
-            FindTools(),
             PageSearchTools(),
             # The agent's workspace, independent of the browser.
             Files(),

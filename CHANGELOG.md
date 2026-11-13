@@ -9,6 +9,10 @@
   reads page content without saving it; collect findings across pages in
   workspace notes. `PageContent` no longer has `extracted_path` or
   `render_receipt()`.
+- Remove `find_in_page`, `FindTools` and `FindIntent`; `search_page` replaces
+  them. Viewers see a search as Ctrl+F with live match marks and scrollbar
+  ticks, staged through `SearchIntent`, and the page never scrolls.
+  `FindResultsEvent` replaces `active` with the bar's `label` and adds `ticks`.
 
 ### Changes
 
