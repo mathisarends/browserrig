@@ -9,7 +9,12 @@ from browserrig.browser import Browser
 from browserrig.core import ActionKind, BrowserCoordination, ReadinessStatus
 from browserrig.core import browser_tool as tool
 from browserrig.files import FileSystem
-from browserrig.observation import ExtractedContent, extract_document, save_content
+from browserrig.observation import (
+    SNAPSHOT_NAME,
+    ExtractedContent,
+    extract_document,
+    save_content,
+)
 from browserrig.readiness import Readiness
 from browserrig.secrets import Secrets
 
@@ -60,6 +65,17 @@ class PageExtractionTools(Plugin, provides=True):
             bool,
             Field(description="Also include site header, navigation and footer."),
         ] = False,
+        name: Annotated[
+            str | None,
+            Field(
+                pattern=SNAPSHOT_NAME,
+                description=(
+                    "Save to pages/<name>/content.md, replacing an earlier save with "
+                    "this name, so later calls in the same response can search it. "
+                    "Omit for a new unique path."
+                ),
+            ),
+        ] = None,
     ) -> ToolResult:
         files = self._workspace
         if files is None:
@@ -76,7 +92,9 @@ class PageExtractionTools(Plugin, provides=True):
             if secrets is not None:
                 content = secrets.redact(content)
             try:
-                saved = await save_content(files, content, full_page=full_page)
+                saved = await save_content(
+                    files, content, full_page=full_page, name=name
+                )
             except (OSError, ValueError) as error:
                 raise ToolError(
                     f"Page extraction could not be saved: {error}"

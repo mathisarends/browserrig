@@ -3,8 +3,9 @@ import re
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent
+from harnessed import Agent, ToolCall
 from harnessed.events import ToolCallFinishedEvent
+from harnessed.models import ModelChunk
 from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel, call
 
@@ -209,6 +210,69 @@ def test_saved_receipt_reports_only_actual_metadata_and_limitations():
     )
     with pytest.raises(ValueError, match="workspace path"):
         content.model_copy(update={"extracted_path": None}).render_receipt()
+
+
+async def test_named_snapshot_is_searchable_in_the_same_batch_and_replaced_on_resave(
+    tmp_path, monkeypatch
+):
+    capture = AsyncMock(
+        return_value=PageContent(
+            url="https://example.org/reviews",
+            title="Reviews",
+            markdown="| 338 | Merrie | Antonia Racer Tank |",
+        )
+    )
+    monkeypatch.setattr(extraction_module, "extract_document", capture)
+    path = "pages/reviews/content.md"
+    agent = Agent(
+        model=ScriptedModel(
+            [
+                [
+                    ModelChunk(
+                        tool_call=ToolCall("extract_content", {"name": "reviews"})
+                    ),
+                    ModelChunk(
+                        tool_call=ToolCall("grep", {"query": "Merrie", "pattern": path})
+                    ),
+                ],
+                "Done",
+            ]
+        ),
+        plugins=[
+            FakeChrome({}),
+            Readiness(),
+            Files(LocalWorkspace(tmp_path)),
+            BrowserPerception(capture=_Capture(), renderer=DomRenderer()),
+            PageExtractionTools(),
+            TextContext(),
+            WorkspaceTools(),
+        ],
+    )
+    async with agent.session() as session:
+        result = await session.run("Save the reviews and find Merrie")
+        saved, found = [
+            event.result
+            for event in result.events
+            if isinstance(event, ToolCallFinishedEvent)
+        ]
+        assert saved.text.startswith(f"Saved: {path}\n")
+        assert not found.is_error and f"{path}:" in found.text
+        capture.return_value = PageContent(
+            url="https://example.org/reviews?p=2", title="Reviews", markdown="Page two"
+        )
+        await session.scope[PageExtractionTools].extract_content(name="reviews")
+    assert "Page two" in (tmp_path / path).read_text(encoding="utf-8")
+    metadata = json.loads((tmp_path / "pages/reviews/source.json").read_text())
+    assert metadata["url"] == "https://example.org/reviews?p=2"
+
+
+@pytest.mark.parametrize("name", ["", "../escape", "a/b", "-dash", "x" * 65])
+async def test_snapshot_names_cannot_leave_the_pages_directory(tmp_path, name):
+    content = PageContent(url="https://example.org/", title="Page", markdown="Body")
+    async with FileSystem(LocalWorkspace(tmp_path)) as files:
+        with pytest.raises(ValueError, match="snapshot name"):
+            await save_content(files, content, full_page=False, name=name)
+    assert not (tmp_path / "pages").exists()
 
 
 class _Capture:

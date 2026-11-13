@@ -79,8 +79,9 @@ macros/scripts are not executed.
 
 ## Saved webpage extractions
 
-`extract_content(full_page=False)` saves a new `pages/<id>/content.md` and
-`source.json` containing URL, title, time and limitations. The tool returns only
+`extract_content(full_page=False, name=None)` saves a new `pages/<id>/content.md`
+and `source.json` containing URL, title, time and limitations. A `name` makes the
+path predictable (`pages/<name>/content.md`) and replaces an earlier save with it. The tool returns only
 the receipt. Use `grep(query, pattern=<saved-path>)` and `read_file` for excerpts;
 the file stays readable after navigation.
 

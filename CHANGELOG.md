@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add an optional `name` to `extract_content` that saves to
+  `pages/<name>/content.md` and replaces an earlier save with that name, so
+  `grep` can search the snapshot in the same tool batch.
+- Encourage batched tool calls in DOM chain and workspace guidance.
+- Evals record chain-skipped tool calls as `tool_skipped`, not as tool errors.
+
 ## 0.3.0 (2026-11-11)
 
 ### Breaking changes

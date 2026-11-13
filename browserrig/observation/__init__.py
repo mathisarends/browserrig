@@ -1,4 +1,4 @@
-from .archive import save_content
+from .archive import SNAPSHOT_NAME, save_content
 from .capture import CaptureContent, CaptureStrategy, capture
 from .changes import decision_change
 from .config import Screenshots, ScreenshotTrigger
@@ -51,6 +51,7 @@ __all__ = [
     "RevealableElement",
     "extract_document",
     "save_content",
+    "SNAPSHOT_NAME",
     "Canvas",
     "ContentGroup",
     "ContentNode",

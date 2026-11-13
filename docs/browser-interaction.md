@@ -121,9 +121,11 @@ changes. Model screenshots omit application overlays by default.
 
 ## Page content and search
 
-`extract_content(full_page=False)` saves loaded content to
-`pages/<id>/content.md`, with provenance in `source.json`. It returns a short
-receipt; use `grep` and bounded `read_file` calls to inspect the file. It requires
+`extract_content(full_page=False, name=None)` saves loaded content to
+`pages/<id>/content.md`, with provenance in `source.json`. With `name`, it saves to
+`pages/<name>/content.md` and replaces an earlier save with that name, so a `grep`
+in the same response can search it. It returns a short receipt; use `grep` and
+bounded `read_file` calls to inspect the file. It requires
 a workspace and does not load lazy content or interpret canvas pixels. Each
 extraction is a separate snapshot. Access the latest typed result through
 `session.scope[PageExtractionTools].extracted_content`.
