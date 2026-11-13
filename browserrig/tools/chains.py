@@ -32,13 +32,18 @@ class ObserveAfterInput:
 class DomActionChains:
     def instructions(self) -> str:
         return (
-            "Send several ordered tool calls in one response when no intermediate observation "
-            "is needed, such as independent form fields with known refs and values; put "
-            "submission last. Navigation, tab changes, scrolling, drags, coordinates, JavaScript, "
-            "uploads, dialogs, waiting and screenshots end the remaining chain; send coordinate "
-            "actions alone. A navigation, new menu, suggestions, modal, alert or input failure "
-            "interrupts the remaining actions; skipped calls were not executed. Inspect the next "
-            "observation before continuing."
+            "Each response costs a full observation round trip. When the current observation "
+            "already shows the refs and values for the next steps, send them as several "
+            "ordered tool calls in one response instead of one call per turn. Typical "
+            "batches: fill every known form field, then submit; type a search or filter value, "
+            "then press Enter or click its search button; set several filters or a page size, "
+            "then apply them. Put the call "
+            "that submits or navigates last. Navigation, tab changes, scrolling, drags, "
+            "coordinates, JavaScript, uploads, dialogs, waiting and screenshots end the "
+            "remaining chain; send coordinate actions alone. A navigation, new menu, "
+            "suggestions, modal, alert or input failure interrupts the remaining actions; "
+            "skipped calls were not executed, so send them again only if still needed. Inspect "
+            "the next observation before continuing."
         )
 
     async def check(self, observe: BrowserPerception, tab: Tab) -> str:
