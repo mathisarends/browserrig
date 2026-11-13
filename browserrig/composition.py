@@ -34,7 +34,6 @@ from .tools import (
     JavaScriptTools,
     KeyboardTools,
     NavigationTools,
-    PageExtractionTools,
     PageSearchTools,
     PointerTools,
     ScreenshotTools,
@@ -55,7 +54,7 @@ def browser_plugins(
     A plugin that fills the same slot as a default
     replaces it in place, such as `BrowserPerception(...)`, `Readiness(...)` or
     `ContextCompaction(...)`; any other plugin is added. `without` drops defaults by type,
-    such as `(Files, FileTools, PageExtractionTools)` for an agent without files. `None`
+    such as `(Files, FileTools)` for an agent without files. `None`
     entries are skipped, so optional plugins can be written inline.
     """
     pack = browser_pack(browser=browser).without(*without)
@@ -117,7 +116,6 @@ def browser_pack(
             FileTransfers(),
             DownloadReceiving(),
             FileTools(),
-            PageExtractionTools(),
             TaskMemory(
                 trigger=WindowRatio(),
                 keep_last_steps=model_profile.keep_last_steps if model_profile else 2,

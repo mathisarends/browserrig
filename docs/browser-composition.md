@@ -288,7 +288,7 @@ Capture, image retention and text compaction are independent:
 Manual compositions select `TextContext(mode="delta")` or `mode="full"` for text
 and `ImageContext()` for images. Image observations include matching full text.
 Perception itself registers no model tools: add `ScreenshotTools()` for screenshot
-requests and `PageExtractionTools()` plus a workspace for saved Markdown.
+requests and `PageSearchTools()` for page search.
 `DomTypingTools`, `DomScrollTools` and `FormTools` are separate DOM capabilities.
 Without context plugins, capture does not publish browser observations.
 Text observations remain until compaction. Coordinate tools use the latest

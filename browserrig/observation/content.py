@@ -25,14 +25,11 @@ class PageContent(Options):
     offset: int = 0
     next_offset: int | None = None
     partial: bool = False
-    extracted_path: str | None = None
     # The visible part of the page that was read, in viewport CSS pixels.
     region: Bounds | None = None
 
     def render(self) -> str:
         text = f"# {_heading(self.title) or 'Page content'}\n\nSource: <{_source(self.url)}>"
-        if self.extracted_path is not None:
-            text += f"\n\nSaved extraction: {self.extracted_path}"
         if self.offset:
             text += f"\n\n(continued from offset {self.offset})"
         if self.markdown:
@@ -42,23 +39,6 @@ class PageContent(Options):
                 f"> - {item}" for item in self.limitations
             )
         return text
-
-    def render_receipt(self) -> str:
-        """A saved snapshot's metadata, without placing its body in model context."""
-        if self.extracted_path is None:
-            raise ValueError("A saved extraction receipt needs a workspace path")
-        title = " ".join(self.title.split()) or "(untitled)"
-        if len(title) > 200:
-            title = title[:197] + "..."
-        lines = [
-            f"Saved: {self.extracted_path}",
-            f"Source: {_source(self.url)}",
-            f"Title: {title}",
-        ]
-        if self.limitations:
-            lines.extend(("", "Extraction limitations:"))
-            lines.extend(f"- {' '.join(item.split())}" for item in self.limitations)
-        return "\n".join(lines)
 
     def page(self, offset: int, max_chars: int) -> Self:
         """Read a response-sized part of the same saved snapshot."""
@@ -244,7 +224,7 @@ def _page(
         line = page.rfind("\n", len(page) // 2) + 1
         following = offset + (line or len(page))
         limitations.append(
-            f"Page content continues; extract_content with offset={following} reads the next part"
+            f"Page content continues; offset={following} reads the next part"
         )
     return page.strip(), following
 

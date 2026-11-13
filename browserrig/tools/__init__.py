@@ -5,7 +5,6 @@ from .dialogs import DialogTools
 from .dom_scroll import DomScrollTools
 from .effects import Effect
 from .execution import Actions
-from .extraction import PageContentExtracted, PageExtractionTools
 from .files import BrowserFileTools, DomUploadTools, FileTools
 from .find import FindTools
 from .forms import FormTools
@@ -35,10 +34,8 @@ __all__ = [
     "DomUploadTools",
     "DomTypingTools",
     "DomScrollTools",
-    "PageExtractionTools",
     "PageSearchTools",
     "ScreenshotTools",
-    "PageContentExtracted",
     "PointerTools",
     "ActionChainPolicy",
     "DomActionChains",

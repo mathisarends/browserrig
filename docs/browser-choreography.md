@@ -77,7 +77,7 @@ completed, warning, failed or cancelled work. Terminal work expires after
 Titles/details are ready to draw. Structured fields retain paths, URLs, page
 selectors, preview/limitations and source geometry. `CaptureRegion` uses source
 viewport CSS pixels; transform it to the viewer's bounds using tab/document
-identity. `ReadingSweepEvent` describes a page-reading pass. Download progress is
+identity. Download progress is
 keyed independently by `download_id`; show percentages only with a known total.
 
 Presentation receipts are transient and excluded from model context and saved

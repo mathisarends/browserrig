@@ -60,7 +60,7 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
         [
             call("screenshot"),
             call("wait", seconds=0),
-            call("extract_content"),
+            call("search_page", query="download"),
             call("screenshot"),
             "Done",
         ]
@@ -78,7 +78,7 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
     assert captures == 2
     tools = {item.name for item in model.requests[0].tools}
     # Every step ends with an observation, so there is no tool to request one.
-    assert {"screenshot", "extract_content", "wait"} <= tools and "observe" not in tools
+    assert {"screenshot", "search_page", "wait"} <= tools and "observe" not in tools
     assert not any(
         isinstance(part, ImagePart)
         for message in model.requests[0].messages
@@ -107,8 +107,8 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
         replies[1].text
         == "Wait completed; the next observation shows the current state."
     )
-    assert replies[2].text.startswith("Saved: pages/")
-    assert "\nTitle: Test form" in replies[2].text
+    assert replies[2].text.startswith('1 record matches "download" on Test form <')
+    assert "[Download PDF](</download-pdf>)" in replies[2].text
 
 
 async def test_model_tools_yaml_and_activity(site):

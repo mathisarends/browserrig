@@ -45,13 +45,10 @@ class DomRenderer:
         elif self.sparse_text_chars:
             text += (
                 "When the viewport holds few controls, observations add its visible text; "
-                "otherwise extract_content saves it for targeted file reads. "
+                "otherwise search_page finds it. "
             )
         else:
-            text += (
-                "Observations omit page text; "
-                "extract_content saves it for targeted file reads. "
-            )
+            text += "Observations omit page text; search_page finds it. "
         if self.max_text_chars or self.sparse_text_chars:
             text += (
                 "Links within prose use [label][ref]; pass that ref to element tools. "

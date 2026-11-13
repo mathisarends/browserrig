@@ -40,7 +40,6 @@ from browserrig import (
     InputVisualization,
     LocalWorkspace,
     MountedWorkspace,
-    PageExtractionTools,
     Readiness,
     Runtime,
     Screenshots,
@@ -116,7 +115,7 @@ async def test_each_browser_tool_has_a_unique_stable_kind(fake_chrome):
         "open_downloaded_file": ActionKind.OPEN_DOWNLOADED_FILE,
         "upload_files": ActionKind.UPLOAD,
         "screenshot": ActionKind.SCREENSHOT,
-        "extract_content": ActionKind.EXTRACT_CONTENT,
+        "search_page": ActionKind.SEARCH_PAGE,
     }
     agent = browserrig.Agent(model=ScriptedModel(["unused"]))
     async with agent.session() as session:
@@ -372,9 +371,7 @@ _WORKSPACE_TOOLS = {
 async def test_file_tools_follow_the_workspace_and_the_browser_bridge(
     fake_chrome, tmp_path
 ):
-    without_files = browserrig.Agent(
-        model=ScriptedModel(["unused"]), without=(Files, PageExtractionTools)
-    )
+    without_files = browserrig.Agent(model=ScriptedModel(["unused"]), without=(Files,))
     async with without_files.session() as session:
         tools = session.scope[ToolRegistry]
         names = {item.name for item in tools.definitions}
@@ -459,9 +456,7 @@ async def test_browser_services_are_isolated_between_sessions(fake_chrome):
 async def test_workspace_changes_replace_transfer_without_reopening_chrome(
     fake_chrome, tmp_path
 ):
-    agent = browserrig.Agent(
-        model=ScriptedModel([]), without=(Files, PageExtractionTools)
-    )
+    agent = browserrig.Agent(model=ScriptedModel([]), without=(Files,))
     async with agent.session() as session:
         scope = session.scope
         browser, coordination = scope[Browser], scope[BrowserCoordination]

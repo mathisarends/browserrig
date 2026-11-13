@@ -8,16 +8,14 @@ from harnessed import ToolCall, ToolResult, ToolStatus
 from pydantic import TypeAdapter, ValidationError
 
 from browserrig.browser import TabInfo
-from browserrig.core import ActionKind, Bounds, Region
+from browserrig.core import ActionKind, Region
 from browserrig.files import Download, FileContent, FileEntry, FileListing
-from browserrig.observation import ExtractedContent
 
 from .events import CaptureRegion, WorkPhase, WorkPresentedEvent
 
 # Native input already explains other operations. Their failures still get a receipt.
 SILENT_WORK = {
     ActionKind.READ_FILE: "Reading file",
-    ActionKind.EXTRACT_CONTENT: "Reading page content",
     ActionKind.WRITE_FILE: "Saving file",
     ActionKind.EDIT_FILE: "Editing file",
     ActionKind.LIST_FILES: "Listing files",
@@ -44,14 +42,6 @@ def started(call: ToolCall, kind: ActionKind) -> WorkPresentedEvent:
     preview = ""
     region = None
     match kind:
-        case ActionKind.EXTRACT_CONTENT:
-            detail = "Loaded page · " + (
-                "including header and navigation"
-                if args.get("full_page")
-                else "main content"
-            )
-            if args.get("offset"):
-                detail += f" · from character {args['offset']}"
         case ActionKind.JAVASCRIPT:
             preview = clipped(str(args.get("code", "")))
         case ActionKind.WRITE_FILE | ActionKind.EDIT_FILE:
@@ -100,7 +90,6 @@ def finished(
     result: ToolResult,
     *,
     elapsed: float,
-    extraction: ExtractedContent | None = None,
 ) -> WorkPresentedEvent:
     phase = WorkPhase.COMPLETED
     if result.status is ToolStatus.CANCELLED:
@@ -111,7 +100,7 @@ def finished(
     if result.is_error:
         return replace(event, detail=result.status.value, preview=clipped(result.text))
     try:
-        return _result(event, result, extraction)
+        return _result(event, result)
     except ValidationError:
         # Custom tool-result hooks may deliberately replace the standard DTO.
         return replace(event, preview=clipped(result.text))
@@ -121,9 +110,7 @@ def clipped(text: str, limit: int = _PREVIEW_CHARS) -> str:
     return text if len(text) <= limit else text[:limit] + "\n… Preview shortened"
 
 
-def _result(
-    event: WorkPresentedEvent, result: ToolResult, extraction: ExtractedContent | None
-) -> WorkPresentedEvent:
+def _result(event: WorkPresentedEvent, result: ToolResult) -> WorkPresentedEvent:
     match event.kind:
         case ActionKind.READ_FILE:
             event = _file(event, FileContent.model_validate_json(result.text))
@@ -136,25 +123,6 @@ def _result(
             )
         case ActionKind.LIST_FILES | ActionKind.LIST_TABS | ActionKind.LIST_DOWNLOADS:
             event = _listing(event, result)
-        case ActionKind.EXTRACT_CONTENT if extraction is not None:
-            detail = f"{event.detail} · {len(extraction.markdown):,} characters · {extraction.url}"
-            if extraction.next_offset is not None:
-                detail += f" · continues at {extraction.next_offset}"
-            event = replace(
-                event,
-                title=extraction.title or event.title,
-                detail=clipped(detail, 500),
-                preview=clipped(extraction.markdown),
-                limitations=_limitations(extraction.limitations),
-                phase=WorkPhase.WARNING if extraction.partial else WorkPhase.COMPLETED,
-                source_url=extraction.url,
-                artifact_path=extraction.extracted_path or "",
-                characters=len(extraction.markdown),
-                offset=extraction.offset,
-                next_offset=extraction.next_offset,
-                content_status="partial" if extraction.partial else "complete",
-                region=_area(extraction.region),
-            )
         case ActionKind.SCREENSHOT:
             event = replace(
                 event,
@@ -242,12 +210,6 @@ def _file(event: WorkPresentedEvent, content: FileContent) -> WorkPresentedEvent
         page_count=content.page_count,
         content_status=content.status,
     )
-
-
-def _area(bounds: Bounds | None) -> CaptureRegion | None:
-    if bounds is None or bounds.width <= 0 or bounds.height <= 0:
-        return None
-    return CaptureRegion(bounds.x, bounds.y, bounds.width, bounds.height)
 
 
 def _limitations(items: tuple[str, ...]) -> tuple[str, ...]:

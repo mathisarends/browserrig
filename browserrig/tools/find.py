@@ -88,7 +88,7 @@ def _report(queries: tuple[str, ...], match: int, found: PageMatches) -> str:
     if not found.total:
         lines = [
             f"No matches for {quoted} on the page. Matching ignores case and accents; try a "
-            "shorter or different wording, or extract_content to read the page."
+            "shorter or different wording, or search_page to read matching records."
         ]
     elif match > found.total:
         lines = [

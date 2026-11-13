@@ -13,7 +13,7 @@ from browserrig import (
     Files,
     FormTools,
     KeyboardTools,
-    PageExtractionTools,
+    PageSearchTools,
     PointerTools,
     Readiness,
     ScreenshotTools,
@@ -32,7 +32,7 @@ from tests.fakes import FakeChrome
         (DomScrollTools(), {"scroll_page", "scroll_element"}),
         (FormTools(), {"select_option", "select_options", "set_date"}),
         (ScreenshotTools(), {"screenshot"}),
-        (PageExtractionTools(), {"extract_content"}),
+        (PageSearchTools(), {"search_page"}),
     ],
 )
 async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
@@ -64,18 +64,6 @@ async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
             == {"send_keys", "click", "click_at", "move_mouse", "drag", "drag_at"}
             | expected
         )
-    assert not model.requests
-
-
-async def test_page_extraction_without_a_workspace_fails_before_model_use():
-    model = ScriptedModel([])
-    agent = Agent(
-        model=model, plugins=[FakeChrome({}), Readiness(), PageExtractionTools()]
-    )
-    with pytest.raises(
-        PluginDependencyError, match="PageExtractionTools requires FileSystem"
-    ):
-        await agent.run("Read the page")
     assert not model.requests
 
 

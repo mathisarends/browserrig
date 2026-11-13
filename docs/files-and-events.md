@@ -30,12 +30,11 @@ agent = Agent(
 | `FileTools` | Combined workspace, preview and DOM upload tools |
 | `FileTransfers` | Binds the workspace and a `FileBridge` into `FileTransfer` |
 | `DownloadReceiving` | Receives later browser downloads independently of tool availability |
-| `PageExtractionTools` | Saves loaded webpage content to workspace Markdown |
 
 `WorkspaceTools`, `BrowserFileTools` and `FileTools` share one slot; choose one.
 The task recipe includes the combined tools. Removing tools does not stop download
 receiving. To omit files from that recipe, remove
-`without=(Files, FileTools, PageExtractionTools)`. Manual browser/file compositions
+`without=(Files, FileTools)`. Manual browser/file compositions
 also need `FileTransfers()` and `DownloadReceiving()` for receiving downloads.
 
 A workspace-only agent uses Harnessed `Agent` with
@@ -76,21 +75,6 @@ Direct `FileSystem.read_file` calls default to text; visual results expose
 `limitations` identify partial, unsupported or metadata-only reads. OCR, graphics
 and stored formula results need interpretation; source files are preserved and
 macros/scripts are not executed.
-
-## Saved webpage extractions
-
-`extract_content(full_page=False, name=None)` saves a new `pages/<id>/content.md`
-and `source.json` containing URL, title, time and limitations. A `name` makes the
-path predictable (`pages/<name>/content.md`) and replaces an earlier save with it. The tool returns only
-the receipt. Use `grep(query, pattern=<saved-path>)` and `read_file` for excerpts;
-the file stays readable after navigation.
-
-Extraction reads loaded DOM content, including available shadow/frame documents,
-without navigating or loading lazy content. It omits hidden text, scripts and
-form values; truncation and unavailable frames are reported. Configured secrets
-are redacted before persistence. The direct Python helper
-`browserrig.observation.content.extract_content(tab, ...)` returns typed Markdown
-without requiring a workspace.
 
 ## Downloads and previews
 
@@ -149,8 +133,8 @@ workspace. The workspace is a tool-level path boundary; Chrome, parsers and
 custom plugins retain their process permissions. Use a separate OS/container
 boundary when the entire process needs isolation.
 
-Harnessed filesystem/sandbox tools can replace local file tools. Remove `Files`,
-`FileTools` and `PageExtractionTools` from the task recipe first, and transfer
+Harnessed filesystem/sandbox tools can replace local file tools. Remove `Files`
+and `FileTools` from the task recipe first, and transfer
 browser files explicitly. A sandbox does not automatically redirect Chrome,
 Browserrig readers or downloads.
 

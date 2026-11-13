@@ -89,7 +89,7 @@ See [backend contracts](browser-composition.md#references-from-other-capture-bac
 | `FormTools` | Native selects, exact multi-select sets and date fields |
 | `NavigationTools` / `TabTools` | Navigation, search, history and tab management |
 | `ScreenshotTools` | Request an image/crop at the next observation boundary |
-| `PageExtractionTools` | Save loaded page content as workspace Markdown |
+| `PageSearchTools` | Search loaded page text for matching records |
 
 Ref-based input reveals and hit-tests the target before acting. DOM reveal
 scrolls exact containers, respecting overflow locks and embedding frames, and
@@ -126,17 +126,12 @@ searches the loaded page text without scrolling or changing it, ignoring case an
 accents. It returns whole records: table rows under their column header, innermost
 list items and paragraphs, grouped by section heading and with their links. The
 first line gives the total; continue with `start` when more records match. Searches
-are read-only, so several can run in one response. Like extraction, it does not
-load lazy content or read canvas pixels, and secrets are redacted before matching.
-
-`extract_content(full_page=False, name=None)` saves loaded content to
-`pages/<id>/content.md`, with provenance in `source.json`. With `name`, it saves to
-`pages/<name>/content.md` and replaces an earlier save with that name, so a `grep`
-in the same response can search it. It returns a short receipt; use `grep` and
-bounded `read_file` calls to inspect the file. It requires
-a workspace and does not load lazy content or interpret canvas pixels. Each
-extraction is a separate snapshot. Access the latest typed result through
-`session.scope[PageExtractionTools].extracted_content`.
+are read-only, so several can run in one response. It reads loaded DOM content,
+including available shadow and frame documents, but does not load lazy content or
+read canvas pixels. Hidden text, scripts and form values are omitted, and secrets are
+redacted before matching. To collect findings across pages, write them to workspace
+notes. The Python helper `browserrig.observation.content.extract_content(tab, ...)`
+returns the page as typed Markdown.
 
 `find_in_page(query, alternatives=(), match=1, max_results=10)` searches rendered
 text across frames, tolerating case, accents and whitespace differences. It

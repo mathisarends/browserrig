@@ -137,9 +137,6 @@ class Search:
             return None
         metadata = path.with_name(path.name[:-3] + ".extraction.json")
         stat = await self._workspace.stat(metadata)
-        if stat is None and path.name == "content.md":
-            metadata = path.with_name("source.json")
-            stat = await self._workspace.stat(metadata)
         if stat is None:
             return None
         if stat.size is None or stat.size > 1_000_000:

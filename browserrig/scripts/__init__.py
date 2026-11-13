@@ -23,7 +23,6 @@ from .models import (
     OwnerHitsArgs,
     OwnerScrollArgs,
     PageFacts,
-    ReadingScrollArgs,
     ScriptArgs,
     ScrollArgs,
     ScrollPlan,
@@ -55,7 +54,6 @@ __all__ = [
     "OVERLAY_STYLES",
     "OWNER_SIZE",
     "PAGE_FACTS",
-    "READING_SCROLL",
     "TARGET_SCROLL",
     "RESET",
     "SCROLL",
@@ -79,7 +77,6 @@ __all__ = [
     "OwnerScrollArgs",
     "OverlayArgs",
     "PageFacts",
-    "ReadingScrollArgs",
     "Script",
     "ScriptArgs",
     "ScriptError",
@@ -203,9 +200,6 @@ CHOREOGRAPHY: Script[ScriptArgs, None] = Script.load(
 )
 SELECT_OPTIONS: Script[SelectOptionsArgs, SelectionResult] = Script.load(
     "select_options", SelectOptionsArgs, SelectionResult, uses=("elements",)
-)
-READING_SCROLL: Script[ReadingScrollArgs, bool] = Script.load(
-    "reading_scroll", ReadingScrollArgs, bool
 )
 SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))
 RESET: Script[ScriptArgs, None] = Script.load("reset", ScriptArgs, type(None))

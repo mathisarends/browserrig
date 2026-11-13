@@ -4,7 +4,6 @@ from browserrig.choreography import WorkPhase
 from browserrig.choreography.work import finished, started
 from browserrig.core import ActionKind
 from browserrig.files import FileContent, FileEntry
-from browserrig.observation import ExtractedContent
 
 
 def test_file_receipt_distinguishes_response_pagination_from_saved_extraction():
@@ -33,31 +32,6 @@ def test_file_receipt_distinguishes_response_pagination_from_saved_extraction():
     assert len(receipt.preview) < len(content.text)
     assert receipt.artifact_path == content.extracted_path
     assert receipt.limitations == content.limitations and receipt.elapsed == 1.2
-
-
-def test_extraction_uses_typed_source_instead_of_parsing_markdown():
-    extraction = ExtractedContent(
-        url="https://example.org/article",
-        title="Source title",
-        markdown="# Content\n\nSome text",
-        offset=100,
-        next_offset=125,
-        partial=True,
-        limitations=("Embedded frame is unavailable",),
-        extracted_path="pages/p17/content.md",
-    )
-    receipt = finished(
-        started(
-            ToolCall("extract_content", {"offset": 100}), ActionKind.EXTRACT_CONTENT
-        ),
-        ToolResult("A result review may change this text."),
-        elapsed=0.3,
-        extraction=extraction,
-    )
-    assert receipt.title == extraction.title and receipt.preview == extraction.markdown
-    assert extraction.url in receipt.detail and "125" in receipt.detail
-    assert receipt.phase is WorkPhase.WARNING
-    assert receipt.artifact_path == extraction.extracted_path
 
 
 def test_screenshot_request_is_not_a_completed_capture():

@@ -35,7 +35,6 @@ function createChoreographyCaption(ui) {
   const glyph = (item) => {
     const action = ui.options().actions;
     const named = {
-      [action.EXTRACT_CONTENT]: 'page',
       [action.READ_FILE]: 'file',
       [action.OPEN_FILE]: 'file',
       [action.OPEN_DOWNLOADED_FILE]: 'file',

@@ -137,23 +137,6 @@ class WorkPhase(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class ReadingSweepEvent(InputEvent):
-    """One page-reading pass, held at the bottom before returning to its origin.
-
-    The running work receipt remains open until native scrolling has returned.
-    Durations are seconds; viewers keep the reading beam active for the whole pass.
-    """
-
-    work_id: str
-    down: float
-    hold: float
-    back: float
-    type: Literal[EventKind.READING_SWEEP] = field(
-        default=EventKind.READING_SWEEP, kw_only=True
-    )
-
-
-@dataclass(frozen=True, slots=True)
 class CaptureRegion:
     """An immutable rectangle in the source tab's viewport CSS pixels."""
 
@@ -205,7 +188,6 @@ class WorkPresentedEvent(LiveEvent):
 
 
 SCENE_EVENTS = (
-    ReadingSweepEvent,
     HighlightElementEvent,
     WaitingEvent,
     BarTypedEvent,

@@ -1,4 +1,3 @@
-from .archive import SNAPSHOT_NAME, save_content
 from .capture import CaptureContent, CaptureStrategy, capture
 from .changes import decision_change
 from .config import Screenshots, ScreenshotTrigger
@@ -51,10 +50,8 @@ __all__ = [
     "EmptyReferences",
     "RevealableElement",
     "extract_document",
-    "save_content",
     "search_content",
     "PageSearch",
-    "SNAPSHOT_NAME",
     "Canvas",
     "ContentGroup",
     "ContentNode",

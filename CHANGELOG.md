@@ -2,12 +2,19 @@
 
 ## Unreleased
 
+### Breaking changes
+
+- Remove `extract_content`, `PageExtractionTools`, `PageContentExtracted`,
+  `save_content` and the reading sweep (`ReadingSweepEvent`). `search_page`
+  reads page content without saving it; collect findings across pages in
+  workspace notes. `PageContent` no longer has `extracted_path` or
+  `render_receipt()`.
+
+### Changes
+
 - Add `search_page`, a read-only page search that returns matching table rows
   with their column headers, list items and paragraphs, including links, without
   scrolling or saving the page.
-- Add an optional `name` to `extract_content` that saves to
-  `pages/<name>/content.md` and replaces an earlier save with that name, so
-  `grep` can search the snapshot in the same tool batch.
 - Encourage batched tool calls in DOM chain and workspace guidance.
 - Evals record chain-skipped tool calls as `tool_skipped`, not as tool errors.
 

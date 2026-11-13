@@ -35,20 +35,19 @@ from browserrig.events import (
     ObservationCapturedEvent,
 )
 from browserrig.input import Input
-from browserrig.observation import BrowserPerception, ExtractedContent
+from browserrig.observation import BrowserPerception
 from browserrig.secrets import Secrets
 from browserrig.tools import (
     FindIntent,
     NavigateIntent,
     OpenFileIntent,
-    PageContentExtracted,
     Perform,
     TargetLocated,
     UploadIntent,
     WaitIntent,
 )
 
-from . import reading, scenes, work
+from . import scenes, work
 from .events import (
     SCENE_EVENTS,
     CaptureRegion,
@@ -76,7 +75,6 @@ class _Presentation:
     screenshot: WorkPresentedEvent | None = None
     running: dict[str, WorkPresentedEvent] = field(default_factory=dict)
     handled: set[str] = field(default_factory=set)
-    extractions: dict[str, ExtractedContent] = field(default_factory=dict)
 
 
 class InputVisualization(Plugin, slot="browserrig.choreography"):
@@ -232,7 +230,6 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
         tab = self._browser.active_tab
         receipt = replace(receipt, target_id=tab.id, document_id=tab.document_id)
         if metadata.kind in {
-            ActionKind.EXTRACT_CONTENT,
             ActionKind.JAVASCRIPT,
             ActionKind.SCREENSHOT,
             ActionKind.GO_BACK,
@@ -250,14 +247,6 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             if shown:
                 await self._emit_work(receipt)
             result = await next_()
-            if metadata.kind is ActionKind.EXTRACT_CONTENT and not result.is_error:
-                async with self._coordination.exclusive():
-                    if self._browser.active_tab.id == tab.id:
-                        await reading.sweep(
-                            tab,
-                            work_id=receipt.work_id,
-                            document_id=receipt.document_id,
-                        )
         except asyncio.CancelledError:
             await self._emit_work(
                 work.finished(
@@ -278,13 +267,11 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             raise
         finally:
             self._state.running.pop(event.call.id, None)
-            extraction = self._state.extractions.pop(event.call.id, None)
         if shown or result.is_error:
             completed = work.finished(
                 receipt,
                 self._redact(result),
                 elapsed=monotonic() - started_at,
-                extraction=self._redact(extraction),
             )
             if metadata.kind is ActionKind.SCREENSHOT and not result.is_error:
                 if previous := self._state.screenshot:
@@ -306,16 +293,6 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             if context is not None and Secrets in context
             else value
         )
-
-    @hook(PageContentExtracted)
-    async def _extracted(self, event: PageContentExtracted) -> None:
-        for call_id, active in self._state.running.items():
-            if (
-                active.kind is ActionKind.EXTRACT_CONTENT
-                and active.target_id == event.target_id
-                and active.document_id == event.document_id
-            ):
-                self._state.extractions[call_id] = event.content
 
     @hook(ToolCallFinishedEvent)
     async def _unexecuted(self, event: ToolCallFinishedEvent) -> None:

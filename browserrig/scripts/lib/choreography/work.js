@@ -1,15 +1,7 @@
 ﻿function createChoreographyWork(ui, cursor, caption, panels) {
   // Effects play once per receipt, even when facts enrich the same receipt again.
   const played = new Set();
-  const scan = ui.node('scan');
   const name = (path) => path.split(/[\\/]/).pop();
-  const host = (url) => {
-    try {
-      return new URL(url).host || url;
-    } catch {
-      return url;
-    }
-  };
   const firstLine = (text) =>
     (text || '')
       .split('\n')
@@ -27,9 +19,7 @@
     if (item.kind === action.WRITE_FILE || item.kind === action.EDIT_FILE) {
       return name(item.artifact_path || item.source_path || item.detail);
     }
-    const source =
-      (item.source_path && name(item.source_path)) ||
-      (item.kind === action.EXTRACT_CONTENT && host(item.source_url || ''));
+    const source = item.source_path && name(item.source_path);
     if (!source) {
       return item.detail;
     }
@@ -64,34 +54,6 @@
     played.add(key);
     return true;
   };
-  const read = (event) => {
-    const phase = ui.options().phases;
-    if (event.phase === phase.RUNNING) {
-      ui.cancel('scan');
-      ui.bounds(scan, 0, 0, innerWidth, innerHeight);
-      scan.dataset.partial = 'false';
-      scan.dataset.state = 'scanning';
-      return;
-    }
-    if (event.phase !== phase.COMPLETED && event.phase !== phase.WARNING) {
-      scan.dataset.state = 'hidden';
-      return;
-    }
-    if (event.region) {
-      // Narrow from the whole viewport to the part that was actually read.
-      const {x, y, width, height} = event.region;
-      ui.bounds(scan, x, y, width, height);
-      scan.dataset.partial = String(event.phase === phase.WARNING);
-      scan.dataset.state = 'focus';
-    }
-    ui.later(
-      'scan',
-      () => {
-        scan.dataset.state = 'hidden';
-      },
-      event.region ? 700 : 0,
-    );
-  };
   const capture = (region) => {
     const frame = ui.node('viewfinder');
     ui.bounds(frame, region.x, region.y, region.width, region.height);
@@ -113,9 +75,6 @@
     const {phases: phase, actions: action} = ui.options();
     const finished = event.phase === phase.COMPLETED || event.phase === phase.WARNING;
     switch (event.kind) {
-      case action.EXTRACT_CONTENT:
-        read(event);
-        break;
       case action.SCREENSHOT:
         if (event.region && event.image_url && once(event, 'capture')) {
           capture(event.region);
@@ -208,13 +167,6 @@
           effects(event);
         }
         break;
-      case kinds.READING_SWEEP:
-        if (visibleHere(event)) {
-          ui.cancel('scan');
-          ui.bounds(scan, 0, 0, innerWidth, innerHeight);
-          scan.dataset.state = 'sweeping';
-        }
-        break;
       case kinds.ACTIVITY_STARTED:
       case kinds.ACTIVITY_FINISHED:
         if (event.kind === ui.options().activities.HANDOFF) {
@@ -230,8 +182,6 @@
   };
   const reset = () => {
     caption.reset();
-    ui.cancel('scan');
-    scan.dataset.state = 'hidden';
     ui.node('edge').dataset.visible = 'false';
   };
   return {show, reset};
