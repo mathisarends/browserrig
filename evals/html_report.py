@@ -256,9 +256,9 @@ def _task_view(
             json.dumps([item.model_dump() for item in view.documents]), encoding="utf-8"
         )
     traced_tools = _trace_tools(spans)
-    view.tools = (
-        traced_tools if len(traced_tools) >= len(record.tools) else record.tools
-    )
+    # Skipped chain calls never ran, so traces contain only executed calls.
+    executed = [tool for tool in record.tools if not tool.skipped]
+    view.tools = traced_tools if len(traced_tools) >= len(executed) else record.tools
     if spans:
         view.metrics = analyze.analyze(record, project, cache, spans=spans)
         view.trace_id = spans[0].get("context", {}).get("trace_id")
@@ -316,12 +316,13 @@ def _trace_coverage(
         for span in spans
         if span["name"] == "harnessed.model"
     )
-    complete = prompt == record.usage.input and len(tools) == record.tool_calls
+    executed = record.tool_calls - (record.tool_skipped or 0)
+    complete = prompt == record.usage.input and len(tools) == executed
     view.metrics["trace_coverage"] = "complete" if complete else "partial"
     if not complete:
         view.trace_error = (
             f"Teilweiser Trace: {prompt}/{record.usage.input} Eingabetokens "
-            f"und {len(tools)}/{record.tool_calls} Toolaufrufe in Phoenix. "
+            f"und {len(tools)}/{executed} ausgeführte Toolaufrufe in Phoenix. "
             "Für Toolmuster werden vollständige lokale Toolaufzeichnungen bevorzugt."
         )
 

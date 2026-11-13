@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from harnessed import PolicyDecision, ToolCall
+from harnessed import PolicyDecision, ToolCall, ToolStatus
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.kernel import PluginLike
 from harnessed.models import Message
@@ -201,6 +201,7 @@ def _capture(record: TaskResult, result) -> None:
     record.tools = _tool_calls(result.events)
     record.tool_calls = len(record.tools)
     record.tool_errors = sum(tool.error for tool in record.tools)
+    record.tool_skipped = sum(tool.skipped for tool in record.tools)
 
 
 def _tool_calls(events: Iterable[object]) -> list[ToolRecord]:
@@ -209,13 +210,15 @@ def _tool_calls(events: Iterable[object]) -> list[ToolRecord]:
         if not isinstance(event, ToolCallFinishedEvent):
             continue
         content = event.result.content
+        skipped = event.result.status is ToolStatus.SKIPPED
         text = content if isinstance(content, str) else json.dumps(content, default=str)
         call = _TOOL_CALL_ADAPTER.dump_python(event.call, mode="json")
         calls.append(
             ToolRecord(
                 name=event.call.name,
                 args=call["arguments"],
-                error=event.result.is_error,
+                error=event.result.is_error and not skipped,
+                skipped=skipped,
                 chars=len(text),
                 preview=text[:300],
             )

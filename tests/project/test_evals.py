@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
-from harnessed import ToolCall, ToolResult
+from harnessed import ToolCall, ToolResult, ToolStatus
 from harnessed.events import ToolCallFinishedEvent
 
 from evals import analyze, evaluate, report, run, runner
@@ -241,6 +241,30 @@ async def test_tool_evidence_serializes_harnessed_arguments(tmp_path, agent_resu
     assert result.status == "pass", result.error
     assert result.tool_calls == 1
     assert result.tools[0].args == {"paths": ["note.txt"], "options": {"mode": "test"}}
+
+
+async def test_skipped_chain_calls_are_counted_apart_from_errors(
+    tmp_path, agent_result
+):
+    agent_result.events = [
+        ToolCallFinishedEvent(
+            call=ToolCall("click", {"ref": "1"}), result=ToolResult("navigated")
+        ),
+        ToolCallFinishedEvent(
+            call=ToolCall("click", {"ref": "2"}),
+            result=ToolResult("Skipped", ToolStatus.SKIPPED),
+        ),
+        ToolCallFinishedEvent(
+            call=ToolCall("click", {"ref": "3"}), result=ToolResult.error("stale ref")
+        ),
+    ]
+    result = await runner.run_task(_task(), runner.RunOptions("test"), tmp_path / "29")
+    assert (result.tool_calls, result.tool_errors, result.tool_skipped) == (3, 1, 1)
+    assert [(tool.error, tool.skipped) for tool in result.tools] == [
+        (False, False),
+        (False, True),
+        (True, False),
+    ]
 
 
 async def test_workspace_setup_failure_becomes_a_task_error(tmp_path):

@@ -228,7 +228,8 @@ duplicate task attempts and incompatible models, datasets or budgets.
 The generator writes `.html`, `.data.json`, and a combined `.run.json`, plus cached
 Phoenix evidence and context dumps beside the report. No model or LLM judge is
 called. Interaction-pattern rates show task-level associations; tool error counts
-refer only to the matching tools. Failure details include the official assertions,
+refer only to the matching tools. Calls skipped after an earlier call ended the
+action chain never ran; `tool_skipped` counts them apart from `tool_errors`. Failure details include the official assertions,
 recorded mutation requests, and literal expected-versus-sent form-field differences.
 These diagnostic comparisons do not change upstream grading. Session/token fields
 are redacted in the embedded request summaries; raw local artifacts are retained.

@@ -25,6 +25,8 @@ class ToolRecord(BaseModel):
     # Older snapshots contain repr strings of Harnessed's immutable mappings.
     args: dict[str, JsonValue] | str
     error: bool
+    # Calls skipped after an earlier call ended the chain never ran and are not errors.
+    skipped: bool = False
     chars: int
     preview: str
 
@@ -65,6 +67,7 @@ class TaskResult(BaseModel):
     usage: Usage | None = None
     tool_calls: int | None = None
     tool_errors: int | None = None
+    tool_skipped: int | None = None
     tools: list[ToolRecord] = Field(default_factory=list)
     error: str | None = None
     error_phase: (
