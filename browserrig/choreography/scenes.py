@@ -14,7 +14,9 @@ from browserrig.core import BrowserBar, BrowserError, FileTransferDirection, Poi
 from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
 from browserrig.input import TYPING_INTERVAL_SECONDS
 from browserrig.observation import PageSearch, close_find, find_text
+from browserrig.scripts import TargetScrollResult
 from browserrig.tools import (
+    DomScrollIntent,
     NavigateIntent,
     OpenFileIntent,
     SearchIntent,
@@ -24,6 +26,7 @@ from browserrig.tools import (
 
 from .events import (
     BarTypedEvent,
+    DomScrolledEvent,
     FileTransferEvent,
     FindBarEvent,
     FindResultsEvent,
@@ -51,6 +54,24 @@ class Scene:
 
     async def show(self, event: InputEvent) -> None:
         await self.tab.emit(replace(event, action_id=self.action_id))
+
+
+async def dom_scroll(
+    scene: Scene, intent: DomScrollIntent, step: Step
+) -> TargetScrollResult:
+    result: TargetScrollResult = await step()
+    if result.before != result.after:
+        await scene.show(
+            DomScrolledEvent(
+                frame_id=intent.frame_id,
+                frame_document_id=intent.frame_document_id,
+                ref=intent.ref,
+                before=(result.before.x, result.before.y),
+                after=(result.after.x, result.after.y),
+                blocked=result.blocked,
+            )
+        )
+    return result
 
 
 async def search(scene: Scene, intent: SearchIntent, step: Step) -> PageSearch:

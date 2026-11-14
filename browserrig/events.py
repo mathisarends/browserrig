@@ -73,6 +73,7 @@ class EventKind(StrEnum):
     KEY_PRESSED = "browser.key.pressed"
     KEYBOARD_VISIBILITY = "browser.keyboard.visibility"
     SCROLLED = "browser.scrolled"
+    DOM_SCROLLED = "browser.dom.scrolled"
     SCROLL_STARTED = "browser.scroll.started"
     HIGHLIGHT_ELEMENT = "browser.element.highlight"
     WAITING = "browser.waiting"

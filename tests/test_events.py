@@ -9,6 +9,7 @@ from browserrig import events
 from browserrig.choreography import (
     SCENE_EVENTS,
     CaptureRegion,
+    DomScrolledEvent,
     WorkPhase,
     WorkPresentedEvent,
 )
@@ -48,6 +49,26 @@ def test_action_page_state_roundtrips_as_a_typed_nested_value():
     restored = registry.decode(registry.encode(event))
     assert restored == event
     assert isinstance(restored.before, events.PageState)
+
+
+def test_dom_scroll_receipt_roundtrips_as_transient_with_local_offsets():
+    adapter = TypeAdapter(DomScrolledEvent)
+    event = DomScrolledEvent(
+        frame_id="frame",
+        frame_document_id="frame-document",
+        ref="ref",
+        before=(12.5, 80),
+        after=(12.5, 300),
+        blocked=True,
+        target_id="tab",
+        document_id="document",
+        action_id="action",
+    )
+    restored = adapter.validate_json(adapter.dump_json(event))
+    EventRegistry(SCENE_EVENTS).validate(restored)
+    assert restored == event
+    assert isinstance(restored, events.LiveEvent)
+    assert not isinstance(restored, events.BrowserEvent)
 
 
 def test_canvas_work_contract_roundtrips_with_typed_geometry_and_phase():

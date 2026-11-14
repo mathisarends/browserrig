@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fix missing choreography for DOM scroll tools: `InputVisualization` now emits
+  transient `DomScrolledEvent` receipts with measured before/after offsets and
+  tab/document/frame/container identity when `scroll_page` or `scroll_element`
+  actually moves. Wheel events retain their native-input semantics.
+
 ## 0.4.0 (2026-11-14)
 
 ### Breaking changes

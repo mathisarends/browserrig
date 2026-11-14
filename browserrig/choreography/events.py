@@ -19,6 +19,25 @@ from browserrig.observation import FindMark
 
 
 @dataclass(frozen=True, slots=True)
+class DomScrolledEvent(InputEvent):
+    """Measured DOM movement; offsets are scrollLeft/scrollTop in local CSS pixels.
+
+    An empty `ref` identifies the outer document. Otherwise it identifies a container
+    in `frame_id`/`frame_document_id`. No event is emitted when offsets are unchanged.
+    """
+
+    frame_id: str
+    frame_document_id: str
+    ref: str
+    before: tuple[float, float]
+    after: tuple[float, float]
+    blocked: bool = False
+    type: Literal[EventKind.DOM_SCROLLED] = field(
+        default=EventKind.DOM_SCROLLED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class HighlightElementEvent(InputEvent):
     ref: str
     x: float
@@ -190,6 +209,7 @@ class WorkPresentedEvent(LiveEvent):
 
 
 SCENE_EVENTS = (
+    DomScrolledEvent,
     HighlightElementEvent,
     WaitingEvent,
     BarTypedEvent,

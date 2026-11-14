@@ -38,6 +38,7 @@ from browserrig.input import Input
 from browserrig.observation import BrowserPerception
 from browserrig.secrets import Secrets
 from browserrig.tools import (
+    DomScrollIntent,
     NavigateIntent,
     OpenFileIntent,
     Perform,
@@ -370,17 +371,21 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
     async def _stage(self, event: Perform, next_: Next[Any]) -> Any:
         scene = scenes.Scene(event.tab, event.action_id)
         match event.intent:
+            case DomScrollIntent() as intent:
+                result = await scenes.dom_scroll(scene, intent, next_)
             case SearchIntent() as intent:
-                return await scenes.search(scene, intent, next_)
+                result = await scenes.search(scene, intent, next_)
             case NavigateIntent() as intent:
-                return await scenes.navigate(scene, intent, next_)
+                result = await scenes.navigate(scene, intent, next_)
             case WaitIntent() as intent:
-                return await scenes.wait(scene, intent, next_)
+                result = await scenes.wait(scene, intent, next_)
             case OpenFileIntent() as intent:
-                return await scenes.open_file(scene, intent, next_)
+                result = await scenes.open_file(scene, intent, next_)
             case UploadIntent() as intent:
-                return await scenes.upload(scene, intent, next_)
-        return await next_()
+                result = await scenes.upload(scene, intent, next_)
+            case _:
+                result = await next_()
+        return result
 
     @hook(TargetLocated)
     async def _highlight(self, event: TargetLocated) -> None:
