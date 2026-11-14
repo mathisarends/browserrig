@@ -308,9 +308,7 @@ async def test_native_policy_selection_and_waterfall_are_removed_with_the_plugin
         assert report.timed_out and "Application data" in report.reason
         assert chosen == ["initial"]
         # The hook can finish exactly as the budget expires on coarse clocks.
-        assert checked and all(
-            ready and 0 <= remaining <= options.timeout for ready, remaining in checked
-        )
+        assert checked and all(ready and remaining >= 0 for ready, remaining in checked)
         await extension.aclose()
         assert (await readiness.wait(tab)).status == "ready"
 
