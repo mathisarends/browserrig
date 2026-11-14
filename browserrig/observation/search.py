@@ -249,8 +249,9 @@ def _window(record: Record, needles: tuple[str, ...]) -> Record:
     text = record.text
     if len(text) <= _RECORD_CHARS:
         return record
-    folded = _fold(text)
+    folded, offsets = _search_text(text)
     at = min((folded.find(needle) for needle in needles if needle in folded), default=0)
+    at = offsets[at] if offsets else 0
     begin = max(0, min(at - _RECORD_CHARS // 3, len(text) - _RECORD_CHARS))
     end = begin + _RECORD_CHARS
     clipped = (
@@ -264,15 +265,40 @@ def _visible(text: str) -> str:
 
 
 def _fold(text: str) -> str:
-    """Case- and accent-insensitive with collapsed whitespace, as the find bar matches.
+    """Case- and accent-insensitive with collapsed whitespace."""
+    return _normalize(text, list(range(len(text))))[0]
 
-    Each character folds to one, so a window found in folded text stays close to the
-    match in the original.
-    """
-    folded = []
-    for char in text:
+
+def _search_text(text: str) -> tuple[str, list[int]]:
+    """Visible search text with positions in the original Markdown."""
+    visible, offsets = [], []
+    start = 0
+    for link in _LINK.finditer(text):
+        visible.extend((text[start : link.start()], link[1]))
+        offsets.extend(range(start, link.start()))
+        offsets.extend(range(link.start(1), link.end(1)))
+        start = link.end()
+    visible.append(text[start:])
+    offsets.extend(range(start, len(text)))
+    return _normalize("".join(visible), offsets)
+
+
+def _normalize(text: str, offsets: list[int]) -> tuple[str, list[int]]:
+    folded, positions = [], []
+    for char, offset in zip(text, offsets, strict=True):
         base = unicodedata.normalize("NFD", char)
         base = "".join(part for part in base if not unicodedata.combining(part))
+        if not base:
+            continue
         base = base.casefold()
-        folded.append(base[0] if len(base) == 1 else char.lower()[:1] or char)
-    return " ".join("".join(folded).split())
+        normalized = base[0] if len(base) == 1 else char.lower()[:1] or char
+        if normalized.isspace():
+            if not folded or folded[-1] == " ":
+                continue
+            normalized = " "
+        folded.append(normalized)
+        positions.append(offset)
+    if folded and folded[-1] == " ":
+        folded.pop()
+        positions.pop()
+    return "".join(folded), positions

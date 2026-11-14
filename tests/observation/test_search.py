@@ -98,6 +98,25 @@ def test_extraction_limitations_are_reported_with_results():
     assert rendered.endswith("Search limitations:\n- Frame 2 could not be read")
 
 
+@pytest.mark.parametrize(
+    "prefix",
+    ["padding " + " " * 1200, "[unrelated](<https://test/needle>) " + "x " * 500],
+)
+def test_long_record_window_uses_visible_match_position(prefix):
+    body = prefix + "NEEDLE" + " tail" * 200
+    content = PageContent(url="https://shop.test/", title="Long", markdown=body)
+    (record,) = search_content(content, ("needle",), start=0, count=1).records
+    assert "NEEDLE" in record.text
+    assert len(record.text) <= 602
+
+
+def test_search_ignores_decomposed_accents():
+    content = PageContent(
+        url="https://shop.test/", title="Accents", markdown="cafe\u0301"
+    )
+    assert search_content(content, ("café",), start=0, count=1).total == 1
+
+
 def test_queries_without_visible_text_are_rejected():
     with pytest.raises(ValueError, match="visible query text"):
         search_content(_page(), (" ",), start=0, count=5)

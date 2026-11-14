@@ -80,6 +80,7 @@ async def _browser(guarded_site):
     async with ChromeBrowser(
         Launch(url=allowed), navigation_policy=AllowedDomains("127.0.0.1"), emit=emit
     ) as browser:
+        await wait_for_page(browser.active_tab)
         yield browser
 
 
@@ -179,6 +180,7 @@ async def test_cross_process_frame_cannot_navigate_to_a_denied_domain(guarded_si
         emit=emit,
     ) as browser:
         tab = browser.active_tab
+        await wait_for_page(tab)
         await tab.evaluate(
             "new Promise(resolve => { const f = document.createElement('iframe');"
             f"f.src = '{child}'; f.onload = () => resolve(true);"

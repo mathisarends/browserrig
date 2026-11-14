@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.0 (2026-11-14)
+
 ### Breaking changes
 
 - Remove `extract_content`, `PageExtractionTools`, `PageContentExtracted`,
@@ -21,6 +23,14 @@
   scrolling or saving the page.
 - Encourage batched tool calls in DOM chain and workspace guidance.
 - Evals record chain-skipped tool calls as `tool_skipped`, not as tool errors.
+
+### Fixed
+
+- Keep the visible search match in long record excerpts even when preceding
+  whitespace is collapsed or link destinations contain the query. Match
+  decomposed accents consistently with precomposed text.
+- Stabilize navigation guard integration setup and readiness timeout assertions
+  on slower runners and Windows clocks.
 
 ## 0.3.0 (2026-11-11)
 
