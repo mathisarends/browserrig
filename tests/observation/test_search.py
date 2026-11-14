@@ -112,9 +112,9 @@ def test_long_record_window_uses_visible_match_position(prefix):
 
 def test_search_ignores_decomposed_accents():
     content = PageContent(
-        url="https://shop.test/", title="Accents", markdown="cafe\u0301"
+        url="https://shop.test/", title="Accents", markdown="cafe\u0301s"
     )
-    assert search_content(content, ("café",), start=0, count=1).total == 1
+    assert search_content(content, ("cafés",), start=0, count=1).total == 1
 
 
 def test_queries_without_visible_text_are_rejected():
