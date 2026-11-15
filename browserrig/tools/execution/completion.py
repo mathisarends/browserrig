@@ -75,7 +75,8 @@ class Completion:
 
         async def dispatch() -> None:
             with self._actions.activate(action_id), span("browserrig.operation"):
-                effects.append(await operation(tab))
+                effect = await operation(tab)
+                effects.append(effect)
 
         report = await self._readiness.wait(
             tab, phase=ReadinessPhase.NAVIGATION, dispatch=dispatch

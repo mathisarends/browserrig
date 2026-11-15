@@ -52,11 +52,10 @@ class DomElementHandle:
         covers it, the point falls back to the middle or near a corner.
         """
         try:
-            local = ElementPoint.model_validate(
-                await self._run(
-                    ElementOperation.POINT, clip=self.frame.local_visible, aim=aim
-                )
+            measured = await self._run(
+                ElementOperation.POINT, clip=self.frame.local_visible, aim=aim
             )
+            local = ElementPoint.model_validate(measured)
         except BrowserError as error:
             if str(error) != "ELEMENT_BLOCKED":
                 raise
@@ -97,7 +96,8 @@ class DomElementHandle:
 
     async def bounds(self) -> Bounds:
         """Return the element's layout box in its frame's CSS pixels."""
-        return Bounds.model_validate(await self._run(ElementOperation.BOUNDS))
+        measured = await self._run(ElementOperation.BOUNDS)
+        return Bounds.model_validate(measured)
 
     async def scroll_step(self) -> ScrollStep | None:
         """Plan one wheel input without scrolling."""
@@ -303,7 +303,8 @@ async def _plan(
         current = current.parent
     target = None
     if ancestors:
-        target = frame.transform.bounds_to_viewport(await handle.bounds())
+        bounds = await handle.bounds()
+        target = frame.transform.bounds_to_viewport(bounds)
     for child in reversed(ancestors):
         parent = child.parent
         assert parent is not None

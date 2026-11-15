@@ -114,7 +114,8 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
     async def setup(self, scope: PluginScope) -> None:
         for name, secret in self._secrets.items():
             if not secret.rotating:
-                self._learn(name, await resolve(name, secret.value))
+                resolved = await resolve(name, secret.value)
+                self._learn(name, resolved)
         scope.effect(self._events.add_filter(self._filter_event))
 
     def redact[T](self, value: T) -> T:
@@ -254,13 +255,15 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
             return ToolResult.error(
                 "JavaScript execution is unavailable while secrets are configured."
             )
-        return self._redact_result(await next_())
+        result = await next_()
+        return self._redact_result(result)
 
     @hook(ReviewToolResult, priority=Priority.GUARD)
     async def _review_tool(
         self, _event: ReviewToolResult, next_: Next[ToolResult]
     ) -> ToolResult:
-        return self._redact_result(await next_())
+        result = await next_()
+        return self._redact_result(result)
 
     @hook(PrepareRequest, priority=Priority.GUARD)
     async def _prepare_request(self, _event: PrepareRequest, next_: Next[Any]) -> Any:

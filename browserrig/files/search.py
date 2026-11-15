@@ -100,9 +100,8 @@ class Search:
             directories += 1
             if directories > _MAX_DIRECTORIES:
                 return paths, True
-            for entry in sorted(
-                await self._workspace.list(parent), key=lambda item: str(item.path)
-            ):
+            entries = await self._workspace.list(parent)
+            for entry in sorted(entries, key=lambda item: str(item.path)):
                 if not include_hidden and entry.path.name.startswith("."):
                     continue
                 if entry.is_directory:
@@ -144,7 +143,8 @@ class Search:
                 f"{path}: extraction coverage metadata was not inspected (size limit)."
             )
         try:
-            details = json.loads(await self._workspace.read_bytes(metadata))
+            stored = await self._workspace.read_bytes(metadata)
+            details = json.loads(stored)
             return await self._coverage_note(path, details)
         except (OSError, ValueError, AttributeError, TypeError):
             return f"{path}: extraction coverage metadata could not be read."

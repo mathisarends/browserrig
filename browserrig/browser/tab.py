@@ -172,7 +172,8 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
             return
         if isinstance(event, PositionedEvent) and event.viewport is None:
             # Measured with the receipt: the viewport may change before viewers see it.
-            event = replace(event, viewport=await self._measure_viewport())
+            viewport = await self._measure_viewport()
+            event = replace(event, viewport=viewport)
         await self._emit(
             replace(event, target_id=self.id, document_id=self.document_id)
         )

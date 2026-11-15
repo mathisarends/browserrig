@@ -111,11 +111,12 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         """Compare current controls without publishing or replacing the delivered observation."""
         async with self._state.lock:
             report = await self._readiness.wait(tab, phase=ReadinessPhase.ACTION)
+            tabs = await self._browser.tabs.list()
             observation = await capture_observation(
                 tab,
                 self.capture_strategy,
                 report,
-                tabs=tuple(await self._browser.tabs.list()),
+                tabs=tuple(tabs),
                 previous=self.snapshot,
                 screenshots=False,
                 redaction=self._secrets(),
@@ -136,11 +137,12 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         async with self._state.lock:
             selected = tab if tab is not None else browser.active_tab
             report = await readiness.wait(selected, phase=phase)
+            tabs = await browser.tabs.list()
             observation = await capture_observation(
                 selected,
                 self.capture_strategy,
                 report,
-                tabs=tuple(await browser.tabs.list()),
+                tabs=tuple(tabs),
                 previous=self.snapshot,
                 region=region,
                 zoom=zoom,

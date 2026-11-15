@@ -104,10 +104,8 @@ class FileSystem:
         if offset < 0 or not 1 <= limit <= 200:
             raise ValueError("Use offset >= 0 and a limit between 1 and 200")
         directory = workspace_path(path)
-        children = sorted(
-            await self.workspace.list(directory),
-            key=lambda child: child.path.name.casefold(),
-        )
+        entries = await self.workspace.list(directory)
+        children = sorted(entries, key=lambda child: child.path.name.casefold())
         return FileListing(
             directory=str(directory),
             entries=tuple(_entry(child) for child in children[offset : offset + limit]),

@@ -146,7 +146,8 @@ class Tabs:
         opened: list[Tab] = []
 
         async def open_new() -> None:
-            opened.append(await self._create(url))
+            created = await self._create(url)
+            opened.append(created)
             await self._focus(opened[0], front=False)
 
         await self._change(TabGesture.OPEN, "", open_new)
@@ -178,9 +179,11 @@ class Tabs:
                 return
             remaining = [tab for tab in await self.list() if tab.id != target_id]
             if remaining:
-                await self._focus(await self._attach(remaining[0].id))
+                attached = await self._attach(remaining[0].id)
+                await self._focus(attached)
             else:
-                await self._focus(await self._create("about:blank"), front=False)
+                blank = await self._create("about:blank")
+                await self._focus(blank, front=False)
 
         await self._change(TabGesture.CLOSE, target_id, close)
         return self.active

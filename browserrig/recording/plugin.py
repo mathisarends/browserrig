@@ -192,4 +192,5 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
     async def _stop_capture(self) -> None:
         capture, self._capture = self._capture, None
         if capture is not None:
-            self._segments.append(await capture.stop())
+            segment = await capture.stop()
+            self._segments.append(segment)

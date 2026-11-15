@@ -135,6 +135,7 @@ rules:
   redundant-name-alias: error
   prefer-deferred-annotations: error
   duplicate-literal-type: warning
+  await-in-call-argument: error
   # Test smells
   private-test-access: error
   string-patch-target: error

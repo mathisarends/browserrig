@@ -60,7 +60,8 @@ class DomTypingTools(Plugin):
             await self._input.keyboard.press_key("Backspace")
         await guard()
         if entry is not None and secrets is not None:
-            return _secret_entered(await secrets.enter(entry, self._input.keyboard))
+            entered = await secrets.enter(entry, self._input.keyboard)
+            return _secret_entered(entered)
         typed = await self._input.keyboard.type_text(text, guard=guard)
         after = await field.text_state()
         expected = typed.entered if clear else None

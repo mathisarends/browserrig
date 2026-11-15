@@ -29,7 +29,8 @@ class Worlds:
             if not retry or "cannot find context" not in error.message.lower():
                 raise
             self.invalidate(session_id=cdp.session_id, frame_id=frame_id)
-        return await operation(await self.context(cdp, frame_id, document_id))
+        context_id = await self.context(cdp, frame_id, document_id)
+        return await operation(context_id)
 
     async def context(self, cdp: CdpSession, frame_id: str, document_id: str) -> int:
         key = (cdp.session_id, frame_id, document_id)

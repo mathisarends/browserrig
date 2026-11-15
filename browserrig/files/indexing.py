@@ -180,10 +180,10 @@ class Indexing:
         manifest.pending_ocr_pages = sorted(pending)
         if self._options.ocr:
             for number in manifest.pending_ocr_pages[: self._options.auto_ocr_pages]:
-                await self._record(
-                    manifest,
-                    await self._read(manifest.source, page_number=number, ocr=True),
+                content = await self._read(
+                    manifest.source, page_number=number, ocr=True
                 )
+                await self._record(manifest, content)
         manifest.limitations.append(
             "Native PDF text is indexed; graphics may require a visual read or explicit page OCR"
         )
@@ -359,9 +359,8 @@ class Indexing:
                 and existing.size > self._options.max_expanded_bytes
             ):
                 raise ValueError("Extraction metadata exceeds max_expanded_bytes")
-            manifest = _Manifest.model_validate_json(
-                await self._workspace.read_bytes(metadata)
-            )
+            stored = await self._workspace.read_bytes(metadata)
+            manifest = _Manifest.model_validate_json(stored)
             if manifest.source != str(source.path):
                 raise ValueError("Extraction metadata belongs to another source")
             if (source.size, source.modified) == (manifest.size, manifest.modified):
