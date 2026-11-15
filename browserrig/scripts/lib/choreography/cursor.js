@@ -180,6 +180,17 @@ function createChoreographyCursor(ui) {
     requestAnimationFrame(rotate);
     ui.later('scroll-end', endScroll, duration + 260);
   };
+  // Where the caret of the address bar is, after its text.
+  const caret = () => {
+    const element = ui.node('address-text');
+    const box = element.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const text = range.getBoundingClientRect();
+    // An empty bar has no text box; its caret sits at the start.
+    const x = text.width ? Math.min(box.right - 4, text.right + 2) : box.left;
+    return [x, box.top + box.height / 2];
+  };
   const address = (event) => {
     if (event.browser_bar !== 'address') {
       return;
@@ -187,22 +198,43 @@ function createChoreographyCursor(ui) {
     browserControl = true;
     style = 'text';
     shape();
-    const element = ui.node('address-text');
-    const box = element.getBoundingClientRect();
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    place([
-      Math.min(box.right - 4, range.getBoundingClientRect().right + 2),
-      box.top + box.height / 2,
-    ]);
+    place(caret());
+  };
+  // The browser's own controls are drawn by the panels; the pointer travels onto them.
+  const press = (event, control) => {
+    browserControl = true;
+    style = control === 'address' ? 'text' : 'pointer';
+    shape();
+    let target = caret();
+    if (control !== 'address') {
+      const box = ui.node('history-icon').getBoundingClientRect();
+      target = [box.left + box.width / 2, box.top + box.height / 2];
+    }
+    move({...event, to_position: target});
+  };
+  // Back in the page, the pointer takes the page's cursor shape again.
+  const enter = (event) => {
+    if (browserControl) {
+      browserControl = false;
+      style = nativeStyle;
+      shape();
+    }
+    move(event);
   };
   const show = (event) => {
     const kinds = ui.options().events;
     label();
+    const control = ui.toolbar(event);
+    if (control) {
+      press(event, control);
+      return;
+    }
     switch (event.type) {
       case kinds.CURSOR_MOVED:
-      case kinds.CURSOR_ENTERED:
         move(event);
+        break;
+      case kinds.CURSOR_ENTERED:
+        enter(event);
         break;
       case kinds.CURSOR_STATE:
         route++;

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+### Changes
+
 - Upgrade Harnessed and every provider/MCP/OTel extra to 0.17.0. No Browserrig
   code changes are required.
 - Add the source viewport to coordinate receipts. Cursor, pointer, wheel,
@@ -15,6 +17,14 @@
   with public `tab_id` and measured deltas (`ref` identifies an element) when
   `scroll_page` or `scroll_element` actually moves. Wheel events retain their
   native-input semantics.
+- Stage the browser's own controls for viewers. Before typing an address the
+  pointer focuses the address bar (`AddressBarFocusedEvent`); `go_back`,
+  `go_forward` and `reload` press their buttons first (`BackPressedEvent`,
+  `ForwardPressedEvent`, `ReloadPressedEvent`, staged through `ControlIntent`).
+  Each is a `PositionedEvent` with the pointer's origin and travel duration; a
+  `CursorEnteredEvent` returns the pointer into the page afterwards, at once
+  when the step fails or is cancelled. Viewers that draw their own toolbar place the controls
+  themselves; nothing extra is clicked in the browser.
 
 ## 0.4.0 (2026-11-14)
 

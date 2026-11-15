@@ -81,9 +81,9 @@ keyed independently by `download_id`; show percentages only with a known total.
 ### Coordinate space
 
 Input receipts with coordinates derive from `PositionedEvent`: cursor, pointer and
-wheel events, element highlights, find marks, file transfers, tab presses and
-cursor entries. Their coordinates, including Bézier control points, are CSS pixels
-in the top-level layout viewport of `target_id`, with the origin at its top-left
+wheel events, element highlights, find marks, file transfers, tab and toolbar
+presses and cursor entries. Their coordinates, including Bézier control points,
+are CSS pixels in the top-level layout viewport of `target_id`, with the origin at its top-left
 corner. `viewport` (`ViewportSize`) is that viewport's size measured when the
 receipt was emitted, so receipts project correctly across tab switches and live
 resizes:
@@ -104,6 +104,17 @@ stroke. `viewport` keeps the last known size while a dialog blocks the page and 
 None only if the tab was never measured. A screenshot `WorkPresentedEvent` carries
 its `CaptureRegion` with the `viewport` of the same capture. Events without
 coordinates, such as keys, and the `TabEvent` scroll receipts carry no viewport.
+
+Viewers that draw their own browser chrome place its controls themselves, as with
+the tab strip. `TabPressedEvent` names the pressed tab-strip control.
+`AddressBarFocusedEvent` precedes the first `BarTypedEvent` of an address, and
+`BackPressedEvent`, `ForwardPressedEvent` and `ReloadPressedEvent` precede their
+history step or reload. Each starts at `from_position`, or `None` before the
+pointer has rested in the tab, and travels for `duration` to the viewer's own
+control. Project that point with its `viewport` as above and measure the control
+in the viewer's DOM. A `CursorEnteredEvent` then brings the pointer back
+to `to_position` once the step has run, with zero duration when it failed or was
+cancelled. These events are presentation only; the browser receives no extra input.
 
 Presentation receipts are transient and excluded from model context and saved
 results. Configured secrets are redacted before preview truncation. Render preview

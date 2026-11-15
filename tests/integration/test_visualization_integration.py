@@ -24,7 +24,14 @@ from browserrig import (
     wait_for_page,
 )
 from browserrig.browser import Frame, screenshot
-from browserrig.choreography import FileTransferEvent, WorkPhase, WorkPresentedEvent
+from browserrig.choreography import (
+    AddressBarFocusedEvent,
+    BackPressedEvent,
+    CursorEnteredEvent,
+    FileTransferEvent,
+    WorkPhase,
+    WorkPresentedEvent,
+)
 from browserrig.core import FileTransferDirection
 from browserrig.events import (
     CursorStateEvent,
@@ -152,6 +159,41 @@ async def test_keyboard_fits_a_compact_viewport_and_keeps_secret_keys_private(si
         assert 0 <= result["left"] < result["right"] <= 360
         assert 0 <= result["top"] < result["bottom"] <= 640
         assert result["active"] == 0 and result["protected"] == "true"
+
+
+async def test_toolbar_presses_lead_the_pointer_to_the_drawn_controls(site):
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            Runtime(),
+            InputRuntime(),
+            Chrome.launch(url=site),
+            InputVisualization(),
+        ],
+    )
+    pointer = """(() => {
+        const cursor = document.querySelector('#cursor');
+        const at = new DOMMatrix(getComputedStyle(cursor).transform);
+        const target = (id) => document.querySelector(id).getBoundingClientRect();
+        return {style: cursor.dataset.style, x: at.m41, y: at.m42,
+          address: document.querySelector('#address').dataset.visible,
+          history: document.querySelector('#history').dataset.visible,
+          bar: target('#address-text').toJSON(), icon: target('#history-icon').toJSON()};
+    })()"""
+    async with agent.session() as session:
+        tab = session.scope[Browser].active_tab
+        await tab.emit(CursorStateEvent(x=300, y=400))
+        await tab.emit(AddressBarFocusedEvent(from_position=(300, 400), duration=0))
+        focused = await _settled(tab, pointer, lambda state: _inside(state, "bar"))
+        assert focused["style"] == "text" and focused["address"] == "true"
+
+        await tab.emit(BackPressedEvent(from_position=(300, 400), duration=0))
+        pressed = await _settled(tab, pointer, lambda state: _inside(state, "icon"))
+        assert pressed["style"] == "pointer" and pressed["history"] == "true"
+
+        await tab.emit(CursorEnteredEvent(to_position=(300, 400), duration=0))
+        returned = await _settled(tab, pointer, lambda state: state["x"] == 300)
+        assert returned["style"] != "pointer" and returned["y"] == 400
 
 
 async def test_long_cursor_badge_stays_inside_a_compact_viewport(site):
@@ -403,6 +445,22 @@ async def test_running_work_restores_after_navigation_without_pointer_input(site
             )
             == "completed"
         )
+
+
+async def _settled(tab, expression, done, seconds=3):
+    """The surface state once `done` holds, as animations finish on the next frames."""
+    async with asyncio.timeout(seconds):
+        while not done(state := await _surface(tab, expression)):
+            await asyncio.sleep(0.05)
+    return state
+
+
+def _inside(state, control) -> bool:
+    box = state[control]
+    return (
+        box["left"] <= state["x"] <= box["right"]
+        and box["top"] <= state["y"] <= box["bottom"]
+    )
 
 
 async def _surface(tab, expression):

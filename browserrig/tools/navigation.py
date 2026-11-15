@@ -10,6 +10,7 @@ from pydantic import Field
 from browserrig.browser import Browser, BrowserEvents, Tab, validated_url
 from browserrig.core import (
     ActionKind,
+    BrowserControl,
     BrowserError,
     ReadinessPhase,
 )
@@ -19,7 +20,7 @@ from browserrig.readiness import Readiness
 
 from .effects import Effect
 from .execution import Actions
-from .intents import NavigateIntent, WaitIntent
+from .intents import ControlIntent, NavigateIntent, WaitIntent
 
 # Where a new tab lands when the agent gives no URL.
 NEW_TAB_URL = "https://duckduckgo.com/"
@@ -88,7 +89,10 @@ class NavigationTools(Plugin):
         kind=ActionKind.GO_BACK, description="Go to the previous browser history entry."
     )
     async def go_back(self) -> Effect:
-        if not await self._actions.tab.go_back():
+        tab = self._actions.tab
+        if not await self._actions.stage(
+            ControlIntent(BrowserControl.BACK), tab, tab.go_back
+        ):
             raise BrowserError("No previous history entry")
         return Effect("Navigated back.")
 
@@ -100,13 +104,16 @@ class NavigationTools(Plugin):
         tab = self._actions.tab
         if not await tab.can_go_forward():
             raise BrowserError("Cannot go forward: no next history entry")
-        if not await tab.go_forward():
+        if not await self._actions.stage(
+            ControlIntent(BrowserControl.FORWARD), tab, tab.go_forward
+        ):
             raise BrowserError("Cannot go forward: no next history entry")
         return Effect("Navigated forward.")
 
     @tool(kind=ActionKind.RELOAD, description="Reload the active tab.")
     async def reload(self) -> Effect:
-        await self._actions.tab.reload()
+        tab = self._actions.tab
+        await self._actions.stage(ControlIntent(BrowserControl.RELOAD), tab, tab.reload)
         return Effect("Reload executed.")
 
     @tool(

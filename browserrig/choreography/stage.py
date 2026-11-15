@@ -6,9 +6,9 @@ from browserrig.input import InputTarget
 
 from .events import CursorEnteredEvent, TabPressedEvent
 
-# Travel to the tab strip plus the press, then the way back into the page.
-_TAB_PRESS_SECONDS = 0.45
-_TAB_ENTER_SECONDS = 0.35
+# Travel to the browser's own controls plus the press, then the way back into the page.
+PRESS_SECONDS = 0.45
+ENTER_SECONDS = 0.35
 
 
 class Stage:
@@ -35,11 +35,11 @@ class Stage:
                 gesture=gesture,
                 tab_id=tab_id,
                 from_position=(position.x, position.y),
-                duration=_TAB_PRESS_SECONDS,
+                duration=PRESS_SECONDS,
                 action_id=action_id,
             )
         )
-        await asyncio.sleep(_TAB_PRESS_SECONDS)
+        await asyncio.sleep(PRESS_SECONDS)
 
     async def enter(
         self, target: InputTarget, position: Point, *, action_id: str
@@ -47,11 +47,11 @@ class Stage:
         await target.emit(
             CursorEnteredEvent(
                 to_position=(position.x, position.y),
-                duration=_TAB_ENTER_SECONDS,
+                duration=ENTER_SECONDS,
                 action_id=action_id,
             )
         )
-        await asyncio.sleep(_TAB_ENTER_SECONDS)
+        await asyncio.sleep(ENTER_SECONDS)
 
     async def show(self, target: InputTarget, event: InputEvent) -> None:
         await target.emit(event)

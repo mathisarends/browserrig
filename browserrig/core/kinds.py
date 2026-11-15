@@ -167,6 +167,14 @@ class BrowserBar(StrEnum):
     FIND = "find"
 
 
+class BrowserControl(StrEnum):
+    """History and reload buttons of the browser's toolbar, outside the page."""
+
+    BACK = "back"
+    FORWARD = "forward"
+    RELOAD = "reload"
+
+
 class TabGesture(StrEnum):
     """Which tab-strip control the pointer presses: a tab, the new-tab button or a tab's close."""
 

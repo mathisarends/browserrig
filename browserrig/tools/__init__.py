@@ -8,6 +8,7 @@ from .execution import Actions
 from .files import BrowserFileTools, DomUploadTools, FileTools
 from .forms import FormTools
 from .intents import (
+    ControlIntent,
     DomScrollIntent,
     Intent,
     NavigateIntent,
@@ -51,6 +52,7 @@ __all__ = [
     "BrowserFileTools",
     "WorkspaceTools",
     "SearchIntent",
+    "ControlIntent",
     "Intent",
     "NavigateIntent",
     "OpenFileIntent",
