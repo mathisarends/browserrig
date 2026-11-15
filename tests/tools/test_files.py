@@ -454,7 +454,7 @@ async def test_remote_workspace_and_cloud_bridge_handle_reads_downloads_and_uplo
         assert await transfer.download_directory() == PurePosixPath("/cloud/downloads")
         bridge.remote["dl-1"] = pdf_document
         path = await transfer.receive(
-            "dl-1", "report.pdf", "https://example.org/report.pdf", None
+            "dl-1", "report.pdf", "https://example.org/report.pdf", browser_path=None
         )
         assert path == "downloads/dl-1/report.pdf"
         assert workspace.files[PurePosixPath(path)] == pdf_document
@@ -814,7 +814,9 @@ def _pending(files, download_id):
 
 
 async def _complete(transfer, download_id, filename):
-    return await transfer.receive(download_id, filename, "https://example.org", None)
+    return await transfer.receive(
+        download_id, filename, "https://example.org", browser_path=None
+    )
 
 
 def _progress(received, state, total=8):

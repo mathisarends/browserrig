@@ -107,7 +107,8 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         context = self._mount.context
         assert context is not None
         performed = Perform(intent, tab, self._actions.action_id)
-        return cast(R, await context.dispatch(performed, default=step))
+        dispatched = await context.dispatch(performed, default=step)
+        return cast(R, dispatched)
 
     @traced
     async def page_change(
@@ -152,7 +153,8 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         self, event: ExecuteTool | ReviewToolResult, next_: Next[ToolResult]
     ) -> ToolResult:
         # Set the signal before the execution receipt is persisted, including on errors.
-        return stop_on_failure(await next_(), event.tool)
+        result = await next_()
+        return stop_on_failure(result, event.tool)
 
     @hook(BrowserToolCall)
     async def _run_tool(self, event: BrowserToolCall, next_: Next[object]) -> object:

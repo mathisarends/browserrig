@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import Field
 
 from browserrig.core import HandoffStatus, Options
-from browserrig.events import HandoffRequestedEvent
+from browserrig.events import HandoffRequestedEvent, HandoffSource
 
 
 class HumanResponse(Options):
@@ -18,7 +18,7 @@ class HandoffReceipt(Options):
     """Immutable handoff record shared by tool results and HumanHandoff.history."""
 
     handoff_id: str
-    source: Literal["tool", "pause"]
+    source: HandoffSource
     status: HandoffStatus
     reason: str
     expected_state: str = ""

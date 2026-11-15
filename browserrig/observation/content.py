@@ -45,7 +45,13 @@ class PageContent(Options):
         if not 0 <= offset <= _MAX_OFFSET or not 1 <= max_chars <= 200000:
             raise ValueError("Use offset in [0, 2000000] and max_chars in [1, 200000]")
         limitations = list(self.limitations)
-        body, following = _page(self.markdown, offset, max_chars, False, limitations)
+        body, following = _page(
+            self.markdown,
+            offset=offset,
+            max_chars=max_chars,
+            more=False,
+            limitations=limitations,
+        )
         return self.model_copy(
             update={
                 "markdown": body,
@@ -183,7 +189,9 @@ def _content(
             ("Only the main region is included; s" if main.main else "S")
             + "ite header, navigation and footer were omitted (full_page=true includes them)",
         )
-    page, next_offset = _page(markdown, offset, max_chars, more, limitations)
+    page, next_offset = _page(
+        markdown, offset=offset, max_chars=max_chars, more=more, limitations=limitations
+    )
     return PageContent(
         url=main.url,
         title=main.title,
@@ -212,7 +220,7 @@ def _frame_heading(state: ContentExtraction) -> str:
 
 
 def _page(
-    markdown: str, offset: int, max_chars: int, more: bool, limitations: list[str]
+    markdown: str, *, offset: int, max_chars: int, more: bool, limitations: list[str]
 ) -> tuple[str, int | None]:
     """Cut one part of the Markdown and name the offset that reads the next part."""
     if offset and offset >= len(markdown):

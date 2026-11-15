@@ -21,19 +21,24 @@ from harnessed.testing import ScriptedModel, call
 from PIL import Image
 
 from browserrig import BrowserPerception, Readiness, Secret, Secrets, Totp, env
-from browserrig.core import ActionKind, Bounds, SecretError
+from browserrig.core import ActionKind, Bounds, ReadinessPhase, SecretError
 from browserrig.events import ActionFailedEvent, KeyPressedEvent, SecretEnteredEvent
 from browserrig.input import Input
 from browserrig.input import keyboard as keyboard_module
-from browserrig.observation import CaptureContent, DomPerception, Element, Snapshot
-from browserrig.observation.capture import _redact
+from browserrig.observation import (
+    CaptureContent,
+    DomPerception,
+    Element,
+    Snapshot,
+    capture,
+)
 from browserrig.observation.extraction import Extraction
 from browserrig.observation.marks import blackout
 from browserrig.secrets import SecretEntry
 from browserrig.secrets.models import resolve
 from browserrig.secrets.origin import OriginPattern
 from browserrig.secrets.redaction import Redactor
-from tests.fakes import FakeChrome
+from tests.fakes import FakeChrome, FakeReadiness, FakeTab
 
 PASSWORD = "hunter2-Correct-Horse"
 
@@ -233,20 +238,28 @@ async def test_capture_redacts_page_text_and_blacks_out_fields_showing_a_secret(
     Image.new("RGB", (100, 50), "white").save(output, format="PNG")
     image = base64.b64encode(output.getvalue()).decode()
     area = Bounds(x=0, y=0, width=100, height=50)
+    tab = FakeTab()
+    report = await FakeReadiness().wait(tab, phase=ReadinessPhase.OBSERVATION)
     content = CaptureContent(page=page, image=image, area=area)
-    redacted, masked = await _redact(page, image, content, redaction)
+    redacted = await capture(
+        tab, _Collected(content), report, screenshots=True, redaction=redaction
+    )
     assert PASSWORD not in repr(redacted)
     assert redacted.elements[0].value == "{{secret:pw}}"
-    assert redacted.elements[1] is other
-    assert masked is not None
-    with Image.open(BytesIO(base64.b64decode(masked))) as result:
+    assert redacted.elements[1].value == "visible"
+    assert redacted.image is not None
+    with Image.open(BytesIO(base64.b64decode(redacted.image))) as result:
         assert result.getpixel((20, 15)) == (0, 0, 0)
         assert result.getpixel((80, 40)) == (255, 255, 255)
     # Without a known image area the screenshot is withheld instead of shown.
-    _, withheld = await _redact(
-        page, image, CaptureContent(page=page, image=image), redaction
+    withheld = await capture(
+        tab,
+        _Collected(CaptureContent(page=page, image=image)),
+        report,
+        screenshots=True,
+        redaction=redaction,
     )
-    assert withheld is None
+    assert withheld.image is None
 
 
 async def test_sensitive_typing_hides_keys_and_stops_when_the_guard_fails(monkeypatch):
@@ -308,6 +321,16 @@ def _secrets():
             "otp": Secret(Totp("JBSWY3DPEHPK3PXP"), domains=("example.org",)),
         }
     )
+
+
+class _Collected:
+    """A capture strategy that returns prepared content."""
+
+    def __init__(self, content: CaptureContent) -> None:
+        self.content = content
+
+    async def collect(self, *_: object, **__: object) -> CaptureContent:
+        return self.content
 
 
 class Leaky(Plugin):

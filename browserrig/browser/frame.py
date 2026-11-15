@@ -10,7 +10,7 @@ from cdpify.domains.page import FrameTree
 from cdpify.domains.runtime import CallArgument, RemoteObject
 from pydantic import BaseModel
 
-from browserrig.core import Bounds, BrowserError, FrameTransform
+from browserrig.core import Bounds, BrowserError, FrameTransform, Position
 from browserrig.scripts import (
     FILE_INPUT,
     OWNER_HITS,
@@ -126,12 +126,10 @@ class Frame:
 
     async def check_point(self, x: float, y: float) -> None:
         """A child hit test cannot see blockers in ancestor documents."""
-        if not (await self.visible_points(((x, y),)))[0]:
+        if not (await self.visible_points((Position(x, y),)))[0]:
             raise BrowserError("ELEMENT_BLOCKED")
 
-    async def visible_points(
-        self, points: tuple[tuple[float, float], ...]
-    ) -> tuple[bool, ...]:
+    async def visible_points(self, points: tuple[Position, ...]) -> tuple[bool, ...]:
         visible = [True] * len(points)
         current = self
         while current.parent is not None:

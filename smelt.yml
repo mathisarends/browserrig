@@ -30,6 +30,8 @@ structure:
       future_annotations: when-needed
       private_modules: forbid
       type_dispatch: {style: match, min_branches: 3}
+      # Later parameters are keyword-only so call sites name their values.
+      max_positional_parameters: 4
       ordering:
         constants_exempt: true
         fix: safe-only
@@ -131,6 +133,19 @@ rules:
   internal-static-helper: error
   unnecessary-future-annotations: warning
   prefer-match-type-dispatch: warning
+  private-symbol-import: error
+  redundant-name-alias: error
+  prefer-deferred-annotations: error
+  duplicate-literal-type: warning
+  await-in-call-argument: error
+  redundant-private-delegate: error
+  deprecated-async-contextmanager-return: error
+  str-enum-explicit-values: error
+  excess-positional-parameters: error
+  anonymous-tuple-type: error
+  # Many chains walk the CDP SDK namespaces or plugin state, which are shaped upstream.
+  deep-object-navigation: hint
+  facade-export-gap: warning
   # Test smells
   private-test-access: error
   string-patch-target: error

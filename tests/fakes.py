@@ -13,7 +13,12 @@ from harnessed.testing import ScriptedModel
 from browserrig import Browser, BrowserCoordination, FileSystem
 from browserrig.browser import BrowserEvents
 from browserrig.browser.network import NetworkActivity
-from browserrig.core import ActionContext, ReadinessPhase, ReadinessStatus
+from browserrig.core import (
+    ActionContext,
+    ReadinessPhase,
+    ReadinessStatus,
+    ViewportSize,
+)
 from browserrig.files import FileBridge, FileTransfers
 from browserrig.input import Input, InputTargets
 from browserrig.observation import BrowserPerception, DomElements, DomReferences
@@ -39,7 +44,7 @@ class FakeTab:
         self.viewport_revision = 0
 
     async def viewport_size(self):
-        return (1280, 800)
+        return ViewportSize(width=1280, height=800)
 
     async def dispatch_mouse(self, *_args, **_kwargs):
         pass

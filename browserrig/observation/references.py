@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from browserrig.browser import Tab
-from browserrig.core import ElementPoint, Point, StaleElement
+from browserrig.core import Aim, ElementPoint, Point, StaleElement
 
 from .models import ElementInfo, Snapshot
 
@@ -15,7 +15,7 @@ class ElementHandle(Protocol):
     def element(self) -> ElementInfo: ...
 
     async def locate(  # pylint: disable=unused-argument
-        self, *, aim: tuple[float, float] | None = None
+        self, *, aim: Aim | None = None
     ) -> ElementPoint: ...
 
 

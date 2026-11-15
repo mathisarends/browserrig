@@ -3,6 +3,7 @@ import json
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import replace
+from typing import NamedTuple
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -55,6 +56,13 @@ type FrameDiscovery = Callable[
 type TabListener = Callable[[Tab, bool], Awaitable[None]]
 
 
+class OpenDialog(NamedTuple):
+    """A JavaScript dialog that blocks the page until it is handled."""
+
+    kind: str
+    message: str
+
+
 class Tab:  # pylint: disable=too-many-public-methods  # document API
     def __init__(
         self,
@@ -74,7 +82,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self.document_id = ""
         self.url = "about:blank"
         self.title = ""
-        self.dialog: tuple[str, str] | None = None
+        self.dialog: OpenDialog | None = None
         self.input = CdpInput(self)
         self.overlays = Overlays(self)
         self.network = NetworkActivity()
@@ -94,7 +102,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self.viewport_revision = 0
         # Last measured viewport, kept for receipts while the page cannot answer.
         self._viewport: ViewportSize | None = None
-        self._frames_key: tuple[str, str, int] | None = None
+        self._frames_key: _FramesKey | None = None
         self._frames: tuple[Frame, ...] = ()
         self._current_action = current_action
         self._on_change = on_change
@@ -152,14 +160,14 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
                 self.viewport_revision += 1
                 self.layout_changed()
             case JavascriptDialogOpeningEvent(type=kind, message=message):
-                self.dialog = (str(kind), message)
-                self.input.dialog_opened.set()
+                self.dialog = OpenDialog(str(kind), message)
+                self.input.dialog_opened()
                 await self.emit(
                     DialogOpenedEvent(kind=str(kind), message=message[:1000])
                 )
             case JavascriptDialogClosedEvent(result=accepted):
                 self.dialog = None
-                self.input.dialog_opened.clear()
+                self.input.dialog_closed()
                 await self.emit(DialogHandledEvent(accepted=accepted))
 
     async def emit(self, event: BrowserEvent | LiveEvent | TabEvent) -> None:
@@ -172,7 +180,8 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
             return
         if isinstance(event, PositionedEvent) and event.viewport is None:
             # Measured with the receipt: the viewport may change before viewers see it.
-            event = replace(event, viewport=await self._measure_viewport())
+            viewport = await self._measure_viewport()
+            event = replace(event, viewport=viewport)
         await self._emit(
             replace(event, target_id=self.id, document_id=self.document_id)
         )
@@ -250,20 +259,17 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         """Forget cached frame geometry after input, scrolling or navigation moved content."""
         self._layout_revision += 1
 
-    async def viewport_size(self) -> tuple[float, float]:
+    async def viewport_size(self) -> ViewportSize:
         viewport = (await self.cdp.page.get_layout_metrics()).css_layout_viewport
-        return viewport.client_width, viewport.client_height
+        return ViewportSize(width=viewport.client_width, height=viewport.client_height)
 
     async def _measure_viewport(self) -> ViewportSize | None:
         """Measure the layout viewport, or keep the last size while the page is blocked."""
         if self.dialog is not None:
             return self._viewport
-        try:
+        with suppress(CDPError, TimeoutError):
             async with asyncio.timeout(_VIEWPORT_PROBE_SECONDS):
-                width, height = await self.viewport_size()
-        except (CDPError, TimeoutError):
-            return self._viewport
-        self._viewport = ViewportSize(width=width, height=height)
+                self._viewport = await self.viewport_size()
         return self._viewport
 
     @traced
@@ -274,16 +280,16 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         """
         if self._discover_frames is None:
             raise BrowserError("Frame discovery is unavailable for this tab")
-        key = (self.document_id, self._current_action(), self._layout_revision)
-        cached = bool(key[1]) and key == self._frames_key
+        key = _FramesKey(
+            self.document_id, self._current_action(), self._layout_revision
+        )
+        cached = bool(key.action_id) and key == self._frames_key
         record(cached=cached)
         if cached:
             return self._frames
         frames, self.frame_limitations = await self._discover_frames(self)
-        if key[1] and key == (
-            self.document_id,
-            self._current_action(),
-            self._layout_revision,
+        if key.action_id and key == _FramesKey(
+            self.document_id, self._current_action(), self._layout_revision
         ):
             self._frames_key = key
             self._frames = frames
@@ -368,3 +374,9 @@ def _javascript_value(value: RemoteObject) -> str:
     if value.value is UNSET:
         return value.description if value.description is not None else "null"
     return json.dumps(value.value, ensure_ascii=False)
+
+
+class _FramesKey(NamedTuple):
+    document_id: str
+    action_id: str
+    layout_revision: int

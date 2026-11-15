@@ -1,6 +1,7 @@
 import io
 import json
 from dataclasses import dataclass
+from typing import Literal
 
 from harnessed import (
     Agent,
@@ -32,7 +33,6 @@ from browserrig.choreography import (
     WorkPresentedEvent,
 )
 from browserrig.events import INPUT_EVENTS, BrowserEvent, KeyPressedEvent
-from browserrig.terminal import _event_record
 
 
 async def test_terminal_observes_native_and_live_events_without_model_or_log_pollution():
@@ -74,22 +74,22 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
     assert "Final answer" not in output.getvalue()
 
 
-def test_terminal_omits_arbitrary_page_and_form_value_fields():
+async def test_terminal_omits_arbitrary_page_and_form_value_fields():
     @dataclass(frozen=True)
     class FormEvent(BrowserEvent):
         value: str
         message: str
         text: str
-        type: str = "test.form"
+        type: Literal["test.form"] = "test.form"
 
-    record = _event_record(
+    record = await _record(
         FormEvent(value="private form", message="page dialog", text="page text")
     )
     assert not {"text", "message", "value"} & record.keys()
 
 
-def test_terminal_omits_rich_work_preview_content():
-    record = _event_record(
+async def test_terminal_omits_rich_work_preview_content():
+    record = await _record(
         WorkPresentedEvent(
             work_id="read",
             kind="read_file",
@@ -144,8 +144,24 @@ async def test_terminal_reports_correlated_compaction_and_attempts_without_inven
     )
 
 
-def test_terminal_distinguishes_skipped_calls_and_chain_breaks_without_result_contents():
+async def test_terminal_distinguishes_skipped_calls_and_chain_breaks_without_result_contents():
     result = ToolResult("PRIVATE RESULT", status=ToolStatus.SKIPPED, break_chain=True)
-    record = _event_record(ToolCallFinishedEvent(ToolCall("click", {}), result))
+    record = await _record(ToolCallFinishedEvent(ToolCall("click", {}), result))
     assert record["tool_status"] == "skipped" and record["break_chain"] is True
     assert "PRIVATE RESULT" not in str(record)
+
+
+async def _record(event: BrowserEvent | ToolCallFinishedEvent) -> dict[str, object]:
+    """Emit `event` in a session and return the line TerminalEvents printed for it."""
+
+    class Emitter(Plugin):
+        events = (type(event),)
+
+    output = io.StringIO()
+    agent = Agent(
+        model=ScriptedModel(["ok"]), plugins=[TerminalEvents(output), Emitter()]
+    )
+    async with agent.session() as session:
+        await session.emit(event)
+    records = [json.loads(line) for line in output.getvalue().splitlines()]
+    return next(record for record in records if record["type"] == str(event.type))

@@ -51,6 +51,7 @@ class PageSearchTools(Plugin):
             tuple[_Query, ...],
             Field(max_length=4, description="Other wordings; a record may match any."),
         ] = (),
+        *,
         full_page: Annotated[
             bool, Field(description="Also search site header, navigation and footer.")
         ] = False,

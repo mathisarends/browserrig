@@ -6,8 +6,11 @@ Roles, names and states are derived from that data in Python; Chrome's accessibi
 tree then supplies the names of the listed controls.
 """
 
+from __future__ import annotations
+
 import asyncio
 from contextlib import suppress
+from typing import NamedTuple
 
 from cdpify import CDPCommandError, CdpSession
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
@@ -242,7 +245,7 @@ class _Assembler:
             self._prefixes[session_id] = f"f{len(self._prefixes) + 1}:"
         return self._prefixes[session_id]
 
-    def _merge(self) -> tuple[list[Element], list[Heading], str]:
+    def _merge(self) -> _Merged:
         ordered: list[tuple[tuple[int, ...], Element | Heading | TextBlock]] = []
         texts: list[str] = []
         for frame in self._frames:
@@ -268,7 +271,7 @@ class _Assembler:
                 elements.append(item.model_copy(update={"order": order}))
             elif isinstance(item, Heading):
                 headings.append(item.model_copy(update={"order": order}))
-        return elements, headings, "\n".join(texts)
+        return _Merged(elements, headings, "\n".join(texts))
 
     def _content(self, elements: list[Element], limit: int) -> tuple[ContentNode, ...]:
         texts: dict[tuple[str, int], TextBlock] = {}
@@ -353,7 +356,7 @@ class _Assembler:
             frame.id,
             entries,
             frame.transform,
-            frozenset(
+            links=frozenset(
                 ref for ref, element in elements.items() if element.role == "link"
             ),
         )
@@ -466,3 +469,11 @@ def _index_of(document: Document, backend_id: int | None) -> int | None:
         return document.backend_ids.index(backend_id)
     except ValueError:
         return None
+
+
+class _Merged(NamedTuple):
+    """Every frame's elements and headings in page order, and their joined text."""
+
+    elements: list[Element]
+    headings: list[Heading]
+    text: str

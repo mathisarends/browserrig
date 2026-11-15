@@ -12,11 +12,14 @@ from .core import (
     CursorStyle,
     FileSource,
     HandoffStatus,
+    Position,
     ReadinessPhase,
     ReadinessStage,
     ReadinessStatus,
     ViewportSize,
 )
+
+type HandoffSource = Literal["tool", "pause"]
 
 
 class EventKind(StrEnum):
@@ -159,10 +162,10 @@ class PageCaptureFinishedEvent(BrowserEvent):
 
 @dataclass(frozen=True, slots=True)
 class CursorMovedEvent(PositionedEvent):
-    from_position: tuple[float, float]
-    to_position: tuple[float, float]
-    control_point_1: tuple[float, float]
-    control_point_2: tuple[float, float]
+    from_position: Position
+    to_position: Position
+    control_point_1: Position
+    control_point_2: Position
     duration: float
     easing: Literal["easeInOutCubic"] = "easeInOutCubic"
     type: Literal[EventKind.CURSOR_MOVED] = field(
@@ -650,7 +653,7 @@ class HandoffRequestedEvent(BrowserEvent):
     handoff_id: str
     reason: str
     expected_state: str = ""
-    source: Literal["tool", "pause"] = "tool"
+    source: HandoffSource = "tool"
     call_id: str = ""
     type: Literal[EventKind.HANDOFF_REQUESTED] = field(
         default=EventKind.HANDOFF_REQUESTED, kw_only=True
@@ -663,7 +666,7 @@ class HandoffFinishedEvent(BrowserEvent):
     status: HandoffStatus
     note: str = ""
     changes: tuple[str, ...] = ()
-    source: Literal["tool", "pause"] = "tool"
+    source: HandoffSource = "tool"
     call_id: str = ""
     type: Literal[EventKind.HANDOFF_FINISHED] = field(
         default=EventKind.HANDOFF_FINISHED, kw_only=True

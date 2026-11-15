@@ -17,7 +17,7 @@ from cdpify.domains.page import (
 from harnessed import Agent
 from harnessed.testing import ScriptedModel
 
-from browserrig.browser import Tab, TabChanged, favicon
+from browserrig.browser import Tab, TabChanged
 from browserrig.browser.favicon import load_favicon
 from browserrig.choreography import TabStrip as TabStripPlugin
 from browserrig.core import MouseEventKind, Point
@@ -76,8 +76,12 @@ def test_site_paths_resolve_only_against_web_pages(url, current, resolved):
         (b"<!doctype html><title>Not found</title>", None),
     ],
 )
-def test_icon_type_comes_from_the_bytes(data, media_type):
-    assert favicon._media_type(data) == media_type  # pylint: disable=protected-access
+async def test_icon_type_comes_from_the_bytes(data, media_type):
+    encoded = base64.b64encode(data).decode()
+    icon = await load_favicon(
+        SimpleNamespace(), "frame", f"data:application/octet-stream;base64,{encoded}"
+    )
+    assert icon == (f"data:{media_type};base64,{encoded}" if media_type else "")
 
 
 async def test_inline_data_icons_are_decoded_without_a_fetch():

@@ -115,6 +115,62 @@ resolved contracts under `coverage.contracts`. `smelt explain SMT107` and
 `smelt explain SMT307` describe the rules. No contract is inferred automatically
 or enabled by default for consumer projects.
 
+## Positional parameter limits
+
+Make later arguments keyword-only with an explicit package contract:
+
+```yaml
+structure:
+  contracts:
+    named-arguments:
+      match: app
+      max_positional_parameters: 2
+```
+
+[SMT345](rules/SMT345.md) reports definitions accepting more than that limit:
+`connect(user_id, run_id, tab_id)` becomes
+`connect(user_id, run_id, *, tab_id)` and callers supply `tab_id=...`.
+Zero requires all ordinary parameters to be keyword-only. `self`/`cls`, variadic
+arguments, dunders, overload/override definitions and tests are exempt.
+Omitting the option imposes no limit; the closest explicit package setting wins.
+`smelt context` exposes the effective limit, including for planned paths.
+Update every caller and partial application; keep externally dictated callback
+signatures with a reasoned local exception. There is no automatic rewrite.
+
+## Aliases, delegates and annotation records
+
+These reviews are independent and opt-in:
+
+```yaml
+rules:
+  redundant-private-delegate: hint
+  redundant-name-alias: hint
+  prefer-deferred-annotations: hint
+  anonymous-tuple-type: hint
+```
+
+[SMT343](rules/SMT343.md) reviews methods that only forward unchanged arguments
+to one exclusive private helper. [SMT344](rules/SMT344.md) reviews module-level
+aliases that only repeat a class or function name. Review external consumers,
+decorators and framework contracts before inlining or removing an alias.
+
+[SMT346](rules/SMT346.md) reviews quoted annotations. With the annotations future
+import or a declared Python 3.14+ minimum, remove redundant quotes; on older
+targets, consider the future import first. Verify runtime annotation consumers
+such as Pydantic and dependency injection. A package that forbids future
+annotations keeps quotes before 3.14. Runtime strings, `Literal` values and
+`Annotated` metadata are excluded.
+
+[SMT347](rules/SMT347.md) suggests named records for fixed tuple types with
+repeated element types or at least three fields. Prefer a `NamedTuple` or frozen
+dataclass when field names clarify a record's meaning. Composite mapping keys,
+source spans and version pairs may intentionally retain tuple semantics. The
+rule excludes variable-length tuples, two distinct element types, quoted
+annotations and externally defined override/dunder/overload signatures.
+
+These four rules skip tests and perform no automatic rewrite. Read each rule's
+scope and valid counterexamples before deciding on a repair.
+
 ## Module names without private prefixes
 
 Require descriptive module/package names while keeping private helpers inside

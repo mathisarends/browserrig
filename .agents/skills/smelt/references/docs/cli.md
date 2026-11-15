@@ -88,6 +88,8 @@ unchanged by presentation grouping. Text groups related late-import SMT313
 findings with their affected lines; JSON retains every finding and adds an
 `ordering` group. Text and GitHub output show usage limits once; SARIF retains
 them in run properties as `usageScopes`. Text omits empty detail fields.
+Text and concise output list a repair repeated verbatim by several findings of
+one rule once, below the findings; JSON keeps the hint on every finding.
 Projects without architecture configuration have no policy-completeness banner
 unless strict coverage is requested. Coverage checks and exit codes still apply.
 
