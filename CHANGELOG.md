@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Upgrade Harnessed and every provider/MCP/OTel extra to 0.17.0. No Browserrig
+  code changes are required.
+
 ## 0.4.0 (2026-11-14)
 
 ### Breaking changes
