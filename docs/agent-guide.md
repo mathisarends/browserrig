@@ -207,6 +207,6 @@ paused; supply `restore_outputs=[YourOutputType]` before resuming structured wor
 
 For explicit continuation without a store, serialize `result.state.to_json()` and
 pass `state=SessionState.from_json(saved)` to `run()` or `session()`.
-Harnessed 0.16 uses state/checkpoint format 3 and audit envelope 6; older formats
+Harnessed 0.17 uses state/checkpoint format 3 and audit envelope 6; older formats
 require separate stores. See the [upgrade notes](../CHANGELOG.md) and
 [session-store example](../examples/session_store.py).

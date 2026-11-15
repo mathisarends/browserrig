@@ -216,6 +216,38 @@ async def test_in_page_title_and_icon_changes_reread_a_settled_strip(monkeypatch
     assert read.await_count == 2
 
 
+async def test_title_change_retries_an_interrupted_icon_download(monkeypatch):
+    events = []
+    watched = _Watched(emit=AsyncMock(side_effect=events.append))
+    tab = watched.tab
+    icon = "https://example.org/icon.png"
+    started = asyncio.Event()
+
+    async def load_icon(_url):
+        if not started.is_set():
+            started.set()
+            await asyncio.Event().wait()
+        return "data:icon"
+
+    read = AsyncMock(return_value=TabStrip(title="Example", icon=icon))
+    load = AsyncMock(side_effect=load_icon)
+    monkeypatch.setattr(tab, "read_strip", read)
+    monkeypatch.setattr(tab, "load_icon", load)
+    async with watched.mounted():
+        await tab.handle(FrameStoppedLoadingEvent(frame_id="tab"))
+        await asyncio.wait_for(started.wait(), 5)
+        read.return_value = TabStrip(title="Retitled", icon=icon)
+        await tab.handle(
+            BindingCalledEvent(
+                name="browserrigTabStripChanged", payload="", execution_context_id=1
+            )
+        )
+        await _until(lambda: events[-1].favicon == "data:icon")
+
+    assert events[-1].title == "Retitled"
+    assert read.await_count == load.await_count == 2
+
+
 async def test_a_closed_tab_stops_resolving_its_strip(monkeypatch):
     watched = _Watched(emit=AsyncMock())
     tab = watched.tab
