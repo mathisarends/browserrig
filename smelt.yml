@@ -143,6 +143,8 @@ rules:
   str-enum-explicit-values: error
   excess-positional-parameters: error
   anonymous-tuple-type: error
+  # Many chains walk the CDP SDK namespaces or plugin state, which are shaped upstream.
+  deep-object-navigation: hint
   facade-export-gap: warning
   # Test smells
   private-test-access: error

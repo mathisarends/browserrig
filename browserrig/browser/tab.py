@@ -161,13 +161,13 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
                 self.layout_changed()
             case JavascriptDialogOpeningEvent(type=kind, message=message):
                 self.dialog = OpenDialog(str(kind), message)
-                self.input.dialog_opened.set()
+                self.input.dialog_opened()
                 await self.emit(
                     DialogOpenedEvent(kind=str(kind), message=message[:1000])
                 )
             case JavascriptDialogClosedEvent(result=accepted):
                 self.dialog = None
-                self.input.dialog_opened.clear()
+                self.input.dialog_closed()
                 await self.emit(DialogHandledEvent(accepted=accepted))
 
     async def emit(self, event: BrowserEvent | LiveEvent | TabEvent) -> None:
