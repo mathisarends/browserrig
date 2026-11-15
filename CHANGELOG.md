@@ -63,6 +63,13 @@
   `control_points`, and `CursorPath.curved(bend=...)` takes a `Bend`.
   `ControlPoint` is removed in favour of `Position`.
 
+### Fixed
+
+- `TabStrip` follows title and favicon changes made in the page without a
+  navigation, including idle single-page-app updates and removed icons. The
+  workaround of calling `tab.report_change(settled=not tab.loading)` after each
+  tool is no longer needed (#47).
+
 ## 0.4.0 (2026-11-14)
 
 ### Breaking changes

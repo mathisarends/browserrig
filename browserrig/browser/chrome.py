@@ -25,6 +25,7 @@ from cdpify.domains.page import (
     NavigatedWithinDocumentEvent,
 )
 from cdpify.domains.runtime import (
+    BindingCalledEvent,
     ExecutionContextDestroyedEvent,
     ExecutionContextsClearedEvent,
 )
@@ -65,6 +66,7 @@ _EVENTS = (
     JavascriptDialogClosedEvent,
     ExecutionContextDestroyedEvent,
     ExecutionContextsClearedEvent,
+    BindingCalledEvent,
     TargetInfoChangedEvent,
     TargetDestroyedEvent,
     DownloadWillBeginEvent,

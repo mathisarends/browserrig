@@ -192,6 +192,11 @@ class PageFacts(Options):
     scroll_y: float
 
 
+class TabStripArgs(ScriptArgs):
+    # Runtime binding the page calls once its title or icon changes.
+    binding: str
+
+
 class TabStrip(Options):
     """The document title and best icon URL; `icon` is empty for non-web pages."""
 

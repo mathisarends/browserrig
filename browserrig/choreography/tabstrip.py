@@ -20,8 +20,9 @@ class TabStrip(Plugin):
     """Stream what a viewer's tab strip shows: url, title, loading state and favicon.
 
     Once a page stops loading, its document title and icon are read in the background,
-    so a slow icon host never holds up other events. Without this plugin no tab-strip
-    events are emitted and no icons are fetched.
+    so a slow icon host never holds up other events. Later in-page title or icon
+    changes, as from scripts or single-page apps, are followed without navigation.
+    Without this plugin no tab-strip events are emitted and no icons are fetched.
     """
 
     events = TAB_STRIP_EVENTS

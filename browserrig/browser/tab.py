@@ -20,7 +20,7 @@ from cdpify.domains.page import (
     LifecycleEventEvent,
     NavigatedWithinDocumentEvent,
 )
-from cdpify.domains.runtime import RemoteObject
+from cdpify.domains.runtime import BindingCalledEvent, RemoteObject
 from harnessed.tracing import record, traced
 
 from browserrig.core import BrowserError, ViewportSize
@@ -36,6 +36,7 @@ from browserrig.events import (
 from browserrig.scripts import (
     TAB_STRIP,
     TabStrip,
+    TabStripArgs,
 )
 
 from .favicon import load_favicon
@@ -44,8 +45,10 @@ from .guard import NavigationGuard
 from .input import CdpInput
 from .network import NetworkActivity
 from .overlays import Overlays
-from .worlds import Worlds
+from .worlds import WORLD_NAME, Worlds
 
+# Called by the page once its title or icon changes after the last strip read.
+_STRIP_BINDING = "browserrigTabStripChanged"
 # Viewport metadata is presentation only and must never hold up input.
 _VIEWPORT_PROBE_SECONDS = 0.25
 
@@ -107,6 +110,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self._current_action = current_action
         self._on_change = on_change
         self._guard = guard
+        self._strip_bound = False
 
     async def handle(self, event: object) -> None:
         """Apply a page event that arrived on this tab's own CDP session."""
@@ -156,6 +160,9 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
                 self.loading = False
                 self.navigation_pending = False
                 await self.report_change(settled=True)
+            case BindingCalledEvent(name=name) if name == _STRIP_BINDING:
+                # Scripts and SPAs retitle a page or swap its icon without navigating.
+                await self.report_change(settled=not self.loading)
             case FrameResizedEvent():
                 self.viewport_revision += 1
                 self.layout_changed()
@@ -196,9 +203,19 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
             await self._on_change(self, settled)
 
     async def read_strip(self) -> TabStrip:
-        """Read the title and icon URL the document declares for a tab strip."""
+        """Read the title and icon URL the document declares for a tab strip.
+
+        Once read, the document reports later title or icon changes as a settled
+        change, so a strip follows in-page updates without polling.
+        """
+        if not self._strip_bound:
+            # Bindings survive reloads and reach only browserrig's isolated worlds.
+            await self.cdp.runtime.add_binding(
+                name=_STRIP_BINDING, execution_context_name=WORLD_NAME
+            )
+            self._strip_bound = True
         frame = await self.main_frame()
-        return await frame.run(TAB_STRIP)
+        return await frame.run(TAB_STRIP, TabStripArgs(binding=_STRIP_BINDING))
 
     async def load_icon(self, url: str) -> str:
         """Load an icon through the page's own network stack, as a `data:` URI."""
