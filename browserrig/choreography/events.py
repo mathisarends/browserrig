@@ -13,27 +13,31 @@ from browserrig.core import (
     FileTransferDirection,
     TabGesture,
 )
-from browserrig.events import EventKind, InputEvent, LiveEvent
+from browserrig.events import EventKind, InputEvent, LiveEvent, TabEvent
 from browserrig.files import FileReadStatus
 from browserrig.observation import FindMark
 
 
 @dataclass(frozen=True, slots=True)
-class DomScrolledEvent(InputEvent):
-    """Measured DOM movement; offsets are scrollLeft/scrollTop in local CSS pixels.
+class PageScrolledEvent(TabEvent):
+    """Measured outer-document movement in CSS pixels; emitted only after movement."""
 
-    An empty `ref` identifies the outer document. Otherwise it identifies a container
-    in `frame_id`/`frame_document_id`. No event is emitted when offsets are unchanged.
-    """
+    delta_x: float
+    delta_y: float
+    type: Literal[EventKind.PAGE_SCROLLED] = field(
+        default=EventKind.PAGE_SCROLLED, kw_only=True
+    )
 
-    frame_id: str
-    frame_document_id: str
+
+@dataclass(frozen=True, slots=True)
+class ElementScrolledEvent(TabEvent):
+    """Measured container movement in local CSS pixels; `ref` is observation-local."""
+
     ref: str
-    before: tuple[float, float]
-    after: tuple[float, float]
-    blocked: bool = False
-    type: Literal[EventKind.DOM_SCROLLED] = field(
-        default=EventKind.DOM_SCROLLED, kw_only=True
+    delta_x: float
+    delta_y: float
+    type: Literal[EventKind.ELEMENT_SCROLLED] = field(
+        default=EventKind.ELEMENT_SCROLLED, kw_only=True
     )
 
 
@@ -209,7 +213,8 @@ class WorkPresentedEvent(LiveEvent):
 
 
 SCENE_EVENTS = (
-    DomScrolledEvent,
+    PageScrolledEvent,
+    ElementScrolledEvent,
     HighlightElementEvent,
     WaitingEvent,
     BarTypedEvent,

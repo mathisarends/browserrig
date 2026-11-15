@@ -18,13 +18,14 @@ from browserrig import (
     InputVisualization,
     wait_for_page,
 )
-from browserrig.choreography import DomScrolledEvent
+from browserrig.choreography import ElementScrolledEvent, PageScrolledEvent
 from browserrig.core import Point
 from browserrig.events import (
     ActionFinishedEvent,
     InputEvent,
     ScrolledEvent,
     ScrollStartedEvent,
+    TabEvent,
 )
 from tests.javascript import evaluate
 from tests.observations import latest
@@ -372,7 +373,6 @@ async def test_dom_scroll_receipts_stream_measured_movement_only(site, target):
         result = await session.run(
             "Scroll the target twice to its boundary", max_steps=3
         )
-        frames = await tab.frames()
         if target == "iframe":
             expected = await evaluate(
                 tab,
@@ -383,11 +383,15 @@ async def test_dom_scroll_receipts_stream_measured_movement_only(site, target):
             expected = positions["editor_y" if target == "element" else "page_y"]
         identity = (tab.id, tab.document_id)
     await asyncio.wait_for(consumer, 30)
-    shown = [event for event in streamed if isinstance(event, DomScrolledEvent)]
+    shown = [
+        event
+        for event in streamed
+        if isinstance(event, (PageScrolledEvent, ElementScrolledEvent))
+    ]
     assert not any(
         isinstance(event, (ScrolledEvent, ScrollStartedEvent)) for event in streamed
     )
-    assert not any(isinstance(event, InputEvent) for event in result.events)
+    assert not any(isinstance(event, (InputEvent, TabEvent)) for event in result.events)
     if target == "unstaged":
         assert shown == []
         assert expected > 0
@@ -401,26 +405,53 @@ async def test_dom_scroll_receipts_stream_measured_movement_only(site, target):
         return
     assert len(shown) == 1  # The second attempt reaches the same boundary.
     event = shown[0]
-    assert event.before == (0, 0)
-    assert event.after[1] == expected > 0
-    assert event.after[1] < 10000  # Measured, clamped movement, not requested input.
-    _assert_scroll_identity(event, result, identity, frames, target)
+    assert event.delta_y == expected > 0
+    assert event.delta_y < 10000  # Measured, clamped movement, not requested input.
+    _assert_scroll_identity(event, result, identity, target)
 
 
-def _assert_scroll_identity(event, result, identity, frames, target):
-    assert event.blocked is (target == "partial")
-    assert (event.target_id, event.document_id) == identity
+async def test_page_scroll_receipts_measure_positive_and_negative_deltas(site):
+    model = ScriptedModel(
+        [
+            call("scroll_page", delta_y=300, delta_x=120),
+            call("scroll_page", delta_y=-80, delta_x=-40),
+            "Done",
+        ]
+    )
+    pages, elements = [], []
+    async with _editor_session(site, model, visualization=True) as (
+        session,
+        _browser,
+        tab,
+    ):
+        session.scope.on(PageScrolledEvent, pages.append)
+        session.scope.on(ElementScrolledEvent, elements.append)
+        result = await session.run("Scroll down then partly back", max_steps=3)
+        assert all(not receipt.is_error for receipt in _receipts(result))
+        assert [(event.delta_x, event.delta_y) for event in pages] == [
+            (120, 300),
+            (-40, -80),
+        ]
+        assert all(event.tab_id == tab.id for event in pages)
+        assert not elements
+
+
+def _assert_scroll_identity(event, result, identity, target):
+    assert (event.tab_id, event.document_id) == identity
     assert event.browser_id and event.action_id
     assert any(
         isinstance(item, ActionFinishedEvent) and item.action_id == event.action_id
         for item in result.events
     )
-    assert bool(event.ref) is (target in {"element", "iframe"})
-    frame = next(frame for frame in frames if frame.id == event.frame_id)
-    assert event.frame_document_id == frame.document_id
-    assert (frame.parent is not None) is (target == "iframe")
+    match event:
+        case ElementScrolledEvent(ref=ref):
+            assert target in {"element", "iframe"} and ref
+        case PageScrolledEvent():
+            assert target in {"page", "partial"}
+        case _:
+            pytest.fail(f"Unexpected movement receipt: {event!r}")
     if target == "partial":
-        assert event.after[0] == 0
+        assert event.delta_x == 0
 
 
 @asynccontextmanager

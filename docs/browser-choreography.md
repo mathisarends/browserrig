@@ -87,49 +87,50 @@ with `TypeAdapter(WorkPresentedEvent).json_schema()`.
 
 ### DOM scroll receipts
 
-`scroll_page` and `scroll_element` publish `DomScrolledEvent` after the browser
-reports actual movement. This closes a gap where successful DOM scrolling had only
-a text tool result and was invisible to external choreography consumers.
-Mount `InputVisualization(renderer=None)` and subscribe before execution:
+The supplied DOM scroll tools publish separate transient events after measured
+movement. Mount `InputVisualization(renderer=None)` and start a consumer before
+execution:
 
 ```python
-from browserrig.choreography import DomScrolledEvent
+from browserrig.choreography import ElementScrolledEvent, PageScrolledEvent
 
 async def consume(session):
     async for event in session.subscribe(transient=True):
-        if isinstance(event, DomScrolledEvent):
-            dx = event.after[0] - event.before[0]
-            dy = event.after[1] - event.before[1]
-            # Use event.action_id to correlate with action lifecycle receipts.
-            print(event.target_id, event.frame_id, event.ref, dx, dy)
+        match event:
+            case PageScrolledEvent(tab_id=tab_id, delta_x=dx, delta_y=dy):
+                print("Page", tab_id, dx, dy)
+            case ElementScrolledEvent(tab_id=tab_id, ref=ref, delta_x=dx, delta_y=dy):
+                print("Element", tab_id, ref, dx, dy)
 ```
 
-| Event | Data and meaning |
+| Event | Payload and meaning |
 | --- | --- |
-| `DomScrolledEvent` (`browser.dom.scrolled`) | `before` and `after`: measured `(scrollLeft, scrollTop)` in the scrolled object's local CSS pixels. Subtract to obtain actual deltas, including clamping at boundaries. |
-| `ScrollStartedEvent` (`browser.scroll.started`) | `x`, `y`: wheel position in tab viewport CSS pixels; `delta_x`, `delta_y`, `duration`: planned native wheel gesture. |
-| `ScrolledEvent` (`browser.scrolled`) | Same wheel position, dispatched deltas and gesture duration after dispatch completes. These are input deltas, not measured DOM offsets. |
-| `ActionStartedEvent`, `ActionFinishedEvent`, `ActionFailedEvent` | Durable execution lifecycle, correlated by `action_id`. A finished action can have unchanged scroll offsets. |
-| `WorkPresentedEvent` (`browser.work.presented`) | Bounded presentation feedback, including tool failures; DOM movement is carried by `DomScrolledEvent`, not by parsing a work preview. |
+| `PageScrolledEvent` (`browser.page.scrolled`) | `tab_id`, `delta_x`, `delta_y`: measured movement of the outer document in CSS pixels. |
+| `ElementScrolledEvent` (`browser.element.scrolled`) | `tab_id`, `ref`, `delta_x`, `delta_y`: measured movement of that container in its local CSS pixels, including containers in iframes. |
+| `ScrollStartedEvent` (`browser.scroll.started`) | Existing wheel input: viewport `x/y`, planned `delta_x/delta_y` and `duration`. |
+| `ScrolledEvent` (`browser.scrolled`) | Existing wheel input after dispatch: wheel position, dispatched deltas and gesture duration. Does not confirm DOM movement. |
+| `ActionStartedEvent`, `ActionFinishedEvent`, `ActionFailedEvent` | Durable execution lifecycle, correlated by `action_id`. A finished action can have moved nothing. |
+| `WorkPresentedEvent` | Presentation/status feedback, including tool failures; its preview is not the source of DOM scroll data. |
 
-`DomScrolledEvent` also carries:
+`tab_id` is the source `Tab.id`. These two new events expose no `target_id`.
+`ref` identifies the container in the action's observation; it is not a permanent
+DOM identifier. Shared fields are `browser_id`, `document_id` (the top-level
+document), `action_id` and `at` (a monotonic timestamp in seconds).
 
-| Field | Meaning |
-| --- | --- |
-| `browser_id`, `target_id`, `document_id` | Source browser, native tab and top-level document. |
-| `frame_id`, `frame_document_id` | Frame and frame document containing the scrolled object, including iframe containers. |
-| `ref` | Container ref from that observation, or `""` for `scroll_page` on the outer document. Refs are observation-local identifiers. |
-| `action_id` | Executing browser action, shared with its action lifecycle events. |
-| `at` | Monotonic event timestamp in seconds. |
-| `blocked` | At least one requested axis was disabled by overflow policy. The other axis may still have moved. |
+Deltas are measured from actual before/after scroll offsets. Positive values
+increase scrollLeft/scrollTop; negative values decrease them. A request for 300px
+that can move only 80px emits 80px. No event is emitted for unchanged offsets or
+a rejected/denied/failed scroll. A partially blocked scroll reports only the
+movement that occurred. Element scrolling emits only `ElementScrolledEvent`;
+it does not also emit a page event. No wheel input or pointer trajectory is invented.
 
-No movement receipt is emitted for unchanged offsets, rejected targets, denied or
-failed execution. A partially blocked scroll emits its measured movement with
-`blocked=True`. DOM scrolling emits no wheel gesture or pointer trajectory.
-Receipts are transient, excluded from saved results and model context, and emitted
-only with `InputVisualization` mounted. Direct low-level scroll helpers do not
-stage choreography; these receipts cover the supplied DOM scroll tools.
+Both events derive from `TabEvent`, stay transient and are excluded from saved
+results and model context. They are emitted only with `InputVisualization`
+mounted. Direct low-level scroll helpers retain their existing API and do not
+stage choreography. Generate frontend schemas with
+`TypeAdapter(PageScrolledEvent).json_schema()` and
+`TypeAdapter(ElementScrolledEvent).json_schema()`.
 
-These offsets are content scroll positions, not points in the tab viewport. They
-must not be projected as cursor coordinates. Source viewport metadata and resize
-projection are tracked separately in [#39](https://github.com/mathisarends/browserrig/issues/39).
+The payload deliberately contains no absolute offsets, frame metadata or
+`blocked` flag. Content deltas are not viewport points. Source viewport/resize
+metadata is tracked separately in [#39](https://github.com/mathisarends/browserrig/issues/39).

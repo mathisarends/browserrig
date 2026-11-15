@@ -57,8 +57,6 @@ class WaitIntent:
 class DomScrollIntent:
     """Scroll a document or container; the step returns `TargetScrollResult`."""
 
-    frame_id: str
-    frame_document_id: str
     ref: str = ""
 
 

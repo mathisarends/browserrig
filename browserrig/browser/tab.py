@@ -29,6 +29,7 @@ from browserrig.events import (
     DialogOpenedEvent,
     LiveEvent,
     NavigationCommittedEvent,
+    TabEvent,
 )
 from browserrig.scripts import (
     TAB_STRIP,
@@ -56,7 +57,8 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         target_id: str,
         cdp: CdpSession,
         *,
-        emit: Callable[[BrowserEvent | LiveEvent], Awaitable[None]] | None = None,
+        emit: Callable[[BrowserEvent | LiveEvent | TabEvent], Awaitable[None]]
+        | None = None,
         worlds: Worlds | None = None,
         discover_frames: FrameDiscovery | None = None,
         current_action: Callable[[], str] = lambda: "",
@@ -154,8 +156,13 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
                 self.input.dialog_opened.clear()
                 await self.emit(DialogHandledEvent(accepted=accepted))
 
-    async def emit(self, event: BrowserEvent | LiveEvent) -> None:
+    async def emit(self, event: BrowserEvent | LiveEvent | TabEvent) -> None:
         if self._emit is not None:
+            if isinstance(event, TabEvent):
+                await self._emit(
+                    replace(event, tab_id=self.id, document_id=self.document_id)
+                )
+                return
             await self._emit(
                 replace(event, target_id=self.id, document_id=self.document_id)
             )

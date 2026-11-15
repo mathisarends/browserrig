@@ -45,7 +45,7 @@ class DomScrollTools(Plugin):
         tab = self._actions.tab
         frame = await tab.main_frame()
         result = await self._actions.stage(
-            DomScrollIntent(frame.id, frame.document_id),
+            DomScrollIntent(),
             tab,
             partial(
                 frame.run,
@@ -74,7 +74,7 @@ class DomScrollTools(Plugin):
         tab = self._actions.tab
         handle = await self._elements.resolve(tab, ref)
         result = await self._actions.stage(
-            DomScrollIntent(handle.frame.id, handle.frame.document_id, ref),
+            DomScrollIntent(ref),
             tab,
             partial(_element_result, handle, delta_x=delta_x, delta_y=delta_y),
         )

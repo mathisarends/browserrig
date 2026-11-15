@@ -73,7 +73,8 @@ class EventKind(StrEnum):
     KEY_PRESSED = "browser.key.pressed"
     KEYBOARD_VISIBILITY = "browser.keyboard.visibility"
     SCROLLED = "browser.scrolled"
-    DOM_SCROLLED = "browser.dom.scrolled"
+    PAGE_SCROLLED = "browser.page.scrolled"
+    ELEMENT_SCROLLED = "browser.element.scrolled"
     SCROLL_STARTED = "browser.scroll.started"
     HIGHLIGHT_ELEMENT = "browser.element.highlight"
     WAITING = "browser.waiting"
@@ -100,6 +101,17 @@ class LiveEvent(TransientEvent):
     browser_id: str = ""
     target_id: str = ""
     document_id: str = ""
+    at: float = field(default_factory=monotonic)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class TabEvent(TransientEvent):
+    """Transient presentation facts about a tab, correlated with a browser action."""
+
+    browser_id: str = ""
+    tab_id: str = ""
+    document_id: str = ""
+    action_id: str = ""
     at: float = field(default_factory=monotonic)
 
 
