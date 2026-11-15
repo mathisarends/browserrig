@@ -2,11 +2,13 @@
 
 from .events import (
     SCENE_EVENTS,
+    ActivityPresentedEvent,
     AddressBarFocusedEvent,
     BackPressedEvent,
     BarTypedEvent,
     CaptureRegion,
     CursorEnteredEvent,
+    DownloadPresentedEvent,
     ElementScrolledEvent,
     FileTransferEvent,
     FindBarEvent,
@@ -14,9 +16,11 @@ from .events import (
     ForwardPressedEvent,
     HighlightElementEvent,
     PageScrolledEvent,
+    PresentedEvent,
     ReloadPressedEvent,
     TabPressedEvent,
     ToolbarPressedEvent,
+    UploadPresentedEvent,
     WaitingEvent,
     WorkPhase,
     WorkPresentedEvent,
@@ -26,6 +30,10 @@ from .stage import Stage
 from .tabstrip import TabStrip
 
 __all__ = [
+    "ActivityPresentedEvent",
+    "DownloadPresentedEvent",
+    "PresentedEvent",
+    "UploadPresentedEvent",
     "ElementScrolledEvent",
     "PageScrolledEvent",
     "SCENE_EVENTS",

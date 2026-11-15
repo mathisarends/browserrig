@@ -167,13 +167,10 @@
           effects(event);
         }
         break;
-      case kinds.ACTIVITY_STARTED:
-      case kinds.ACTIVITY_FINISHED:
+      case kinds.ACTIVITY_PRESENTED:
         if (event.kind === ui.options().activities.HANDOFF) {
           // The person is asked to act: the viewport edge marks that control is theirs.
-          ui.node('edge').dataset.visible = String(
-            event.type === kinds.ACTIVITY_STARTED,
-          );
+          ui.node('edge').dataset.visible = String(event.active);
         }
         break;
       default:

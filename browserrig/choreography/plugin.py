@@ -19,6 +19,7 @@ from browserrig.core import (
 from browserrig.events import (
     INPUT_EVENTS,
     BrowserEvent,
+    DownloadProgressedEvent,
     ObservationCapturedEvent,
 )
 from browserrig.input import Input
@@ -41,12 +42,14 @@ from .events import (
     SCENE_EVENTS,
     CaptureRegion,
     HighlightElementEvent,
+    PresentedEvent,
     WorkPhase,
     WorkPresentedEvent,
 )
 from .images import thumbnail
 from .projection import project
 from .stage import Stage
+from .status import StatusFact, StatusProjection
 
 # How each intent is staged around its step.
 _SCENES: dict[type, Callable[[scenes.Scene, Any, scenes.Step], Awaitable[Any]]] = {
@@ -68,15 +71,17 @@ class _Staging:
     screenshot: WorkPresentedEvent | None = None
     running: dict[str, WorkPresentedEvent] = field(default_factory=dict)
     handled: set[str] = field(default_factory=set)
+    status: StatusProjection = field(default_factory=StatusProjection)
 
 
-class Choreography(Plugin, slot="browserrig.choreography"):
+class Choreography(Plugin, slot="browserrig.choreography", provides=True):
     """Stage the browser for people watching: visible input and browser UI as events.
 
     Tools and input devices only describe what they do. This plugin streams input as
     live events, stages browser UI such as the address and find bars, highlights the
-    elements tools act on and publishes work receipts. It draws nothing itself; viewers
-    such as `ChoreographyOverlay` consume the events. How fast input runs is up to
+    elements tools act on and projects work, downloads, uploads and activities into
+    `PresentedEvent`s. It draws nothing itself; viewers such as `ChoreographyOverlay`
+    consume the events. How fast input runs is up to
     `InputPacing`. Without this plugin no input events are emitted.
     """
 
@@ -90,6 +95,7 @@ class Choreography(Plugin, slot="browserrig.choreography"):
     async def setup(self, scope: PluginScope) -> None:
         self._state.context = scope
         scope.on(BrowserEvent, self._browser_event)
+        scope.on(DownloadProgressedEvent, self._status)
         # Each call installs now and registers its undo for teardown.
         scope.effect(self._input.present(Stage()))
 
@@ -109,7 +115,12 @@ class Choreography(Plugin, slot="browserrig.choreography"):
         if self._input.mouse.position_in(event.tab.id) is not None:
             await self._input.mouse.publish_cursor()
 
+    async def _status(self, event: StatusFact) -> None:
+        if presented := self._state.status.project(event):
+            await self._emit(presented)
+
     async def _browser_event(self, event: BrowserEvent) -> None:
+        await self._status(event)
         if receipt := project(event):
             # Facts enrich the same tool receipt rather than creating a second card.
             for active in self._state.running.values():
@@ -129,7 +140,7 @@ class Choreography(Plugin, slot="browserrig.choreography"):
                         document_id=receipt.document_id or active.document_id,
                     )
                     break
-            await self._emit_work(receipt)
+            await self._emit(receipt)
         if isinstance(event, ObservationCapturedEvent):
             await self._screenshot_captured(event)
 
@@ -159,10 +170,10 @@ class Choreography(Plugin, slot="browserrig.choreography"):
         started_at = monotonic()
         try:
             if shown:
-                await self._emit_work(receipt)
+                await self._emit(receipt)
             result = await next_()
         except asyncio.CancelledError:
-            await self._emit_work(
+            await self._emit(
                 work.finished(
                     receipt,
                     ToolResult("Cancelled", ToolStatus.CANCELLED),
@@ -171,7 +182,7 @@ class Choreography(Plugin, slot="browserrig.choreography"):
             )
             raise
         except Exception as error:
-            await self._emit_work(
+            await self._emit(
                 work.finished(
                     receipt,
                     ToolResult.error(self._redact(str(error))),
@@ -189,7 +200,7 @@ class Choreography(Plugin, slot="browserrig.choreography"):
             )
             if metadata.kind is ActionKind.SCREENSHOT and not result.is_error:
                 if previous := self._state.screenshot:
-                    await self._emit_work(
+                    await self._emit(
                         replace(
                             previous,
                             phase=WorkPhase.CANCELLED,
@@ -197,7 +208,7 @@ class Choreography(Plugin, slot="browserrig.choreography"):
                         )
                     )
                 self._state.screenshot = completed
-            await self._emit_work(completed)
+            await self._emit(completed)
         return result
 
     def _redact[T](self, value: T) -> T:
@@ -215,7 +226,7 @@ class Choreography(Plugin, slot="browserrig.choreography"):
             return
         if event.result.is_error:
             result = self._redact(event.result)
-            await self._emit_work(
+            await self._emit(
                 WorkPresentedEvent(
                     work_id=f"tool:{event.call_id}",
                     call_id=event.call_id,
@@ -228,7 +239,7 @@ class Choreography(Plugin, slot="browserrig.choreography"):
                 )
             )
 
-    async def _emit_work(self, event: WorkPresentedEvent) -> None:
+    async def _emit(self, event: PresentedEvent) -> None:
         # The browser event boundary also applies configured secret redaction.
         await self._events.emit(replace(event, at=monotonic()))
 
@@ -257,7 +268,7 @@ class Choreography(Plugin, slot="browserrig.choreography"):
             if viewport
             else receipt.region
         )
-        await self._emit_work(
+        await self._emit(
             replace(
                 receipt,
                 phase=WorkPhase.COMPLETED if image else WorkPhase.WARNING,
@@ -278,7 +289,7 @@ class Choreography(Plugin, slot="browserrig.choreography"):
         self._state.handled.clear()
         if receipt := self._state.screenshot:
             self._state.screenshot = None
-            await self._emit_work(
+            await self._emit(
                 replace(
                     receipt,
                     phase=WorkPhase.CANCELLED,

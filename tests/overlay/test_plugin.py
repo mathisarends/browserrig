@@ -1,4 +1,11 @@
+import pytest
+
 from browserrig.browser import TabChanged
+from browserrig.choreography import (
+    Choreography,
+    DownloadPresentedEvent,
+    WorkPhase,
+)
 from browserrig.events import CursorStateEvent, DownloadStartedEvent, EventKind
 from browserrig.overlay import ChoreographyOverlay
 from tests.fakes import mounted
@@ -23,17 +30,33 @@ class _Surface:
         pass
 
 
-async def test_overlay_draws_whatever_reaches_it_without_choreography():
-    async with mounted(ChoreographyOverlay(theme="light")) as (services, ctx):
+def _download(phase=WorkPhase.RUNNING):
+    return DownloadPresentedEvent(
+        download_id="d", filename="a.pdf", phase=phase, target_id="tab-1"
+    )
+
+
+async def test_overlay_cannot_mount_without_choreography():
+    with pytest.raises(Exception, match="Choreography"):
+        async with mounted(ChoreographyOverlay()):
+            pass
+
+
+async def test_overlay_draws_presented_events_but_never_browser_facts():
+    async with mounted(Choreography(), ChoreographyOverlay(theme="light")) as (
+        services,
+        ctx,
+    ):
         surface = services.browser.active_tab.overlays = _Surface()
         await ctx.dispatch(
             DownloadStartedEvent(download_id="d", filename="a.pdf", url="https://x/")
         )
+        await ctx.dispatch(_download())
         await ctx.dispatch(CursorStateEvent(x=1, y=2, target_id="another-tab"))
         await ctx.dispatch(CursorStateEvent(x=10, y=20, target_id="tab-1"))
     assert surface.mounts == 1
     assert [message["type"] for message in surface.sent] == [
-        EventKind.DOWNLOAD_STARTED,
+        EventKind.DOWNLOAD_PRESENTED,
         EventKind.CURSOR_STATE,
     ]
     assert surface.sent[0]["presentation"]["theme"] == "light"
@@ -42,12 +65,10 @@ async def test_overlay_draws_whatever_reaches_it_without_choreography():
 
 
 async def test_settled_tab_change_restores_receipts_once_per_document():
-    async with mounted(ChoreographyOverlay()) as (services, ctx):
+    async with mounted(Choreography(), ChoreographyOverlay()) as (services, ctx):
         tab = services.browser.active_tab
         surface = tab.overlays = _Surface()
-        await ctx.dispatch(
-            DownloadStartedEvent(download_id="d", filename="a.pdf", url="https://x/")
-        )
+        await ctx.dispatch(_download())
         tab.document_id = "doc-2"
         await ctx.dispatch(TabChanged(tab, settled=False))
         await ctx.dispatch(TabChanged(tab, settled=True))

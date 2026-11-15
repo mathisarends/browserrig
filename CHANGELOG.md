@@ -14,7 +14,13 @@
   `ChoreographyOverlay(...)`. Both are browser defaults; drop both with
   `without=(InputPacing, Choreography, ChoreographyOverlay)` to work unseen.
   Bare harnessed agents mount `ChoreographyOverlay()` next to `Choreography()`
-  to keep the in-page rendering.
+  to keep the in-page rendering; the overlay requires `Choreography`.
+- Separate browser facts from presentation. `Choreography` projects downloads,
+  uploads and activities into `DownloadPresentedEvent`,
+  `UploadPresentedEvent` and `ActivityPresentedEvent`, which share the new
+  `PresentedEvent` base with `WorkPresentedEvent`. Viewers, including the
+  overlay, draw only input and presented events and no longer interpret
+  `Download*Event`, `FilesUploadedEvent` or `Activity*Event` facts.
 - `Choreography` republishes the resting cursor when the active tab settles on a
   new document, so every viewer, not only the in-page overlay, can redraw it.
 

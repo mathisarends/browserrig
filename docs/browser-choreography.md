@@ -24,9 +24,9 @@ overlay = ChoreographyOverlay(name="Research", keyboard_layout="de", theme="dark
 
 Mount `overlay` in `Agent(plugins=[...])`. Layouts are `en`/`de`, themes are
 `dark`/`light`/`auto`. Pass `without=(ChoreographyOverlay,)` to keep only the
-events for an [external viewer](#external-viewers). The overlay renders whatever
-reaches it: without `Choreography` it still shows activity and downloads, but no
-input. Input pacing is controlled separately by `InputPacing`.
+events for an [external viewer](#external-viewers). The overlay draws only what
+`Choreography` emits, so it requires that plugin. Input pacing is controlled
+separately by `InputPacing`.
 
 ```powershell
 uv run python -m examples.visualization --headed --layout de --theme dark
@@ -68,15 +68,22 @@ example supports `--video .browserrig/recordings`.
 ## External viewers
 
 Start a consumer before the run and use `session.subscribe(transient=True)` for
-input, work, activity and download events. `WorkPresentedEvent` supplies the same
-structured receipts to `ChoreographyOverlay` and external viewers; upsert by `work_id`.
-`call_id`/`action_id` correlate execution, and `WorkPhase` identifies running,
-completed, warning, failed or cancelled work. Terminal work expires after
-`retention` seconds.
+input events and `PresentedEvent`s. `ChoreographyOverlay` draws exactly these, so
+an external viewer sees the same scene:
 
+| Event | Upsert by | Meaning |
+| --- | --- | --- |
+| `WorkPresentedEvent` | `work_id` | Tool receipts; `call_id`/`action_id` correlate execution. |
+| `DownloadPresentedEvent` | `download_id` | Named download with `received_bytes`; show percentages only with a known `total_bytes`. |
+| `UploadPresentedEvent` | `target_id` | Files set on an input, with the element `ref`. |
+| `ActivityPresentedEvent` | `interval_id` | Ongoing activity such as a handoff while `active` is true. |
+
+`WorkPhase` identifies running, completed, warning, failed or cancelled work and
+downloads. Terminal receipts and uploads expire after `retention` seconds.
 Titles/details are ready to draw. Structured fields retain paths, URLs, page
-selectors, preview/limitations and source geometry. Download progress is
-keyed independently by `download_id`; show percentages only with a known total.
+selectors, preview/limitations and source geometry. The underlying facts
+(`DownloadStartedEvent`, `ActivityStartedEvent`, …) stay available for data
+consumers; viewers do not need them.
 
 ### Coordinate space
 

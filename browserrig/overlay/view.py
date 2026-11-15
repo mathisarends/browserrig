@@ -10,9 +10,9 @@ from harnessed.tracing import traced
 from pydantic import Field
 
 from browserrig.browser import Overlay, Tab
-from browserrig.choreography import WorkPhase
+from browserrig.choreography import PresentedEvent, WorkPhase
 from browserrig.core import ActionKind, ActivityKind, Options
-from browserrig.events import BrowserEvent, EventKind, LiveEvent
+from browserrig.events import EventKind, InputEvent
 from browserrig.scripts import CHOREOGRAPHY
 
 from .receipts import Receipts
@@ -46,9 +46,10 @@ class OverlayView:
         self._receipts = Receipts()
         self._shown: _Document | None = None
 
-    def remember(self, event: LiveEvent | BrowserEvent) -> None:
+    def remember(self, event: InputEvent | PresentedEvent) -> None:
         """Retain receipts even when the document cannot currently render them."""
-        self._receipts.remember(event)
+        if isinstance(event, PresentedEvent):
+            self._receipts.remember(event)
 
     def suspend(self) -> None:
         """Request state restoration after a dialog or unavailable document."""
@@ -59,7 +60,7 @@ class OverlayView:
         if _Document(tab.id, tab.document_id) != self._shown:
             await self._show(tab, None)
 
-    async def show(self, tab: Tab, event: LiveEvent | BrowserEvent) -> None:
+    async def show(self, tab: Tab, event: InputEvent | PresentedEvent) -> None:
         self.remember(event)
         await self._show(tab, event)
 
@@ -70,7 +71,7 @@ class OverlayView:
             await asyncio.gather(*(overlay.close() for overlay in overlays.values()))
 
     @traced
-    async def _show(self, tab: Tab, event: LiveEvent | BrowserEvent | None) -> None:
+    async def _show(self, tab: Tab, event: InputEvent | PresentedEvent | None) -> None:
         async with self._lock:
             if self._closed:
                 return

@@ -45,8 +45,7 @@ function createChoreographyTransfers(ui, cursor) {
     }
     return item;
   };
-  const finish = (event, status, state) => {
-    const item = downloadCard(event.download_id, event.filename);
+  const finish = (event, item, status, state) => {
     item.state = state;
     ui.cancel(`download:${event.download_id}`);
     card(item.id, item.name, status, state);
@@ -60,8 +59,44 @@ function createChoreographyTransfers(ui, cursor) {
           item.node.remove();
         }
       },
-      2200,
+      Math.max(0, event.retention) * 1000,
     );
+  };
+  const received = (event) => {
+    if (event.received_bytes <= 0) {
+      return 'Downloading …';
+    }
+    const total =
+      event.total_bytes > 0
+        ? ` / ${(event.total_bytes / 1024).toFixed(1)} KB`
+        : ' KB received';
+    return `${(event.received_bytes / 1024).toFixed(1)}${total}`;
+  };
+  const download = (event) => {
+    const phases = ui.options().phases;
+    const item = downloadCard(event.download_id, event.filename || 'Download');
+    if (event.phase === phases.COMPLETED) {
+      finish(event, item, 'Downloaded', 'completed');
+      return;
+    }
+    if (event.phase === phases.FAILED) {
+      finish(event, item, 'Download failed', 'failed');
+      return;
+    }
+    if (event.phase === phases.CANCELLED) {
+      finish(event, item, 'Download canceled', 'failed');
+      return;
+    }
+    if (item.state && item.state !== 'active') {
+      return;
+    }
+    const appearing = !item.state;
+    item.state = 'active';
+    ui.cancel(`download:${event.download_id}`);
+    card(item.id, item.name, received(event));
+    if (appearing && !event.restoring) {
+      fly(item.id, cursor.point(), false);
+    }
   };
   const show = (event) => {
     const kinds = ui.options().events;
@@ -81,44 +116,12 @@ function createChoreographyTransfers(ui, cursor) {
         }
         break;
       }
-      case kinds.FILES_UPLOADED:
+      case kinds.UPLOAD_PRESENTED:
         card('upload', event.paths.map(filename).join(', '), 'Uploaded', 'completed');
         ui.hide('upload', 2200);
         break;
-      case kinds.DOWNLOAD_STARTED: {
-        const item = downloadCard(event.download_id, event.filename);
-        item.state = 'active';
-        ui.cancel(`download:${event.download_id}`);
-        card(item.id, item.name, 'Downloading …');
-        if (!event.restoring) {
-          fly(item.id, cursor.point(), false);
-        }
-        break;
-      }
-      case kinds.DOWNLOAD_PROGRESS: {
-        const item = downloadCard(event.download_id);
-        if (item.state && item.state !== 'active') {
-          break;
-        }
-        const progress =
-          event.total_bytes > 0
-            ? ` / ${(event.total_bytes / 1024).toFixed(1)} KB`
-            : ' KB received';
-        card(
-          item.id,
-          item.name,
-          `${(event.received_bytes / 1024).toFixed(1)}${progress}`,
-        );
-        break;
-      }
-      case kinds.DOWNLOAD_COMPLETED:
-        finish(event, 'Downloaded', 'completed');
-        break;
-      case kinds.DOWNLOAD_FAILED:
-        finish(event, 'Download failed', 'failed');
-        break;
-      case kinds.DOWNLOAD_CANCELED:
-        finish(event, 'Download canceled', 'failed');
+      case kinds.DOWNLOAD_PRESENTED:
+        download(event);
         break;
       default:
         break;

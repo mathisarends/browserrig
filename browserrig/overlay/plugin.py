@@ -8,21 +8,13 @@ from harnessed import Plugin, PluginState, hook
 from harnessed.kernel import PluginScope, needs
 
 from browserrig.browser import Browser, TabChanged
-from browserrig.choreography import WorkPresentedEvent
-from browserrig.core import BrowserError
-from browserrig.events import (
-    ActivityFinishedEvent,
-    ActivityStartedEvent,
-    BrowserEvent,
-    DownloadCanceledEvent,
-    DownloadCompletedEvent,
-    DownloadFailedEvent,
-    DownloadProgressedEvent,
-    DownloadStartedEvent,
-    FilesUploadedEvent,
-    InputEvent,
-    LiveEvent,
+from browserrig.choreography import (
+    ActivityPresentedEvent,
+    Choreography,
+    PresentedEvent,
 )
+from browserrig.core import BrowserError
+from browserrig.events import InputEvent
 
 from .view import KeyboardLayout, OverlayStyle, OverlayView, Theme
 
@@ -33,19 +25,21 @@ _SHOW_SECONDS = 2.5
 
 @dataclass
 class _Overlay:
-    """One session's view and the status events still waiting to be shown."""
+    """One session's view and the activity receipts still waiting to be shown."""
 
     view: OverlayView | None = None
-    activities: deque[BrowserEvent] = field(default_factory=deque)
+    activities: deque[ActivityPresentedEvent] = field(default_factory=deque)
     activity_task: asyncio.Task[None] | None = None
 
 
-class ChoreographyOverlay(Plugin, slot="browserrig.choreography-overlay"):
+class ChoreographyOverlay(
+    Plugin, slot="browserrig.choreography-overlay", needs=(Choreography,)
+):
     """Draw the session's choreography inside the active tab for people watching it.
 
-    A transparent, inert iframe shows cursor, keyboard, browser UI and work receipts;
-    live viewers and native recordings see it, model screenshots do not. It only
-    consumes events: input appears with `Choreography`, activity and downloads without.
+    A transparent, inert iframe shows cursor, keyboard, browser UI and presented
+    receipts; live viewers and native recordings see it, model screenshots do not. It
+    only consumes what `Choreography` emits and never reads browser facts itself.
     """
 
     _state = PluginState(_Overlay)
@@ -66,8 +60,8 @@ class ChoreographyOverlay(Plugin, slot="browserrig.choreography-overlay"):
     async def setup(self, scope: PluginScope) -> None:
         view = self._state.view = OverlayView(self.style)
         scope.effect(view.close)
-        scope.on(LiveEvent, self._live_event)
-        scope.on(BrowserEvent, self._browser_event)
+        scope.on(InputEvent, self._show)
+        scope.on(PresentedEvent, self._presented)
         scope.effect(self._stop_activities)
 
     @hook(TabChanged)
@@ -83,28 +77,15 @@ class ChoreographyOverlay(Plugin, slot="browserrig.choreography-overlay"):
         except (BrowserError, TimeoutError):
             logger.debug("Overlay restoration unavailable")
 
-    async def _live_event(self, event: LiveEvent) -> None:
-        if isinstance(event, (InputEvent, DownloadProgressedEvent, WorkPresentedEvent)):
+    async def _presented(self, event: PresentedEvent) -> None:
+        if not isinstance(event, ActivityPresentedEvent):
             await self._show(event)
-
-    async def _browser_event(self, event: BrowserEvent) -> None:
-        if isinstance(event, (ActivityStartedEvent, ActivityFinishedEvent)):
-            # Status rendering must never hold up model/control hooks.
-            state = self._state
-            state.activities.append(event)
-            if state.activity_task is None:
-                state.activity_task = asyncio.create_task(self._show_activities())
-        elif isinstance(
-            event,
-            (
-                DownloadStartedEvent,
-                DownloadCompletedEvent,
-                DownloadFailedEvent,
-                DownloadCanceledEvent,
-                FilesUploadedEvent,
-            ),
-        ):
-            await self._show(event)
+            return
+        # Status rendering must never hold up model/control hooks.
+        state = self._state
+        state.activities.append(event)
+        if state.activity_task is None:
+            state.activity_task = asyncio.create_task(self._show_activities())
 
     async def _show_activities(self) -> None:
         state = self._state
@@ -123,7 +104,7 @@ class ChoreographyOverlay(Plugin, slot="browserrig.choreography-overlay"):
                 await task
         state.activities.clear()
 
-    async def _show(self, event: LiveEvent | BrowserEvent) -> None:
+    async def _show(self, event: InputEvent | PresentedEvent) -> None:
         view = self._state.view
         if view is None:
             return

@@ -1,102 +1,72 @@
-"""Retain presentation receipts across document replacement.
+"""Retain presented receipts across document replacement.
 
-Starts live until their matching terminal event; finished receipts live briefly.
-Only the renderer serializes these events.
+Running receipts live until a later receipt replaces them; terminal receipts expire
+after the `retention` their producer gave them. Only the overlay serializes these.
 """
 
 from collections import OrderedDict
 from dataclasses import dataclass, replace
 from time import monotonic
 
-from browserrig.choreography import WorkPhase, WorkPresentedEvent
-from browserrig.events import (
-    ActivityFinishedEvent,
-    ActivityStartedEvent,
-    BrowserEvent,
-    DownloadCanceledEvent,
-    DownloadCompletedEvent,
-    DownloadFailedEvent,
-    DownloadProgressedEvent,
-    DownloadStartedEvent,
-    EventKind,
-    FilesUploadedEvent,
-    LiveEvent,
+from browserrig.choreography import (
+    ActivityPresentedEvent,
+    DownloadPresentedEvent,
+    PresentedEvent,
+    UploadPresentedEvent,
+    WorkPhase,
+    WorkPresentedEvent,
 )
+from browserrig.events import EventKind
 
 type _Key = tuple[EventKind, str]
+type _Expiring = WorkPresentedEvent | DownloadPresentedEvent | UploadPresentedEvent
 
 
 @dataclass(frozen=True, slots=True)
 class _Receipt:
-    event: BrowserEvent | LiveEvent
+    event: PresentedEvent
     expires_at: float | None
 
 
 class Receipts:
-    """A bounded cache indexed by the typed stream and operation identity."""
+    """A bounded cache indexed by receipt type and operation identity."""
 
     def __init__(self) -> None:
         self._items: OrderedDict[_Key, _Receipt] = OrderedDict()
 
-    def remember(self, event: BrowserEvent | LiveEvent) -> None:
+    def remember(self, event: PresentedEvent) -> None:
         match event:
-            case WorkPresentedEvent(work_id=identity, phase=phase):
-                self._put(
-                    EventKind.WORK_PRESENTED,
-                    identity,
-                    event,
-                    running=phase is WorkPhase.RUNNING,
-                    retention=event.retention,
-                )
-            case ActivityStartedEvent(interval_id=identity):
-                self._put(EventKind.ACTIVITY_STARTED, identity, event, running=True)
-            case ActivityFinishedEvent(interval_id=identity):
-                self._items.pop((EventKind.ACTIVITY_STARTED, identity), None)
-            case DownloadStartedEvent(download_id=identity):
-                self._items.pop((EventKind.DOWNLOAD_PROGRESS, identity), None)
-                self._put(EventKind.DOWNLOAD_STARTED, identity, event, running=True)
-            case DownloadProgressedEvent(download_id=identity):
-                self._put(EventKind.DOWNLOAD_PROGRESS, identity, event, running=True)
-            case (
-                DownloadCompletedEvent(download_id=identity)
-                | DownloadFailedEvent(download_id=identity)
-                | DownloadCanceledEvent(download_id=identity)
+            case WorkPresentedEvent(work_id=identity, phase=phase) | (
+                DownloadPresentedEvent(download_id=identity, phase=phase)
             ):
-                self._items.pop((EventKind.DOWNLOAD_PROGRESS, identity), None)
-                if started := self._items.get((EventKind.DOWNLOAD_STARTED, identity)):
-                    self._put(
-                        EventKind.DOWNLOAD_STARTED,
-                        identity,
-                        started.event,
-                        retention=2.2,
-                    )
-                self._put(event.type, identity, event, retention=2.2)
-            case FilesUploadedEvent():
-                self._put(event.type, event.target_id, event)
+                self._put(event, identity, running=phase is WorkPhase.RUNNING)
+            case UploadPresentedEvent():
+                self._put(event, event.target_id, running=False)
+            case ActivityPresentedEvent(interval_id=identity, active=True):
+                self._items[event.type, identity] = _Receipt(event, None)
+                self._items.move_to_end((event.type, identity))
+            case ActivityPresentedEvent(interval_id=identity):
+                self._items.pop((event.type, identity), None)
         self._prune()
 
-    def snapshot(self) -> tuple[BrowserEvent | LiveEvent, ...]:
+    def snapshot(self) -> tuple[PresentedEvent, ...]:
         self._prune()
         now = monotonic()
         return tuple(
             replace(receipt.event, retention=max(0, receipt.expires_at - now))
-            if isinstance(receipt.event, WorkPresentedEvent)
+            if isinstance(
+                receipt.event,
+                (WorkPresentedEvent, DownloadPresentedEvent, UploadPresentedEvent),
+            )
             and receipt.expires_at is not None
             else receipt.event
             for receipt in self._items.values()
         )
 
-    def _put(
-        self,
-        stream: EventKind,
-        identity: str,
-        event: BrowserEvent | LiveEvent,
-        *,
-        running: bool = False,
-        retention: float = 8,
-    ) -> None:
-        key = (stream, identity)
-        self._items[key] = _Receipt(event, None if running else monotonic() + retention)
+    def _put(self, event: _Expiring, identity: str, *, running: bool) -> None:
+        key = (event.type, identity)
+        expires_at = None if running else monotonic() + event.retention
+        self._items[key] = _Receipt(event, expires_at)
         self._items.move_to_end(key)
 
     def _prune(self) -> None:
