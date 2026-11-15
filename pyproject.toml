@@ -130,6 +130,8 @@ disable = [
 
 [tool.pylint.design]
 max-nested-blocks = 3
+# Event dataclasses extend harnessed's event bases; PositionedEvent adds one level.
+max-parents = 8
 
 [tool.pylint.reports]
 reports = false

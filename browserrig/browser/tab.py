@@ -6,7 +6,7 @@ from dataclasses import replace
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-from cdpify import UNSET, CDPCommandError, CdpSession
+from cdpify import UNSET, CDPCommandError, CDPError, CdpSession
 from cdpify.domains.page import (
     FrameNavigatedEvent,
     FrameResizedEvent,
@@ -22,13 +22,14 @@ from cdpify.domains.page import (
 from cdpify.domains.runtime import RemoteObject
 from harnessed.tracing import record, traced
 
-from browserrig.core import BrowserError
+from browserrig.core import BrowserError, ViewportSize
 from browserrig.events import (
     BrowserEvent,
     DialogHandledEvent,
     DialogOpenedEvent,
     LiveEvent,
     NavigationCommittedEvent,
+    PositionedEvent,
     TabEvent,
 )
 from browserrig.scripts import (
@@ -43,6 +44,9 @@ from .input import CdpInput
 from .network import NetworkActivity
 from .overlays import Overlays
 from .worlds import Worlds
+
+# Viewport metadata is presentation only and must never hold up input.
+_VIEWPORT_PROBE_SECONDS = 0.25
 
 type FrameDiscovery = Callable[
     [Tab], Awaitable[tuple[tuple[Frame, ...], tuple[str, ...]]]
@@ -88,6 +92,8 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self._layout_revision = 0
         # Counts viewport resizes, as when a person resizes the browser window.
         self.viewport_revision = 0
+        # Last measured viewport, kept for receipts while the page cannot answer.
+        self._viewport: ViewportSize | None = None
         self._frames_key: tuple[str, str, int] | None = None
         self._frames: tuple[Frame, ...] = ()
         self._current_action = current_action
@@ -157,15 +163,19 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
                 await self.emit(DialogHandledEvent(accepted=accepted))
 
     async def emit(self, event: BrowserEvent | LiveEvent | TabEvent) -> None:
-        if self._emit is not None:
-            if isinstance(event, TabEvent):
-                await self._emit(
-                    replace(event, tab_id=self.id, document_id=self.document_id)
-                )
-                return
+        if self._emit is None:
+            return
+        if isinstance(event, TabEvent):
             await self._emit(
-                replace(event, target_id=self.id, document_id=self.document_id)
+                replace(event, tab_id=self.id, document_id=self.document_id)
             )
+            return
+        if isinstance(event, PositionedEvent) and event.viewport is None:
+            # Measured with the receipt: the viewport may change before viewers see it.
+            event = replace(event, viewport=await self._measure_viewport())
+        await self._emit(
+            replace(event, target_id=self.id, document_id=self.document_id)
+        )
 
     async def discard(self) -> None:
         self.closed = True
@@ -243,6 +253,18 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
     async def viewport_size(self) -> tuple[float, float]:
         viewport = (await self.cdp.page.get_layout_metrics()).css_layout_viewport
         return viewport.client_width, viewport.client_height
+
+    async def _measure_viewport(self) -> ViewportSize | None:
+        """Measure the layout viewport, or keep the last size while the page is blocked."""
+        if self.dialog is not None:
+            return self._viewport
+        try:
+            async with asyncio.timeout(_VIEWPORT_PROBE_SECONDS):
+                width, height = await self.viewport_size()
+        except (CDPError, TimeoutError):
+            return self._viewport
+        self._viewport = ViewportSize(width=width, height=height)
+        return self._viewport
 
     @traced
     async def frames(self) -> tuple[Frame, ...]:

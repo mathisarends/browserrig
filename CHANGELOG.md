@@ -4,6 +4,12 @@
 
 - Upgrade Harnessed and every provider/MCP/OTel extra to 0.17.0. No Browserrig
   code changes are required.
+- Add the source viewport to coordinate receipts. Cursor, pointer, wheel,
+  highlight, find, file-transfer and tab-press events now derive from
+  `PositionedEvent` and carry `viewport` (`ViewportSize`), measured when the
+  receipt is emitted; screenshot `WorkPresentedEvent`s carry it with their
+  `CaptureRegion`. External renderers can project input across tab switches and
+  live resizes without querying the browser later.
 - Fix missing choreography for DOM scroll tools: `InputVisualization` now emits
   separate transient `PageScrolledEvent` and `ElementScrolledEvent` receipts
   with public `tab_id` and measured deltas (`ref` identifies an element) when

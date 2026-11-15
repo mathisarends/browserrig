@@ -7,7 +7,9 @@ from cdpify import CDPCommandError
 from cdpify.domains.runtime import EvaluateResult, ExceptionDetails, RemoteObject
 
 from browserrig.browser import Tab
-from browserrig.core import BrowserError
+from browserrig.browser import tab as tab_module
+from browserrig.core import BrowserError, ViewportSize
+from browserrig.events import CursorStateEvent, KeyPressedEvent
 
 
 @pytest.mark.parametrize(
@@ -90,6 +92,58 @@ async def test_unserializable_result_is_reported_without_reexecuting_the_code():
         await tab.evaluate("expression")
     runtime.evaluate.assert_awaited_once()
     runtime.release_object_group.assert_awaited_once()
+
+
+async def test_coordinate_receipts_carry_the_viewport_measured_with_them():
+    events = []
+    tab, page = _emitting_tab(events)
+    page.get_layout_metrics.side_effect = [_metrics(1280, 800), _metrics(640, 480)]
+    await tab.emit(CursorStateEvent(x=10, y=20))
+    await tab.emit(CursorStateEvent(x=10, y=20))
+    await tab.emit(KeyPressedEvent(key="a"))
+    assert [event.viewport for event in events[:2]] == [
+        ViewportSize(width=1280, height=800),
+        ViewportSize(width=640, height=480),
+    ]
+    assert not hasattr(events[2], "viewport")
+    assert page.get_layout_metrics.await_count == 2
+
+
+@pytest.mark.parametrize("failure", ["dialog", "error", "timeout"])
+async def test_unmeasurable_viewport_keeps_the_last_known_size(monkeypatch, failure):
+    monkeypatch.setattr(tab_module, "_VIEWPORT_PROBE_SECONDS", 0.01)
+    events = []
+    tab, page = _emitting_tab(events)
+    page.get_layout_metrics.return_value = _metrics(1280, 800)
+    await tab.emit(CursorStateEvent(x=10, y=20))
+
+    async def pending():
+        await asyncio.Event().wait()
+
+    if failure == "dialog":
+        tab.dialog = ("alert", "Blocked")
+    elif failure == "error":
+        page.get_layout_metrics.side_effect = CDPCommandError(
+            "Page.getLayoutMetrics", -32000, "Target closed"
+        )
+    else:
+        page.get_layout_metrics.side_effect = pending
+    await tab.emit(CursorStateEvent(x=30, y=40))
+    assert events[-1].viewport == ViewportSize(width=1280, height=800)
+
+
+def _emitting_tab(events):
+    async def emit(event):
+        events.append(event)
+
+    page = SimpleNamespace(get_layout_metrics=AsyncMock())
+    return Tab("tab", SimpleNamespace(page=page), emit=emit), page
+
+
+def _metrics(width, height):
+    return SimpleNamespace(
+        css_layout_viewport=SimpleNamespace(client_width=width, client_height=height)
+    )
 
 
 def _tab(result):

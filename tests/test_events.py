@@ -14,7 +14,7 @@ from browserrig.choreography import (
     WorkPhase,
     WorkPresentedEvent,
 )
-from browserrig.core import ActionKind
+from browserrig.core import ActionKind, ViewportSize
 
 
 def test_enum_tags_and_registry_roundtrip():
@@ -93,6 +93,7 @@ def test_canvas_work_contract_roundtrips_with_typed_geometry_and_phase():
         title="Screenshot",
         phase=WorkPhase.COMPLETED,
         region=CaptureRegion(x=10, y=20, width=100, height=80),
+        viewport=ViewportSize(width=1280, height=800),
         target_id="tab",
         document_id="document",
     )
@@ -102,6 +103,26 @@ def test_canvas_work_contract_roundtrips_with_typed_geometry_and_phase():
     assert restored.phase is WorkPhase.COMPLETED and isinstance(
         restored.region, CaptureRegion
     )
+    assert isinstance(restored.viewport, ViewportSize)
+
+
+def test_coordinate_receipt_roundtrips_with_its_source_viewport():
+    adapter = TypeAdapter(events.CursorMovedEvent)
+    event = events.CursorMovedEvent(
+        from_position=(10, 20),
+        to_position=(300, 200),
+        control_point_1=(80, -15),
+        control_point_2=(250, 260),
+        duration=0.4,
+        viewport=ViewportSize(width=1280, height=720),
+        target_id="tab",
+        document_id="document",
+    )
+    restored = adapter.validate_json(adapter.dump_json(event))
+    EventRegistry(events.INPUT_EVENTS).validate(restored)
+    assert restored == event
+    assert isinstance(restored, events.PositionedEvent)
+    assert isinstance(restored.viewport, ViewportSize)
 
 
 @pytest.mark.parametrize(

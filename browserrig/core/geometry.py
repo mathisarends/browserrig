@@ -30,6 +30,14 @@ class Bounds(Options):
 
 
 @dataclass(frozen=True, slots=True)
+class ViewportSize:
+    """The size of a tab's top-level layout viewport in CSS pixels."""
+
+    width: float
+    height: float
+
+
+@dataclass(frozen=True, slots=True)
 class FrameTransform:
     """Affine map from one frame's CSS pixels to the top-level viewport.
 

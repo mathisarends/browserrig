@@ -9,7 +9,15 @@ from .errors import (
     SecretError,
     StaleElement,
 )
-from .geometry import Bounds, ElementPoint, FrameTransform, Geometry, Point, Region
+from .geometry import (
+    Bounds,
+    ElementPoint,
+    FrameTransform,
+    Geometry,
+    Point,
+    Region,
+    ViewportSize,
+)
 from .ids import ActionId, DocumentId, TargetId
 from .kinds import (
     ActionKind,
@@ -72,5 +80,6 @@ __all__ = [
     "StaleElement",
     "TabGesture",
     "TargetId",
+    "ViewportSize",
     "browser_tool",
 ]

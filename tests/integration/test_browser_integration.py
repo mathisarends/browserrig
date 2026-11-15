@@ -18,8 +18,16 @@ from browserrig import (
 )
 from browserrig.browser import Connect, Launch
 from browserrig.choreography import CursorEnteredEvent, Stage, TabPressedEvent
-from browserrig.core import Point
-from browserrig.events import BrowserEvent, CursorStateEvent, InputEvent, TabOpenedEvent
+from browserrig.core import Point, ViewportSize
+from browserrig.events import (
+    BrowserEvent,
+    CursorMovedEvent,
+    CursorStateEvent,
+    InputEvent,
+    PointerPressedEvent,
+    PositionedEvent,
+    TabOpenedEvent,
+)
 from browserrig.input import HumanMotor
 from browserrig.kinds import TabGesture
 from tests.javascript import evaluate
@@ -48,6 +56,45 @@ async def test_custom_setup_reaches_page_and_oopif_sessions(site):
         ]
         assert await tab.viewport_size() == (900, 700)
         assert await evaluate(tab, "devicePixelRatio") == 2
+
+
+async def test_coordinate_receipts_carry_the_viewport_of_their_input(site):
+    events = []
+
+    async def emit(event):
+        events.append(event)
+
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            Runtime(),
+            InputRuntime(),
+            Chrome.launch(url=site),
+            InputVisualization(renderer=None),
+        ],
+    )
+    async with agent.session() as session:
+        session.scope.on(InputEvent, emit)
+        tab = session.scope[Browser].active_tab
+        mouse = session.scope[Input].mouse
+        await mouse.move_to(Point(x=100, y=120))
+        before = ViewportSize(*await tab.viewport_size())
+        resized = len(events)
+        # A live resize between gestures, as when the viewer's window changes size.
+        await tab.cdp.emulation.set_device_metrics_override(
+            width=640, height=480, device_scale_factor=1, mobile=False
+        )
+        await mouse.click(Point(x=300, y=200))
+        after = ViewportSize(*await tab.viewport_size())
+    assert before != after
+    positioned = [event for event in events if isinstance(event, PositionedEvent)]
+    assert all(event.viewport is not None for event in positioned)
+    first = [e for e in events[:resized] if isinstance(e, CursorMovedEvent)]
+    second = [e for e in events[resized:] if isinstance(e, CursorMovedEvent)]
+    assert first and all(event.viewport == before for event in first)
+    assert second and all(event.viewport == after for event in second)
+    press = next(e for e in events[resized:] if isinstance(e, PointerPressedEvent))
+    assert press.viewport == after and (press.x, press.y) == (300, 200)
 
 
 async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site):

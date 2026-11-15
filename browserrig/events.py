@@ -15,6 +15,7 @@ from .core import (
     ReadinessPhase,
     ReadinessStage,
     ReadinessStatus,
+    ViewportSize,
 )
 
 
@@ -120,6 +121,18 @@ class InputEvent(LiveEvent):
     action_id: str = ""
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PositionedEvent(InputEvent):
+    """Input with coordinates in CSS pixels of the tab's top-level layout viewport.
+
+    The origin is the viewport's top-left corner. `viewport` is its size when the input
+    was performed, so viewers scale by `viewport` rather than a size measured later.
+    It is None when the browser could not report its size.
+    """
+
+    viewport: ViewportSize | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class PageCaptureStartedEvent(BrowserEvent):
     """Before application overlays are hidden; subscribers finish before capture."""
@@ -141,7 +154,7 @@ class PageCaptureFinishedEvent(BrowserEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class CursorMovedEvent(InputEvent):
+class CursorMovedEvent(PositionedEvent):
     from_position: tuple[float, float]
     to_position: tuple[float, float]
     control_point_1: tuple[float, float]
@@ -154,7 +167,7 @@ class CursorMovedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class CursorStateEvent(InputEvent):
+class CursorStateEvent(PositionedEvent):
     x: float
     y: float
     buttons: int = 0
@@ -174,7 +187,7 @@ class CursorStyleEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class PointerPressedEvent(InputEvent):
+class PointerPressedEvent(PositionedEvent):
     x: float
     y: float
     click_count: int
@@ -185,7 +198,7 @@ class PointerPressedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class PointerReleasedEvent(InputEvent):
+class PointerReleasedEvent(PositionedEvent):
     x: float
     y: float
     click_count: int
@@ -214,7 +227,7 @@ class KeyboardVisibilityEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class ScrollStartedEvent(InputEvent):
+class ScrollStartedEvent(PositionedEvent):
     """The native wheel gesture is about to run for its planned duration."""
 
     x: float
@@ -228,7 +241,7 @@ class ScrollStartedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class ScrolledEvent(InputEvent):
+class ScrolledEvent(PositionedEvent):
     x: float
     y: float
     delta_x: float
