@@ -136,6 +136,10 @@ rules:
   prefer-deferred-annotations: error
   duplicate-literal-type: warning
   await-in-call-argument: error
+  redundant-private-delegate: error
+  deprecated-async-contextmanager-return: error
+  str-enum-explicit-values: error
+  facade-export-gap: warning
   # Test smells
   private-test-access: error
   string-patch-target: error
