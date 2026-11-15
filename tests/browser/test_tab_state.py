@@ -14,6 +14,7 @@ from cdpify.domains.page import (
     JavascriptDialogOpeningEvent,
     LifecycleEventEvent,
 )
+from cdpify.domains.runtime import BindingCalledEvent
 from harnessed import Agent
 from harnessed.testing import ScriptedModel
 
@@ -186,6 +187,32 @@ async def test_tab_strip_publishes_loading_then_the_settled_icon_once(monkeypatc
         (False, "From Chrome", "data:image/png;base64,AA=="),
     ]
     load.assert_awaited_once_with(icon)
+
+
+async def test_in_page_title_and_icon_changes_reread_a_settled_strip(monkeypatch):
+    events = []
+    watched = _Watched(emit=AsyncMock(side_effect=events.append))
+    tab = watched.tab
+    tab.url, tab.title = "https://example.org/", "example.org"
+    strips = [
+        TabStrip(title="Example", icon=""),
+        TabStrip(title="Retitled", icon="data:image/svg+xml,<svg/>"),
+    ]
+    monkeypatch.setattr(tab, "read_strip", AsyncMock(side_effect=strips))
+    monkeypatch.setattr(tab, "load_icon", AsyncMock(return_value="data:icon"))
+    changed = BindingCalledEvent(
+        name="browserrigTabStripChanged", payload="", execution_context_id=1
+    )
+
+    async with watched.mounted():
+        await tab.handle(FrameStoppedLoadingEvent(frame_id="tab"))
+        await _until(lambda: events and events[-1].title == "Example")
+        # A script retitles the page and adds an icon; Chrome reports no navigation.
+        await tab.handle(changed)
+        await _until(lambda: events[-1].favicon == "data:icon")
+
+    assert events[-1].title == "Retitled"
+    assert tab.read_strip.await_count == 2
 
 
 async def test_a_closed_tab_stops_resolving_its_strip(monkeypatch):

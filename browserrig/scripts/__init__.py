@@ -36,6 +36,7 @@ from .models import (
     SelectOptionsArgs,
     Size,
     TabStrip,
+    TabStripArgs,
     TargetScrollArgs,
     TargetScrollResult,
     TextState,
@@ -93,6 +94,7 @@ __all__ = [
     "SecretFocusArgs",
     "SeedArgs",
     "TabStrip",
+    "TabStripArgs",
     "TargetScrollArgs",
     "TargetScrollResult",
     "TextState",
@@ -207,7 +209,9 @@ SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))
 RESET: Script[ScriptArgs, None] = Script.load("reset", ScriptArgs, type(None))
 FOCUSED: Script[ScriptArgs, Any] = Script.load("focused", ScriptArgs, Any)
 CURSOR: Script[CursorArgs, str] = Script.load("cursor", CursorArgs, str)
-TAB_STRIP: Script[ScriptArgs, TabStrip] = Script.load("tab_strip", ScriptArgs, TabStrip)
+TAB_STRIP: Script[TabStripArgs, TabStrip] = Script.load(
+    "tab_strip", TabStripArgs, TabStrip
+)
 PAGE_FACTS: Script[ScriptArgs, PageFacts] = Script.load(
     "page_facts", ScriptArgs, PageFacts
 )

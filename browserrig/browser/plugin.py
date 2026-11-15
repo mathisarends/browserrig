@@ -133,7 +133,8 @@ class Chrome(Plugin, slot="browserrig.browser"):
 class TabChanged(Event[None]):
     """`tab` may show a new url, title or loading state, or has closed.
 
-    `settled` marks a page that stopped loading, so its document can be read.
+    `settled` marks a document worth reading: it stopped loading, or a loaded
+    document changed its title or icon after its tab strip was read.
     """
 
     tab: Tab

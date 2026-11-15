@@ -4,6 +4,9 @@ from typing import NamedTuple
 
 from cdpify import CDPCommandError, CdpSession
 
+# Runtime bindings target browserrig's isolated worlds by this name.
+WORLD_NAME = "browserrig"
+
 
 class _WorldKey(NamedTuple):
     session_id: str
@@ -46,7 +49,7 @@ class Worlds:
                 return self._ids[key]
             generation = self._generation
             result = await cdp.page.create_isolated_world(
-                frame_id=frame_id, world_name="browserrig"
+                frame_id=frame_id, world_name=WORLD_NAME
             )
             if generation == self._generation:
                 self._ids[key] = result.execution_context_id

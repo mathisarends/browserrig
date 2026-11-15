@@ -23,6 +23,8 @@ The isolated world's `globalThis.__browserrig` namespace holds:
 - `findIndex`: the page text of the last find, with its session and the
   `stability` time it was read at; typing reuses it while the document is
   unchanged. Closing the find bar clears it.
+- `tabStrip`: one head mutation observer per document and the last title/icon
+  it reported; it calls a CDP binding once the tab strip would show a new one.
 - `secretFields`: fields that received a secret; their text is masked with
   `-webkit-text-security`.
 - `secretTarget`: the field focused when secret typing started; typing aborts
