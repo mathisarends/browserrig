@@ -80,6 +80,17 @@ viewport CSS pixels; transform it to the viewer's bounds using tab/document
 identity. Download progress is
 keyed independently by `download_id`; show percentages only with a known total.
 
+Viewers that draw their own browser chrome place its controls themselves, as with
+the tab strip. `TabPressedEvent` names the pressed tab-strip control.
+`AddressBarFocusedEvent` precedes the first `BarTypedEvent` of an address, and
+`BackPressedEvent`, `ForwardPressedEvent` and `ReloadPressedEvent` precede their
+history step or reload. Each starts at `from_position` in viewport CSS pixels, or
+`None` before the pointer has rested in the tab, and travels for `duration` to the
+viewer's own control. Map that point through the viewport's bounds and measure the
+control in the viewer's DOM. A `CursorEnteredEvent` then brings the pointer back
+to `to_position` once the step has run, with zero duration when it failed or was
+cancelled. These events are presentation only; the browser receives no extra input.
+
 Presentation receipts are transient and excluded from model context and saved
 results. Configured secrets are redacted before preview truncation. Render preview
 text as data. Use exported event classes/enums; a frontend schema can be generated

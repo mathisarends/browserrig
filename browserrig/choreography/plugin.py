@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from collections import deque
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from time import monotonic
@@ -38,6 +39,7 @@ from browserrig.input import Input
 from browserrig.observation import BrowserPerception
 from browserrig.secrets import Secrets
 from browserrig.tools import (
+    ControlIntent,
     NavigateIntent,
     OpenFileIntent,
     Perform,
@@ -62,6 +64,15 @@ from .stage import Stage
 
 logger = logging.getLogger(__name__)
 _DEFAULT_RENDERER = IframeRenderer()
+# How each intent is staged around its step.
+_SCENES: dict[type, Callable[[scenes.Scene, Any, scenes.Step], Awaitable[Any]]] = {
+    SearchIntent: scenes.search,
+    NavigateIntent: scenes.navigate,
+    ControlIntent: scenes.press,
+    WaitIntent: scenes.wait,
+    OpenFileIntent: scenes.open_file,
+    UploadIntent: scenes.upload,
+}
 
 
 @dataclass
@@ -368,19 +379,12 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
 
     @hook(Perform)
     async def _stage(self, event: Perform, next_: Next[Any]) -> Any:
-        scene = scenes.Scene(event.tab, event.action_id)
-        match event.intent:
-            case SearchIntent() as intent:
-                return await scenes.search(scene, intent, next_)
-            case NavigateIntent() as intent:
-                return await scenes.navigate(scene, intent, next_)
-            case WaitIntent() as intent:
-                return await scenes.wait(scene, intent, next_)
-            case OpenFileIntent() as intent:
-                return await scenes.open_file(scene, intent, next_)
-            case UploadIntent() as intent:
-                return await scenes.upload(scene, intent, next_)
-        return await next_()
+        staged = _SCENES.get(type(event.intent))
+        if staged is None:
+            return await next_()
+        pointer = self._input.mouse.position_in(event.tab.id)
+        scene = scenes.Scene(event.tab, event.action_id, pointer)
+        return await staged(scene, event.intent, next_)
 
     @hook(TargetLocated)
     async def _highlight(self, event: TargetLocated) -> None:

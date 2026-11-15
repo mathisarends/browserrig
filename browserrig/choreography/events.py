@@ -115,11 +115,67 @@ class TabPressedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class AddressBarFocusedEvent(InputEvent):
+    """The pointer leaves the page and clicks into the viewer's address bar.
+
+    Like each toolbar press below, the event belongs to the tab the pointer leaves,
+    starting at `from_position`, which is None while the pointer has no place there
+    yet. Viewers place the control themselves; the harness waits `duration` before it
+    acts, here before the first `BarTypedEvent`. Nothing is clicked in the browser.
+    """
+
+    from_position: tuple[float, float] | None
+    duration: float
+    type: Literal[EventKind.ADDRESS_BAR_FOCUSED] = field(
+        default=EventKind.ADDRESS_BAR_FOCUSED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class BackPressedEvent(InputEvent):
+    """The pointer presses the viewer's back button before the tab goes back."""
+
+    from_position: tuple[float, float] | None
+    duration: float
+    type: Literal[EventKind.BACK_PRESSED] = field(
+        default=EventKind.BACK_PRESSED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ForwardPressedEvent(InputEvent):
+    """The pointer presses the viewer's forward button before the tab goes forward."""
+
+    from_position: tuple[float, float] | None
+    duration: float
+    type: Literal[EventKind.FORWARD_PRESSED] = field(
+        default=EventKind.FORWARD_PRESSED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ReloadPressedEvent(InputEvent):
+    """The pointer presses the viewer's reload button before the tab reloads."""
+
+    from_position: tuple[float, float] | None
+    duration: float
+    type: Literal[EventKind.RELOAD_PRESSED] = field(
+        default=EventKind.RELOAD_PRESSED, kw_only=True
+    )
+
+
+type ToolbarPressedEvent = (
+    AddressBarFocusedEvent | BackPressedEvent | ForwardPressedEvent | ReloadPressedEvent
+)
+
+
+@dataclass(frozen=True, slots=True)
 class CursorEnteredEvent(InputEvent):
-    """After a tab press, the pointer returns from the tab strip into this tab's page.
+    """After a tab or toolbar press, the pointer returns into this tab's page.
 
     It travels to `to_position`, where this tab last had the pointer; the harness waits
-    `duration` before dispatching native input there.
+    `duration` before dispatching native input there. After a toolbar press it follows
+    once the control has acted; if that failed or was cancelled, `duration` is zero.
     """
 
     to_position: tuple[float, float]
@@ -197,6 +253,10 @@ SCENE_EVENTS = (
     FindResultsEvent,
     FileTransferEvent,
     TabPressedEvent,
+    AddressBarFocusedEvent,
+    BackPressedEvent,
+    ForwardPressedEvent,
+    ReloadPressedEvent,
     CursorEnteredEvent,
     WorkPresentedEvent,
 )

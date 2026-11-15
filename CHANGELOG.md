@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Changes
+
+- Stage the browser's own controls for viewers. Before typing an address the
+  pointer focuses the address bar (`AddressBarFocusedEvent`); `go_back`,
+  `go_forward` and `reload` press their buttons first (`BackPressedEvent`,
+  `ForwardPressedEvent`, `ReloadPressedEvent`, staged through `ControlIntent`).
+  Each carries the pointer's origin and travel duration; a `CursorEnteredEvent`
+  returns the pointer into the page afterwards, at once when the step fails or
+  is cancelled. Viewers that draw their own toolbar place the controls
+  themselves; nothing extra is clicked in the browser.
+
 ## 0.4.0 (2026-11-14)
 
 ### Breaking changes

@@ -73,6 +73,16 @@ function createChoreographySurface() {
   };
   const svg = (content, box = '0 0 26 32') =>
     `<svg viewBox="${box}" fill="none" aria-hidden="true">${content}</svg>`;
+  // Which of the browser's own toolbar controls an event presses, if any.
+  const toolbar = (event) => {
+    const kinds = options.events || {};
+    return {
+      [kinds.ADDRESS_BAR_FOCUSED]: 'address',
+      [kinds.BACK_PRESSED]: 'back',
+      [kinds.FORWARD_PRESSED]: 'forward',
+      [kinds.RELOAD_PRESSED]: 'reload',
+    }[event.type];
+  };
   configure();
   return {
     node,
@@ -83,6 +93,7 @@ function createChoreographySurface() {
     bounds,
     svg,
     fly,
+    toolbar,
     configure,
     options: () => options,
     reduced: () => motion.matches,
