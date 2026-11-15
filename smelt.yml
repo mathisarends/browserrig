@@ -131,6 +131,9 @@ rules:
   internal-static-helper: error
   unnecessary-future-annotations: warning
   prefer-match-type-dispatch: warning
+  private-symbol-import: error
+  redundant-name-alias: error
+  prefer-deferred-annotations: error
   # Test smells
   private-test-access: error
   string-patch-target: error

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -140,7 +142,7 @@ class ContentGroup(Options):
     role: str
     name: str = ""
     bounds: Bounds | None = None
-    children: tuple["ContentGroup | TextBlock | Heading | ElementRef", ...] = ()
+    children: tuple[ContentGroup | TextBlock | Heading | ElementRef, ...] = ()
 
 
 type ContentNode = ContentGroup | TextBlock | Heading | ElementRef

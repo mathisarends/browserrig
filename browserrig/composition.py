@@ -40,7 +40,7 @@ from .tools import (
     Targeting,
 )
 
-ContextCompaction = Compaction
+ContextCompaction = Compaction  # smelt: ignore[SMT344] -- public name for Compaction
 
 
 def browser_plugins(
