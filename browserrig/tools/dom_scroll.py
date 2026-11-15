@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Annotated
 
 from harnessed import Plugin, ToolError
@@ -12,6 +13,7 @@ from browserrig.scripts import TARGET_SCROLL, TargetScrollArgs, TargetScrollResu
 
 from .effects import Effect
 from .execution import Actions
+from .intents import DomScrollIntent
 
 type _VerticalScroll = Annotated[
     float,
@@ -40,7 +42,18 @@ class DomScrollTools(Plugin):
     ) -> Effect:
         if delta_y == 0 and delta_x == 0:
             raise ToolError("Provide a non-zero delta_y or delta_x")
-        return await scroll_page(self._actions.tab, delta_y=delta_y, delta_x=delta_x)
+        tab = self._actions.tab
+        frame = await tab.main_frame()
+        result = await self._actions.stage(
+            DomScrollIntent(),
+            tab,
+            partial(
+                frame.run,
+                TARGET_SCROLL,
+                TargetScrollArgs(delta_x=delta_x, delta_y=delta_y, page=True),
+            ),
+        )
+        return _scroll_effect(tab, result, "Page")
 
     @tool(
         kind=ActionKind.SCROLL_ELEMENT,
@@ -60,7 +73,12 @@ class DomScrollTools(Plugin):
             raise ToolError("Provide a non-zero delta_y or delta_x")
         tab = self._actions.tab
         handle = await self._elements.resolve(tab, ref)
-        return await scroll_element(tab, handle, delta_y=delta_y, delta_x=delta_x)
+        result = await self._actions.stage(
+            DomScrollIntent(ref),
+            tab,
+            partial(_element_result, handle, delta_x=delta_x, delta_y=delta_y),
+        )
+        return _scroll_effect(tab, result, "Element")
 
 
 async def scroll_page(tab: Tab, *, delta_x: float, delta_y: float) -> Effect:
@@ -76,6 +94,13 @@ async def scroll_element(
     tab: Tab, handle: DomElementHandle, *, delta_x: float, delta_y: float
 ) -> Effect:
     """Scroll only the addressed DOM container, without revealing or bubbling."""
+    result = await _element_result(handle, delta_x=delta_x, delta_y=delta_y)
+    return _scroll_effect(tab, result, "Element")
+
+
+async def _element_result(
+    handle: DomElementHandle, *, delta_x: float, delta_y: float
+) -> TargetScrollResult:
     result = await handle.run(
         TARGET_SCROLL, TargetScrollArgs(delta_x=delta_x, delta_y=delta_y)
     )
@@ -84,7 +109,7 @@ async def scroll_element(
             "Ref is not a scrollable container; use a container ref marked scroll(...), "
             "or scroll_page for the outer document"
         )
-    return _scroll_effect(tab, result, "Element")
+    return result
 
 
 def _scroll_effect(tab: Tab, result: TargetScrollResult, label: str) -> Effect:

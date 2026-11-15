@@ -13,9 +13,32 @@ from browserrig.core import (
     FileTransferDirection,
     TabGesture,
 )
-from browserrig.events import EventKind, InputEvent, LiveEvent
+from browserrig.events import EventKind, InputEvent, LiveEvent, TabEvent
 from browserrig.files import FileReadStatus
 from browserrig.observation import FindMark
+
+
+@dataclass(frozen=True, slots=True)
+class PageScrolledEvent(TabEvent):
+    """Measured outer-document movement in CSS pixels; emitted only after movement."""
+
+    delta_x: float
+    delta_y: float
+    type: Literal[EventKind.PAGE_SCROLLED] = field(
+        default=EventKind.PAGE_SCROLLED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ElementScrolledEvent(TabEvent):
+    """Measured container movement in local CSS pixels; `ref` is observation-local."""
+
+    ref: str
+    delta_x: float
+    delta_y: float
+    type: Literal[EventKind.ELEMENT_SCROLLED] = field(
+        default=EventKind.ELEMENT_SCROLLED, kw_only=True
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,6 +213,8 @@ class WorkPresentedEvent(LiveEvent):
 
 
 SCENE_EVENTS = (
+    PageScrolledEvent,
+    ElementScrolledEvent,
     HighlightElementEvent,
     WaitingEvent,
     BarTypedEvent,

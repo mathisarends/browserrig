@@ -53,7 +53,21 @@ class WaitIntent:
     seconds: float
 
 
-type Intent = NavigateIntent | OpenFileIntent | SearchIntent | UploadIntent | WaitIntent
+@dataclass(frozen=True, slots=True)
+class DomScrollIntent:
+    """Scroll a document or container; the step returns `TargetScrollResult`."""
+
+    ref: str = ""
+
+
+type Intent = (
+    NavigateIntent
+    | OpenFileIntent
+    | SearchIntent
+    | UploadIntent
+    | WaitIntent
+    | DomScrollIntent
+)
 
 
 @dataclass(frozen=True)

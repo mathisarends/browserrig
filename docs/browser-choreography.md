@@ -84,3 +84,53 @@ Presentation receipts are transient and excluded from model context and saved
 results. Configured secrets are redacted before preview truncation. Render preview
 text as data. Use exported event classes/enums; a frontend schema can be generated
 with `TypeAdapter(WorkPresentedEvent).json_schema()`.
+
+### DOM scroll receipts
+
+The supplied DOM scroll tools publish separate transient events after measured
+movement. Mount `InputVisualization(renderer=None)` and start a consumer before
+execution:
+
+```python
+from browserrig.choreography import ElementScrolledEvent, PageScrolledEvent
+
+async def consume(session):
+    async for event in session.subscribe(transient=True):
+        match event:
+            case PageScrolledEvent(tab_id=tab_id, delta_x=dx, delta_y=dy):
+                print("Page", tab_id, dx, dy)
+            case ElementScrolledEvent(tab_id=tab_id, ref=ref, delta_x=dx, delta_y=dy):
+                print("Element", tab_id, ref, dx, dy)
+```
+
+| Event | Payload and meaning |
+| --- | --- |
+| `PageScrolledEvent` (`browser.page.scrolled`) | `tab_id`, `delta_x`, `delta_y`: measured movement of the outer document in CSS pixels. |
+| `ElementScrolledEvent` (`browser.element.scrolled`) | `tab_id`, `ref`, `delta_x`, `delta_y`: measured movement of that container in its local CSS pixels, including containers in iframes. |
+| `ScrollStartedEvent` (`browser.scroll.started`) | Existing wheel input: viewport `x/y`, planned `delta_x/delta_y` and `duration`. |
+| `ScrolledEvent` (`browser.scrolled`) | Existing wheel input after dispatch: wheel position, dispatched deltas and gesture duration. Does not confirm DOM movement. |
+| `ActionStartedEvent`, `ActionFinishedEvent`, `ActionFailedEvent` | Durable execution lifecycle, correlated by `action_id`. A finished action can have moved nothing. |
+| `WorkPresentedEvent` | Presentation/status feedback, including tool failures; its preview is not the source of DOM scroll data. |
+
+`tab_id` is the source `Tab.id`. These two new events expose no `target_id`.
+`ref` identifies the container in the action's observation; it is not a permanent
+DOM identifier. Shared fields are `browser_id`, `document_id` (the top-level
+document), `action_id` and `at` (a monotonic timestamp in seconds).
+
+Deltas are measured from actual before/after scroll offsets. Positive values
+increase scrollLeft/scrollTop; negative values decrease them. A request for 300px
+that can move only 80px emits 80px. No event is emitted for unchanged offsets or
+a rejected/denied/failed scroll. A partially blocked scroll reports only the
+movement that occurred. Element scrolling emits only `ElementScrolledEvent`;
+it does not also emit a page event. No wheel input or pointer trajectory is invented.
+
+Both events derive from `TabEvent`, stay transient and are excluded from saved
+results and model context. They are emitted only with `InputVisualization`
+mounted. Direct low-level scroll helpers retain their existing API and do not
+stage choreography. Generate frontend schemas with
+`TypeAdapter(PageScrolledEvent).json_schema()` and
+`TypeAdapter(ElementScrolledEvent).json_schema()`.
+
+The payload deliberately contains no absolute offsets, frame metadata or
+`blocked` flag. Content deltas are not viewport points. Source viewport/resize
+metadata is tracked separately in [#39](https://github.com/mathisarends/browserrig/issues/39).

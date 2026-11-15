@@ -9,6 +9,8 @@ from browserrig import events
 from browserrig.choreography import (
     SCENE_EVENTS,
     CaptureRegion,
+    ElementScrolledEvent,
+    PageScrolledEvent,
     WorkPhase,
     WorkPresentedEvent,
 )
@@ -48,6 +50,38 @@ def test_action_page_state_roundtrips_as_a_typed_nested_value():
     restored = registry.decode(registry.encode(event))
     assert restored == event
     assert isinstance(restored.before, events.PageState)
+
+
+@pytest.mark.parametrize(
+    "kind, extra", [(PageScrolledEvent, {}), (ElementScrolledEvent, {"ref": "ref"})]
+)
+def test_scroll_receipt_roundtrips_with_public_tab_id_and_measured_deltas(kind, extra):
+    adapter = TypeAdapter(kind)
+    event = kind(
+        tab_id="tab",
+        document_id="document",
+        action_id="action",
+        delta_x=-12.5,
+        delta_y=220,
+        **extra,
+    )
+    payload = adapter.dump_json(event)
+    restored = adapter.validate_json(payload)
+    EventRegistry(SCENE_EVENTS).validate(restored)
+    assert restored == event
+    assert isinstance(restored, events.TabEvent)
+    assert not isinstance(restored, events.BrowserEvent)
+    assert set(adapter.dump_python(event)) == {
+        "browser_id",
+        "tab_id",
+        "document_id",
+        "action_id",
+        "at",
+        "type",
+        "delta_x",
+        "delta_y",
+        *extra,
+    }
 
 
 def test_canvas_work_contract_roundtrips_with_typed_geometry_and_phase():

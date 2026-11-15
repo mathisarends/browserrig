@@ -26,6 +26,7 @@ from harnessed.testing import ScriptedModel
 from browserrig import TerminalEvents
 from browserrig.choreography import (
     SCENE_EVENTS,
+    PageScrolledEvent,
     WaitingEvent,
     WorkPhase,
     WorkPresentedEvent,
@@ -44,6 +45,7 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
             await log.emit(
                 WaitingEvent(duration=2, browser_id="browser-1", target_id="tab-1")
             )
+            await log.emit(PageScrolledEvent(tab_id="tab-1", delta_x=0, delta_y=-80))
 
     output = io.StringIO()
     model = ScriptedModel(["Final answer"])
@@ -59,6 +61,11 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
     wait = next(record for record in records if record["type"] == "browser.waiting")
     assert wait["duration"] == 2 and wait["target_id"] == "tab-1"
     assert wait["browser_id"] == "browser-1"
+    scroll = next(
+        record for record in records if record["type"] == "browser.page.scrolled"
+    )
+    assert scroll["tab_id"] == "tab-1" and scroll["delta_y"] == -80
+    assert "target_id" not in scroll
     assert any(
         record["type"] == ModelRequestedEvent.__dataclass_fields__["type"].default
         for record in records

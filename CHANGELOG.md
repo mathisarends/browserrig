@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Fix missing choreography for DOM scroll tools: `InputVisualization` now emits
+  separate transient `PageScrolledEvent` and `ElementScrolledEvent` receipts
+  with public `tab_id` and measured deltas (`ref` identifies an element) when
+  `scroll_page` or `scroll_element` actually moves. Wheel events retain their
+  native-input semantics.
+
 ## 0.4.0 (2026-11-14)
 
 ### Breaking changes

@@ -28,7 +28,13 @@ from harnessed.models import TextPart, UserMessage
 
 from browserrig.browser import Browser, BrowserEvents
 from browserrig.core import ActionKind, BrowserToolMetadata, SecretError
-from browserrig.events import SECRET_EVENTS, BrowserEvent, LiveEvent, SecretEnteredEvent
+from browserrig.events import (
+    SECRET_EVENTS,
+    BrowserEvent,
+    LiveEvent,
+    SecretEnteredEvent,
+    TabEvent,
+)
 from browserrig.scripts import (
     SECRET_FIELD,
     SECRET_FOCUS,
@@ -269,8 +275,8 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
         return replace(request, messages=messages)
 
     def _filter_event(
-        self, event: BrowserEvent | LiveEvent
-    ) -> BrowserEvent | LiveEvent:
+        self, event: BrowserEvent | LiveEvent | TabEvent
+    ) -> BrowserEvent | LiveEvent | TabEvent:
         return self._redactor.scrub(event)
 
     def _redact_result(self, result: ToolResult) -> ToolResult:

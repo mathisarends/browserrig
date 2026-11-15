@@ -5,10 +5,12 @@ from .events import (
     BarTypedEvent,
     CaptureRegion,
     CursorEnteredEvent,
+    ElementScrolledEvent,
     FileTransferEvent,
     FindBarEvent,
     FindResultsEvent,
     HighlightElementEvent,
+    PageScrolledEvent,
     TabPressedEvent,
     WaitingEvent,
     WorkPhase,
@@ -20,6 +22,8 @@ from .stage import Stage
 from .tabstrip import TabStrip
 
 __all__ = [
+    "ElementScrolledEvent",
+    "PageScrolledEvent",
     "SCENE_EVENTS",
     "BarTypedEvent",
     "CaptureRegion",

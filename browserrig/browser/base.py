@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import TYPE_CHECKING, Protocol
 
-from browserrig.events import BrowserEvent, LiveEvent
+from browserrig.events import BrowserEvent, LiveEvent, TabEvent
 from browserrig.files import Download, FileTransfer
 
 from .tab import Tab
@@ -12,8 +12,10 @@ from .tab import Tab
 if TYPE_CHECKING:
     from .tabs import Tabs
 
-type EventSink = Callable[[BrowserEvent | LiveEvent], Awaitable[None]]
-type EventFilter = Callable[[BrowserEvent | LiveEvent], BrowserEvent | LiveEvent]
+type EventSink = Callable[[BrowserEvent | LiveEvent | TabEvent], Awaitable[None]]
+type EventFilter = Callable[
+    [BrowserEvent | LiveEvent | TabEvent], BrowserEvent | LiveEvent | TabEvent
+]
 
 
 class BrowserEvents:
@@ -37,7 +39,7 @@ class BrowserEvents:
 
         return remove
 
-    async def emit(self, event: BrowserEvent | LiveEvent) -> None:
+    async def emit(self, event: BrowserEvent | LiveEvent | TabEvent) -> None:
         event = replace(event, browser_id=self.browser_id)
         for event_filter in tuple(self._filters):
             event = event_filter(event)
@@ -57,5 +59,5 @@ class Browser(Protocol):
         ...
 
 
-async def _discard(_event: BrowserEvent | LiveEvent) -> None:
+async def _discard(_event: BrowserEvent | LiveEvent | TabEvent) -> None:
     pass
