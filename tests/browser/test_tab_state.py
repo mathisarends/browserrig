@@ -198,7 +198,8 @@ async def test_in_page_title_and_icon_changes_reread_a_settled_strip(monkeypatch
         TabStrip(title="Example", icon=""),
         TabStrip(title="Retitled", icon="data:image/svg+xml,<svg/>"),
     ]
-    monkeypatch.setattr(tab, "read_strip", AsyncMock(side_effect=strips))
+    read = AsyncMock(side_effect=strips)
+    monkeypatch.setattr(tab, "read_strip", read)
     monkeypatch.setattr(tab, "load_icon", AsyncMock(return_value="data:icon"))
     changed = BindingCalledEvent(
         name="browserrigTabStripChanged", payload="", execution_context_id=1
@@ -212,7 +213,7 @@ async def test_in_page_title_and_icon_changes_reread_a_settled_strip(monkeypatch
         await _until(lambda: events[-1].favicon == "data:icon")
 
     assert events[-1].title == "Retitled"
-    assert tab.read_strip.await_count == 2
+    assert read.await_count == 2
 
 
 async def test_a_closed_tab_stops_resolving_its_strip(monkeypatch):
