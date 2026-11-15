@@ -1,6 +1,6 @@
 """Events of the staged scene: what a viewer sees beyond raw input.
 
-They are only emitted while the `InputVisualization` plugin is mounted.
+They are only emitted while the `Choreography` plugin is mounted.
 """
 
 from dataclasses import dataclass, field
@@ -9,6 +9,7 @@ from typing import Literal
 
 from browserrig.core import (
     ActionKind,
+    ActivityKind,
     BrowserBar,
     FileTransferDirection,
     Position,
@@ -238,8 +239,17 @@ class CaptureRegion:
     height: float
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PresentedEvent(LiveEvent):
+    """Status that `Choreography` projected from browser facts for people watching.
+
+    Viewers draw these instead of the facts. Terminal receipts expire after their
+    `retention` seconds.
+    """
+
+
 @dataclass(frozen=True, slots=True)
-class WorkPresentedEvent(LiveEvent):
+class WorkPresentedEvent(PresentedEvent):
     """Bounded, redacted work receipt for inert overlays and external viewers.
 
     Preview text is data, never HTML. A screenshot receipt is completed only after
@@ -281,6 +291,55 @@ class WorkPresentedEvent(LiveEvent):
             object.__setattr__(self, "kind", ActionKind(self.kind))
 
 
+@dataclass(frozen=True, slots=True)
+class DownloadPresentedEvent(PresentedEvent):
+    """One download as viewers show it; upsert by `download_id`.
+
+    Every receipt names the file. `total_bytes` is None while the size is unknown.
+    """
+
+    download_id: str
+    filename: str
+    phase: WorkPhase
+    received_bytes: int = 0
+    total_bytes: int | None = None
+    reason: str = ""
+    retention: float = 2.2
+    type: Literal[EventKind.DOWNLOAD_PRESENTED] = field(
+        default=EventKind.DOWNLOAD_PRESENTED, kw_only=True
+    )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "phase", WorkPhase(self.phase))
+
+
+@dataclass(frozen=True, slots=True)
+class UploadPresentedEvent(PresentedEvent):
+    """Files placed into a page's file input; `ref` is observation-local."""
+
+    paths: tuple[str, ...]
+    ref: str = ""
+    retention: float = 8
+    type: Literal[EventKind.UPLOAD_PRESENTED] = field(
+        default=EventKind.UPLOAD_PRESENTED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ActivityPresentedEvent(PresentedEvent):
+    """An activity interval, such as model thinking or a handoff, begins or ends."""
+
+    interval_id: str
+    kind: ActivityKind
+    active: bool
+    type: Literal[EventKind.ACTIVITY_PRESENTED] = field(
+        default=EventKind.ACTIVITY_PRESENTED, kw_only=True
+    )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "kind", ActivityKind(self.kind))
+
+
 SCENE_EVENTS = (
     PageScrolledEvent,
     ElementScrolledEvent,
@@ -297,4 +356,7 @@ SCENE_EVENTS = (
     ReloadPressedEvent,
     CursorEnteredEvent,
     WorkPresentedEvent,
+    DownloadPresentedEvent,
+    UploadPresentedEvent,
+    ActivityPresentedEvent,
 )

@@ -13,11 +13,12 @@ import browserrig
 from browserrig import (
     BrowserFileTools,
     BrowserPerception,
+    Choreography,
+    ChoreographyOverlay,
     Chrome,
     Files,
     ImageContext,
     InputPacing,
-    InputVisualization,
     LocalWorkspace,
     Readiness,
     ReadinessOptions,
@@ -205,17 +206,19 @@ def test_two_file_tool_groups_conflict():
 
 def test_configured_pacing_and_choreography_replace_their_defaults_in_place():
     defaults = browser_plugins()
-    pacing, choreography = InputPacing(Instant()), InputVisualization()
+    pacing, choreography = InputPacing(Instant()), Choreography()
     composed = browser_plugins(choreography, pacing)
     assert len(composed) == len(defaults)
     assert composed[_index(defaults, InputPacing)] is pacing
-    assert composed[_index(defaults, InputVisualization)] is choreography
+    assert composed[_index(defaults, Choreography)] is choreography
 
 
 def test_without_drops_defaults_and_rejects_types_that_are_not_defaults():
-    composed = browser_plugins(without=(InputVisualization, TabStrip, Compaction))
+    composed = browser_plugins(
+        without=(Choreography, ChoreographyOverlay, TabStrip, Compaction)
+    )
     assert not any(
-        isinstance(plugin, (InputVisualization, TabStrip, Compaction))
+        isinstance(plugin, (Choreography, ChoreographyOverlay, TabStrip, Compaction))
         for plugin in composed
     )
     with pytest.raises(ValueError, match="contains no recipes matching: Secrets"):

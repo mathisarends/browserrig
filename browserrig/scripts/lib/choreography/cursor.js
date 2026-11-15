@@ -272,12 +272,12 @@ function createChoreographyCursor(ui) {
       case kinds.BAR_TYPED:
         address(event);
         break;
-      case kinds.ACTIVITY_STARTED:
-        activities.set(event.interval_id, event.kind);
-        label();
-        break;
-      case kinds.ACTIVITY_FINISHED:
-        activities.delete(event.interval_id);
+      case kinds.ACTIVITY_PRESENTED:
+        if (event.active) {
+          activities.set(event.interval_id, event.kind);
+        } else {
+          activities.delete(event.interval_id);
+        }
         label();
         break;
       default:

@@ -35,8 +35,8 @@ assert set(browserrig.__all__) <= set(dir(browserrig))
 assert Path(browserrig.__file__).is_relative_to(Path.cwd())
 assert files('browserrig').joinpath('py.typed').is_file()
 assert all(script.declaration for script in (CHOREOGRAPHY, CONTENT, ELEMENT, OVERLAY, SECRET_FIELD))
-assert files('browserrig.choreography').joinpath('view.html').is_file()
-assert files('browserrig.choreography').joinpath('view.css').is_file()
+assert files('browserrig.overlay').joinpath('view.html').is_file()
+assert files('browserrig.overlay').joinpath('view.css').is_file()
 
 
 async def read_without_file_extras():

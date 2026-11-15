@@ -92,6 +92,9 @@ class EventKind(StrEnum):
     PAGE_CAPTURE_STARTED = "browser.page.capture.started"
     PAGE_CAPTURE_FINISHED = "browser.page.capture.finished"
     WORK_PRESENTED = "browser.work.presented"
+    DOWNLOAD_PRESENTED = "browser.download.presented"
+    UPLOAD_PRESENTED = "browser.upload.presented"
+    ACTIVITY_PRESENTED = "browser.activity.presented"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

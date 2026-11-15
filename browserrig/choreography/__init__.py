@@ -2,11 +2,13 @@
 
 from .events import (
     SCENE_EVENTS,
+    ActivityPresentedEvent,
     AddressBarFocusedEvent,
     BackPressedEvent,
     BarTypedEvent,
     CaptureRegion,
     CursorEnteredEvent,
+    DownloadPresentedEvent,
     ElementScrolledEvent,
     FileTransferEvent,
     FindBarEvent,
@@ -14,19 +16,24 @@ from .events import (
     ForwardPressedEvent,
     HighlightElementEvent,
     PageScrolledEvent,
+    PresentedEvent,
     ReloadPressedEvent,
     TabPressedEvent,
     ToolbarPressedEvent,
+    UploadPresentedEvent,
     WaitingEvent,
     WorkPhase,
     WorkPresentedEvent,
 )
-from .plugin import InputVisualization
-from .renderer import IframeRenderer
+from .plugin import Choreography
 from .stage import Stage
 from .tabstrip import TabStrip
 
 __all__ = [
+    "ActivityPresentedEvent",
+    "DownloadPresentedEvent",
+    "PresentedEvent",
+    "UploadPresentedEvent",
     "ElementScrolledEvent",
     "PageScrolledEvent",
     "SCENE_EVENTS",
@@ -34,8 +41,7 @@ __all__ = [
     "BackPressedEvent",
     "BarTypedEvent",
     "CaptureRegion",
-    "InputVisualization",
-    "IframeRenderer",
+    "Choreography",
     "CursorEnteredEvent",
     "FileTransferEvent",
     "FindBarEvent",

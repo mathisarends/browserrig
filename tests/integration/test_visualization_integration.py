@@ -10,13 +10,13 @@ from harnessed.testing import ScriptedModel
 from browserrig import Agent as BrowserAgent
 from browserrig import (
     Browser,
+    Choreography,
+    ChoreographyOverlay,
     Chrome,
     Files,
-    IframeRenderer,
     Input,
     InputPacing,
     InputRuntime,
-    InputVisualization,
     LocalWorkspace,
     Point,
     Runtime,
@@ -60,7 +60,8 @@ async def test_file_cards_wait_for_explicit_completion_receipts(site):
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(),
+            Choreography(),
+            ChoreographyOverlay(),
             _UploadReceipts(),
         ],
     )
@@ -109,7 +110,8 @@ async def test_scroll_feedback_is_visible_during_native_wheel_input(site):
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(),
+            Choreography(),
+            ChoreographyOverlay(),
         ],
     )
     async with agent.session() as session:
@@ -139,7 +141,8 @@ async def test_keyboard_fits_a_compact_viewport_and_keeps_secret_keys_private(si
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site, viewport=Viewport(width=360, height=640)),
-            InputVisualization(renderer=IframeRenderer(keyboard_layout="de")),
+            Choreography(),
+            ChoreographyOverlay(keyboard_layout="de"),
         ],
     )
     async with agent.session() as session:
@@ -168,7 +171,8 @@ async def test_toolbar_presses_lead_the_pointer_to_the_drawn_controls(site):
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(),
+            Choreography(),
+            ChoreographyOverlay(),
         ],
     )
     pointer = """(() => {
@@ -203,7 +207,8 @@ async def test_long_cursor_badge_stays_inside_a_compact_viewport(site):
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site, viewport=Viewport(width=360, height=640)),
-            InputVisualization(renderer=IframeRenderer(name="W" * 40)),
+            Choreography(),
+            ChoreographyOverlay(name="W" * 40),
         ],
     )
     async with agent.session() as session:
@@ -239,10 +244,11 @@ async def test_work_stream_is_complete_with_and_without_local_rendering(
         browser=Chrome.launch(url=site),
         plugins=[
             Files(LocalWorkspace(tmp_path)),
-            InputVisualization(renderer=IframeRenderer() if local_renderer else None),
             Approvals(default=PolicyDecision.ALLOW),
         ],
-        without=(InputPacing,),
+        without=(InputPacing,)
+        if local_renderer
+        else (InputPacing, ChoreographyOverlay),
     )
     receipts = []
     async with agent.session() as session:
@@ -307,7 +313,8 @@ async def test_simultaneous_downloads_keep_independent_progress_and_outcomes(sit
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(),
+            Choreography(),
+            ChoreographyOverlay(),
         ],
     )
     async with agent.session() as session:
@@ -353,7 +360,8 @@ async def test_work_and_transfers_fit_the_viewport(site, tmp_path, theme, width)
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site, viewport=Viewport(width=width, height=740)),
-            InputVisualization(renderer=IframeRenderer(theme=theme)),
+            Choreography(),
+            ChoreographyOverlay(theme=theme),
         ],
     )
     async with agent.session() as session:
@@ -402,7 +410,8 @@ async def test_running_work_restores_after_navigation_without_pointer_input(site
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(),
+            Choreography(),
+            ChoreographyOverlay(),
         ],
     )
     async with agent.session() as session:

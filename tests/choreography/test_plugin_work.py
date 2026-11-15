@@ -3,7 +3,7 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel
 
-from browserrig import InputVisualization, Secret, Secrets
+from browserrig import Choreography, Secret, Secrets
 from browserrig.choreography import WorkPhase, WorkPresentedEvent
 from browserrig.core import ActionKind, browser_tool
 from browserrig.files import FileContent
@@ -34,7 +34,7 @@ async def test_external_receipts_are_redacted_before_preview_truncation():
             FakeChrome({}),
             _Reader("x" * 1790 + secret),
             Secrets({"KEY": Secret(secret, domains=("example.org",))}),
-            InputVisualization(renderer=None),
+            Choreography(),
         ],
     )
     receipts = []
@@ -53,7 +53,7 @@ async def test_external_receipts_close_on_tool_validation_or_execution_error():
         model=ScriptedModel(
             [[ModelChunk(tool_call=ToolCall("read_material", {"fail": True}))], "Done"]
         ),
-        plugins=[FakeChrome({}), _Reader("unused"), InputVisualization(renderer=None)],
+        plugins=[FakeChrome({}), _Reader("unused"), Choreography()],
     )
     receipts = []
     async with agent.session() as session:
@@ -74,7 +74,7 @@ async def test_denied_call_is_visible_without_faking_an_execution_start():
         plugins=[
             FakeChrome({}),
             _Reader("unused"),
-            InputVisualization(renderer=None),
+            Choreography(),
             Approvals(deny=("read_material",)),
         ],
     )

@@ -33,8 +33,9 @@ class Agent(harnessed.Agent):
     with a 256k application limit for GPT-6.1 Terra, or 100k tokens for other models
     when no window is known. Pass `without=(ContextCompaction,)`
     to keep everything, or a configured `ContextCompaction`. Input is paced like a
-    person and streamed for people
-    watching; pass `without=(InputPacing, InputVisualization)` to work at full speed unseen.
+    person and streamed and drawn for people watching; pass
+    `without=(InputPacing, Choreography, ChoreographyOverlay)` to work at full speed
+    unseen.
 
     The default `TaskMemory` compaction asks for a workspace checkpoint before
     summarizing and an explicit read afterward. Configure `TaskMemory(...)` to

@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Breaking changes
+
+- Split choreography into an event producer and an in-page consumer.
+  `InputVisualization` is now `Choreography` and only emits events; the new
+  `ChoreographyOverlay` plugin draws them inside the active tab and takes
+  `name`, `keyboard_layout` and `theme` directly. `IframeRenderer` and the
+  `renderer` parameter are removed: replace `InputVisualization(renderer=None)`
+  with `without=(ChoreographyOverlay,)` and
+  `InputVisualization(renderer=IframeRenderer(...))` with
+  `ChoreographyOverlay(...)`. Both are browser defaults; drop both with
+  `without=(InputPacing, Choreography, ChoreographyOverlay)` to work unseen.
+  Bare harnessed agents mount `ChoreographyOverlay()` next to `Choreography()`
+  to keep the in-page rendering; the overlay requires `Choreography`.
+- Separate browser facts from presentation. `Choreography` projects downloads,
+  uploads and activities into `DownloadPresentedEvent`,
+  `UploadPresentedEvent` and `ActivityPresentedEvent`, which share the new
+  `PresentedEvent` base with `WorkPresentedEvent`. Viewers, including the
+  overlay, draw only input and presented events and no longer interpret
+  `Download*Event`, `FilesUploadedEvent` or `Activity*Event` facts.
+- `Choreography` republishes the resting cursor when the active tab settles on a
+  new document, so every viewer, not only the in-page overlay, can redraw it.
+
 ### Changes
 
 - Upgrade Harnessed and every provider/MCP/OTel extra to 0.17.0. No Browserrig
@@ -12,7 +34,7 @@
   receipt is emitted; screenshot `WorkPresentedEvent`s carry it with their
   `CaptureRegion`. External renderers can project input across tab switches and
   live resizes without querying the browser later.
-- Fix missing choreography for DOM scroll tools: `InputVisualization` now emits
+- Fix missing choreography for DOM scroll tools: `Choreography` now emits
   separate transient `PageScrolledEvent` and `ElementScrolledEvent` receipts
   with public `tab_id` and measured deltas (`ref` identifies an element) when
   `scroll_page` or `scroll_element` actually moves. Wheel events retain their
