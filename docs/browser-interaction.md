@@ -147,8 +147,9 @@ agent action coordination, device synchronization or presentation.
 
 ## Input choreography
 
-`InputPacing` chooses how devices move and type; `InputVisualization` chooses how
-people see that activity. Both are optional and independently configurable.
+`InputPacing` chooses how devices move and type; `Choreography` chooses how
+people see that activity and `ChoreographyOverlay` draws it in the page. All three
+are optional and independently configurable.
 `devices.pace(motor)` and `devices.present(presenter)` return callbacks restoring
 the previous implementations. `Perform`, `TargetLocated` and `ChangeTab` provide
 hooks around intents, resolved targets and tab operations.

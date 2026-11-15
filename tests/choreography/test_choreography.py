@@ -17,13 +17,13 @@ from browserrig.choreography import (
     AddressBarFocusedEvent,
     BackPressedEvent,
     BarTypedEvent,
+    Choreography,
     CursorEnteredEvent,
     FileTransferEvent,
     FindBarEvent,
     FindResultsEvent,
     ForwardPressedEvent,
     HighlightElementEvent,
-    InputVisualization,
     ReloadPressedEvent,
     TabPressedEvent,
     WaitingEvent,
@@ -61,7 +61,7 @@ from browserrig.tools import targeting as targeting_module
 from tests.fakes import mounted
 
 # The plugins that pace input like a person and stage actions for viewers.
-STAGING = (InputPacing, InputVisualization)
+STAGING = (InputPacing, Choreography)
 
 
 class _Frame:

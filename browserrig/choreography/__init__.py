@@ -21,8 +21,7 @@ from .events import (
     WorkPhase,
     WorkPresentedEvent,
 )
-from .plugin import InputVisualization
-from .renderer import IframeRenderer
+from .plugin import Choreography
 from .stage import Stage
 from .tabstrip import TabStrip
 
@@ -34,8 +33,7 @@ __all__ = [
     "BackPressedEvent",
     "BarTypedEvent",
     "CaptureRegion",
-    "InputVisualization",
-    "IframeRenderer",
+    "Choreography",
     "CursorEnteredEvent",
     "FileTransferEvent",
     "FindBarEvent",

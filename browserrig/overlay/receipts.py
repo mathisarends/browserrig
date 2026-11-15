@@ -8,6 +8,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, replace
 from time import monotonic
 
+from browserrig.choreography import WorkPhase, WorkPresentedEvent
 from browserrig.events import (
     ActivityFinishedEvent,
     ActivityStartedEvent,
@@ -21,8 +22,6 @@ from browserrig.events import (
     FilesUploadedEvent,
     LiveEvent,
 )
-
-from .events import WorkPhase, WorkPresentedEvent
 
 type _Key = tuple[EventKind, str]
 

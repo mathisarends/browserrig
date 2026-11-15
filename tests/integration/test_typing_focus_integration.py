@@ -11,9 +11,10 @@ from browserrig import (
     Agent,
     Browser,
     BrowserPerception,
+    Choreography,
+    ChoreographyOverlay,
     Chrome,
     InputPacing,
-    InputVisualization,
     wait_for_page,
 )
 from tests.javascript import evaluate
@@ -128,5 +129,5 @@ def _agent(site, clear):
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
         plugins=[Approvals(default=PolicyDecision.ALLOW)],
-        without=(InputPacing, InputVisualization),
+        without=(InputPacing, Choreography, ChoreographyOverlay),
     ), holder

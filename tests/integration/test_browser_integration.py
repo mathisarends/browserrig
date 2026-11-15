@@ -7,11 +7,11 @@ from harnessed.testing import ScriptedModel
 
 from browserrig import (
     Browser,
+    Choreography,
     Chrome,
     ChromeBrowser,
     Input,
     InputRuntime,
-    InputVisualization,
     Runtime,
     Viewport,
     wait_for_page,
@@ -70,7 +70,7 @@ async def test_coordinate_receipts_carry_the_viewport_of_their_input(site):
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(renderer=None),
+            Choreography(),
         ],
     )
     async with agent.session() as session:
@@ -109,7 +109,7 @@ async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site
             Runtime(),
             Chrome(),
             InputRuntime(),
-            InputVisualization(renderer=None),
+            Choreography(),
         ],
     )
     async with agent.session() as session:

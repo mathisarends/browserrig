@@ -2,9 +2,11 @@
 
 [Back to README](../README.md) · [Input contracts](browser-interaction.md#input-choreography)
 
-`InputVisualization` renders cursor, keyboard, targets and action feedback inside
-the active Chrome tab. The live viewer and native recording see the same page
-presentation; native browser toolbars are outside the capture.
+`Choreography` stages input, browser UI and work receipts as live events; it draws
+nothing itself. `ChoreographyOverlay` consumes those events and renders cursor,
+keyboard, targets and action feedback inside the active Chrome tab. The live viewer
+and native recording see the same page presentation; native browser toolbars are
+outside the capture. Both are browser defaults.
 
 ![Presentation states](media/choreography/overview.png)
 
@@ -15,18 +17,16 @@ it makes no model calls.
 ## Configure or reproduce
 
 ```python
-from browserrig import IframeRenderer, InputVisualization
+from browserrig import ChoreographyOverlay
 
-presentation = InputVisualization(renderer=IframeRenderer(
-    name="Research",
-    keyboard_layout="de",
-    theme="dark",
-))
+overlay = ChoreographyOverlay(name="Research", keyboard_layout="de", theme="dark")
 ```
 
-Mount `presentation` in `Agent(plugins=[...])`. Layouts are `en`/`de`, themes are
-`dark`/`light`/`auto`. `InputVisualization(renderer=None)` keeps events for an
-external viewer. Input pacing is controlled separately by `InputPacing`.
+Mount `overlay` in `Agent(plugins=[...])`. Layouts are `en`/`de`, themes are
+`dark`/`light`/`auto`. Pass `without=(ChoreographyOverlay,)` to keep only the
+events for an [external viewer](#external-viewers). The overlay renders whatever
+reaches it: without `Choreography` it still shows activity and downloads, but no
+input. Input pacing is controlled separately by `InputPacing`.
 
 ```powershell
 uv run python -m examples.visualization --headed --layout de --theme dark
@@ -69,7 +69,7 @@ example supports `--video .browserrig/recordings`.
 
 Start a consumer before the run and use `session.subscribe(transient=True)` for
 input, work, activity and download events. `WorkPresentedEvent` supplies the same
-structured receipts to the iframe and external viewers; upsert by `work_id`.
+structured receipts to `ChoreographyOverlay` and external viewers; upsert by `work_id`.
 `call_id`/`action_id` correlate execution, and `WorkPhase` identifies running,
 completed, warning, failed or cancelled work. Terminal work expires after
 `retention` seconds.
@@ -124,7 +124,7 @@ with `TypeAdapter(WorkPresentedEvent).json_schema()`.
 ### DOM scroll receipts
 
 The supplied DOM scroll tools publish separate transient events after measured
-movement. Mount `InputVisualization(renderer=None)` and start a consumer before
+movement. With `Choreography` mounted (a default), start a consumer before
 execution:
 
 ```python
@@ -161,7 +161,7 @@ movement that occurred. Element scrolling emits only `ElementScrolledEvent`;
 it does not also emit a page event. No wheel input or pointer trajectory is invented.
 
 Both events derive from `TabEvent`, stay transient and are excluded from saved
-results and model context. They are emitted only with `InputVisualization`
+results and model context. They are emitted only with `Choreography`
 mounted. Direct low-level scroll helpers retain their existing API and do not
 stage choreography. Generate frontend schemas with
 `TypeAdapter(PageScrolledEvent).json_schema()` and

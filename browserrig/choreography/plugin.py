@@ -1,8 +1,5 @@
 import asyncio
-import logging
-from collections import deque
 from collections.abc import Awaitable, Callable
-from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from time import monotonic
 from typing import Any
@@ -16,24 +13,12 @@ from browserrig.browser import Browser, BrowserEvents, TabChanged
 from browserrig.core import (
     ActionKind,
     BrowserCoordination,
-    BrowserError,
     BrowserToolMetadata,
     ViewportSize,
 )
 from browserrig.events import (
     INPUT_EVENTS,
-    ActivityFinishedEvent,
-    ActivityStartedEvent,
     BrowserEvent,
-    CursorStateEvent,
-    DownloadCanceledEvent,
-    DownloadCompletedEvent,
-    DownloadFailedEvent,
-    DownloadProgressedEvent,
-    DownloadStartedEvent,
-    FilesUploadedEvent,
-    InputEvent,
-    LiveEvent,
     ObservationCapturedEvent,
 )
 from browserrig.input import Input
@@ -61,11 +46,8 @@ from .events import (
 )
 from .images import thumbnail
 from .projection import project
-from .renderer import IframeRenderer, IframeView
 from .stage import Stage
 
-logger = logging.getLogger(__name__)
-_DEFAULT_RENDERER = IframeRenderer()
 # How each intent is staged around its step.
 _SCENES: dict[type, Callable[[scenes.Scene, Any, scenes.Step], Awaitable[Any]]] = {
     DomScrollIntent: scenes.dom_scroll,
@@ -79,48 +61,37 @@ _SCENES: dict[type, Callable[[scenes.Scene, Any, scenes.Step], Awaitable[Any]]] 
 
 
 @dataclass
-class _Presentation:
-    """One session's view and the status events still waiting to be shown."""
+class _Staging:
+    """One session's running tool receipts and the screenshot still awaiting capture."""
 
-    view: IframeView | None = None
-    activities: deque[BrowserEvent] = field(default_factory=deque)
-    activity_task: asyncio.Task[None] | None = None
     context: PluginScope | None = None
     screenshot: WorkPresentedEvent | None = None
     running: dict[str, WorkPresentedEvent] = field(default_factory=dict)
     handled: set[str] = field(default_factory=set)
 
 
-class InputVisualization(Plugin, slot="browserrig.choreography"):
-    """Stage the browser for people watching: visible input and browser UI.
+class Choreography(Plugin, slot="browserrig.choreography"):
+    """Stage the browser for people watching: visible input and browser UI as events.
 
     Tools and input devices only describe what they do. This plugin streams input as
-    live events, shows browser UI such as the address and find bars and highlights the
-    elements tools act on. How fast input runs is up to `InputPacing`. Without this plugin
-    no input events are emitted.
+    live events, stages browser UI such as the address and find bars, highlights the
+    elements tools act on and publishes work receipts. It draws nothing itself; viewers
+    such as `ChoreographyOverlay` consume the events. How fast input runs is up to
+    `InputPacing`. Without this plugin no input events are emitted.
     """
 
     events = INPUT_EVENTS + SCENE_EVENTS
-    _state = PluginState(_Presentation)
+    _state = PluginState(_Staging)
     _browser = needs(Browser)
     _input = needs(Input)
     _events = needs(BrowserEvents)
     _coordination = needs(BrowserCoordination)
-
-    def __init__(self, *, renderer: IframeRenderer | None = _DEFAULT_RENDERER) -> None:
-        super().__init__()
-        self.renderer = renderer
 
     async def setup(self, scope: PluginScope) -> None:
         self._state.context = scope
         scope.on(BrowserEvent, self._browser_event)
         # Each call installs now and registers its undo for teardown.
         scope.effect(self._input.present(Stage()))
-        if self.renderer is not None:
-            view = self._state.view = self.renderer.create()
-            scope.effect(view.close)
-            scope.on(LiveEvent, self._render)
-            scope.effect(self._stop_activities)
 
         async def publish_cursor(_event: TurnStartedEvent) -> None:
             # Live subscribers often attach late, so seed their cursor at turn start.
@@ -129,48 +100,16 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
         scope.on(TurnStartedEvent, publish_cursor)
 
     @hook(TabChanged)
-    async def _refresh(self, event: TabChanged) -> None:
-        if not event.settled or event.tab.closed or self._state.view is None:
+    async def _republish_cursor(self, event: TabChanged) -> None:
+        # A new document or tab shows nothing yet; viewers learn where the pointer rests.
+        if not event.settled or event.tab.closed:
             return
         if event.tab.id != self._browser.active_tab.id:
             return
-        point = self._input.mouse.position_in(event.tab.id)
-        if point is not None:
-            await self._render(
-                CursorStateEvent(x=point.x, y=point.y, target_id=event.tab.id)
-            )
-        else:
-            try:
-                async with asyncio.timeout(2.5):
-                    await self._state.view.restore(event.tab)
-            except (BrowserError, TimeoutError):
-                logger.debug("Presentation restoration unavailable")
-
-    async def _render(self, event: LiveEvent) -> None:
-        if isinstance(event, (InputEvent, DownloadProgressedEvent, WorkPresentedEvent)):
-            await self._present(event)
+        if self._input.mouse.position_in(event.tab.id) is not None:
+            await self._input.mouse.publish_cursor()
 
     async def _browser_event(self, event: BrowserEvent) -> None:
-        if isinstance(event, (ActivityStartedEvent, ActivityFinishedEvent)):
-            if self._state.view is None:
-                return
-            # Status rendering must never hold up model/control hooks.
-            state = self._state
-            state.activities.append(event)
-            if state.activity_task is None:
-                state.activity_task = asyncio.create_task(self._show_activities())
-            return
-        if isinstance(
-            event,
-            (
-                DownloadStartedEvent,
-                DownloadCompletedEvent,
-                DownloadFailedEvent,
-                DownloadCanceledEvent,
-                FilesUploadedEvent,
-            ),
-        ):
-            await self._present(event)
         if receipt := project(event):
             # Facts enrich the same tool receipt rather than creating a second card.
             for active in self._state.running.values():
@@ -193,46 +132,6 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             await self._emit_work(receipt)
         if isinstance(event, ObservationCapturedEvent):
             await self._screenshot_captured(event)
-
-    async def _show_activities(self) -> None:
-        state = self._state
-        try:
-            while state.activities:
-                await self._present(state.activities.popleft())
-        finally:
-            state.activity_task = None
-
-    async def _stop_activities(self) -> None:
-        state = self._state
-        task = state.activity_task
-        if task is not None:
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
-        state.activities.clear()
-
-    async def _present(self, event: LiveEvent | BrowserEvent) -> None:
-        view = self._state.view
-        if view is None:
-            return
-        view.remember(event)
-        try:
-            tab = self._browser.active_tab
-            if (
-                isinstance(event, InputEvent)
-                and event.target_id
-                and tab.id != event.target_id
-            ):
-                return
-            if tab.closed or tab.navigation_pending or tab.dialog is not None:
-                view.suspend()
-                return
-            async with asyncio.timeout(2.5):
-                await view.show(tab, event)
-        except (BrowserError, TimeoutError):
-            view.suspend()
-            # Presentation cannot turn successful native input into failed input.
-            logger.debug("Input presentation unavailable for the current document")
 
     @hook(ExecuteTool)
     async def _work(self, event: ExecuteTool, next_: Next[ToolResult]) -> ToolResult:

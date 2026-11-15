@@ -12,10 +12,11 @@ from harnessed.testing import CallbackModel, ScriptedModel, call
 from browserrig import (
     Agent,
     Browser,
+    Choreography,
+    ChoreographyOverlay,
     Chrome,
     Input,
     InputPacing,
-    InputVisualization,
     wait_for_page,
 )
 from browserrig.choreography import ElementScrolledEvent, PageScrolledEvent
@@ -461,9 +462,9 @@ async def _editor_session(site, model, *, visualization=False):
         browser=Chrome.launch(url=site),
         plugins=[
             Approvals(default=PolicyDecision.ALLOW),
-            *([InputVisualization(renderer=None)] if visualization else []),
+            *([Choreography()] if visualization else []),
         ],
-        without=(InputPacing, InputVisualization),
+        without=(InputPacing, Choreography, ChoreographyOverlay),
     )
     async with agent.session() as session:
         browser = session.scope[Browser]

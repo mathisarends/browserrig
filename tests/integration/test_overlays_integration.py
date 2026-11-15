@@ -12,13 +12,13 @@ from PIL import Image
 from browserrig import (
     Activity,
     Browser,
+    Choreography,
+    ChoreographyOverlay,
     Chrome,
     ChromeBrowser,
     DomCapture,
-    IframeRenderer,
     Input,
     InputRuntime,
-    InputVisualization,
     Point,
     Runtime,
     VideoRecording,
@@ -132,7 +132,8 @@ async def test_input_visualization_renders_native_events_and_restores_after_navi
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(),
+            Choreography(),
+            ChoreographyOverlay(),
         ],
     )
     async with agent.session() as session:
@@ -186,14 +187,16 @@ async def test_input_visualization_renders_native_events_and_restores_after_navi
         assert len(await tab.frames()) == 1
 
 
-async def test_event_only_visualization_has_no_iframe_or_observation_dependency(site):
+async def test_choreography_without_overlay_has_no_iframe_or_observation_dependency(
+    site,
+):
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(renderer=None),
+            Choreography(),
         ],
     )
     async with agent.session() as session:
@@ -212,11 +215,8 @@ async def test_renderer_layout_remains_transparent_and_highlights_german_keys(
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(
-                renderer=IframeRenderer(
-                    name="Research", keyboard_layout="de", theme=theme
-                )
-            ),
+            Choreography(),
+            ChoreographyOverlay(name="Research", keyboard_layout="de", theme=theme),
         ],
     )
     async with agent.session() as session:

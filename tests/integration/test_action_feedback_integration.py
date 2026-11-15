@@ -11,10 +11,11 @@ from browserrig import (
     Agent,
     Browser,
     BrowserPerception,
+    Choreography,
+    ChoreographyOverlay,
     Chrome,
     Input,
     InputPacing,
-    InputVisualization,
     wait_for_page,
 )
 from browserrig.core import BrowserError
@@ -139,7 +140,7 @@ def _agent(site, respond):
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
         plugins=[Approvals(default=PolicyDecision.ALLOW)],
-        without=(InputPacing, InputVisualization),
+        without=(InputPacing, Choreography, ChoreographyOverlay),
     )
 
 

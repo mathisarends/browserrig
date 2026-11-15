@@ -1,11 +1,11 @@
 from browserrig.choreography import WorkPhase, WorkPresentedEvent
-from browserrig.choreography.receipts import Receipts
 from browserrig.core import ActionKind
 from browserrig.events import (
     DownloadCompletedEvent,
     DownloadProgressedEvent,
     DownloadStartedEvent,
 )
+from browserrig.overlay.receipts import Receipts
 
 
 def test_operation_updates_replace_only_the_matching_receipt():
