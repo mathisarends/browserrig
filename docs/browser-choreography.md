@@ -75,10 +75,35 @@ completed, warning, failed or cancelled work. Terminal work expires after
 `retention` seconds.
 
 Titles/details are ready to draw. Structured fields retain paths, URLs, page
-selectors, preview/limitations and source geometry. `CaptureRegion` uses source
-viewport CSS pixels; transform it to the viewer's bounds using tab/document
-identity. Download progress is
+selectors, preview/limitations and source geometry. Download progress is
 keyed independently by `download_id`; show percentages only with a known total.
+
+### Coordinate space
+
+Input receipts with coordinates derive from `PositionedEvent`: cursor, pointer and
+wheel events, element highlights, find marks, file transfers, tab presses and
+cursor entries. Their coordinates, including Bézier control points, are CSS pixels
+in the top-level layout viewport of `target_id`, with the origin at its top-left
+corner. `viewport` (`ViewportSize`) is that viewport's size measured when the
+receipt was emitted, so receipts project correctly across tab switches and live
+resizes:
+
+```python
+def project(x, y, viewport, width, height):
+    """Map a receipt point into a letterboxed `width` x `height` surface."""
+    scale = min(width / viewport.width, height / viewport.height)
+    left = (width - viewport.width * scale) / 2
+    top = (height - viewport.height * scale) / 2
+    return left + x * scale, top + y * scale
+
+# project(*event.control_point_1, event.viewport, 1920, 1080)
+```
+
+Points may lie outside the viewport, for example control points of a curved
+stroke. `viewport` keeps the last known size while a dialog blocks the page and is
+None only if the tab was never measured. A screenshot `WorkPresentedEvent` carries
+its `CaptureRegion` with the `viewport` of the same capture. Events without
+coordinates, such as keys, and the `TabEvent` scroll receipts carry no viewport.
 
 Presentation receipts are transient and excluded from model context and saved
 results. Configured secrets are redacted before preview truncation. Render preview
@@ -132,5 +157,5 @@ stage choreography. Generate frontend schemas with
 `TypeAdapter(ElementScrolledEvent).json_schema()`.
 
 The payload deliberately contains no absolute offsets, frame metadata or
-`blocked` flag. Content deltas are not viewport points. Source viewport/resize
-metadata is tracked separately in [#39](https://github.com/mathisarends/browserrig/issues/39).
+`blocked` flag. Content deltas are not viewport points; see
+[coordinate space](#coordinate-space) for receipts that carry them.

@@ -12,8 +12,15 @@ from browserrig.core import (
     BrowserBar,
     FileTransferDirection,
     TabGesture,
+    ViewportSize,
 )
-from browserrig.events import EventKind, InputEvent, LiveEvent, TabEvent
+from browserrig.events import (
+    EventKind,
+    InputEvent,
+    LiveEvent,
+    PositionedEvent,
+    TabEvent,
+)
 from browserrig.files import FileReadStatus
 from browserrig.observation import FindMark
 
@@ -42,7 +49,7 @@ class ElementScrolledEvent(TabEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class HighlightElementEvent(InputEvent):
+class HighlightElementEvent(PositionedEvent):
     ref: str
     x: float
     y: float
@@ -85,7 +92,7 @@ class FindBarEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class FindResultsEvent(InputEvent):
+class FindResultsEvent(PositionedEvent):
     """Matches for the find bar's text, updated after each key and with the final results.
 
     `label` is the count the find bar shows. `marks` covers the text matches in the
@@ -106,7 +113,7 @@ class FindResultsEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class FileTransferEvent(InputEvent):
+class FileTransferEvent(PositionedEvent):
     """Files move into a new tab or onto a page element; the harness waits for `duration`."""
 
     direction: FileTransferDirection
@@ -120,7 +127,7 @@ class FileTransferEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class TabPressedEvent(InputEvent):
+class TabPressedEvent(PositionedEvent):
     """The pointer leaves the page and presses a control in the viewer's tab strip.
 
     The event belongs to the tab the pointer leaves, starting at `from_position`.
@@ -138,7 +145,7 @@ class TabPressedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class CursorEnteredEvent(InputEvent):
+class CursorEnteredEvent(PositionedEvent):
     """After a tab press, the pointer returns from the tab strip into this tab's page.
 
     It travels to `to_position`, where this tab last had the pointer; the harness waits
@@ -163,7 +170,10 @@ class WorkPhase(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class CaptureRegion:
-    """An immutable rectangle in the source tab's viewport CSS pixels."""
+    """An immutable rectangle in the source tab's viewport CSS pixels.
+
+    The receipt's `viewport` gives the size of that viewport at capture time.
+    """
 
     x: float
     y: float
@@ -200,6 +210,8 @@ class WorkPresentedEvent(LiveEvent):
     artifact_path: str = ""
     image_url: str = field(default="", repr=False)
     region: CaptureRegion | None = None
+    # The source viewport `region` lies in, measured with the capture.
+    viewport: ViewportSize | None = None
     elapsed: float = 0
     retention: float = 8
     type: Literal[EventKind.WORK_PRESENTED] = field(
