@@ -49,7 +49,6 @@ from browserrig import (
 )
 from browserrig.core import (
     Geometry,
-    Point,
     ReadinessError,
     ReadinessPhase,
     ReadinessStage,
@@ -63,7 +62,6 @@ from browserrig.observation import CaptureContent
 from browserrig.observation.delta import INTRO
 from browserrig.observation.extraction import Extraction
 from browserrig.tools import Actions, BrowserFileTools, FileTools
-from browserrig.tools.mouse import _image_point
 from tests.fakes import FakeChrome
 from tests.observations import has_image, image_id
 
@@ -240,9 +238,8 @@ async def test_text_only_observations_and_probes_keep_last_shown_crop_and_no_dup
         observe = session.scope[BrowserPerception]
         assert observe.snapshot.image is None
         assert _images(model.requests[1])[0].id == _images(model.requests[2])[0].id
-        assert _image_point(observe.coordinate_source(), Point(x=20, y=30)) == Point(
-            x=110, y=65
-        )
+        geometry = observe.coordinate_source().geometry
+        assert geometry is not None and geometry.point(20, 30) == (110, 65)
         assert sum(capture.captures) == 1
         before = observe.snapshot
         await observe.probe(browser.active_tab)
@@ -513,9 +510,8 @@ async def test_coordinate_geometry_uses_final_receipts_after_request_image_remov
         assert [item.source for item in included] == ["browser-image"]
         observe = session.scope[BrowserPerception]
         assert observe.snapshot.geometry is not None
-        assert _image_point(observe.coordinate_source(), Point(x=20, y=30)) == Point(
-            x=20, y=30
-        )
+        # Without the image, points stay in viewport CSS pixels.
+        assert observe.coordinate_source().geometry is None
 
 
 async def test_compaction_removes_last_screenshot_on_a_text_only_step():
