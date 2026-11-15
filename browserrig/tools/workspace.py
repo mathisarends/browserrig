@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Annotated, Literal
+from typing import Annotated
 from uuid import uuid4
 
 from harnessed import (
@@ -34,6 +34,7 @@ from browserrig.files import (
     FileEntry,
     FileListing,
     FileSystem,
+    FileView,
 )
 
 from .file_observation import FileSystemObservation
@@ -180,7 +181,7 @@ class WorkspaceIO(FileSystemObservation):
             bool | None, Field(description="True forces full-page PDF OCR.")
         ] = None,
         view: Annotated[
-            Literal["auto", "text", "image"],
+            FileView,
             Field(
                 description=(
                     "auto displays images and reads other formats as text; "

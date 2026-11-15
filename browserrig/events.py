@@ -18,6 +18,8 @@ from .core import (
     ViewportSize,
 )
 
+type HandoffSource = Literal["tool", "pause"]
+
 
 class EventKind(StrEnum):
     """Stable wire tags, independent of Python class names."""
@@ -650,7 +652,7 @@ class HandoffRequestedEvent(BrowserEvent):
     handoff_id: str
     reason: str
     expected_state: str = ""
-    source: Literal["tool", "pause"] = "tool"
+    source: HandoffSource = "tool"
     call_id: str = ""
     type: Literal[EventKind.HANDOFF_REQUESTED] = field(
         default=EventKind.HANDOFF_REQUESTED, kw_only=True
@@ -663,7 +665,7 @@ class HandoffFinishedEvent(BrowserEvent):
     status: HandoffStatus
     note: str = ""
     changes: tuple[str, ...] = ()
-    source: Literal["tool", "pause"] = "tool"
+    source: HandoffSource = "tool"
     call_id: str = ""
     type: Literal[EventKind.HANDOFF_FINISHED] = field(
         default=EventKind.HANDOFF_FINISHED, kw_only=True

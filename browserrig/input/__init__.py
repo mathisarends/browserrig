@@ -8,7 +8,7 @@ from .motor import (
     KeyStroke,
     Motor,
 )
-from .mouse import Mouse
+from .mouse import ClickButton, ClickCount, Mouse
 from .plugin import InputRuntime
 from .pointer import ControlPoint, CursorPath, movement
 from .presenter import Presenter, Unseen
@@ -31,6 +31,8 @@ __all__ = [
     "KeyStroke",
     "Keyboard",
     "Motor",
+    "ClickButton",
+    "ClickCount",
     "Mouse",
     "Presenter",
     "TypedText",

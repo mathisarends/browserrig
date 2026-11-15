@@ -26,6 +26,8 @@ from .target import Focus, InputTarget, MouseButton, focused
 from .wheel import FRAME_SECONDS, wheel_duration, wheel_progress
 
 type Emit = Callable[[InputTarget, InputEvent], Awaitable[None]]
+type ClickCount = Literal[1, 2]
+type ClickButton = Literal["left", "right"]
 
 
 @dataclass(slots=True)
@@ -129,8 +131,8 @@ class Mouse:
         self,
         point: Point,
         *,
-        count: Literal[1, 2] = 1,
-        button: Literal["left", "right"] = "left",
+        count: ClickCount = 1,
+        button: ClickButton = "left",
         modifiers: int = 0,
     ) -> None:
         """Click at `point`; `modifiers` are the flags of keys held meanwhile."""

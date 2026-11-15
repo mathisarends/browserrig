@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from browserrig.core import Options
 
 from .config import FileOptions
-from .models import FileContent, FileExtraction
+from .models import ExtractionStatus, FileContent, FileExtraction
 from .workspace import FileStat, Workspace, workspace_path
 
 type _Reader = Callable[..., Awaitable[FileContent]]
@@ -402,7 +402,7 @@ class _Manifest(BaseModel):
     size: int | None
     modified: float
     url: str = ""
-    status: Literal["processing", "complete", "partial", "failed"] = "processing"
+    status: ExtractionStatus = "processing"
     page_count: int | None = None
     sheets: list[str] = Field(default_factory=list)
     pending_ocr_pages: list[int] = Field(default_factory=list)

@@ -134,6 +134,7 @@ rules:
   private-symbol-import: error
   redundant-name-alias: error
   prefer-deferred-annotations: error
+  duplicate-literal-type: warning
   # Test smells
   private-test-access: error
   string-patch-target: error

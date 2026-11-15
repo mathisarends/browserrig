@@ -1,7 +1,6 @@
 """Render mixed page content without losing the position of noninteractive text."""
 
 from collections.abc import Callable
-from typing import Literal
 
 from .models import (
     ContentGroup,
@@ -12,6 +11,7 @@ from .models import (
     Heading,
     Snapshot,
     TextBlock,
+    ViewportSide,
 )
 
 _LANDMARKS = {
@@ -31,7 +31,7 @@ _PROSE = frozenset({"paragraph", "blockquote", "listitem", "cell"})
 
 def render_flow(
     snapshot: Snapshot,
-    position: Literal["above", "below"] | None,
+    position: ViewportSide | None,
     format_element: Callable[[ElementInfo], str],
 ) -> list[str]:
     """Filter leaves to one viewport partition while retaining their enclosing groups."""
@@ -63,7 +63,7 @@ def semantic_text(nodes: tuple[ContentNode, ...]) -> tuple[str, ...]:
 def _partition(
     nodes: tuple[ContentNode, ...],
     elements: dict[str, ElementInfo],
-    position: Literal["above", "below"] | None,
+    position: ViewportSide | None,
 ) -> tuple[ContentNode, ...]:
     selected: list[ContentNode] = []
     for node in nodes:

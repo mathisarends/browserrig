@@ -3,7 +3,6 @@
 from bisect import bisect_right
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Literal
 from urllib.parse import urljoin
 
 from browserrig.core import Bounds, FrameTransform
@@ -17,6 +16,7 @@ from browserrig.observation.models import (
     Offscreen,
     ScrollInfo,
     TextBlock,
+    ViewportSide,
 )
 
 from . import semantics
@@ -789,7 +789,7 @@ class _FrameExtractor:
         )
         return self._transform.bounds_to_viewport(local)
 
-    def _outside(self, rect: Rect) -> Literal["above", "below"] | None:
+    def _outside(self, rect: Rect) -> ViewportSide | None:
         if self._viewport is None:
             return None
         if rect[3] <= self._viewport[1]:

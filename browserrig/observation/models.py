@@ -18,6 +18,7 @@ from browserrig.core import (
 )
 
 type Tristate = bool | Literal["mixed"] | None
+type ViewportSide = Literal["above", "below"]
 CHECKABLE_ROLES = frozenset(
     {"checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio"}
 )
@@ -64,7 +65,7 @@ class ElementInfo(ElementRef):
     section: str = ""
     group: str = ""
     in_viewport: bool = True
-    outside_viewport: Literal["above", "below"] | None = None
+    outside_viewport: ViewportSide | None = None
     scroll: ScrollInfo | None = None
     covered: bool = False
     pinned: bool = False
@@ -107,7 +108,7 @@ class Heading(Options):
     frame_id: str
     order: int = 0
     in_viewport: bool = True
-    outside_viewport: Literal["above", "below"] | None = None
+    outside_viewport: ViewportSide | None = None
     section: str = ""
 
 
@@ -122,7 +123,7 @@ class TextBlock(Options):
     order: int = 0
     bounds: Bounds | None = None
     in_viewport: bool = True
-    outside_viewport: Literal["above", "below"] | None = None
+    outside_viewport: ViewportSide | None = None
     truncated: bool = False
     leading_space: bool = False
     trailing_space: bool = False

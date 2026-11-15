@@ -5,7 +5,7 @@ import tempfile
 from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from pathlib import Path, PurePosixPath
 from types import TracebackType
-from typing import Literal, Self
+from typing import Self
 
 from harnessed.plugins.filesystem import PathMatches, SearchResult
 from harnessed.tracing import traced
@@ -13,7 +13,7 @@ from harnessed.tracing import traced
 from .config import FileOptions
 from .content import ReadRequest
 from .indexing import Indexing
-from .models import FileContent, FileEntry, FileExtraction, FileListing
+from .models import FileContent, FileEntry, FileExtraction, FileListing, FileView
 from .reading import FileReader
 from .search import Search
 from .workspace import FileStat, LocalWorkspace, Workspace, workspace_path
@@ -131,7 +131,7 @@ class FileSystem:
         cell_range: str | None = None,
         member: str | None = None,
         ocr: bool | None = None,
-        view: Literal["auto", "text", "image"] = "text",
+        view: FileView = "text",
         offset: int = 0,
         max_chars: int = 20000,
     ) -> FileContent:
