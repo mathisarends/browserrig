@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import csv
 import posixpath
 from collections.abc import Iterable, Iterator
 from contextlib import ExitStack, suppress
 from datetime import date, datetime, time
 from pathlib import Path
+from typing import NamedTuple
 from zipfile import ZipFile
 
 import xlrd
@@ -220,12 +223,12 @@ def read_delimited(context: ReadContext) -> ParsedContent:
                 else None
             )
             for index, row in enumerate(rows, 1):
-                if bounds and index > bounds[3]:
+                if bounds and index > bounds.bottom:
                     break
-                if bounds and index < bounds[1]:
+                if bounds and index < bounds.top:
                     continue
-                left, right = (bounds[0], bounds[2]) if bounds else (1, len(row))
-                if index == (bounds[1] if bounds else 1):
+                left, right = (bounds.left, bounds.right) if bounds else (1, len(row))
+                if index == (bounds.top if bounds else 1):
                     yield _table_header(left, right)
                 cells = [
                     _value(row[column]) if column < len(row) else ""
@@ -237,11 +240,9 @@ def read_delimited(context: ReadContext) -> ParsedContent:
     return details
 
 
-def _bounds(
-    selection: str | None, rows: int, columns: int
-) -> tuple[int, int, int, int]:
+def _bounds(selection: str | None, rows: int, columns: int) -> _CellRange:
     if selection is None:
-        return 1, 1, max(1, columns), max(1, rows)
+        return _CellRange(1, 1, max(1, columns), max(1, rows))
     try:
         bounds = range_boundaries(selection.upper())
         left, top, right, bottom = bounds
@@ -249,7 +250,7 @@ def _bounds(
             raise ValueError
         if right < left or bottom < top or right > 16384 or bottom > 1048576:
             raise ValueError
-        return left, top, right, bottom
+        return _CellRange(left, top, right, bottom)
     except (ValueError, TypeError) as error:
         raise ValueError(
             "cell_range must be an A1 range, for example B2:F100"
@@ -275,7 +276,7 @@ def _table_header(left: int, right: int) -> str:
     )
 
 
-def _xlsx_layout(path: Path, name: str) -> tuple[list[str], int, int]:
+def _xlsx_layout(path: Path, name: str) -> _SheetLayout:
     notes = []
     max_row = max_column = 1
     row = column = 0
@@ -329,7 +330,7 @@ def _xlsx_layout(path: Path, name: str) -> tuple[list[str], int, int]:
                         f"Hidden columns: {node.get('min')}–{node.get('max')} (included)\n\n"
                     )
                 node.clear()
-    return notes, max_row, max_column
+    return _SheetLayout(notes, max_row, max_column)
 
 
 def _xls_value(cell, datemode: int) -> object:
@@ -344,21 +345,21 @@ def _xls_value(cell, datemode: int) -> object:
     return cell.value
 
 
-def _odf_values(table, bounds: tuple[int, int, int, int]) -> Iterator[str]:
+def _odf_values(table, bounds: _CellRange) -> Iterator[str]:
     index = 0
     for row in _odf_rows(table):
         repeats = int(row.getAttribute("numberrowsrepeated") or 1)
         if not 1 <= repeats <= 1048576 or index + repeats > 1048576:
             raise ValueError("ODS row repetition exceeds spreadsheet dimensions")
         cells = _odf_cells(row)
-        first, last = max(index + 1, bounds[1]), min(index + repeats, bounds[3])
+        first, last = max(index + 1, bounds.top), min(index + repeats, bounds.bottom)
         index += repeats
         if any(cells):
             for number in range(first, last + 1):
                 yield from _odf_row_text(
-                    row, cells, number, left=bounds[0], right=bounds[2]
+                    row, cells, number, left=bounds.left, right=bounds.right
                 )
-        if index >= bounds[3]:
+        if index >= bounds.bottom:
             return
 
 
@@ -417,3 +418,18 @@ def _odf_row_text(
     for column, value in enumerate(cells, 1):
         if left <= column <= right and value:
             yield f"{get_column_letter(column)}{number}: {value}\n\n"
+
+
+class _CellRange(NamedTuple):
+    """Inclusive 1-based column and row bounds of a sheet selection."""
+
+    left: int
+    top: int
+    right: int
+    bottom: int
+
+
+class _SheetLayout(NamedTuple):
+    notes: list[str]
+    rows: int
+    columns: int

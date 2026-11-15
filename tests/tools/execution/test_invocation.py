@@ -12,6 +12,7 @@ from harnessed.plugins import Approvals
 from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel, call
 
+from browserrig.browser import OpenDialog
 from browserrig.core import ActionKind, browser_tool
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent
 from browserrig.tools import Actions, DialogTools
@@ -63,7 +64,7 @@ async def test_passive_tools_preserve_custom_result_conversion_without_browser_w
     agent = _agent(original, call(_ResultTools.data))
     async with agent.session() as session:
         services = session.scope[FakeServices]
-        services.browser.active_tab.dialog = ("alert", "Blocked page")
+        services.browser.active_tab.dialog = OpenDialog("alert", "Blocked page")
         async with services.coordination.exclusive():
             assert await session.scope[_ResultTools].data() is original
             result = await asyncio.wait_for(session.run("Read the rows"), timeout=5)
@@ -90,7 +91,7 @@ async def test_denied_input_never_enters_the_automatic_action_frame():
 async def test_dialog_handling_bypasses_an_existing_action_lock():
     async with mounted(Actions(), _Dialogs()) as (services, scope):
         tab = services.browser.active_tab
-        tab.dialog = ("alert", "Continue?")
+        tab.dialog = OpenDialog("alert", "Continue?")
         tab.handle_dialog = AsyncMock()
         async with services.coordination.exclusive():
             result = await asyncio.wait_for(

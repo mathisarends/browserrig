@@ -17,6 +17,7 @@ from browserrig.core import (
     BrowserError,
     FileTransferDirection,
     Point,
+    Position,
 )
 from browserrig.events import (
     InputEvent,
@@ -185,7 +186,7 @@ async def _pressed(
     pointer is back at once. Without a place in the page it has nowhere to return to.
     """
     start = scene.pointer
-    position = (start.x, start.y) if start is not None else None
+    position = Position(start.x, start.y) if start is not None else None
     await scene.show(pressed(from_position=position, duration=PRESS_SECONDS))
     duration = ENTER_SECONDS
     try:

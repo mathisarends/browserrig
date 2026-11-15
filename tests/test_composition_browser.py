@@ -47,6 +47,7 @@ from browserrig import (
     UntilCompaction,
     browser_plugins,
 )
+from browserrig.browser import OpenDialog
 from browserrig.core import (
     Geometry,
     ReadinessError,
@@ -682,7 +683,7 @@ async def test_placeholder_observations_do_not_report_a_viewport_resize(dialog):
         browser = _browser_ready(holder)
         first = await session.run("Inspect", max_steps=1)
         capture.size = (0, 0)
-        browser.active_tab.dialog = ("alert", "Confirm") if dialog else None
+        browser.active_tab.dialog = OpenDialog("alert", "Confirm") if dialog else None
         placeholder = await session.run("Capture unavailable", max_steps=1)
         capture.size = (800, 600)
         browser.active_tab.dialog = None

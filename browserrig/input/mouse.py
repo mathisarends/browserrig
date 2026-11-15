@@ -7,7 +7,14 @@ from typing import Literal
 
 from harnessed.tracing import traced
 
-from browserrig.core import BrowserError, CursorStyle, MouseEventKind, Point, TabGesture
+from browserrig.core import (
+    BrowserError,
+    CursorStyle,
+    MouseEventKind,
+    Point,
+    Position,
+    TabGesture,
+)
 from browserrig.events import (
     CursorMovedEvent,
     CursorStateEvent,
@@ -105,8 +112,8 @@ class Mouse:
         rest = self._rest(target)
         if not rest.placed:
             motor = self._motor()
-            width, height = await target.viewport_size()
-            rest.position = motor.landing(width, height)
+            viewport = await target.viewport_size()
+            rest.position = motor.landing(viewport.width, viewport.height)
         if enter:
             await self._presenter().enter(
                 target, rest.position, action_id=self._action_id()
@@ -278,14 +285,13 @@ class Mouse:
         await self._refresh_style(target)
 
     async def _stroke(self, target: InputTarget, path: CursorPath) -> None:
-        cp1, cp2 = path.control_points
         await self._emit(
             target,
             CursorMovedEvent(
-                from_position=(path.start.x, path.start.y),
-                to_position=(path.end.x, path.end.y),
-                control_point_1=cp1,
-                control_point_2=cp2,
+                from_position=Position(path.start.x, path.start.y),
+                to_position=Position(path.end.x, path.end.y),
+                control_point_1=path.control_point_1,
+                control_point_2=path.control_point_2,
                 duration=path.duration,
             ),
         )

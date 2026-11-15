@@ -1,9 +1,9 @@
-from typing import Any
+from typing import Any, NamedTuple
 
 from pydantic import ConfigDict
 from pydantic.alias_generators import to_camel
 
-from browserrig.core import Bounds, ElementOperation, Options, Point
+from browserrig.core import Aim, Bounds, Box, ElementOperation, Options, Point, Position
 
 
 class ScriptArgs(Options):
@@ -22,7 +22,7 @@ class ElementArgs(ScriptArgs):
     value: str | bool | None = None
     clip: Bounds | None = None
     # Preferred spot for `point`, as fractions of the element's visible box.
-    aim: tuple[float, float] | None = None
+    aim: Aim | None = None
 
 
 class ScrollArgs(ScriptArgs):
@@ -102,7 +102,14 @@ class FindArgs(ScriptArgs):
 
 
 class OwnerHitsArgs(ScriptArgs):
-    points: tuple[tuple[float, float], ...]
+    points: tuple[Position, ...]
+
+
+class Size(NamedTuple):
+    """Width and height in CSS pixels."""
+
+    width: float
+    height: float
 
 
 class CursorArgs(ScriptArgs):
@@ -162,8 +169,8 @@ class FoundText(Options):
 
 class FoundMark(Options):
     index: int
-    # Frame-local viewport rectangles as (x, y, width, height).
-    rects: tuple[tuple[float, float, float, float], ...]
+    # Frame-local viewport rectangles.
+    rects: tuple[Box, ...]
 
 
 class FindResult(Options):

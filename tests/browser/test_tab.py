@@ -6,7 +6,7 @@ import pytest
 from cdpify import CDPCommandError
 from cdpify.domains.runtime import EvaluateResult, ExceptionDetails, RemoteObject
 
-from browserrig.browser import Tab
+from browserrig.browser import OpenDialog, Tab
 from browserrig.browser import tab as tab_module
 from browserrig.core import BrowserError, ViewportSize
 from browserrig.events import CursorStateEvent, KeyPressedEvent
@@ -121,7 +121,7 @@ async def test_unmeasurable_viewport_keeps_the_last_known_size(monkeypatch, fail
         await asyncio.Event().wait()
 
     if failure == "dialog":
-        tab.dialog = ("alert", "Blocked")
+        tab.dialog = OpenDialog("alert", "Blocked")
     elif failure == "error":
         page.get_layout_metrics.side_effect = CDPCommandError(
             "Page.getLayoutMetrics", -32000, "Target closed"

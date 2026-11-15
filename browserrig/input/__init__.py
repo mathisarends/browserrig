@@ -10,7 +10,7 @@ from .motor import (
 )
 from .mouse import ClickButton, ClickCount, Mouse
 from .plugin import InputRuntime
-from .pointer import ControlPoint, CursorPath, movement
+from .pointer import Bend, CursorPath, movement
 from .presenter import Presenter, Unseen
 from .target import Focus, InputTarget, InputTargets, KeyEventType, MouseButton
 
@@ -20,7 +20,7 @@ __all__ = [
     "MouseButton",
     "CENTER",
     "TYPING_INTERVAL_SECONDS",
-    "ControlPoint",
+    "Bend",
     "CursorPath",
     "Focus",
     "HumanMotor",

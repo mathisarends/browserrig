@@ -1,8 +1,10 @@
 """Project typed browser tool results into bounded presentation receipts."""
 
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import replace
-from typing import Any
+from typing import Any, NamedTuple
 
 from harnessed import ToolCall, ToolResult, ToolStatus
 from pydantic import TypeAdapter, ValidationError
@@ -228,7 +230,7 @@ def _limitations(items: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(clipped(item, 240) for item in items[:6])
 
 
-def _file_change(kind: ActionKind, args: Mapping[str, Any]) -> tuple[str, str]:
+def _file_change(kind: ActionKind, args: Mapping[str, Any]) -> _FileChange:
     """The text being saved and how it changes the file."""
     if kind is ActionKind.EDIT_FILE:
         change = (
@@ -236,14 +238,14 @@ def _file_change(kind: ActionKind, args: Mapping[str, Any]) -> tuple[str, str]:
             if args.get("replace_all")
             else "replacing one match"
         )
-        return clipped(str(args.get("new_text", ""))), change
+        return _FileChange(clipped(str(args.get("new_text", ""))), change)
     if args.get("append"):
         change = "appending to file"
     elif args.get("overwrite"):
         change = "replacing existing file if present"
     else:
         change = "creating file"
-    return clipped(str(args.get("content", ""))), change
+    return _FileChange(clipped(str(args.get("content", ""))), change)
 
 
 def _selection(args: Mapping[str, Any]) -> str:
@@ -257,3 +259,8 @@ def _selection(args: Mapping[str, Any]) -> str:
     if args.get("ocr") is True:
         parts.append("OCR requested")
     return " · ".join(parts)
+
+
+class _FileChange(NamedTuple):
+    preview: str
+    change: str

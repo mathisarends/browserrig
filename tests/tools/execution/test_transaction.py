@@ -7,7 +7,7 @@ import pytest
 from harnessed import ToolError
 
 from browserrig import FileSystem, LocalWorkspace, MountedWorkspace
-from browserrig.browser import Tab
+from browserrig.browser import OpenDialog, Tab
 from browserrig.core import Bounds, BrowserError, ElementPoint, Point
 from browserrig.events import (
     ActionFailedEvent,
@@ -148,7 +148,7 @@ async def test_upload_does_not_require_a_pointer_target(tmp_path, placement):
 async def test_tab_management_does_not_wait_on_current_page_dialog(kind):
     async with mounted(Actions()) as (services, ctx):
         tab = services.browser.active_tab
-        tab.dialog = ("alert", "hello")
+        tab.dialog = OpenDialog("alert", "hello")
         await ctx[Actions].run(
             kind=kind, operation=AsyncMock(return_value=Effect("Done.")), settle=False
         )

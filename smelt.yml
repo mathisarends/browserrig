@@ -142,6 +142,7 @@ rules:
   deprecated-async-contextmanager-return: error
   str-enum-explicit-values: error
   excess-positional-parameters: error
+  anonymous-tuple-type: error
   facade-export-gap: warning
   # Test smells
   private-test-access: error

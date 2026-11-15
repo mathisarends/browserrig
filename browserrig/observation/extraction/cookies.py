@@ -6,9 +6,12 @@ container can also qualify when it offers both acceptance and rejection. No page
 input or consent policy belongs here.
 """
 
+from __future__ import annotations
+
 import re
 from bisect import bisect_left, bisect_right
 from collections.abc import Callable
+from typing import NamedTuple
 
 from browserrig.observation.models import CookieBanner, Element
 
@@ -75,7 +78,7 @@ def cookie_banners(
     candidates = {
         node: children
         for node, children in candidates.items()
-        if _decisions(children)[0]
+        if _decisions(children).decides
     }
     if not candidates:
         return ()
@@ -153,7 +156,7 @@ def _matches(
         identified and bool(_COOKIE.search(text))
     )
     privacy = bool(_PRIVACY.search(context))
-    _, alternatives = _decisions(controls)
+    alternatives = _decisions(controls).alternatives
     # A footer launcher or a privacy-policy link alone never supplies a decision.
     # Vendor/container names only corroborate visible content and choices.
     return (cookie and (identified or dialog or positioned or alternatives)) or (
@@ -161,7 +164,7 @@ def _matches(
     )
 
 
-def _decisions(elements: list[Element]) -> tuple[bool, bool]:
+def _decisions(elements: list[Element]) -> _Decisions:
     labels = [el.name for el in elements if el.role in _CHOICE_ROLES]
     accepts = any(_ACCEPT.search(label) for label in labels)
     rejects = any(_REJECT.search(label) for label in labels)
@@ -170,7 +173,7 @@ def _decisions(elements: list[Element]) -> tuple[bool, bool]:
         or rejects
         or any(_SAVE.search(label) or _ACKNOWLEDGE.fullmatch(label) for label in labels)
     )
-    return decides, accepts and rejects
+    return _Decisions(decides=decides, alternatives=accepts and rejects)
 
 
 def _text(
@@ -203,3 +206,10 @@ def _heading(
         ):
             return document.text(node, 80)
     return ""
+
+
+class _Decisions(NamedTuple):
+    # Some control makes a consent choice.
+    decides: bool
+    # Both accepting and rejecting are offered.
+    alternatives: bool

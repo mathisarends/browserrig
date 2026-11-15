@@ -2,14 +2,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
-from browserrig.core import Point
+from browserrig.core import Aim, Point
 
 from .pointer import CursorPath, movement
 
 # Seconds between keys a person types, in the page and in the browser's own bars.
 TYPING_INTERVAL_SECONDS = 0.05
 # The middle of a target, as fractions of its visible box.
-CENTER = (0.5, 0.5)
+CENTER = Aim(0.5, 0.5)
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,9 +43,7 @@ class Motor(Protocol):
         """
         ...
 
-    def aim_fractions(
-        self, target_width: float, target_height: float
-    ) -> tuple[float, float]:
+    def aim_fractions(self, target_width: float, target_height: float) -> Aim:
         """Choose horizontal and vertical fractions within the target's visible box.
 
         A spot that something else covers falls back to the target's visible points.
@@ -74,7 +72,7 @@ class Instant:
 
     def aim_fractions(  # pylint: disable=unused-argument
         self, target_width: float, target_height: float
-    ) -> tuple[float, float]:
+    ) -> Aim:
         return CENTER
 
     def press(self) -> float:
@@ -108,7 +106,7 @@ class HumanMotor:
 
     def aim_fractions(  # pylint: disable=unused-argument
         self, target_width: float, target_height: float
-    ) -> tuple[float, float]:
+    ) -> Aim:
         return CENTER
 
     def press(self) -> float:

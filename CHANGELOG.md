@@ -32,6 +32,14 @@
   `write_file` (`overwrite`, `append`) and `edit_file` (`replace_all`).
   `FileTransfer.receive` takes `browser_path=` by keyword. Agent tool calls are
   unchanged.
+- Name the fields of fixed-length tuples. Coordinates are `Position(x, y)`,
+  aim spots `Aim(x, y)` and find-mark rectangles `Box(x, y, width, height)`;
+  all remain tuples, so unpacking and serialized receipts are unchanged.
+  `Tab.viewport_size()` returns `ViewportSize`, `Tab.dialog` is an
+  `OpenDialog(kind, message)`, `Motor.aim_fractions` returns `Aim`,
+  `CursorPath` has `control_point_1`/`control_point_2` instead of
+  `control_points`, and `CursorPath.curved(bend=...)` takes a `Bend`.
+  `ControlPoint` is removed in favour of `Position`.
 
 ## 0.4.0 (2026-11-14)
 

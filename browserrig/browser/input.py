@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from cdpify.domains.input import MouseButton as CdpMouseButton
 
-from browserrig.core import CursorStyle, MouseEventKind, Point
+from browserrig.core import CursorStyle, MouseEventKind, Point, ViewportSize
 from browserrig.events import InputEvent
 from browserrig.input import InputTarget, KeyEventType, MouseButton
 from browserrig.scripts import CURSOR, CursorArgs
@@ -45,7 +45,7 @@ class CdpInput:
     def id(self) -> str:
         return self._tab.id
 
-    async def viewport_size(self) -> tuple[float, float]:
+    async def viewport_size(self) -> ViewportSize:
         return await self._tab.viewport_size()
 
     def layout_changed(self) -> None:

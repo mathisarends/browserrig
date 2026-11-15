@@ -12,6 +12,7 @@ from .core import (
     CursorStyle,
     FileSource,
     HandoffStatus,
+    Position,
     ReadinessPhase,
     ReadinessStage,
     ReadinessStatus,
@@ -161,10 +162,10 @@ class PageCaptureFinishedEvent(BrowserEvent):
 
 @dataclass(frozen=True, slots=True)
 class CursorMovedEvent(PositionedEvent):
-    from_position: tuple[float, float]
-    to_position: tuple[float, float]
-    control_point_1: tuple[float, float]
-    control_point_2: tuple[float, float]
+    from_position: Position
+    to_position: Position
+    control_point_1: Position
+    control_point_2: Position
     duration: float
     easing: Literal["easeInOutCubic"] = "easeInOutCubic"
     type: Literal[EventKind.CURSOR_MOVED] = field(

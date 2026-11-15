@@ -4,7 +4,7 @@ import asyncio
 from dataclasses import asdict
 from functools import cache
 from importlib.resources import files
-from typing import Literal
+from typing import Literal, NamedTuple
 
 from harnessed.tracing import traced
 from pydantic import Field
@@ -43,7 +43,7 @@ class IframeView:
         self._lock = asyncio.Lock()
         self._closed = False
         self._receipts = Receipts()
-        self._shown: tuple[str, str] | None = None
+        self._shown: _Document | None = None
 
     def remember(self, event: LiveEvent | BrowserEvent) -> None:
         """Retain receipts even when the document cannot currently render them."""
@@ -78,7 +78,7 @@ class IframeView:
                     html=_document(), script=CHOREOGRAPHY
                 )
                 self._overlays[tab.id] = overlay
-            identity = (tab.id, tab.document_id)
+            identity = _Document(tab.id, tab.document_id)
             data = asdict(event) if event is not None else {}
             data["presentation"] = {
                 **self._presentation,
@@ -99,3 +99,8 @@ def _document() -> str:
     template = package.joinpath("view.html").read_text(encoding="utf-8")
     styles = package.joinpath("view.css").read_text(encoding="utf-8")
     return template.replace("{{styles}}", styles)
+
+
+class _Document(NamedTuple):
+    target_id: str
+    document_id: str

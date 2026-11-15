@@ -1,14 +1,21 @@
 import asyncio
 from collections.abc import Awaitable, Callable
+from typing import NamedTuple
 
 from cdpify import CDPCommandError, CdpSession
+
+
+class _WorldKey(NamedTuple):
+    session_id: str
+    frame_id: str
+    document_id: str
 
 
 class Worlds:
     """Document-scoped isolated contexts shared by successive frame discoveries."""
 
     def __init__(self) -> None:
-        self._ids: dict[tuple[str, str, str], int] = {}
+        self._ids: dict[_WorldKey, int] = {}
         self._generation = 0
         self._lock = asyncio.Lock()
 
@@ -33,7 +40,7 @@ class Worlds:
         return await operation(context_id)
 
     async def context(self, cdp: CdpSession, frame_id: str, document_id: str) -> int:
-        key = (cdp.session_id, frame_id, document_id)
+        key = _WorldKey(cdp.session_id, frame_id, document_id)
         async with self._lock:
             if key in self._ids:
                 return self._ids[key]
@@ -57,8 +64,8 @@ class Worlds:
             key: value
             for key, value in self._ids.items()
             if not (
-                (session_id is None or key[0] == session_id)
-                and (frame_id is None or key[1] == frame_id)
+                (session_id is None or key.session_id == session_id)
+                and (frame_id is None or key.frame_id == frame_id)
                 and (context_id is None or value == context_id)
             )
         }

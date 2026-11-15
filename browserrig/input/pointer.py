@@ -1,12 +1,20 @@
 import math
 from dataclasses import dataclass
-from typing import Self
+from typing import NamedTuple, Self
 
-from browserrig.core import Point
-
-type ControlPoint = tuple[float, float]
+from browserrig.core import Point, Position
 
 _FRAME_INTERVAL_SECONDS = 1 / 60
+
+
+class Bend(NamedTuple):
+    """How far each control point leans sideways, as a fraction of the distance."""
+
+    first: float
+    second: float
+
+
+_GENTLE = Bend(0.06, 0.04)
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,7 +24,8 @@ class CursorPath:
     start: Point
     end: Point
     duration: float
-    control_points: tuple[ControlPoint, ControlPoint]
+    control_point_1: Position
+    control_point_2: Position
 
     @classmethod
     def curved(
@@ -25,7 +34,7 @@ class CursorPath:
         end: Point,
         duration: float,
         *,
-        bend: tuple[float, float] = (0.06, 0.04),
+        bend: Bend = _GENTLE,
     ) -> Self:
         """A gentle arc: each control point leans sideways by `bend` of the distance.
 
@@ -33,24 +42,23 @@ class CursorPath:
         """
         dx, dy = end.x - start.x, end.y - start.y
 
-        def bounded(x: float, y: float) -> ControlPoint:
-            return (
+        def bounded(x: float, y: float) -> Position:
+            return Position(
                 max(min(start.x, end.x), min(max(start.x, end.x), x)),
                 max(min(start.y, end.y), min(max(start.y, end.y), y)),
             )
 
-        first, second = bend
         return cls(
             start,
             end,
             duration,
-            (
-                bounded(
-                    start.x + dx * 0.3 - dy * first, start.y + dy * 0.3 + dx * first
-                ),
-                bounded(
-                    start.x + dx * 0.7 - dy * second, start.y + dy * 0.7 + dx * second
-                ),
+            control_point_1=bounded(
+                start.x + dx * 0.3 - dy * bend.first,
+                start.y + dy * 0.3 + dx * bend.first,
+            ),
+            control_point_2=bounded(
+                start.x + dx * 0.7 - dy * bend.second,
+                start.y + dy * 0.7 + dx * bend.second,
             ),
         )
 
@@ -61,15 +69,15 @@ class CursorPath:
     def point(self, progress: float) -> Point:
         t = _ease(progress)
         u = 1 - t
-        cp1, cp2 = self.control_points
+        cp1, cp2 = self.control_point_1, self.control_point_2
         return Point(
             x=u**3 * self.start.x
-            + 3 * u**2 * t * cp1[0]
-            + 3 * u * t**2 * cp2[0]
+            + 3 * u**2 * t * cp1.x
+            + 3 * u * t**2 * cp2.x
             + t**3 * self.end.x,
             y=u**3 * self.start.y
-            + 3 * u**2 * t * cp1[1]
-            + 3 * u * t**2 * cp2[1]
+            + 3 * u**2 * t * cp1.y
+            + 3 * u * t**2 * cp2.y
             + t**3 * self.end.y,
         )
 

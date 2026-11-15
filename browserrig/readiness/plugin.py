@@ -24,7 +24,7 @@ from .hooks import CheckReadiness, ReadinessCheck, SelectReadiness
 from .models import ReadinessReport
 from .network import NetworkQuiet
 from .policies import ReadinessContext, ReadinessPolicy
-from .state import ReadinessState
+from .state import LoadedDocument, ReadinessState
 from .wait import wait_for_page
 
 
@@ -72,7 +72,7 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
             return report.model_copy(
                 update={"phase": phase, "document_id": tab.document_id}
             )
-        document = (tab.id, tab.document_id)
+        document = LoadedDocument(tab.id, tab.document_id)
         stage = (
             ReadinessStage.ONGOING
             if document in self._state.initialized
@@ -100,7 +100,7 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
 
     def invalidate(self, tab: Tab) -> None:
         """Invalidate this document after an application-level reset (for example in an SPA)."""
-        self._state.initialized.discard((tab.id, tab.document_id))
+        self._state.initialized.discard(LoadedDocument(tab.id, tab.document_id))
         self._state.deferred.pop(tab.id, None)
         self._state.spent.pop(tab.id, None)
         for key, task in tuple(self._state.pending.items()):
@@ -158,9 +158,9 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         ):
             # Keep only the live generation for this tab.
             self._state.initialized = {
-                key for key in self._state.initialized if key[0] != tab.id
+                key for key in self._state.initialized if key.tab_id != tab.id
             }
-            self._state.initialized.add((tab.id, report.document_id))
+            self._state.initialized.add(LoadedDocument(tab.id, report.document_id))
         return report
 
     async def _select(self, context: ReadinessContext) -> ReadinessPolicy:

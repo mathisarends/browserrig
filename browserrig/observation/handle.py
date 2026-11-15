@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from browserrig.browser import Frame, Tab
 from browserrig.core import (
+    Aim,
     Bounds,
     BrowserError,
     ElementOperation,
@@ -45,7 +46,7 @@ class DomElementHandle:
     snapshot: Snapshot
     tab: Tab
 
-    async def locate(self, *, aim: tuple[float, float] | None = None) -> ElementPoint:
+    async def locate(self, *, aim: Aim | None = None) -> ElementPoint:
         """Return a hit-tested viewport point and the element's visible bounds.
 
         `aim` is a preferred spot as fractions of the visible box; when something
@@ -265,7 +266,7 @@ class DomElementHandle:
         value: str | bool | None = None,
         *,
         clip: Bounds | None = None,
-        aim: tuple[float, float] | None = None,
+        aim: Aim | None = None,
     ) -> Any:
         return await self.run(
             ELEMENT,

@@ -7,6 +7,7 @@ in one forward pass and all subtree queries are linear slices; nothing recurses.
 
 import re
 from functools import cached_property
+from typing import NamedTuple, Self
 
 from cdpify.domains.domsnapshot import DocumentSnapshot, RareBooleanData, RareStringData
 
@@ -14,8 +15,27 @@ from browserrig.observation.models import ScrollInfo
 
 from .styles import Style
 
-type Rect = tuple[float, float, float, float]
-"""left, top, right, bottom in document CSS pixels."""
+
+class Rect(NamedTuple):
+    """A box in document CSS pixels."""
+
+    left: float
+    top: float
+    right: float
+    bottom: float
+
+    @classmethod
+    def from_box(cls, x: float, y: float, width: float, height: float) -> Self:
+        return cls(x, y, x + width, y + height)
+
+
+class TextRun(NamedTuple):
+    """A rendered text node: its index, its text and its box."""
+
+    node: int
+    text: str
+    rect: Rect
+
 
 _ELEMENT, _TEXT = 1, 3
 _WHITESPACE = re.compile(r"\s+")
@@ -49,7 +69,12 @@ def clean(text: str, limit: int = 150) -> str:
 def intersect(a: Rect, b: Rect | None) -> Rect:
     if b is None:
         return a
-    return (max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3]))
+    return Rect(
+        max(a.left, b.left),
+        max(a.top, b.top),
+        min(a.right, b.right),
+        min(a.bottom, b.bottom),
+    )
 
 
 def is_empty(rect: Rect) -> bool:
@@ -194,9 +219,9 @@ class Document:  # pylint: disable=too-many-public-methods
     def has_layout(self, index: int) -> bool:
         return index in self._layout
 
-    def text_runs(self, *, raw: bool = False) -> list[tuple[int, str, Rect]]:
+    def text_runs(self, *, raw: bool = False) -> list[TextRun]:
         """Every rendered, visible text node with its parent element and box."""
-        runs: list[tuple[int, str, Rect]] = []
+        runs: list[TextRun] = []
         for node, layout in self._layout.items():
             if self._types[node] != _TEXT:
                 continue
@@ -209,7 +234,7 @@ class Document:  # pylint: disable=too-many-public-methods
             value = original if raw else clean(original, 1000)
             x, y, width, height = self._bounds[layout]
             if value and width >= 1 and height >= 1:
-                runs.append((node, value, (x, y, x + width, y + height)))
+                runs.append(TextRun(node, value, Rect.from_box(x, y, width, height)))
         runs.sort()
         return runs
 
@@ -235,7 +260,7 @@ class Document:  # pylint: disable=too-many-public-methods
         if layout is None:
             return None
         x, y, width, height = self._bounds[layout]
-        rect = (x, y, x + width, y + height)
+        rect = Rect.from_box(x, y, width, height)
         if not is_empty(rect):
             return rect
         union: Rect | None = None
@@ -245,15 +270,15 @@ class Document:  # pylint: disable=too-many-public-methods
                 continue
             x, y, width, height = self._bounds[child]
             if width >= 1 and height >= 1:
-                box = (x, y, x + width, y + height)
+                box = Rect.from_box(x, y, width, height)
                 union = (
                     box
                     if union is None
-                    else (
-                        min(union[0], box[0]),
-                        min(union[1], box[1]),
-                        max(union[2], box[2]),
-                        max(union[3], box[3]),
+                    else Rect(
+                        min(union.left, box.left),
+                        min(union.top, box.top),
+                        max(union.right, box.right),
+                        max(union.bottom, box.bottom),
                     )
                 )
         return union or rect
@@ -432,7 +457,7 @@ class Document:  # pylint: disable=too-many-public-methods
                     "body",
                 ):
                     x, y, width, height = bounds[box]
-                    rect = (x, y, x + width, y + height)
+                    rect = Rect.from_box(x, y, width, height)
                     own_hard = intersect(
                         _overflow(rect, overflow_x, overflow_y, hard=True), hard
                     )
@@ -498,11 +523,11 @@ class Document:  # pylint: disable=too-many-public-methods
 def _overflow(rect: Rect, overflow_x: str, overflow_y: str, *, hard: bool) -> Rect:
     clips = ("hidden", "clip") if hard else ("auto", "scroll")
     clips_x, clips_y = overflow_x in clips, overflow_y in clips
-    return (
-        rect[0] if clips_x else -_UNBOUNDED,
-        rect[1] if clips_y else -_UNBOUNDED,
-        rect[2] if clips_x else _UNBOUNDED,
-        rect[3] if clips_y else _UNBOUNDED,
+    return Rect(
+        rect.left if clips_x else -_UNBOUNDED,
+        rect.top if clips_y else -_UNBOUNDED,
+        rect.right if clips_x else _UNBOUNDED,
+        rect.bottom if clips_y else _UNBOUNDED,
     )
 
 

@@ -7,6 +7,7 @@ from harnessed.tracing import traced
 from browserrig.browser import Tab
 from browserrig.core import (
     ActionContext,
+    Aim,
     Bounds,
     BrowserError,
     ElementPoint,
@@ -24,7 +25,7 @@ from .scrolling import prepare_element
 class _Aim:
     context: PluginScope | None = None
     action_id: str = ""
-    points: dict[str, tuple[float, float]] = field(default_factory=dict)
+    points: dict[str, Aim] = field(default_factory=dict)
 
 
 class Targeting(Plugin, slot="browserrig.targeting", provides=True):
@@ -101,7 +102,7 @@ class Targeting(Plugin, slot="browserrig.targeting", provides=True):
         if tab.document_id != document_id:
             raise StaleElement("The document changed during hover; observe again")
 
-    def _aim(self, ref: str, bounds: Bounds | None) -> tuple[float, float]:
+    def _aim(self, ref: str, bounds: Bounds | None) -> Aim:
         action_id = self._correlation.action_id
         state = self._state
         if state.action_id != action_id:

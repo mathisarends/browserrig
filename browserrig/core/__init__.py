@@ -10,11 +10,14 @@ from .errors import (
     StaleElement,
 )
 from .geometry import (
+    Aim,
     Bounds,
+    Box,
     ElementPoint,
     FrameTransform,
     Geometry,
     Point,
+    Position,
     Region,
     ViewportSize,
 )
@@ -54,7 +57,9 @@ __all__ = [
     "ActionKind",
     "ActivityKind",
     "ActivityOutcome",
+    "Aim",
     "Bounds",
+    "Box",
     "BrowserBar",
     "BrowserControl",
     "BrowserClosed",
@@ -73,6 +78,7 @@ __all__ = [
     "MouseEventKind",
     "Options",
     "Point",
+    "Position",
     "ReadinessError",
     "ReadinessPhase",
     "ReadinessStage",

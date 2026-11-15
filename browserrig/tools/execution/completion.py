@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from collections.abc import Awaitable, Callable
 from time import monotonic
+from typing import NamedTuple
 
 from harnessed.tracing import span, traced
 
@@ -38,11 +41,8 @@ class Completion:
         operation: Callable[[Tab], Awaitable[Effect]],
         *,
         settle: bool,
-    ) -> tuple[Effect, str, str]:
-        """Run input in `tab`, then wait for its page, or for a tab the input opened.
-
-        Returns the effect, a readiness note and a note on the tab that opened.
-        """
+    ) -> Dispatched:
+        """Run input in `tab`, then wait for its page, or for a tab the input opened."""
         started = monotonic()
         mark = self._browser.tabs.openings
         with self._actions.activate(action_id), span("browserrig.operation"):
@@ -54,7 +54,7 @@ class Completion:
             else ""
         )
         if kind not in FOLLOWED_KINDS or tab.closed:
-            return effect, note, ""
+            return Dispatched(effect, note, "")
         with self._actions.activate(action_id):
             followed = await self._follow(tab, mark, expected=effect.opens_tab)
         if effect.opens_tab and not followed:
@@ -62,7 +62,7 @@ class Completion:
             if settled:
                 note = await self._settle(tab, kind, started)
             followed = " No new tab opened; the input acted in this tab."
-        return effect, note, followed
+        return Dispatched(effect, note, followed)
 
     @traced
     async def navigate(
@@ -132,3 +132,11 @@ class Completion:
         if report.status != ReadinessStatus.READY:
             note += f" Readiness is {report.status}: {report.reason}."
         return note
+
+
+class Dispatched(NamedTuple):
+    """The effect of dispatched input with its readiness note and opened-tab note."""
+
+    effect: Effect
+    note: str
+    followed: str

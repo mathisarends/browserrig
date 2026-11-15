@@ -29,7 +29,14 @@ from browserrig.choreography import (
     WaitingEvent,
     scenes,
 )
-from browserrig.core import Bounds, BrowserError, ElementPoint, Point, TabGesture
+from browserrig.core import (
+    Bounds,
+    BrowserError,
+    ElementPoint,
+    Point,
+    TabGesture,
+    ViewportSize,
+)
 from browserrig.events import (
     ActionFailedEvent,
     ActionFinishedEvent,
@@ -136,7 +143,7 @@ class _Tab:
         self._timeline.append(f"key {kind} {key}")
 
     async def viewport_size(self):
-        return 1000, 800
+        return ViewportSize(width=1000, height=800)
 
     async def cursor_style(self, _point):
         return None

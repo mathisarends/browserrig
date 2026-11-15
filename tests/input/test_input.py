@@ -38,6 +38,7 @@ from browserrig.events import (
 )
 from browserrig.input import (
     CENTER,
+    Bend,
     CursorPath,
     HumanMotor,
     Input,
@@ -699,7 +700,7 @@ class _Steady(Instant):
     """One straight stroke of 0.3 seconds, 18 frames at 60 Hz."""
 
     def pointer_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
-        return (CursorPath.curved(start, destination, 0.3, bend=(0, 0)),)
+        return (CursorPath.curved(start, destination, 0.3, bend=Bend(0, 0)),)
 
 
 async def test_a_slow_browser_skips_frames_instead_of_stretching_the_stroke(

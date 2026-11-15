@@ -3,6 +3,7 @@
 from bisect import bisect_right
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import NamedTuple
 from urllib.parse import urljoin
 
 from browserrig.core import Bounds, FrameTransform
@@ -107,8 +108,30 @@ _ALERT_ROLES = frozenset({"alert", "status"})
 # Smaller canvases are icons, sparklines or tracking pixels, not drawing surfaces.
 _MIN_CANVAS_SIDE = 24
 
-type Context = tuple[str, str]
-"""Section and group labels that apply to a node's descendants."""
+
+class Context(NamedTuple):
+    """Section and group labels that apply to a node's descendants."""
+
+    section: str
+    group: str
+
+
+class Placement(NamedTuple):
+    """Where an element is laid out, which part of it is visible and if it is covered."""
+
+    rect: Rect
+    visible: Rect | None
+    covered: bool
+
+
+class _LabelProxy(NamedTuple):
+    label: int
+    control: int
+
+
+class _ModalCandidate(NamedTuple):
+    paint_order: int
+    index: int
 
 
 @dataclass(slots=True)
@@ -126,13 +149,13 @@ class FrameExtraction:
     text: str = ""
     texts: list[tuple[int, TextBlock]] = field(default_factory=list)
     _context: Callable[[int], Context] = field(
-        default=lambda _index: ("", ""), repr=False
+        default=lambda _index: Context("", ""), repr=False
     )
     _covered: Callable[[int], bool] = field(default=lambda _index: False, repr=False)
 
     def section(self, index: int) -> str:
         """The landmark section that contains this node, such as an iframe owner."""
-        return self._context(index)[0]
+        return self._context(index).section
 
     def covered(self, index: int) -> bool:
         """Whether an overlay hides the visible part of this node, such as an iframe owner."""
@@ -188,13 +211,14 @@ class _FrameExtractor:
         )
         self._viewport = self._document_viewport()
         self._preview = (
-            (
-                self._viewport[0],
-                max(0, self._viewport[1] - viewport_expansion),
-                self._viewport[2],
+            Rect(
+                self._viewport.left,
+                max(0, self._viewport.top - viewport_expansion),
+                self._viewport.right,
                 min(
-                    self._viewport[3] + viewport_expansion,
-                    document.content_height or self._viewport[3] + viewport_expansion,
+                    self._viewport.bottom + viewport_expansion,
+                    document.content_height
+                    or self._viewport.bottom + viewport_expansion,
                 ),
             )
             if self._viewport is not None
@@ -216,8 +240,8 @@ class _FrameExtractor:
         )
         modal = self._find_modal()
         if modal is not None:
-            self._modal = modal[1]
-            result.modal = (modal[0], self._modal_view(modal[1]))
+            self._modal = modal.index
+            result.modal = (modal.paint_order, self._modal_view(modal.index))
         result.elements, result.offscreen = self._elements()
         result.cookie_banners = cookie_banners(
             self._document,
@@ -243,7 +267,7 @@ class _FrameExtractor:
         """
         document = self._document
         candidates: dict[int, bool] = {}
-        placements: dict[int, tuple[Rect, Rect | None, bool]] = {}
+        placements: dict[int, Placement] = {}
         labels: list[int] = []
         hidden_uploads: list[int] = []
         for index in document.elements():
@@ -283,9 +307,9 @@ class _FrameExtractor:
         offscreen: list[Offscreen] = []
         upload_labels: dict[int, str] = {}
         for index, control in kept:
-            rect = placements[index][0]
+            rect = placements[index].rect
             if (
-                placements[index][1] is not None
+                placements[index].visible is not None
                 or visible_area(document, index, rect, self._preview) is not None
             ):
                 element = self._element(index, placements[index], control)
@@ -309,7 +333,9 @@ class _FrameExtractor:
         built.extend(
             (
                 index,
-                self._element(index, ((0, 0, 0, 0), None, False), None).model_copy(
+                self._element(
+                    index, Placement(Rect(0, 0, 0, 0), None, False), None
+                ).model_copy(
                     update={
                         "bounds": None,
                         "outside_viewport": None,
@@ -388,14 +414,14 @@ class _FrameExtractor:
 
     def _covered(self, index: int) -> bool:
         placement = self._placement(index)
-        return placement is not None and placement[2]
+        return placement is not None and placement.covered
 
     def _label_proxies(
         self,
         labels: list[int],
         candidates: dict[int, bool],
-        placements: dict[int, tuple[Rect, Rect | None, bool]],
-    ) -> list[tuple[int, int]]:
+        placements: dict[int, Placement],
+    ) -> list[_LabelProxy]:
         """Visible labels stand in for hidden checkable controls and file inputs."""
         document = self._document
         proxies = []
@@ -411,7 +437,7 @@ class _FrameExtractor:
             placement = self._placement(label)
             if placement is not None:
                 placements[label] = placement
-                proxies.append((label, control))
+                proxies.append(_LabelProxy(label, control))
         return proxies
 
     def _canvases(self, listed: set[int]) -> list[tuple[int, Canvas]]:
@@ -453,14 +479,14 @@ class _FrameExtractor:
             )
         return canvases
 
-    def _placement(self, index: int) -> tuple[Rect, Rect | None, bool] | None:
+    def _placement(self, index: int) -> Placement | None:
         """Document rect, visible area and covered flag, or None when hidden."""
         document = self._document
         rect = document.rect(index)
         if rect is None or hidden(document, index, rect):
             return None
         area = visible_area(document, index, rect, self._viewport)
-        return rect, area, area is not None and self._occluded(index, area)
+        return Placement(rect, area, area is not None and self._occluded(index, area))
 
     def _headings_and_alerts(self) -> tuple[list[tuple[int, Heading]], list[str]]:
         document = self._document
@@ -499,7 +525,7 @@ class _FrameExtractor:
                             level=semantics.heading_level(document, index),
                             text=text,
                             frame_id=self._frame_id,
-                            section=self._context(index)[0],
+                            section=self._context(index).section,
                             in_viewport=area is not None,
                             outside_viewport=self._outside(rect)
                             if area is None
@@ -582,7 +608,7 @@ class _FrameExtractor:
         return kept
 
     def _element(
-        self, index: int, placement: tuple[Rect, Rect | None, bool], control: int | None
+        self, index: int, placement: Placement, control: int | None
     ) -> Element:
         document = self._document
         source = index if control is None else control
@@ -660,14 +686,14 @@ class _FrameExtractor:
 
     # Headings, alerts and dialogs
 
-    def _find_modal(self) -> tuple[int, int] | None:
+    def _find_modal(self) -> _ModalCandidate | None:
         """The topmost visible modal dialog, as (paint order, index).
 
         Only native `<dialog open>` and `aria-modal="true"` count; whether a banner
         without them blocks the page shows up as covered elements instead.
         """
         document = self._document
-        best: tuple[int, int] | None = None
+        best: _ModalCandidate | None = None
         for index in document.elements():
             if not document.is_element(index) or not document.has_layout(index):
                 continue
@@ -678,7 +704,7 @@ class _FrameExtractor:
                 continue
             if visible_area(document, index, rect, self._viewport) is None:
                 continue
-            candidate = (document.paint_order(index), index)
+            candidate = _ModalCandidate(document.paint_order(index), index)
             if best is None or candidate > best:
                 best = candidate
         return best
@@ -707,7 +733,7 @@ class _FrameExtractor:
         while node >= 0 and node not in contexts:
             path.append(node)
             node = document.parent(node)
-        inherited = contexts[node] if node >= 0 else (self._fallback, "")
+        inherited = contexts[node] if node >= 0 else Context(self._fallback, "")
         for ancestor in reversed(path):
             inherited = self._contribution(ancestor, inherited)
             contexts[ancestor] = inherited
@@ -718,7 +744,7 @@ class _FrameExtractor:
         if not document.is_element(node):
             return inherited
         if node == self._modal:
-            return (f"DIALOG: {self._dialog_name(node)}".rstrip(": "), "")
+            return Context(f"DIALOG: {self._dialog_name(node)}".rstrip(": "), "")
         role = semantics.role(document, node)
         landmark = _LANDMARKS.get(role)
         if landmark is not None:
@@ -727,7 +753,7 @@ class _FrameExtractor:
             )
             if landmark == "DIALOG" and not label:
                 label = self._dialog_name(node)
-            return (f"{landmark}: {label}" if label else landmark, "")
+            return Context(f"{landmark}: {label}" if label else landmark, "")
         group = _GROUPS.get(role)
         if group is not None:
             label = (
@@ -739,9 +765,9 @@ class _FrameExtractor:
                 )
             )
             if label:
-                return (inherited[0], f'{group} "{label}"')
+                return Context(inherited.section, f'{group} "{label}"')
             if group in _UNNAMED_GROUPS:
-                return (inherited[0], group)
+                return Context(inherited.section, group)
         return inherited
 
     def _dialog_name(self, index: int) -> str:
@@ -771,12 +797,7 @@ class _FrameExtractor:
             return None
         local = self._transform.bounds_to_local(self._visible)
         x, y = self._document.scroll
-        return (
-            local.x + x,
-            local.y + y,
-            local.x + local.width + x,
-            local.y + local.height + y,
-        )
+        return Rect.from_box(local.x + x, local.y + y, local.width, local.height)
 
     def _bounds(self, rect: Rect, area: Rect | None) -> Bounds:
         x, y = self._document.scroll

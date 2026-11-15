@@ -11,6 +11,7 @@ from browserrig.core import (
     ActionKind,
     BrowserBar,
     FileTransferDirection,
+    Position,
     TabGesture,
     ViewportSize,
 )
@@ -137,7 +138,7 @@ class TabPressedEvent(PositionedEvent):
 
     gesture: TabGesture
     tab_id: str
-    from_position: tuple[float, float]
+    from_position: Position
     duration: float
     type: Literal[EventKind.TAB_PRESSED] = field(
         default=EventKind.TAB_PRESSED, kw_only=True
@@ -154,7 +155,7 @@ class AddressBarFocusedEvent(PositionedEvent):
     acts, here before the first `BarTypedEvent`. Nothing is clicked in the browser.
     """
 
-    from_position: tuple[float, float] | None
+    from_position: Position | None
     duration: float
     type: Literal[EventKind.ADDRESS_BAR_FOCUSED] = field(
         default=EventKind.ADDRESS_BAR_FOCUSED, kw_only=True
@@ -165,7 +166,7 @@ class AddressBarFocusedEvent(PositionedEvent):
 class BackPressedEvent(PositionedEvent):
     """The pointer presses the viewer's back button before the tab goes back."""
 
-    from_position: tuple[float, float] | None
+    from_position: Position | None
     duration: float
     type: Literal[EventKind.BACK_PRESSED] = field(
         default=EventKind.BACK_PRESSED, kw_only=True
@@ -176,7 +177,7 @@ class BackPressedEvent(PositionedEvent):
 class ForwardPressedEvent(PositionedEvent):
     """The pointer presses the viewer's forward button before the tab goes forward."""
 
-    from_position: tuple[float, float] | None
+    from_position: Position | None
     duration: float
     type: Literal[EventKind.FORWARD_PRESSED] = field(
         default=EventKind.FORWARD_PRESSED, kw_only=True
@@ -187,7 +188,7 @@ class ForwardPressedEvent(PositionedEvent):
 class ReloadPressedEvent(PositionedEvent):
     """The pointer presses the viewer's reload button before the tab reloads."""
 
-    from_position: tuple[float, float] | None
+    from_position: Position | None
     duration: float
     type: Literal[EventKind.RELOAD_PRESSED] = field(
         default=EventKind.RELOAD_PRESSED, kw_only=True
@@ -208,7 +209,7 @@ class CursorEnteredEvent(PositionedEvent):
     once the control has acted; if that failed or was cancelled, `duration` is zero.
     """
 
-    to_position: tuple[float, float]
+    to_position: Position
     duration: float
     easing: Literal["easeInOutCubic"] = "easeInOutCubic"
     type: Literal[EventKind.CURSOR_ENTERED] = field(

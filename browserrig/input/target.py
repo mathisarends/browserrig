@@ -1,7 +1,13 @@
 from collections.abc import Callable
 from typing import Literal, Protocol
 
-from browserrig.core import BrowserError, CursorStyle, MouseEventKind, Point
+from browserrig.core import (
+    BrowserError,
+    CursorStyle,
+    MouseEventKind,
+    Point,
+    ViewportSize,
+)
 from browserrig.events import InputEvent
 
 type KeyEventType = Literal["keyDown", "keyUp", "rawKeyDown", "char"]
@@ -47,7 +53,7 @@ class InputTarget(Protocol):
 
     async def cancel_drag(self) -> None: ...
 
-    async def viewport_size(self) -> tuple[float, float]: ...
+    async def viewport_size(self) -> ViewportSize: ...
 
     async def cursor_style(self, point: Point) -> CursorStyle | None: ...
 

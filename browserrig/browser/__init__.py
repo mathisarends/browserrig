@@ -11,7 +11,7 @@ from .plugin import Chrome, TabChanged
 from .policy import DomainNotAllowed, NavigationPolicy
 from .receiving import DownloadReceiving
 from .setup import SessionSetup
-from .tab import Tab, validated_url
+from .tab import OpenDialog, Tab, validated_url
 from .tabs import Tabs
 
 __all__ = [
@@ -31,6 +31,7 @@ __all__ = [
     "Overlay",
     "Overlays",
     "SessionSetup",
+    "OpenDialog",
     "Tab",
     "TabChanged",
     "TabInfo",

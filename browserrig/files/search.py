@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import fnmatch
 import json
@@ -6,6 +8,7 @@ from collections.abc import Iterable
 from functools import lru_cache
 from io import StringIO
 from pathlib import Path, PurePosixPath
+from typing import NamedTuple
 
 from harnessed.plugins.filesystem import PathMatches, SearchResult
 
@@ -197,8 +200,9 @@ def _scan_file(path: Path, expression: re.Pattern[str], *, limit: int, budget: i
 
 def _scan_lines(
     lines: Iterable[str], expression: re.Pattern[str], *, limit: int, budget: int
-) -> tuple[list[tuple[int, int, str]], bool]:
-    matches, offset, consumed = [], 0, 0
+) -> tuple[list[_LineMatch], bool]:
+    matches: list[_LineMatch] = []
+    offset, consumed = 0, 0
     for number, line in enumerate(lines, 1):
         line_offset = offset
         offset += len(line)
@@ -213,7 +217,14 @@ def _scan_lines(
         preview = ("…" if start else "") + line[start:end].rstrip()
         if end < len(line.rstrip()):
             preview += "…"
-        matches.append((number, line_offset + start, preview))
+        matches.append(_LineMatch(number, line_offset + start, preview))
         if len(matches) >= limit:
             return matches, True
     return matches, False
+
+
+class _LineMatch(NamedTuple):
+    line: int
+    # Characters before the preview within the file.
+    offset: int
+    preview: str

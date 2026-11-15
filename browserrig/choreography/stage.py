@@ -1,6 +1,6 @@
 import asyncio
 
-from browserrig.core import Point, TabGesture
+from browserrig.core import Point, Position, TabGesture
 from browserrig.events import InputEvent
 from browserrig.input import InputTarget
 
@@ -34,7 +34,7 @@ class Stage:
             TabPressedEvent(
                 gesture=gesture,
                 tab_id=tab_id,
-                from_position=(position.x, position.y),
+                from_position=Position(position.x, position.y),
                 duration=PRESS_SECONDS,
                 action_id=action_id,
             )
@@ -46,7 +46,7 @@ class Stage:
     ) -> None:
         await target.emit(
             CursorEnteredEvent(
-                to_position=(position.x, position.y),
+                to_position=Position(position.x, position.y),
                 duration=ENTER_SECONDS,
                 action_id=action_id,
             )
