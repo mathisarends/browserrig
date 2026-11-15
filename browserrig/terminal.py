@@ -19,7 +19,7 @@ from harnessed.events import (
 )
 from harnessed.hooks import SessionAppended
 
-from .events import BrowserEvent, EventKind, LiveEvent
+from .events import BrowserEvent, EventKind, LiveEvent, TabEvent
 
 _METADATA = {
     "request_id",
@@ -50,7 +50,8 @@ _METADATA = {
 }
 
 type _TerminalEvent = (
-    SessionEvent
+    TabEvent
+    | SessionEvent
     | LiveEvent
     | CompactionStartedEvent
     | CompactionFinishedEvent
@@ -78,6 +79,7 @@ class TerminalEvents(Plugin):
 
     @hook(
         LiveEvent,
+        TabEvent,
         CompactionStartedEvent,
         CompactionFinishedEvent,
         ModelAttemptStartedEvent,
@@ -89,7 +91,7 @@ class TerminalEvents(Plugin):
 
 
 def _event_record(event: _TerminalEvent) -> dict[str, object]:
-    if isinstance(event, BrowserEvent | LiveEvent):
+    if isinstance(event, BrowserEvent | LiveEvent | TabEvent):
         record = asdict(event)
         # Omit page/form contents. URLs and key names remain diagnostic metadata.
         for name in ("text", "message", "value", "preview", "image_url"):

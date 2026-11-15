@@ -11,10 +11,17 @@ from cdpify import CDPCommandError
 
 from browserrig.browser import Tab
 from browserrig.core import BrowserBar, BrowserError, FileTransferDirection, Point
-from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
+from browserrig.events import (
+    InputEvent,
+    KeyboardVisibilityEvent,
+    KeyPressedEvent,
+    TabEvent,
+)
 from browserrig.input import TYPING_INTERVAL_SECONDS
 from browserrig.observation import PageSearch, close_find, find_text
+from browserrig.scripts import TargetScrollResult
 from browserrig.tools import (
+    DomScrollIntent,
     NavigateIntent,
     OpenFileIntent,
     SearchIntent,
@@ -24,9 +31,11 @@ from browserrig.tools import (
 
 from .events import (
     BarTypedEvent,
+    ElementScrolledEvent,
     FileTransferEvent,
     FindBarEvent,
     FindResultsEvent,
+    PageScrolledEvent,
     WaitingEvent,
 )
 
@@ -49,8 +58,24 @@ class Scene:
     tab: Tab
     action_id: str
 
-    async def show(self, event: InputEvent) -> None:
+    async def show(self, event: InputEvent | TabEvent) -> None:
         await self.tab.emit(replace(event, action_id=self.action_id))
+
+
+async def dom_scroll(
+    scene: Scene, intent: DomScrollIntent, step: Step
+) -> TargetScrollResult:
+    result: TargetScrollResult = await step()
+    if result.before != result.after:
+        dx = result.after.x - result.before.x
+        dy = result.after.y - result.before.y
+        receipt = (
+            ElementScrolledEvent(ref=intent.ref, delta_x=dx, delta_y=dy)
+            if intent.ref
+            else PageScrolledEvent(delta_x=dx, delta_y=dy)
+        )
+        await scene.show(receipt)
+    return result
 
 
 async def search(scene: Scene, intent: SearchIntent, step: Step) -> PageSearch:
