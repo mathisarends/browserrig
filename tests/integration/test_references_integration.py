@@ -111,15 +111,15 @@ class _CanvasCapture:
         self, tab, _report, *, screenshots, region=None, zoom=1, cursor=None
     ):
         shape = Bounds.model_validate(await evaluate(tab, "shape"))
-        width, height = await tab.viewport_size()
+        viewport = await tab.viewport_size()
         return CaptureContent(
             page=PageContent(
                 url=tab.url,
                 title=tab.title,
-                width=width,
-                height=height,
+                width=viewport.width,
+                height=viewport.height,
                 scroll_y=0,
-                page_height=height,
+                page_height=viewport.height,
                 elements=(
                     ElementInfo(
                         ref="drawing/rectangle",
