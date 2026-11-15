@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (2026-11-15)
 
 ### Breaking changes
 
@@ -21,11 +21,27 @@
   `PresentedEvent` base with `WorkPresentedEvent`. Viewers, including the
   overlay, draw only input and presented events and no longer interpret
   `Download*Event`, `FilesUploadedEvent` or `Activity*Event` facts.
-- `Choreography` republishes the resting cursor when the active tab settles on a
-  new document, so every viewer, not only the in-page overlay, can redraw it.
+- Optional flags and tuning parameters of tool methods are keyword-only when
+  called from Python: `PointerTools.click`/`click_at` (`count`, `button`,
+  `new_tab`), `PageSearchTools.search_page` (`full_page`, `start`,
+  `max_results`) and `WorkspaceTools.grep` (`limit`, `include_hidden`),
+  `write_file` (`overwrite`, `append`) and `edit_file` (`replace_all`).
+  `FileTransfer.receive` takes `browser_path=` by keyword. Agent tool calls are
+  unchanged.
+- Name the fields of fixed-length tuples. Coordinates are `Position(x, y)`,
+  aim spots `Aim(x, y)` and find-mark rectangles `Box(x, y, width, height)`;
+  all remain tuples, so unpacking and serialized receipts are unchanged.
+  `Tab.viewport_size()` and custom `InputTarget.viewport_size()` implementations
+  use `ViewportSize`; replace tuple unpacking with `.width`/`.height`.
+  `Tab.dialog` is an `OpenDialog(kind, message)`, `Motor.aim_fractions` returns `Aim`,
+  `CursorPath` has `control_point_1`/`control_point_2` instead of
+  `control_points`, and `CursorPath.curved(bend=...)` takes a `Bend`.
+  `ControlPoint` is removed in favour of `Position`.
 
 ### Changes
 
+- `Choreography` republishes the resting cursor when the active tab settles on a
+  new document, so every viewer, not only the in-page overlay, can redraw it.
 - Upgrade Harnessed and every provider/MCP/OTel extra to 0.17.0. No Browserrig
   code changes are required.
 - Add the source viewport to coordinate receipts. Cursor, pointer, wheel,
@@ -47,24 +63,13 @@
   `CursorEnteredEvent` returns the pointer into the page afterwards, at once
   when the step fails or is cancelled. Viewers that draw their own toolbar place the controls
   themselves; nothing extra is clicked in the browser.
-- Optional flags and tuning parameters of tool methods are keyword-only when
-  called from Python: `PointerTools.click`/`click_at` (`count`, `button`,
-  `new_tab`), `PageSearchTools.search_page` (`full_page`, `start`,
-  `max_results`) and `WorkspaceTools.grep` (`limit`, `include_hidden`),
-  `write_file` (`overwrite`, `append`) and `edit_file` (`replace_all`).
-  `FileTransfer.receive` takes `browser_path=` by keyword. Agent tool calls are
-  unchanged.
-- Name the fields of fixed-length tuples. Coordinates are `Position(x, y)`,
-  aim spots `Aim(x, y)` and find-mark rectangles `Box(x, y, width, height)`;
-  all remain tuples, so unpacking and serialized receipts are unchanged.
-  `Tab.viewport_size()` returns `ViewportSize`, `Tab.dialog` is an
-  `OpenDialog(kind, message)`, `Motor.aim_fractions` returns `Aim`,
-  `CursorPath` has `control_point_1`/`control_point_2` instead of
-  `control_points`, and `CursorPath.curved(bend=...)` takes a `Bend`.
-  `ControlPoint` is removed in favour of `Position`.
 
 ### Fixed
 
+- Retry a favicon download interrupted by an in-page title or icon update; a
+  cancelled load no longer leaves the icon URL cached without its image.
+- Keep HTML files checked out with LF line endings so the JavaScript format
+  check also passes on Windows with `core.autocrlf=true`.
 - `TabStrip` follows title and favicon changes made in the page without a
   navigation, including idle single-page-app updates and removed icons. The
   workaround of calling `tab.report_change(settled=not tab.loading)` after each

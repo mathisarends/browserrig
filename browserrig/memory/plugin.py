@@ -102,7 +102,7 @@ class TaskMemory(Compaction, provides=True):
         await super().setup(scope)
         if self._files is None:
             return
-        # Compatibility boundary for pinned Harnessed 0.16: wrap its existing
+        # Compatibility boundary for pinned Harnessed 0.17: wrap its existing
         # policy, retaining native budgets, usage accounting and emergency recovery.
         policy = scope[CompactionPolicy]
         summarizer = policy.summarizer or ModelSummarizer(

@@ -99,10 +99,10 @@ class _Strip:
                     if strip.icon != self.icon_url:
                         # The title should not wait for the icon.
                         await self.publish(tab)
+                        favicon = await tab.load_icon(strip.icon) if strip.icon else ""
+                        # An interrupted load must be retried on the next strip read.
                         self.icon_url = strip.icon
-                        self.favicon = (
-                            await tab.load_icon(strip.icon) if strip.icon else ""
-                        )
+                        self.favicon = favicon
                 await self.publish(tab)
         except Exception:  # pylint: disable=broad-exception-caught
             # Navigation, dialogs and detached sessions only cost the strip state.
