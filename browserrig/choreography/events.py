@@ -12,14 +12,44 @@ from browserrig.core import (
     BrowserBar,
     FileTransferDirection,
     TabGesture,
+    ViewportSize,
 )
-from browserrig.events import EventKind, InputEvent, LiveEvent
+from browserrig.events import (
+    EventKind,
+    InputEvent,
+    LiveEvent,
+    PositionedEvent,
+    TabEvent,
+)
 from browserrig.files import FileReadStatus
 from browserrig.observation import FindMark
 
 
 @dataclass(frozen=True, slots=True)
-class HighlightElementEvent(InputEvent):
+class PageScrolledEvent(TabEvent):
+    """Measured outer-document movement in CSS pixels; emitted only after movement."""
+
+    delta_x: float
+    delta_y: float
+    type: Literal[EventKind.PAGE_SCROLLED] = field(
+        default=EventKind.PAGE_SCROLLED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ElementScrolledEvent(TabEvent):
+    """Measured container movement in local CSS pixels; `ref` is observation-local."""
+
+    ref: str
+    delta_x: float
+    delta_y: float
+    type: Literal[EventKind.ELEMENT_SCROLLED] = field(
+        default=EventKind.ELEMENT_SCROLLED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class HighlightElementEvent(PositionedEvent):
     ref: str
     x: float
     y: float
@@ -62,7 +92,7 @@ class FindBarEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class FindResultsEvent(InputEvent):
+class FindResultsEvent(PositionedEvent):
     """Matches for the find bar's text, updated after each key and with the final results.
 
     `label` is the count the find bar shows. `marks` covers the text matches in the
@@ -83,7 +113,7 @@ class FindResultsEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class FileTransferEvent(InputEvent):
+class FileTransferEvent(PositionedEvent):
     """Files move into a new tab or onto a page element; the harness waits for `duration`."""
 
     direction: FileTransferDirection
@@ -97,7 +127,7 @@ class FileTransferEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class TabPressedEvent(InputEvent):
+class TabPressedEvent(PositionedEvent):
     """The pointer leaves the page and presses a control in the viewer's tab strip.
 
     The event belongs to the tab the pointer leaves, starting at `from_position`.
@@ -115,7 +145,7 @@ class TabPressedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class AddressBarFocusedEvent(InputEvent):
+class AddressBarFocusedEvent(PositionedEvent):
     """The pointer leaves the page and clicks into the viewer's address bar.
 
     Like each toolbar press below, the event belongs to the tab the pointer leaves,
@@ -132,7 +162,7 @@ class AddressBarFocusedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class BackPressedEvent(InputEvent):
+class BackPressedEvent(PositionedEvent):
     """The pointer presses the viewer's back button before the tab goes back."""
 
     from_position: tuple[float, float] | None
@@ -143,7 +173,7 @@ class BackPressedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class ForwardPressedEvent(InputEvent):
+class ForwardPressedEvent(PositionedEvent):
     """The pointer presses the viewer's forward button before the tab goes forward."""
 
     from_position: tuple[float, float] | None
@@ -154,7 +184,7 @@ class ForwardPressedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class ReloadPressedEvent(InputEvent):
+class ReloadPressedEvent(PositionedEvent):
     """The pointer presses the viewer's reload button before the tab reloads."""
 
     from_position: tuple[float, float] | None
@@ -170,7 +200,7 @@ type ToolbarPressedEvent = (
 
 
 @dataclass(frozen=True, slots=True)
-class CursorEnteredEvent(InputEvent):
+class CursorEnteredEvent(PositionedEvent):
     """After a tab or toolbar press, the pointer returns into this tab's page.
 
     It travels to `to_position`, where this tab last had the pointer; the harness waits
@@ -196,7 +226,10 @@ class WorkPhase(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class CaptureRegion:
-    """An immutable rectangle in the source tab's viewport CSS pixels."""
+    """An immutable rectangle in the source tab's viewport CSS pixels.
+
+    The receipt's `viewport` gives the size of that viewport at capture time.
+    """
 
     x: float
     y: float
@@ -233,6 +266,8 @@ class WorkPresentedEvent(LiveEvent):
     artifact_path: str = ""
     image_url: str = field(default="", repr=False)
     region: CaptureRegion | None = None
+    # The source viewport `region` lies in, measured with the capture.
+    viewport: ViewportSize | None = None
     elapsed: float = 0
     retention: float = 8
     type: Literal[EventKind.WORK_PRESENTED] = field(
@@ -246,6 +281,8 @@ class WorkPresentedEvent(LiveEvent):
 
 
 SCENE_EVENTS = (
+    PageScrolledEvent,
+    ElementScrolledEvent,
     HighlightElementEvent,
     WaitingEvent,
     BarTypedEvent,

@@ -7,11 +7,13 @@ from .events import (
     BarTypedEvent,
     CaptureRegion,
     CursorEnteredEvent,
+    ElementScrolledEvent,
     FileTransferEvent,
     FindBarEvent,
     FindResultsEvent,
     ForwardPressedEvent,
     HighlightElementEvent,
+    PageScrolledEvent,
     ReloadPressedEvent,
     TabPressedEvent,
     ToolbarPressedEvent,
@@ -25,6 +27,8 @@ from .stage import Stage
 from .tabstrip import TabStrip
 
 __all__ = [
+    "ElementScrolledEvent",
+    "PageScrolledEvent",
     "SCENE_EVENTS",
     "AddressBarFocusedEvent",
     "BackPressedEvent",

@@ -18,6 +18,7 @@ from browserrig.core import (
     BrowserCoordination,
     BrowserError,
     BrowserToolMetadata,
+    ViewportSize,
 )
 from browserrig.events import (
     INPUT_EVENTS,
@@ -40,6 +41,7 @@ from browserrig.observation import BrowserPerception
 from browserrig.secrets import Secrets
 from browserrig.tools import (
     ControlIntent,
+    DomScrollIntent,
     NavigateIntent,
     OpenFileIntent,
     Perform,
@@ -66,6 +68,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_RENDERER = IframeRenderer()
 # How each intent is staged around its step.
 _SCENES: dict[type, Callable[[scenes.Scene, Any, scenes.Step], Awaitable[Any]]] = {
+    DomScrollIntent: scenes.dom_scroll,
     SearchIntent: scenes.search,
     NavigateIntent: scenes.navigate,
     ControlIntent: scenes.press,
@@ -340,7 +343,21 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
             return
         self._state.screenshot = None
         image = snapshot.image
-        region = snapshot.geometry
+        geometry = snapshot.geometry
+        viewport = (
+            ViewportSize(width=snapshot.width, height=snapshot.height)
+            if snapshot.width > 0 and snapshot.height > 0
+            else None
+        )
+        region = (
+            CaptureRegion(
+                x=geometry.x, y=geometry.y, width=geometry.width, height=geometry.height
+            )
+            if geometry
+            else CaptureRegion(x=0, y=0, width=viewport.width, height=viewport.height)
+            if viewport
+            else receipt.region
+        )
         await self._emit_work(
             replace(
                 receipt,
@@ -352,15 +369,8 @@ class InputVisualization(Plugin, slot="browserrig.choreography"):
                 document_id=snapshot.document_id,
                 source_url=snapshot.url,
                 image_url=await asyncio.to_thread(thumbnail, image) if image else "",
-                region=CaptureRegion(
-                    x=region.x, y=region.y, width=region.width, height=region.height
-                )
-                if region
-                else CaptureRegion(
-                    x=0, y=0, width=snapshot.width, height=snapshot.height
-                )
-                if snapshot.width > 0 and snapshot.height > 0
-                else receipt.region,
+                region=region,
+                viewport=viewport or receipt.viewport,
             )
         )
 

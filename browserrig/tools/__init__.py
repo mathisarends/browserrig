@@ -9,6 +9,7 @@ from .files import BrowserFileTools, DomUploadTools, FileTools
 from .forms import FormTools
 from .intents import (
     ControlIntent,
+    DomScrollIntent,
     Intent,
     NavigateIntent,
     OpenFileIntent,
@@ -30,6 +31,7 @@ from .typing import DomTypingTools
 from .workspace import WorkspaceTools
 
 __all__ = [
+    "DomScrollIntent",
     "Targeting",
     "DomUploadTools",
     "DomTypingTools",

@@ -60,6 +60,13 @@ class WaitIntent:
     seconds: float
 
 
+@dataclass(frozen=True, slots=True)
+class DomScrollIntent:
+    """Scroll a document or container; the step returns `TargetScrollResult`."""
+
+    ref: str = ""
+
+
 type Intent = (
     ControlIntent
     | NavigateIntent
@@ -67,6 +74,7 @@ type Intent = (
     | SearchIntent
     | UploadIntent
     | WaitIntent
+    | DomScrollIntent
 )
 
 
