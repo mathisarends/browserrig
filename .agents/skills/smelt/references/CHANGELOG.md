@@ -7,6 +7,128 @@ current configuration and complete rule contracts, see the [README](README.md),
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-14
+
+Report schema 2, YAML version 1, grouped debt baseline version 2, the default
+rule set and exit codes remain unchanged. SMT343/SMT344/SMT346/SMT347 are opt-in;
+SMT345 activates through an explicit package limit. All five reviews require
+manual repairs. Update installation, hook and CI pins together to `0.8.0`
+(`v0.8.0`), refresh the editor schema and reinstall the bundled agent skill with
+`smelt skill install --force`. No baseline rewrite is required. See the
+[upgrade checklist](docs/upgrading.md#070-to-080).
+
+- Optional style review [SMT346](docs/rules/SMT346.md)
+  `prefer-deferred-annotations` reports modules that quote annotations such as
+  `list["Tab"]`. With the annotations future import or a declared Python 3.14+
+  minimum the quotes are redundant; otherwise the hint suggests adding
+  `from __future__ import annotations`. A `future_annotations: forbid` package
+  contract keeps quotes before 3.14. `Literal` values, `Annotated` metadata,
+  runtime strings such as `cast("Tab", ...)` and tests are ignored. Enable it
+  with `rules: {prefer-deferred-annotations: hint}`; no automatic rewrite.
+  Implements [#123](https://github.com/mathisarends/smelt/issues/123).
+
+- Optional review [SMT347](docs/rules/SMT347.md) `anonymous-tuple-type`
+  reports fixed-length tuple types in annotations and type aliases with three
+  or more elements or a repeated element type, such as
+  `dict[UUID, tuple[UUID, UUID, Connection]]`, and suggests a `NamedTuple` or
+  frozen dataclass. `tuple[X, ...]`, two distinct element types, quoted
+  annotations, dunder/`@override`/`@overload` signatures and tests are not
+  reported. Enable it with `rules: {anonymous-tuple-type: hint}`; no automatic
+  rewrite. Implements part of
+  [#121](https://github.com/mathisarends/smelt/issues/121).
+
+- Optional review [SMT344](docs/rules/SMT344.md) `redundant-name-alias` reports
+  a module-level name that only repeats another class or function name, such as
+  `AutofillData = PasswordData`, including `TypeAlias` and `type` statements.
+  Unions, subscripts, `Annotated`, constants, conditional fallbacks, typing
+  special forms and tests are not reported. Enable it with
+  `rules: {redundant-name-alias: hint}`; no automatic rewrite. Implements
+  [#120](https://github.com/mathisarends/smelt/issues/120).
+
+- New package policy `max_positional_parameters` limits how many parameters a
+  function or method may accept positionally; later parameters must be
+  keyword-only. [SMT345](docs/rules/SMT345.md) `excess-positional-parameters`
+  reports violations (warning). `self`/`cls`, `*args`/`**kwargs`, dunder,
+  `@overload` and `@override` definitions and tests are not counted. Enable it
+  with `structure.contracts.<name>: {match: app, max_positional_parameters: 2}`;
+  `smelt context` shows the limit. No automatic rewrite. Implements
+  [#122](https://github.com/mathisarends/smelt/issues/122).
+
+- Optional review [SMT343](docs/rules/SMT343.md) `redundant-private-delegate`
+  reports a method whose whole body returns a call to a private method of the
+  same class that receives every parameter unchanged and is used nowhere else,
+  such as `def events(...): return self._events(...)`. Validation before the
+  call, shared or decorated helpers, dunder methods, classes with bases from
+  other modules and tests are not reported. Enable it with
+  `rules: {redundant-private-delegate: hint}`; no automatic rewrite. Implements
+  [#119](https://github.com/mathisarends/smelt/issues/119).
+
+## [0.7.0] - 2026-11-14
+
+Report schema 2, YAML version 1, grouped debt baseline version 2, the default
+rule set and exit codes remain unchanged. The six new rules SMT337–SMT342 are
+opt-in; SMT341 and SMT342 are alternative `StrEnum` conventions, so enable at
+most one. Text and concise output now label details by name and list shared
+repair advice once; JSON, SARIF and GitHub output are unchanged. Update
+installation, hook and CI pins together to `0.7.0` (`v0.7.0`), refresh the
+editor schema and the installed agent skill. No baseline rewrite is required.
+See the [upgrade checklist](docs/upgrading.md#060-to-070).
+
+- Optional style rules fix how `StrEnum` values are declared.
+  [SMT341](docs/rules/SMT341.md) `str-enum-auto-values` makes `auto()` the
+  convention: it reports explicit strings equal to the lowercased member name,
+  and `auto()` members in classes that need custom values such as
+  `"mouseMoved"`. [SMT342](docs/rules/SMT342.md) `str-enum-explicit-values`
+  makes explicit strings the convention and reports every `auto()` member.
+  Enable one of them, e.g. `rules: {str-enum-auto-values: hint}`. Tests are not
+  checked; no automatic rewrite. Implements
+  [#116](https://github.com/mathisarends/smelt/issues/116).
+
+- Repair hints of SMT316, SMT320, SMT335, SMT429 and SMT430 no longer repeat the
+  member and its suggested name, which the message and the `suggested_name`
+  detail already carry; they name the target only when a collision changes it.
+  The hints are therefore shared across findings and listed once. Messages,
+  finding ids and debt identities are unchanged.
+
+- Text and concise output list repair advice repeated verbatim by several
+  findings of one rule once, under "Repairs shared by several findings", instead
+  of after every finding. Unique advice stays with its finding; JSON, SARIF and
+  GitHub output still carry the hint on each finding.
+
+- Text output labels finding details by name (`Suggested name: _hits`) instead
+  of prefixing every detail with `Expected`, and omits the constant
+  `automatic_rename` flag. JSON and SARIF are unchanged.
+
+- Optional [SMT340](docs/rules/SMT340.md) reports an awaited result passed
+  directly as a call argument, such as `Result(text=await client.read())`, and
+  suggests naming it in a local variable first (the keyword for keyword
+  arguments). Enable `rules: {await-in-call-argument: hint}`. Awaits in
+  comprehensions, lambdas, conditional expressions, boolean operators and while
+  conditions are skipped; tests are not checked; no automatic rewrite. Implements
+  [#112](https://github.com/mathisarends/smelt/issues/112).
+
+- Optional [SMT339](docs/rules/SMT339.md) reports production imports and
+  module-qualified reads of private symbols defined in analyzed project modules.
+  Enable `rules: {private-symbol-import: warning}`. Dunders, public aliases and
+  initializer re-exports under public aliases stay valid; tests remain with
+  SMT420. Respects the TYPE_CHECKING policy; renames stay manual. Implements
+  [#105](https://github.com/mathisarends/smelt/issues/105).
+
+- Optional [SMT338](docs/rules/SMT338.md), enabled with
+  `rules: {duplicate-literal-type: hint}`, finds repeated multi-value `Literal`
+  types within and across source files in the same root package. Findings group
+  locations per file and value set, preserve `Annotated` metadata boundaries,
+  and suggest a shared plain type alias. Facts are cached by file content;
+  changes to existing groups remain visible in changed checks and debt baselines.
+  Same values may describe independent concepts; no automatic rewrite is made.
+
+- Optional [SMT337](docs/rules/SMT337.md) flags `AsyncIterator[T]` return
+  annotations on `@asynccontextmanager` functions and recommends
+  `AsyncGenerator[T, None]`. Enable
+  `rules: {deprecated-async-contextmanager-return: warning}`. The decorator stays
+  supported; ordinary async iterators are unaffected. Import aliases and quoted
+  annotations are supported; rewrites remain manual.
+
 ## [0.6.0] - 2026-11-08
 
 Report schema 2, YAML version 1, grouped debt baseline version 2 and the default
@@ -635,7 +757,9 @@ smelt explain SMT313 --format json
 - Import fanout, match suggestions and missing-assertion checks are review aids;
   their default severities differ. Configure policy and severity deliberately.
 
-[Unreleased]: https://github.com/mathisarends/smelt/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/mathisarends/smelt/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/mathisarends/smelt/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/mathisarends/smelt/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/mathisarends/smelt/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/mathisarends/smelt/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/mathisarends/smelt/compare/v0.3.0...v0.4.0

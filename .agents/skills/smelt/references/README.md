@@ -22,8 +22,8 @@ uv tool install smelt-cli
 smelt init --maintainability
 ```
 
-Upgrading to 0.6.0? Follow the [upgrade checklist](docs/upgrading.md#050-to-060)
-for pins, the agent skill and the new opt-in reviews.
+Upgrading to 0.8.0? Follow the [upgrade checklist](docs/upgrading.md#070-to-080)
+for pins and the new opt-in reviews.
 
 Review the generated `smelt.yml`: it proposes a starting policy from your layout
 and selects source and test checks. You decide which conventions to adopt.
@@ -103,7 +103,7 @@ repos:
         name: smelt
         entry: smelt check --staged --fail-on warning
         language: python
-        additional_dependencies: [smelt-cli==0.6.0]
+        additional_dependencies: [smelt-cli==0.8.0]
         pass_filenames: false
         always_run: true
         require_serial: true
@@ -143,7 +143,7 @@ Add this to your `AGENTS.md` or `CLAUDE.md`:
 
 ```md
 Before editing, run `smelt context <feature-or-path>` to read the applicable policy.
-After editing, run `smelt check --changed --format json` and address new findings.
+After editing, run `smelt check --changed --format concise` and address new findings.
 Use `smelt explain <code>` for the rule's intent and repair advice.
 Run focused tests, stage your changes, then run `prek run --all-files`.
 Inspect and stage any hook fixes, and rerun until the checks pass.

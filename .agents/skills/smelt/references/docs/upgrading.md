@@ -1,5 +1,91 @@
 # Upgrading Smelt
 
+## 0.7.0 to 0.8.0
+
+0.8.0 retains report schema 2, YAML version 1, grouped debt baseline version 2,
+the default rule set and exit codes. No baseline rewrite is required. The five
+new rules require explicit selection or package policy. See the
+[changelog](../CHANGELOG.md#080---2026-11-14).
+
+### Upgrade checklist
+
+1. Update installation, dependency, hook and CI pins together:
+
+   ```bash
+   uv tool install --upgrade 'smelt-cli==0.8.0'
+   # or: python -m pip install --upgrade 'smelt-cli==0.8.0'
+   smelt --version
+   ```
+
+   Use `additional_dependencies: [smelt-cli==0.8.0]` for isolated Python hooks,
+   `rev: v0.8.0` for source hooks and `uvx --from smelt-cli==0.8.0 smelt check`
+   in CI. Run `prek install` after updating hooks.
+
+2. Refresh the editor schema with `smelt config schema > .smelt.schema.json`
+   and the agent skill with `smelt skill install --force`. Preserve local skill
+   edits first and retain `--destination` for a custom installation. Run
+   `smelt check --show-hints --fail-on warning`, plus the project's tests and
+   other checks, before relying on changed/staged comparisons.
+
+3. Adopt the new reviews deliberately:
+
+   | Rule | Activation | Review |
+   | --- | --- | --- |
+   | [SMT343](rules/SMT343.md) | `rules: {redundant-private-delegate: hint}` | Methods that only forward unchanged arguments to an exclusive private helper |
+   | [SMT344](rules/SMT344.md) | `rules: {redundant-name-alias: hint}` | Module aliases that only repeat a class or function name |
+   | [SMT345](rules/SMT345.md) | `structure.contracts.<name>: {match: app, max_positional_parameters: 2}` | Parameters beyond the package limit must be keyword-only |
+   | [SMT346](rules/SMT346.md) | `rules: {prefer-deferred-annotations: hint}` | Quoted annotations that can use deferred evaluation |
+   | [SMT347](rules/SMT347.md) | `rules: {anonymous-tuple-type: hint}` | Fixed tuple types with repeated element types or at least three fields |
+
+   Repairs remain manual. Update callers when making parameters keyword-only;
+   preserve callbacks with externally defined positional signatures. Before
+   removing aliases or delegates, review external consumers and framework hooks.
+   When adding an annotations future import, verify runtime annotation consumers.
+   A repeated tuple shape does not prove that two records describe one concept.
+
+## 0.6.0 to 0.7.0
+
+0.7.0 retains report schema 2, YAML version 1, grouped debt baseline version 2,
+the default rule set and exit codes. No baseline rewrite is required. The six
+new rules are opt-in. See the [changelog](../CHANGELOG.md#070---2026-11-14).
+
+### Upgrade checklist
+
+1. Update installation, dependency, hook and CI pins together:
+
+   ```bash
+   uv tool install --upgrade 'smelt-cli==0.7.0'
+   # or: python -m pip install --upgrade 'smelt-cli==0.7.0'
+   smelt --version
+   ```
+
+   Use `additional_dependencies: [smelt-cli==0.7.0]` for isolated Python hooks,
+   `rev: v0.7.0` for source hooks and `uvx --from smelt-cli==0.7.0 smelt check`
+   in CI. Run `prek install` after updating hooks.
+
+2. Refresh the editor schema with `smelt config schema > .smelt.schema.json` and
+   the agent skill with `smelt skill install --force` (preserve local edits
+   first). Then run `smelt check --show-hints --fail-on warning`.
+
+3. Adopt the new reviews deliberately:
+
+   | Rule | Activation | Review |
+   | --- | --- | --- |
+   | [SMT337](rules/SMT337.md) | `rules: {deprecated-async-contextmanager-return: warning}` | `AsyncIterator` returns on `@asynccontextmanager` |
+   | [SMT338](rules/SMT338.md) | `rules: {duplicate-literal-type: hint}` | Repeated multi-value `Literal` types |
+   | [SMT339](rules/SMT339.md) | `rules: {private-symbol-import: warning}` | Production access to private project symbols |
+   | [SMT340](rules/SMT340.md) | `rules: {await-in-call-argument: hint}` | Awaited results passed directly as arguments |
+   | [SMT341](rules/SMT341.md) | `rules: {str-enum-auto-values: hint}` | `StrEnum` values via `auto()` |
+   | [SMT342](rules/SMT342.md) | `rules: {str-enum-explicit-values: hint}` | `StrEnum` values as explicit strings |
+
+   SMT341 and SMT342 enforce opposite conventions; enable at most one. All
+   repairs remain manual.
+
+4. Scripts parsing text or concise output: details are now labelled by name
+   (`Suggested name: _hits`) and repair advice shared by several findings of one
+   rule is listed once under "Repairs shared by several findings". Prefer
+   `--format json` for automation; it is unchanged.
+
 ## 0.5.0 to 0.6.0
 
 0.6.0 retains report schema 2, YAML version 1, grouped debt baseline version 2,
