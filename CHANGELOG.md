@@ -25,6 +25,13 @@
   `CursorEnteredEvent` returns the pointer into the page afterwards, at once
   when the step fails or is cancelled. Viewers that draw their own toolbar place the controls
   themselves; nothing extra is clicked in the browser.
+- Optional flags and tuning parameters of tool methods are keyword-only when
+  called from Python: `PointerTools.click`/`click_at` (`count`, `button`,
+  `new_tab`), `PageSearchTools.search_page` (`full_page`, `start`,
+  `max_results`) and `WorkspaceTools.grep` (`limit`, `include_hidden`),
+  `write_file` (`overwrite`, `append`) and `edit_file` (`replace_all`).
+  `FileTransfer.receive` takes `browser_path=` by keyword. Agent tool calls are
+  unchanged.
 
 ## 0.4.0 (2026-11-14)
 

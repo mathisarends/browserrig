@@ -111,7 +111,7 @@ class DomCapture(Options):
             pixels,
             page.elements if self.marks else (),
             area,
-            scale,
+            scale=scale,
             cursor=cursor if self.cursor else None,
         )
         return CaptureContent(

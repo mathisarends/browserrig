@@ -82,7 +82,7 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         key = (*document, phase, stage, uuid4().hex if dispatch is not None else "")
         if key not in self._state.pending:
             task = asyncio.create_task(
-                self._wait(tab, phase, stage, dispatch, since),
+                self._wait(tab, phase, stage, dispatch=dispatch, since=since),
                 name="browserrig:readiness",
             )
             self._state.pending[key] = task
@@ -129,6 +129,7 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         tab: Tab,
         phase: ReadinessPhase,
         stage: ReadinessStage,
+        *,
         dispatch: Callable[[], Awaitable[None]] | None,
         since: float | None,
     ) -> ReadinessReport:

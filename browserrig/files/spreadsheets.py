@@ -355,7 +355,9 @@ def _odf_values(table, bounds: tuple[int, int, int, int]) -> Iterator[str]:
         index += repeats
         if any(cells):
             for number in range(first, last + 1):
-                yield from _odf_row_text(row, cells, number, bounds[0], bounds[2])
+                yield from _odf_row_text(
+                    row, cells, number, left=bounds[0], right=bounds[2]
+                )
         if index >= bounds[3]:
             return
 
@@ -407,7 +409,7 @@ def _odf_cell_text(cell) -> str:
 
 
 def _odf_row_text(
-    row, cells: list[str], number: int, left: int, right: int
+    row, cells: list[str], number: int, *, left: int, right: int
 ) -> Iterator[str]:
     yield f"### Row {number}\n\n"
     if row.getAttribute("visibility") in {"collapse", "filter"}:

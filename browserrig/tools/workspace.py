@@ -111,6 +111,7 @@ class WorkspaceIO(FileSystemObservation):
             ),
         ],
         pattern: str = "**/*.md",
+        *,
         limit: Annotated[int, Field(ge=1, le=500)] = 20,
         include_hidden: Annotated[
             bool, Field(description="Include hidden files and caches.")
@@ -278,6 +279,7 @@ class WorkspaceIO(FileSystemObservation):
         self,
         path: str,
         content: str,
+        *,
         overwrite: Annotated[
             bool, Field(description="Allow replacing an existing file.")
         ] = False,
@@ -312,6 +314,7 @@ class WorkspaceIO(FileSystemObservation):
             ),
         ],
         new_text: str,
+        *,
         replace_all: bool = False,
     ) -> FileEntry:
         files = self._files()

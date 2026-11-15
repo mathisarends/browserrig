@@ -434,10 +434,10 @@ class Document:  # pylint: disable=too-many-public-methods
                     x, y, width, height = bounds[box]
                     rect = (x, y, x + width, y + height)
                     own_hard = intersect(
-                        _overflow(rect, overflow_x, overflow_y, True), hard
+                        _overflow(rect, overflow_x, overflow_y, hard=True), hard
                     )
                     own_soft = intersect(
-                        _overflow(rect, overflow_x, overflow_y, False), soft
+                        _overflow(rect, overflow_x, overflow_y, hard=False), soft
                     )
             hidden[index], pinned[index] = is_hidden, is_pinned
             clip[index], scroll[index] = hard, soft
@@ -495,7 +495,7 @@ class Document:  # pylint: disable=too-many-public-methods
         return end
 
 
-def _overflow(rect: Rect, overflow_x: str, overflow_y: str, hard: bool) -> Rect:
+def _overflow(rect: Rect, overflow_x: str, overflow_y: str, *, hard: bool) -> Rect:
     clips = ("hidden", "clip") if hard else ("auto", "scroll")
     clips_x, clips_y = overflow_x in clips, overflow_y in clips
     return (

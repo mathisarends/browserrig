@@ -93,6 +93,7 @@ class PointerTools(Plugin):
         self,
         x: Annotated[float, Field(ge=0)],
         y: Annotated[float, Field(ge=0)],
+        *,
         count: _ClickCount = 1,
         button: ClickButton = "left",
         new_tab: _NewTab = False,
@@ -140,6 +141,7 @@ class PointerTools(Plugin):
     async def click(
         self,
         ref: str,
+        *,
         count: _ClickCount = 1,
         button: ClickButton = "left",
         new_tab: _NewTab = False,

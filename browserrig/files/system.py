@@ -155,7 +155,7 @@ class FileSystem:
         reader = self._reader
         assert reader is not None
         content = await asyncio.to_thread(
-            reader.read, source, request, offset, max_chars
+            reader.read, source, request, offset=offset, max_chars=max_chars
         )
         document_path = None
         try:
@@ -294,7 +294,7 @@ class FileSystem:
         reader = self._reader
         assert reader is not None
         content = await asyncio.to_thread(
-            reader.read, source, ReadRequest(**selectors), 0, 200000
+            reader.read, source, ReadRequest(**selectors), offset=0, max_chars=200000
         )
         return content.model_copy(update={"path": path})
 

@@ -319,7 +319,7 @@ async def _redact(
         image,
         tuple(element.bounds for element in changed if element.bounds is not None),
         content.area,
-        content.scale,
+        scale=content.scale,
     )
 
 

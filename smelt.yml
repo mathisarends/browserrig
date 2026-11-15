@@ -30,6 +30,8 @@ structure:
       future_annotations: when-needed
       private_modules: forbid
       type_dispatch: {style: match, min_branches: 3}
+      # Later parameters are keyword-only so call sites name their values.
+      max_positional_parameters: 4
       ordering:
         constants_exempt: true
         fix: safe-only
@@ -139,6 +141,7 @@ rules:
   redundant-private-delegate: error
   deprecated-async-contextmanager-return: error
   str-enum-explicit-values: error
+  excess-positional-parameters: error
   facade-export-gap: warning
   # Test smells
   private-test-access: error

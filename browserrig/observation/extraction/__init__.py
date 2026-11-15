@@ -353,7 +353,7 @@ class _Assembler:
             frame.id,
             entries,
             frame.transform,
-            frozenset(
+            links=frozenset(
                 ref for ref, element in elements.items() if element.role == "link"
             ),
         )

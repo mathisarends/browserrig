@@ -42,8 +42,8 @@ def annotate(
     image: str,
     elements: tuple[ElementInfo, ...],
     area: Bounds,
-    scale: float = 1,
     *,
+    scale: float = 1,
     cursor: Point | None = None,
 ) -> str:
     """Draw element refs and the cursor without inserting an overlay into the page.
@@ -98,7 +98,7 @@ def annotate(
 
 @traced
 def blackout(
-    image: str, regions: tuple[Bounds, ...], area: Bounds, scale: float = 1
+    image: str, regions: tuple[Bounds, ...], area: Bounds, *, scale: float = 1
 ) -> str:
     """Paint viewport `regions` solid black in an image of `area`, e.g. fields with secrets."""
     with Image.open(BytesIO(base64.b64decode(image))) as source:

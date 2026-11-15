@@ -57,7 +57,7 @@ class Search:
                 continue
             try:
                 found, clipped, consumed = await self._scan(
-                    entry, expression, limit - len(matches), remaining
+                    entry, expression, limit=limit - len(matches), budget=remaining
                 )
             except (OSError, UnicodeError, ValueError) as error:
                 notes.append(f"{entry.path}: not searched ({type(error).__name__}).")
@@ -113,21 +113,21 @@ class Search:
         return sorted(paths, key=lambda item: str(item.path)), False
 
     async def _scan(
-        self, entry: FileStat, expression: re.Pattern[str], limit: int, budget: int
+        self, entry: FileStat, expression: re.Pattern[str], *, limit: int, budget: int
     ):
         if isinstance(self._workspace, LocalWorkspace):
             return await asyncio.to_thread(
                 _scan_file,
                 self._workspace.host_path(entry.path),
                 expression,
-                limit,
-                budget,
+                limit=limit,
+                budget=budget,
             )
         data = await self._workspace.read_bytes(entry.path)
         if len(data) > budget:
             raise ValueError("Remote file grew beyond the remaining search byte budget")
         found, clipped = _scan_lines(
-            StringIO(data.decode("utf-8-sig")), expression, limit, budget
+            StringIO(data.decode("utf-8-sig")), expression, limit=limit, budget=budget
         )
         return found, clipped, len(data)
 
@@ -183,12 +183,12 @@ def _matches(path: tuple[str, ...], pattern: tuple[str, ...]) -> bool:
     )
 
 
-def _scan_file(path: Path, expression: re.Pattern[str], limit: int, budget: int):
+def _scan_file(path: Path, expression: re.Pattern[str], *, limit: int, budget: int):
     before = path.stat()
     if before.st_size > budget:
         raise ValueError("File grew beyond the remaining search byte budget")
     with path.open(encoding="utf-8-sig", newline="") as stream:
-        found, clipped = _scan_lines(stream, expression, limit, budget)
+        found, clipped = _scan_lines(stream, expression, limit=limit, budget=budget)
     after = path.stat()
     if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
         raise ValueError("File changed during search; search it again")
@@ -196,7 +196,7 @@ def _scan_file(path: Path, expression: re.Pattern[str], limit: int, budget: int)
 
 
 def _scan_lines(
-    lines: Iterable[str], expression: re.Pattern[str], limit: int, budget: int
+    lines: Iterable[str], expression: re.Pattern[str], *, limit: int, budget: int
 ) -> tuple[list[tuple[int, int, str]], bool]:
     matches, offset, consumed = [], 0, 0
     for number, line in enumerate(lines, 1):

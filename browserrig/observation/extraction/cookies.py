@@ -109,7 +109,9 @@ def cookie_banners(
         )
         text = _text(runs, indexes, node, document.end(node))
         context = _text(context_runs, context_indexes, node, document.end(node))
-        if not _matches(document, node, children, f"{name} {context}", text):
+        if not _matches(
+            document, node, children, context=f"{name} {context}", text=text
+        ):
             continue
         found.append(
             (
@@ -136,6 +138,7 @@ def _matches(
     document: Document,
     node: int,
     controls: list[Element],
+    *,
     context: str,
     text: str,
 ) -> bool:

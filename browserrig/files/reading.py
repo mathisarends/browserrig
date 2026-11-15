@@ -57,20 +57,28 @@ class FileReader:
         self,
         path: Path,
         request: ReadRequest,
+        *,
         offset: int,
         max_chars: int,
-        *,
         depth: int = 0,
     ) -> FileContent:
         try:
-            return self._read(path, request, offset, max_chars, depth)
+            return self._read(
+                path, request, offset=offset, max_chars=max_chars, depth=depth
+            )
         except (OSError, ValueError):
             raise
         except Exception as error:  # pylint: disable=broad-exception-caught
             raise ValueError(f"Could not read {path.name}: {error}") from error
 
     def _read(
-        self, path: Path, request: ReadRequest, offset: int, max_chars: int, depth: int
+        self,
+        path: Path,
+        request: ReadRequest,
+        *,
+        offset: int,
+        max_chars: int,
+        depth: int,
     ) -> FileContent:
         with path.open("rb") as stream:
             sample = stream.read(65536)
@@ -107,14 +115,14 @@ class FileReader:
                 raise ValueError("Image views do not accept a text offset")
             return render_image(ReadContext(path, format_, request, self.options))
         if format_ == "text":
-            return _plain_text(path, sample, offset, max_chars)
+            return _plain_text(path, sample, offset=offset, max_chars=max_chars)
         if format_ in _UNSUPPORTED or format_ == "binary":
             return _unsupported(
                 path,
                 format_,
                 "No local content reader is available for this format",
-                offset,
-                max_chars,
+                offset=offset,
+                max_chars=max_chars,
             )
         missing = _missing_module(format_)
         if missing is not None:
@@ -127,11 +135,13 @@ class FileReader:
         cached = content_path.is_file() and metadata_path.is_file()
         record(cached=cached)
         if not cached:
-            self._extract(path, format_, request, content_path, metadata_path)
+            self._extract(
+                path, format_, request, target=content_path, metadata=metadata_path
+            )
         details = FileContent.model_validate_json(
             metadata_path.read_text(encoding="utf-8")
         )
-        text = read_text(content_path, "utf-8", offset, max_chars)
+        text = read_text(content_path, "utf-8", offset=offset, max_chars=max_chars)
         return details.model_copy(
             update={
                 "text": text[:max_chars],
@@ -146,6 +156,7 @@ class FileReader:
         path: Path,
         format_: str,
         request: ReadRequest,
+        *,
         target: Path,
         metadata: Path,
     ) -> None:
@@ -229,8 +240,8 @@ class FileReader:
         result = self.read(
             extracted,
             replace(request, member=nested if separator else None),
-            offset,
-            max_chars,
+            offset=offset,
+            max_chars=max_chars,
             depth=depth + 1,
         )
         return result.model_copy(update={"path": str(path), "member": request.member})
@@ -250,7 +261,7 @@ class FileReader:
             with NamedTemporaryFile(dir=directory, delete=False) as stream:
                 temporary = Path(stream.name)
                 name = containers.copy_entry(
-                    path, format_, member, stream, self.options.max_expanded_bytes
+                    path, format_, member, stream, limit=self.options.max_expanded_bytes
                 )
             if key != self._key(path, ReadRequest(member=member)):
                 raise ValueError(
@@ -307,10 +318,12 @@ class FileReader:
         return spec.load()(ReadContext(path, format_, request, self.options))
 
 
-def _plain_text(path: Path, sample: bytes, offset: int, max_chars: int) -> FileContent:
+def _plain_text(
+    path: Path, sample: bytes, *, offset: int, max_chars: int
+) -> FileContent:
     encoding = text_encoding(sample)
     if encoding is not None:
-        result = text_result(path, encoding, offset, max_chars)
+        result = text_result(path, encoding, offset=offset, max_chars=max_chars)
         return result.model_copy(
             update={
                 "media_type": mimetypes.guess_type(path.name)[0] or "text/plain",
@@ -320,8 +333,8 @@ def _plain_text(path: Path, sample: bytes, offset: int, max_chars: int) -> FileC
         path,
         "text",
         "The file contains binary data or an unrecognized text encoding",
-        offset,
-        max_chars,
+        offset=offset,
+        max_chars=max_chars,
     )
 
 
@@ -430,8 +443,8 @@ def _without_reader(
     reason = FILES_MISSING.format(format=format_, module=module)
     encoding = text_encoding(sample)
     if encoding is None:
-        return _unsupported(path, format_, reason, offset, max_chars)
-    result = text_result(path, encoding, offset, max_chars)
+        return _unsupported(path, format_, reason, offset=offset, max_chars=max_chars)
+    result = text_result(path, encoding, offset=offset, max_chars=max_chars)
     return result.model_copy(
         update={
             "media_type": mimetypes.guess_type(path.name)[0] or "text/plain",
@@ -443,7 +456,7 @@ def _without_reader(
 
 
 def _unsupported(
-    path: Path, format_: str, reason: str, offset: int, max_chars: int
+    path: Path, format_: str, reason: str, *, offset: int, max_chars: int
 ) -> FileContent:
     text = f"Name: {path.name}\nSize: {path.stat().st_size} bytes\nFormat: {format_}"
     return FileContent(
