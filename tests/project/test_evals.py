@@ -380,14 +380,15 @@ def test_comparison_still_reports_real_regressions():
     assert "100% ->  50%" in comparison
 
 
-def test_comparison_names_the_page_text_arms():
+def test_comparison_names_the_observation_arms():
     before = _benchmark([_record("demo")])
     current = _benchmark([_record("demo", "fail", 0.5)])
     current.page_text = PageText.OFF
+    current.landmarks = False
 
     comparison = report.compare(current, before)
 
-    assert "page text inline -> off" in comparison
+    assert "observation text=inline -> text=off, no landmarks" in comparison
     assert "WORSE" in comparison
 
 

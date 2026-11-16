@@ -16,15 +16,21 @@ class Renderer(Protocol):
 class DomRenderer:
     # Describes the text a capture supplies; custom captures promise none by default.
     text: PageText = PageText.OFF
+    landmarks: bool = True
     marks: bool = True
 
     def instructions(self, screenshots: Screenshots) -> str:
         # The observation labels its own sections (previews, overlays, canvases, deltas);
         # this only explains what the labels cannot.
+        groups = (
+            'landmarks like [MAIN] and groups like <form "Login">'
+            if self.landmarks
+            else 'groups like <form "Login">'
+        )
         text = (
             "Each observation starts with a page header, then lists interactive elements "
             'one per line as `[ref] role "name" states value=... -> link`, grouped under '
-            'landmarks like [MAIN] and groups like <form "Login">. A leading * marks elements '
+            f"{groups}. A leading * marks elements "
             "new since the previous observation. Inside iframes, above/below previews refer to "
             "the frame's viewport. An element with scroll(up=..., down=...) is an inner scroll "
             "container; use scroll_element(ref=...) for that panel and scroll_page for the page. "

@@ -62,13 +62,16 @@ def test_report_uses_local_membership_and_rejects_mixed_subsets(tmp_path):
         build([path, original], tmp_path / "mixed.html", {}, "revision")
 
 
-@pytest.mark.parametrize("setting", [{"max_steps": 100}, {"page_text": PageText.OFF}])
+@pytest.mark.parametrize(
+    "setting",
+    [{"max_steps": 100}, {"page_text": PageText.OFF}, {"headings": False}],
+)
 def test_report_rejects_incompatible_settings(tmp_path, setting):
     paths = [tmp_path / "one.json", tmp_path / "two.json"]
     write_run(paths[0], _run([]))
     write_run(paths[1], _run([]).model_copy(update=setting))
 
-    with pytest.raises(ValueError, match="budgets or page text"):
+    with pytest.raises(ValueError, match="budgets or observations"):
         build(paths, tmp_path / "report.html", {}, "revision")
 
 

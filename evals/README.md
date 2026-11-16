@@ -133,7 +133,9 @@ uv run --no-sync python -m evals.run --tasks 29,106,116 --headed
 uv run --no-sync python -m evals.run --tasks @retrieve --repeat 2
 
 # A/B arm without prose between controls; compare with a default inline run.
-uv run --no-sync python -m evals.run --page-text off --label controls-only
+uv run --no-sync python -m evals.run --page-text off --label no-prose
+# Only controls and their labels: no prose, headings or landmarks.
+uv run --no-sync python -m evals.run --page-text off --no-headings --no-landmarks --label controls-only
 ```
 
 Default authentication uses the existing subscription provider `openai-codex`,
@@ -145,8 +147,9 @@ GPT-6.1 Terra uses the same model profile as regular Browserrig agents: a
 at 70%, compaction at 80%, two retained steps, a 40% input target and an
 8,192-token summary ceiling. New result files record `context_window`,
 `reserve_tokens`, `keep_last_steps`, `target_ratio` and `max_summary_tokens`,
-plus `page_text`. Older baselines without these fields keep their original
-meaning; a missing `page_text` means `inline`.
+plus `page_text`, `headings` and `landmarks`. Older baselines without these
+fields keep their original meaning; missing observation fields mean inline
+text with headings and landmarks.
 There is no automatic fallback between providers.
 
 Each attempt recreates its websites, signs into the public benchmark accounts,

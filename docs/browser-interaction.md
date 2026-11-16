@@ -69,11 +69,21 @@ include nearby previews up to 1,000 CSS pixels beyond the viewport; set
 `viewport_expansion=0` for a strict viewport. Hidden, inert and clipped content is
 excluded. Cookie-banner detection is heuristic and makes no consent choice.
 
-`DomCapture(text=PageText.INLINE)` interleaves visible text with controls
-within `max_text_chars`. `PageText.SPARSE` adds text only when the viewport
-shows fewer than five named controls; `PageText.OFF` keeps control names,
-headings and landmarks without prose, and `search_page` still reads the page.
-`max_elements=...` bounds controls. `marks=False` removes screenshot reference marks, and `cursor=True`
+Observations always list controls with their labels. `DomCapture` adds the
+rest explicitly:
+
+```python
+DomCapture(
+    text=PageText.INLINE,  # prose beside controls; SPARSE or OFF
+    max_text_chars=3000,
+    headings=True,         # lines such as `## Pricing`
+    landmarks=True,        # regions such as [MAIN] grouping their controls
+)
+```
+
+`PageText.SPARSE` adds prose only when the viewport shows fewer than five named
+controls; `search_page` still reads all text when prose is off. Dialogs and
+cookie banners stay grouped. `max_elements=...` bounds controls. `marks=False` removes screenshot reference marks, and `cursor=True`
 adds a cursor marker. Unsupported frames and extraction limits are reported.
 Perspective-transformed frames remain unsupported.
 

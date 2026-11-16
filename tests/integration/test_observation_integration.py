@@ -100,6 +100,32 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
         ).disabled
 
 
+async def test_controls_only_capture_keeps_labels_and_dialogs(site):
+    async with ChromeBrowser(Launch(url=site)) as browser:
+        tab = browser.active_tab
+        await wait_for_page(tab)
+        await evaluate(
+            tab,
+            """document.body.innerHTML = `
+            <nav aria-label=Primary><a href='/plans'>Plans</a></nav>
+            <main><h2>Pricing</h2><p>Every plan renews monthly.</p>
+            <label>Seats<input type=number></label><button>Buy</button></main>
+            <div role=dialog aria-label=Plan><button>Close</button></div>`;
+        """,
+        )
+        report = await wait_for_page(tab)
+        controls = DomCapture(text=PageText.OFF, headings=False, landmarks=False)
+        text = render(await capture(tab, controls, report))
+        for expected in ('link "Plans"', '"Seats"', 'button "Buy"'):
+            assert expected in text
+        assert "[DIALOG: Plan]" in text
+        for omitted in ("[NAVIGATION", "[MAIN]", "Pricing", "renews monthly"):
+            assert omitted not in text
+        full = render(await capture(tab, DomCapture(), report))
+        for expected in ("[NAVIGATION: Primary]", "[MAIN]", "## Pricing", "renews"):
+            assert expected in full
+
+
 async def test_element_names_come_from_chrome_accessibility_tree(site):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab

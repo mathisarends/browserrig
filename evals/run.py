@@ -52,6 +52,8 @@ def _parser() -> argparse.ArgumentParser:
         default=PageText.INLINE,
         help="Prose in observations; compare arms such as inline and off",
     )
+    parser.add_argument("--no-headings", dest="headings", action="store_false")
+    parser.add_argument("--no-landmarks", dest="landmarks", action="store_false")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA)
     parser.add_argument(
@@ -128,6 +130,8 @@ async def main() -> None:
                 max_steps=args.max_steps,
                 timeout=args.timeout,
                 page_text=args.page_text,
+                headings=args.headings,
+                landmarks=args.landmarks,
                 tasks=[],
                 **(asdict(profile) if profile is not None else {}),
             )
@@ -140,7 +144,13 @@ async def main() -> None:
                     args.humanlike,
                     (
                         *plugins,
-                        DomPerception(capture=DomCapture(text=args.page_text)),
+                        DomPerception(
+                            capture=DomCapture(
+                                text=args.page_text,
+                                headings=args.headings,
+                                landmarks=args.landmarks,
+                            )
+                        ),
                     ),
                     args.max_steps,
                     args.timeout,

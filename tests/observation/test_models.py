@@ -302,6 +302,14 @@ def test_observation_instructions_follow_captured_page_text(text, expected):
     assert ("[label][ref]" in instructions) == (text != PageText.OFF)
 
 
+@pytest.mark.parametrize("landmarks", [True, False])
+def test_observation_instructions_mention_landmarks_only_when_captured(landmarks):
+    observe = DomPerception(capture=DomCapture(landmarks=landmarks))
+    instructions = observe.renderer.instructions(observe.screenshots)
+    assert ("landmarks like [MAIN]" in instructions) == landmarks
+    assert '<form "Login">' in instructions
+
+
 def _snapshot(*elements: Element, **fields) -> Snapshot:
     return Snapshot(
         id="observation",
