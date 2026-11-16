@@ -377,13 +377,11 @@ def _format(path: Path, sample: bytes) -> str:
                         return type_
             return Ext.ZIP
     if sample.startswith(b"\xd0\xcf\x11\xe0"):
-        return (
-            Ext.XLS
-            if suffix == Ext.XLS
-            else suffix
-            if suffix in _UNSUPPORTED
-            else "binary"
-        )
+        if suffix == Ext.XLS:
+            return Ext.XLS
+        if suffix in _UNSUPPORTED:
+            return suffix
+        return "binary"
     if suffix in {Ext.TAR, Ext.TGZ, Ext.TBZ2, Ext.TXZ, Ext.GZ, Ext.BZ2, Ext.XZ}:
         if tarfile.is_tarfile(path):
             return Ext.TAR

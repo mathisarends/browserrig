@@ -150,7 +150,7 @@ returns the page as typed Markdown.
 
 `execute_javascript(code=...)` evaluates in the active tab's main context, supports
 top-level `await`, and keeps variables until navigation. Return plain objects for
-JSON results. The timeout defaults to 10 seconds, with a maximum of 30; pending
+JSON results. `timeout_seconds` defaults to 10, with a maximum of 30; pending
 asynchronous effects can outlive a timeout. Inspect the page before retrying.
 `Secrets` and `AllowedDomains` disable this tool while mounted.
 

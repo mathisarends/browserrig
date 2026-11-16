@@ -107,9 +107,9 @@ function createChoreographyKeyboard(ui) {
       }
     }
     ui.panel('keyboard', true);
-    ui.later('keys', clear, Math.max(110, (event.duration || 0) * 1000));
+    ui.later('keys', clear, Math.max(110, (event.duration_seconds || 0) * 1000));
     if (!typing) {
-      ui.hide('keyboard', Math.max(800, (event.duration || 0) * 1000 + 180));
+      ui.hide('keyboard', Math.max(800, (event.duration_seconds || 0) * 1000 + 180));
     }
   };
   const show = (event) => {

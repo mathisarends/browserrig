@@ -40,13 +40,12 @@ def read_container(context: ReadContext) -> ParsedContent:
                 count = 0
                 for entry in _tar_entries(archive, limit):
                     count += 1
-                    kind = (
-                        "file"
-                        if entry.isfile()
-                        else "directory"
-                        if entry.isdir()
-                        else "link or special entry"
-                    )
+                    if entry.isfile():
+                        kind = "file"
+                    elif entry.isdir():
+                        kind = "directory"
+                    else:
+                        kind = "link or special entry"
                     yield f"- {cell_text(entry.name)} ({entry.size} bytes; {kind})\n"
                 details.entry_count = count
         elif format_ == Ext.MBOX:
@@ -119,7 +118,8 @@ def copy_entry(
 
 
 class _ByteSource(Protocol):
-    def read(self, size: int = -1, /) -> bytes: ...
+    def read(self, size: int = -1, /) -> bytes:
+        """Read up to `size` bytes, all for -1; return empty bytes at EOF."""
 
 
 def _copy(source: _ByteSource, target: IO[bytes], limit: int) -> None:

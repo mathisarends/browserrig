@@ -28,9 +28,9 @@ class JavaScriptTools(Plugin):
                 description="Supports top-level await; await promises and return serializable data."
             ),
         ],
-        timeout: Annotated[
+        timeout_seconds: Annotated[
             float, Field(gt=0, le=30, description="Execution timeout in seconds.")
         ] = 10,
     ) -> Effect:
-        result = await self._actions.tab.evaluate(code, timeout=timeout)
+        result = await self._actions.tab.evaluate(code, timeout_seconds=timeout_seconds)
         return Effect(f"JavaScript result:\n{result}")

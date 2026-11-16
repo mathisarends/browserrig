@@ -167,14 +167,17 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
         )
         if not any(spans):
             # A session containing only waits still gets a brief view of its final page.
-            duration = self._segments[-1].ended_at - self._segments[-1].started_at
+            duration_seconds = (
+                self._segments[-1].ended_at - self._segments[-1].started_at
+            )
             frame_duration = 1 / self.frame_rate
             spans = (
                 *spans[:-1],
                 # Native capture can finish within one monotonic clock tick.
                 (
                     Span(
-                        max(0, duration - frame_duration), max(duration, frame_duration)
+                        max(0, duration_seconds - frame_duration),
+                        max(duration_seconds, frame_duration),
                     ),
                 ),
             )

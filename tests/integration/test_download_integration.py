@@ -501,7 +501,7 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
         plugins=[
             Files(LocalWorkspace(tmp_path)),
             DomPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
-            Readiness(options=ReadinessOptions(timeout=3)),
+            Readiness(options=ReadinessOptions(timeout_seconds=3)),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     ).run("Preview the PDF and return to the original tab", max_steps=3)

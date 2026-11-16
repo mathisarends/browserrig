@@ -19,11 +19,11 @@ _GENTLE = Bend(0.06, 0.04)
 
 @dataclass(frozen=True, slots=True)
 class CursorPath:
-    """One eased cubic Bézier stroke of the pointer, taking `duration` seconds."""
+    """One eased cubic Bézier stroke of the pointer, taking `duration_seconds` seconds."""
 
     start: Point
     end: Point
-    duration: float
+    duration_seconds: float
     control_point_1: Position
     control_point_2: Position
 
@@ -32,7 +32,7 @@ class CursorPath:
         cls,
         start: Point,
         end: Point,
-        duration: float,
+        duration_seconds: float,
         *,
         bend: Bend = _GENTLE,
     ) -> Self:
@@ -51,7 +51,7 @@ class CursorPath:
         return cls(
             start,
             end,
-            duration,
+            duration_seconds,
             control_point_1=bounded(
                 start.x + dx * 0.3 - dy * bend.first,
                 start.y + dy * 0.3 + dx * bend.first,
@@ -64,7 +64,7 @@ class CursorPath:
 
     @property
     def steps(self) -> int:
-        return max(1, math.ceil(self.duration / _FRAME_INTERVAL_SECONDS))
+        return max(1, math.ceil(self.duration_seconds / _FRAME_INTERVAL_SECONDS))
 
     def point(self, progress: float) -> Point:
         t = _ease(progress)
@@ -84,8 +84,8 @@ class CursorPath:
 
 def movement(start: Point, end: Point) -> CursorPath:
     distance = math.hypot(end.x - start.x, end.y - start.y)
-    duration = min(0.6, max(0.08, 0.05 + 0.075 * math.log2(distance / 20 + 1)))
-    return CursorPath.curved(start, end, duration if distance >= 2 else 0)
+    duration_seconds = min(0.6, max(0.08, 0.05 + 0.075 * math.log2(distance / 20 + 1)))
+    return CursorPath.curved(start, end, duration_seconds if distance >= 2 else 0)
 
 
 def _ease(progress: float) -> float:

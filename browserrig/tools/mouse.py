@@ -122,14 +122,14 @@ class PointerTools(Plugin):
         self,
         start: Point,
         end: Point,
-        duration: Annotated[
+        duration_seconds: Annotated[
             float, Field(ge=0.05, le=5, description="Drag duration in seconds.")
         ] = 0.5,
     ) -> Effect:
         await self._input.mouse.drag(
             start=_image_point(self._observe.coordinate_source(), start),
             end=_image_point(self._observe.coordinate_source(), end),
-            duration=duration,
+            duration_seconds=duration_seconds,
         )
         return Effect("Drag dispatched; inspect the destination.")
 
@@ -184,7 +184,7 @@ class PointerTools(Plugin):
         self,
         source_ref: str,
         target_ref: str,
-        duration: Annotated[
+        duration_seconds: Annotated[
             float, Field(ge=0.05, le=5, description="Drag duration in seconds.")
         ] = 0.5,
     ) -> Effect:
@@ -196,7 +196,9 @@ class PointerTools(Plugin):
             self._targets.locate(ref=source_ref, scroll=False),
             self._targets.locate(ref=target_ref, scroll=False),
         )
-        await self._input.mouse.drag(start=start, end=end, duration=duration)
+        await self._input.mouse.drag(
+            start=start, end=end, duration_seconds=duration_seconds
+        )
         return Effect(
             "Drag dispatched; inspect the destination.",
             prepared_scroll=prepared.scrolled or target.scrolled,

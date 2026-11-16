@@ -169,7 +169,7 @@ class CursorMovedEvent(PositionedEvent):
     to_position: Position
     control_point_1: Position
     control_point_2: Position
-    duration: float
+    duration_seconds: float
     easing: Literal["easeInOutCubic"] = "easeInOutCubic"
     type: Literal[EventKind.CURSOR_MOVED] = field(
         default=EventKind.CURSOR_MOVED, kw_only=True
@@ -222,7 +222,7 @@ class PointerReleasedEvent(PositionedEvent):
 class KeyPressedEvent(InputEvent):
     key: str
     modifiers: tuple[str, ...] = ()
-    duration: float = 0
+    duration_seconds: float = 0
     type: Literal[EventKind.KEY_PRESSED] = field(
         default=EventKind.KEY_PRESSED, kw_only=True
     )
@@ -244,7 +244,7 @@ class ScrollStartedEvent(PositionedEvent):
     y: float
     delta_x: float
     delta_y: float
-    duration: float
+    duration_seconds: float
     type: Literal[EventKind.SCROLL_STARTED] = field(
         default=EventKind.SCROLL_STARTED, kw_only=True
     )
@@ -256,7 +256,7 @@ class ScrolledEvent(PositionedEvent):
     y: float
     delta_x: float
     delta_y: float
-    duration: float
+    duration_seconds: float
     type: Literal[EventKind.SCROLLED] = field(default=EventKind.SCROLLED, kw_only=True)
 
 
@@ -567,7 +567,7 @@ class ReadinessEndedEvent(BrowserEvent):
     readiness_id: str
     phase: ReadinessPhase
     stage: ReadinessStage = field(default=ReadinessStage.ONGOING, kw_only=True)
-    duration: float
+    duration_seconds: float
     reason: str = ""
     timed_out: bool = False
 

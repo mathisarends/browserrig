@@ -7,6 +7,152 @@ current configuration and complete rule contracts, see the [README](README.md),
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-16
+
+Report schema 2, YAML version 1, grouped debt baseline version 2, the default
+rule set and exit codes remain unchanged. The two new reviews require explicit
+selection and have no automatic rewrites. Update installation, hook and CI pins
+together to `0.10.0` (`v0.10.0`), refresh the editor schema and reinstall the
+bundled agent skill with `smelt skill install --force`. No baseline rewrite is
+required. See the [upgrade checklist](docs/upgrading.md#090-to-0100).
+
+- Optional design review [SMT361](docs/rules/SMT361.md) `parallel-record-fields`
+  reports declared sequence fields of the same instance paired with `zip`, once
+  per class and field group, with declaration and use locations. It recognizes
+  import aliases, simple field aliases and `strict=True`. Local sequences and
+  different receivers remain valid; deliberate column storage can keep reasoned
+  suppressions. Enable `rules: {parallel-record-fields: hint}`; no automatic rewrite.
+  Implements [#155](https://github.com/mathisarends/smelt/issues/155).
+- Optional performance review [SMT362](docs/rules/SMT362.md)
+  `loop-invariant-collection` groups repeated membership-set comprehensions in
+  passive `for` loops when tuple literals or explicit immutable tuple/frozen-record
+  declarations establish stable inputs. Unknown calls, mutable inputs, properties
+  and suspension points stay quiet. Enable `rules: {loop-invariant-collection: hint}`.
+  No automatic hoisting: preserve guards, empty loops and evaluation order. The
+  initial scope requires local standard-library dataclasses and plain field types;
+  Pydantic snapshots and `Annotated` fields remain outside its inference limits.
+  Initial scope for [#154](https://github.com/mathisarends/smelt/issues/154).
+
+## [0.9.0] - 2026-11-16
+
+Report schema 2, YAML version 1, grouped debt baseline version 2, the default
+rule set and exit codes remain unchanged. The thirteen new reviews require
+explicit selection or package policy and have no automatic rewrites. Update
+installation, hook and CI pins together to `0.9.0` (`v0.9.0`), refresh the editor
+schema and reinstall the bundled agent skill with `smelt skill install --force`.
+No baseline rewrite is required. See the
+[upgrade checklist](docs/upgrading.md#080-to-090).
+
+- Optional ownership review [SMT360](docs/rules/SMT360.md)
+  `mutable-field-in-frozen-dataclass` reports directly annotated `dict`, `list`
+  and `set` instance fields on explicitly frozen dataclasses, including import
+  aliases. Review mutability and caller aliases; `Mapping` alone freezes nothing
+  and a mapping proxy needs a defensive copy to isolate the caller's dictionary.
+  Enable `rules: {mutable-field-in-frozen-dataclass: warning}`; no automatic rewrite.
+  Implements [#153](https://github.com/mathisarends/smelt/issues/153).
+- Optional style review [SMT359](docs/rules/SMT359.md)
+  `nested-conditional-expression` reports direct nesting in either result branch,
+  once per outermost chain. Use explicit `if/elif` or `match` while preserving lazy
+  evaluation. Simple fallbacks and independent conditionals remain valid. Enable
+  `rules: {nested-conditional-expression: hint}`; no automatic rewrite. Implements
+  [#152](https://github.com/mathisarends/smelt/issues/152).
+- Optional review [SMT348](docs/rules/SMT348.md) `missing-interface-docstring`
+  reports `@abstractmethod` and `typing.Protocol` methods whose body is only
+  `...`, `pass` or `raise NotImplementedError` and which have no docstring, so
+  ports state their contract where implementers read it. Default
+  implementations, `@overload`/`@override` signatures, property setters,
+  dunders other than `__call__` and tests are ignored. Enable it with
+  `rules: {missing-interface-docstring: hint}`; no automatic rewrite.
+  Implements [#127](https://github.com/mathisarends/smelt/issues/127).
+- Optional review [SMT349](docs/rules/SMT349.md) `stateful-dataclass` reports
+  a `@dataclass` that is not `frozen=True` when a method other than
+  `__post_init__` assigns, deletes or augments an attribute of `self`, writes
+  an item of a field, calls a mutating container method on a field declared as
+  a mutable container, or calls `setattr` on `self`. Build values before
+  construction and freeze the dataclass, or keep accumulation in a plain class
+  with private attributes. Mutations through other objects and tests are
+  ignored. Enable it with `rules: {stateful-dataclass: hint}`; no automatic
+  rewrite. Implements [#133](https://github.com/mathisarends/smelt/issues/133).
+- Optional review [SMT350](docs/rules/SMT350.md) `missing-broad-except-reason`
+  reports `except Exception`, `except BaseException`, tuples containing them
+  and bare `except:` handlers without a comment explaining why they catch
+  everything. Comments on the `except` line, directly above it or before or on
+  the first body statement count; linter directives such as `noqa` or
+  `pylint: disable` alone do not. Handlers that always re-raise and tests are
+  ignored. Enable it with `rules: {missing-broad-except-reason: hint}`; no
+  automatic rewrite. Implements
+  [#143](https://github.com/mathisarends/smelt/issues/143).
+- Package contracts accept `dataclass_options`, a list of `frozen`, `slots`
+  and `kw_only`. Policy rule [SMT351](docs/rules/SMT351.md)
+  `missing-dataclass-option` then reports production `@dataclass` classes
+  that do not set each listed option to `True`. Missing `slots` is not
+  reported below bases from outside the project or for classes with a
+  `functools.cached_property`. The closest package policy wins, `[]` lifts an
+  outer requirement and `smelt context` shows the policy. Tests are not
+  checked; no automatic rewrite. Implements
+  [#137](https://github.com/mathisarends/smelt/issues/137).
+- Optional review [SMT355](docs/rules/SMT355.md) `duplicate-class-name`
+  reports public top-level classes whose name is also defined at the top level
+  of another module in the same package, counting the package's `__init__.py`.
+  Each definition gets a finding with the other locations. Re-exports, private
+  and nested classes, separate packages and tests are not compared. Enable it
+  with `rules: {duplicate-class-name: warning}`; no automatic rewrite.
+  Implements [#138](https://github.com/mathisarends/smelt/issues/138).
+- Optional review [SMT356](docs/rules/SMT356.md) `duplicate-narrowing-assert`
+  reports, once per class and expression, `assert self.<attribute> is not None`
+  or `assert isinstance(self.<attribute>, ...)` repeated in at least two methods
+  of the same class, including each operand of an `and`. Single local
+  narrowings, asserts in nested functions, static methods and tests are not
+  reported. Make the attribute required during construction or read it through
+  one property that raises a meaningful error. Enable it with
+  `rules: {duplicate-narrowing-assert: warning}`; no automatic rewrite.
+  Implements [#142](https://github.com/mathisarends/smelt/issues/142).
+- Optional review [SMT352](docs/rules/SMT352.md) `duplicate-function` reports
+  module-level functions whose parameters, annotations, decorators and body
+  match another function in the same root package, ignoring names,
+  docstrings, comments and formatting. Every copy gets a finding listing the
+  others and their nearest common package. Bodies under three statements,
+  methods, nested functions and tests are ignored. Enable it with
+  `rules: {duplicate-function: warning}`; no automatic rewrite. Implements
+  [#140](https://github.com/mathisarends/smelt/issues/140).
+- Optional review [SMT357](docs/rules/SMT357.md) `missing-duration-unit`
+  reports module constants, class fields and parameters named `*timeout`,
+  `*delay`, `*interval`, `*duration` or `*wait` that hold an `int` or `float`
+  without a unit suffix, such as `_FRAME_TIMEOUT = 2.0`. Names ending in a
+  unit (`_TIMEOUT_SECONDS`, `quiet_ms`), `timedelta` values, `@overload` and
+  `@override` signatures and tests are not reported. Enable it with
+  `rules: {missing-duration-unit: warning}`; no automatic rewrite.
+- Optional review [SMT358](docs/rules/SMT358.md) `prefer-named-duration`
+  reports `int` and `float` literals passed as the duration of
+  `asyncio.timeout`, `asyncio.sleep`, `asyncio.wait_for`, `asyncio.wait`,
+  `time.sleep` and the anyio and trio sleep and timeout scopes, and literals
+  added to a clock reading such as `loop.time() + 10`. `sleep(0)` and tests
+  are not reported. Enable it with `rules: {prefer-named-duration: warning}`;
+  no automatic rewrite. Together with SMT357 implements
+  [#135](https://github.com/mathisarends/smelt/issues/135).
+- Package contracts accept `bases`, a mapping from an outside base class to
+  the project base that replaces it, e.g.
+  `{pydantic.BaseModel: app.core.Options}`. Policy rule
+  [SMT353](docs/rules/SMT353.md) `prefer-project-base-class` then reports
+  production classes that inherit the outside base directly, resolved through
+  imports, aliases and module attributes. Only inheritance is judged:
+  importing the outside base for annotations, `isinstance` or adapters stays
+  valid. The module defining the project base is exempt, the closest package
+  policy wins, `{}` lifts an outer mapping and `smelt context` shows the
+  policy. Tests are not checked; no automatic rewrite. Implements
+  [#139](https://github.com/mathisarends/smelt/issues/139).
+- Package contracts accept `errors: {base: <qualified exception>, allow: [...]}`.
+  Policy rule [SMT354](docs/rules/SMT354.md) `prefer-domain-exception` then
+  reports production code that raises a builtin exception class instead of
+  the project hierarchy, including `raise ValueError(...) from error`.
+  `NotImplementedError`, `StopIteration`, `StopAsyncIteration`,
+  `GeneratorExit`, `KeyboardInterrupt` and `SystemExit` are always allowed and
+  `allow` adds more. Bare re-raises, names shadowing a builtin, protocol dunder
+  methods such as `__getattr__` and pydantic validators are not reported. The
+  closest package policy wins, `errors: {}` lifts an outer policy and
+  `smelt context` shows it. Tests are not checked; no automatic rewrite.
+  Implements [#141](https://github.com/mathisarends/smelt/issues/141).
+
 ## [0.8.0] - 2026-11-14
 
 Report schema 2, YAML version 1, grouped debt baseline version 2, the default
@@ -757,7 +903,9 @@ smelt explain SMT313 --format json
 - Import fanout, match suggestions and missing-assertion checks are review aids;
   their default severities differ. Configure policy and severity deliberately.
 
-[Unreleased]: https://github.com/mathisarends/smelt/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/mathisarends/smelt/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/mathisarends/smelt/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/mathisarends/smelt/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/mathisarends/smelt/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/mathisarends/smelt/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/mathisarends/smelt/compare/v0.5.0...v0.6.0

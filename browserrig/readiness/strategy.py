@@ -18,7 +18,7 @@ class ReadinessStrategy(ABC):
     def __init__(self, tab: Tab, options: ReadinessOptions) -> None:
         self._tab = tab
         self._options = options
-        self.delay = options.poll_interval
+        self.delay = options.poll_interval_seconds
         self.reason = ""
 
     @abstractmethod

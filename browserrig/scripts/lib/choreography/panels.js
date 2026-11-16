@@ -51,7 +51,7 @@ function createChoreographyPanels(ui, caption) {
     ui.panel('navigation', true);
     const bounds = ui.node('navigation').getBoundingClientRect();
     highlight({x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height});
-    ui.hide('navigation', event.duration * 1000 + 700);
+    ui.hide('navigation', event.duration_seconds * 1000 + 700);
   };
   const icons = {
     back: 'M16 10H4 M9 5l-5 5 5 5',
@@ -102,7 +102,7 @@ function createChoreographyPanels(ui, caption) {
       typed({text: '', key: ''});
       return;
     }
-    press(control, undefined, event.duration * 1000 + 900);
+    press(control, undefined, event.duration_seconds * 1000 + 900);
   };
   const show = (event) => {
     const kinds = ui.options().events;
@@ -142,9 +142,9 @@ function createChoreographyPanels(ui, caption) {
             kind: ui.options().actions.WAIT,
             phase: ui.options().phases.RUNNING,
             title: 'Waiting',
-            detail: `${event.duration.toFixed(1)} s`,
+            detail: `${event.duration_seconds.toFixed(1)} s`,
           },
-          event.duration * 1000,
+          event.duration_seconds * 1000,
         );
         break;
       default:

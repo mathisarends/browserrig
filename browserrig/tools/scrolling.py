@@ -8,6 +8,9 @@ from browserrig.core import BrowserError, StaleElement
 from browserrig.input import Mouse
 from browserrig.observation import ElementHandle, RevealableElement, ScrollableElement
 
+_WHEEL_REVEAL_SECONDS = 20
+_WHEEL_SETTLE_SECONDS = 0.05
+
 
 @traced
 async def prepare_element(
@@ -26,7 +29,7 @@ async def prepare_element(
     scrolled = False
     previous = None
     stalled = 0
-    async with asyncio.timeout(20):
+    async with asyncio.timeout(_WHEEL_REVEAL_SECONDS):
         for _ in range(32):
             await tab.sync_document()
             if tab.document_id != document_id:
@@ -44,7 +47,7 @@ async def prepare_element(
                 point=step.point, delta_x=step.delta_x, delta_y=step.delta_y
             )
             scrolled = True
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(_WHEEL_SETTLE_SECONDS)
     raise BrowserError(
         "Element could not be brought into view using wheel input; try another way to reach it"
     )

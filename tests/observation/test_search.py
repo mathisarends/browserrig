@@ -1,7 +1,7 @@
 import pytest
 
 from browserrig.observation import search_content
-from browserrig.observation.content import PageContent
+from browserrig.observation.content import ExtractedContent
 from browserrig.observation.search import records
 
 _PAGE = """# Reviews
@@ -86,7 +86,7 @@ def test_results_continue_from_start_and_report_what_remains():
 
 def test_long_records_show_a_window_around_the_match():
     body = "filler " * 200 + "NEEDLE" + " tail" * 200
-    content = PageContent(url="https://shop.test/", title="Long", markdown=body)
+    content = ExtractedContent(url="https://shop.test/", title="Long", markdown=body)
     (record,) = search_content(content, ("needle",), start=0, count=1).records
     assert "NEEDLE" in record.text and len(record.text) <= 602
     assert record.text.startswith("…") and record.text.endswith("…")
@@ -104,14 +104,14 @@ def test_extraction_limitations_are_reported_with_results():
 )
 def test_long_record_window_uses_visible_match_position(prefix):
     body = prefix + "NEEDLE" + " tail" * 200
-    content = PageContent(url="https://shop.test/", title="Long", markdown=body)
+    content = ExtractedContent(url="https://shop.test/", title="Long", markdown=body)
     (record,) = search_content(content, ("needle",), start=0, count=1).records
     assert "NEEDLE" in record.text
     assert len(record.text) <= 602
 
 
 def test_search_ignores_decomposed_accents():
-    content = PageContent(
+    content = ExtractedContent(
         url="https://shop.test/", title="Accents", markdown="cafe\u0301s"
     )
     assert search_content(content, ("cafés",), start=0, count=1).total == 1
@@ -122,5 +122,7 @@ def test_queries_without_visible_text_are_rejected():
         search_content(_page(), (" ",), start=0, count=5)
 
 
-def _page() -> PageContent:
-    return PageContent(url="https://shop.test/reviews", title="Admin", markdown=_PAGE)
+def _page() -> ExtractedContent:
+    return ExtractedContent(
+        url="https://shop.test/reviews", title="Admin", markdown=_PAGE
+    )

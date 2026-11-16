@@ -151,7 +151,7 @@ async def test_exact_typing_emits_ordered_correlated_keys_without_persistable_te
     ] == list("A+ä🙂\t")
     keys = [event for event in events if isinstance(event, KeyPressedEvent)]
     assert [event.key for event in keys] == list("A+ä🙂\t")
-    assert all(event.duration == 0.05 for event in keys)
+    assert all(event.duration_seconds == 0.05 for event in keys)
     assert all(
         event.target_id == "tab-1" and event.document_id == "document-1"
         for event in events
@@ -187,7 +187,7 @@ async def test_address_typing_shows_each_key_without_page_input_and_submits(
     ]
     assert all(event.browser_bar == BrowserBar.ADDRESS for event in typed)
     assert all(event.action_id == "action-1" for event in events)
-    assert all(event.duration == 0.05 for event in typed)
+    assert all(event.duration_seconds == 0.05 for event in typed)
     pressed, shown = events[:2]
     assert isinstance(pressed, AddressBarFocusedEvent)
     assert isinstance(shown, KeyboardVisibilityEvent) and shown.visible
@@ -206,9 +206,12 @@ async def test_long_addresses_type_faster_and_submit_with_enter(monkeypatch):
     assert len(typed) == len(address) + 1
     assert (typed[-1].key, typed[-1].text) == ("Enter", address)
     # The whole address stays within the bar's time budget, Enter included.
-    assert all(event.duration == pytest.approx(0.8 / len(address)) for event in typed)
+    assert all(
+        event.duration_seconds == pytest.approx(0.8 / len(address)) for event in typed
+    )
     assert (
-        sum(call.args[0] for call in sleep.await_args_list) <= 0.8 + typed[0].duration
+        sum(call.args[0] for call in sleep.await_args_list)
+        <= 0.8 + typed[0].duration_seconds
     )
 
 
@@ -372,7 +375,9 @@ async def test_cancelled_drag_releases_mouse_button():
 
     devices, tab, _, commands = _rig(dispatch=dispatch)
     task = asyncio.create_task(
-        devices.mouse.drag(start=Point(x=10, y=10), end=Point(x=200, y=200), duration=1)
+        devices.mouse.drag(
+            start=Point(x=10, y=10), end=Point(x=200, y=200), duration_seconds=1
+        )
     )
     await asyncio.wait_for(entered.wait(), 5)
     task.cancel()
@@ -392,7 +397,7 @@ async def test_failed_native_drag_cancellation_still_releases_mouse_button():
     tab.cdp.input.cancel_dragging.side_effect = RuntimeError("cancel failed")
     with pytest.raises(RuntimeError, match="cancel failed"):
         await devices.mouse.drag(
-            start=Point(x=10, y=10), end=Point(x=200, y=200), duration=0.1
+            start=Point(x=10, y=10), end=Point(x=200, y=200), duration_seconds=0.1
         )
     assert commands[-1]["type"] == "mouseReleased"
     assert commands[-1]["buttons"] == 0
@@ -499,8 +504,8 @@ async def test_tab_switch_presses_the_tab_then_enters_the_new_page(monkeypatch):
     assert isinstance(landed, CursorStateEvent) and (landed.x, landed.y) == (500, 300)
     assert all(event.action_id == "switch-1" for event in (pressed, entered, landed))
     assert [call.args for call in sleep.await_args_list] == [
-        (pressed.duration,),
-        (entered.duration,),
+        (pressed.duration_seconds,),
+        (entered.duration_seconds,),
     ]
     # Hover in the new page is real: the renderer gets the landing position too.
     assert not first_commands
@@ -543,7 +548,7 @@ async def test_a_gesture_stays_on_the_tab_where_it_started(monkeypatch):
     focus["tab"] = first
     devices = _devices(lambda: focus["tab"])
     await devices.mouse.drag(
-        start=Point(x=10, y=10), end=Point(x=200, y=200), duration=0.1
+        start=Point(x=10, y=10), end=Point(x=200, y=200), duration_seconds=0.1
     )
     assert first_commands[-1]["type"] == "mouseReleased"
     assert not second_commands
@@ -584,7 +589,7 @@ async def test_scroll_spreads_wheel_input_over_frames_along_the_curve(monkeypatc
     assert steps.index(max(steps)) < len(steps) // 3 and steps[-1] < 5
     scrolled = [event for event in events if isinstance(event, ScrolledEvent)]
     assert [(e.delta_x, e.delta_y) for e in scrolled] == [(-60, 600)]
-    assert scrolled[0].duration == wheel_duration(math.hypot(600, 60))
+    assert scrolled[0].duration_seconds == wheel_duration(math.hypot(600, 60))
 
 
 async def test_unwatched_input_reports_nothing_and_never_pauses(monkeypatch):
@@ -715,7 +720,7 @@ async def test_a_slow_browser_skips_frames_instead_of_stretching_the_stroke(
     devices.pace(_Steady())
     await devices.mouse.move_to(Point(x=300, y=0))
     stroke = next(event for event in events if isinstance(event, CursorMovedEvent))
-    assert stroke.duration == 0.3
+    assert stroke.duration_seconds == 0.3
     xs = [c["x"] for c in commands if c["type"] == "mouseMoved"]
     # Late frames are skipped, the rest still follow the path to its end.
     assert len(xs) < 18 and xs == sorted(xs) and xs[-1] == 300

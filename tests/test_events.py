@@ -113,7 +113,7 @@ def test_coordinate_receipt_roundtrips_with_its_source_viewport():
         to_position=(300, 200),
         control_point_1=(80, -15),
         control_point_2=(250, 260),
-        duration=0.4,
+        duration_seconds=0.4,
         viewport=ViewportSize(width=1280, height=720),
         target_id="tab",
         document_id="document",
@@ -123,6 +123,9 @@ def test_coordinate_receipt_roundtrips_with_its_source_viewport():
     assert restored == event
     assert isinstance(restored, events.PositionedEvent)
     assert isinstance(restored.viewport, ViewportSize)
+    payload = adapter.dump_python(event)
+    assert payload["duration_seconds"] == 0.4
+    assert "duration" not in payload
 
 
 @pytest.mark.parametrize(

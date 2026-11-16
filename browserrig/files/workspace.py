@@ -58,7 +58,8 @@ class Workspace(Protocol):
         """Direct children of the directory at `path`, in any order."""
         ...
 
-    async def read_bytes(self, path: PurePosixPath) -> bytes: ...
+    async def read_bytes(self, path: PurePosixPath) -> bytes:
+        """Read the entire file; raise FileNotFoundError if `path` is missing."""
 
     async def write_bytes(
         self, path: PurePosixPath, data: bytes, *, overwrite: bool = True

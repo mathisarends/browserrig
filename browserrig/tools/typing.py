@@ -8,13 +8,14 @@ from pydantic import Field
 from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
-from browserrig.input import Input, TypedText
+from browserrig.input import Input
 from browserrig.observation import DomElementHandle, DomElements
 from browserrig.secrets import Secrets
 
 from .effects import Effect
 from .execution import Actions
 from .targeting import Targeting
+from .text_entry import entered, secret_entered
 
 
 class DomTypingTools(Plugin):
@@ -60,8 +61,8 @@ class DomTypingTools(Plugin):
             await self._input.keyboard.press_key("Backspace")
         await guard()
         if entry is not None and secrets is not None:
-            entered = await secrets.enter(entry, self._input.keyboard)
-            return _secret_entered(entered)
+            exact = await secrets.enter(entry, self._input.keyboard)
+            return secret_entered(exact)
         typed = await self._input.keyboard.type_text(text, guard=guard)
         after = await field.text_state()
         expected = typed.entered if clear else None
@@ -82,7 +83,7 @@ class DomTypingTools(Plugin):
                 "reformatted or rejected the input. Observe the field before continuing.",
                 break_chain=True,
             )
-        return _entered(typed)
+        return entered(typed)
 
 
 async def _require_focus(browser: Browser, tab: Tab, field: DomElementHandle) -> None:
@@ -91,24 +92,3 @@ async def _require_focus(browser: Browser, tab: Tab, field: DomElementHandle) ->
             "Typing stopped: the addressed field lost focus. Inspect the current "
             "focus and field value before continuing; remaining text was not sent."
         )
-
-
-def _entered(typed: TypedText) -> Effect:
-    if typed.exact:
-        return Effect("Text entered.")
-    return Effect(
-        f"Text entered with a slip: typed {typed.entered!r} instead of "
-        f"{typed.intended!r}. Check the field before continuing.",
-        break_chain=True,
-    )
-
-
-def _secret_entered(exact: bool) -> Effect:
-    if exact:
-        return Effect("Text entered.")
-    # Never echo text that surrounds a secret.
-    return Effect(
-        "Text entered with a slip in the text around the secret. "
-        "Check the field before continuing.",
-        break_chain=True,
-    )

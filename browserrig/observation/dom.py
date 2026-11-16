@@ -8,6 +8,9 @@ from harnessed.tracing import traced
 from browserrig.browser import Frame
 from browserrig.scripts import RESET, SEED, SeedArgs
 
+_SNAPSHOT_SECONDS = 2
+_SEED_SECONDS = 2
+
 
 @traced
 async def seed_frame(
@@ -20,7 +23,7 @@ async def seed_frame(
         session_id = frame.cdp.session_id
         if session_id not in metadata:
             metadata[session_id] = None
-            async with asyncio.timeout(2):
+            async with asyncio.timeout(_SNAPSHOT_SECONDS):
                 metadata[session_id] = await frame.cdp.dom_snapshot.capture_snapshot(
                     computed_styles=[]
                 )
@@ -79,7 +82,7 @@ async def _seed_dom(frame: Frame, snapshot: CaptureSnapshotResult) -> bool:
                 return None
 
     try:
-        async with asyncio.timeout(2):
+        async with asyncio.timeout(_SEED_SECONDS):
             objects = await asyncio.gather(*(resolve(index) for index in indexes[:256]))
             resolved = [
                 (index, object_id)

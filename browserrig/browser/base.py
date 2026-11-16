@@ -50,9 +50,11 @@ class Browser(Protocol):
     tabs: Tabs
 
     @property
-    def active_tab(self) -> Tab: ...
+    def active_tab(self) -> Tab:
+        """Return the focused tab, raising BrowserError when none is active."""
 
-    async def downloads(self) -> tuple[Download, ...]: ...
+    async def downloads(self) -> tuple[Download, ...]:
+        """Return tracked downloads, including pending transfers."""
 
     async def receive_downloads(self, transfer: FileTransfer | None) -> bool:
         """Save later downloads through `transfer`; return whether they are received."""

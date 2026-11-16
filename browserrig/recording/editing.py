@@ -43,7 +43,7 @@ async def edit_video(
     labels = []
     originals = []
     manifest = []
-    duration = 0.0
+    duration_seconds = 0.0
     for index, (segment, windows) in enumerate(zip(segments, spans, strict=True)):
         manifest.append(
             {
@@ -77,7 +77,7 @@ async def edit_video(
                 f"end_frame={end_frame},setpts=PTS-STARTPTS[{label}]"
             )
             labels.append(f"[{label}]")
-            duration += (end_frame - start_frame) / frame_rate
+            duration_seconds += (end_frame - start_frame) / frame_rate
     (directory / "timeline.json").write_text(
         json.dumps(manifest, indent=2), encoding="utf-8"
     )
@@ -115,6 +115,6 @@ async def edit_video(
         path=path,
         original_path=original_path,
         sources=tuple(segment.path for segment in segments),
-        original_duration=sum(s.ended_at - s.started_at for s in segments),
-        duration=duration,
+        original_duration_seconds=sum(s.ended_at - s.started_at for s in segments),
+        duration_seconds=duration_seconds,
     )

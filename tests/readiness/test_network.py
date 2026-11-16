@@ -17,11 +17,11 @@ from browserrig.readiness.policies import ReadinessContext
 from tests.fakes import FakeTab
 
 _OPTIONS = ReadinessOptions(
-    timeout=5,
+    timeout_seconds=5,
     navigation_min_ms=0,
     action_min_ms=0,
     quiet_ms=0,
-    poll_interval=0.005,
+    poll_interval_seconds=0.005,
 )
 _POLICY = NetworkQuiet(reaction_ms=100, chain_ms=50, settle_ms=20, extra_ms=400)
 

@@ -80,8 +80,8 @@ class FakeTabs:
     async def list(self):
         return ()
 
-    async def opened_since(self, _mark, *, timeout=0):
-        del timeout
+    async def opened_since(self, _mark, *, timeout_seconds=0):
+        del timeout_seconds
         return None
 
 
@@ -153,7 +153,7 @@ class FakeReadiness:
             document_id=tab.document_id,
             phase=phase,
             status=ReadinessStatus.READY,
-            duration=0,
+            duration_seconds=0,
         )
 
 

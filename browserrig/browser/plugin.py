@@ -42,7 +42,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
         url: str = "about:blank",
         viewport: Viewport | None = None,
         session_setup: tuple[SessionSetup, ...] = (),
-        timeout: float = 20,
+        timeout_seconds: float = 20,
         arguments: tuple[str, ...] = (),
         bridge: FileBridge | None = None,
     ) -> Self:
@@ -60,7 +60,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
                 url=url,
                 viewport=viewport if viewport is not None else Viewport(),
                 session_setup=session_setup,
-                timeout=timeout,
+                timeout_seconds=timeout_seconds,
                 arguments=arguments,
                 bridge=bridge if bridge is not None else MountedWorkspace(),
             )
@@ -73,7 +73,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
         endpoint: str | SecretStr,
         target_id: TargetId | None = None,
         url: str = "about:blank",
-        timeout: float = 20,
+        timeout_seconds: float = 20,
         headers: Mapping[str, str | SecretStr] | None = None,
         viewport: Viewport | None = None,
         session_setup: tuple[SessionSetup, ...] = (),
@@ -96,7 +96,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
                 endpoint=SecretStr(endpoint) if isinstance(endpoint, str) else endpoint,
                 target_id=target_id,
                 url=url,
-                timeout=timeout,
+                timeout_seconds=timeout_seconds,
                 headers={
                     key: SecretStr(value) if isinstance(value, str) else value
                     for key, value in (headers.items() if headers is not None else ())

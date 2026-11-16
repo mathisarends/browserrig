@@ -8,6 +8,6 @@ class ReadinessReport(Options):
     phase: ReadinessPhase
     stage: ReadinessStage = ReadinessStage.ONGOING
     status: ReadinessStatus
-    duration: float
+    duration_seconds: float
     reason: str = ""
     timed_out: bool = False

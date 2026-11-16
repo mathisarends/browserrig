@@ -133,11 +133,13 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         dispatch: Callable[[], Awaitable[None]] | None,
         since: float | None,
     ) -> ReadinessReport:
-        remaining = max(0, self.options.timeout - self._state.spent.get(tab.id, 0))
+        remaining = max(
+            0, self.options.timeout_seconds - self._state.spent.get(tab.id, 0)
+        )
         report = await wait_for_page(
             tab,
             events=self._events,
-            options=self.options.model_copy(update={"timeout": remaining}),
+            options=self.options.model_copy(update={"timeout_seconds": remaining}),
             phase=phase,
             stage=stage,
             select=self._select,
@@ -145,7 +147,9 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
             dispatch=dispatch,
             since=since,
         )
-        self._state.spent[tab.id] = self._state.spent.get(tab.id, 0) + report.duration
+        self._state.spent[tab.id] = (
+            self._state.spent.get(tab.id, 0) + report.duration_seconds
+        )
         if phase == ReadinessPhase.OBSERVATION:
             self._state.spent.pop(tab.id, None)
         elif report.timed_out:

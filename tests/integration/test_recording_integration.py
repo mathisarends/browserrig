@@ -87,10 +87,10 @@ async def test_native_recording_cuts_waits_across_tabs_and_closure(
         first.id,
     ]
     retained = sum(end - start for s in manifest for start, end in s["kept"])
-    assert result.original_duration - retained >= 1.5
+    assert result.original_duration_seconds - retained >= 1.5
     # Retained intervals round outward to whole frames to preserve brief actions.
     rounding = 2 * sum(len(s["kept"]) for s in manifest) / 15
-    assert result.original_duration - result.duration >= 1.5 - rounding
+    assert result.original_duration_seconds - result.duration_seconds >= 1.5 - rounding
     info = await asyncio.to_thread(
         subprocess.run,
         [
@@ -109,7 +109,7 @@ async def test_native_recording_cuts_waits_across_tabs_and_closure(
     )
     metadata = json.loads(info.stdout)
     assert float(metadata["format"]["duration"]) == pytest.approx(
-        result.duration, abs=0.3
+        result.duration_seconds, abs=0.3
     )
     stream = metadata["streams"][0]
     assert (stream["codec_name"], stream["width"], stream["height"]) == (
@@ -126,7 +126,7 @@ async def test_native_recording_cuts_waits_across_tabs_and_closure(
     )
     # The uncut film keeps the wait that the edited video removes.
     original = await _duration(result.original_path)
-    assert original == pytest.approx(result.original_duration, abs=0.3)
+    assert original == pytest.approx(result.original_duration_seconds, abs=0.3)
     assert original > float(metadata["format"]["duration"]) + 1
     uncut = await _video_colors(result.original_path)
     assert sum(red > 180 and green < 60 and blue < 60 for red, green, blue in uncut) > 3
@@ -201,9 +201,9 @@ async def test_immediate_session_exit_still_produces_a_video(
         recording = session.scope[VideoRecording]
     assert recording.result is not None
     assert recording.result.path.stat().st_size > 0
-    assert recording.result.duration >= 1 / 15
+    assert recording.result.duration_seconds >= 1 / 15
     if same_tick:
-        assert recording.result.original_duration == 0
+        assert recording.result.original_duration_seconds == 0
     probe = await asyncio.to_thread(
         subprocess.run,
         [

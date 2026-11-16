@@ -334,6 +334,10 @@ def _option(option: Option) -> str:
 def _states(element: ElementInfo) -> list[str]:
     unchecked = "unchecked" if element.role in CHECKABLE_ROLES else ""
     current = element.current
+    if current == "true":
+        current = "current"
+    elif current:
+        current = f"current={current}"
     states = [
         "disabled" if element.disabled else "",
         _tristate(element.checked, "checked", unchecked, "mixed"),
@@ -341,7 +345,7 @@ def _states(element: ElementInfo) -> list[str]:
         _tristate(element.pressed, "pressed", "", "pressed=mixed"),
         _tristate(element.expanded, "expanded", "collapsed", ""),
         f"haspopup={element.has_popup}" if element.has_popup else "",
-        ("current" if current == "true" else f"current={current}") if current else "",
+        current,
         *(flag for flag in _FLAGS if getattr(element, flag)),
     ]
     return [state for state in states if state]

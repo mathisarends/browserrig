@@ -45,7 +45,7 @@ class DomReadiness(ReadinessStrategy):
         self, tab: Tab, options: ReadinessOptions, phase: ReadinessPhase
     ) -> None:
         super().__init__(tab, options)
-        self.budget = options.timeout
+        self.budget = options.timeout_seconds
         self._started = monotonic()
         self._after_action = phase == ReadinessPhase.AFTER_ACTION
         minimum = 0

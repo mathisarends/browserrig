@@ -16,7 +16,7 @@ from browserrig.observation.models import Element
 
 from .document import clean
 
-_TIMEOUT = 2
+_TIMEOUT_SECONDS = 2
 _NON_WORD = re.compile(r"\W+")
 
 
@@ -28,7 +28,7 @@ async def chrome_names(
     queried = [element for element in elements if element.frame_id in sessions]
     record(elements=len(queried))
     try:
-        async with asyncio.timeout(_TIMEOUT):
+        async with asyncio.timeout(_TIMEOUT_SECONDS):
             names = await asyncio.gather(
                 *(
                     _name(sessions[element.frame_id], element.backend_id)

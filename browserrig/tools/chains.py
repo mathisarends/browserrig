@@ -14,7 +14,8 @@ from browserrig.observation import (
 
 
 class ActionChainPolicy(Protocol):
-    def instructions(self) -> str: ...
+    def instructions(self) -> str:
+        """Explain when chained actions may continue without another observation."""
 
     async def check(self, observe: BrowserPerception, tab: Tab) -> str:
         """Empty means continue; otherwise explain why a new observation is needed."""

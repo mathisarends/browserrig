@@ -33,6 +33,10 @@ from browserrig.scripts import (
 from .models import Element, Snapshot
 from .references import RevealStep, ScrollStep
 
+_BLOCKED_DIAGNOSTICS_SECONDS = 0.5
+_REVEAL_SECONDS = 20
+_REVEAL_SETTLE_SECONDS = 0.05
+
 
 @dataclass(frozen=True, slots=True)
 class DomElementHandle:
@@ -64,7 +68,7 @@ class DomElementHandle:
                 "The target could not be hit-tested; layout diagnostics unavailable."
             )
             try:
-                async with asyncio.timeout(0.5):
+                async with asyncio.timeout(_BLOCKED_DIAGNOSTICS_SECONDS):
                     details = await self.run(
                         ELEMENT,
                         ElementArgs(
@@ -138,7 +142,7 @@ class DomElementHandle:
         """Reveal DOM geometry with exact container scrolling and measured receipts."""
         scrolled = False
         stalled = 0
-        async with asyncio.timeout(20):
+        async with asyncio.timeout(_REVEAL_SECONDS):
             for _ in range(32):
                 step = await self.reveal_step()
                 if step is None:
@@ -162,7 +166,7 @@ class DomElementHandle:
                     stalled += 1
                     if stalled >= 2:
                         break
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(_REVEAL_SETTLE_SECONDS)
         raise BrowserError(
             "Automatic reveal stalled or exceeded its step limit; inspect the current "
             "page and scroll the relevant container explicitly."

@@ -7,9 +7,14 @@ from .render import render
 
 
 class Renderer(Protocol):
-    def instructions(self, screenshots: Screenshots) -> str: ...
-    def refs(self) -> str | None: ...
-    def render(self, snapshot: Snapshot) -> str: ...
+    def instructions(self, screenshots: Screenshots) -> str:
+        """Explain the observation format for the configured screenshot policy."""
+
+    def refs(self) -> str | None:
+        """Describe how to use target refs, or None when refs are unavailable."""
+
+    def render(self, snapshot: Snapshot) -> str:
+        """Format a snapshot as the observation text supplied to the agent."""
 
 
 @dataclass(frozen=True)
