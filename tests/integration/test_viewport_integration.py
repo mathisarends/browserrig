@@ -22,7 +22,7 @@ from browserrig import (
 from browserrig.browser import Launch
 from browserrig.core import StaleElement
 from browserrig.events import ActionFinishedEvent
-from browserrig.observation import capture, render
+from browserrig.observation import PageText, capture, render
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
@@ -43,9 +43,7 @@ async def test_strict_viewport_controls_are_described_and_the_rest_are_known(sit
         """,
         )
         report = await wait_for_page(tab)
-        strategy = DomCapture(
-            viewport_expansion=0, max_text_chars=0, sparse_text_chars=0
-        )
+        strategy = DomCapture(viewport_expansion=0, text=PageText.OFF)
         state = await capture(tab, strategy, report)
         assert 0 < len(state.elements) < 300
         assert all(element.in_viewport for element in state.elements)

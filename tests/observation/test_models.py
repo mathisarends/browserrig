@@ -13,6 +13,7 @@ from browserrig.observation import (
     Modal,
     Offscreen,
     Option,
+    PageText,
     Snapshot,
     render,
 )
@@ -265,10 +266,9 @@ def test_browser_options_hide_credentials_and_reject_owned_flags():
     [
         {"max_elements": 0},
         {"max_elements": 50001},
-        {"max_text_chars": -1},
+        {"max_text_chars": 0},
         {"max_text_chars": 100001},
-        {"sparse_text_chars": -1},
-        {"sparse_text_chars": 100001},
+        {"text": "prose"},
         {"viewport_expansion": -1},
         {"viewport_expansion": 10001},
     ],
@@ -285,6 +285,29 @@ def test_default_observation_explains_context_without_enabling_screenshots():
     assert "Plain text has no action refs" in instructions
     assert "above/below previews" in instructions and "scroll(up=" in instructions
     assert "Screenshots are included only when requested" in instructions
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        (PageText.INLINE, "reading order beside its controls"),
+        (PageText.SPARSE, "When the viewport holds few controls"),
+        (PageText.OFF, "Observations omit page text"),
+    ],
+)
+def test_observation_instructions_follow_captured_page_text(text, expected):
+    observe = DomPerception(capture=DomCapture(text=text))
+    instructions = observe.renderer.instructions(observe.screenshots)
+    assert expected in instructions
+    assert ("[label][ref]" in instructions) == (text != PageText.OFF)
+
+
+@pytest.mark.parametrize("landmarks", [True, False])
+def test_observation_instructions_mention_landmarks_only_when_captured(landmarks):
+    observe = DomPerception(capture=DomCapture(landmarks=landmarks))
+    instructions = observe.renderer.instructions(observe.screenshots)
+    assert ("landmarks like [MAIN]" in instructions) == landmarks
+    assert '<form "Login">' in instructions
 
 
 def _snapshot(*elements: Element, **fields) -> Snapshot:

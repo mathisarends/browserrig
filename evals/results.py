@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, JsonValue
 
+from browserrig.observation import PageText
+
 
 class AgentResponse(BaseModel):
     task_type: Literal["RETRIEVE", "MUTATE", "NAVIGATE"]
@@ -88,6 +90,10 @@ class BenchmarkResult(BaseModel):
     keep_last_steps: int | None = None
     target_ratio: float | None = None
     max_summary_tokens: int | None = None
+    # Runs recorded before these options observed inline text, headings and landmarks.
+    page_text: PageText = PageText.INLINE
+    headings: bool = True
+    landmarks: bool = True
     model: str
     # Snapshots written before subscription support used API keys.
     provider: Literal["openai", "openai-codex"] = "openai"
@@ -95,6 +101,20 @@ class BenchmarkResult(BaseModel):
     repeat: int = Field(ge=1)
     project: str
     tasks: list[TaskResult]
+
+    @property
+    def observation(self) -> str:
+        """The observation arm, such as `text=off, no headings`."""
+        parts = [f"text={self.page_text}"]
+        parts.extend(
+            f"no {name}"
+            for name, kept in (
+                ("headings", self.headings),
+                ("landmarks", self.landmarks),
+            )
+            if not kept
+        )
+        return ", ".join(parts)
 
 
 def write_run(path: Path, run: BenchmarkResult) -> None:

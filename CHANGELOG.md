@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+- Replace `DomCapture(max_text_chars=..., sparse_text_chars=...)` with
+  `DomCapture(text=PageText.INLINE | PageText.SPARSE | PageText.OFF,
+  max_text_chars=...)`. `PageText.OFF` omits prose between controls; `SPARSE`
+  uses `max_text_chars` as its budget. `max_text_chars` must be at least 1, and
+  `sparse_text_chars` is removed. `DomRenderer(text=...)` replaces its `max_text_chars` and
+  `sparse_text_chars` fields. Defaults are unchanged.
+
+### Changes
+
+- Add `DomCapture(headings=True, landmarks=True)`. Turning both off together
+  with `text=PageText.OFF` leaves only controls with their labels; dialogs and
+  cookie banners stay grouped. `DomRenderer(landmarks=...)` adjusts its
+  instructions accordingly.
+- Add `--page-text`, `--no-headings` and `--no-landmarks` to the WebArena
+  runner and record them in results, so observation arms can be compared.
+
 ## 0.5.0 (2026-11-15)
 
 ### Breaking changes

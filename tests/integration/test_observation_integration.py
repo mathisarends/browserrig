@@ -27,7 +27,7 @@ from browserrig import (
 from browserrig.browser import Launch
 from browserrig.core import Bounds, BrowserError, Geometry, Point, Region
 from browserrig.kinds import ElementOperation
-from browserrig.observation import DomPerception, capture, render
+from browserrig.observation import DomPerception, PageText, capture, render
 from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
 from tests.observations import has_image
@@ -98,6 +98,32 @@ async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
         assert next(
             e for e in state.elements if e.name == "Disabled by fieldset"
         ).disabled
+
+
+async def test_controls_only_capture_keeps_labels_and_dialogs(site):
+    async with ChromeBrowser(Launch(url=site)) as browser:
+        tab = browser.active_tab
+        await wait_for_page(tab)
+        await evaluate(
+            tab,
+            """document.body.innerHTML = `
+            <nav aria-label=Primary><a href='/plans'>Plans</a></nav>
+            <main><h2>Pricing</h2><p>Every plan renews monthly.</p>
+            <label>Seats<input type=number></label><button>Buy</button></main>
+            <div role=dialog aria-label=Plan><button>Close</button></div>`;
+        """,
+        )
+        report = await wait_for_page(tab)
+        controls = DomCapture(text=PageText.OFF, headings=False, landmarks=False)
+        text = render(await capture(tab, controls, report))
+        for expected in ('link "Plans"', '"Seats"', 'button "Buy"'):
+            assert expected in text
+        assert "[DIALOG: Plan]" in text
+        for omitted in ("[NAVIGATION", "[MAIN]", "Pricing", "renews monthly"):
+            assert omitted not in text
+        full = render(await capture(tab, DomCapture(), report))
+        for expected in ("[NAVIGATION: Primary]", "[MAIN]", "## Pricing", "renews"):
+            assert expected in full
 
 
 async def test_element_names_come_from_chrome_accessibility_tree(site):
@@ -249,7 +275,7 @@ async def test_limits_are_reported_and_checkbox_state_changes_fingerprint(site):
         )
         limited = await capture(
             tab,
-            DomCapture(max_elements=1, max_text_chars=2, sparse_text_chars=0),
+            DomCapture(max_elements=1, max_text_chars=2),
             report,
         )
         assert len(limited.elements) == 1 and len(limited.text) <= 2
@@ -282,7 +308,7 @@ async def test_default_text_preserves_dense_page_guidance_with_an_explicit_opt_o
         busy = await capture(tab, DomCapture(), report, previous=sparse)
         assert "Your request was blocked." in busy.text
         assert busy.fingerprint != sparse.fingerprint
-        controls_only = await capture(tab, DomCapture(max_text_chars=0), report)
+        controls_only = await capture(tab, DomCapture(text=PageText.OFF), report)
         assert controls_only.text == ""
 
 

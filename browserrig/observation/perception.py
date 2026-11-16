@@ -26,9 +26,7 @@ class DomPerception(BrowserPerception, provides=BrowserPerception):
             renderer=renderer
             if renderer is not None
             else DomRenderer(
-                max_text_chars=capture.max_text_chars,
-                sparse_text_chars=capture.sparse_text_chars,
-                marks=capture.marks,
+                text=capture.text, landmarks=capture.landmarks, marks=capture.marks
             ),
             screenshots=screenshots,
         )

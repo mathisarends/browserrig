@@ -7,7 +7,7 @@ import pytest
 from browserrig import ChromeBrowser, DomCapture, Input, wait_for_page
 from browserrig.browser import Launch
 from browserrig.core import Point
-from browserrig.observation import capture, render
+from browserrig.observation import PageText, capture, render
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
@@ -62,9 +62,7 @@ async def test_cookie_banner_has_context_and_existing_action_refs(site, markup):
         await wait_for_page(tab)
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        state = await capture(
-            tab, DomCapture(max_text_chars=0, sparse_text_chars=0), report
-        )
+        state = await capture(tab, DomCapture(text=PageText.OFF), report)
         assert not state.text
         assert len(state.cookie_banners) == 1
         banner = state.cookie_banners[0]
@@ -134,9 +132,7 @@ async def test_banner_text_survives_busy_page_and_disappears_after_normal_click(
         )
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        before = await capture(
-            tab, DomCapture(max_text_chars=0, sparse_text_chars=0), report
-        )
+        before = await capture(tab, DomCapture(text=PageText.OFF), report)
         assert not before.text and len(before.cookie_banners) == 1
         banner = before.cookie_banners[0]
         assert banner.name == "Privacy choices" and "analytics" in banner.text

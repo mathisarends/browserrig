@@ -11,6 +11,7 @@ import pytest
 from harnessed import ToolCall, ToolResult, ToolStatus
 from harnessed.events import ToolCallFinishedEvent
 
+from browserrig.observation import PageText
 from evals import analyze, evaluate, report, run, runner
 from evals.environments import Environments
 from evals.evaluate import Grade
@@ -377,6 +378,18 @@ def test_comparison_still_reports_real_regressions():
 
     assert "WORSE" in comparison
     assert "100% ->  50%" in comparison
+
+
+def test_comparison_names_the_observation_arms():
+    before = _benchmark([_record("demo")])
+    current = _benchmark([_record("demo", "fail", 0.5)])
+    current.page_text = PageText.OFF
+    current.landmarks = False
+
+    comparison = report.compare(current, before)
+
+    assert "observation text=inline -> text=off, no landmarks" in comparison
+    assert "WORSE" in comparison
 
 
 def test_analysis_uses_current_status_and_keeps_repetition_dumps(tmp_path, monkeypatch):

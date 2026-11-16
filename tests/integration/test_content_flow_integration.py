@@ -91,7 +91,7 @@ async def test_text_budget_marks_the_paragraph_and_keeps_later_controls(site):
         )
         state = await capture(
             tab,
-            DomCapture(max_text_chars=80, sparse_text_chars=0),
+            DomCapture(max_text_chars=80),
             await wait_for_page(tab),
         )
     text = render(state)
@@ -140,7 +140,7 @@ async def test_exact_text_budget_boundary_still_reports_the_omitted_next_block(s
         )
         state = await capture(
             tab,
-            DomCapture(max_text_chars=80, sparse_text_chars=0),
+            DomCapture(max_text_chars=80),
             await wait_for_page(tab),
         )
     text = render(state)
@@ -239,7 +239,7 @@ async def test_new_text_is_redacted_and_fingerprinted_beyond_legacy_excerpt(site
             "document.body.innerHTML = '<button>Repeated label</button>'.repeat(10)"
             " + '<p id=note>Initial guidance</p>'",
         )
-        strategy = DomCapture(max_text_chars=80, sparse_text_chars=0)
+        strategy = DomCapture(max_text_chars=80)
         report = await wait_for_page(tab)
         before = await capture(tab, strategy, report)
         await evaluate(

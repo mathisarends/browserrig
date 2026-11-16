@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from .config import Screenshots, ScreenshotTrigger
+from .config import PageText, Screenshots, ScreenshotTrigger
 from .models import Snapshot
 from .render import render
 
@@ -14,17 +14,23 @@ class Renderer(Protocol):
 
 @dataclass(frozen=True)
 class DomRenderer:
-    max_text_chars: int = 0
-    sparse_text_chars: int = 0
+    # Describes the text a capture supplies; custom captures promise none by default.
+    text: PageText = PageText.OFF
+    landmarks: bool = True
     marks: bool = True
 
     def instructions(self, screenshots: Screenshots) -> str:
         # The observation labels its own sections (previews, overlays, canvases, deltas);
         # this only explains what the labels cannot.
+        groups = (
+            'landmarks like [MAIN] and groups like <form "Login">'
+            if self.landmarks
+            else 'groups like <form "Login">'
+        )
         text = (
             "Each observation starts with a page header, then lists interactive elements "
             'one per line as `[ref] role "name" states value=... -> link`, grouped under '
-            'landmarks like [MAIN] and groups like <form "Login">. A leading * marks elements '
+            f"{groups}. A leading * marks elements "
             "new since the previous observation. Inside iframes, above/below previews refer to "
             "the frame's viewport. An element with scroll(up=..., down=...) is an inner scroll "
             "container; use scroll_element(ref=...) for that panel and scroll_page for the page. "
@@ -36,20 +42,20 @@ class DomRenderer:
             "Canvas content has no "
             "refs; screenshot it and point with click_at or drag_at. "
         )
-        if self.max_text_chars:
+        if self.text == PageText.INLINE:
             text += (
                 "Visible text appears in reading order beside its controls, within a bounded "
                 "text budget. Plain text has no action refs. A truncation marker applies "
                 "to text at that position; later controls are still listed. "
             )
-        elif self.sparse_text_chars:
+        elif self.text == PageText.SPARSE:
             text += (
                 "When the viewport holds few controls, observations add its visible text; "
                 "otherwise search_page finds it. "
             )
         else:
             text += "Observations omit page text; search_page finds it. "
-        if self.max_text_chars or self.sparse_text_chars:
+        if self.text != PageText.OFF:
             text += (
                 "Links within prose use [label][ref]; pass that ref to element tools. "
             )

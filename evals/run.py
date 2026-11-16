@@ -10,6 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from browserrig.core import MODEL_PROFILES
+from browserrig.observation import DomCapture, DomPerception, PageText
 
 from . import report
 from .environments import DEFAULT_CONFIG, DEFAULT_DATA, Environments
@@ -44,6 +45,15 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--headed", action="store_true")
     parser.add_argument("--humanlike", action="store_true")
+    parser.add_argument(
+        "--page-text",
+        type=PageText,
+        choices=tuple(PageText),
+        default=PageText.INLINE,
+        help="Prose in observations; compare arms such as inline and off",
+    )
+    parser.add_argument("--no-headings", dest="headings", action="store_false")
+    parser.add_argument("--no-landmarks", dest="landmarks", action="store_false")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA)
     parser.add_argument(
@@ -119,6 +129,9 @@ async def main() -> None:
                 upstream_version=manifest.version,
                 max_steps=args.max_steps,
                 timeout=args.timeout,
+                page_text=args.page_text,
+                headings=args.headings,
+                landmarks=args.landmarks,
                 tasks=[],
                 **(asdict(profile) if profile is not None else {}),
             )
@@ -129,7 +142,16 @@ async def main() -> None:
                     model,
                     args.headed,
                     args.humanlike,
-                    plugins,
+                    (
+                        *plugins,
+                        DomPerception(
+                            capture=DomCapture(
+                                text=args.page_text,
+                                headings=args.headings,
+                                landmarks=args.landmarks,
+                            )
+                        ),
+                    ),
                     args.max_steps,
                     args.timeout,
                 )

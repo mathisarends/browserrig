@@ -16,23 +16,35 @@ from browserrig.core import (
 from browserrig.readiness import ReadinessReport
 
 from .capture import CaptureContent
+from .config import PageText
 from .extraction import extract
 from .handle import DomReferences
 from .marks import annotate
 from .models import PageContent
+from .outline import outline
 
 _MAX_REGION_SIDE = 2000
 _SCREENSHOT_SECONDS = 2
 
 
 class DomCapture(Options):
-    """Observe the viewport plus a vertical context buffer; only real visibility permits input."""
+    """Observe the viewport plus a vertical context buffer; only real visibility permits input.
+
+    Observations always list controls with their labels; the fields below add page
+    prose, headings and landmarks. Dialogs and cookie banners stay grouped.
+    """
 
     max_elements: int | None = Field(default=None, ge=1, le=50000)
-    max_text_chars: int = Field(default=3000, ge=0, le=100000)
+    # INLINE interleaves visible prose with controls; SPARSE adds it only when the
+    # viewport shows fewer than five named controls; OFF omits it.
+    text: PageText = PageText.INLINE
+    # Text budget for INLINE and SPARSE.
+    max_text_chars: int = Field(default=3000, ge=1, le=100000)
+    # Heading lines such as `## Pricing`.
+    headings: bool = True
+    # Page regions such as [MAIN] or [NAVIGATION] that group their controls.
+    landmarks: bool = True
     viewport_expansion: int = Field(default=1000, ge=0, le=10000)
-    # Show visible text on pages with fewer than five named controls.
-    sparse_text_chars: int = Field(default=1500, ge=0, le=100000)
     marks: bool = True
     cursor: bool = False
 
@@ -47,17 +59,20 @@ class DomCapture(Options):
         zoom: float = 1,
         cursor: Point | None = None,
     ) -> CaptureContent:
-        record(screenshots=screenshots)
+        # Comparison probes after actions need controls, not prose.
+        text = PageText.OFF if report.phase == ReadinessPhase.ACTION else self.text
+        record(
+            screenshots=screenshots,
+            page_text=text,
+            headings=self.headings,
+            landmarks=self.landmarks,
+        )
         frames = await tab.frames()
         extraction = extract(
             frames,
             max_elements=self.max_elements,
-            max_text=0
-            if report.phase == ReadinessPhase.ACTION
-            else self.max_text_chars,
-            sparse_text=0
-            if report.phase == ReadinessPhase.ACTION
-            else self.sparse_text_chars,
+            max_text=self.max_text_chars if text == PageText.INLINE else 0,
+            sparse_text=self.max_text_chars if text == PageText.SPARSE else 0,
             viewport_expansion=self.viewport_expansion,
             # Comparison probes match controls by identity, not by their names.
             names=report.phase != ReadinessPhase.ACTION,
@@ -65,7 +80,7 @@ class DomCapture(Options):
         if not screenshots:
             extracted = await extraction
             return CaptureContent(
-                page=_limited(extracted, tab), references=DomReferences()
+                page=_limited(self._outline(extracted), tab), references=DomReferences()
             )
         viewport = frames[0].visible
         assert viewport is not None
@@ -91,7 +106,7 @@ class DomCapture(Options):
         shot = asyncio.create_task(screenshot(tab, geometry))
         try:
             extracted = await extraction
-            page = _limited(extracted, tab)
+            page = _limited(self._outline(extracted), tab)
         except BaseException:
             shot.cancel()
             await asyncio.gather(shot, return_exceptions=True)
@@ -122,6 +137,9 @@ class DomCapture(Options):
             scale=scale,
             references=DomReferences(),
         )
+
+    def _outline(self, page: PageContent) -> PageContent:
+        return outline(page, headings=self.headings, landmarks=self.landmarks)
 
 
 def _limited(page: PageContent, tab: Tab) -> PageContent:

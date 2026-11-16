@@ -50,7 +50,7 @@ from browserrig import (
 from browserrig.browser import BrowserEvents
 from browserrig.browser import plugin as plugin_module
 from browserrig.core import ActionKind
-from browserrig.observation import DomPerception
+from browserrig.observation import DomPerception, PageText
 from browserrig.tools import BrowserToolMetadata, DialogTools, KeyboardTools
 from tests.fakes import FakeBrowser
 
@@ -268,7 +268,10 @@ async def test_facade_warning_policy_keeps_deferred_plugin_until_service_is_adde
     "capture,trigger",
     [
         (DomCapture(), ScreenshotTrigger.ON_REQUEST),
-        (DomCapture(max_text_chars=1000, marks=False), ScreenshotTrigger.EACH_STEP),
+        (
+            DomCapture(text=PageText.OFF, marks=False),
+            ScreenshotTrigger.EACH_STEP,
+        ),
     ],
 )
 async def test_facade_renders_configured_observation_prompt(
@@ -290,8 +293,8 @@ async def test_facade_renders_configured_observation_prompt(
         assert "## Workspace and downloads" in rendered
         assert "## Element references" in rendered
         assert ("labeled with its ref" in rendered) == capture.marks
-        assert ("reading order beside its controls" in rendered) == bool(
-            capture.max_text_chars
+        assert ("reading order beside its controls" in rendered) == (
+            capture.text == PageText.INLINE
         )
         assert ("Every observation includes a screenshot" in rendered) == (
             trigger == ScreenshotTrigger.EACH_STEP

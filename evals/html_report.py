@@ -114,9 +114,17 @@ def build(
             run.provider,
             run.max_steps,
             run.timeout,
-        ) != (baseline.model, baseline.provider, baseline.max_steps, baseline.timeout):
+            run.observation,
+        ) != (
+            baseline.model,
+            baseline.provider,
+            baseline.max_steps,
+            baseline.timeout,
+            baseline.observation,
+        ):
             raise ValueError(
-                "Cannot merge different datasets, models, providers or budgets"
+                "Cannot merge different datasets, models, providers, budgets "
+                "or observations"
             )
         for record in run.tasks:
             task_id = record.task_id

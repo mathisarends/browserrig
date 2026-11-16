@@ -6,6 +6,7 @@ from collections import Counter
 
 import pytest
 
+from browserrig.observation import PageText
 from evals import analyze
 from evals.freeze import LOCAL_DATA
 from evals.html_report import build
@@ -61,16 +62,16 @@ def test_report_uses_local_membership_and_rejects_mixed_subsets(tmp_path):
         build([path, original], tmp_path / "mixed.html", {}, "revision")
 
 
-def test_report_rejects_incompatible_budgets(tmp_path):
+@pytest.mark.parametrize(
+    "setting",
+    [{"max_steps": 100}, {"page_text": PageText.OFF}, {"headings": False}],
+)
+def test_report_rejects_incompatible_settings(tmp_path, setting):
     paths = [tmp_path / "one.json", tmp_path / "two.json"]
     write_run(paths[0], _run([]))
-    other = _run([])
-    other.max_steps = 100
-    write_run(paths[1], other)
+    write_run(paths[1], _run([]).model_copy(update=setting))
 
-    with pytest.raises(
-        ValueError, match="different datasets, models, providers or budgets"
-    ):
+    with pytest.raises(ValueError, match="budgets or observations"):
         build(paths, tmp_path / "report.html", {}, "revision")
 
 

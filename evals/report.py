@@ -53,6 +53,8 @@ def compare(run: BenchmarkResult, before: BenchmarkResult) -> str:
         return "Runs have different datasets or budgets; comparison skipped."
     now, then = _by_task(run.tasks), _by_task(before.tasks)
     lines = [f"Compared with {before.run} ({before.provider}:{before.model})"]
+    if run.observation != before.observation:
+        lines.append(f"  observation {before.observation} -> {run.observation}")
     changes = []
     comparable = 0
     for name in sorted(now.keys() & then.keys()):

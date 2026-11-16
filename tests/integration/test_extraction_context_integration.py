@@ -166,9 +166,7 @@ async def test_dense_form_keeps_guidance_and_probe_omits_the_text_budget(site):
             "document.body.insertAdjacentHTML('beforeend',"
             "'<p>'+ 'Extra context '.repeat(1000)+'</p>')",
         )
-        bounded = await capture(
-            tab, DomCapture(max_text_chars=120, sparse_text_chars=0), report
-        )
+        bounded = await capture(tab, DomCapture(max_text_chars=120), report)
         assert len(bounded.text) <= 120 and any(
             "truncated" in item for item in bounded.limitations
         )
