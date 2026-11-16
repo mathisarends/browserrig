@@ -1,7 +1,12 @@
 from browserrig.choreography import WorkPhase
 from browserrig.choreography.projection import project
 from browserrig.core import ActionKind, ReadinessPhase
-from browserrig.events import FileReadFailedEvent, FileReadStartedEvent, ReadyEvent
+from browserrig.events import (
+    ActionFailedEvent,
+    FileReadFailedEvent,
+    FileReadStartedEvent,
+    ReadyEvent,
+)
 
 
 def test_file_read_presentation_preserves_source_and_selectors():
@@ -39,3 +44,19 @@ def test_read_cancellation_uses_typed_outcome_not_reason_text():
         )
     )
     assert receipt is not None and receipt.phase is WorkPhase.CANCELLED
+
+
+def test_cancelled_action_receipt_keeps_its_call_identity():
+    receipt = project(
+        ActionFailedEvent(
+            action_id="action-1",
+            kind=ActionKind.CLICK,
+            dispatched=True,
+            reason="cancelled",
+            cancelled=True,
+            call_id="call-1",
+            label="click",
+        )
+    )
+    assert receipt is not None and receipt.phase is WorkPhase.CANCELLED
+    assert receipt.action_id == "action-1" and receipt.call_id == "call-1"

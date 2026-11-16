@@ -123,26 +123,36 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
         await self._status(event)
         if receipt := project(event):
             # Facts enrich the same tool receipt rather than creating a second card.
-            for active in self._state.running.values():
-                if (
-                    active.kind is receipt.kind
-                    and receipt.kind is not ActionKind.HANDLE_DIALOG
-                ):
-                    receipt = replace(
-                        receipt,
-                        work_id=active.work_id,
-                        call_id=active.call_id,
-                        tool_name=active.tool_name,
-                        detail=receipt.detail or active.detail,
-                        preview=receipt.preview or active.preview,
-                        source_path=receipt.source_path or active.source_path,
-                        target_id=receipt.target_id or active.target_id,
-                        document_id=receipt.document_id or active.document_id,
-                    )
-                    break
+            if active := self._owner(receipt):
+                receipt = replace(
+                    receipt,
+                    work_id=active.work_id,
+                    call_id=active.call_id,
+                    tool_name=active.tool_name,
+                    detail=receipt.detail or active.detail,
+                    preview=receipt.preview or active.preview,
+                    source_path=receipt.source_path or active.source_path,
+                    target_id=receipt.target_id or active.target_id,
+                    document_id=receipt.document_id or active.document_id,
+                )
             await self._emit(receipt)
         if isinstance(event, ObservationCapturedEvent):
             await self._screenshot_captured(event)
+
+    def _owner(self, receipt: WorkPresentedEvent) -> WorkPresentedEvent | None:
+        """The running tool receipt a projected fact belongs to, by call when known."""
+        if receipt.kind is ActionKind.HANDLE_DIALOG:
+            return None
+        if receipt.call_id:
+            return self._state.running.get(receipt.call_id)
+        return next(
+            (
+                active
+                for active in self._state.running.values()
+                if active.kind is receipt.kind
+            ),
+            None,
+        )
 
     @hook(ExecuteTool)
     async def _work(self, event: ExecuteTool, next_: Next[ToolResult]) -> ToolResult:

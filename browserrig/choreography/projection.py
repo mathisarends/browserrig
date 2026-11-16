@@ -206,6 +206,7 @@ def _action(
         work_id=f"action:{event.action_id}",
         kind=event.kind,
         action_id=event.action_id,
+        call_id=event.call_id,
         title=SILENT_WORK.get(
             event.kind, event.kind.value.replace("_", " ").capitalize()
         ),

@@ -8,17 +8,32 @@ from harnessed import ToolError, ToolResult
 from browserrig.browser import Tab
 from browserrig.core import ActionKind
 
+LABEL_CHARS = 80
+
 
 @dataclass
 class ToolAction:
     kind: ActionKind
     tab: Tab | None = None
     action_id: str = ""
+    call_id: str = ""
+    label: str = ""
     started: bool = False
     preparation_notes: list[str] = field(default_factory=list)
     preparation_omitted: int = 0
     active: bool = True
     result: ToolResult | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CallIdentity:
+    """The originating tool call of an action, safe to publish in lifecycle events."""
+
+    call_id: str = ""
+    label: str = ""
+
+
+NO_CALL = CallIdentity()
 
 
 class ToolActionError(ToolError):
@@ -34,6 +49,22 @@ class InvocationContext:
         self._current: ContextVar[ToolAction | None] = ContextVar(
             "browserrig.tool_action", default=None
         )
+        self._call: ContextVar[CallIdentity] = ContextVar(
+            "browserrig.tool_call", default=NO_CALL
+        )
+
+    @property
+    def call(self) -> CallIdentity:
+        """The tool call executing in this task, or an empty identity outside one."""
+        return self._call.get()
+
+    @contextmanager
+    def bind_call(self, call_id: str, label: str) -> Generator[None, None, None]:
+        token = self._call.set(CallIdentity(call_id, label[:LABEL_CHARS]))
+        try:
+            yield
+        finally:
+            self._call.reset(token)
 
     @property
     def current(self) -> ToolAction | None:
@@ -49,7 +80,8 @@ class InvocationContext:
 
     @contextmanager
     def activate(self, kind: ActionKind) -> Generator[ToolAction, None, None]:
-        action = ToolAction(kind)
+        call = self.call
+        action = ToolAction(kind, call_id=call.call_id, label=call.label)
         token = self._current.set(action)
         try:
             yield action

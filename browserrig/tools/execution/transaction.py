@@ -26,7 +26,7 @@ from browserrig.tools.chains import observes
 from browserrig.tools.effects import Effect
 
 from .completion import Completion
-from .context import ToolAction, ToolActionError
+from .context import NO_CALL, CallIdentity, ToolAction, ToolActionError
 from .policy import (
     CHAINABLE_KINDS,
     NAVIGATION_KINDS,
@@ -68,6 +68,7 @@ class ActionRunner:
         expects_change: bool = False,
         settle: bool = True,
         action: ToolAction | None = None,
+        call: CallIdentity = NO_CALL,
     ) -> ToolResult:
         """Run one mutation once. Its addressed tab cannot change with global focus."""
         record(kind=kind)
@@ -77,6 +78,7 @@ class ActionRunner:
             if action is not None:
                 action.tab = tab
                 action.action_id = action_id
+                call = CallIdentity(action.call_id, action.label)
             dispatched = False
             try:
                 before = await self._prepare(tab, kind)
@@ -89,6 +91,8 @@ class ActionRunner:
                             kind=kind,
                             target_id=tab.id,
                             document_id=tab.document_id,
+                            call_id=call.call_id,
+                            label=call.label,
                         )
                     )
                     dispatched = True
@@ -116,6 +120,8 @@ class ActionRunner:
                         after_url=tab.url,
                         prepared_scroll=effect.prepared_scroll,
                         expects_change=expects_change,
+                        call_id=call.call_id,
+                        label=call.label,
                     )
                 )
                 return await self._result(
@@ -138,6 +144,7 @@ class ActionRunner:
                     tab,
                     action_id,
                     kind,
+                    call,
                     dispatched=dispatched,
                     reason=reason,
                     cancelled=True,
@@ -152,7 +159,7 @@ class ActionRunner:
                     else f"{type(error).__name__}: {error}"
                 )
                 await self._fail(
-                    tab, action_id, kind, dispatched=dispatched, reason=reason
+                    tab, action_id, kind, call, dispatched=dispatched, reason=reason
                 )
                 hint = (
                     "; the action may have run. Observe before retrying."
@@ -172,6 +179,8 @@ class ActionRunner:
                 kind=action.kind,
                 target_id=tab.id,
                 document_id=tab.document_id,
+                call_id=action.call_id,
+                label=action.label,
             )
         )
         action.started = True
@@ -253,6 +262,7 @@ class ActionRunner:
         tab: Tab,
         action_id: str,
         kind: ActionKind,
+        call: CallIdentity,
         *,
         dispatched: bool,
         reason: str,
@@ -267,6 +277,8 @@ class ActionRunner:
                 dispatched=dispatched,
                 reason=reason,
                 cancelled=cancelled,
+                call_id=call.call_id,
+                label=call.label,
             )
         )
 

@@ -13,6 +13,11 @@
 
 ### Changes
 
+- `ActionStartedEvent`, `ActionFinishedEvent` and `ActionFailedEvent` carry the
+  originating tool `call_id` and a short display `label` (the tool name, at most
+  80 characters, never its arguments). Failure and cancellation keep both, and
+  action receipts join their tool receipt by `call_id`. `Actions.run(label=...)`
+  names explicitly managed operations.
 - Add `Chrome.connect(downloads=...)` with a `DownloadSource` protocol so a host
   that owns an attached browser's download policy can relay its download events;
   browserrig then tracks and presents those downloads without taking over files.
