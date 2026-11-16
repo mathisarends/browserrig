@@ -19,6 +19,9 @@
   instructions accordingly.
 - Add `--page-text`, `--no-headings` and `--no-landmarks` to the WebArena
   runner and record them in results, so observation arms can be compared.
+- Upgrade Harnessed and every provider/MCP/OTel extra to 0.18.0, which adds
+  registry-wide call envelopes (`CallEnvelope`). No Browserrig code changes are
+  required.
 
 ## 0.5.0 (2026-11-15)
 
