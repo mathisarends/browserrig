@@ -223,24 +223,32 @@ def _describe(event) -> str:  # pylint: disable=too-many-return-statements,too-m
             return f"{kind} finished"
         case ActionFailedEvent(kind=kind):
             return f"{kind} failed"
-        case KeyPressedEvent(key=key, modifiers=modifiers, duration=duration):
-            return f"shows key {'+'.join((*modifiers, key))} {duration:.2f}"
+        case KeyPressedEvent(
+            key=key, modifiers=modifiers, duration_seconds=duration_seconds
+        ):
+            return f"shows key {'+'.join((*modifiers, key))} {duration_seconds:.2f}"
         case KeyboardVisibilityEvent(visible=visible):
             return "keyboard shown" if visible else "keyboard hidden"
-        case BarTypedEvent(browser_bar=where, key=key, text=text, duration=duration):
-            return f"{where} bar {key} -> {text!r} {duration:.2f}"
+        case BarTypedEvent(
+            browser_bar=where, key=key, text=text, duration_seconds=duration_seconds
+        ):
+            return f"{where} bar {key} -> {text!r} {duration_seconds:.2f}"
         case FindBarEvent(visible=visible):
             return "find bar open" if visible else "find bar closed"
         case FindResultsEvent(query=query, label=label, ticks=ticks):
             return f"results {query!r} {label} ticks={list(ticks)}"
-        case WaitingEvent(duration=duration):
-            return f"waiting {duration:g}"
-        case FileTransferEvent(direction=direction, x=x, y=y, duration=duration):
-            return f"transfer {direction} at {x},{y} {duration:.2f}"
+        case WaitingEvent(duration_seconds=duration_seconds):
+            return f"waiting {duration_seconds:g}"
+        case FileTransferEvent(
+            direction=direction, x=x, y=y, duration_seconds=duration_seconds
+        ):
+            return f"transfer {direction} at {x},{y} {duration_seconds:.2f}"
         case HighlightElementEvent(ref=ref):
             return f"highlight {ref}"
-        case TabPressedEvent(gesture=gesture, tab_id=tab_id, duration=duration):
-            return f"tab {gesture} {tab_id!r} from {event.target_id} {duration:.2f}"
+        case TabPressedEvent(
+            gesture=gesture, tab_id=tab_id, duration_seconds=duration_seconds
+        ):
+            return f"tab {gesture} {tab_id!r} from {event.target_id} {duration_seconds:.2f}"
         case (
             AddressBarFocusedEvent()
             | BackPressedEvent()
@@ -248,10 +256,12 @@ def _describe(event) -> str:  # pylint: disable=too-many-return-statements,too-m
             | ReloadPressedEvent()
         ):
             return _toolbar(event)
-        case CursorEnteredEvent(to_position=(x, y), duration=duration):
-            return f"cursor enters {event.target_id} at {x:g},{y:g} {duration:.2f}"
-        case CursorMovedEvent(to_position=(x, y), duration=duration):
-            return f"cursor moves to {x:g},{y:g} {duration:.2f}"
+        case CursorEnteredEvent(to_position=(x, y), duration_seconds=duration_seconds):
+            return (
+                f"cursor enters {event.target_id} at {x:g},{y:g} {duration_seconds:.2f}"
+            )
+        case CursorMovedEvent(to_position=(x, y), duration_seconds=duration_seconds):
+            return f"cursor moves to {x:g},{y:g} {duration_seconds:.2f}"
         case CursorStateEvent(x=x, y=y):
             return f"cursor rests in {event.target_id} at {x:g},{y:g}"
         case NavigationStartedEvent(url=url, typed=typed):
@@ -266,7 +276,9 @@ def _describe(event) -> str:  # pylint: disable=too-many-return-statements,too-m
 def _toolbar(event) -> str:
     start = event.from_position
     where = "nowhere" if start is None else f"{start[0]:g},{start[1]:g}"
-    return f"{event.type} from {where} in {event.target_id} {event.duration:.2f}"
+    return (
+        f"{event.type} from {where} in {event.target_id} {event.duration_seconds:.2f}"
+    )
 
 
 class _SearchTools(PageSearchTools, provides=True):

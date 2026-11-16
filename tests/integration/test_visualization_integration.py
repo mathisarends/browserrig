@@ -86,7 +86,7 @@ async def test_file_cards_wait_for_explicit_completion_receipts(site):
             FileTransferEvent(
                 direction=FileTransferDirection.UPLOAD,
                 paths=("report.pdf",),
-                duration=0.1,
+                duration_seconds=0.1,
                 x=80,
                 y=80,
             )
@@ -149,7 +149,7 @@ async def test_keyboard_fits_a_compact_viewport_and_keeps_secret_keys_private(si
         browser = session.scope[Browser]
         tab = browser.active_tab
         await session.scope[Input].mouse.move_to(Point(x=300, y=600))
-        await tab.emit(KeyPressedEvent(key="•", duration=2))
+        await tab.emit(KeyPressedEvent(key="•", duration_seconds=2))
         result = await _surface(
             tab,
             """(() => {
@@ -187,15 +187,17 @@ async def test_toolbar_presses_lead_the_pointer_to_the_drawn_controls(site):
     async with agent.session() as session:
         tab = session.scope[Browser].active_tab
         await tab.emit(CursorStateEvent(x=300, y=400))
-        await tab.emit(AddressBarFocusedEvent(from_position=(300, 400), duration=0))
+        await tab.emit(
+            AddressBarFocusedEvent(from_position=(300, 400), duration_seconds=0)
+        )
         focused = await _settled(tab, pointer, lambda state: _inside(state, "bar"))
         assert focused["style"] == "text" and focused["address"] == "true"
 
-        await tab.emit(BackPressedEvent(from_position=(300, 400), duration=0))
+        await tab.emit(BackPressedEvent(from_position=(300, 400), duration_seconds=0))
         pressed = await _settled(tab, pointer, lambda state: _inside(state, "icon"))
         assert pressed["style"] == "pointer" and pressed["history"] == "true"
 
-        await tab.emit(CursorEnteredEvent(to_position=(300, 400), duration=0))
+        await tab.emit(CursorEnteredEvent(to_position=(300, 400), duration_seconds=0))
         returned = await _settled(tab, pointer, lambda state: state["x"] == 300)
         assert returned["style"] != "pointer" and returned["y"] == 400
 
@@ -336,7 +338,9 @@ async def test_simultaneous_downloads_keep_independent_progress_and_outcomes(sit
         assert state == [["a", "completed"], ["b", "active"]]
         await tab.emit(
             FileTransferEvent(
-                direction=FileTransferDirection.OPEN, paths=("notes.md",), duration=0.01
+                direction=FileTransferDirection.OPEN,
+                paths=("notes.md",),
+                duration_seconds=0.01,
             )
         )
         await asyncio.sleep(1.9)

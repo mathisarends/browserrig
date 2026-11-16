@@ -154,6 +154,8 @@ rules:
   duplicate-function: warning
   duplicate-class-name: warning
   prefer-named-duration: warning
+  missing-duration-unit: warning
+  mutable-field-in-frozen-dataclass: warning
   nested-conditional-expression: warning
   # Design/performance candidates need an ownership and evaluation-order review.
   parallel-record-fields: hint
@@ -161,8 +163,6 @@ rules:
   # Reviewed non-adoptions and compatibility rationale: docs/smelt-policy.md.
   stateful-dataclass: off
   duplicate-narrowing-assert: off
-  missing-duration-unit: off
-  mutable-field-in-frozen-dataclass: off
   # Many chains walk the CDP SDK namespaces or plugin state, which are shaped upstream.
   deep-object-navigation: hint
   facade-export-gap: warning

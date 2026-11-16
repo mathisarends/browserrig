@@ -28,14 +28,14 @@ def test_factories_validate_options_without_opening_resources(monkeypatch):
         headless=False,
         url="https://example.org",
         viewport=Viewport(width=900),
-        timeout=12,
+        timeout_seconds=12,
         arguments=("--disable-extensions",),
         session_setup=(setup,),
     )
     connected = Chrome.connect(
         endpoint="http://localhost:9222",
         url="https://example.org",
-        timeout=12,
+        timeout_seconds=12,
         headers={"Authorization": "Bearer credential"},
         viewport=Viewport(width=900),
         bridge=bridge,
@@ -48,7 +48,9 @@ def test_factories_validate_options_without_opening_resources(monkeypatch):
         )
         assert browser.options.url == "https://example.org"
         assert browser.options.viewport.width == 900
-        assert browser.options.timeout == 12
+        assert browser.options.timeout_seconds == 12
+        payload = browser.options.model_dump()
+        assert payload["timeout_seconds"] == 12 and "timeout" not in payload
         assert browser.options.session_setup == (setup,)
     assert isinstance(launched.options, Launch)
     assert launched.options.executable == Path("chrome")
@@ -126,7 +128,7 @@ def test_browser_recipe_rejects_low_level_options_with_migration_guidance(
     ("factory", "options"),
     [
         (Chrome.launch, {"arguments": ("--user-data-dir=unexpected",)}),
-        (Chrome.launch, {"timeout": 0}),
+        (Chrome.launch, {"timeout_seconds": 0}),
         (Chrome.connect, {"endpoint": "invalid"}),
         (Chrome.connect, {"endpoint": "ws://localhost:9222/devtools/page/tab"}),
         (

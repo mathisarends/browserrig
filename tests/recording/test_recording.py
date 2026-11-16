@@ -269,8 +269,8 @@ async def test_session_exception_finalizes_open_activity(
     assert len(edits) == 1
     # An unfinished LLM interval is projected through the end of the capture.
     assert edits[0][1] == ((Span(0, 1),), ())
-    assert recording.result.original_duration == 10
-    assert recording.result.duration == 1
+    assert recording.result.original_duration_seconds == 10
+    assert recording.result.duration_seconds == 1
     assert tab.cdp.page.stop_screen_recording.await_count == 2
 
 
@@ -293,8 +293,8 @@ async def test_session_with_only_waits_retains_a_final_view(
     async with agent.session() as session:
         recording = session.scope[VideoRecording]
         recording_clock.now += elapsed
-    assert recording.result.original_duration == pytest.approx(elapsed)
-    assert recording.result.duration == pytest.approx(1 / 30)
+    assert recording.result.original_duration_seconds == pytest.approx(elapsed)
+    assert recording.result.duration_seconds == pytest.approx(1 / 30)
     (window,) = edits[0][1][0]
     assert window.start == pytest.approx(max(0, elapsed - 1 / 30))
     assert window.end == pytest.approx(max(elapsed, 1 / 30))

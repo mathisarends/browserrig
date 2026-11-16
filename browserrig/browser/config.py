@@ -25,7 +25,7 @@ class CdpEndpoint:
     """Where to reach a browser over CDP, and the headers that request needs."""
 
     url: str
-    headers: dict[str, str]
+    headers: dict[str, str]  # smelt: ignore[SMT360] -- mutable transport headers
 
 
 class Launch(Options):
@@ -41,7 +41,7 @@ class Launch(Options):
     url: str = "about:blank"
     viewport: Viewport = Viewport()
     session_setup: tuple[InstanceOf[SessionSetup], ...] = ()
-    timeout: float = Field(default=20, gt=0, le=120)
+    timeout_seconds: float = Field(default=20, gt=0, le=120)
     arguments: tuple[str, ...] = ()
     # Chrome runs on this machine, so it sees a local workspace directly.
     bridge: InstanceOf[FileBridge] = Field(default_factory=MountedWorkspace)
@@ -74,7 +74,7 @@ class Launch(Options):
         return ChromeProcess(
             executable=self.executable,
             flags=(*flags, *self.arguments),
-            timeout=self.timeout,
+            timeout_seconds=self.timeout_seconds,
         )
 
     async def cdp_endpoint(self, stack: AsyncExitStack) -> CdpEndpoint:
@@ -90,7 +90,7 @@ class Connect(Options):
     endpoint: SecretStr
     target_id: TargetId | None = None
     url: str = "about:blank"
-    timeout: float = Field(default=20, gt=0, le=120)
+    timeout_seconds: float = Field(default=20, gt=0, le=120)
     headers: dict[str, SecretStr] = Field(default_factory=dict, repr=False)
     viewport: Viewport | None = None
     session_setup: tuple[InstanceOf[SessionSetup], ...] = ()

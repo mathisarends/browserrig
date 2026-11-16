@@ -20,11 +20,11 @@ class ChromeProcess:
     """Chrome on a throwaway profile; `flags` are added to the ones it owns."""
 
     def __init__(
-        self, *, executable: Path | None, flags: tuple[str, ...], timeout: float
+        self, *, executable: Path | None, flags: tuple[str, ...], timeout_seconds: float
     ) -> None:
         self._executable = executable
         self._flags = flags
-        self._timeout = timeout
+        self._timeout_seconds = timeout_seconds
         self._process: Process | None = None
         self._profile: TemporaryDirectory[str] | None = None
         self.endpoint = ""
@@ -54,7 +54,7 @@ class ChromeProcess:
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
             active_port = Path(self._profile.name) / "DevToolsActivePort"
-            async with asyncio.timeout(self._timeout):
+            async with asyncio.timeout(self._timeout_seconds):
                 while True:
                     if self._process.returncode is not None:
                         raise BrowserError(

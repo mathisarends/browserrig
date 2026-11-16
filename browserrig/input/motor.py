@@ -90,16 +90,16 @@ class HumanMotor:
     def __init__(
         self,
         *,
-        typing_interval: float = TYPING_INTERVAL_SECONDS,
+        typing_interval_seconds: float = TYPING_INTERVAL_SECONDS,
     ) -> None:
-        if typing_interval < 0:
-            raise ValueError("typing_interval must not be negative")
-        self._typing_interval = typing_interval
+        if typing_interval_seconds < 0:
+            raise ValueError("typing_interval_seconds must not be negative")
+        self._typing_interval_seconds = typing_interval_seconds
 
     def keystrokes(  # pylint: disable=unused-argument
         self, text: str, *, sensitive: bool
     ) -> Sequence[KeyStroke]:
-        return tuple(KeyStroke(key, self._typing_interval) for key in text)
+        return tuple(KeyStroke(key, self._typing_interval_seconds) for key in text)
 
     def pointer_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
         return (movement(start, destination),)

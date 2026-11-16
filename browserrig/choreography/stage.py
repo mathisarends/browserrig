@@ -35,7 +35,7 @@ class Stage:
                 gesture=gesture,
                 tab_id=tab_id,
                 from_position=Position(position.x, position.y),
-                duration=PRESS_SECONDS,
+                duration_seconds=PRESS_SECONDS,
                 action_id=action_id,
             )
         )
@@ -47,7 +47,7 @@ class Stage:
         await target.emit(
             CursorEnteredEvent(
                 to_position=Position(position.x, position.y),
-                duration=ENTER_SECONDS,
+                duration_seconds=ENTER_SECONDS,
                 action_id=action_id,
             )
         )

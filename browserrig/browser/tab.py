@@ -234,11 +234,11 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self._main_frame_id = tree.frame.id
 
     @traced
-    async def evaluate(self, expression: str, *, timeout: float = 10) -> str:
+    async def evaluate(self, expression: str, *, timeout_seconds: float = 10) -> str:
         """Evaluate once in the main page world and render its completion value."""
         group = f"browserrig-evaluate-{uuid4().hex}"
         try:
-            async with asyncio.timeout(timeout):
+            async with asyncio.timeout(timeout_seconds):
                 result = await self.cdp.runtime.evaluate(
                     expression=expression,
                     object_group=group,
@@ -246,7 +246,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
                     await_promise=True,
                     repl_mode=True,
                     user_gesture=True,
-                    timeout=timeout * 1000,
+                    timeout=timeout_seconds * 1000,
                 )
             if details := result.exception_details:
                 message = (
@@ -258,7 +258,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
             return _javascript_value(result.result)
         except TimeoutError as error:
             raise BrowserError(
-                f"JavaScript timed out after {timeout:g} seconds"
+                f"JavaScript timed out after {timeout_seconds:g} seconds"
             ) from error
         except CDPCommandError as error:
             if error.message == "Object couldn't be returned by value":

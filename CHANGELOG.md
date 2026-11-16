@@ -4,6 +4,16 @@
 
 ### Breaking changes
 
+- Numeric Browserrig durations name their units. Replace `timeout=` with
+  `timeout_seconds=` in `Chrome.launch`/`connect`, `Launch`/`Connect`,
+  `HumanHandoff`, `Tab.evaluate`, `Tabs.opened_since` and `execute_javascript`.
+  `ReadinessOptions` uses `timeout_seconds` and `poll_interval_seconds`;
+  `HumanMotor` uses `typing_interval_seconds`. Input paths, drag APIs and tools,
+  readiness reports and browser/choreography event payloads use
+  `duration_seconds`; `RecordingResult` exposes `original_duration_seconds`
+  and `duration_seconds`. Update custom event viewers and persisted payloads;
+  the built-in overlay and terminal consumers are migrated. Values remain in
+  seconds. Existing `_ms` fields and upstream CDP/HTTP/animation APIs are unchanged.
 - Replace `DomCapture(max_text_chars=..., sparse_text_chars=...)` with
   `DomCapture(text=PageText.INLINE | PageText.SPARSE | PageText.OFF,
   max_text_chars=...)`. `PageText.OFF` omits prose between controls; `SPARSE`

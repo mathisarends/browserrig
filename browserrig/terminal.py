@@ -32,6 +32,7 @@ _METADATA = {
     "outcome",
     "reason",
     "duration",
+    "duration_seconds",
     "elapsed",
     "step",
     "model",

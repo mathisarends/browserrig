@@ -9,8 +9,8 @@ class RecordingResult:
     path: Path
     original_path: Path
     sources: tuple[Path, ...]
-    original_duration: float
-    duration: float
+    original_duration_seconds: float
+    duration_seconds: float
 
 
 @dataclass(frozen=True, slots=True)

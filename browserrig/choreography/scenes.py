@@ -161,7 +161,7 @@ async def press(scene: Scene, intent: ControlIntent, step: Step) -> Any:
 
 
 async def wait(scene: Scene, intent: WaitIntent, step: Step) -> Any:
-    await scene.show(WaitingEvent(duration=intent.seconds))
+    await scene.show(WaitingEvent(duration_seconds=intent.seconds))
     return await step()
 
 
@@ -187,21 +187,23 @@ async def _pressed(
     """
     start = scene.pointer
     position = Position(start.x, start.y) if start is not None else None
-    await scene.show(pressed(from_position=position, duration=PRESS_SECONDS))
-    duration = ENTER_SECONDS
+    await scene.show(pressed(from_position=position, duration_seconds=PRESS_SECONDS))
+    duration_seconds = ENTER_SECONDS
     try:
         await asyncio.sleep(PRESS_SECONDS)
         yield
     except BaseException:
-        duration = 0
+        duration_seconds = 0
         raise
     finally:
         if position is not None:
             await scene.show(
-                CursorEnteredEvent(to_position=position, duration=duration)
+                CursorEnteredEvent(
+                    to_position=position, duration_seconds=duration_seconds
+                )
             )
-            if duration:
-                await asyncio.sleep(duration)
+            if duration_seconds:
+                await asyncio.sleep(duration_seconds)
 
 
 async def _type_in_bar(
@@ -227,7 +229,10 @@ async def _type_in_bar(
             started = monotonic()
             await scene.show(
                 BarTypedEvent(
-                    browser_bar=browser_bar, key=key, text=typed, duration=interval
+                    browser_bar=browser_bar,
+                    key=key,
+                    text=typed,
+                    duration_seconds=interval,
                 )
             )
             if after_key is not None and key != "Enter":
@@ -247,7 +252,7 @@ async def _transfer(
         FileTransferEvent(
             direction=direction,
             paths=paths,
-            duration=_TRANSFER_SECONDS,
+            duration_seconds=_TRANSFER_SECONDS,
             x=point.x if point is not None else None,
             y=point.y if point is not None else None,
         )
