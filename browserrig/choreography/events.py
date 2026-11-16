@@ -253,7 +253,8 @@ class WorkPresentedEvent(PresentedEvent):
     """Bounded, redacted work receipt for inert overlays and external viewers.
 
     Preview text is data, never HTML. A screenshot receipt is completed only after
-    the requested observation has actually captured an image.
+    the requested observation has actually captured an image. A nonempty `label`
+    carries redacted model-written text for host UIs; `title` keeps its fixed caption.
     """
 
     work_id: str
@@ -262,6 +263,7 @@ class WorkPresentedEvent(PresentedEvent):
     phase: WorkPhase
     call_id: str = ""
     tool_name: str = ""
+    label: str = ""
     action_id: str = ""
     detail: str = ""
     source_url: str = ""

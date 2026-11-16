@@ -23,6 +23,7 @@ from .composition import (  # smelt: ignore[SMT106] -- public facade
 from .core import (
     ActionContext,
     ActionKind,
+    ActionLabel,
     BrowserCoordination,
     ChangeTab,
     HandoffStatus,
@@ -119,6 +120,7 @@ from .tools import (
 __version__ = "0.5.0"
 
 __all__ = [
+    "ActionLabel",
     "Runtime",
     "ActionContext",
     "ChangeTab",

@@ -37,6 +37,55 @@ headless mode. `--directory` selects output for PNGs, gallery, manifest, timelin
 and recordings. Ordinary model screenshots omit viewer surfaces; see
 [overlay behavior](browser-composition.md#browser-owned-presentation).
 
+## Model-written action labels
+
+Ask the model for a short action label on each tool call by adding Harnessed's
+registry-wide envelope plugin:
+
+```python
+from harnessed.plugins import CallEnvelope
+from browserrig import ActionLabel, Agent
+
+agent = Agent(plugins=[CallEnvelope(ActionLabel)])
+```
+
+This opt-in adds `action_label` to tool schemas, including tools from other
+plugins and MCP servers. It costs extra output tokens per call. The envelope is
+validated and removed before the tool runs; tool implementations do not change.
+Missing or invalid labels are dropped by default and the call still runs.
+Without the plugin, schemas and presentation stay unchanged. For a native
+Harnessed agent, compose `plugins=[browser_pack(), CallEnvelope(ActionLabel)]`;
+no separate pack flag is needed.
+
+Labels are data for host UIs in the event stream. `Choreography` carries the
+redacted text in `WorkPresentedEvent.label` through completion, failure and
+cancellation. Input actions carry it in `ActionStartedEvent.label`,
+`ActionFinishedEvent.label` and `ActionFailedEvent.label`, with the originating
+`call_id`. `WorkPresentedEvent.title` retains its fixed caption; the built-in
+overlay does not display model labels or add captions for labeled calls.
+Static `ActionKind` values still select scenes and icons. Without a label,
+action events fall back to the tool name.
+
+Hosts can read a label from completed call events with the public typed accessor:
+
+```python
+from harnessed import envelope_value
+from harnessed.events import ToolCallFinishedEvent, ToolCallRequestedEvent
+from browserrig import ActionLabel, Secrets
+
+def action_label(event: ToolCallRequestedEvent | ToolCallFinishedEvent, scope):
+    label = envelope_value(event.call, ActionLabel)
+    if label is None:
+        return ""
+    text = label.action_label
+    return scope[Secrets].redact(text) if Secrets in scope else text
+```
+
+These durable events retain raw call arguments for replay, so hosts apply their
+redaction policy before displaying envelope text, just as for other arguments.
+Browserrig presentation receipts already pass through configured secret
+redaction. Labels arrive once per complete call event, not token by token.
+
 ## Session videos
 
 Add `VideoRecording()` to the agent's plugins:
@@ -152,7 +201,7 @@ async def consume(session):
 | `ElementScrolledEvent` (`browser.element.scrolled`) | `tab_id`, `ref`, `delta_x`, `delta_y`: measured movement of that container in its local CSS pixels, including containers in iframes. |
 | `ScrollStartedEvent` (`browser.scroll.started`) | Existing wheel input: viewport `x/y`, planned `delta_x/delta_y` and `duration_seconds`. |
 | `ScrolledEvent` (`browser.scrolled`) | Existing wheel input after dispatch: wheel position, dispatched deltas and gesture duration. Does not confirm DOM movement. |
-| `ActionStartedEvent`, `ActionFinishedEvent`, `ActionFailedEvent` | Durable execution lifecycle, correlated by `action_id`; `call_id` and `label` name the originating tool call without its arguments. A finished action can have moved nothing. |
+| `ActionStartedEvent`, `ActionFinishedEvent`, `ActionFailedEvent` | Durable execution lifecycle, correlated by `action_id`; `call_id` identifies the originating call and `label` carries its redacted model label or tool name. A finished action can have moved nothing. |
 | `WorkPresentedEvent` | Presentation/status feedback, including tool failures; its preview is not the source of DOM scroll data. |
 
 `tab_id` is the source `Tab.id`. These two new events expose no `target_id`.

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 from time import monotonic
 from typing import Any
 
-from harnessed import Plugin, PluginState, ToolResult, ToolStatus, hook
+from harnessed import Plugin, PluginState, ToolResult, ToolStatus, envelope_value, hook
 from harnessed.events import ToolCallFinishedEvent, TurnEndedEvent, TurnStartedEvent
 from harnessed.hooks import ExecuteTool, Next
 from harnessed.kernel import PluginScope, needs
@@ -12,6 +12,7 @@ from harnessed.kernel import PluginScope, needs
 from browserrig.browser import Browser, BrowserEvents, TabChanged
 from browserrig.core import (
     ActionKind,
+    ActionLabel,
     BrowserCoordination,
     BrowserToolMetadata,
     ViewportSize,
@@ -129,6 +130,7 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
                     work_id=active.work_id,
                     call_id=active.call_id,
                     tool_name=active.tool_name,
+                    label=active.label,
                     detail=receipt.detail or active.detail,
                     preview=receipt.preview or active.preview,
                     source_path=receipt.source_path or active.source_path,
@@ -161,6 +163,9 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
             return await next_()
         self._state.handled.add(event.call.id)
         receipt = work.started(self._redact(event.call), metadata.kind)
+        label = event.envelope.get(ActionLabel)
+        if label is not None:
+            receipt = replace(receipt, label=self._redact(label.action_label))
         tab = self._browser.active_tab
         receipt = replace(receipt, target_id=tab.id, document_id=tab.document_id)
         if metadata.kind in {
@@ -236,6 +241,8 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
             return
         if event.result.is_error:
             result = self._redact(event.result)
+            label = envelope_value(event.call, ActionLabel)
+            text = self._redact(label.action_label) if label is not None else ""
             await self._emit(
                 WorkPresentedEvent(
                     work_id=f"tool:{event.call_id}",
@@ -243,6 +250,7 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
                     tool_name=event.call.name,
                     kind=None,
                     title="Tool not executed",
+                    label=text,
                     phase=WorkPhase.FAILED,
                     detail=f"{event.call.name} · {result.status.value}",
                     preview=work.clipped(result.text),
