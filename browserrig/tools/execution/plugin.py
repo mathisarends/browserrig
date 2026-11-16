@@ -26,6 +26,7 @@ from browserrig.tools.chains import (
 from browserrig.tools.effects import Effect
 from browserrig.tools.intents import Intent, Perform
 
+from .context import LABEL_CHARS, CallIdentity
 from .invocation import ToolExecution
 from .transaction import ActionRunner
 
@@ -84,15 +85,20 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         check: Callable[[Tab], Awaitable[None]] | None = None,
         expects_change: bool = False,
         settle: bool = True,
+        label: str = "",
     ) -> ToolResult:
         """Run an explicitly managed operation outside an automatically wrapped tool."""
         record(kind=kind)
+        call = self._invocation.context.call
+        if label:
+            call = CallIdentity(call.call_id, label[:LABEL_CHARS])
         return await self._runner.run(
             kind=kind,
             operation=operation,
             check=check,
             expects_change=expects_change,
             settle=settle,
+            call=call,
         )
 
     @traced
@@ -147,6 +153,14 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     def tab(self) -> Tab:
         """The fixed addressed tab of the browser tool currently executing."""
         return self._invocation.context.tab
+
+    @hook(ExecuteTool)
+    async def _bind_call(
+        self, event: ExecuteTool, next_: Next[ToolResult]
+    ) -> ToolResult:
+        # Actions started by this call carry its identity, never its arguments.
+        with self._invocation.context.bind_call(event.call.id, event.call.name):
+            return await next_()
 
     @hook(ExecuteTool, ReviewToolResult)
     async def _execute_browser_result(

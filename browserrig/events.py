@@ -512,8 +512,13 @@ class FilesUploadedEvent(BrowserEvent):
 
 @dataclass(frozen=True, slots=True)
 class ActionStartedEvent(BrowserEvent):
+    """An action began. `call_id` names the originating tool call, if any, and
+    `label` is a short display name that never includes tool arguments."""
+
     action_id: str
     kind: ActionKind
+    call_id: str = field(default="", kw_only=True)
+    label: str = field(default="", kw_only=True)
     type: Literal[EventKind.ACTION_STARTED] = field(
         default=EventKind.ACTION_STARTED, kw_only=True
     )
@@ -535,6 +540,8 @@ class ActionFinishedEvent(BrowserEvent):
     after_url: str
     prepared_scroll: bool = False
     expects_change: bool = False
+    call_id: str = field(default="", kw_only=True)
+    label: str = field(default="", kw_only=True)
     type: Literal[EventKind.ACTION_FINISHED] = field(
         default=EventKind.ACTION_FINISHED, kw_only=True
     )
@@ -547,6 +554,8 @@ class ActionFailedEvent(BrowserEvent):
     dispatched: bool
     reason: str
     cancelled: bool = field(default=False, kw_only=True)
+    call_id: str = field(default="", kw_only=True)
+    label: str = field(default="", kw_only=True)
     type: Literal[EventKind.ACTION_FAILED] = field(
         default=EventKind.ACTION_FAILED, kw_only=True
     )

@@ -14,8 +14,14 @@ from harnessed.testing import ScriptedModel, call
 
 from browserrig.browser import OpenDialog
 from browserrig.core import ActionKind, browser_tool
-from browserrig.events import ActionFailedEvent, ActionFinishedEvent
+from browserrig.events import (
+    ACTION_EVENTS,
+    ActionFailedEvent,
+    ActionFinishedEvent,
+    ActionStartedEvent,
+)
 from browserrig.tools import Actions, DialogTools
+from browserrig.tools.effects import Effect
 from tests.fakes import FakeServices, mounted
 
 
@@ -57,6 +63,38 @@ async def test_automatic_actions_preserve_rich_results_and_error_status(status):
         assert (
             len([e for e in services.events if isinstance(e, ActionFailedEvent)]) == 1
         )
+
+
+@pytest.mark.parametrize(
+    ("status", "terminal"),
+    [(ToolStatus.OK, ActionFinishedEvent), (ToolStatus.TIMEOUT, ActionFailedEvent)],
+)
+async def test_action_lifecycle_names_the_originating_call(status, terminal):
+    agent = _agent(ToolResult("Done", status=status), call(_ResultTools.input))
+    async with agent.session() as session:
+        services = session.scope[FakeServices]
+        result = await session.run("Run the input")
+    tool_call = next(
+        e.call for e in result.events if isinstance(e, ToolCallFinishedEvent)
+    )
+    lifecycle = [e for e in services.events if isinstance(e, ACTION_EVENTS)]
+    assert [type(e) for e in lifecycle] == [ActionStartedEvent, terminal]
+    assert {(e.call_id, e.label) for e in lifecycle} == {(tool_call.id, tool_call.name)}
+
+
+async def test_managed_actions_outside_a_tool_carry_only_their_label():
+    agent = _agent(ToolResult("Unused"), call(_ResultTools.input))
+    async with agent.session() as session:
+        services = session.scope[FakeServices]
+        await session.scope[Actions].run(
+            kind=ActionKind.RELOAD,
+            operation=AsyncMock(return_value=Effect("Reloaded")),
+            settle=False,
+            label="Refresh dashboard" * 10,
+        )
+    started = next(e for e in services.events if isinstance(e, ActionStartedEvent))
+    assert started.call_id == ""
+    assert started.label == ("Refresh dashboard" * 10)[:80]
 
 
 async def test_passive_tools_preserve_custom_result_conversion_without_browser_waits():
