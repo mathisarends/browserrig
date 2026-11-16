@@ -9,6 +9,7 @@ from pydantic import Field, InstanceOf, SecretStr, field_validator, model_valida
 from browserrig.core import Options, TargetId
 from browserrig.files import FileBridge, MountedWorkspace
 
+from .downloads import DownloadSource
 from .process import ChromeProcess
 from .setup import SessionSetup
 
@@ -33,6 +34,8 @@ class Launch(Options):
     owns_process: ClassVar[bool] = True
     # A launched browser always starts in a fresh tab of its own context.
     target_id: ClassVar[None] = None
+    # browserrig enables download events itself, so no host relays them.
+    downloads: ClassVar[None] = None
     executable: Path | None = None
     headless: bool = True
     url: str = "about:blank"
@@ -93,6 +96,7 @@ class Connect(Options):
     session_setup: tuple[InstanceOf[SessionSetup], ...] = ()
     # Without a bridge, downloads stay on the browser host and uploads are unavailable.
     bridge: InstanceOf[FileBridge] | None = None
+    downloads: InstanceOf[DownloadSource] | None = None
 
     @model_validator(mode="after")
     def _target_ownership(self) -> Self:

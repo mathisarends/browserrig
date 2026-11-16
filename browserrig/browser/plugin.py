@@ -15,6 +15,7 @@ from browserrig.input import InputTargets
 from .base import Browser, BrowserEvents
 from .chrome import ChromeBrowser
 from .config import BrowserOptions, Connect, Launch, Viewport
+from .downloads import DownloadSource
 from .policy import NavigationPolicy
 from .setup import SessionSetup
 from .tab import Tab
@@ -77,6 +78,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
         viewport: Viewport | None = None,
         session_setup: tuple[SessionSetup, ...] = (),
         bridge: FileBridge | None = None,
+        downloads: DownloadSource | None = None,
     ) -> Self:
         """Configure a connection opened at session entry to an existing CDP browser.
 
@@ -84,8 +86,10 @@ class Chrome(Plugin, slot="browserrig.browser"):
         a fresh isolated context is created; `target_id` selects an existing tab.
         Chrome runs elsewhere, so it reaches the agent's workspace only through a
         `bridge`; without one, downloads stay on its host and the agent cannot open
-        or upload workspace files. This call validates configuration without
-        connecting.
+        or upload workspace files. Pass `downloads` when the host enables download
+        events on its own connection; browserrig then tracks and presents those
+        downloads while the host keeps their policy and files. This call validates
+        configuration without connecting.
         """
         return cls(
             Connect(
@@ -100,6 +104,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
                 viewport=viewport,
                 session_setup=session_setup,
                 bridge=bridge,
+                downloads=downloads,
             )
         )
 

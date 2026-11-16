@@ -44,7 +44,7 @@ from browserrig.input import InputTargets
 
 from .base import BrowserEvents, EventSink, discard_event
 from .config import BrowserOptions, CdpEndpoint, Launch
-from .downloads import Downloads
+from .downloads import Downloads, DownloadSource
 from .guard import NavigationGuard
 from .input import ChromeInputTargets
 from .policy import NavigationPolicy
@@ -140,6 +140,8 @@ class ChromeBrowser:
                     )
                 self._start_listeners()
                 self._stack.push_async_callback(self._stop_listeners)
+                if options.downloads is not None:
+                    self._relay(options.downloads)
                 await self.client.target.set_discover_targets(discover=True)
                 await self.tabs.open_initial()
                 self._connected = True
@@ -215,6 +217,26 @@ class ChromeBrowser:
                     name=f"browserrig:{event_type.__name__}",
                 )
             )
+
+    def _relay(self, source: DownloadSource) -> None:
+        self._tasks.append(
+            asyncio.create_task(
+                self._relay_downloads(source), name="browserrig:host-downloads"
+            )
+        )
+
+    async def _relay_downloads(self, source: DownloadSource) -> None:
+        events = source.events()
+        try:
+            async for event in events:
+                await self._downloads.handle(event)
+        except Exception:  # pylint: disable=broad-exception-caught
+            # The host owns this source; its failure must not break browsing.
+            logger.exception("Host download event source failed")
+        finally:
+            close = getattr(events, "aclose", None)
+            if close is not None:
+                await close()
 
     async def _consume(
         self, subscription: EventSubscription[ReceivedEvent[Any]]

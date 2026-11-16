@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 from cdpify import ReceivedEvent
-from cdpify.domains.browser import DownloadWillBeginEvent
+from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
 from cdpify.domains.page import JavascriptDialogOpeningEvent
 from cdpify.domains.target import (
     TargetDestroyedEvent,
@@ -17,12 +17,14 @@ from cdpify.domains.target import (
 from pydantic import ValidationError
 
 from browserrig import ChromeBrowser, SessionSetup, Viewport
-from browserrig.browser import Connect, Launch, Tab
+from browserrig.browser import Connect, DownloadState, Launch, Tab
 from browserrig.browser import tabs as tabs_module
 from browserrig.core import ActionContext
 from browserrig.events import (
     DialogOpenedEvent,
     DisconnectedEvent,
+    DownloadCompletedEvent,
+    DownloadStartedEvent,
     TabClosedEvent,
     TabOpenedEvent,
 )
@@ -173,6 +175,44 @@ async def test_root_events_reach_downloads_and_session_events_reach_their_tab():
     assert [download.id for download in await browser.downloads()] == ["id"]
 
 
+async def test_host_download_source_feeds_attached_downloads_once():
+    began = DownloadWillBeginEvent(
+        frame_id="frame",
+        guid="id",
+        url="https://example.org",
+        suggested_filename="a.txt",
+    )
+    completed = DownloadProgressEvent(
+        guid="id", total_bytes=3, received_bytes=3, state="completed"
+    )
+    source = _HostDownloads([began, began, completed, completed])
+    browser, events = _browser(
+        Connect(endpoint="ws://localhost/devtools/browser/test", downloads=source)
+    )
+    await browser._relay_downloads(source)
+    [download] = await browser.downloads()
+    assert (download.state, download.received_bytes) == (DownloadState.COMPLETED, 3)
+    assert [type(event) for event in events] == [
+        DownloadStartedEvent,
+        DownloadCompletedEvent,
+    ]
+    assert source.closed
+
+
+async def test_failing_host_download_source_does_not_break_the_browser(caplog):
+    browser, _ = _browser()
+    source = _HostDownloads([], RuntimeError("host went away"))
+    await browser._relay_downloads(source)
+    assert browser._failure is None
+    assert "host went away" in caplog.text
+    assert source.closed
+
+
+def test_connect_requires_a_download_source():
+    with pytest.raises(ValidationError):
+        Connect(endpoint="ws://localhost/devtools/browser/test", downloads=object())
+
+
 async def test_subscription_failure_is_fatal_but_cancellation_propagates():
     browser, _ = _browser()
     failure = RuntimeError("connection lost")
@@ -301,6 +341,25 @@ class _RecordingSetup:
         assert cdp.page.set_lifecycle_events_enabled.await_count > 0
         metrics = cdp.emulation.set_device_metrics_override.await_count
         self.calls.append((self.name, cdp, frame, metrics))
+
+
+class _HostDownloads:
+    def __init__(self, items, failure=None):
+        self._items = items
+        self._failure = failure
+        self.closed = False
+
+    def events(self):
+        return self._events()
+
+    async def _events(self):
+        try:
+            for item in self._items:
+                yield item
+            if self._failure is not None:
+                raise self._failure
+        finally:
+            self.closed = True
 
 
 def _browser(options=None, *, actions=None):
