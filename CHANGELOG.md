@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.6.0 (2026-11-16)
+
+Upgrade from 0.5.x using the [migration guide](docs/migration-0.6.md).
+
 ### Breaking changes
 
 - Numeric Browserrig durations name their units. Replace `timeout=` with
@@ -46,6 +50,8 @@
 - Upgrade Harnessed and every provider/MCP/OTel extra to 0.18.0, which adds
   registry-wide call envelopes (`CallEnvelope`). No Browserrig code changes are
   required.
+- Upgrade development checks to Smelt 0.10.0 and adopt reviewed guardrails for
+  duration names and frozen dataclass fields; see the development policy guide.
 
 ## 0.5.0 (2026-11-15)
 

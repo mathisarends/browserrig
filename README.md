@@ -105,6 +105,7 @@ custom tools and context propagation.
 
 | Guide | Start here for… |
 | --- | --- |
+| [Migrate to 0.6](docs/migration-0.6.md) | API changes from 0.5.x, observation modes and host event envelopes |
 | [Composition](docs/browser-composition.md) | Layers, plugins, hooks and custom capture backends |
 | [Agent guide](docs/agent-guide.md) | Sessions, streaming, prompts, completion and persistence |
 | [Browser interaction](docs/browser-interaction.md) | Direct browser access, refs, coordinates and input |
