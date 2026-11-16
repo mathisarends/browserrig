@@ -39,20 +39,17 @@ def read_sqlite(context: ReadContext) -> ParsedContent:
                     details.limitations.append(
                         "Binary BLOB values are shown by byte length, not decoded"
                     )
-                yield (
-                    "| "
-                    + " | ".join(
-                        "NULL"
-                        if value is None
-                        else f"[binary: {len(value)} bytes]"
-                        if isinstance(value, bytes)
-                        else cell_text(value)
-                        for value in row
-                    )
-                    + " |\n"
-                )
+                yield "| " + " | ".join(_sqlite_cell(value) for value in row) + " |\n"
         finally:
             connection.close()
 
     details.blocks = blocks()
     return details
+
+
+def _sqlite_cell(value: object) -> str:
+    if value is None:
+        return "NULL"
+    if isinstance(value, bytes):
+        return f"[binary: {len(value)} bytes]"
+    return cell_text(value)

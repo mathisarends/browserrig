@@ -10,6 +10,11 @@ from typing import Self
 
 from browserrig.core import BrowserError
 
+_STARTUP_POLL_SECONDS = 0.05
+_TERMINATE_SECONDS = 5
+_PROFILE_CLEANUP_SECONDS = 10
+_PROFILE_RETRY_SECONDS = 0.1
+
 
 class ChromeProcess:
     """Chrome on a throwaway profile; `flags` are added to the ones it owns."""
@@ -59,7 +64,7 @@ class ChromeProcess:
                     if endpoint is not None:
                         self.endpoint = endpoint
                         return self
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(_STARTUP_POLL_SECONDS)
         except (Exception, asyncio.CancelledError):
             await self.aclose()
             raise
@@ -71,7 +76,7 @@ class ChromeProcess:
         if self._process is not None and self._process.returncode is None:
             self._process.terminate()
             try:
-                async with asyncio.timeout(5):
+                async with asyncio.timeout(_TERMINATE_SECONDS):
                     await self._process.wait()
             except TimeoutError:
                 self._process.kill()
@@ -79,7 +84,7 @@ class ChromeProcess:
         self._process = None
         if self._profile is not None:
             profile = self._profile
-            deadline = asyncio.get_running_loop().time() + 10
+            deadline = asyncio.get_running_loop().time() + _PROFILE_CLEANUP_SECONDS
             while True:
                 try:
                     await asyncio.to_thread(profile.cleanup)
@@ -100,7 +105,7 @@ class ChromeProcess:
                         )
                         self._profile = None
                         break
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(_PROFILE_RETRY_SECONDS)
 
 
 def _chrome_executable(explicit: Path | None = None) -> str:

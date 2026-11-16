@@ -32,6 +32,7 @@ structure:
       type_dispatch: {style: match, min_branches: 3}
       # Later parameters are keyword-only so call sites name their values.
       max_positional_parameters: 4
+      bases: {pydantic.BaseModel: browserrig.core.Options}
       ordering:
         constants_exempt: true
         fix: safe-only
@@ -43,6 +44,9 @@ structure:
     script-annotations:
       match: browserrig.scripts
       future_annotations: forbid
+    recording-values:
+      match: browserrig.recording
+      dataclass_options: [frozen, slots]
     # Packages depend on each other only through their __init__ facade
     # (SMT107 error); tests may still import implementation modules.
     # SMT108 hints when one file reaches into several modules of a package.
@@ -145,6 +149,20 @@ rules:
   str-enum-explicit-values: error
   excess-positional-parameters: error
   anonymous-tuple-type: error
+  missing-interface-docstring: warning
+  missing-broad-except-reason: warning
+  duplicate-function: warning
+  duplicate-class-name: warning
+  prefer-named-duration: warning
+  nested-conditional-expression: warning
+  # Design/performance candidates need an ownership and evaluation-order review.
+  parallel-record-fields: hint
+  loop-invariant-collection: hint
+  # Reviewed non-adoptions and compatibility rationale: docs/smelt-policy.md.
+  stateful-dataclass: off
+  duplicate-narrowing-assert: off
+  missing-duration-unit: off
+  mutable-field-in-frozen-dataclass: off
   # Many chains walk the CDP SDK namespaces or plugin state, which are shaped upstream.
   deep-object-navigation: hint
   facade-export-gap: warning

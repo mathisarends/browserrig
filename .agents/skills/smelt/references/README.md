@@ -22,7 +22,7 @@ uv tool install smelt-cli
 smelt init --maintainability
 ```
 
-Upgrading to 0.8.0? Follow the [upgrade checklist](docs/upgrading.md#070-to-080)
+Upgrading to 0.10.0? Follow the [upgrade checklist](docs/upgrading.md#090-to-0100)
 for pins and the new opt-in reviews.
 
 Review the generated `smelt.yml`: it proposes a starting policy from your layout
@@ -103,7 +103,7 @@ repos:
         name: smelt
         entry: smelt check --staged --fail-on warning
         language: python
-        additional_dependencies: [smelt-cli==0.8.0]
+        additional_dependencies: [smelt-cli==0.10.0]
         pass_filenames: false
         always_run: true
         require_serial: true

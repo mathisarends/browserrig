@@ -21,7 +21,8 @@ class InputTarget(Protocol):
     """
 
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        """Identify the tab whose document receives input."""
 
     async def dispatch_mouse(
         self,
@@ -34,11 +35,13 @@ class InputTarget(Protocol):
         buttons: int,
         click_count: int,
         modifiers: int = 0,
-    ) -> None: ...
+    ) -> None:
+        """Send a native mouse event at viewport CSS pixels with CDP button masks."""
 
     async def dispatch_wheel(
         self, point: Point, *, delta_x: float, delta_y: float
-    ) -> None: ...
+    ) -> None:
+        """Send a wheel event at `point`, with deltas measured in CSS pixels."""
 
     async def dispatch_key(
         self,
@@ -49,17 +52,23 @@ class InputTarget(Protocol):
         code: str,
         windows_virtual_key_code: int,
         text: str | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Send a native key event using CDP key codes and modifier masks."""
 
-    async def cancel_drag(self) -> None: ...
+    async def cancel_drag(self) -> None:
+        """Cancel a native drag still owned by the document."""
 
-    async def viewport_size(self) -> ViewportSize: ...
+    async def viewport_size(self) -> ViewportSize:
+        """Return the current viewport dimensions in CSS pixels."""
 
-    async def cursor_style(self, point: Point) -> CursorStyle | None: ...
+    async def cursor_style(self, point: Point) -> CursorStyle | None:
+        """Read the cursor at viewport CSS pixels, or None when unavailable."""
 
-    def layout_changed(self) -> None: ...
+    def layout_changed(self) -> None:
+        """Invalidate cached document geometry after input changes the layout."""
 
-    async def emit(self, event: InputEvent) -> None: ...
+    async def emit(self, event: InputEvent) -> None:
+        """Publish input feedback stamped with this target's browser and tab."""
 
 
 # Transport for the browser's currently focused tab, or None while none has focus.
@@ -69,7 +78,8 @@ type Focus = Callable[[], InputTarget | None]
 class InputTargets(Protocol):
     """The backend's focused input transport, independent of its browser API."""
 
-    def focused(self) -> InputTarget | None: ...
+    def focused(self) -> InputTarget | None:
+        """Return the focused tab's transport, or None while no tab has focus."""
 
 
 def focused(focus: Focus) -> InputTarget:

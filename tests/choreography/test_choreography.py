@@ -52,7 +52,7 @@ from browserrig.events import (
 )
 from browserrig.files import FileSystem, LocalWorkspace, MountedWorkspace
 from browserrig.input import mouse as mouse_module
-from browserrig.observation.content import PageContent
+from browserrig.observation.content import ExtractedContent
 from browserrig.pacing import InputPacing
 from browserrig.scripts import FindResult
 from browserrig.tools import Actions, FileTools, NavigationTools, PageSearchTools
@@ -330,7 +330,9 @@ async def test_search_page_types_into_the_find_bar_and_shows_records_without_scr
 def _page(monkeypatch, timeline):
     async def extract(_tab, *, full_page):  # pylint: disable=unused-argument
         timeline.append("page read")
-        return PageContent(url="https://example.org/", title="Example", markdown="ab")
+        return ExtractedContent(
+            url="https://example.org/", title="Example", markdown="ab"
+        )
 
     monkeypatch.setattr(search_module, "extract_document", extract)
 

@@ -38,7 +38,8 @@ _CAPTURE_SECONDS = 10
 class Redaction(Protocol):
     """Hides known secret values, e.g. the Secrets plugin."""
 
-    def redact[T](self, value: T) -> T: ...
+    def redact[T](self, value: T) -> T:
+        """Return a value of the same type with known secret text concealed."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -231,7 +232,8 @@ class CaptureStrategy(Protocol):
         region: Region | None = None,
         zoom: float = 1,
         cursor: Point | None = None,
-    ) -> CaptureContent: ...
+    ) -> CaptureContent:
+        """Collect current page data and requested image/region with its resolver."""
 
 
 async def _collect(
@@ -345,12 +347,16 @@ def _mark_new(
 
 
 def _fingerprint(page: PageContent, document_id: str) -> str:
+    if page.content is not None:
+        text = semantic_text(page.content)
+    elif page.text:
+        text = (page.text,)
+    else:
+        text = ()
     fingerprint = PageFingerprint(
         url=page.url,
         document_id=document_id,
-        text=semantic_text(page.content)
-        if page.content is not None
-        else ((page.text,) if page.text else ()),
+        text=text,
         scroll_y=page.scroll_y,
         elements=tuple(
             ElementFingerprint(

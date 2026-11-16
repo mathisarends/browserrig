@@ -12,11 +12,13 @@ class ElementHandle(Protocol):
     """Locate a live target in viewport CSS pixels without performing input."""
 
     @property
-    def element(self) -> ElementInfo: ...
+    def element(self) -> ElementInfo:
+        """Return the target metadata published by the originating capture."""
 
     async def locate(  # pylint: disable=unused-argument
         self, *, aim: Aim | None = None
-    ) -> ElementPoint: ...
+    ) -> ElementPoint:
+        """Return a live viewport CSS point near `aim`; reject stale/blocked targets."""
 
 
 class References(Protocol):
@@ -28,7 +30,8 @@ class References(Protocol):
 
     async def resolve(  # pylint: disable=unused-argument
         self, tab: Tab, snapshot: Snapshot, ref: str
-    ) -> ElementHandle: ...
+    ) -> ElementHandle:
+        """Validate `ref` against this tab/document; raise StaleElement if invalid."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +62,8 @@ class RevealStep:
 class ScrollableElement(Protocol):
     """Optional wheel planning; input remains with Mouse and its Motor."""
 
-    async def scroll_step(self) -> ScrollStep | None: ...
+    async def scroll_step(self) -> ScrollStep | None:
+        """Plan one wheel input without scrolling; None means the target is visible."""
 
 
 class EmptyReferences:
@@ -73,4 +77,5 @@ class EmptyReferences:
 class RevealableElement(Protocol):
     """Optional backend-owned preparation before the shared pointer locates a ref."""
 
-    async def reveal(self, *, report: Callable[[str], None] | None = None) -> bool: ...
+    async def reveal(self, *, report: Callable[[str], None] | None = None) -> bool:
+        """Reveal the target, report applied steps and return whether scrolling occurred."""

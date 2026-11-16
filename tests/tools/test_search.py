@@ -6,7 +6,7 @@ from harnessed.models import ModelChunk
 from harnessed.testing import ScriptedModel
 
 from browserrig import Browser, PageSearchTools, Readiness, Secret, Secrets
-from browserrig.observation.content import PageContent
+from browserrig.observation.content import ExtractedContent
 from browserrig.tools import search as search_module
 from tests.fakes import FakeChrome
 
@@ -21,7 +21,7 @@ async def test_searches_in_one_batch_return_records_without_another_observation(
     monkeypatch,
 ):
     capture = AsyncMock(
-        return_value=PageContent(
+        return_value=ExtractedContent(
             url="https://shop.test/customers", title="Customers", markdown=_ROWS
         )
     )
@@ -67,7 +67,7 @@ async def test_searches_in_one_batch_return_records_without_another_observation(
 async def test_secrets_are_redacted_before_they_can_be_matched(monkeypatch):
     secret = "hunter2-credential"
     capture = AsyncMock(
-        return_value=PageContent(
+        return_value=ExtractedContent(
             url="https://example.org/",
             title="Account",
             markdown=f"Password hint: {secret}",

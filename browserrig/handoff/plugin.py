@@ -191,6 +191,7 @@ class HumanHandoff(Plugin, provides=True):
                 except TimeoutError:
                     return await self._finish(HandoffStatus.TIMEOUT, secrets=secrets)
                 except Exception:  # pylint: disable=broad-exception-caught
+                    # Host callbacks are arbitrary; always record a failed handoff.
                     return await self._finish(
                         HandoffStatus.FAILED,
                         note="The host callback failed; completion is unknown.",
