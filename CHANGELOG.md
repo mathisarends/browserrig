@@ -26,8 +26,8 @@
 - Ship `ActionLabel` for opt-in `CallEnvelope(ActionLabel)` composition. Model-written
   `action_label` values are available to hosts in call envelopes and redacted work
   and action event labels, including failures and cancellation. The built-in overlay
-  keeps its fixed captions. Hosts can read raw call envelopes with Harnessed's
-  `envelope_value` accessor and apply their display redaction policy (#51).
+  keeps its fixed captions. Hosts use `action_label(event, scope=session.scope)`
+  to read call labels with built-in secret redaction (#51).
 - `ActionStartedEvent`, `ActionFinishedEvent` and `ActionFailedEvent` carry the
   originating tool `call_id` and a short display `label` (at most 80 characters;
   the tool name when no model label is supplied). Failure and cancellation keep both, and

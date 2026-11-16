@@ -66,25 +66,22 @@ overlay does not display model labels or add captions for labeled calls.
 Static `ActionKind` values still select scenes and icons. Without a label,
 action events fall back to the tool name.
 
-Hosts can read a label from completed call events with the public typed accessor:
+Hosts read labels from complete call events with the built-in redacting accessor:
 
 ```python
-from harnessed import envelope_value
-from harnessed.events import ToolCallFinishedEvent, ToolCallRequestedEvent
-from browserrig import ActionLabel, Secrets
+from browserrig import action_label
 
-def action_label(event: ToolCallRequestedEvent | ToolCallFinishedEvent, scope):
-    label = envelope_value(event.call, ActionLabel)
-    if label is None:
-        return ""
-    text = label.action_label
-    return scope[Secrets].redact(text) if Secrets in scope else text
+text = action_label(event, scope=session.scope)
 ```
 
-These durable events retain raw call arguments for replay, so hosts apply their
-redaction policy before displaying envelope text, just as for other arguments.
-Browserrig presentation receipts already pass through configured secret
-redaction. Labels arrive once per complete call event, not token by token.
+Pass a `ToolCallRequestedEvent` or `ToolCallFinishedEvent` and its session scope.
+The accessor validates the envelope, applies that session's configured secret
+redaction and returns an empty string for absent or invalid labels. No caller-side
+redaction is needed. The scope is required; without a `Secrets` plugin, ordinary
+label text is returned. Raw events retain call arguments for replay; use
+`action_label` for display rather than reading the raw envelope field.
+Browserrig work and action event labels are already redacted. Labels arrive once
+per complete call event, not token by token.
 
 ## Session videos
 
