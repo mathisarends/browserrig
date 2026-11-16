@@ -1,6 +1,6 @@
 from .capture import CaptureContent, CaptureStrategy, capture
 from .changes import decision_change
-from .config import Screenshots, ScreenshotTrigger
+from .config import PageText, Screenshots, ScreenshotTrigger
 from .content import PageContent as ExtractedContent
 from .content import extract_document
 from .dom_capture import DomCapture
@@ -64,6 +64,7 @@ __all__ = [
     "CaptureContent",
     "CaptureStrategy",
     "DomCapture",
+    "PageText",
     "Screenshots",
     "ScreenshotTrigger",
     "ImageContext",

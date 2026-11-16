@@ -27,7 +27,7 @@ from browserrig import (
 from browserrig.browser import Launch
 from browserrig.core import Bounds, BrowserError, Geometry, Point, Region
 from browserrig.kinds import ElementOperation
-from browserrig.observation import DomPerception, capture, render
+from browserrig.observation import DomPerception, PageText, capture, render
 from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
 from tests.observations import has_image
@@ -249,7 +249,7 @@ async def test_limits_are_reported_and_checkbox_state_changes_fingerprint(site):
         )
         limited = await capture(
             tab,
-            DomCapture(max_elements=1, max_text_chars=2, sparse_text_chars=0),
+            DomCapture(max_elements=1, max_text_chars=2),
             report,
         )
         assert len(limited.elements) == 1 and len(limited.text) <= 2
@@ -282,7 +282,7 @@ async def test_default_text_preserves_dense_page_guidance_with_an_explicit_opt_o
         busy = await capture(tab, DomCapture(), report, previous=sparse)
         assert "Your request was blocked." in busy.text
         assert busy.fingerprint != sparse.fingerprint
-        controls_only = await capture(tab, DomCapture(max_text_chars=0), report)
+        controls_only = await capture(tab, DomCapture(text=PageText.OFF), report)
         assert controls_only.text == ""
 
 

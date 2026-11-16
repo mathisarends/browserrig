@@ -12,6 +12,7 @@ from browserrig.observation import (
     CookieBanner,
     DomCapture,
     Element,
+    PageText,
     capture,
     decision_change,
 )
@@ -195,6 +196,32 @@ async def test_optional_screenshot_failure_retains_the_dom_and_cancels_stalled_w
     assert cancelled == stalled
     extracted.assert_awaited_once()
     tab.frames.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "text,phase,budgets",
+    [
+        (PageText.INLINE, ReadinessPhase.OBSERVATION, (500, 0)),
+        (PageText.SPARSE, ReadinessPhase.OBSERVATION, (0, 500)),
+        (PageText.OFF, ReadinessPhase.OBSERVATION, (0, 0)),
+        (PageText.INLINE, ReadinessPhase.ACTION, (0, 0)),
+    ],
+)
+async def test_page_text_mode_selects_the_extraction_budget(
+    monkeypatch, text, phase, budgets
+):
+    tab = FakeTab()
+    report = await FakeReadiness().wait(tab, phase=phase)
+    page = (await _Capture().collect(tab, report, screenshots=False)).page
+    tab.frames = AsyncMock(return_value=())
+    tab.frame_limitations = ()
+    extracted = AsyncMock(return_value=page)
+    monkeypatch.setattr(dom_capture_module, "extract", extracted)
+    strategy = DomCapture(text=text, max_text_chars=500)
+    await strategy.collect(tab, report, screenshots=False)
+    extracted.assert_awaited_once()
+    options = extracted.await_args.kwargs
+    assert (options["max_text"], options["sparse_text"]) == budgets
 
 
 class _Capture:

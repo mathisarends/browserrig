@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Breaking changes
+
+- Replace `DomCapture(max_text_chars=..., sparse_text_chars=...)` with
+  `DomCapture(text=PageText.INLINE | PageText.SPARSE | PageText.OFF,
+  max_text_chars=...)`. `PageText.OFF` renders only controls with their labels,
+  headings and landmarks, without prose; `SPARSE` uses `max_text_chars` as its
+  budget. `max_text_chars` must be at least 1, and `sparse_text_chars` is
+  removed. `DomRenderer(text=...)` replaces its `max_text_chars` and
+  `sparse_text_chars` fields. Defaults are unchanged.
+
+### Changes
+
+- Add `--page-text` to the WebArena runner and record `page_text` in results,
+  so runs with and without prose between controls can be compared.
 - Fix missing choreography for DOM scroll tools: `InputVisualization` now emits
   separate transient `PageScrolledEvent` and `ElementScrolledEvent` receipts
   with public `tab_id` and measured deltas (`ref` identifies an element) when

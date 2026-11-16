@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from .config import Screenshots, ScreenshotTrigger
+from .config import PageText, Screenshots, ScreenshotTrigger
 from .models import Snapshot
 from .render import render
 
@@ -14,8 +14,8 @@ class Renderer(Protocol):
 
 @dataclass(frozen=True)
 class DomRenderer:
-    max_text_chars: int = 0
-    sparse_text_chars: int = 0
+    # Describes the text a capture supplies; custom captures promise none by default.
+    text: PageText = PageText.OFF
     marks: bool = True
 
     def instructions(self, screenshots: Screenshots) -> str:
@@ -36,20 +36,20 @@ class DomRenderer:
             "Canvas content has no "
             "refs; screenshot it and point with click_at or drag_at. "
         )
-        if self.max_text_chars:
+        if self.text == PageText.INLINE:
             text += (
                 "Visible text appears in reading order beside its controls, within a bounded "
                 "text budget. Plain text has no action refs. A truncation marker applies "
                 "to text at that position; later controls are still listed. "
             )
-        elif self.sparse_text_chars:
+        elif self.text == PageText.SPARSE:
             text += (
                 "When the viewport holds few controls, observations add its visible text; "
                 "otherwise search_page finds it. "
             )
         else:
             text += "Observations omit page text; search_page finds it. "
-        if self.max_text_chars or self.sparse_text_chars:
+        if self.text != PageText.OFF:
             text += (
                 "Links within prose use [label][ref]; pass that ref to element tools. "
             )

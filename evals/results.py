@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, JsonValue
 
+from browserrig.observation import PageText
+
 
 class AgentResponse(BaseModel):
     task_type: Literal["RETRIEVE", "MUTATE", "NAVIGATE"]
@@ -88,6 +90,8 @@ class BenchmarkResult(BaseModel):
     keep_last_steps: int | None = None
     target_ratio: float | None = None
     max_summary_tokens: int | None = None
+    # Runs recorded before the option observed inline text.
+    page_text: PageText = PageText.INLINE
     model: str
     # Snapshots written before subscription support used API keys.
     provider: Literal["openai", "openai-codex"] = "openai"

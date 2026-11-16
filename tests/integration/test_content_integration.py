@@ -6,7 +6,7 @@ import pytest
 from browserrig import ChromeBrowser, DomCapture, wait_for_page
 from browserrig.browser import Launch
 from browserrig.kinds import ElementOperation
-from browserrig.observation import capture
+from browserrig.observation import PageText, capture
 from browserrig.observation.content import extract_content
 from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
@@ -46,9 +46,7 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
         """,
         )
         report = await wait_for_page(tab)
-        snapshot = await capture(
-            tab, DomCapture(max_text_chars=0, sparse_text_chars=0), report
-        )
+        snapshot = await capture(tab, DomCapture(text=PageText.OFF), report)
         assert snapshot.image is None
         assert snapshot.text == ""
         assert not snapshot.limitations
