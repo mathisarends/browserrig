@@ -92,6 +92,7 @@ class EventKind(StrEnum):
     PAGE_CAPTURE_STARTED = "browser.page.capture.started"
     PAGE_CAPTURE_FINISHED = "browser.page.capture.finished"
     WORK_PRESENTED = "browser.work.presented"
+    TOOL_CALL_PRESENTED = "browser.tool_call.presented"
     DOWNLOAD_PRESENTED = "browser.download.presented"
     UPLOAD_PRESENTED = "browser.upload.presented"
     ACTIVITY_PRESENTED = "browser.activity.presented"

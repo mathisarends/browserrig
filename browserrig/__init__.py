@@ -12,7 +12,7 @@ from .browser import (
     SessionSetup,
     Viewport,
 )
-from .choreography import Choreography, TabStrip
+from .choreography import ActionLabels, Choreography, TabStrip
 from .completion import Done
 from .composition import (  # smelt: ignore[SMT106] -- public facade
     ContextCompaction,
@@ -92,7 +92,7 @@ from .readiness import (
     wait_for_page,
 )
 from .recording import RecordingResult, VideoRecording
-from .secrets import Secret, Secrets, SecretValue, Totp, action_label, env
+from .secrets import Secret, Secrets, SecretValue, Totp, env
 from .terminal import TerminalEvents
 from .todos import Todo, TodoList, Todos
 from .tools import (
@@ -120,7 +120,7 @@ from .tools import (
 __version__ = "0.5.0"
 
 __all__ = [
-    "action_label",
+    "ActionLabels",
     "ActionLabel",
     "Runtime",
     "ActionContext",

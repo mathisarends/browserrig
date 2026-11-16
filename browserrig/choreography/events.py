@@ -1,11 +1,13 @@
 """Events of the staged scene: what a viewer sees beyond raw input.
 
-They are only emitted while the `Choreography` plugin is mounted.
+`Choreography` publishes scene events; `ActionLabels` publishes host call events.
 """
 
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Literal
+
+from harnessed import ToolStatus
 
 from browserrig.core import (
     ActionKind,
@@ -340,6 +342,41 @@ class ActivityPresentedEvent(PresentedEvent):
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "kind", ActivityKind(self.kind))
+
+
+class ToolCallPhase(StrEnum):
+    REQUESTED = "requested"
+    FINISHED = "finished"
+
+
+@dataclass(frozen=True, slots=True)
+class ActionEnvelope:
+    """A display snapshot, redacted before publication, with no live session state."""
+
+    action_label: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCallPresentedEvent(LiveEvent):
+    """A complete call's redacted display envelope for host UIs, separate from replay data.
+
+    The built-in overlay does not consume this event. Missing or invalid model labels
+    produce an empty `envelope.action_label`; finished calls also carry their status.
+    """
+
+    call_id: str
+    tool_name: str
+    phase: ToolCallPhase
+    envelope: ActionEnvelope = field(default_factory=ActionEnvelope)
+    status: ToolStatus | None = None
+    type: Literal[EventKind.TOOL_CALL_PRESENTED] = field(
+        default=EventKind.TOOL_CALL_PRESENTED, kw_only=True
+    )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "phase", ToolCallPhase(self.phase))
+        if self.status is not None:
+            object.__setattr__(self, "status", ToolStatus(self.status))
 
 
 SCENE_EVENTS = (

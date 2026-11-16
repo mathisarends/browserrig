@@ -2,6 +2,7 @@
 
 from .events import (
     SCENE_EVENTS,
+    ActionEnvelope,
     ActivityPresentedEvent,
     AddressBarFocusedEvent,
     BackPressedEvent,
@@ -20,16 +21,23 @@ from .events import (
     ReloadPressedEvent,
     TabPressedEvent,
     ToolbarPressedEvent,
+    ToolCallPhase,
+    ToolCallPresentedEvent,
     UploadPresentedEvent,
     WaitingEvent,
     WorkPhase,
     WorkPresentedEvent,
 )
+from .labels import ActionLabels
 from .plugin import Choreography
 from .stage import Stage
 from .tabstrip import TabStrip
 
 __all__ = [
+    "ActionEnvelope",
+    "ActionLabels",
+    "ToolCallPhase",
+    "ToolCallPresentedEvent",
     "ActivityPresentedEvent",
     "DownloadPresentedEvent",
     "PresentedEvent",

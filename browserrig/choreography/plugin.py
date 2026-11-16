@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 from time import monotonic
 from typing import Any
 
-from harnessed import Plugin, PluginState, ToolResult, ToolStatus, hook
+from harnessed import Plugin, PluginState, ToolResult, ToolStatus, envelope_value, hook
 from harnessed.events import ToolCallFinishedEvent, TurnEndedEvent, TurnStartedEvent
 from harnessed.hooks import ExecuteTool, Next
 from harnessed.kernel import PluginScope, needs
@@ -25,7 +25,7 @@ from browserrig.events import (
 )
 from browserrig.input import Input
 from browserrig.observation import BrowserPerception
-from browserrig.secrets import Secrets, action_label
+from browserrig.secrets import Secrets
 from browserrig.tools import (
     ControlIntent,
     DomScrollIntent,
@@ -241,8 +241,8 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
             return
         if event.result.is_error:
             result = self._redact(event.result)
-            context = self._state.context
-            assert context is not None
+            label = envelope_value(event.call, ActionLabel)
+            text = self._redact(label.action_label) if label is not None else ""
             await self._emit(
                 WorkPresentedEvent(
                     work_id=f"tool:{event.call_id}",
@@ -250,7 +250,7 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
                     tool_name=event.call.name,
                     kind=None,
                     title="Tool not executed",
-                    label=action_label(event, scope=context),
+                    label=text,
                     phase=WorkPhase.FAILED,
                     detail=f"{event.call.name} · {result.status.value}",
                     preview=work.clipped(result.text),

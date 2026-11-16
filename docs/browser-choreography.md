@@ -39,49 +39,60 @@ and recordings. Ordinary model screenshots omit viewer surfaces; see
 
 ## Model-written action labels
 
-Ask the model for a short action label on each tool call by adding Harnessed's
-registry-wide envelope plugin:
+Ask the model for a short action label on each tool call and receive redacted
+display events by adding `ActionLabels`:
 
 ```python
-from harnessed.plugins import CallEnvelope
-from browserrig import ActionLabel, Agent
+from browserrig import ActionLabels, Agent
 
-agent = Agent(plugins=[CallEnvelope(ActionLabel)])
+agent = Agent(plugins=[ActionLabels()])
 ```
 
-This opt-in adds `action_label` to tool schemas, including tools from other
-plugins and MCP servers. It costs extra output tokens per call. The envelope is
+This opt-in registers the `ActionLabel` envelope and adds `action_label` to tool
+schemas, including tools from other plugins and MCP servers. It costs extra
+output tokens per call. The envelope is
 validated and removed before the tool runs; tool implementations do not change.
 Missing or invalid labels are dropped by default and the call still runs.
 Without the plugin, schemas and presentation stay unchanged. For a native
-Harnessed agent, compose `plugins=[browser_pack(), CallEnvelope(ActionLabel)]`;
+Harnessed agent, compose `plugins=[browser_pack(), ActionLabels()]`;
 no separate pack flag is needed.
 
-Labels are data for host UIs in the event stream. `Choreography` carries the
-redacted text in `WorkPresentedEvent.label` through completion, failure and
-cancellation. Input actions carry it in `ActionStartedEvent.label`,
+Hosts access the label directly in their stream's `match`:
+
+```python
+from browserrig.choreography import ToolCallPresentedEvent
+
+async with agent.session() as session:
+    async with session.stream("Read the annual report") as stream:
+        async for event in stream:
+            match event:
+                case ToolCallPresentedEvent() as event:
+                    print(event.envelope.action_label)
+```
+
+`ToolCallPresentedEvent` carries `call_id`, `tool_name`, `phase`
+(`ToolCallPhase.REQUESTED` or `FINISHED`) and `envelope.action_label`. Finished
+calls also include their `ToolStatus` in `status`, including errors, denials and
+cancellation. Missing or invalid labels become an empty string. Envelopes are
+immutable display snapshots, automatically redacted against the session's known
+secrets before publication; no helper, scope lookup or caller-side redaction is
+needed. They remain readable after the session closes, and serialize as a nested
+`envelope` object. The events work without `Choreography`, its overlay or a browser.
+
+These notifications are transient: they appear in `session.stream(...)` and
+`session.subscribe(transient=True)`, but are not stored in run results or replay
+logs. Harnessed's `ToolCallRequestedEvent` and `ToolCallFinishedEvent` remain the
+raw execution records; the host display uses `ToolCallPresentedEvent`.
+
+`Choreography` also carries redacted text in `WorkPresentedEvent.label` through
+completion, failure and cancellation. Input actions carry it in `ActionStartedEvent.label`,
 `ActionFinishedEvent.label` and `ActionFailedEvent.label`, with the originating
 `call_id`. `WorkPresentedEvent.title` retains its fixed caption; the built-in
 overlay does not display model labels or add captions for labeled calls.
 Static `ActionKind` values still select scenes and icons. Without a label,
 action events fall back to the tool name.
 
-Hosts read labels from complete call events with the built-in redacting accessor:
-
-```python
-from browserrig import action_label
-
-text = action_label(event, scope=session.scope)
-```
-
-Pass a `ToolCallRequestedEvent` or `ToolCallFinishedEvent` and its session scope.
-The accessor validates the envelope, applies that session's configured secret
-redaction and returns an empty string for absent or invalid labels. No caller-side
-redaction is needed. The scope is required; without a `Secrets` plugin, ordinary
-label text is returned. Raw events retain call arguments for replay; use
-`action_label` for display rather than reading the raw envelope field.
-Browserrig work and action event labels are already redacted. Labels arrive once
-per complete call event, not token by token.
+Labels arrive once per complete call event, not token by token.
 
 ## Session videos
 

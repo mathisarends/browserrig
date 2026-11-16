@@ -5,11 +5,11 @@ import pytest
 from harnessed import Agent, Plugin, PolicyDecision, ToolCall
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals, CallEnvelope
+from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
-    ActionLabel,
+    ActionLabels,
     Browser,
     Choreography,
     ChoreographyOverlay,
@@ -31,6 +31,7 @@ from browserrig.choreography import (
     BackPressedEvent,
     CursorEnteredEvent,
     FileTransferEvent,
+    ToolCallPresentedEvent,
     WorkPhase,
     WorkPresentedEvent,
 )
@@ -484,13 +485,14 @@ async def test_model_labels_stay_in_the_event_stream_without_changing_overlay(
         browser=Chrome.launch(url=site),
         plugins=[
             Files(LocalWorkspace(tmp_path)),
-            CallEnvelope(ActionLabel),
+            ActionLabels(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
         without=(InputPacing,),
     )
     captions = []
     receipts = []
+    displayed_calls = []
     async with agent.session() as session:
         tab = session.scope[Browser].active_tab
         await session.scope[Input].mouse.move_to(Point(x=60, y=15))
@@ -504,8 +506,15 @@ async def test_model_labels_stay_in_the_event_stream_without_changing_overlay(
 
         session.scope.on(ToolCallFinishedEvent, caption)
         session.scope.on(WorkPresentedEvent, receipts.append)
+        session.scope.on(ToolCallPresentedEvent, displayed_calls.append)
         result = await session.run("Focus the field, then read the report")
     assert captions == ["", ""]
+    assert [event.envelope.action_label for event in displayed_calls] == [
+        "Focusing the email field",
+        "Focusing the email field",
+        "Reading the annual report",
+        "Reading the annual report",
+    ]
     assert not any(receipt.call_id == calls[0].id for receipt in receipts)
     updates = [receipt for receipt in receipts if receipt.call_id == calls[1].id]
     assert updates[0].phase is WorkPhase.RUNNING
