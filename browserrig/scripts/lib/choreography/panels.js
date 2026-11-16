@@ -85,16 +85,32 @@ function createChoreographyPanels(ui, caption) {
     }
   };
   // Back, forward and reload appear as one short card in the middle of the page.
-  const press = (control, location) => {
+  // A press without a location keeps the one its work receipt showed.
+  const press = (control, location, hold = 900) => {
     ui.node('history-icon').innerHTML = icon(control);
     ui.node('history-title').textContent =
       {back: 'Back', forward: 'Forward', reload: 'Reload'}[control] || '';
-    ui.node('history-detail').textContent = host(location);
+    if (location !== undefined) {
+      ui.node('history-detail').textContent = host(location);
+    }
     ui.panel('history', true);
-    ui.hide('history', 900);
+    ui.hide('history', hold);
+  };
+  // The pointer heads for the empty address bar, or for the card of a history control.
+  const toolbar = (event, control) => {
+    if (control === 'address') {
+      typed({text: '', key: ''});
+      return;
+    }
+    press(control, undefined, event.duration * 1000 + 900);
   };
   const show = (event) => {
     const kinds = ui.options().events;
+    const control = ui.toolbar(event);
+    if (control) {
+      toolbar(event, control);
+      return;
+    }
     switch (event.type) {
       case kinds.HIGHLIGHT_ELEMENT:
         highlight(event);

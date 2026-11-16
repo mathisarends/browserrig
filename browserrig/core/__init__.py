@@ -9,13 +9,25 @@ from .errors import (
     SecretError,
     StaleElement,
 )
-from .geometry import Bounds, ElementPoint, FrameTransform, Geometry, Point, Region
+from .geometry import (
+    Aim,
+    Bounds,
+    Box,
+    ElementPoint,
+    FrameTransform,
+    Geometry,
+    Point,
+    Position,
+    Region,
+    ViewportSize,
+)
 from .ids import ActionId, DocumentId, TargetId
 from .kinds import (
     ActionKind,
     ActivityKind,
     ActivityOutcome,
     BrowserBar,
+    BrowserControl,
     CursorStyle,
     ElementOperation,
     FileSource,
@@ -45,8 +57,11 @@ __all__ = [
     "ActionKind",
     "ActivityKind",
     "ActivityOutcome",
+    "Aim",
     "Bounds",
+    "Box",
     "BrowserBar",
+    "BrowserControl",
     "BrowserClosed",
     "BrowserError",
     "BrowserToolMetadata",
@@ -63,6 +78,7 @@ __all__ = [
     "MouseEventKind",
     "Options",
     "Point",
+    "Position",
     "ReadinessError",
     "ReadinessPhase",
     "ReadinessStage",
@@ -72,5 +88,6 @@ __all__ = [
     "StaleElement",
     "TabGesture",
     "TargetId",
+    "ViewportSize",
     "browser_tool",
 ]

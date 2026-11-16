@@ -12,10 +12,14 @@ from .core import (
     CursorStyle,
     FileSource,
     HandoffStatus,
+    Position,
     ReadinessPhase,
     ReadinessStage,
     ReadinessStatus,
+    ViewportSize,
 )
+
+type HandoffSource = Literal["tool", "pause"]
 
 
 class EventKind(StrEnum):
@@ -68,6 +72,10 @@ class EventKind(StrEnum):
     CURSOR_STYLE = "browser.cursor.style"
     CURSOR_ENTERED = "browser.cursor.entered"
     TAB_PRESSED = "browser.tab.pressed"
+    ADDRESS_BAR_FOCUSED = "browser.address_bar.focused"
+    BACK_PRESSED = "browser.back.pressed"
+    FORWARD_PRESSED = "browser.forward.pressed"
+    RELOAD_PRESSED = "browser.reload.pressed"
     POINTER_PRESSED = "browser.pointer.pressed"
     POINTER_RELEASED = "browser.pointer.released"
     KEY_PRESSED = "browser.key.pressed"
@@ -84,6 +92,9 @@ class EventKind(StrEnum):
     PAGE_CAPTURE_STARTED = "browser.page.capture.started"
     PAGE_CAPTURE_FINISHED = "browser.page.capture.finished"
     WORK_PRESENTED = "browser.work.presented"
+    DOWNLOAD_PRESENTED = "browser.download.presented"
+    UPLOAD_PRESENTED = "browser.upload.presented"
+    ACTIVITY_PRESENTED = "browser.activity.presented"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -120,6 +131,18 @@ class InputEvent(LiveEvent):
     action_id: str = ""
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PositionedEvent(InputEvent):
+    """Input with coordinates in CSS pixels of the tab's top-level layout viewport.
+
+    The origin is the viewport's top-left corner. `viewport` is its size when the input
+    was performed, so viewers scale by `viewport` rather than a size measured later.
+    It is None when the browser could not report its size.
+    """
+
+    viewport: ViewportSize | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class PageCaptureStartedEvent(BrowserEvent):
     """Before application overlays are hidden; subscribers finish before capture."""
@@ -141,11 +164,11 @@ class PageCaptureFinishedEvent(BrowserEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class CursorMovedEvent(InputEvent):
-    from_position: tuple[float, float]
-    to_position: tuple[float, float]
-    control_point_1: tuple[float, float]
-    control_point_2: tuple[float, float]
+class CursorMovedEvent(PositionedEvent):
+    from_position: Position
+    to_position: Position
+    control_point_1: Position
+    control_point_2: Position
     duration: float
     easing: Literal["easeInOutCubic"] = "easeInOutCubic"
     type: Literal[EventKind.CURSOR_MOVED] = field(
@@ -154,7 +177,7 @@ class CursorMovedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class CursorStateEvent(InputEvent):
+class CursorStateEvent(PositionedEvent):
     x: float
     y: float
     buttons: int = 0
@@ -174,7 +197,7 @@ class CursorStyleEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class PointerPressedEvent(InputEvent):
+class PointerPressedEvent(PositionedEvent):
     x: float
     y: float
     click_count: int
@@ -185,7 +208,7 @@ class PointerPressedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class PointerReleasedEvent(InputEvent):
+class PointerReleasedEvent(PositionedEvent):
     x: float
     y: float
     click_count: int
@@ -214,7 +237,7 @@ class KeyboardVisibilityEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class ScrollStartedEvent(InputEvent):
+class ScrollStartedEvent(PositionedEvent):
     """The native wheel gesture is about to run for its planned duration."""
 
     x: float
@@ -228,7 +251,7 @@ class ScrollStartedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class ScrolledEvent(InputEvent):
+class ScrolledEvent(PositionedEvent):
     x: float
     y: float
     delta_x: float
@@ -633,7 +656,7 @@ class HandoffRequestedEvent(BrowserEvent):
     handoff_id: str
     reason: str
     expected_state: str = ""
-    source: Literal["tool", "pause"] = "tool"
+    source: HandoffSource = "tool"
     call_id: str = ""
     type: Literal[EventKind.HANDOFF_REQUESTED] = field(
         default=EventKind.HANDOFF_REQUESTED, kw_only=True
@@ -646,7 +669,7 @@ class HandoffFinishedEvent(BrowserEvent):
     status: HandoffStatus
     note: str = ""
     changes: tuple[str, ...] = ()
-    source: Literal["tool", "pause"] = "tool"
+    source: HandoffSource = "tool"
     call_id: str = ""
     type: Literal[EventKind.HANDOFF_FINISHED] = field(
         default=EventKind.HANDOFF_FINISHED, kw_only=True

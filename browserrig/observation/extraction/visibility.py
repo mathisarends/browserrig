@@ -1,6 +1,7 @@
 """Decide whether an element can be seen, and whether something paints over it."""
 
 import re
+from typing import NamedTuple
 
 from .document import Document, Rect, intersect, is_empty
 from .styles import Style
@@ -55,7 +56,7 @@ class Occlusion:
 
     def __init__(self, document: Document, viewport: Rect | None) -> None:
         self._document = document
-        self._boxes: list[tuple[int, int, Rect]] = []
+        self._boxes: list[_PaintedBox] = []
         if viewport is None:
             return
         for index in document.elements():
@@ -71,7 +72,9 @@ class Occlusion:
                 area is not None
                 and (area[2] - area[0]) * (area[3] - area[1]) >= _MIN_OCCLUDER_AREA
             ):
-                self._boxes.append((document.paint_order(index), index, area))
+                self._boxes.append(
+                    _PaintedBox(document.paint_order(index), index, area)
+                )
         self._boxes.sort(reverse=True)
 
     def covered(self, index: int, area: Rect) -> bool:
@@ -106,3 +109,9 @@ def _paints(document: Document, index: int) -> bool:
     if document.tag(index) in _OPAQUE_TAGS:
         return True
     return document.style(index, Style.BACKGROUND_COLOR) not in _TRANSPARENT
+
+
+class _PaintedBox(NamedTuple):
+    paint_order: int
+    index: int
+    area: Rect

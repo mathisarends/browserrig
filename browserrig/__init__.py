@@ -11,7 +11,7 @@ from .browser import (
     SessionSetup,
     Viewport,
 )
-from .choreography import IframeRenderer, InputVisualization, TabStrip
+from .choreography import Choreography, TabStrip
 from .completion import Done
 from .composition import (  # smelt: ignore[SMT106] -- public facade
     ContextCompaction,
@@ -73,6 +73,7 @@ from .observation import (
     TrimInBatches,
     UntilCompaction,
 )
+from .overlay import ChoreographyOverlay
 from .pacing import InputPacing
 from .readiness import (
     CheckReadiness,
@@ -114,7 +115,7 @@ from .tools import (
     WorkspaceTools,
 )
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     "Runtime",
@@ -184,8 +185,8 @@ __all__ = [
     "BrowserFileTools",
     "WorkspaceTools",
     "JavaScriptTools",
-    "InputVisualization",
-    "IframeRenderer",
+    "Choreography",
+    "ChoreographyOverlay",
     "Overlay",
     "Overlays",
     "TabStrip",

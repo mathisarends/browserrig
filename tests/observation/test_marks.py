@@ -42,7 +42,7 @@ def test_cursor_tip_matches_viewport_and_zoomed_crop_with_or_without_refs(
         if marks
         else ()
     )
-    encoded = annotate(screenshot, elements, area, scale, cursor=cursor)
+    encoded = annotate(screenshot, elements, area, scale=scale, cursor=cursor)
     with Image.open(BytesIO(base64.b64decode(encoded))) as image:
         assert image.size == (area.width * scale, area.height * scale)
         assert image.getpixel(pixel) == (30, 30, 30)

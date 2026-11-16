@@ -10,13 +10,13 @@ from harnessed.testing import ScriptedModel
 from browserrig import Agent as BrowserAgent
 from browserrig import (
     Browser,
+    Choreography,
+    ChoreographyOverlay,
     Chrome,
     Files,
-    IframeRenderer,
     Input,
     InputPacing,
     InputRuntime,
-    InputVisualization,
     LocalWorkspace,
     Point,
     Runtime,
@@ -24,7 +24,14 @@ from browserrig import (
     wait_for_page,
 )
 from browserrig.browser import Frame, screenshot
-from browserrig.choreography import FileTransferEvent, WorkPhase, WorkPresentedEvent
+from browserrig.choreography import (
+    AddressBarFocusedEvent,
+    BackPressedEvent,
+    CursorEnteredEvent,
+    FileTransferEvent,
+    WorkPhase,
+    WorkPresentedEvent,
+)
 from browserrig.core import FileTransferDirection
 from browserrig.events import (
     CursorStateEvent,
@@ -53,7 +60,8 @@ async def test_file_cards_wait_for_explicit_completion_receipts(site):
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(),
+            Choreography(),
+            ChoreographyOverlay(),
             _UploadReceipts(),
         ],
     )
@@ -102,7 +110,8 @@ async def test_scroll_feedback_is_visible_during_native_wheel_input(site):
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(),
+            Choreography(),
+            ChoreographyOverlay(),
         ],
     )
     async with agent.session() as session:
@@ -132,7 +141,8 @@ async def test_keyboard_fits_a_compact_viewport_and_keeps_secret_keys_private(si
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site, viewport=Viewport(width=360, height=640)),
-            InputVisualization(renderer=IframeRenderer(keyboard_layout="de")),
+            Choreography(),
+            ChoreographyOverlay(keyboard_layout="de"),
         ],
     )
     async with agent.session() as session:
@@ -154,6 +164,42 @@ async def test_keyboard_fits_a_compact_viewport_and_keeps_secret_keys_private(si
         assert result["active"] == 0 and result["protected"] == "true"
 
 
+async def test_toolbar_presses_lead_the_pointer_to_the_drawn_controls(site):
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            Runtime(),
+            InputRuntime(),
+            Chrome.launch(url=site),
+            Choreography(),
+            ChoreographyOverlay(),
+        ],
+    )
+    pointer = """(() => {
+        const cursor = document.querySelector('#cursor');
+        const at = new DOMMatrix(getComputedStyle(cursor).transform);
+        const target = (id) => document.querySelector(id).getBoundingClientRect();
+        return {style: cursor.dataset.style, x: at.m41, y: at.m42,
+          address: document.querySelector('#address').dataset.visible,
+          history: document.querySelector('#history').dataset.visible,
+          bar: target('#address-text').toJSON(), icon: target('#history-icon').toJSON()};
+    })()"""
+    async with agent.session() as session:
+        tab = session.scope[Browser].active_tab
+        await tab.emit(CursorStateEvent(x=300, y=400))
+        await tab.emit(AddressBarFocusedEvent(from_position=(300, 400), duration=0))
+        focused = await _settled(tab, pointer, lambda state: _inside(state, "bar"))
+        assert focused["style"] == "text" and focused["address"] == "true"
+
+        await tab.emit(BackPressedEvent(from_position=(300, 400), duration=0))
+        pressed = await _settled(tab, pointer, lambda state: _inside(state, "icon"))
+        assert pressed["style"] == "pointer" and pressed["history"] == "true"
+
+        await tab.emit(CursorEnteredEvent(to_position=(300, 400), duration=0))
+        returned = await _settled(tab, pointer, lambda state: state["x"] == 300)
+        assert returned["style"] != "pointer" and returned["y"] == 400
+
+
 async def test_long_cursor_badge_stays_inside_a_compact_viewport(site):
     agent = Agent(
         model=ScriptedModel([]),
@@ -161,7 +207,8 @@ async def test_long_cursor_badge_stays_inside_a_compact_viewport(site):
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site, viewport=Viewport(width=360, height=640)),
-            InputVisualization(renderer=IframeRenderer(name="W" * 40)),
+            Choreography(),
+            ChoreographyOverlay(name="W" * 40),
         ],
     )
     async with agent.session() as session:
@@ -197,10 +244,11 @@ async def test_work_stream_is_complete_with_and_without_local_rendering(
         browser=Chrome.launch(url=site),
         plugins=[
             Files(LocalWorkspace(tmp_path)),
-            InputVisualization(renderer=IframeRenderer() if local_renderer else None),
             Approvals(default=PolicyDecision.ALLOW),
         ],
-        without=(InputPacing,),
+        without=(InputPacing,)
+        if local_renderer
+        else (InputPacing, ChoreographyOverlay),
     )
     receipts = []
     async with agent.session() as session:
@@ -265,7 +313,8 @@ async def test_simultaneous_downloads_keep_independent_progress_and_outcomes(sit
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(),
+            Choreography(),
+            ChoreographyOverlay(),
         ],
     )
     async with agent.session() as session:
@@ -311,7 +360,8 @@ async def test_work_and_transfers_fit_the_viewport(site, tmp_path, theme, width)
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site, viewport=Viewport(width=width, height=740)),
-            InputVisualization(renderer=IframeRenderer(theme=theme)),
+            Choreography(),
+            ChoreographyOverlay(theme=theme),
         ],
     )
     async with agent.session() as session:
@@ -360,7 +410,8 @@ async def test_running_work_restores_after_navigation_without_pointer_input(site
             Runtime(),
             InputRuntime(),
             Chrome.launch(url=site),
-            InputVisualization(),
+            Choreography(),
+            ChoreographyOverlay(),
         ],
     )
     async with agent.session() as session:
@@ -403,6 +454,22 @@ async def test_running_work_restores_after_navigation_without_pointer_input(site
             )
             == "completed"
         )
+
+
+async def _settled(tab, expression, done, seconds=3):
+    """The surface state once `done` holds, as animations finish on the next frames."""
+    async with asyncio.timeout(seconds):
+        while not done(state := await _surface(tab, expression)):
+            await asyncio.sleep(0.05)
+    return state
+
+
+def _inside(state, control) -> bool:
+    box = state[control]
+    return (
+        box["left"] <= state["x"] <= box["right"]
+        and box["top"] <= state["y"] <= box["bottom"]
+    )
 
 
 async def _surface(tab, expression):

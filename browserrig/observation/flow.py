@@ -1,7 +1,6 @@
 """Render mixed page content without losing the position of noninteractive text."""
 
 from collections.abc import Callable
-from typing import Literal
 
 from .models import (
     ContentGroup,
@@ -12,6 +11,7 @@ from .models import (
     Heading,
     Snapshot,
     TextBlock,
+    ViewportSide,
 )
 
 _LANDMARKS = {
@@ -31,7 +31,7 @@ _PROSE = frozenset({"paragraph", "blockquote", "listitem", "cell"})
 
 def render_flow(
     snapshot: Snapshot,
-    position: Literal["above", "below"] | None,
+    position: ViewportSide | None,
     format_element: Callable[[ElementInfo], str],
 ) -> list[str]:
     """Filter leaves to one viewport partition while retaining their enclosing groups."""
@@ -42,7 +42,7 @@ def render_flow(
     for banner in snapshot.cookie_banners:
         if position is None and banner not in banners.values():
             lines.extend(_banner(banner, 1))
-    lines.extend(_lines(nodes, elements, format_element, banners, 1))
+    lines.extend(_lines(nodes, elements, format_element, banners, depth=1))
     return lines
 
 
@@ -63,7 +63,7 @@ def semantic_text(nodes: tuple[ContentNode, ...]) -> tuple[str, ...]:
 def _partition(
     nodes: tuple[ContentNode, ...],
     elements: dict[str, ElementInfo],
-    position: Literal["above", "below"] | None,
+    position: ViewportSide | None,
 ) -> tuple[ContentNode, ...]:
     selected: list[ContentNode] = []
     for node in nodes:
@@ -117,8 +117,8 @@ def _lines(
     elements: dict[str, ElementInfo],
     format_element: Callable[[ElementInfo], str],
     banners: dict[str, CookieBanner],
-    depth: int,
     *,
+    depth: int,
     banner_text: bool = False,
 ) -> list[str]:
     lines: list[str] = []
@@ -136,7 +136,7 @@ def _lines(
                         elements,
                         format_element,
                         banners,
-                        depth,
+                        depth=depth,
                         banner_text=banner_text,
                     )
                 )
@@ -175,8 +175,8 @@ def _group_lines(
     elements: dict[str, ElementInfo],
     format_element: Callable[[ElementInfo], str],
     banners: dict[str, CookieBanner],
-    depth: int,
     *,
+    depth: int,
     banner_text: bool,
 ) -> list[str]:
     lines: list[str] = []
@@ -198,7 +198,7 @@ def _group_lines(
             elements,
             format_element,
             banners,
-            depth if transparent else depth + 1,
+            depth=depth if transparent else depth + 1,
             banner_text=banner_text or banner is not None,
         )
     )

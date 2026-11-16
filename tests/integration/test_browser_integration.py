@@ -7,19 +7,27 @@ from harnessed.testing import ScriptedModel
 
 from browserrig import (
     Browser,
+    Choreography,
     Chrome,
     ChromeBrowser,
     Input,
     InputRuntime,
-    InputVisualization,
     Runtime,
     Viewport,
     wait_for_page,
 )
 from browserrig.browser import Connect, Launch
 from browserrig.choreography import CursorEnteredEvent, Stage, TabPressedEvent
-from browserrig.core import Point
-from browserrig.events import BrowserEvent, CursorStateEvent, InputEvent, TabOpenedEvent
+from browserrig.core import Point, ViewportSize
+from browserrig.events import (
+    BrowserEvent,
+    CursorMovedEvent,
+    CursorStateEvent,
+    InputEvent,
+    PointerPressedEvent,
+    PositionedEvent,
+    TabOpenedEvent,
+)
 from browserrig.input import HumanMotor
 from browserrig.kinds import TabGesture
 from tests.javascript import evaluate
@@ -46,8 +54,47 @@ async def test_custom_setup_reaches_page_and_oopif_sessions(site):
             (tab.cdp.session_id, False),
             (frames[1].cdp.session_id, True),
         ]
-        assert await tab.viewport_size() == (900, 700)
+        assert await tab.viewport_size() == ViewportSize(width=900, height=700)
         assert await evaluate(tab, "devicePixelRatio") == 2
+
+
+async def test_coordinate_receipts_carry_the_viewport_of_their_input(site):
+    events = []
+
+    async def emit(event):
+        events.append(event)
+
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            Runtime(),
+            InputRuntime(),
+            Chrome.launch(url=site),
+            Choreography(),
+        ],
+    )
+    async with agent.session() as session:
+        session.scope.on(InputEvent, emit)
+        tab = session.scope[Browser].active_tab
+        mouse = session.scope[Input].mouse
+        await mouse.move_to(Point(x=100, y=120))
+        before = await tab.viewport_size()
+        resized = len(events)
+        # A live resize between gestures, as when the viewer's window changes size.
+        await tab.cdp.emulation.set_device_metrics_override(
+            width=640, height=480, device_scale_factor=1, mobile=False
+        )
+        await mouse.click(Point(x=300, y=200))
+        after = await tab.viewport_size()
+    assert before != after
+    positioned = [event for event in events if isinstance(event, PositionedEvent)]
+    assert all(event.viewport is not None for event in positioned)
+    first = [e for e in events[:resized] if isinstance(e, CursorMovedEvent)]
+    second = [e for e in events[resized:] if isinstance(e, CursorMovedEvent)]
+    assert first and all(event.viewport == before for event in first)
+    assert second and all(event.viewport == after for event in second)
+    press = next(e for e in events[resized:] if isinstance(e, PointerPressedEvent))
+    assert press.viewport == after and (press.x, press.y) == (300, 200)
 
 
 async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site):
@@ -62,7 +109,7 @@ async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site
             Runtime(),
             Chrome(),
             InputRuntime(),
-            InputVisualization(renderer=None),
+            Choreography(),
         ],
     )
     async with agent.session() as session:
@@ -73,8 +120,10 @@ async def test_tabs_land_the_cursor_and_activation_republishes_its_position(site
         first = browser.active_tab
         # Unwatched, the cursor lands centered and nothing is reported.
         assert not any(isinstance(event, CursorStateEvent) for event in events)
-        width, height = await first.viewport_size()
-        assert devices.mouse.position == Point(x=width / 2, y=height / 2)
+        viewport = await first.viewport_size()
+        assert devices.mouse.position == Point(
+            x=viewport.width / 2, y=viewport.height / 2
+        )
         devices.pace(HumanMotor())
         devices.present(Stage())
         await devices.mouse.move_to(Point(x=100, y=120))
@@ -152,6 +201,6 @@ async def test_viewport_resizes_are_counted_and_report_the_new_size(site):
         async with asyncio.timeout(5):
             while tab.viewport_revision == before:
                 await asyncio.sleep(0.02)
-        width, height = await tab.viewport_size()
+        viewport = await tab.viewport_size()
         # The client width excludes a page scrollbar.
-        assert width <= 700 and height == 500
+        assert viewport.width <= 700 and viewport.height == 500

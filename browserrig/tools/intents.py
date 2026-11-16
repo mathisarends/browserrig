@@ -10,7 +10,7 @@ from typing import Any
 from harnessed.kernel import Event, Waterfall
 
 from browserrig.browser import Tab
-from browserrig.core import Bounds, Point
+from browserrig.core import Bounds, BrowserControl, Point
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +29,13 @@ class NavigateIntent:
 
     url: str
     typed: str
+
+
+@dataclass(frozen=True, slots=True)
+class ControlIntent:
+    """Go back, go forward or reload, as a person would with a toolbar `control`."""
+
+    control: BrowserControl
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +68,8 @@ class DomScrollIntent:
 
 
 type Intent = (
-    NavigateIntent
+    ControlIntent
+    | NavigateIntent
     | OpenFileIntent
     | SearchIntent
     | UploadIntent

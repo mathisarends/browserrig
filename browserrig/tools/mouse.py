@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Annotated, Literal
+from typing import Annotated
 
 from harnessed import (
     Instructions,
@@ -15,7 +15,7 @@ from pydantic import Field
 from browserrig.browser import Browser
 from browserrig.core import ActionKind, BrowserError, Point
 from browserrig.core import browser_tool as tool
-from browserrig.input import Input
+from browserrig.input import ClickButton, ClickCount, Input
 from browserrig.observation import BrowserPerception, CapturedImage, Snapshot
 
 from .effects import Effect
@@ -23,10 +23,9 @@ from .execution import Actions
 from .targeting import Targeting
 
 type _ClickCount = Annotated[
-    Literal[1, 2],
+    ClickCount,
     Field(description="Use 2 for a native double click."),
 ]
-type _ClickButton = Literal["left", "right"]
 type _NewTab = Annotated[
     bool,
     Field(description="Open the link in a new tab and activate it."),
@@ -94,8 +93,9 @@ class PointerTools(Plugin):
         self,
         x: Annotated[float, Field(ge=0)],
         y: Annotated[float, Field(ge=0)],
+        *,
         count: _ClickCount = 1,
-        button: _ClickButton = "left",
+        button: ClickButton = "left",
         new_tab: _NewTab = False,
     ) -> Effect:
         _check_new_tab(new_tab, count, button)
@@ -141,8 +141,9 @@ class PointerTools(Plugin):
     async def click(
         self,
         ref: str,
+        *,
         count: _ClickCount = 1,
-        button: _ClickButton = "left",
+        button: ClickButton = "left",
         new_tab: _NewTab = False,
     ) -> Effect:
         _check_new_tab(new_tab, count, button)
@@ -218,7 +219,7 @@ def _check_new_tab(new_tab: bool, count: int, button: str) -> None:
 
 
 def _click_message(
-    count: Literal[1, 2], button: Literal["left", "right"], new_tab: bool = False
+    count: ClickCount, button: ClickButton, new_tab: bool = False
 ) -> str:
     gesture = "right click" if button == "right" else "click"
     if count == 2:

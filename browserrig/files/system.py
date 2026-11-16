@@ -5,7 +5,7 @@ import tempfile
 from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from pathlib import Path, PurePosixPath
 from types import TracebackType
-from typing import Literal, Self
+from typing import Self
 
 from harnessed.plugins.filesystem import PathMatches, SearchResult
 from harnessed.tracing import traced
@@ -13,7 +13,7 @@ from harnessed.tracing import traced
 from .config import FileOptions
 from .content import ReadRequest
 from .indexing import Indexing
-from .models import FileContent, FileEntry, FileExtraction, FileListing
+from .models import FileContent, FileEntry, FileExtraction, FileListing, FileView
 from .reading import FileReader
 from .search import Search
 from .workspace import FileStat, LocalWorkspace, Workspace, workspace_path
@@ -104,10 +104,8 @@ class FileSystem:
         if offset < 0 or not 1 <= limit <= 200:
             raise ValueError("Use offset >= 0 and a limit between 1 and 200")
         directory = workspace_path(path)
-        children = sorted(
-            await self.workspace.list(directory),
-            key=lambda child: child.path.name.casefold(),
-        )
+        entries = await self.workspace.list(directory)
+        children = sorted(entries, key=lambda child: child.path.name.casefold())
         return FileListing(
             directory=str(directory),
             entries=tuple(_entry(child) for child in children[offset : offset + limit]),
@@ -131,7 +129,7 @@ class FileSystem:
         cell_range: str | None = None,
         member: str | None = None,
         ocr: bool | None = None,
-        view: Literal["auto", "text", "image"] = "text",
+        view: FileView = "text",
         offset: int = 0,
         max_chars: int = 20000,
     ) -> FileContent:
@@ -157,7 +155,7 @@ class FileSystem:
         reader = self._reader
         assert reader is not None
         content = await asyncio.to_thread(
-            reader.read, source, request, offset, max_chars
+            reader.read, source, request, offset=offset, max_chars=max_chars
         )
         document_path = None
         try:
@@ -296,7 +294,7 @@ class FileSystem:
         reader = self._reader
         assert reader is not None
         content = await asyncio.to_thread(
-            reader.read, source, ReadRequest(**selectors), 0, 200000
+            reader.read, source, ReadRequest(**selectors), offset=0, max_chars=200000
         )
         return content.model_copy(update={"path": path})
 

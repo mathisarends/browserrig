@@ -18,6 +18,7 @@ from browserrig.core import (
     ReadinessPhase,
     Region,
     StaleElement,
+    ViewportSize,
 )
 from browserrig.events import (
     ObservationCapturedEvent,
@@ -111,11 +112,12 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         """Compare current controls without publishing or replacing the delivered observation."""
         async with self._state.lock:
             report = await self._readiness.wait(tab, phase=ReadinessPhase.ACTION)
+            tabs = await self._browser.tabs.list()
             observation = await capture_observation(
                 tab,
                 self.capture_strategy,
                 report,
-                tabs=tuple(await self._browser.tabs.list()),
+                tabs=tuple(tabs),
                 previous=self.snapshot,
                 screenshots=False,
                 redaction=self._secrets(),
@@ -136,11 +138,12 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         async with self._state.lock:
             selected = tab if tab is not None else browser.active_tab
             report = await readiness.wait(selected, phase=phase)
+            tabs = await browser.tabs.list()
             observation = await capture_observation(
                 selected,
                 self.capture_strategy,
                 report,
-                tabs=tuple(await browser.tabs.list()),
+                tabs=tuple(tabs),
                 previous=self.snapshot,
                 region=region,
                 zoom=zoom,
@@ -312,7 +315,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     async def _track_viewport(self, snapshot: Snapshot, nudges: Nudges | None) -> None:
         """Notice a viewport resized from outside, such as by a person resizing the window."""
         state = self._state
-        size = (snapshot.width, snapshot.height)
+        size = ViewportSize(width=snapshot.width, height=snapshot.height)
         # Dialogs and unavailable captures have placeholder dimensions, not a viewport.
         if snapshot.width <= 0 or snapshot.height <= 0:
             return
@@ -324,8 +327,8 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         state.generation += 1
         if nudges is not None:
             await nudges.queue(
-                f"The browser viewport was resized from {previous[0]:.0f}x{previous[1]:.0f} "
-                f"to {size[0]:.0f}x{size[1]:.0f}, likely by the user. The layout may have "
+                f"The browser viewport was resized from {previous.width:.0f}x{previous.height:.0f} "
+                f"to {size.width:.0f}x{size.height:.0f}, likely by the user. The layout may have "
                 "reflowed: earlier coordinates, positions and screenshots are outdated, "
                 "so rely on the current observation.",
                 key=f"viewport:{snapshot.tab_id}",

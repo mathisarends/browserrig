@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import NamedTuple
 
 from pydantic import Field
 
@@ -29,6 +30,37 @@ class Bounds(Options):
         return self.x <= x < self.x + self.width and self.y <= y < self.y + self.height
 
 
+class Position(NamedTuple):
+    """A point in CSS pixels that, unlike `Point`, may lie outside the viewport."""
+
+    x: float
+    y: float
+
+
+class Aim(NamedTuple):
+    """A spot within a target, as fractions of its visible width and height."""
+
+    x: float
+    y: float
+
+
+class Box(NamedTuple):
+    """A rectangle in CSS pixels that serializes compactly as (x, y, width, height)."""
+
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+@dataclass(frozen=True, slots=True)
+class ViewportSize:
+    """The size of a tab's top-level layout viewport in CSS pixels."""
+
+    width: float
+    height: float
+
+
 @dataclass(frozen=True, slots=True)
 class FrameTransform:
     """Affine map from one frame's CSS pixels to the top-level viewport.
@@ -43,17 +75,18 @@ class FrameTransform:
     offset_x: float = 0
     offset_y: float = 0
 
-    def to_viewport(self, x: float, y: float) -> tuple[float, float]:
-        return self.scale_x * x + self.skew_x * y + self.offset_x, (
-            self.skew_y * x + self.scale_y * y + self.offset_y
+    def to_viewport(self, x: float, y: float) -> Position:
+        return Position(
+            self.scale_x * x + self.skew_x * y + self.offset_x,
+            self.skew_y * x + self.scale_y * y + self.offset_y,
         )
 
-    def to_local(self, x: float, y: float) -> tuple[float, float]:
+    def to_local(self, x: float, y: float) -> Position:
         determinant = self.scale_x * self.scale_y - self.skew_x * self.skew_y
         if abs(determinant) < 1e-9:
             raise ValueError("Frame transform has no visible area")
         x, y = x - self.offset_x, y - self.offset_y
-        return (
+        return Position(
             (self.scale_y * x - self.skew_x * y) / determinant,
             (self.scale_x * y - self.skew_y * x) / determinant,
         )
@@ -76,12 +109,12 @@ class FrameTransform:
         right = self.to_viewport(quad[2], quad[3])
         bottom = self.to_viewport(quad[6], quad[7])
         return FrameTransform(
-            scale_x=(right[0] - origin[0]) / width,
-            skew_y=(right[1] - origin[1]) / width,
-            skew_x=(bottom[0] - origin[0]) / height,
-            scale_y=(bottom[1] - origin[1]) / height,
-            offset_x=origin[0],
-            offset_y=origin[1],
+            scale_x=(right.x - origin.x) / width,
+            skew_y=(right.y - origin.y) / width,
+            skew_x=(bottom.x - origin.x) / height,
+            scale_y=(bottom.y - origin.y) / height,
+            offset_x=origin.x,
+            offset_y=origin.y,
         )
 
 
@@ -102,10 +135,10 @@ class Geometry(Options):
     height: float = Field(gt=0)
     scale: float = Field(default=1, gt=0)
 
-    def point(self, x: float, y: float) -> tuple[float, float]:
+    def point(self, x: float, y: float) -> Position:
         if not (0 <= x < self.width * self.scale and 0 <= y < self.height * self.scale):
             raise ValueError("Point is outside the observed image")
-        return self.x + x / self.scale, self.y + y / self.scale
+        return Position(self.x + x / self.scale, self.y + y / self.scale)
 
 
 class Region(Options):
@@ -135,9 +168,7 @@ class Region(Options):
         )
 
 
-def _enclosing(
-    bounds: Bounds, transform: Callable[[float, float], tuple[float, float]]
-) -> Bounds:
+def _enclosing(bounds: Bounds, transform: Callable[[float, float], Position]) -> Bounds:
     points = [
         transform(x, y)
         for x in (bounds.x, bounds.x + bounds.width)

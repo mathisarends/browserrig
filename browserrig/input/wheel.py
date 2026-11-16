@@ -22,10 +22,10 @@ def wheel_progress(fraction: float) -> float:
     """Chrome's smooth scroll curve: a soft start, a fast middle and a long gentle settle."""
     if fraction <= 0 or fraction >= 1:
         return 0.0 if fraction <= 0 else 1.0
-    return _cubic_bezier(0.4, 0.0, 0.0, 1.0, fraction)
+    return _cubic_bezier(0.4, 0.0, 0.0, 1.0, x=fraction)
 
 
-def _cubic_bezier(x1: float, y1: float, x2: float, y2: float, x: float) -> float:
+def _cubic_bezier(x1: float, y1: float, x2: float, y2: float, *, x: float) -> float:
     def sample(a: float, b: float, t: float) -> float:
         return 3 * (1 - t) ** 2 * t * a + 3 * (1 - t) * t**2 * b + t**3
 

@@ -6,7 +6,7 @@ from harnessed.models import ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
-from browserrig import Agent, Chrome, InputVisualization
+from browserrig import Agent, Choreography, Chrome
 from browserrig.events import KeyPressedEvent, TabOpenedEvent
 from tests.observations import all_states
 
@@ -38,7 +38,7 @@ async def _click(site, name, **arguments):
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site + "/links"),
-        plugins=[Approvals(default=PolicyDecision.ALLOW), InputVisualization()],
+        plugins=[Approvals(default=PolicyDecision.ALLOW), Choreography()],
     )
     streamed = []
     ready = asyncio.Event()

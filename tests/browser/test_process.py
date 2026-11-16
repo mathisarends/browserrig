@@ -8,7 +8,7 @@ import pytest
 
 from browserrig.browser import Launch
 from browserrig.browser import process as process_module
-from browserrig.browser.process import ChromeProcess, _active_endpoint
+from browserrig.browser.process import ChromeProcess
 from browserrig.core import BrowserError
 
 
@@ -48,16 +48,25 @@ async def test_profile_cleanup_propagates_unexpected_errors_and_retains_ownershi
     assert profile.cleanup.call_count == 2
 
 
-def test_startup_retries_locked_and_incomplete_port_file():
-    path = Mock()
-    path.read_text.side_effect = [
-        PermissionError(),
-        "9222\n",
-        "9222\n/devtools/browser/test\n",
-    ]
-    assert _active_endpoint(path) is None
-    assert _active_endpoint(path) is None
-    assert _active_endpoint(path) == "ws://127.0.0.1:9222/devtools/browser/test"
+async def test_startup_waits_for_a_complete_port_file(
+    monkeypatch: pytest.MonkeyPatch, profile: Mock
+) -> None:
+    port_file = Path(profile.name) / "DevToolsActivePort"
+    port_file.parent.mkdir()
+    published = iter(["9222\n", "9222\n/devtools/browser/test\n"])
+
+    async def publish(_: float) -> None:
+        port_file.write_text(next(published), encoding="utf-8")
+
+    running = Mock(returncode=None, wait=AsyncMock(return_value=0))
+    monkeypatch.setattr(
+        process_module.asyncio,
+        "create_subprocess_exec",
+        AsyncMock(return_value=running),
+    )
+    monkeypatch.setattr(asyncio, "sleep", publish)
+    async with _process() as process:
+        assert process.endpoint == "ws://127.0.0.1:9222/devtools/browser/test"
 
 
 async def test_profile_cleanup_gives_up_on_persistent_lock_without_failing(

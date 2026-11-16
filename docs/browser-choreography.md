@@ -2,9 +2,11 @@
 
 [Back to README](../README.md) · [Input contracts](browser-interaction.md#input-choreography)
 
-`InputVisualization` renders cursor, keyboard, targets and action feedback inside
-the active Chrome tab. The live viewer and native recording see the same page
-presentation; native browser toolbars are outside the capture.
+`Choreography` stages input, browser UI and work receipts as live events; it draws
+nothing itself. `ChoreographyOverlay` consumes those events and renders cursor,
+keyboard, targets and action feedback inside the active Chrome tab. The live viewer
+and native recording see the same page presentation; native browser toolbars are
+outside the capture. Both are browser defaults.
 
 ![Presentation states](media/choreography/overview.png)
 
@@ -15,18 +17,16 @@ it makes no model calls.
 ## Configure or reproduce
 
 ```python
-from browserrig import IframeRenderer, InputVisualization
+from browserrig import ChoreographyOverlay
 
-presentation = InputVisualization(renderer=IframeRenderer(
-    name="Research",
-    keyboard_layout="de",
-    theme="dark",
-))
+overlay = ChoreographyOverlay(name="Research", keyboard_layout="de", theme="dark")
 ```
 
-Mount `presentation` in `Agent(plugins=[...])`. Layouts are `en`/`de`, themes are
-`dark`/`light`/`auto`. `InputVisualization(renderer=None)` keeps events for an
-external viewer. Input pacing is controlled separately by `InputPacing`.
+Mount `overlay` in `Agent(plugins=[...])`. Layouts are `en`/`de`, themes are
+`dark`/`light`/`auto`. Pass `without=(ChoreographyOverlay,)` to keep only the
+events for an [external viewer](#external-viewers). The overlay draws only what
+`Choreography` emits, so it requires that plugin. Input pacing is controlled
+separately by `InputPacing`.
 
 ```powershell
 uv run python -m examples.visualization --headed --layout de --theme dark
@@ -68,17 +68,60 @@ example supports `--video .browserrig/recordings`.
 ## External viewers
 
 Start a consumer before the run and use `session.subscribe(transient=True)` for
-input, work, activity and download events. `WorkPresentedEvent` supplies the same
-structured receipts to the iframe and external viewers; upsert by `work_id`.
-`call_id`/`action_id` correlate execution, and `WorkPhase` identifies running,
-completed, warning, failed or cancelled work. Terminal work expires after
-`retention` seconds.
+input events and `PresentedEvent`s. `ChoreographyOverlay` draws exactly these, so
+an external viewer sees the same scene:
 
+| Event | Upsert by | Meaning |
+| --- | --- | --- |
+| `WorkPresentedEvent` | `work_id` | Tool receipts; `call_id`/`action_id` correlate execution. |
+| `DownloadPresentedEvent` | `download_id` | Named download with `received_bytes`; show percentages only with a known `total_bytes`. |
+| `UploadPresentedEvent` | `target_id` | Files set on an input, with the element `ref`. |
+| `ActivityPresentedEvent` | `interval_id` | Ongoing activity such as a handoff while `active` is true. |
+
+`WorkPhase` identifies running, completed, warning, failed or cancelled work and
+downloads. Terminal receipts and uploads expire after `retention` seconds.
 Titles/details are ready to draw. Structured fields retain paths, URLs, page
-selectors, preview/limitations and source geometry. `CaptureRegion` uses source
-viewport CSS pixels; transform it to the viewer's bounds using tab/document
-identity. Download progress is
-keyed independently by `download_id`; show percentages only with a known total.
+selectors, preview/limitations and source geometry. The underlying facts
+(`DownloadStartedEvent`, `ActivityStartedEvent`, …) stay available for data
+consumers; viewers do not need them.
+
+### Coordinate space
+
+Input receipts with coordinates derive from `PositionedEvent`: cursor, pointer and
+wheel events, element highlights, find marks, file transfers, tab and toolbar
+presses and cursor entries. Their coordinates, including Bézier control points,
+are CSS pixels in the top-level layout viewport of `target_id`, with the origin at its top-left
+corner. `viewport` (`ViewportSize`) is that viewport's size measured when the
+receipt was emitted, so receipts project correctly across tab switches and live
+resizes:
+
+```python
+def project(x, y, viewport, width, height):
+    """Map a receipt point into a letterboxed `width` x `height` surface."""
+    scale = min(width / viewport.width, height / viewport.height)
+    left = (width - viewport.width * scale) / 2
+    top = (height - viewport.height * scale) / 2
+    return left + x * scale, top + y * scale
+
+# project(*event.control_point_1, event.viewport, 1920, 1080)
+```
+
+Points may lie outside the viewport, for example control points of a curved
+stroke. `viewport` keeps the last known size while a dialog blocks the page and is
+None only if the tab was never measured. A screenshot `WorkPresentedEvent` carries
+its `CaptureRegion` with the `viewport` of the same capture. Events without
+coordinates, such as keys, and the `TabEvent` scroll receipts carry no viewport.
+
+Viewers that draw their own browser chrome place its controls themselves, as with
+the tab strip. `TabPressedEvent` names the pressed tab-strip control.
+`AddressBarFocusedEvent` precedes the first `BarTypedEvent` of an address, and
+`BackPressedEvent`, `ForwardPressedEvent` and `ReloadPressedEvent` precede their
+history step or reload. Each starts at `from_position`, or `None` before the
+pointer has rested in the tab, and travels for `duration` to the viewer's own
+control. Project that point with its `viewport` as above and measure the control
+in the viewer's DOM. A `CursorEnteredEvent` then brings the pointer back
+to `to_position` once the step has run, with zero duration when it failed or was
+cancelled. These events are presentation only; the browser receives no extra input.
 
 Presentation receipts are transient and excluded from model context and saved
 results. Configured secrets are redacted before preview truncation. Render preview
@@ -88,7 +131,7 @@ with `TypeAdapter(WorkPresentedEvent).json_schema()`.
 ### DOM scroll receipts
 
 The supplied DOM scroll tools publish separate transient events after measured
-movement. Mount `InputVisualization(renderer=None)` and start a consumer before
+movement. With `Choreography` mounted (a default), start a consumer before
 execution:
 
 ```python
@@ -125,12 +168,12 @@ movement that occurred. Element scrolling emits only `ElementScrolledEvent`;
 it does not also emit a page event. No wheel input or pointer trajectory is invented.
 
 Both events derive from `TabEvent`, stay transient and are excluded from saved
-results and model context. They are emitted only with `InputVisualization`
+results and model context. They are emitted only with `Choreography`
 mounted. Direct low-level scroll helpers retain their existing API and do not
 stage choreography. Generate frontend schemas with
 `TypeAdapter(PageScrolledEvent).json_schema()` and
 `TypeAdapter(ElementScrolledEvent).json_schema()`.
 
 The payload deliberately contains no absolute offsets, frame metadata or
-`blocked` flag. Content deltas are not viewport points. Source viewport/resize
-metadata is tracked separately in [#39](https://github.com/mathisarends/browserrig/issues/39).
+`blocked` flag. Content deltas are not viewport points; see
+[coordinate space](#coordinate-space) for receipts that carry them.

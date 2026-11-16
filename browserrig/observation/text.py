@@ -11,7 +11,7 @@ from .delta import delta, unmarked
 from .hooks import ProjectObservation
 from .models import Snapshot
 from .plugin import BrowserPerception
-from .state import TextState
+from .state import ObservedText, PageView, TextState
 
 
 class TextContext(Plugin, slot="browserrig.text"):
@@ -55,7 +55,7 @@ class TextContext(Plugin, slot="browserrig.text"):
         message = self._observe.project(snapshot)
         text = message.text
         plain = unmarked(text)
-        page = (
+        page = PageView(
             snapshot.tab_id,
             snapshot.document_id,
             snapshot.viewport_revision,
@@ -67,12 +67,12 @@ class TextContext(Plugin, slot="browserrig.text"):
             self.mode == "delta"
             and snapshot.image is None
             and base is not None
-            and base[1] in state.included
+            and base.ref in state.included
         ):
-            changes = delta(base[0], plain)
+            changes = delta(base.text, plain)
             if len(changes) <= len(text) // 2:
                 return UserMessage(content=changes)
-        state.bases[page] = (plain, snapshot.id)
+        state.bases[page] = ObservedText(plain, snapshot.id)
         return message
 
     @hook(ObservationsIncludedEvent)
@@ -87,7 +87,7 @@ class TextContext(Plugin, slot="browserrig.text"):
         state.visible = state.sent_ref in refs
         state.included = frozenset(refs)
         state.bases = {
-            page: base for page, base in state.bases.items() if base[1] in refs
+            page: base for page, base in state.bases.items() if base.ref in refs
         }
 
     def _page_key(self, snapshot: Snapshot) -> str:

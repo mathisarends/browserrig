@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from browserrig.browser import Frame, Tab
 from browserrig.core import (
+    Aim,
     Bounds,
     BrowserError,
     ElementOperation,
@@ -45,18 +46,17 @@ class DomElementHandle:
     snapshot: Snapshot
     tab: Tab
 
-    async def locate(self, *, aim: tuple[float, float] | None = None) -> ElementPoint:
+    async def locate(self, *, aim: Aim | None = None) -> ElementPoint:
         """Return a hit-tested viewport point and the element's visible bounds.
 
         `aim` is a preferred spot as fractions of the visible box; when something
         covers it, the point falls back to the middle or near a corner.
         """
         try:
-            local = ElementPoint.model_validate(
-                await self._run(
-                    ElementOperation.POINT, clip=self.frame.local_visible, aim=aim
-                )
+            measured = await self._run(
+                ElementOperation.POINT, clip=self.frame.local_visible, aim=aim
             )
+            local = ElementPoint.model_validate(measured)
         except BrowserError as error:
             if str(error) != "ELEMENT_BLOCKED":
                 raise
@@ -97,7 +97,8 @@ class DomElementHandle:
 
     async def bounds(self) -> Bounds:
         """Return the element's layout box in its frame's CSS pixels."""
-        return Bounds.model_validate(await self._run(ElementOperation.BOUNDS))
+        measured = await self._run(ElementOperation.BOUNDS)
+        return Bounds.model_validate(measured)
 
     async def scroll_step(self) -> ScrollStep | None:
         """Plan one wheel input without scrolling."""
@@ -265,7 +266,7 @@ class DomElementHandle:
         value: str | bool | None = None,
         *,
         clip: Bounds | None = None,
-        aim: tuple[float, float] | None = None,
+        aim: Aim | None = None,
     ) -> Any:
         return await self.run(
             ELEMENT,
@@ -303,7 +304,8 @@ async def _plan(
         current = current.parent
     target = None
     if ancestors:
-        target = frame.transform.bounds_to_viewport(await handle.bounds())
+        bounds = await handle.bounds()
+        target = frame.transform.bounds_to_viewport(bounds)
     for child in reversed(ancestors):
         parent = child.parent
         assert parent is not None

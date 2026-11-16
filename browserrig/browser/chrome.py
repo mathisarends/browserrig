@@ -25,6 +25,7 @@ from cdpify.domains.page import (
     NavigatedWithinDocumentEvent,
 )
 from cdpify.domains.runtime import (
+    BindingCalledEvent,
     ExecutionContextDestroyedEvent,
     ExecutionContextsClearedEvent,
 )
@@ -41,7 +42,7 @@ from browserrig.events import (
 from browserrig.files import Download, FileTransfer
 from browserrig.input import InputTargets
 
-from .base import BrowserEvents, EventSink, _discard
+from .base import BrowserEvents, EventSink, discard_event
 from .config import BrowserOptions, CdpEndpoint, Launch
 from .downloads import Downloads
 from .guard import NavigationGuard
@@ -65,6 +66,7 @@ _EVENTS = (
     JavascriptDialogClosedEvent,
     ExecutionContextDestroyedEvent,
     ExecutionContextsClearedEvent,
+    BindingCalledEvent,
     TargetInfoChangedEvent,
     TargetDestroyedEvent,
     DownloadWillBeginEvent,
@@ -80,7 +82,7 @@ class ChromeBrowser:
         self,
         options: BrowserOptions | None = None,
         *,
-        emit: EventSink = _discard,
+        emit: EventSink = discard_event,
         on_tab_change: TabListener | None = None,
         navigation_policy: NavigationPolicy | None = None,
         current_action: Callable[[], str] = str,

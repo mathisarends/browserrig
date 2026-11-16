@@ -1,7 +1,8 @@
 """How each staged tool step looks to viewers, around the step itself."""
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from time import monotonic
 from typing import Any
@@ -10,7 +11,14 @@ from uuid import uuid4
 from cdpify import CDPCommandError
 
 from browserrig.browser import Tab
-from browserrig.core import BrowserBar, BrowserError, FileTransferDirection, Point
+from browserrig.core import (
+    BrowserBar,
+    BrowserControl,
+    BrowserError,
+    FileTransferDirection,
+    Point,
+    Position,
+)
 from browserrig.events import (
     InputEvent,
     KeyboardVisibilityEvent,
@@ -21,6 +29,7 @@ from browserrig.input import TYPING_INTERVAL_SECONDS
 from browserrig.observation import PageSearch, close_find, find_text
 from browserrig.scripts import TargetScrollResult
 from browserrig.tools import (
+    ControlIntent,
     DomScrollIntent,
     NavigateIntent,
     OpenFileIntent,
@@ -30,17 +39,30 @@ from browserrig.tools import (
 )
 
 from .events import (
+    AddressBarFocusedEvent,
+    BackPressedEvent,
     BarTypedEvent,
+    CursorEnteredEvent,
     ElementScrolledEvent,
     FileTransferEvent,
     FindBarEvent,
     FindResultsEvent,
+    ForwardPressedEvent,
     PageScrolledEvent,
+    ReloadPressedEvent,
+    ToolbarPressedEvent,
     WaitingEvent,
 )
+from .stage import ENTER_SECONDS, PRESS_SECONDS
 
 type Step = Callable[[], Awaitable[Any]]
 
+# The event each history or reload button shows when the pointer presses it.
+_PRESSED: dict[BrowserControl, type[ToolbarPressedEvent]] = {
+    BrowserControl.BACK: BackPressedEvent,
+    BrowserControl.FORWARD: ForwardPressedEvent,
+    BrowserControl.RELOAD: ReloadPressedEvent,
+}
 # Bar text is typed at a person's typing speed, but a long URL speeds up to stay within this.
 _BAR_TYPING_SECONDS = 0.8
 # Long enough for a viewer to follow a file into its destination, short enough to stay brisk.
@@ -53,10 +75,14 @@ _OR = " | "
 
 @dataclass(frozen=True, slots=True)
 class Scene:
-    """Where a step is staged: its tab and the action it belongs to."""
+    """Where a step is staged: its tab, the action it belongs to and the pointer.
+
+    `pointer` is where the pointer rests in the tab, or None before it has been there.
+    """
 
     tab: Tab
     action_id: str
+    pointer: Point | None = None
 
     async def show(self, event: InputEvent | TabEvent) -> None:
         await self.tab.emit(replace(event, action_id=self.action_id))
@@ -122,9 +148,16 @@ async def search(scene: Scene, intent: SearchIntent, step: Step) -> PageSearch:
 
 
 async def navigate(scene: Scene, intent: NavigateIntent, step: Step) -> Any:
-    """The address typed into the bar and submitted before the page starts loading."""
-    await _type_in_bar(scene, BrowserBar.ADDRESS, intent.typed, submit=True)
-    return await step()
+    """The address bar pressed, the address typed and submitted, then the page loading."""
+    async with _pressed(scene, AddressBarFocusedEvent):
+        await _type_in_bar(scene, BrowserBar.ADDRESS, intent.typed, submit=True)
+        return await step()
+
+
+async def press(scene: Scene, intent: ControlIntent, step: Step) -> Any:
+    """The toolbar control pressed before the step, as a person goes back or reloads."""
+    async with _pressed(scene, _PRESSED[intent.control]):
+        return await step()
 
 
 async def wait(scene: Scene, intent: WaitIntent, step: Step) -> Any:
@@ -141,6 +174,34 @@ async def open_file(scene: Scene, intent: OpenFileIntent, step: Step) -> Any:
 async def upload(scene: Scene, intent: UploadIntent, step: Step) -> Any:
     await _transfer(scene, FileTransferDirection.UPLOAD, intent.paths, intent.point)
     return await step()
+
+
+@asynccontextmanager
+async def _pressed(
+    scene: Scene, pressed: type[ToolbarPressedEvent]
+) -> AsyncGenerator[None]:
+    """The pointer travels to a toolbar control and presses it, then returns.
+
+    The return follows whatever the control does; if that fails or is cancelled, the
+    pointer is back at once. Without a place in the page it has nowhere to return to.
+    """
+    start = scene.pointer
+    position = Position(start.x, start.y) if start is not None else None
+    await scene.show(pressed(from_position=position, duration=PRESS_SECONDS))
+    duration = ENTER_SECONDS
+    try:
+        await asyncio.sleep(PRESS_SECONDS)
+        yield
+    except BaseException:
+        duration = 0
+        raise
+    finally:
+        if position is not None:
+            await scene.show(
+                CursorEnteredEvent(to_position=position, duration=duration)
+            )
+            if duration:
+                await asyncio.sleep(duration)
 
 
 async def _type_in_bar(

@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Annotated, Literal
+from typing import Annotated
 from uuid import uuid4
 
 from harnessed import (
@@ -34,6 +34,7 @@ from browserrig.files import (
     FileEntry,
     FileListing,
     FileSystem,
+    FileView,
 )
 
 from .file_observation import FileSystemObservation
@@ -110,6 +111,7 @@ class WorkspaceIO(FileSystemObservation):
             ),
         ],
         pattern: str = "**/*.md",
+        *,
         limit: Annotated[int, Field(ge=1, le=500)] = 20,
         include_hidden: Annotated[
             bool, Field(description="Include hidden files and caches.")
@@ -180,7 +182,7 @@ class WorkspaceIO(FileSystemObservation):
             bool | None, Field(description="True forces full-page PDF OCR.")
         ] = None,
         view: Annotated[
-            Literal["auto", "text", "image"],
+            FileView,
             Field(
                 description=(
                     "auto displays images and reads other formats as text; "
@@ -277,6 +279,7 @@ class WorkspaceIO(FileSystemObservation):
         self,
         path: str,
         content: str,
+        *,
         overwrite: Annotated[
             bool, Field(description="Allow replacing an existing file.")
         ] = False,
@@ -311,6 +314,7 @@ class WorkspaceIO(FileSystemObservation):
             ),
         ],
         new_text: str,
+        *,
         replace_all: bool = False,
     ) -> FileEntry:
         files = self._files()

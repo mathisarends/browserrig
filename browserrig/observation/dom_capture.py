@@ -65,8 +65,9 @@ class DomCapture(Options):
             names=report.phase != ReadinessPhase.ACTION,
         )
         if not screenshots:
+            extracted = await extraction
             return CaptureContent(
-                page=_limited(await extraction, tab), references=DomReferences()
+                page=_limited(extracted, tab), references=DomReferences()
             )
         viewport = frames[0].visible
         assert viewport is not None
@@ -91,7 +92,8 @@ class DomCapture(Options):
         # The screenshot does not depend on the extraction; only its marks do.
         shot = asyncio.create_task(screenshot(tab, geometry))
         try:
-            page = _limited(await extraction, tab)
+            extracted = await extraction
+            page = _limited(extracted, tab)
         except BaseException:
             shot.cancel()
             await asyncio.gather(shot, return_exceptions=True)
@@ -111,7 +113,7 @@ class DomCapture(Options):
             pixels,
             page.elements if self.marks else (),
             area,
-            scale,
+            scale=scale,
             cursor=cursor if self.cursor else None,
         )
         return CaptureContent(

@@ -4,35 +4,36 @@ import asyncio
 from dataclasses import asdict
 from functools import cache
 from importlib.resources import files
-from typing import Literal
+from typing import Literal, NamedTuple
 
 from harnessed.tracing import traced
 from pydantic import Field
 
 from browserrig.browser import Overlay, Tab
+from browserrig.choreography import PresentedEvent, WorkPhase
 from browserrig.core import ActionKind, ActivityKind, Options
-from browserrig.events import BrowserEvent, EventKind, LiveEvent
+from browserrig.events import EventKind, InputEvent
 from browserrig.scripts import CHOREOGRAPHY
 
-from .events import WorkPhase
 from .receipts import Receipts
 
+type KeyboardLayout = Literal["en", "de"]
+type Theme = Literal["dark", "light", "auto"]
 
-class IframeRenderer(Options):
-    """Configure a transparent, inert browser-owned input visualization."""
+
+class OverlayStyle(Options):
+    """How the in-page overlay labels the cursor, lays out keys and colors itself."""
 
     name: str = Field(default="Browserrig", min_length=1, max_length=40)
-    keyboard_layout: Literal["en", "de"] = "en"
-    theme: Literal["dark", "light", "auto"] = "dark"
-
-    def create(self) -> IframeView:
-        """Create fresh presentation state for one session."""
-        return IframeView(self)
+    keyboard_layout: KeyboardLayout = "en"
+    theme: Theme = "dark"
 
 
-class IframeView:
-    def __init__(self, options: IframeRenderer) -> None:
-        self._presentation = options.model_dump(mode="json")
+class OverlayView:
+    """One session's iframe per tab, fed with serialized receipts."""
+
+    def __init__(self, style: OverlayStyle) -> None:
+        self._presentation = style.model_dump(mode="json")
         self._presentation["events"] = {kind.name: kind.value for kind in EventKind}
         self._presentation["phases"] = {phase.name: phase.value for phase in WorkPhase}
         self._presentation["actions"] = {kind.name: kind.value for kind in ActionKind}
@@ -43,21 +44,23 @@ class IframeView:
         self._lock = asyncio.Lock()
         self._closed = False
         self._receipts = Receipts()
-        self._shown: tuple[str, str] | None = None
+        self._shown: _Document | None = None
 
-    def remember(self, event: LiveEvent | BrowserEvent) -> None:
+    def remember(self, event: InputEvent | PresentedEvent) -> None:
         """Retain receipts even when the document cannot currently render them."""
-        self._receipts.remember(event)
+        if isinstance(event, PresentedEvent):
+            self._receipts.remember(event)
 
     def suspend(self) -> None:
         """Request state restoration after a dialog or unavailable document."""
         self._shown = None
 
     async def restore(self, tab: Tab) -> None:
-        """Restore state without inventing a browser input event."""
-        await self._show(tab, None)
+        """Redraw retained receipts in a document that has not shown them yet."""
+        if _Document(tab.id, tab.document_id) != self._shown:
+            await self._show(tab, None)
 
-    async def show(self, tab: Tab, event: LiveEvent | BrowserEvent) -> None:
+    async def show(self, tab: Tab, event: InputEvent | PresentedEvent) -> None:
         self.remember(event)
         await self._show(tab, event)
 
@@ -68,7 +71,7 @@ class IframeView:
             await asyncio.gather(*(overlay.close() for overlay in overlays.values()))
 
     @traced
-    async def _show(self, tab: Tab, event: LiveEvent | BrowserEvent | None) -> None:
+    async def _show(self, tab: Tab, event: InputEvent | PresentedEvent | None) -> None:
         async with self._lock:
             if self._closed:
                 return
@@ -78,7 +81,7 @@ class IframeView:
                     html=_document(), script=CHOREOGRAPHY
                 )
                 self._overlays[tab.id] = overlay
-            identity = (tab.id, tab.document_id)
+            identity = _Document(tab.id, tab.document_id)
             data = asdict(event) if event is not None else {}
             data["presentation"] = {
                 **self._presentation,
@@ -99,3 +102,8 @@ def _document() -> str:
     template = package.joinpath("view.html").read_text(encoding="utf-8")
     styles = package.joinpath("view.css").read_text(encoding="utf-8")
     return template.replace("{{styles}}", styles)
+
+
+class _Document(NamedTuple):
+    target_id: str
+    document_id: str

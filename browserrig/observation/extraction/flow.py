@@ -193,6 +193,7 @@ def compose(
     frame_id: str,
     entries: list[tuple[int, ContentNode]],
     transform: FrameTransform,
+    *,
     links: frozenset[str],
 ) -> tuple[ContentNode, ...]:
     """Wrap ordered leaves in their actual semantic ancestors, dropping empty wrappers."""

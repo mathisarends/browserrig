@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from cdpify.domains.input import MouseButton as CdpMouseButton
 
-from browserrig.core import CursorStyle, MouseEventKind, Point
+from browserrig.core import CursorStyle, MouseEventKind, Point, ViewportSize
 from browserrig.events import InputEvent
 from browserrig.input import InputTarget, KeyEventType, MouseButton
 from browserrig.scripts import CURSOR, CursorArgs
@@ -39,13 +39,20 @@ class CdpInput:
 
     def __init__(self, tab: Tab) -> None:
         self._tab = tab
-        self.dialog_opened = asyncio.Event()
+        self._dialog_opened = asyncio.Event()
 
     @property
     def id(self) -> str:
         return self._tab.id
 
-    async def viewport_size(self) -> tuple[float, float]:
+    def dialog_opened(self) -> None:
+        """Release input that waits for its reply because a dialog now holds it."""
+        self._dialog_opened.set()
+
+    def dialog_closed(self) -> None:
+        self._dialog_opened.clear()
+
+    async def viewport_size(self) -> ViewportSize:
         return await self._tab.viewport_size()
 
     def layout_changed(self) -> None:
@@ -141,7 +148,7 @@ class CdpInput:
         # Started eagerly, input that needs no reply lands within the caller's step.
         sent = asyncio.Task(command, loop=asyncio.get_running_loop(), eager_start=True)
         if not sent.done():
-            opened = asyncio.ensure_future(self.dialog_opened.wait())
+            opened = asyncio.ensure_future(self._dialog_opened.wait())
             try:
                 await asyncio.wait((sent, opened), return_when=asyncio.FIRST_COMPLETED)
             except asyncio.CancelledError:

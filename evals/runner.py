@@ -20,10 +20,11 @@ from pydantic_core import PydanticSerializationError
 
 from browserrig import (
     Agent,
+    Choreography,
+    ChoreographyOverlay,
     Chrome,
     Files,
     InputPacing,
-    InputVisualization,
     LocalWorkspace,
 )
 
@@ -171,7 +172,9 @@ def _agent(options: RunOptions, workspace: Path, endpoint: str, target: str) -> 
             Approvals(default=PolicyDecision.ALLOW),
             *options.plugins,
         ],
-        without=() if options.humanlike else (InputPacing, InputVisualization),
+        without=()
+        if options.humanlike
+        else (InputPacing, Choreography, ChoreographyOverlay),
     )
 
 

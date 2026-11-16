@@ -11,21 +11,34 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
+from harnessed import ToolError
 
 from browserrig.choreography import (
+    AddressBarFocusedEvent,
+    BackPressedEvent,
     BarTypedEvent,
+    Choreography,
     CursorEnteredEvent,
     FileTransferEvent,
     FindBarEvent,
     FindResultsEvent,
+    ForwardPressedEvent,
     HighlightElementEvent,
-    InputVisualization,
+    ReloadPressedEvent,
     TabPressedEvent,
     WaitingEvent,
     scenes,
 )
-from browserrig.core import Bounds, ElementPoint, Point, TabGesture
+from browserrig.core import (
+    Bounds,
+    BrowserError,
+    ElementPoint,
+    Point,
+    TabGesture,
+    ViewportSize,
+)
 from browserrig.events import (
+    ActionFailedEvent,
     ActionFinishedEvent,
     ActionStartedEvent,
     CursorMovedEvent,
@@ -48,7 +61,7 @@ from browserrig.tools import targeting as targeting_module
 from tests.fakes import mounted
 
 # The plugins that pace input like a person and stage actions for viewers.
-STAGING = (InputPacing, InputVisualization)
+STAGING = (InputPacing, Choreography)
 
 
 class _Frame:
@@ -83,6 +96,7 @@ class _Tab:
         self.navigation_pending = False
         self.closed = False
         self.frame_limitations = ()
+        self.reload_error = None
         self._timeline = timeline
         self._frame = _Frame(timeline)
 
@@ -103,6 +117,25 @@ class _Tab:
     async def navigate(self, url):
         self._timeline.append(f"navigate {url}")
 
+    async def can_go_back(self):
+        return True
+
+    async def go_back(self):
+        self._timeline.append("history back")
+        return True
+
+    async def can_go_forward(self):
+        return True
+
+    async def go_forward(self):
+        self._timeline.append("history forward")
+        return True
+
+    async def reload(self):
+        self._timeline.append("reload")
+        if self.reload_error is not None:
+            raise self.reload_error
+
     async def dispatch_mouse(self, kind, point, **_):
         self._timeline.append(f"mouse {kind} {point.x:g},{point.y:g}")
 
@@ -110,7 +143,7 @@ class _Tab:
         self._timeline.append(f"key {kind} {key}")
 
     async def viewport_size(self):
-        return 1000, 800
+        return ViewportSize(width=1000, height=800)
 
     async def cursor_style(self, _point):
         return None
@@ -176,7 +209,7 @@ def _shown(timeline) -> list[str]:
             action = entry.action_id
         if isinstance(entry, InputEvent) and entry.action_id != action:
             raise AssertionError(f"{entry} is not attributed to action {action!r}")
-        if isinstance(entry, ActionFinishedEvent):
+        if isinstance(entry, (ActionFinishedEvent, ActionFailedEvent)):
             action = ""
         shown.append(entry if isinstance(entry, str) else _describe(entry))
     return shown
@@ -188,6 +221,8 @@ def _describe(event) -> str:  # pylint: disable=too-many-return-statements,too-m
             return f"{kind} started"
         case ActionFinishedEvent(kind=kind):
             return f"{kind} finished"
+        case ActionFailedEvent(kind=kind):
+            return f"{kind} failed"
         case KeyPressedEvent(key=key, modifiers=modifiers, duration=duration):
             return f"shows key {'+'.join((*modifiers, key))} {duration:.2f}"
         case KeyboardVisibilityEvent(visible=visible):
@@ -206,6 +241,13 @@ def _describe(event) -> str:  # pylint: disable=too-many-return-statements,too-m
             return f"highlight {ref}"
         case TabPressedEvent(gesture=gesture, tab_id=tab_id, duration=duration):
             return f"tab {gesture} {tab_id!r} from {event.target_id} {duration:.2f}"
+        case (
+            AddressBarFocusedEvent()
+            | BackPressedEvent()
+            | ForwardPressedEvent()
+            | ReloadPressedEvent()
+        ):
+            return _toolbar(event)
         case CursorEnteredEvent(to_position=(x, y), duration=duration):
             return f"cursor enters {event.target_id} at {x:g},{y:g} {duration:.2f}"
         case CursorMovedEvent(to_position=(x, y), duration=duration):
@@ -219,6 +261,12 @@ def _describe(event) -> str:  # pylint: disable=too-many-return-statements,too-m
         case FilesUploadedEvent(paths=paths):
             return f"uploaded {len(paths)} file"
     raise AssertionError(f"No description for {event}")
+
+
+def _toolbar(event) -> str:
+    start = event.from_position
+    where = "nowhere" if start is None else f"{start[0]:g},{start[1]:g}"
+    return f"{event.type} from {where} in {event.target_id} {event.duration:.2f}"
 
 
 class _SearchTools(PageSearchTools, provides=True):
@@ -292,6 +340,8 @@ async def test_navigate_types_the_address_before_the_page_loads(timeline):
         await ctx[_NavigationTools].navigate("https://ab.cd/")
     assert _shown(timeline) == [
         "navigate started",
+        "browser.address_bar.focused from nowhere in tab-1 0.45",
+        "sleep 0.45",
         "keyboard shown",
         "address bar a -> 'a' 0.05",
         "sleep 0.05",
@@ -323,6 +373,8 @@ async def test_navigate_in_a_new_tab_opens_it_before_typing_there(timeline):
         "sleep 0.35",
         "mouse mouseMoved 500,400",
         "cursor rests in tab-2 at 500,400",
+        "browser.address_bar.focused from 500,400 in tab-2 0.45",
+        "sleep 0.45",
         "keyboard shown",
         "address bar a -> 'a' 0.05",
         "sleep 0.05",
@@ -335,7 +387,75 @@ async def test_navigate_in_a_new_tab_opens_it_before_typing_there(timeline):
         "keyboard hidden",
         "navigation to https://a.b/ started as 'a.b'",
         "navigate https://a.b/",
+        "cursor enters tab-2 at 500,400 0.35",
+        "sleep 0.35",
         "navigate finished",
+    ]
+
+
+async def test_history_controls_are_pressed_before_they_act(timeline):
+    async with _staged(timeline, _NavigationTools()) as (services, ctx):
+        await services.input.mouse.move_to(Point(x=10, y=20))
+        timeline.clear()
+        await ctx[_NavigationTools].go_back()
+        await ctx[_NavigationTools].go_forward()
+        await ctx[_NavigationTools].reload()
+    assert _shown(timeline) == [
+        "go_back started",
+        "browser.back.pressed from 10,20 in tab-1 0.45",
+        "sleep 0.45",
+        "history back",
+        "cursor enters tab-1 at 10,20 0.35",
+        "sleep 0.35",
+        "go_back finished",
+        "go_forward started",
+        "browser.forward.pressed from 10,20 in tab-1 0.45",
+        "sleep 0.45",
+        "history forward",
+        "cursor enters tab-1 at 10,20 0.35",
+        "sleep 0.35",
+        "go_forward finished",
+        "reload started",
+        "browser.reload.pressed from 10,20 in tab-1 0.45",
+        "sleep 0.45",
+        "reload",
+        "cursor enters tab-1 at 10,20 0.35",
+        "sleep 0.35",
+        "reload finished",
+    ]
+
+
+async def test_a_failed_control_returns_the_pointer_at_once(timeline):
+    async with _staged(timeline, _NavigationTools()) as (services, ctx):
+        services.browser.active_tab.reload_error = BrowserError("Reload failed")
+        await services.input.mouse.move_to(Point(x=10, y=20))
+        timeline.clear()
+        with pytest.raises(ToolError, match="Reload failed"):
+            await ctx[_NavigationTools].reload()
+    assert _shown(timeline) == [
+        "reload started",
+        "browser.reload.pressed from 10,20 in tab-1 0.45",
+        "sleep 0.45",
+        "reload",
+        "cursor enters tab-1 at 10,20 0.00",
+        "reload failed",
+    ]
+
+
+async def test_a_cancelled_control_returns_the_pointer_at_once(timeline):
+    async with _staged(timeline, _NavigationTools()) as (services, ctx):
+        services.browser.active_tab.reload_error = asyncio.CancelledError()
+        await services.input.mouse.move_to(Point(x=10, y=20))
+        timeline.clear()
+        with pytest.raises(asyncio.CancelledError):
+            await ctx[_NavigationTools].reload()
+    assert _shown(timeline) == [
+        "reload started",
+        "browser.reload.pressed from 10,20 in tab-1 0.45",
+        "sleep 0.45",
+        "reload",
+        "cursor enters tab-1 at 10,20 0.00",
+        "reload failed",
     ]
 
 
@@ -494,6 +614,12 @@ async def test_unstaged_navigate_loads_right_away(timeline):
         "navigate https://a.b/",
         "navigate finished",
     ]
+
+
+async def test_unstaged_history_controls_act_right_away(timeline):
+    async with _staged(timeline, _NavigationTools(), staging=()) as (_, ctx):
+        await ctx[_NavigationTools].go_back()
+    assert _shown(timeline) == ["go_back started", "history back", "go_back finished"]
 
 
 async def test_unstaged_wait_only_waits(timeline):

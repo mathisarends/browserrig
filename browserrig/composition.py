@@ -13,13 +13,14 @@ from harnessed.plugins import Compaction, ContextState
 
 from .activity import Activity
 from .browser import Chrome, DownloadReceiving
-from .choreography import InputVisualization, TabStrip
+from .choreography import Choreography, TabStrip
 from .core import ModelProfile, Runtime
 from .files import Files, FileTransfers
 from .input import InputRuntime
 from .memory import TaskMemory
 from .nudges import Nudges
 from .observation import DomPerception, ImageContext, TextContext
+from .overlay import ChoreographyOverlay
 from .pacing import InputPacing
 from .readiness import DownloadReadiness, Readiness
 from .tools import (
@@ -40,7 +41,7 @@ from .tools import (
     Targeting,
 )
 
-ContextCompaction = Compaction
+ContextCompaction = Compaction  # smelt: ignore[SMT344] -- public name for Compaction
 
 
 def browser_plugins(
@@ -86,7 +87,9 @@ def browser_pack(
             # Types and moves the pointer at a person's pace.
             InputPacing(),
             # Streams input and browser UI for anyone watching the session.
-            InputVisualization(),
+            Choreography(),
+            # Draws that stream inside the active tab, for live viewers and recordings.
+            ChoreographyOverlay(),
             # Titles and favicons for a viewer's tab strip; the agent reads tabs without it.
             TabStrip(),
             Readiness(),

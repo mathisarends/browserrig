@@ -135,7 +135,12 @@ class ActionRunner:
                     else "cancelled"
                 )
                 await self._fail(
-                    tab, action_id, kind, dispatched, reason, cancelled=True
+                    tab,
+                    action_id,
+                    kind,
+                    dispatched=dispatched,
+                    reason=reason,
+                    cancelled=True,
                 )
                 raise
             except Exception as error:
@@ -146,7 +151,9 @@ class ActionRunner:
                     if isinstance(error, (BrowserError, ToolError))
                     else f"{type(error).__name__}: {error}"
                 )
-                await self._fail(tab, action_id, kind, dispatched, reason)
+                await self._fail(
+                    tab, action_id, kind, dispatched=dispatched, reason=reason
+                )
                 hint = (
                     "; the action may have run. Observe before retrying."
                     if dispatched
@@ -246,9 +253,9 @@ class ActionRunner:
         tab: Tab,
         action_id: str,
         kind: ActionKind,
+        *,
         dispatched: bool,
         reason: str,
-        *,
         cancelled: bool = False,
     ) -> None:
         await self._events.emit(

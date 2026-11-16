@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import asyncio
 from contextlib import suppress
 from dataclasses import dataclass
+from typing import NamedTuple
 
 from harnessed import Plugin, PluginState, hook
 from harnessed.kernel import PluginScope, needs
@@ -17,8 +20,9 @@ class TabStrip(Plugin):
     """Stream what a viewer's tab strip shows: url, title, loading state and favicon.
 
     Once a page stops loading, its document title and icon are read in the background,
-    so a slow icon host never holds up other events. Without this plugin no tab-strip
-    events are emitted and no icons are fetched.
+    so a slow icon host never holds up other events. Later in-page title or icon
+    changes, as from scripts or single-page apps, are followed without navigation.
+    Without this plugin no tab-strip events are emitted and no icons are fetched.
     """
 
     events = TAB_STRIP_EVENTS
@@ -67,7 +71,7 @@ class _Strip:
     chrome_title: str = ""
     icon_url: str = ""
     favicon: str = ""
-    shown: tuple[str, str, bool, str] | None = None
+    shown: _StripState | None = None
     task: asyncio.Task[None] | None = None
 
     async def publish(self, tab: Tab) -> None:
@@ -75,7 +79,7 @@ class _Strip:
         if tab.title != self.chrome_title:
             self.chrome_title = tab.title
             self.title = tab.title
-        state = (tab.url, self.title, tab.loading, self.favicon)
+        state = _StripState(tab.url, self.title, tab.loading, self.favicon)
         if tab.closed or state == self.shown:
             return
         self.shown = state
@@ -95,10 +99,10 @@ class _Strip:
                     if strip.icon != self.icon_url:
                         # The title should not wait for the icon.
                         await self.publish(tab)
+                        favicon = await tab.load_icon(strip.icon) if strip.icon else ""
+                        # An interrupted load must be retried on the next strip read.
                         self.icon_url = strip.icon
-                        self.favicon = (
-                            await tab.load_icon(strip.icon) if strip.icon else ""
-                        )
+                        self.favicon = favicon
                 await self.publish(tab)
         except Exception:  # pylint: disable=broad-exception-caught
             # Navigation, dialogs and detached sessions only cost the strip state.
@@ -108,3 +112,10 @@ class _Strip:
         if self.task is not None:
             self.task.cancel()
             self.task = None
+
+
+class _StripState(NamedTuple):
+    url: str
+    title: str
+    loading: bool
+    favicon: str

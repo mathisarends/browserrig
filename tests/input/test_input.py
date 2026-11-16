@@ -16,6 +16,7 @@ from harnessed.testing import mount_plugin
 from browserrig.browser import Tab
 from browserrig.choreography import (
     SCENE_EVENTS,
+    AddressBarFocusedEvent,
     BarTypedEvent,
     CursorEnteredEvent,
     Stage,
@@ -37,6 +38,7 @@ from browserrig.events import (
 )
 from browserrig.input import (
     CENTER,
+    Bend,
     CursorPath,
     HumanMotor,
     Input,
@@ -186,7 +188,10 @@ async def test_address_typing_shows_each_key_without_page_input_and_submits(
     assert all(event.browser_bar == BrowserBar.ADDRESS for event in typed)
     assert all(event.action_id == "action-1" for event in events)
     assert all(event.duration == 0.05 for event in typed)
-    assert isinstance(events[0], KeyboardVisibilityEvent) and events[0].visible
+    pressed, shown = events[:2]
+    assert isinstance(pressed, AddressBarFocusedEvent)
+    assert isinstance(shown, KeyboardVisibilityEvent) and shown.visible
+    # Without a place in the page, the pointer has nowhere to return to.
     assert isinstance(events[-1], KeyboardVisibilityEvent) and not events[-1].visible
 
 
@@ -695,7 +700,7 @@ class _Steady(Instant):
     """One straight stroke of 0.3 seconds, 18 frames at 60 Hz."""
 
     def pointer_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
-        return (CursorPath.curved(start, destination, 0.3, bend=(0, 0)),)
+        return (CursorPath.curved(start, destination, 0.3, bend=Bend(0, 0)),)
 
 
 async def test_a_slow_browser_skips_frames_instead_of_stretching_the_stroke(

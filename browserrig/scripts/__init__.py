@@ -34,7 +34,9 @@ from .models import (
     SelectedOption,
     SelectionResult,
     SelectOptionsArgs,
+    Size,
     TabStrip,
+    TabStripArgs,
     TargetScrollArgs,
     TargetScrollResult,
     TextState,
@@ -83,6 +85,7 @@ __all__ = [
     "ScrollArgs",
     "ScrollPlan",
     "SelectOptionsArgs",
+    "Size",
     "SelectedOption",
     "SelectionResult",
     "SecretField",
@@ -91,6 +94,7 @@ __all__ = [
     "SecretFocusArgs",
     "SeedArgs",
     "TabStrip",
+    "TabStripArgs",
     "TargetScrollArgs",
     "TargetScrollResult",
     "TextState",
@@ -205,17 +209,17 @@ SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))
 RESET: Script[ScriptArgs, None] = Script.load("reset", ScriptArgs, type(None))
 FOCUSED: Script[ScriptArgs, Any] = Script.load("focused", ScriptArgs, Any)
 CURSOR: Script[CursorArgs, str] = Script.load("cursor", CursorArgs, str)
-TAB_STRIP: Script[ScriptArgs, TabStrip] = Script.load("tab_strip", ScriptArgs, TabStrip)
+TAB_STRIP: Script[TabStripArgs, TabStrip] = Script.load(
+    "tab_strip", TabStripArgs, TabStrip
+)
 PAGE_FACTS: Script[ScriptArgs, PageFacts] = Script.load(
     "page_facts", ScriptArgs, PageFacts
 )
-VIEWPORT: Script[ScriptArgs, tuple[float, float]] = Script.load(
-    "viewport", ScriptArgs, tuple[float, float]
-)
-OWNER_SIZE: Script[ScriptArgs, tuple[float, float] | None] = Script.load(
+VIEWPORT: Script[ScriptArgs, Size] = Script.load("viewport", ScriptArgs, Size)
+OWNER_SIZE: Script[ScriptArgs, Size | None] = Script.load(
     "owner_size",
     ScriptArgs,
-    tuple[float, float] | None,
+    Size | None,
     uses=("composed", "visibility"),
 )
 OWNER_HITS: Script[OwnerHitsArgs, tuple[bool, ...]] = Script.load(

@@ -67,7 +67,7 @@ def read_container(context: ReadContext) -> ParsedContent:
 
 
 def copy_entry(
-    path: Path, format_: str, name: str, target: IO[bytes], limit: int
+    path: Path, format_: str, name: str, target: IO[bytes], *, limit: int
 ) -> str:
     _safe_member(name)
     if format_ == Ext.ZIP:
@@ -104,7 +104,7 @@ def copy_entry(
             with source:
                 _copy(source, target, limit)
     elif format_ in {Ext.EML, Ext.MBOX}:
-        return _copy_message(path, format_, name, target, limit)
+        return _copy_message(path, format_, name, target, limit=limit)
     elif format_ in _COMPRESSED:
         if name != path.stem:
             raise ValueError(f"This compressed file contains one entry: {path.stem}")
@@ -132,7 +132,7 @@ def _copy(source: _ByteSource, target: IO[bytes], limit: int) -> None:
 
 
 def _copy_message(
-    path: Path, format_: str, name: str, target: IO[bytes], limit: int
+    path: Path, format_: str, name: str, target: IO[bytes], *, limit: int
 ) -> str:
     if format_ == Ext.MBOX:
         if not name.startswith("#") or not name[1:].isdigit():

@@ -115,7 +115,7 @@ async def capture_observation(
             fingerprint="dialog",
             viewport_revision=viewport_revision,
             tabs=tabs,
-            text=f"Open {tab.dialog[0]} dialog: {tab.dialog[1]}",
+            text=f"Open {tab.dialog.kind} dialog: {tab.dialog.message}",
             cursor=cursor,
         )
         return CapturedObservation(snapshot, EmptyReferences())
@@ -319,7 +319,7 @@ async def _redact(
         image,
         tuple(element.bounds for element in changed if element.bounds is not None),
         content.area,
-        content.scale,
+        scale=content.scale,
     )
 
 

@@ -18,8 +18,8 @@ Use the recipe and replace only what your agent needs:
 
 ```python
 from browserrig import (
-    Agent, Chrome, DomCapture, DomPerception, ImageContext,
-    InputVisualization, Screenshots, ScreenshotTrigger, TrimInBatches,
+    Agent, Chrome, Choreography, ChoreographyOverlay, DomCapture, DomPerception,
+    ImageContext, Screenshots, ScreenshotTrigger, TrimInBatches,
 )
 
 agent = Agent(
@@ -32,7 +32,7 @@ agent = Agent(
         ),
         ImageContext(TrimInBatches(max_images=6, min_images=3)),
     ],
-    without=(InputVisualization,),
+    without=(Choreography, ChoreographyOverlay),
 )
 ```
 
@@ -298,8 +298,9 @@ coordinates for this page.
 ## Browser-owned presentation
 
 `InputPacing` installs a `Motor` controlling keystrokes and pointer routes.
-`InputVisualization` installs a `Presenter` controlling viewer feedback. Both are
-optional; tools consume the session's `Input` service with either configuration.
+`Choreography` installs a `Presenter` controlling viewer feedback and streams it
+as events; `ChoreographyOverlay` draws them in the page. All are optional;
+tools consume the session's `Input` service in any configuration.
 `InputRuntime` uses `ChangeTab` to synchronize devices; backend tabs own only
 technical tab operations.
 

@@ -59,5 +59,5 @@ class Browser(Protocol):
         ...
 
 
-async def _discard(_event: BrowserEvent | LiveEvent | TabEvent) -> None:
+async def discard_event(_event: BrowserEvent | LiveEvent | TabEvent) -> None:
     pass

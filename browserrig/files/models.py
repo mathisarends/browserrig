@@ -6,6 +6,8 @@ from pydantic import Field
 from browserrig.core import Options
 
 type FileReadStatus = Literal["complete", "partial", "metadata_only", "unsupported"]
+type ExtractionStatus = Literal["processing", "complete", "partial", "failed"]
+type FileView = Literal["auto", "text", "image"]
 
 
 class DownloadState(StrEnum):
@@ -17,7 +19,7 @@ class DownloadState(StrEnum):
 class FileExtraction(Options):
     path: str
     metadata_path: str
-    status: Literal["processing", "complete", "partial", "failed"]
+    status: ExtractionStatus
     page_count: int | None = None
     indexed_pages: tuple[int, ...] = ()
     pending_ocr_pages: tuple[int, ...] = ()

@@ -23,13 +23,15 @@ The isolated world's `globalThis.__browserrig` namespace holds:
 - `findIndex`: the page text of the last find, with its session and the
   `stability` time it was read at; typing reuses it while the document is
   unchanged. Closing the find bar clears it.
+- `tabStrip`: one head mutation observer per document and the last title/icon
+  it reported; it calls a CDP binding once the tab strip would show a new one.
 - `secretFields`: fields that received a secret; their text is masked with
   `-webkit-text-security`.
 - `secretTarget`: the field focused when secret typing started; typing aborts
   as soon as focus leaves it.
 - `overlays` and `overlayNodes`: application-owned iframe surfaces and their DOM
   identities. Generic browser capture controls their visibility; readiness skips
-  their activity. Choreography is one consumer of the surface API.
+  their activity. `ChoreographyOverlay` is one consumer of the surface API.
 
 Scripts throw only the fixed codes in `ScriptError`. Unexpected exception text
 is never returned to the model. ESLint and Prettier cover main files and helpers;
@@ -38,7 +40,7 @@ Python contract tests guard script names, inline JavaScript and error codes.
 `choreography.js` composes the `lib/choreography/` helpers for the surface,
 cursor, keyboard, panels and transfers. These helpers consume typed receipts;
 they do not dispatch input or read the inspected document. The iframe's DOM and
-CSS live separately in `choreography/view.html` and `view.css`. Generic surface
+CSS live separately in `overlay/view.html` and `view.css`. Generic surface
 ownership and screenshot visibility remain in `overlay.js`.
 
 Shared helpers own composed ancestry, shadow/slot traversal, visibility, geometry,

@@ -18,7 +18,7 @@ from browserrig import (
     Point,
     Runtime,
 )
-from browserrig.core import TabGesture
+from browserrig.core import TabGesture, ViewportSize
 from browserrig.events import TabActivatedEvent, TabClosedEvent
 from browserrig.input import Instant
 
@@ -141,7 +141,7 @@ class _Transport:
     keys: list[str] = field(default_factory=list)
 
     async def viewport_size(self):
-        return 100, 80
+        return ViewportSize(width=100, height=80)
 
     async def dispatch_mouse(self, _kind, point, **_kwargs):
         self.mouse.append(point)

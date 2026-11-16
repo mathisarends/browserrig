@@ -6,8 +6,11 @@ is always repeated in full, and changed lines keep their section and group lines
 read in place.
 """
 
+from __future__ import annotations
+
 import re
 from difflib import SequenceMatcher
+from typing import NamedTuple
 
 _NEW_MARK = re.compile(r"^(\s*(?:#+ )?)\*\[")
 _INLINE_NEW = re.compile(r"\*(?=\[(?:\\.|[^\]\\])*\]\[[^\]]+\])")
@@ -50,10 +53,10 @@ def delta(base: str, current: str) -> str:
     return "\n".join(lines)
 
 
-def _split(text: str) -> tuple[list[str], list[str]]:
+def _split(text: str) -> _Sections:
     lines = text.split("\n")
     end = lines.index("") if "" in lines else len(lines)
-    return lines[:end], lines[end + 1 :]
+    return _Sections(lines[:end], lines[end + 1 :])
 
 
 def _mark(sign: str, line: str) -> str:
@@ -74,3 +77,10 @@ def _context(lines: list[str], index: int) -> list[str]:
 
 def _indent(line: str) -> int:
     return len(line) - len(line.lstrip())
+
+
+class _Sections(NamedTuple):
+    """An observation's header lines and the page lines after the first blank line."""
+
+    header: list[str]
+    body: list[str]

@@ -16,11 +16,81 @@
 
 - Add `--page-text` to the WebArena runner and record `page_text` in results,
   so runs with and without prose between controls can be compared.
-- Fix missing choreography for DOM scroll tools: `InputVisualization` now emits
+
+## 0.5.0 (2026-11-15)
+
+### Breaking changes
+
+- Split choreography into an event producer and an in-page consumer.
+  `InputVisualization` is now `Choreography` and only emits events; the new
+  `ChoreographyOverlay` plugin draws them inside the active tab and takes
+  `name`, `keyboard_layout` and `theme` directly. `IframeRenderer` and the
+  `renderer` parameter are removed: replace `InputVisualization(renderer=None)`
+  with `without=(ChoreographyOverlay,)` and
+  `InputVisualization(renderer=IframeRenderer(...))` with
+  `ChoreographyOverlay(...)`. Both are browser defaults; drop both with
+  `without=(InputPacing, Choreography, ChoreographyOverlay)` to work unseen.
+  Bare harnessed agents mount `ChoreographyOverlay()` next to `Choreography()`
+  to keep the in-page rendering; the overlay requires `Choreography`.
+- Separate browser facts from presentation. `Choreography` projects downloads,
+  uploads and activities into `DownloadPresentedEvent`,
+  `UploadPresentedEvent` and `ActivityPresentedEvent`, which share the new
+  `PresentedEvent` base with `WorkPresentedEvent`. Viewers, including the
+  overlay, draw only input and presented events and no longer interpret
+  `Download*Event`, `FilesUploadedEvent` or `Activity*Event` facts.
+- Optional flags and tuning parameters of tool methods are keyword-only when
+  called from Python: `PointerTools.click`/`click_at` (`count`, `button`,
+  `new_tab`), `PageSearchTools.search_page` (`full_page`, `start`,
+  `max_results`) and `WorkspaceTools.grep` (`limit`, `include_hidden`),
+  `write_file` (`overwrite`, `append`) and `edit_file` (`replace_all`).
+  `FileTransfer.receive` takes `browser_path=` by keyword. Agent tool calls are
+  unchanged.
+- Name the fields of fixed-length tuples. Coordinates are `Position(x, y)`,
+  aim spots `Aim(x, y)` and find-mark rectangles `Box(x, y, width, height)`;
+  all remain tuples, so unpacking and serialized receipts are unchanged.
+  `Tab.viewport_size()` and custom `InputTarget.viewport_size()` implementations
+  use `ViewportSize`; replace tuple unpacking with `.width`/`.height`.
+  `Tab.dialog` is an `OpenDialog(kind, message)`, `Motor.aim_fractions` returns `Aim`,
+  `CursorPath` has `control_point_1`/`control_point_2` instead of
+  `control_points`, and `CursorPath.curved(bend=...)` takes a `Bend`.
+  `ControlPoint` is removed in favour of `Position`.
+
+### Changes
+
+- `Choreography` republishes the resting cursor when the active tab settles on a
+  new document, so every viewer, not only the in-page overlay, can redraw it.
+- Upgrade Harnessed and every provider/MCP/OTel extra to 0.17.0. No Browserrig
+  code changes are required.
+- Add the source viewport to coordinate receipts. Cursor, pointer, wheel,
+  highlight, find, file-transfer and tab-press events now derive from
+  `PositionedEvent` and carry `viewport` (`ViewportSize`), measured when the
+  receipt is emitted; screenshot `WorkPresentedEvent`s carry it with their
+  `CaptureRegion`. External renderers can project input across tab switches and
+  live resizes without querying the browser later.
+- Fix missing choreography for DOM scroll tools: `Choreography` now emits
   separate transient `PageScrolledEvent` and `ElementScrolledEvent` receipts
   with public `tab_id` and measured deltas (`ref` identifies an element) when
   `scroll_page` or `scroll_element` actually moves. Wheel events retain their
   native-input semantics.
+- Stage the browser's own controls for viewers. Before typing an address the
+  pointer focuses the address bar (`AddressBarFocusedEvent`); `go_back`,
+  `go_forward` and `reload` press their buttons first (`BackPressedEvent`,
+  `ForwardPressedEvent`, `ReloadPressedEvent`, staged through `ControlIntent`).
+  Each is a `PositionedEvent` with the pointer's origin and travel duration; a
+  `CursorEnteredEvent` returns the pointer into the page afterwards, at once
+  when the step fails or is cancelled. Viewers that draw their own toolbar place the controls
+  themselves; nothing extra is clicked in the browser.
+
+### Fixed
+
+- Retry a favicon download interrupted by an in-page title or icon update; a
+  cancelled load no longer leaves the icon URL cached without its image.
+- Keep HTML files checked out with LF line endings so the JavaScript format
+  check also passes on Windows with `core.autocrlf=true`.
+- `TabStrip` follows title and favicon changes made in the page without a
+  navigation, including idle single-page-app updates and removed icons. The
+  workaround of calling `tab.report_change(settled=not tab.loading)` after each
+  tool is no longer needed (#47).
 
 ## 0.4.0 (2026-11-14)
 

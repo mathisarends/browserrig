@@ -3,10 +3,11 @@ import json
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import replace
+from typing import NamedTuple
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-from cdpify import UNSET, CDPCommandError, CdpSession
+from cdpify import UNSET, CDPCommandError, CDPError, CdpSession
 from cdpify.domains.page import (
     FrameNavigatedEvent,
     FrameResizedEvent,
@@ -19,21 +20,23 @@ from cdpify.domains.page import (
     LifecycleEventEvent,
     NavigatedWithinDocumentEvent,
 )
-from cdpify.domains.runtime import RemoteObject
+from cdpify.domains.runtime import BindingCalledEvent, RemoteObject
 from harnessed.tracing import record, traced
 
-from browserrig.core import BrowserError
+from browserrig.core import BrowserError, ViewportSize
 from browserrig.events import (
     BrowserEvent,
     DialogHandledEvent,
     DialogOpenedEvent,
     LiveEvent,
     NavigationCommittedEvent,
+    PositionedEvent,
     TabEvent,
 )
 from browserrig.scripts import (
     TAB_STRIP,
     TabStrip,
+    TabStripArgs,
 )
 
 from .favicon import load_favicon
@@ -42,13 +45,25 @@ from .guard import NavigationGuard
 from .input import CdpInput
 from .network import NetworkActivity
 from .overlays import Overlays
-from .worlds import Worlds
+from .worlds import WORLD_NAME, Worlds
+
+# Called by the page once its title or icon changes after the last strip read.
+_STRIP_BINDING = "browserrigTabStripChanged"
+# Viewport metadata is presentation only and must never hold up input.
+_VIEWPORT_PROBE_SECONDS = 0.25
 
 type FrameDiscovery = Callable[
     [Tab], Awaitable[tuple[tuple[Frame, ...], tuple[str, ...]]]
 ]
 # Told when url, title or loading may have changed; `settled` once loading stopped.
 type TabListener = Callable[[Tab, bool], Awaitable[None]]
+
+
+class OpenDialog(NamedTuple):
+    """A JavaScript dialog that blocks the page until it is handled."""
+
+    kind: str
+    message: str
 
 
 class Tab:  # pylint: disable=too-many-public-methods  # document API
@@ -70,7 +85,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self.document_id = ""
         self.url = "about:blank"
         self.title = ""
-        self.dialog: tuple[str, str] | None = None
+        self.dialog: OpenDialog | None = None
         self.input = CdpInput(self)
         self.overlays = Overlays(self)
         self.network = NetworkActivity()
@@ -88,11 +103,14 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self._layout_revision = 0
         # Counts viewport resizes, as when a person resizes the browser window.
         self.viewport_revision = 0
-        self._frames_key: tuple[str, str, int] | None = None
+        # Last measured viewport, kept for receipts while the page cannot answer.
+        self._viewport: ViewportSize | None = None
+        self._frames_key: _FramesKey | None = None
         self._frames: tuple[Frame, ...] = ()
         self._current_action = current_action
         self._on_change = on_change
         self._guard = guard
+        self._strip_bound = False
 
     async def handle(self, event: object) -> None:
         """Apply a page event that arrived on this tab's own CDP session."""
@@ -142,30 +160,38 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
                 self.loading = False
                 self.navigation_pending = False
                 await self.report_change(settled=True)
+            case BindingCalledEvent(name=name) if name == _STRIP_BINDING:
+                # Scripts and SPAs retitle a page or swap its icon without navigating.
+                await self.report_change(settled=not self.loading)
             case FrameResizedEvent():
                 self.viewport_revision += 1
                 self.layout_changed()
             case JavascriptDialogOpeningEvent(type=kind, message=message):
-                self.dialog = (str(kind), message)
-                self.input.dialog_opened.set()
+                self.dialog = OpenDialog(str(kind), message)
+                self.input.dialog_opened()
                 await self.emit(
                     DialogOpenedEvent(kind=str(kind), message=message[:1000])
                 )
             case JavascriptDialogClosedEvent(result=accepted):
                 self.dialog = None
-                self.input.dialog_opened.clear()
+                self.input.dialog_closed()
                 await self.emit(DialogHandledEvent(accepted=accepted))
 
     async def emit(self, event: BrowserEvent | LiveEvent | TabEvent) -> None:
-        if self._emit is not None:
-            if isinstance(event, TabEvent):
-                await self._emit(
-                    replace(event, tab_id=self.id, document_id=self.document_id)
-                )
-                return
+        if self._emit is None:
+            return
+        if isinstance(event, TabEvent):
             await self._emit(
-                replace(event, target_id=self.id, document_id=self.document_id)
+                replace(event, tab_id=self.id, document_id=self.document_id)
             )
+            return
+        if isinstance(event, PositionedEvent) and event.viewport is None:
+            # Measured with the receipt: the viewport may change before viewers see it.
+            viewport = await self._measure_viewport()
+            event = replace(event, viewport=viewport)
+        await self._emit(
+            replace(event, target_id=self.id, document_id=self.document_id)
+        )
 
     async def discard(self) -> None:
         self.closed = True
@@ -177,9 +203,19 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
             await self._on_change(self, settled)
 
     async def read_strip(self) -> TabStrip:
-        """Read the title and icon URL the document declares for a tab strip."""
+        """Read the title and icon URL the document declares for a tab strip.
+
+        Once read, the document reports later title or icon changes as a settled
+        change, so a strip follows in-page updates without polling.
+        """
+        if not self._strip_bound:
+            # Bindings survive reloads and reach only browserrig's isolated worlds.
+            await self.cdp.runtime.add_binding(
+                name=_STRIP_BINDING, execution_context_name=WORLD_NAME
+            )
+            self._strip_bound = True
         frame = await self.main_frame()
-        return await frame.run(TAB_STRIP)
+        return await frame.run(TAB_STRIP, TabStripArgs(binding=_STRIP_BINDING))
 
     async def load_icon(self, url: str) -> str:
         """Load an icon through the page's own network stack, as a `data:` URI."""
@@ -240,9 +276,18 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         """Forget cached frame geometry after input, scrolling or navigation moved content."""
         self._layout_revision += 1
 
-    async def viewport_size(self) -> tuple[float, float]:
+    async def viewport_size(self) -> ViewportSize:
         viewport = (await self.cdp.page.get_layout_metrics()).css_layout_viewport
-        return viewport.client_width, viewport.client_height
+        return ViewportSize(width=viewport.client_width, height=viewport.client_height)
+
+    async def _measure_viewport(self) -> ViewportSize | None:
+        """Measure the layout viewport, or keep the last size while the page is blocked."""
+        if self.dialog is not None:
+            return self._viewport
+        with suppress(CDPError, TimeoutError):
+            async with asyncio.timeout(_VIEWPORT_PROBE_SECONDS):
+                self._viewport = await self.viewport_size()
+        return self._viewport
 
     @traced
     async def frames(self) -> tuple[Frame, ...]:
@@ -252,16 +297,16 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         """
         if self._discover_frames is None:
             raise BrowserError("Frame discovery is unavailable for this tab")
-        key = (self.document_id, self._current_action(), self._layout_revision)
-        cached = bool(key[1]) and key == self._frames_key
+        key = _FramesKey(
+            self.document_id, self._current_action(), self._layout_revision
+        )
+        cached = bool(key.action_id) and key == self._frames_key
         record(cached=cached)
         if cached:
             return self._frames
         frames, self.frame_limitations = await self._discover_frames(self)
-        if key[1] and key == (
-            self.document_id,
-            self._current_action(),
-            self._layout_revision,
+        if key.action_id and key == _FramesKey(
+            self.document_id, self._current_action(), self._layout_revision
         ):
             self._frames_key = key
             self._frames = frames
@@ -346,3 +391,9 @@ def _javascript_value(value: RemoteObject) -> str:
     if value.value is UNSET:
         return value.description if value.description is not None else "null"
     return json.dumps(value.value, ensure_ascii=False)
+
+
+class _FramesKey(NamedTuple):
+    document_id: str
+    action_id: str
+    layout_revision: int

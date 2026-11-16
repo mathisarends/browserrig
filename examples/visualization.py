@@ -14,10 +14,9 @@ from harnessed.testing import ScriptedModel
 from browserrig import (
     Agent,
     Browser,
+    ChoreographyOverlay,
     Chrome,
     Files,
-    IframeRenderer,
-    InputVisualization,
     LocalWorkspace,
     VideoRecording,
     Viewport,
@@ -39,7 +38,7 @@ async def main() -> None:
     args = parser.parse_args()
     directory = args.directory.resolve()
     directory.mkdir(parents=True, exist_ok=True)
-    renderer = IframeRenderer(keyboard_layout=args.layout, theme=args.theme)
+    overlay = ChoreographyOverlay(keyboard_layout=args.layout, theme=args.theme)
     with visualization_site(directory, args.theme) as url:
         agent = Agent(
             model=ScriptedModel([]),
@@ -50,7 +49,7 @@ async def main() -> None:
             ),
             plugins=[
                 Files(LocalWorkspace(directory / "workspace")),
-                InputVisualization(renderer=renderer),
+                overlay,
                 VideoRecording(directory / "recording", width=1440, height=1000),
             ],
         )
@@ -68,7 +67,7 @@ async def main() -> None:
                 headless=not args.headed,
                 viewport=Viewport(width=360, height=740),
             ),
-            plugins=[InputVisualization(renderer=renderer)],
+            plugins=[overlay],
         )
         async with compact.session() as session:
             small = VisualWalkthrough(

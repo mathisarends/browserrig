@@ -11,11 +11,12 @@ from browserrig import (
     Agent,
     Browser,
     BrowserPerception,
+    Choreography,
+    ChoreographyOverlay,
     Chrome,
     ChromeBrowser,
     DomCapture,
     InputPacing,
-    InputVisualization,
     wait_for_page,
 )
 from browserrig.browser import Launch
@@ -71,7 +72,7 @@ async def test_select_options_replaces_exact_set_or_reports_atomic_failure(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
         plugins=[Approvals(default=PolicyDecision.ALLOW)],
-        without=(InputPacing, InputVisualization),
+        without=(InputPacing, Choreography, ChoreographyOverlay),
     )
     async with agent.session() as session:
         tab = session.scope[Browser].active_tab

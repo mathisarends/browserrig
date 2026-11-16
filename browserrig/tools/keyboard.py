@@ -61,8 +61,10 @@ class KeyboardTools(Plugin):
         if secrets is not None:
             entry = await secrets.prepare(text, browser=self._browser)
             if entry is not None:
-                return _secret_entered(await secrets.enter(entry, self._input.keyboard))
-        return _entered(await self._input.keyboard.type_text(text))
+                entered = await secrets.enter(entry, self._input.keyboard)
+                return _secret_entered(entered)
+        typed = await self._input.keyboard.type_text(text)
+        return _entered(typed)
 
 
 def _entered(typed: TypedText) -> Effect:

@@ -1,6 +1,6 @@
 """Events of the staged scene: what a viewer sees beyond raw input.
 
-They are only emitted while the `InputVisualization` plugin is mounted.
+They are only emitted while the `Choreography` plugin is mounted.
 """
 
 from dataclasses import dataclass, field
@@ -9,11 +9,20 @@ from typing import Literal
 
 from browserrig.core import (
     ActionKind,
+    ActivityKind,
     BrowserBar,
     FileTransferDirection,
+    Position,
     TabGesture,
+    ViewportSize,
 )
-from browserrig.events import EventKind, InputEvent, LiveEvent, TabEvent
+from browserrig.events import (
+    EventKind,
+    InputEvent,
+    LiveEvent,
+    PositionedEvent,
+    TabEvent,
+)
 from browserrig.files import FileReadStatus
 from browserrig.observation import FindMark
 
@@ -42,7 +51,7 @@ class ElementScrolledEvent(TabEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class HighlightElementEvent(InputEvent):
+class HighlightElementEvent(PositionedEvent):
     ref: str
     x: float
     y: float
@@ -85,7 +94,7 @@ class FindBarEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class FindResultsEvent(InputEvent):
+class FindResultsEvent(PositionedEvent):
     """Matches for the find bar's text, updated after each key and with the final results.
 
     `label` is the count the find bar shows. `marks` covers the text matches in the
@@ -106,7 +115,7 @@ class FindResultsEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class FileTransferEvent(InputEvent):
+class FileTransferEvent(PositionedEvent):
     """Files move into a new tab or onto a page element; the harness waits for `duration`."""
 
     direction: FileTransferDirection
@@ -120,7 +129,7 @@ class FileTransferEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class TabPressedEvent(InputEvent):
+class TabPressedEvent(PositionedEvent):
     """The pointer leaves the page and presses a control in the viewer's tab strip.
 
     The event belongs to the tab the pointer leaves, starting at `from_position`.
@@ -130,7 +139,7 @@ class TabPressedEvent(InputEvent):
 
     gesture: TabGesture
     tab_id: str
-    from_position: tuple[float, float]
+    from_position: Position
     duration: float
     type: Literal[EventKind.TAB_PRESSED] = field(
         default=EventKind.TAB_PRESSED, kw_only=True
@@ -138,14 +147,70 @@ class TabPressedEvent(InputEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class CursorEnteredEvent(InputEvent):
-    """After a tab press, the pointer returns from the tab strip into this tab's page.
+class AddressBarFocusedEvent(PositionedEvent):
+    """The pointer leaves the page and clicks into the viewer's address bar.
 
-    It travels to `to_position`, where this tab last had the pointer; the harness waits
-    `duration` before dispatching native input there.
+    Like each toolbar press below, the event belongs to the tab the pointer leaves,
+    starting at `from_position`, which is None while the pointer has no place there
+    yet. Viewers place the control themselves; the harness waits `duration` before it
+    acts, here before the first `BarTypedEvent`. Nothing is clicked in the browser.
     """
 
-    to_position: tuple[float, float]
+    from_position: Position | None
+    duration: float
+    type: Literal[EventKind.ADDRESS_BAR_FOCUSED] = field(
+        default=EventKind.ADDRESS_BAR_FOCUSED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class BackPressedEvent(PositionedEvent):
+    """The pointer presses the viewer's back button before the tab goes back."""
+
+    from_position: Position | None
+    duration: float
+    type: Literal[EventKind.BACK_PRESSED] = field(
+        default=EventKind.BACK_PRESSED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ForwardPressedEvent(PositionedEvent):
+    """The pointer presses the viewer's forward button before the tab goes forward."""
+
+    from_position: Position | None
+    duration: float
+    type: Literal[EventKind.FORWARD_PRESSED] = field(
+        default=EventKind.FORWARD_PRESSED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ReloadPressedEvent(PositionedEvent):
+    """The pointer presses the viewer's reload button before the tab reloads."""
+
+    from_position: Position | None
+    duration: float
+    type: Literal[EventKind.RELOAD_PRESSED] = field(
+        default=EventKind.RELOAD_PRESSED, kw_only=True
+    )
+
+
+type ToolbarPressedEvent = (
+    AddressBarFocusedEvent | BackPressedEvent | ForwardPressedEvent | ReloadPressedEvent
+)
+
+
+@dataclass(frozen=True, slots=True)
+class CursorEnteredEvent(PositionedEvent):
+    """After a tab or toolbar press, the pointer returns into this tab's page.
+
+    It travels to `to_position`, where this tab last had the pointer; the harness waits
+    `duration` before dispatching native input there. After a toolbar press it follows
+    once the control has acted; if that failed or was cancelled, `duration` is zero.
+    """
+
+    to_position: Position
     duration: float
     easing: Literal["easeInOutCubic"] = "easeInOutCubic"
     type: Literal[EventKind.CURSOR_ENTERED] = field(
@@ -163,7 +228,10 @@ class WorkPhase(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class CaptureRegion:
-    """An immutable rectangle in the source tab's viewport CSS pixels."""
+    """An immutable rectangle in the source tab's viewport CSS pixels.
+
+    The receipt's `viewport` gives the size of that viewport at capture time.
+    """
 
     x: float
     y: float
@@ -171,8 +239,17 @@ class CaptureRegion:
     height: float
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PresentedEvent(LiveEvent):
+    """Status that `Choreography` projected from browser facts for people watching.
+
+    Viewers draw these instead of the facts. Terminal receipts expire after their
+    `retention` seconds.
+    """
+
+
 @dataclass(frozen=True, slots=True)
-class WorkPresentedEvent(LiveEvent):
+class WorkPresentedEvent(PresentedEvent):
     """Bounded, redacted work receipt for inert overlays and external viewers.
 
     Preview text is data, never HTML. A screenshot receipt is completed only after
@@ -200,6 +277,8 @@ class WorkPresentedEvent(LiveEvent):
     artifact_path: str = ""
     image_url: str = field(default="", repr=False)
     region: CaptureRegion | None = None
+    # The source viewport `region` lies in, measured with the capture.
+    viewport: ViewportSize | None = None
     elapsed: float = 0
     retention: float = 8
     type: Literal[EventKind.WORK_PRESENTED] = field(
@@ -212,6 +291,55 @@ class WorkPresentedEvent(LiveEvent):
             object.__setattr__(self, "kind", ActionKind(self.kind))
 
 
+@dataclass(frozen=True, slots=True)
+class DownloadPresentedEvent(PresentedEvent):
+    """One download as viewers show it; upsert by `download_id`.
+
+    Every receipt names the file. `total_bytes` is None while the size is unknown.
+    """
+
+    download_id: str
+    filename: str
+    phase: WorkPhase
+    received_bytes: int = 0
+    total_bytes: int | None = None
+    reason: str = ""
+    retention: float = 2.2
+    type: Literal[EventKind.DOWNLOAD_PRESENTED] = field(
+        default=EventKind.DOWNLOAD_PRESENTED, kw_only=True
+    )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "phase", WorkPhase(self.phase))
+
+
+@dataclass(frozen=True, slots=True)
+class UploadPresentedEvent(PresentedEvent):
+    """Files placed into a page's file input; `ref` is observation-local."""
+
+    paths: tuple[str, ...]
+    ref: str = ""
+    retention: float = 8
+    type: Literal[EventKind.UPLOAD_PRESENTED] = field(
+        default=EventKind.UPLOAD_PRESENTED, kw_only=True
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ActivityPresentedEvent(PresentedEvent):
+    """An activity interval, such as model thinking or a handoff, begins or ends."""
+
+    interval_id: str
+    kind: ActivityKind
+    active: bool
+    type: Literal[EventKind.ACTIVITY_PRESENTED] = field(
+        default=EventKind.ACTIVITY_PRESENTED, kw_only=True
+    )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "kind", ActivityKind(self.kind))
+
+
 SCENE_EVENTS = (
     PageScrolledEvent,
     ElementScrolledEvent,
@@ -222,6 +350,13 @@ SCENE_EVENTS = (
     FindResultsEvent,
     FileTransferEvent,
     TabPressedEvent,
+    AddressBarFocusedEvent,
+    BackPressedEvent,
+    ForwardPressedEvent,
+    ReloadPressedEvent,
     CursorEnteredEvent,
     WorkPresentedEvent,
+    DownloadPresentedEvent,
+    UploadPresentedEvent,
+    ActivityPresentedEvent,
 )

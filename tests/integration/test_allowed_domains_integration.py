@@ -10,11 +10,12 @@ from harnessed.testing import ScriptedModel, call
 from browserrig import (
     Agent,
     AllowedDomains,
+    Choreography,
+    ChoreographyOverlay,
     Chrome,
     ChromeBrowser,
     DomainNotAllowed,
     InputPacing,
-    InputVisualization,
     TabStrip,
     wait_for_page,
 )
@@ -152,7 +153,7 @@ async def test_model_receives_blocked_navigation_error_and_can_continue(guarded_
             AllowedDomains("127.0.0.1"),
             Approvals(default=PolicyDecision.ALLOW),
         ],
-        without=(InputPacing, InputVisualization, TabStrip),
+        without=(InputPacing, Choreography, ChoreographyOverlay, TabStrip),
     )
     async with agent.session() as session:
         await session.run("Navigate", max_steps=3)

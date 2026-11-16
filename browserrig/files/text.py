@@ -34,8 +34,10 @@ def text_encoding(sample: bytes) -> str | None:
         return match.encoding if match is not None and match.chaos < 0.1 else None
 
 
-def text_result(path: Path, encoding: str, offset: int, max_chars: int) -> FileContent:
-    text = read_text(path, encoding, offset, max_chars)
+def text_result(
+    path: Path, encoding: str, *, offset: int, max_chars: int
+) -> FileContent:
+    text = read_text(path, encoding, offset=offset, max_chars=max_chars)
     return FileContent(
         path=str(path),
         media_type="text/plain",
@@ -47,7 +49,7 @@ def text_result(path: Path, encoding: str, offset: int, max_chars: int) -> FileC
     )
 
 
-def read_text(path: Path, encoding: str, offset: int, max_chars: int) -> str:
+def read_text(path: Path, encoding: str, *, offset: int, max_chars: int) -> str:
     try:
         with path.open(encoding=encoding, newline="") as stream:
             remaining = offset

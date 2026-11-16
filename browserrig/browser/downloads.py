@@ -82,7 +82,10 @@ class Downloads:
         if event.state == DownloadState.COMPLETED and transfer is not None:
             try:
                 path = await transfer.receive(
-                    guid, previous.filename, previous.url, event.file_path or None
+                    guid,
+                    previous.filename,
+                    previous.url,
+                    browser_path=event.file_path or None,
                 )
             except Exception as failure:  # pylint: disable=broad-exception-caught
                 # A custom bridge may fail in its own ways; the download must still end.

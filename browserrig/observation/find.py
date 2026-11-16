@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from cdpify import CDPCommandError
 
 from browserrig.browser import Frame, Tab
-from browserrig.core import Bounds, BrowserError
+from browserrig.core import Bounds, Box, BrowserError
 from browserrig.scripts import FIND, FindArgs, FoundText
 
 # Matches each frame keeps as ranges for marks and listing; more are only counted.
@@ -12,10 +12,10 @@ _MARKED_PER_FRAME = 1000
 
 @dataclass(frozen=True, slots=True)
 class FindMark:
-    """One match in the viewport: its number and its line boxes as (x, y, width, height)."""
+    """One match in the viewport: its number and its line boxes."""
 
     index: int
-    rects: tuple[tuple[float, float, float, float], ...]
+    rects: tuple[Box, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,7 +149,7 @@ def _viewport_marks(frame: Frame, marks, *, first: int) -> list[FindMark]:
                 box = box.intersect(frame.visible)
             if box.width > 0 and box.height > 0:
                 rects.append(
-                    (
+                    Box(
                         round(box.x, 1),
                         round(box.y, 1),
                         round(box.width, 1),

@@ -48,7 +48,7 @@ class FileTransfer:
 
     @traced
     async def receive(
-        self, download_id: str, filename: str, url: str, browser_path: str | None
+        self, download_id: str, filename: str, url: str, *, browser_path: str | None
     ) -> str:
         """Bring a finished download into the workspace; return its workspace path."""
         if not re.fullmatch(r"[a-zA-Z0-9-]+", download_id):
