@@ -178,7 +178,7 @@ class Mouse:
         *,
         start: Point,
         end: Point,
-        duration: float,
+        duration_seconds: float,
     ) -> None:
         """Let the browser handle the drag gesture; always release the left button."""
         distance = math.hypot(end.x - start.x, end.y - start.y)
@@ -192,7 +192,7 @@ class Mouse:
                 target, MouseEventKind.PRESSED, start, buttons=1, click_count=1
             )
             # CDP's mouse input handles native drag-and-drop as well as pointer gestures.
-            steps = max(3, math.ceil(duration * 30))
+            steps = max(3, math.ceil(duration_seconds * 30))
             for index in range(1, steps + 1):
                 fraction = index / steps
                 current = Point(
@@ -200,7 +200,7 @@ class Mouse:
                     y=start.y + (end.y - start.y) * fraction,
                 )
                 await self._dispatch(target, MouseEventKind.MOVED, current, buttons=1)
-                await asyncio.sleep(duration / steps)
+                await asyncio.sleep(duration_seconds / steps)
             # Entering the drop target may only fire dragenter. Move again there so
             # its dragover handler can accept the drop before the button is released.
             await self._dispatch(target, MouseEventKind.MOVED, end, buttons=1)
@@ -227,7 +227,7 @@ class Mouse:
         target = focused(self._focus)
         point = point or self._rest(target).position
         await self._move(target, point)
-        duration = wheel_duration(math.hypot(delta_x, delta_y))
+        duration_seconds = wheel_duration(math.hypot(delta_x, delta_y))
         await self._emit(
             target,
             ScrollStartedEvent(
@@ -235,7 +235,7 @@ class Mouse:
                 y=point.y,
                 delta_x=delta_x,
                 delta_y=delta_y,
-                duration=duration,
+                duration_seconds=duration_seconds,
             ),
         )
         clock = asyncio.get_running_loop()
@@ -249,7 +249,11 @@ class Mouse:
             )
             # Follow the clock so slow dispatches do not stretch the scroll.
             elapsed = max(clock.time() - started, frame * FRAME_SECONDS)
-            progress = wheel_progress(elapsed / duration) if elapsed < duration else 1.0
+            progress = (
+                wheel_progress(elapsed / duration_seconds)
+                if elapsed < duration_seconds
+                else 1.0
+            )
             if progress <= sent:
                 continue
             await target.dispatch_wheel(
@@ -266,7 +270,7 @@ class Mouse:
                 y=point.y,
                 delta_x=delta_x,
                 delta_y=delta_y,
-                duration=duration,
+                duration_seconds=duration_seconds,
             ),
         )
         # Scrolled content can put a different element under the resting pointer.
@@ -292,7 +296,7 @@ class Mouse:
                 to_position=Position(path.end.x, path.end.y),
                 control_point_1=path.control_point_1,
                 control_point_2=path.control_point_2,
-                duration=path.duration,
+                duration_seconds=path.duration_seconds,
             ),
         )
         # Viewers animate the stroke on their own clock, so follow the clock too: when a
@@ -303,13 +307,13 @@ class Mouse:
         while step < steps:
             step += 1
             await self._dispatch(target, MouseEventKind.MOVED, path.point(step / steps))
-            if not path.duration:
+            if not path.duration_seconds:
                 continue
             await asyncio.sleep(
-                max(0.0, started + path.duration * step / steps - monotonic())
+                max(0.0, started + path.duration_seconds * step / steps - monotonic())
             )
             # The last frame always lands on the destination.
-            due = math.floor((monotonic() - started) / path.duration * steps)
+            due = math.floor((monotonic() - started) / path.duration_seconds * steps)
             step = max(step, min(steps - 1, due))
 
     async def _publish(self, target: InputTarget) -> None:
@@ -391,6 +395,6 @@ def _joined(
             raise BrowserError(
                 "Each stroke of a pointer route starts where the last ended"
             )
-    if any(path.duration < 0 for path in strokes):
+    if any(path.duration_seconds < 0 for path in strokes):
         raise BrowserError("Pointer strokes must not have a negative duration")
     return strokes

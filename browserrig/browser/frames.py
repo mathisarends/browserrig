@@ -15,7 +15,8 @@ from .tab import Tab
 
 _MAX_FRAMES = 64
 _MAX_DEPTH = 8
-_FRAME_TIMEOUT = 2.0
+_FRAME_TIMEOUT_SECONDS = 2.0
+_FRAME_ATTACH_SECONDS = 10
 
 type _FrameSession = Callable[[str], Awaitable[CdpSession]]
 
@@ -59,7 +60,7 @@ async def discover_frames(
                 limitations.append("Frame count or nesting limit reached")
                 return
             try:
-                async with asyncio.timeout(_FRAME_TIMEOUT):
+                async with asyncio.timeout(_FRAME_TIMEOUT_SECONDS):
                     child = await inspect(frame_id, parent, session_space)
                     if child is None:
                         continue
@@ -111,7 +112,7 @@ async def discover_frames(
         return replace(child, cdp=cdp, transform=transform, visible=visible)
 
     try:
-        async with asyncio.timeout(10):
+        async with asyncio.timeout(_FRAME_ATTACH_SECONDS):
             await visit(root, result[0], FrameTransform(), 0)
     except TimeoutError:
         limitations.append(

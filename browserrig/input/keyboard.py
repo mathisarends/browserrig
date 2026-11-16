@@ -102,7 +102,7 @@ class Keyboard:
                 KeyPressedEvent(
                     key=modifiers[-1],
                     modifiers=modifiers[:-1],
-                    duration=_HELD_SHOWN_SECONDS,
+                    duration_seconds=_HELD_SHOWN_SECONDS,
                 ),
             )
             yield flags
@@ -137,7 +137,7 @@ class Keyboard:
                 await self._stroke(
                     target,
                     Stroke("Backspace") if key.key == _ERASE else character(key.key),
-                    duration=key.delay_after,
+                    duration_seconds=key.delay_after,
                     sensitive=sensitive,
                 )
                 if key.delay_after:
@@ -151,7 +151,7 @@ class Keyboard:
         target: InputTarget,
         stroke: Stroke,
         *,
-        duration: float = 0,
+        duration_seconds: float = 0,
         sensitive: bool = False,
     ) -> None:
         async with AsyncExitStack() as held:
@@ -196,7 +196,7 @@ class Keyboard:
             KeyPressedEvent(
                 key=_HIDDEN_KEY if sensitive else stroke.key,
                 modifiers=() if sensitive else stroke.modifiers,
-                duration=duration,
+                duration_seconds=duration_seconds,
             ),
         )
 

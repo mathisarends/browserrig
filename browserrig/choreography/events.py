@@ -64,7 +64,7 @@ class HighlightElementEvent(PositionedEvent):
 
 @dataclass(frozen=True, slots=True)
 class WaitingEvent(InputEvent):
-    duration: float
+    duration_seconds: float
     type: Literal[EventKind.WAITING] = field(default=EventKind.WAITING, kw_only=True)
 
 
@@ -73,13 +73,13 @@ class BarTypedEvent(InputEvent):
     """One key typed into the browser's address or find bar, not into the page.
 
     `text` is the bar's whole content after the key; `key` is "Enter" when the text is
-    submitted. The harness waits `duration` before the next key.
+    submitted. The harness waits `duration_seconds` before the next key.
     """
 
     browser_bar: BrowserBar
     key: str
     text: str
-    duration: float
+    duration_seconds: float
     type: Literal[EventKind.BAR_TYPED] = field(
         default=EventKind.BAR_TYPED, kw_only=True
     )
@@ -116,11 +116,11 @@ class FindResultsEvent(PositionedEvent):
 
 @dataclass(frozen=True, slots=True)
 class FileTransferEvent(PositionedEvent):
-    """Files move into a new tab or onto a page element; the harness waits for `duration`."""
+    """Files move into a new tab or onto an element for `duration_seconds`."""
 
     direction: FileTransferDirection
     paths: tuple[str, ...]
-    duration: float
+    duration_seconds: float
     x: float | None = None
     y: float | None = None
     type: Literal[EventKind.FILE_TRANSFER] = field(
@@ -134,13 +134,13 @@ class TabPressedEvent(PositionedEvent):
 
     The event belongs to the tab the pointer leaves, starting at `from_position`.
     `tab_id` names the pressed tab; it is empty for the new-tab button. Viewers place
-    the control themselves; the harness waits `duration` before switching tabs.
+    the control themselves; the harness waits `duration_seconds` before switching tabs.
     """
 
     gesture: TabGesture
     tab_id: str
     from_position: Position
-    duration: float
+    duration_seconds: float
     type: Literal[EventKind.TAB_PRESSED] = field(
         default=EventKind.TAB_PRESSED, kw_only=True
     )
@@ -152,12 +152,12 @@ class AddressBarFocusedEvent(PositionedEvent):
 
     Like each toolbar press below, the event belongs to the tab the pointer leaves,
     starting at `from_position`, which is None while the pointer has no place there
-    yet. Viewers place the control themselves; the harness waits `duration` before it
+    yet. Viewers place the control themselves; the harness waits `duration_seconds` before it
     acts, here before the first `BarTypedEvent`. Nothing is clicked in the browser.
     """
 
     from_position: Position | None
-    duration: float
+    duration_seconds: float
     type: Literal[EventKind.ADDRESS_BAR_FOCUSED] = field(
         default=EventKind.ADDRESS_BAR_FOCUSED, kw_only=True
     )
@@ -168,7 +168,7 @@ class BackPressedEvent(PositionedEvent):
     """The pointer presses the viewer's back button before the tab goes back."""
 
     from_position: Position | None
-    duration: float
+    duration_seconds: float
     type: Literal[EventKind.BACK_PRESSED] = field(
         default=EventKind.BACK_PRESSED, kw_only=True
     )
@@ -179,7 +179,7 @@ class ForwardPressedEvent(PositionedEvent):
     """The pointer presses the viewer's forward button before the tab goes forward."""
 
     from_position: Position | None
-    duration: float
+    duration_seconds: float
     type: Literal[EventKind.FORWARD_PRESSED] = field(
         default=EventKind.FORWARD_PRESSED, kw_only=True
     )
@@ -190,7 +190,7 @@ class ReloadPressedEvent(PositionedEvent):
     """The pointer presses the viewer's reload button before the tab reloads."""
 
     from_position: Position | None
-    duration: float
+    duration_seconds: float
     type: Literal[EventKind.RELOAD_PRESSED] = field(
         default=EventKind.RELOAD_PRESSED, kw_only=True
     )
@@ -206,12 +206,12 @@ class CursorEnteredEvent(PositionedEvent):
     """After a tab or toolbar press, the pointer returns into this tab's page.
 
     It travels to `to_position`, where this tab last had the pointer; the harness waits
-    `duration` before dispatching native input there. After a toolbar press it follows
-    once the control has acted; if that failed or was cancelled, `duration` is zero.
+    `duration_seconds` before dispatching native input there. After a toolbar press it follows
+    once the control has acted; if that failed or was cancelled, `duration_seconds` is zero.
     """
 
     to_position: Position
-    duration: float
+    duration_seconds: float
     easing: Literal["easeInOutCubic"] = "easeInOutCubic"
     type: Literal[EventKind.CURSOR_ENTERED] = field(
         default=EventKind.CURSOR_ENTERED, kw_only=True

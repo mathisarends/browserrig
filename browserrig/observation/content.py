@@ -17,7 +17,7 @@ _LINK = re.compile(r"\]\(<([^<>\s]+)>\)")
 _MAX_OFFSET = 2_000_000
 
 
-class PageContent(Options):
+class ExtractedContent(Options):
     url: str
     title: str
     markdown: str
@@ -66,7 +66,7 @@ class PageContent(Options):
 @traced
 async def extract_content(
     tab: Tab, *, max_chars: int = 50000, full_page: bool = False, offset: int = 0
-) -> PageContent:
+) -> ExtractedContent:
     """Read loaded document content without scrolling or replacing interactive element refs.
 
     Unless ``full_page`` is set, a page's main landmark replaces its surrounding header,
@@ -82,7 +82,7 @@ async def extract_content(
     )
 
 
-async def extract_document(tab: Tab, *, full_page: bool = False) -> PageContent:
+async def extract_document(tab: Tab, *, full_page: bool = False) -> ExtractedContent:
     """Capture one bounded snapshot before response pagination."""
     content = await _extract_document(
         tab, max_chars=_MAX_OFFSET, full_page=full_page, offset=0
@@ -101,7 +101,7 @@ async def extract_document(tab: Tab, *, full_page: bool = False) -> PageContent:
 
 async def _extract_document(
     tab: Tab, *, max_chars: int, full_page: bool, offset: int
-) -> PageContent:
+) -> ExtractedContent:
     if tab.dialog:
         raise BrowserError("Handle the open dialog before extracting page content")
     await tab.sync_document()
@@ -182,7 +182,7 @@ def _content(
     more: bool,
     limitations: list[str],
     partial: bool,
-) -> PageContent:
+) -> ExtractedContent:
     if main.main or main.chrome:
         limitations.insert(
             0,
@@ -192,7 +192,7 @@ def _content(
     page, next_offset = _page(
         markdown, offset=offset, max_chars=max_chars, more=more, limitations=limitations
     )
-    return PageContent(
+    return ExtractedContent(
         url=main.url,
         title=main.title,
         markdown=page,

@@ -250,7 +250,7 @@ async def test_unsuccessful_handoffs_release_browser_and_hint_state(outcome):
             return None
         return HumanResponse(status=HandoffStatus.DECLINED)
 
-    agent, model, holder = _agent([_request(), "Done"], ask, timeout=0.02)
+    agent, model, holder = _agent([_request(), "Done"], ask, timeout_seconds=0.02)
     async with agent.session() as session:
         _prepare(holder)
         result = await session.run("Log in")
@@ -286,7 +286,7 @@ async def test_handoff_has_its_own_timeout_and_stops_trailing_tool_calls():
     agent, model, holder = _agent(
         [batch, "Done"],
         ask,
-        timeout=1,
+        timeout_seconds=1,
         extra=(AgentLoop(tool_timeout=0.01),),
     )
     async with agent.session() as session:

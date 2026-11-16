@@ -32,7 +32,8 @@ _INSTRUCTIONS = Instructions(
 class ImageRetention(Protocol):
     """Decides how many of the oldest images to drop once a new one was added."""
 
-    def overflow(self, count: int) -> int: ...
+    def overflow(self, count: int) -> int:
+        """Return how many oldest images to discard from `count` retained images."""
 
 
 @dataclass(frozen=True, slots=True, init=False)

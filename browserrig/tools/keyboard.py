@@ -7,11 +7,12 @@ from pydantic import Field
 from browserrig.browser import Browser
 from browserrig.core import ActionKind
 from browserrig.core import browser_tool as tool
-from browserrig.input import Input, TypedText
+from browserrig.input import Input
 from browserrig.secrets import Secrets
 
 from .effects import Effect
 from .execution import Actions
+from .text_entry import entered, secret_entered
 
 
 class KeyboardTools(Plugin):
@@ -61,28 +62,7 @@ class KeyboardTools(Plugin):
         if secrets is not None:
             entry = await secrets.prepare(text, browser=self._browser)
             if entry is not None:
-                entered = await secrets.enter(entry, self._input.keyboard)
-                return _secret_entered(entered)
+                exact = await secrets.enter(entry, self._input.keyboard)
+                return secret_entered(exact)
         typed = await self._input.keyboard.type_text(text)
-        return _entered(typed)
-
-
-def _entered(typed: TypedText) -> Effect:
-    if typed.exact:
-        return Effect("Text entered.")
-    return Effect(
-        f"Text entered with a slip: typed {typed.entered!r} instead of "
-        f"{typed.intended!r}. Check the field before continuing.",
-        break_chain=True,
-    )
-
-
-def _secret_entered(exact: bool) -> Effect:
-    if exact:
-        return Effect("Text entered.")
-    # Never echo text that surrounds a secret.
-    return Effect(
-        "Text entered with a slip in the text around the secret. "
-        "Check the field before continuing.",
-        break_chain=True,
-    )
+        return entered(typed)

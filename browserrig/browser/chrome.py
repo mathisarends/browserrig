@@ -121,13 +121,13 @@ class ChromeBrowser:
         self._stack = AsyncExitStack()
         try:
             options = self._options
-            async with asyncio.timeout(options.timeout):
+            async with asyncio.timeout(options.timeout_seconds):
                 endpoint = await self._resolve_endpoint()
                 self.client = await self._stack.enter_async_context(
                     CdpClient(
                         endpoint.url,
                         additional_headers=endpoint.headers,
-                        default_timeout=options.timeout,
+                        default_timeout=options.timeout_seconds,
                     )
                 )
                 self._context = await self.tabs.start(self.client, self._stack)
@@ -187,7 +187,9 @@ class ChromeBrowser:
         url = endpoint.url
         if url.startswith(("http://", "https://")):
             async with httpx2.AsyncClient(
-                timeout=options.timeout, headers=endpoint.headers, trust_env=False
+                timeout=options.timeout_seconds,
+                headers=endpoint.headers,
+                trust_env=False,
             ) as http:
                 response = await http.get(url.rstrip("/") + "/json/version")
                 response.raise_for_status()

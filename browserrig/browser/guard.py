@@ -22,6 +22,8 @@ from .policy import DomainNotAllowed, NavigationPolicy
 if TYPE_CHECKING:
     from .base import EventSink
 
+_TARGET_SETUP_SECONDS = 10
+
 
 class NavigationGuard:
     """Intercept documents before resuming newly created page and frame targets.
@@ -84,7 +86,7 @@ class NavigationGuard:
 
     async def watch(self, target_id: str) -> None:
         ready = self._ready.setdefault(target_id, asyncio.Event())
-        async with asyncio.timeout(10):
+        async with asyncio.timeout(_TARGET_SETUP_SECONDS):
             await ready.wait()
         self.raise_if_blocked()
 
@@ -118,6 +120,7 @@ class NavigationGuard:
                     if target in live:
                         raise
         except Exception as error:  # pylint: disable=broad-exception-caught
+            # Any listener failure must wake waiters and fail navigation closed.
             self._failure = error
             for ready in self._ready.values():
                 ready.set()

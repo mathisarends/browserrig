@@ -4,7 +4,7 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
-from .content import PageContent
+from .content import ExtractedContent
 
 # A record longer than this is shown as a window around its first match.
 _RECORD_CHARS = 600
@@ -79,7 +79,7 @@ class PageSearch:
 
 
 def search_content(
-    content: PageContent, queries: tuple[str, ...], *, start: int, count: int
+    content: ExtractedContent, queries: tuple[str, ...], *, start: int, count: int
 ) -> PageSearch:
     """Records whose visible text contains any query, ignoring case and accents."""
     needles = tuple(dict.fromkeys(filter(None, map(_fold, queries))))

@@ -54,11 +54,12 @@ class Agent(harnessed.Agent):
         store: SessionStore | None = None,
         plugin_validation: PluginValidation = PluginValidation.ERROR,
     ) -> None:
-        name = (
-            model.rsplit(":", 1)[-1]
-            if isinstance(model, str)
-            else (model.info.name if isinstance(model, Model) else "")
-        )
+        if isinstance(model, str):
+            name = model.rsplit(":", 1)[-1]
+        elif isinstance(model, Model):
+            name = model.info.name
+        else:
+            name = ""
         profile = MODEL_PROFILES.get(name)
         if isinstance(model, str) and profile is not None:
             model = PydanticAIModel(model, context_window=profile.context_window)

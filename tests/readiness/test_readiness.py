@@ -45,7 +45,9 @@ class Access(Plugin, needs=(Readiness,)):
 
 async def test_readiness_deduplicates_waiters_and_one_cancellation_does_not_cancel_other():
     holder = {}
-    options = ReadinessOptions(quiet_ms=0, navigation_min_ms=40, poll_interval=0.005)
+    options = ReadinessOptions(
+        quiet_ms=0, navigation_min_ms=40, poll_interval_seconds=0.005
+    )
     agent = Agent(
         model=ScriptedModel(["ok"]),
         plugins=[FakeChrome(holder), Readiness(options=options), Access(holder)],
@@ -68,7 +70,9 @@ async def test_readiness_deduplicates_waiters_and_one_cancellation_does_not_canc
 
 async def test_endless_dom_mutation_is_explicitly_degraded():
     holder = {}
-    options = ReadinessOptions(timeout=0.03, poll_interval=0.005, navigation_min_ms=0)
+    options = ReadinessOptions(
+        timeout_seconds=0.03, poll_interval_seconds=0.005, navigation_min_ms=0
+    )
     agent = Agent(
         model=ScriptedModel(["ok"]),
         plugins=[FakeChrome(holder), Readiness(options=options), Access(holder)],
@@ -176,7 +180,7 @@ async def test_redirect_chain_restarts_probes_without_extending_the_deadline(
 
 
 async def test_after_action_requires_fresh_observation_time_even_when_dom_was_quiet():
-    options = _fast_options(timeout=0.2, quiet_ms=5, action_min_ms=30)
+    options = _fast_options(timeout_seconds=0.2, quiet_ms=5, action_min_ms=30)
     task = asyncio.create_task(
         wait_for_page(FakeTab(), options=options, phase=ReadinessPhase.AFTER_ACTION)
     )
@@ -228,7 +232,10 @@ async def test_navigation_dispatches_execute_once_each_and_do_not_share_a_readon
     holder = {}
     agent = Agent(
         model=ScriptedModel(["ok"]),
-        plugins=[FakeChrome(holder), Readiness(options=_fast_options(timeout=0.2))],
+        plugins=[
+            FakeChrome(holder),
+            Readiness(options=_fast_options(timeout_seconds=0.2)),
+        ],
     )
     async with agent.session() as session:
         readiness, tab = session.scope[Readiness], holder["browser"].active_tab
@@ -256,7 +263,10 @@ async def test_cancelling_a_dispatch_cancels_its_owned_work():
 
     agent = Agent(
         model=ScriptedModel(["ok"]),
-        plugins=[FakeChrome(holder), Readiness(options=_fast_options(timeout=1))],
+        plugins=[
+            FakeChrome(holder),
+            Readiness(options=_fast_options(timeout_seconds=1)),
+        ],
     )
     async with agent.session() as session:
         task = asyncio.create_task(
@@ -353,7 +363,7 @@ async def test_active_downloads_can_finish_during_the_shared_wait():
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(options=_fast_options(timeout=0.2)),
+            Readiness(options=_fast_options(timeout_seconds=0.2)),
             DownloadReadiness(),
         ],
     )
@@ -396,7 +406,7 @@ async def test_successive_checks_share_the_remaining_budget_until_observation(
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(options=_fast_options(timeout=2)),
+            Readiness(options=_fast_options(timeout_seconds=2)),
             RecordBudget(),
         ],
     )
@@ -406,7 +416,7 @@ async def test_successive_checks_share_the_remaining_budget_until_observation(
         second = await readiness.wait(tab, phase=ReadinessPhase.AFTER_ACTION)
         assert first.status == second.status == "ready"
         assert 0 < budgets[1] < budgets[0] <= 2
-        assert budgets[1] <= 2 - first.duration
+        assert budgets[1] <= 2 - first.duration_seconds
         await readiness.wait(tab)
         assert tab.id not in readiness._state.spent
 
@@ -484,11 +494,11 @@ async def test_dom_probe_keeps_the_main_state_when_no_child_can_be_discovered():
 def _fast_options(**kwargs):
     return ReadinessOptions(
         **{
-            "timeout": 0.05,
+            "timeout_seconds": 0.05,
             "navigation_min_ms": 0,
             "action_min_ms": 0,
             "quiet_ms": 0,
-            "poll_interval": 0.002,
+            "poll_interval_seconds": 0.002,
             **kwargs,
         }
     )

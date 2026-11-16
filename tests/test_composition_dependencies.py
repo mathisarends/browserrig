@@ -131,6 +131,27 @@ async def test_each_browser_tool_has_a_unique_stable_kind(fake_chrome):
     assert fake_chrome[0].closed
 
 
+@pytest.mark.parametrize(
+    "name, unit_name, old_name, default",
+    [
+        ("execute_javascript", "timeout_seconds", "timeout", 10),
+        ("drag", "duration_seconds", "duration", 0.5),
+        ("drag_at", "duration_seconds", "duration", 0.5),
+    ],
+)
+async def test_tool_schemas_expose_duration_units(
+    fake_chrome, name, unit_name, old_name, default
+):
+    agent = browserrig.Agent(model=ScriptedModel([]))
+    async with agent.session() as session:
+        info = session.scope[ToolRegistry].plan(ToolCall(name, {})).tool
+        properties = info.definition.parameters["properties"]
+        assert properties[unit_name]["default"] == default
+        assert properties[unit_name]["type"] == "number"
+        assert old_name not in properties
+    assert fake_chrome[0].closed
+
+
 async def test_incomplete_browser_composition_reports_transitive_dependencies_before_model_use():
     model = ScriptedModel(["unused"])
     agent = Agent(

@@ -30,7 +30,9 @@ def test_page_readiness_is_not_presented():
     assert (
         project(
             ReadyEvent(
-                readiness_id="ready-1", phase=ReadinessPhase.ACTION, duration=0.05
+                readiness_id="ready-1",
+                phase=ReadinessPhase.ACTION,
+                duration_seconds=0.05,
             )
         )
         is None

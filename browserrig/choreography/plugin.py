@@ -269,15 +269,16 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
             if snapshot.width > 0 and snapshot.height > 0
             else None
         )
-        region = (
-            CaptureRegion(
+        if geometry:
+            region = CaptureRegion(
                 x=geometry.x, y=geometry.y, width=geometry.width, height=geometry.height
             )
-            if geometry
-            else CaptureRegion(x=0, y=0, width=viewport.width, height=viewport.height)
-            if viewport
-            else receipt.region
-        )
+        elif viewport:
+            region = CaptureRegion(
+                x=0, y=0, width=viewport.width, height=viewport.height
+            )
+        else:
+            region = receipt.region
         await self._emit(
             replace(
                 receipt,

@@ -193,10 +193,12 @@ class Tabs:
         """How many tabs have opened so far; a mark to pass to `opened_since`."""
         return len(self._opened)
 
-    async def opened_since(self, mark: int, *, timeout: float = 0) -> Tab | None:
-        """The newest open tab opened after `mark`, waiting up to `timeout` for one."""
+    async def opened_since(
+        self, mark: int, *, timeout_seconds: float = 0
+    ) -> Tab | None:
+        """The newest open tab opened after `mark`, waiting up to `timeout_seconds` for one."""
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + timeout
+        deadline = loop.time() + timeout_seconds
         while True:
             for target_id in reversed(self._opened[mark:]):
                 tab = self._tabs.get(target_id)

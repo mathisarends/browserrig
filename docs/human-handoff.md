@@ -18,7 +18,7 @@ async def ask_human(request: HandoffRequestedEvent) -> HumanResponse:
 agent = Agent(
     model=model,
     browser=Chrome.launch(url=url, headless=False),
-    plugins=[HumanHandoff(ask=ask_human, timeout=900, history_limit=5)],
+    plugins=[HumanHandoff(ask=ask_human, timeout_seconds=900, history_limit=5)],
 )
 ```
 

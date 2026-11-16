@@ -139,7 +139,7 @@ async def test_navigation_command_itself_is_bounded_before_the_response_commits(
     agent = Agent(
         model=ScriptedModel(["Done"]),
         plugins=browser_plugins(
-            Readiness(options=_options(timeout=0.5, navigation_min_ms=0)),
+            Readiness(options=_options(timeout_seconds=0.5, navigation_min_ms=0)),
             browser=Chrome.launch(url=readiness_site),
             without=(FileTools,),
         ),
@@ -242,7 +242,7 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
     agent = Agent(
         model=model,
         plugins=browser_plugins(
-            Readiness(options=_options(timeout=0.5, action_min_ms=0)),
+            Readiness(options=_options(timeout_seconds=0.5, action_min_ms=0)),
             browser=Chrome.launch(url=readiness_site),
             without=(FileTools,),
         ),
@@ -295,10 +295,10 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
 def _options(**kwargs):
     return ReadinessOptions(
         **{
-            "timeout": 2,
+            "timeout_seconds": 2,
             "quiet_ms": 75,
             "navigation_min_ms": 100,
-            "poll_interval": 0.02,
+            "poll_interval_seconds": 0.02,
             **kwargs,
         }
     )

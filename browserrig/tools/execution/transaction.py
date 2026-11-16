@@ -151,6 +151,7 @@ class ActionRunner:
                 )
                 raise
             except Exception as error:
+                # Every failed action needs a receipt, including unknown backend errors.
                 if action is not None:
                     dispatched = action.started
                 reason = (

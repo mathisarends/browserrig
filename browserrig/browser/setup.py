@@ -9,4 +9,5 @@ class SessionSetup(Protocol):
 
     async def apply(  # pylint: disable=unused-argument
         self, cdp: CdpSession, *, frame: bool
-    ) -> None: ...
+    ) -> None:
+        """Configure `cdp` before use; `frame` marks an out-of-process frame session."""

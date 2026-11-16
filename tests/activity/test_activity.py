@@ -388,6 +388,6 @@ def _readiness_ended(kind, readiness_id, reason=""):
     return kind(
         readiness_id=readiness_id,
         phase=ReadinessPhase.ACTION,
-        duration=0.1,
+        duration_seconds=0.1,
         reason=reason,
     )

@@ -43,7 +43,9 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
         async def input(self, _event: ModelRequestedEvent, log: Inject[SessionLog]):
             await log.emit(KeyPressedEvent(key="x", action_id="action-1"))
             await log.emit(
-                WaitingEvent(duration=2, browser_id="browser-1", target_id="tab-1")
+                WaitingEvent(
+                    duration_seconds=2, browser_id="browser-1", target_id="tab-1"
+                )
             )
             await log.emit(PageScrolledEvent(tab_id="tab-1", delta_x=0, delta_y=-80))
 
@@ -59,7 +61,7 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
     key = next(record for record in records if record["type"] == "browser.key.pressed")
     assert key["key"] == "x" and key["action_id"] == "action-1"
     wait = next(record for record in records if record["type"] == "browser.waiting")
-    assert wait["duration"] == 2 and wait["target_id"] == "tab-1"
+    assert wait["duration_seconds"] == 2 and wait["target_id"] == "tab-1"
     assert wait["browser_id"] == "browser-1"
     scroll = next(
         record for record in records if record["type"] == "browser.page.scrolled"

@@ -117,7 +117,7 @@ the tab strip. `TabPressedEvent` names the pressed tab-strip control.
 `AddressBarFocusedEvent` precedes the first `BarTypedEvent` of an address, and
 `BackPressedEvent`, `ForwardPressedEvent` and `ReloadPressedEvent` precede their
 history step or reload. Each starts at `from_position`, or `None` before the
-pointer has rested in the tab, and travels for `duration` to the viewer's own
+pointer has rested in the tab, and travels for `duration_seconds` to the viewer's own
 control. Project that point with its `viewport` as above and measure the control
 in the viewer's DOM. A `CursorEnteredEvent` then brings the pointer back
 to `to_position` once the step has run, with zero duration when it failed or was
@@ -150,7 +150,7 @@ async def consume(session):
 | --- | --- |
 | `PageScrolledEvent` (`browser.page.scrolled`) | `tab_id`, `delta_x`, `delta_y`: measured movement of the outer document in CSS pixels. |
 | `ElementScrolledEvent` (`browser.element.scrolled`) | `tab_id`, `ref`, `delta_x`, `delta_y`: measured movement of that container in its local CSS pixels, including containers in iframes. |
-| `ScrollStartedEvent` (`browser.scroll.started`) | Existing wheel input: viewport `x/y`, planned `delta_x/delta_y` and `duration`. |
+| `ScrollStartedEvent` (`browser.scroll.started`) | Existing wheel input: viewport `x/y`, planned `delta_x/delta_y` and `duration_seconds`. |
 | `ScrolledEvent` (`browser.scrolled`) | Existing wheel input after dispatch: wheel position, dispatched deltas and gesture duration. Does not confirm DOM movement. |
 | `ActionStartedEvent`, `ActionFinishedEvent`, `ActionFailedEvent` | Durable execution lifecycle, correlated by `action_id`; `call_id` and `label` name the originating tool call without its arguments. A finished action can have moved nothing. |
 | `WorkPresentedEvent` | Presentation/status feedback, including tool failures; its preview is not the source of DOM scroll data. |

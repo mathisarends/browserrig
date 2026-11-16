@@ -71,7 +71,7 @@ async def wait_for_page(
             stage=stage,
         )
     )
-    record(phase=phase, stage=stage, budget=options.timeout)
+    record(phase=phase, stage=stage, budget=options.timeout_seconds)
     runner = _Runner(
         tab,
         options,
@@ -84,11 +84,11 @@ async def wait_for_page(
     )
     timed_out = False
     try:
-        timeout = asyncio.timeout(options.timeout)
+        timeout = asyncio.timeout(options.timeout_seconds)
         try:
             async with timeout:
                 # Deliver an already-exhausted budget before sending another command.
-                if options.timeout <= 0:
+                if options.timeout_seconds <= 0:
                     await asyncio.sleep(0)
                 if dispatch is not None:
                     await dispatch()
@@ -107,7 +107,7 @@ async def wait_for_page(
                 document_id=started_document,
                 phase=phase,
                 stage=stage,
-                duration=monotonic() - started,
+                duration_seconds=monotonic() - started,
                 reason="cancelled",
             )
         )
@@ -120,7 +120,7 @@ async def wait_for_page(
                 document_id=started_document,
                 phase=phase,
                 stage=stage,
-                duration=monotonic() - started,
+                duration_seconds=monotonic() - started,
                 reason=type(error).__name__,
             )
         )
@@ -136,7 +136,7 @@ async def wait_for_page(
         phase=phase,
         stage=runner.stage,
         status=status,
-        duration=monotonic() - started,
+        duration_seconds=monotonic() - started,
         reason=runner.reason if status != ReadinessStatus.READY else "",
         timed_out=timed_out,
     )
@@ -161,7 +161,7 @@ async def wait_for_page(
             document_id=started_document,
             phase=phase,
             stage=stage,
-            duration=report.duration,
+            duration_seconds=report.duration_seconds,
             reason=report.reason,
             timed_out=report.timed_out,
         )

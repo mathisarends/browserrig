@@ -40,7 +40,7 @@ from .styles import STYLES
 
 __all__ = ["Extraction", "extract"]
 
-_TIMEOUT = 5
+_TIMEOUT_SECONDS = 5
 SPARSE_CONTROLS = 5
 
 
@@ -439,7 +439,7 @@ def _session_roots(frames: tuple[Frame, ...]) -> list[Frame]:
 
 @traced
 async def _snapshot(cdp: CdpSession) -> CaptureSnapshotResult:
-    async with asyncio.timeout(_TIMEOUT):
+    async with asyncio.timeout(_TIMEOUT_SECONDS):
         return await cdp.dom_snapshot.capture_snapshot(
             computed_styles=list(STYLES),
             include_paint_order=True,

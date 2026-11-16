@@ -69,14 +69,14 @@ async def test_drag_pointer_and_html5_transfer(site, native, coordinates):
             return {
                 "start": {"x": 70, "y": y},
                 "end": {"x": 350, "y": y},
-                "duration": 0.1,
+                "duration_seconds": 0.1,
             }
         prefix = "Native" if native else "Pointer"
         refs = {e["name"]: e["ref"] for e in state["elements"]}
         return {
             "source_ref": refs[f"{prefix} source"],
             "target_ref": refs[f"{prefix} target"],
-            "duration": 0.1,
+            "duration_seconds": 0.1,
         }
 
     state = await _perform(site, "drag_at" if coordinates else "drag", arguments)
@@ -106,7 +106,7 @@ async def test_drag_uses_browser_behavior_for_draggable_ancestor(site, prevented
             await evaluate(tab, "document.elementFromPoint(70, 140).draggable") is False
         )
         await devices.mouse.drag(
-            start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1
+            start=Point(x=70, y=140), end=Point(x=350, y=140), duration_seconds=0.1
         )
         assert await evaluate(tab, "window.dragStarts") == 1
         assert await evaluate(tab, "window.nativeDrop") == (
@@ -142,7 +142,7 @@ async def test_cancelled_native_drag_does_not_drop_and_allows_next_gesture(site)
         )
         task = asyncio.create_task(
             devices.mouse.drag(
-                start=Point(x=70, y=140), end=Point(x=350, y=140), duration=0.1
+                start=Point(x=70, y=140), end=Point(x=350, y=140), duration_seconds=0.1
             )
         )
         try:

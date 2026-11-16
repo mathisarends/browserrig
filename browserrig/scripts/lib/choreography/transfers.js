@@ -110,7 +110,7 @@ function createChoreographyTransfers(ui, cursor) {
           uploading ? 'Uploading …' : 'Opening …',
         );
         const point = event.x === null ? cursor.point() : [event.x, event.y];
-        fly(id, point, uploading, event.duration);
+        fly(id, point, uploading, event.duration_seconds);
         if (!uploading) {
           ui.hide(id, 1800);
         }

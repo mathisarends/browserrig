@@ -119,7 +119,7 @@ class Completion:
         has already settled, so a tab it opened is attached by now.
         """
         opened = await self._browser.tabs.opened_since(
-            mark, timeout=_TAB_OPEN_SECONDS if expected else 0
+            mark, timeout_seconds=_TAB_OPEN_SECONDS if expected else 0
         )
         if opened is None:
             return ""

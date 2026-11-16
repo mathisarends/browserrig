@@ -394,7 +394,7 @@ class _Chunk(Options):
     ocr: bool = False
 
 
-class _Manifest(BaseModel):
+class _Manifest(BaseModel):  # smelt: ignore[SMT353] -- mutable progress state
     model_config = ConfigDict(extra="forbid")
     id: str = Field(default_factory=lambda: uuid4().hex, pattern=r"^[a-f0-9]{32}$")
     source: str

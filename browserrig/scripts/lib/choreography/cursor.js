@@ -100,7 +100,7 @@ function createChoreographyCursor(ui) {
     const to = event.to_position;
     const cp1 = event.control_point_1 || from;
     const cp2 = event.control_point_2 || to;
-    const duration = ui.reduced() ? 0 : Math.max(0, event.duration || 0) * 1000;
+    const duration = ui.reduced() ? 0 : Math.max(0, event.duration_seconds || 0) * 1000;
     const started = performance.now();
     const animate = (now) => {
       if (generation !== route) {
@@ -163,7 +163,7 @@ function createChoreographyCursor(ui) {
     ];
     shape();
     const started = performance.now();
-    const duration = Math.max(1, event.duration * 1000);
+    const duration = Math.max(1, event.duration_seconds * 1000);
     const rotate = (now) => {
       if (generation !== scroll || ui.reduced()) {
         return;

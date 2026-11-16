@@ -141,7 +141,9 @@ async def test_input_visualization_renders_native_events_and_restores_after_navi
         tab = browser.active_tab
         await wait_for_page(tab)
         await session.scope[Input].mouse.move_to(Point(x=300, y=200))
-        await tab.emit(KeyPressedEvent(key="a", modifiers=("Control",), duration=2))
+        await tab.emit(
+            KeyPressedEvent(key="a", modifiers=("Control",), duration_seconds=2)
+        )
         state = await evaluate(
             tab,
             """(() => {
@@ -224,7 +226,7 @@ async def test_renderer_layout_remains_transparent_and_highlights_german_keys(
         tab = browser.active_tab
         await wait_for_page(tab)
         await session.scope[Input].mouse.move_to(Point(x=200, y=200))
-        await tab.emit(KeyPressedEvent(key="ä", duration=2))
+        await tab.emit(KeyPressedEvent(key="ä", duration_seconds=2))
         state = await evaluate(
             tab,
             """(() => {

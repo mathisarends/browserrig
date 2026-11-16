@@ -74,15 +74,19 @@ class HumanHandoff(Plugin, provides=True):
         self,
         *,
         ask: HandoffCallback,
-        timeout: float = 900,
+        timeout_seconds: float = 900,
         track_pauses: bool = True,
         history_limit: int = 5,
     ) -> None:
         super().__init__()
         if not callable(ask):
             raise TypeError("ask must be an async handoff callback")
-        if isinstance(timeout, bool) or not math.isfinite(timeout) or timeout <= 0:
-            raise ValueError("timeout must be finite and positive")
+        if (
+            isinstance(timeout_seconds, bool)
+            or not math.isfinite(timeout_seconds)
+            or timeout_seconds <= 0
+        ):
+            raise ValueError("timeout_seconds must be finite and positive")
         if not isinstance(track_pauses, bool):
             raise TypeError("track_pauses must be a bool")
         if (
@@ -92,7 +96,7 @@ class HumanHandoff(Plugin, provides=True):
         ):
             raise ValueError("history_limit must be between 1 and 20")
         self.ask = ask
-        self.timeout = timeout
+        self.timeout_seconds = timeout_seconds
         self.track_pauses = track_pauses
         self.history_limit = history_limit
 
@@ -145,7 +149,7 @@ class HumanHandoff(Plugin, provides=True):
 
     @tool(
         description="Hand browser control to a human and wait for their response.",
-        timeout_seconds=lambda plugin: plugin.timeout + 60,
+        timeout_seconds=lambda plugin: plugin.timeout_seconds + 60,
         readonly=True,
         chain=ToolChain.STOP_AFTER,
     )
@@ -184,13 +188,14 @@ class HumanHandoff(Plugin, provides=True):
             try:
                 await self._begin(request, nudges)
                 try:
-                    async with asyncio.timeout(self.timeout):
+                    async with asyncio.timeout(self.timeout_seconds):
                         response = await self.ask(request)
                     if not isinstance(response, HumanResponse):
                         raise TypeError("Handoff callbacks must return HumanResponse")
                 except TimeoutError:
                     return await self._finish(HandoffStatus.TIMEOUT, secrets=secrets)
                 except Exception:  # pylint: disable=broad-exception-caught
+                    # Host callbacks are arbitrary; always record a failed handoff.
                     return await self._finish(
                         HandoffStatus.FAILED,
                         note="The host callback failed; completion is unknown.",
