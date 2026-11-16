@@ -11,6 +11,7 @@ from browserrig.choreography import (
     CaptureRegion,
     ElementScrolledEvent,
     PageScrolledEvent,
+    ToolCallPresentedEvent,
     WorkPhase,
     WorkPresentedEvent,
 )
@@ -142,7 +143,7 @@ def test_coordinate_receipt_roundtrips_with_its_source_viewport():
     + SCENE_EVENTS
     + events.FILE_EVENTS
     + events.UPLOAD_EVENTS
-    + (events.ObservationCapturedEvent,),
+    + (events.ObservationCapturedEvent, ToolCallPresentedEvent),
 )
 def test_each_tag_has_one_literal_enum_and_matching_default(kind):
     values = get_args(get_type_hints(kind)["type"])

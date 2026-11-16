@@ -4,14 +4,15 @@ from hashlib import sha256
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent, Plugin, PolicyDecision, ToolResult, ToolStatus
+from harnessed import Agent, Plugin, PolicyDecision, ToolCall, ToolResult, ToolStatus
 from harnessed.events import ToolCallFinishedEvent, ToolExecutionFinishedEvent
 from harnessed.kernel import needs
-from harnessed.models import ImagePart, ImageReference, TextPart
-from harnessed.plugins import Approvals
+from harnessed.models import ImagePart, ImageReference, ModelChunk, TextPart
+from harnessed.plugins import Approvals, CallEnvelope
 from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel, call
 
+from browserrig import ActionLabel, Secret, Secrets
 from browserrig.browser import OpenDialog
 from browserrig.core import ActionKind, browser_tool
 from browserrig.events import (
@@ -80,6 +81,34 @@ async def test_action_lifecycle_names_the_originating_call(status, terminal):
     lifecycle = [e for e in services.events if isinstance(e, ACTION_EVENTS)]
     assert [type(e) for e in lifecycle] == [ActionStartedEvent, terminal]
     assert {(e.call_id, e.label) for e in lifecycle} == {(tool_call.id, tool_call.name)}
+
+
+@pytest.mark.parametrize("status", [ToolStatus.OK, ToolStatus.TIMEOUT])
+async def test_action_lifecycle_uses_redacted_model_label(status):
+    secret = "private-credential"
+    request = [
+        ModelChunk(
+            tool_call=ToolCall("labeled_input", {"action_label": f"Reading {secret}"})
+        )
+    ]
+    agent = Agent(
+        model=ScriptedModel([request, "Done"]),
+        plugins=[
+            FakeServices(),
+            Actions(),
+            _ResultTools(ToolResult("Done", status=status)),
+            CallEnvelope(ActionLabel),
+            Secrets({"KEY": Secret(secret, domains=("example.org",))}),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
+    )
+    async with agent.session() as session:
+        services = session.scope[FakeServices]
+        await session.run("Read")
+    lifecycle = [event for event in services.events if isinstance(event, ACTION_EVENTS)]
+    assert len(lifecycle) == 2
+    assert {event.label for event in lifecycle} == {"Reading {{secret:KEY}}"}
+    assert lifecycle[0].call_id == lifecycle[-1].call_id != ""
 
 
 async def test_managed_actions_outside_a_tool_carry_only_their_label():
@@ -160,6 +189,10 @@ class _ResultTools(Plugin, needs=(Actions,), provides=True):
 
     @browser_tool(kind=ActionKind.JAVASCRIPT, description="Return an input receipt.")
     async def input(self):
+        return self.value
+
+    @browser_tool(kind=ActionKind.CLICK, description="Return a labeled input receipt.")
+    async def labeled_input(self):
         return self.value
 
     @browser_tool(

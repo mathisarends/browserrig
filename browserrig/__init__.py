@@ -12,7 +12,7 @@ from .browser import (
     SessionSetup,
     Viewport,
 )
-from .choreography import Choreography, TabStrip
+from .choreography import ActionLabels, Choreography, TabStrip
 from .completion import Done
 from .composition import (  # smelt: ignore[SMT106] -- public facade
     ContextCompaction,
@@ -23,6 +23,7 @@ from .composition import (  # smelt: ignore[SMT106] -- public facade
 from .core import (
     ActionContext,
     ActionKind,
+    ActionLabel,
     BrowserCoordination,
     ChangeTab,
     HandoffStatus,
@@ -119,6 +120,8 @@ from .tools import (
 __version__ = "0.5.0"
 
 __all__ = [
+    "ActionLabels",
+    "ActionLabel",
     "Runtime",
     "ActionContext",
     "ChangeTab",

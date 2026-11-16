@@ -2,13 +2,32 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
 from inspect import iscoroutinefunction, signature
-from typing import cast
+from typing import Annotated, cast
 from weakref import WeakKeyDictionary
 
 from harnessed import ToolChain, tool
 from harnessed.kernel import PluginBase, Scope, Waterfall, registration
+from pydantic import Field
 
 from .kinds import ActionKind
+from .options import Options
+
+
+class ActionLabel(Options):
+    """Optional model-written display text for a tool call's envelope."""
+
+    action_label: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=80,
+            pattern=r"\S",
+            description=(
+                "Short human-readable action in progress, such as 'Opening the pricing page'. "
+                "Describe intent without credentials, personal data or other sensitive values."
+            ),
+        ),
+    ]
 
 
 @dataclass(frozen=True, slots=True)

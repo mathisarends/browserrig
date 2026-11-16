@@ -3,12 +3,13 @@ import base64
 
 import pytest
 from harnessed import Agent, Plugin, PolicyDecision, ToolCall
+from harnessed.events import ToolCallFinishedEvent
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel
 
-from browserrig import Agent as BrowserAgent
 from browserrig import (
+    ActionLabels,
     Browser,
     Choreography,
     ChoreographyOverlay,
@@ -23,17 +24,21 @@ from browserrig import (
     Viewport,
     wait_for_page,
 )
+from browserrig import Agent as BrowserAgent
 from browserrig.browser import Frame, screenshot
 from browserrig.choreography import (
     AddressBarFocusedEvent,
     BackPressedEvent,
     CursorEnteredEvent,
     FileTransferEvent,
+    ToolCallPresentedEvent,
     WorkPhase,
     WorkPresentedEvent,
 )
 from browserrig.core import FileTransferDirection
 from browserrig.events import (
+    ActionFinishedEvent,
+    ActionStartedEvent,
     CursorStateEvent,
     DownloadCompletedEvent,
     DownloadStartedEvent,
@@ -458,6 +463,72 @@ async def test_running_work_restores_after_navigation_without_pointer_input(site
             )
             == "completed"
         )
+
+
+async def test_model_labels_stay_in_the_event_stream_without_changing_overlay(
+    site, tmp_path
+):
+    (tmp_path / "report.txt").write_text("Annual report", encoding="utf-8")
+    calls = [
+        ToolCall(
+            "click_at", {"x": 60, "y": 15, "action_label": "Focusing the email field"}
+        ),
+        ToolCall(
+            "read_file",
+            {"path": "report.txt", "action_label": "Reading the annual report"},
+        ),
+    ]
+    agent = BrowserAgent(
+        model=ScriptedModel(
+            [*([ModelChunk(tool_call=call)] for call in calls), "Done"]
+        ),
+        browser=Chrome.launch(url=site),
+        plugins=[
+            Files(LocalWorkspace(tmp_path)),
+            ActionLabels(),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
+        without=(InputPacing,),
+    )
+    captions = []
+    receipts = []
+    displayed_calls = []
+    async with agent.session() as session:
+        tab = session.scope[Browser].active_tab
+        await session.scope[Input].mouse.move_to(Point(x=60, y=15))
+
+        async def caption(_event: ToolCallFinishedEvent):
+            captions.append(
+                await _surface(
+                    tab, "document.querySelector('#caption-title').textContent"
+                )
+            )
+
+        session.scope.on(ToolCallFinishedEvent, caption)
+        session.scope.on(WorkPresentedEvent, receipts.append)
+        session.scope.on(ToolCallPresentedEvent, displayed_calls.append)
+        result = await session.run("Focus the field, then read the report")
+    assert captions == ["", ""]
+    assert [event.envelope.action_label for event in displayed_calls] == [
+        "Focusing the email field",
+        "Focusing the email field",
+        "Reading the annual report",
+        "Reading the annual report",
+    ]
+    assert not any(receipt.call_id == calls[0].id for receipt in receipts)
+    updates = [receipt for receipt in receipts if receipt.call_id == calls[1].id]
+    assert updates[0].phase is WorkPhase.RUNNING
+    assert updates[-1].phase is WorkPhase.COMPLETED
+    assert {receipt.label for receipt in updates} == {"Reading the annual report"}
+    assert {receipt.title for receipt in updates} == {"Reading file", "File read"}
+    lifecycle = [
+        event
+        for event in result.events
+        if isinstance(event, (ActionStartedEvent, ActionFinishedEvent))
+    ]
+    assert len(lifecycle) == 2
+    assert {event.label for event in lifecycle} == {"Focusing the email field"}
+    assert {event.call_id for event in lifecycle} == {calls[0].id}
 
 
 async def _settled(tab, expression, done, seconds=3):

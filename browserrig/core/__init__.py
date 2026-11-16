@@ -43,9 +43,10 @@ from .model_profiles import MODEL_PROFILES, ModelProfile
 from .options import Options
 from .runtime import Runtime
 from .tabs import ChangeTab, TabDispatch
-from .tools import BrowserToolCall, BrowserToolMetadata, browser_tool
+from .tools import ActionLabel, BrowserToolCall, BrowserToolMetadata, browser_tool
 
 __all__ = [
+    "ActionLabel",
     "ActionContext",
     "Runtime",
     "ChangeTab",

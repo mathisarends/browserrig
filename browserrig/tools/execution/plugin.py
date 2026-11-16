@@ -11,12 +11,14 @@ from browserrig.browser import Browser, BrowserEvents, Tab
 from browserrig.core import (
     ActionContext,
     ActionKind,
+    ActionLabel,
     BrowserCoordination,
     BrowserToolCall,
 )
 from browserrig.events import ACTION_EVENTS
 from browserrig.observation import BrowserPerception
 from browserrig.readiness import Readiness
+from browserrig.secrets import Secrets
 from browserrig.tools.chains import (
     ActionChainPolicy,
     ObserveAfterInput,
@@ -158,8 +160,12 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     async def _bind_call(
         self, event: ExecuteTool, next_: Next[ToolResult]
     ) -> ToolResult:
-        # Actions started by this call carry its identity, never its arguments.
-        with self._invocation.context.bind_call(event.call.id, event.call.name):
+        label = event.envelope.get(ActionLabel)
+        text = label.action_label if label is not None else event.call.name
+        context = self._mount.context
+        if context is not None and Secrets in context:
+            text = context[Secrets].redact(text)
+        with self._invocation.context.bind_call(event.call.id, text):
             return await next_()
 
     @hook(ExecuteTool, ReviewToolResult)

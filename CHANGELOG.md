@@ -23,9 +23,15 @@
 
 ### Changes
 
+- Add opt-in `ActionLabels()`, registering the `ActionLabel` envelope and emitting
+  `ToolCallPresentedEvent` with an immutable, automatically redacted
+  `event.envelope.action_label`. Hosts need no helper or session scope. Requested
+  and finished events cover browser, file and foreign-plugin calls, including
+  failures and cancellation. Work and action events also carry redacted labels;
+  the built-in overlay keeps its fixed captions (#51).
 - `ActionStartedEvent`, `ActionFinishedEvent` and `ActionFailedEvent` carry the
-  originating tool `call_id` and a short display `label` (the tool name, at most
-  80 characters, never its arguments). Failure and cancellation keep both, and
+  originating tool `call_id` and a short display `label` (at most 80 characters;
+  the tool name when no model label is supplied). Failure and cancellation keep both, and
   action receipts join their tool receipt by `call_id`. `Actions.run(label=...)`
   names explicitly managed operations.
 - Add `Chrome.connect(downloads=...)` with a `DownloadSource` protocol so a host

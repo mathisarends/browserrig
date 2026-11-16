@@ -37,6 +37,63 @@ headless mode. `--directory` selects output for PNGs, gallery, manifest, timelin
 and recordings. Ordinary model screenshots omit viewer surfaces; see
 [overlay behavior](browser-composition.md#browser-owned-presentation).
 
+## Model-written action labels
+
+Ask the model for a short action label on each tool call and receive redacted
+display events by adding `ActionLabels`:
+
+```python
+from browserrig import ActionLabels, Agent
+
+agent = Agent(plugins=[ActionLabels()])
+```
+
+This opt-in registers the `ActionLabel` envelope and adds `action_label` to tool
+schemas, including tools from other plugins and MCP servers. It costs extra
+output tokens per call. The envelope is
+validated and removed before the tool runs; tool implementations do not change.
+Missing or invalid labels are dropped by default and the call still runs.
+Without the plugin, schemas and presentation stay unchanged. For a native
+Harnessed agent, compose `plugins=[browser_pack(), ActionLabels()]`;
+no separate pack flag is needed.
+
+Hosts access the label directly in their stream's `match`:
+
+```python
+from browserrig.choreography import ToolCallPresentedEvent
+
+async with agent.session() as session:
+    async with session.stream("Read the annual report") as stream:
+        async for event in stream:
+            match event:
+                case ToolCallPresentedEvent() as event:
+                    print(event.envelope.action_label)
+```
+
+`ToolCallPresentedEvent` carries `call_id`, `tool_name`, `phase`
+(`ToolCallPhase.REQUESTED` or `FINISHED`) and `envelope.action_label`. Finished
+calls also include their `ToolStatus` in `status`, including errors, denials and
+cancellation. Missing or invalid labels become an empty string. Envelopes are
+immutable display snapshots, automatically redacted against the session's known
+secrets before publication; no helper, scope lookup or caller-side redaction is
+needed. They remain readable after the session closes, and serialize as a nested
+`envelope` object. The events work without `Choreography`, its overlay or a browser.
+
+These notifications are transient: they appear in `session.stream(...)` and
+`session.subscribe(transient=True)`, but are not stored in run results or replay
+logs. Harnessed's `ToolCallRequestedEvent` and `ToolCallFinishedEvent` remain the
+raw execution records; the host display uses `ToolCallPresentedEvent`.
+
+`Choreography` also carries redacted text in `WorkPresentedEvent.label` through
+completion, failure and cancellation. Input actions carry it in `ActionStartedEvent.label`,
+`ActionFinishedEvent.label` and `ActionFailedEvent.label`, with the originating
+`call_id`. `WorkPresentedEvent.title` retains its fixed caption; the built-in
+overlay does not display model labels or add captions for labeled calls.
+Static `ActionKind` values still select scenes and icons. Without a label,
+action events fall back to the tool name.
+
+Labels arrive once per complete call event, not token by token.
+
 ## Session videos
 
 Add `VideoRecording()` to the agent's plugins:
@@ -152,7 +209,7 @@ async def consume(session):
 | `ElementScrolledEvent` (`browser.element.scrolled`) | `tab_id`, `ref`, `delta_x`, `delta_y`: measured movement of that container in its local CSS pixels, including containers in iframes. |
 | `ScrollStartedEvent` (`browser.scroll.started`) | Existing wheel input: viewport `x/y`, planned `delta_x/delta_y` and `duration_seconds`. |
 | `ScrolledEvent` (`browser.scrolled`) | Existing wheel input after dispatch: wheel position, dispatched deltas and gesture duration. Does not confirm DOM movement. |
-| `ActionStartedEvent`, `ActionFinishedEvent`, `ActionFailedEvent` | Durable execution lifecycle, correlated by `action_id`; `call_id` and `label` name the originating tool call without its arguments. A finished action can have moved nothing. |
+| `ActionStartedEvent`, `ActionFinishedEvent`, `ActionFailedEvent` | Durable execution lifecycle, correlated by `action_id`; `call_id` identifies the originating call and `label` carries its redacted model label or tool name. A finished action can have moved nothing. |
 | `WorkPresentedEvent` | Presentation/status feedback, including tool failures; its preview is not the source of DOM scroll data. |
 
 `tab_id` is the source `Tab.id`. These two new events expose no `target_id`.

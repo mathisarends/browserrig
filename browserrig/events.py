@@ -92,6 +92,7 @@ class EventKind(StrEnum):
     PAGE_CAPTURE_STARTED = "browser.page.capture.started"
     PAGE_CAPTURE_FINISHED = "browser.page.capture.finished"
     WORK_PRESENTED = "browser.work.presented"
+    TOOL_CALL_PRESENTED = "browser.tool_call.presented"
     DOWNLOAD_PRESENTED = "browser.download.presented"
     UPLOAD_PRESENTED = "browser.upload.presented"
     ACTIVITY_PRESENTED = "browser.activity.presented"
@@ -513,7 +514,7 @@ class FilesUploadedEvent(BrowserEvent):
 @dataclass(frozen=True, slots=True)
 class ActionStartedEvent(BrowserEvent):
     """An action began. `call_id` names the originating tool call, if any, and
-    `label` is a short display name that never includes tool arguments."""
+    `label` is the redacted model label when supplied, otherwise the tool name."""
 
     action_id: str
     kind: ActionKind
