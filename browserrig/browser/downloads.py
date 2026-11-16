@@ -1,4 +1,6 @@
+from collections.abc import AsyncIterator
 from time import monotonic
+from typing import Protocol, runtime_checkable
 
 from cdpify import CdpClient
 from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
@@ -16,6 +18,21 @@ from .base import EventSink
 
 # Chrome reports every received chunk; viewers only need a smooth progress ring.
 _PROGRESS_INTERVAL_SECONDS = 0.2
+
+type DownloadEvent = DownloadWillBeginEvent | DownloadProgressEvent
+
+
+@runtime_checkable
+class DownloadSource(Protocol):
+    """Relay download events that an attached browser's host connection receives.
+
+    Chrome sends download events only to the connection that enabled them, so the
+    host keeps its download policy and files while browserrig tracks progress.
+    """
+
+    def events(self) -> AsyncIterator[DownloadEvent]:
+        """Yield events for this session; iteration is stopped when it closes."""
+        ...
 
 
 class Downloads:
@@ -48,11 +65,10 @@ class Downloads:
     def all(self) -> tuple[Download, ...]:
         return tuple(self._visible(item) for item in self._items.values())
 
-    async def handle(
-        self, event: DownloadWillBeginEvent | DownloadProgressEvent
-    ) -> None:
+    async def handle(self, event: DownloadEvent) -> None:
         match event:
-            case DownloadWillBeginEvent():
+            # A relayed host event can repeat one received on browserrig's connection.
+            case DownloadWillBeginEvent() if event.guid not in self._items:
                 self._transfers[event.guid] = self._transfer
                 self._items[event.guid] = Download(
                     id=event.guid, url=event.url, filename=event.suggested_filename

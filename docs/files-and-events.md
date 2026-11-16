@@ -126,6 +126,22 @@ downloads finish in their original workspace; their paths are unavailable in an
 unrelated workspace. Attaching to an existing `target_id` preserves its download
 policy, so its downloads are not received into the workspace.
 
+Chrome sends download events only to the connection that enabled them. When a
+host application owns an attached browser's download policy, relay the events
+its connection receives through `Chrome.connect(downloads=...)`. A
+`DownloadSource` yields `Browser.downloadWillBegin` and `Browser.downloadProgress`
+events for one session; browserrig then lists and presents those downloads
+while the host keeps their files. Repeated events are ignored.
+
+```python
+class HostDownloads:
+    def events(self) -> AsyncIterator[DownloadEvent]:
+        return host.download_events(profile_id)
+
+
+Chrome.connect(endpoint=endpoint, target_id=target_id, downloads=HostDownloads())
+```
+
 ## File access boundaries and optional sandboxes
 
 Built-in file tools reject absolute paths, traversal and links escaping the

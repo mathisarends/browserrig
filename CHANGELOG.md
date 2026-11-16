@@ -13,6 +13,9 @@
 
 ### Changes
 
+- Add `Chrome.connect(downloads=...)` with a `DownloadSource` protocol so a host
+  that owns an attached browser's download policy can relay its download events;
+  browserrig then tracks and presents those downloads without taking over files.
 - Add `DomCapture(headings=True, landmarks=True)`. Turning both off together
   with `text=PageText.OFF` leaves only controls with their labels; dialogs and
   cookie banners stay grouped. `DomRenderer(landmarks=...)` adjusts its
