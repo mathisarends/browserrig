@@ -61,14 +61,14 @@ when needed. For a fully explicit composition, select individual plugins:
 from harnessed import Agent
 from browserrig import (
     Actions, Chrome, DomPerception, ImageContext, InputRuntime, KeyboardTools,
-    NavigationTools, PointerTools, Readiness, Runtime, TabTools, Targeting,
+    MultiTab, NavigationTools, PointerTools, Readiness, Runtime, TabTools, Targeting,
     TextContext,
 )
 
 agent = Agent(
     model=model,
     plugins=[
-        Runtime(), Chrome.launch(), InputRuntime(), Readiness(), DomPerception(),
+        Runtime(), MultiTab(), Chrome.launch(), InputRuntime(), Readiness(), DomPerception(),
         TextContext(), ImageContext(), Actions(), Targeting(),
         PointerTools(), KeyboardTools(), NavigationTools(), TabTools(),
     ],
@@ -81,6 +81,46 @@ explicitly. `Actions()` observes after each input; the task recipe selects
 service dependencies; instruction order follows the configured plugin list.
 Configure Harnessed `Approvals` to allow tool side effects
 or ask through your host UI.
+
+## Choose tab behavior
+
+The default recipe selects `MultiTab()`. Replace it at the composition root:
+
+```python
+from browserrig import Agent, Chrome, SingleTab
+
+agent = Agent(
+    model=model,
+    browser=Chrome.launch(url="https://example.com"),
+    plugins=[SingleTab()],
+)
+```
+
+`SingleTab()` and `MultiTab()` share the `browserrig.tabs` slot. Two explicit
+choices conflict. Manual Harnessed compositions can select either plugin too;
+the browser backend retains multi-tab behavior when no policy is supplied.
+
+Single-tab sessions reuse their controlled tab for navigation and file previews.
+Ordinary links with new-window targets, forms (including POST), and simple
+`window.open(url)` requests navigate in the controlled tab's top-level document.
+History remains available. Redirected `window.open` calls return `null`; flows
+that need a separate window handle, such as opening an empty popup to populate
+later, are unsupported. Unexpected extra controlled tabs are
+closed and reported instead of replaying their URL as a new request. Existing
+tabs outside an attached session's scope are left alone.
+
+Single-tab mode hides the tab-management tools and omits the tab overview from
+observations and probes. Its fixed instructions describe single-tab navigation;
+multi-tab guidance comes from `MultiTab()`. The current tab's internal identity
+is retained for input, references and observation coherence. `TabStrip()` remains
+an independent viewer feature in either mode.
+
+**Pending Harnessed integration:** the shared `NewTab` annotation in
+`browserrig/tools/parameters.py` is prepared for
+[`ToolParameter(enabled=...)`](https://github.com/mathisarends/harnessed/issues/120).
+Until that API is available, `new_tab` remains in navigation and pointer schemas;
+single-tab mode already rejects `new_tab=True` before dispatching input. Finish
+this dependency integration before treating the single-tab model API as complete.
 
 ## Co-locate tools, instructions, hooks and state
 

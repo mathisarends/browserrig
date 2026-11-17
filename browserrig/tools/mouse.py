@@ -9,10 +9,10 @@ from harnessed import (
     SystemPrompt,
     ToolError,
 )
-from harnessed.kernel import needs
+from harnessed.kernel import needs, observes
 from pydantic import Field
 
-from browserrig.browser import Browser
+from browserrig.browser import Browser, TabPolicy
 from browserrig.core import ActionKind, BrowserError, Point
 from browserrig.core import browser_tool as tool
 from browserrig.input import ClickButton, ClickCount, Input
@@ -20,15 +20,12 @@ from browserrig.observation import BrowserPerception, CapturedImage, Snapshot
 
 from .effects import Effect
 from .execution import Actions
+from .parameters import NewTab
 from .targeting import Targeting
 
 type _ClickCount = Annotated[
     ClickCount,
     Field(description="Use 2 for a native double click."),
-]
-type _NewTab = Annotated[
-    bool,
-    Field(description="Open the link in a new tab and activate it."),
 ]
 
 
@@ -37,8 +34,7 @@ _INSTRUCTIONS = Instructions(
     text=(
         "Point in pixels from the top-left of the newest screenshot still in context; "
         "crop and scale map back to the viewport. Without an image, use viewport CSS pixels. "
-        "After a tab or document change, request a fresh screenshot before pointing. "
-        "Clicks that open a new tab activate it."
+        "After the active document changes, request a fresh screenshot before pointing. "
     ),
 )
 
@@ -54,6 +50,7 @@ class PointerTools(Plugin):
     _observe = needs(BrowserPerception)
     _actions = needs(Actions)
     _targets = needs(Targeting)
+    _tabs = observes(TabPolicy)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
@@ -96,9 +93,11 @@ class PointerTools(Plugin):
         *,
         count: _ClickCount = 1,
         button: ClickButton = "left",
-        new_tab: _NewTab = False,
+        new_tab: NewTab = False,
     ) -> Effect:
         _check_new_tab(new_tab, count, button)
+        if new_tab and self._tabs is not None:
+            self._tabs.check_new_tab()
 
         point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
         if new_tab:
@@ -144,9 +143,11 @@ class PointerTools(Plugin):
         *,
         count: _ClickCount = 1,
         button: ClickButton = "left",
-        new_tab: _NewTab = False,
+        new_tab: NewTab = False,
     ) -> Effect:
         _check_new_tab(new_tab, count, button)
+        if new_tab and self._tabs is not None:
+            self._tabs.check_new_tab()
 
         point = await self._targets.locate(ref=ref)
         await self._input.mouse.move_to(point)

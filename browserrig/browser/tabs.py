@@ -33,7 +33,9 @@ from .frame import Frame
 from .frames import discover_frames
 from .guard import NavigationGuard
 from .models import TabInfo
+from .popups import SingleTabSession
 from .tab import Tab, TabListener, validated_url
+from .tab_policy import TabPolicy
 from .worlds import Worlds
 
 if TYPE_CHECKING:
@@ -51,11 +53,14 @@ class Tabs:
         emit: EventSink,
         on_change: TabListener | None = None,
         guard: NavigationGuard | None = None,
+        policy: TabPolicy | None = None,
         current_action: Callable[[], str] = str,
         change_tab: TabDispatch | None = None,
     ) -> None:
         self._options = options
         self._guard = guard
+        self._policy = policy if policy is not None else TabPolicy()
+        self._policy_error = ""
         self._current_action = current_action
         self._change_tab = change_tab
         self._check = check
@@ -82,6 +87,12 @@ class Tabs:
         if tab is None:
             raise BrowserError("No active tab; open or explicitly activate one")
         return tab
+
+    def check_policy(self) -> None:
+        """Report unsupported page-created tabs once on the next browser operation."""
+        if self._policy_error:
+            reason, self._policy_error = self._policy_error, ""
+            raise BrowserError(reason)
 
     async def start(self, client: CdpClient, stack: AsyncExitStack) -> str | None:
         """Bind the connection and create its controlled browser context."""
@@ -118,6 +129,8 @@ class Tabs:
                 continue
             if self._context is None and info.target_id not in self._tabs:
                 continue
+            if not self._policy.multiple and info.target_id not in self._tabs:
+                continue
             found.append(
                 TabInfo(
                     id=info.target_id,
@@ -133,6 +146,7 @@ class Tabs:
 
         Strings may come from the model and are limited to HTTP(S) and about:blank.
         A path opens as file:// without checks; get it from `FileTransfer.stage` first.
+        Single-tab sessions navigate their existing tab instead of creating another.
         """
         if isinstance(target, Path):
             url = target.absolute().as_uri()
@@ -143,6 +157,12 @@ class Tabs:
         self._check()
         if self._guard is not None:
             await self._guard.check(url)
+        if not self._policy.multiple and (current := self.focused()) is not None:
+            navigated = await current.cdp.page.navigate(url=url)
+            current.check_navigation()
+            if navigated.error_text:
+                raise BrowserError(f"Navigation failed: {navigated.error_text}")
+            return current
         opened: list[Tab] = []
 
         async def open_new() -> None:
@@ -213,6 +233,7 @@ class Tabs:
 
     async def link_modifier(self) -> str:
         """The key held while clicking a link to open it in a new tab on the browser's host."""
+        self._policy.check_new_tab()
         if not self._link_modifier:
             self._check()
             version = await self.client.browser.get_version()
@@ -267,12 +288,13 @@ class Tabs:
         )
 
     async def _create(self, url: str) -> Tab:
+        prepare = self._guard is not None or not self._policy.multiple
         result = await self.client.target.create_target(
-            url="about:blank" if self._guard is not None else url,
+            url="about:blank" if prepare else url,
             browser_context_id=self._context or self._target_context,
         )
         tab = await self._attach(result.target_id, opened=True)
-        if self._guard is not None and url != "about:blank":
+        if prepare and url != "about:blank":
             await tab.navigate(url)
         return tab
 
@@ -290,14 +312,28 @@ class Tabs:
         if known := self._tabs.get(info.target_id):
             known.url, known.title = info.url, info.title
             await known.report_change()
-        elif (
-            info.type == "page"
-            and self._context
-            and info.browser_context_id == self._context
-        ):
+        elif info.type == "page" and self._controlled(info):
+            if not self._policy.multiple and (
+                self._tabs or self._options.target_id is not None
+            ):
+                self._closed_targets.add(info.target_id)
+                self._policy_error = (
+                    "The page opened a separate tab that cannot be used "
+                    "in single-tab mode"
+                )
+                await self.client.target.close_target(target_id=info.target_id)
+                return
             await self._attach(
                 info.target_id, opened=True, opener_id=info.opener_id or ""
             )
+
+    def _controlled(self, info: TargetInfo) -> bool:
+        if self._context is not None:
+            return info.browser_context_id == self._context
+        return info.opener_id in self._tabs or (
+            self._options.target_id is not None
+            and info.opener_id == self._options.target_id
+        )
 
     async def _attach(
         self, target_id: str, *, opened: bool = False, opener_id: str = ""
@@ -313,6 +349,10 @@ class Tabs:
             )
             cdp = self.client.session(attached.session_id)
             try:
+                if self._context is None:
+                    stack.push_async_callback(self._detach, attached.session_id)
+                if not self._policy.multiple:
+                    await SingleTabSession(cdp).start(stack)
                 await _enable_session(cdp, self._options)
                 tab = Tab(
                     target_id,
@@ -343,8 +383,6 @@ class Tabs:
                     )
                 # A tab attached mid-session already shows a page worth reading.
                 await tab.report_change(settled=True)
-                if self._context is None:
-                    stack.push_async_callback(self._detach, attached.session_id)
                 return tab
             except (Exception, asyncio.CancelledError):
                 await self._detach(attached.session_id)
@@ -378,6 +416,8 @@ class Tabs:
                 stack.push_async_callback(self._detach, sid)
                 cdp = self.client.session(sid)
                 try:
+                    if not self._policy.multiple:
+                        await SingleTabSession(cdp).start(stack)
                     await _enable_session(cdp, self._options, frame=True)
                 except (Exception, asyncio.CancelledError):
                     await self._detach(sid)

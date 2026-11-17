@@ -12,7 +12,7 @@ from harnessed.kernel import PluginLike
 from harnessed.plugins import Compaction, ContextState
 
 from .activity import Activity
-from .browser import Chrome, DownloadReceiving
+from .browser import Chrome, DownloadReceiving, MultiTab
 from .choreography import Choreography, TabStrip
 from .core import ModelProfile, Runtime
 from .files import Files, FileTransfers
@@ -102,6 +102,7 @@ def browser_pack(
             # Harnessed resolves setup dependencies independently of prompt order.
             PointerTools(),
             Actions(chain_policy=DomActionChains()),
+            MultiTab(),
             NavigationTools(),
             JavaScriptTools(),
             KeyboardTools(),

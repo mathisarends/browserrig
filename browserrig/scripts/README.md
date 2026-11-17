@@ -3,6 +3,11 @@ options object. `Script.load` loads packaged resources once and composes the
 declared `lib/` helpers into a local wrapper. Python argument models serialize
 aliases to JavaScript; result adapters validate returned data.
 
+`single_tab.js` runs in the page's main world before its scripts. It routes link,
+form and simple popup navigation into the current context and supports explicit
+teardown when disconnecting from an externally owned tab. Other capture scripts
+continue to use their isolated worlds.
+
 `Frame.run` and `run_on_owner` share dispatch and error translation. Only owner
 scripts receive the embedding iframe element as `this`. Seed additionally
 receives resolved DOM objects through CDP object arguments. Object handles stay

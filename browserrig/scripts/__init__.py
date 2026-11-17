@@ -1,4 +1,4 @@
-"""Load and validate the standalone scripts sent to the isolated CDP world."""
+"""Load and validate the standalone browser scripts sent through CDP."""
 
 import re
 from collections.abc import Callable
@@ -34,6 +34,7 @@ from .models import (
     SelectedOption,
     SelectionResult,
     SelectOptionsArgs,
+    SingleTabArgs,
     Size,
     TabStrip,
     TabStripArgs,
@@ -65,6 +66,8 @@ __all__ = [
     "SECRET_FOCUS",
     "SEED",
     "STABILITY",
+    "SINGLE_TAB",
+    "SingleTabArgs",
     "TAB_STRIP",
     "VIEWPORT",
     "ContentArgs",
@@ -179,6 +182,9 @@ FIND: Script[FindArgs, FindResult] = Script.load(
     "find", FindArgs, FindResult, uses=("composed",)
 )
 STABILITY: Script[ScriptArgs, DOMProbe] = Script.load("stability", ScriptArgs, DOMProbe)
+SINGLE_TAB: Script[SingleTabArgs, None] = Script.load(
+    "single_tab", SingleTabArgs, type(None)
+)
 OVERLAY: Script[OverlayArgs, bool | None] = Script.load(
     "overlay", OverlayArgs, bool | None
 )

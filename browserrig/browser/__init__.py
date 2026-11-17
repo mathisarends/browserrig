@@ -13,6 +13,7 @@ from .policy import DomainNotAllowed, NavigationPolicy
 from .receiving import DownloadReceiving
 from .setup import SessionSetup
 from .tab import OpenDialog, Tab, validated_url
+from .tab_policy import MultiTab, SingleTab, TabPolicy
 from .tabs import Tabs
 
 __all__ = [
@@ -38,6 +39,9 @@ __all__ = [
     "Tab",
     "TabChanged",
     "TabInfo",
+    "MultiTab",
+    "SingleTab",
+    "TabPolicy",
     "Tabs",
     "Viewport",
     "screenshot",

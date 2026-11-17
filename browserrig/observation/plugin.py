@@ -8,11 +8,11 @@ from harnessed import (
     hook,
 )
 from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.kernel import PluginScope, needs
+from harnessed.kernel import PluginScope, needs, observes
 from harnessed.models import UserMessage
 from harnessed.tracing import traced
 
-from browserrig.browser import Browser, BrowserEvents, Tab
+from browserrig.browser import Browser, BrowserEvents, Tab, TabInfo, TabPolicy
 from browserrig.core import (
     BrowserCoordination,
     ReadinessPhase,
@@ -62,6 +62,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
     _readiness = needs(Readiness)
+    _tab_policy = observes(TabPolicy)
 
     def __init__(
         self,
@@ -112,7 +113,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         """Compare current controls without publishing or replacing the delivered observation."""
         async with self._state.lock:
             report = await self._readiness.wait(tab, phase=ReadinessPhase.ACTION)
-            tabs = await self._browser.tabs.list()
+            tabs = await self._tab_overview()
             observation = await capture_observation(
                 tab,
                 self.capture_strategy,
@@ -138,7 +139,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         async with self._state.lock:
             selected = tab if tab is not None else browser.active_tab
             report = await readiness.wait(selected, phase=phase)
-            tabs = await browser.tabs.list()
+            tabs = await self._tab_overview()
             observation = await capture_observation(
                 selected,
                 self.capture_strategy,
@@ -267,6 +268,11 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             return image
         # Without an included image, coordinates refer to the textual viewport.
         return snapshot.model_copy(update={"geometry": None})
+
+    async def _tab_overview(self) -> tuple[TabInfo, ...]:
+        if self._tab_policy is not None and not self._tab_policy.multiple:
+            return ()
+        return await self._browser.tabs.list()
 
     @hook(PreStep)
     async def _before_step(

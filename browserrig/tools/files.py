@@ -86,7 +86,7 @@ class _BrowserFileActions(FileSystemObservation):
     @tool(
         kind=ActionKind.OPEN_FILE,
         enabled=_reaches_chrome,
-        description="Preview a workspace file in a new browser tab.",
+        description="Preview a workspace file in the browser.",
     )
     async def open_file(self, path: str) -> Effect:
         with file_errors():
@@ -96,7 +96,7 @@ class _BrowserFileActions(FileSystemObservation):
     @tool(
         kind=ActionKind.OPEN_DOWNLOADED_FILE,
         enabled=_reaches_chrome,
-        description="Open a completed download in a new browser tab.",
+        description="Open a completed download in the browser.",
     )
     async def open_downloaded_file(
         self, download_id: Annotated[str, Field(description="ID from list_downloads.")]
