@@ -125,6 +125,7 @@ async def test_scroll_feedback_is_visible_during_native_wheel_input(site):
     async with agent.session() as session:
         browser = session.scope[Browser]
         tab = browser.active_tab
+        assert (await wait_for_page(tab)).status == "ready"
         observed = []
 
         async def started(_event: ScrollStartedEvent):
@@ -139,7 +140,11 @@ async def test_scroll_feedback_is_visible_during_native_wheel_input(site):
         session.scope.on(ScrollStartedEvent, started, priority=10)
         await session.scope[Input].mouse.scroll(delta_y=500, point=Point(x=500, y=400))
         assert observed == [0]
-        assert await evaluate(tab, "scrollY") > 450
+        # The input reply can precede compositing, especially with a one-step motor.
+        async with asyncio.timeout(3):
+            while (scroll_y := await evaluate(tab, "scrollY")) <= 450:
+                await asyncio.sleep(0.01)
+        assert scroll_y > 450
 
 
 async def test_keyboard_fits_a_compact_viewport_and_keeps_secret_keys_private(site):
