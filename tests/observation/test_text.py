@@ -1,27 +1,26 @@
 import pytest
 from harnessed import Agent
 from harnessed.events import IncludedObservation, ObservationsIncludedEvent
-from harnessed.models import UserMessage
 from harnessed.testing import ScriptedModel
 
+from browserrig import Readiness
 from browserrig.observation import (
-    DomRenderer,
+    BrowserPerception,
+    DomText,
+    DomTextMode,
     ElementInfo,
     ProjectObservation,
     Snapshot,
-    TextContext,
 )
-from tests.fakes import FakeServices
+from tests.fakes import FakeChrome
 
 
-@pytest.mark.parametrize("mode,repeat", [("delta", False), ("full", True)])
+@pytest.mark.parametrize("mode,repeat", [("delta", False), (DomTextMode.FULL, True)])
 async def test_unchanged_observation_delivery_is_an_explicit_context_policy(
     mode, repeat
 ):
-    services = FakeServices()
-    agent = Agent(model=ScriptedModel([]), plugins=[services, TextContext(mode=mode)])
+    agent = _agent(mode)
     async with agent.session() as session:
-        services = _services(session)
         snapshot = _snapshot()
         first = await session.scope.dispatch(
             ProjectObservation(snapshot), default=_empty
@@ -52,10 +51,8 @@ async def test_unchanged_observation_delivery_is_an_explicit_context_policy(
 async def test_a_lost_base_or_changed_geometry_requires_a_complete_observation(
     invalidate,
 ):
-    services = FakeServices()
-    agent = Agent(model=ScriptedModel([]), plugins=[services, TextContext()])
+    agent = _agent()
     async with agent.session() as session:
-        services = _services(session)
         snapshot = _snapshot()
         first = await session.scope.dispatch(
             ProjectObservation(snapshot), default=_empty
@@ -66,7 +63,7 @@ async def test_a_lost_base_or_changed_geometry_requires_a_complete_observation(
                 ObservationsIncludedEvent(request_id="compacted", observations=())
             )
         elif invalidate == "backend":
-            services.observe.generation += 1
+            session.scope[BrowserPerception].invalidate()
         else:
             snapshot = snapshot.model_copy(
                 update={"viewport_revision": 1, "width": 900}
@@ -79,13 +76,15 @@ async def test_a_lost_base_or_changed_geometry_requires_a_complete_observation(
         assert '"Continue"' in message.text
 
 
-def _services(session):
-    services = session.scope[FakeServices]
-    services.observe.generation = 0
-    services.observe.project = lambda snapshot: UserMessage(
-        DomRenderer().render(snapshot)
+def _agent(mode=DomTextMode.DELTA):
+    return Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            FakeChrome({}),
+            Readiness(),
+            BrowserPerception(text=DomText(mode=mode)),
+        ],
     )
-    return services
 
 
 def _snapshot():

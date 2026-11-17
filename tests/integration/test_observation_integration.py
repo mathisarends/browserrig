@@ -2,6 +2,7 @@ import base64
 import json
 import re
 from io import BytesIO
+from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Plugin, PolicyDecision, ToolCall
@@ -15,15 +16,21 @@ from PIL import Image
 from browserrig import (
     Agent,
     Browser,
+    BrowserPerception,
+    ChoreographyOverlay,
     Chrome,
     ChromeBrowser,
     DomCapture,
-    DomPerception,
+    DomText,
+    DomTextMode,
     Input,
+    InputPacing,
     PageText,
     Screenshots,
     ScreenshotTrigger,
+    SetOfMarks,
     Viewport,
+    WheelTools,
     wait_for_page,
 )
 from browserrig.browser import Launch
@@ -36,9 +43,114 @@ from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
 )
 from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
-from tests.observations import has_image
+from tests.observations import has_image, image_id
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.mark.parametrize(
+    "text,pixels,marked",
+    [
+        pytest.param(False, True, False, id="screenshot"),
+        pytest.param(False, True, True, id="screenshot-marks"),
+        pytest.param(True, False, False, id="text"),
+        pytest.param(True, True, False, id="text-screenshot"),
+        pytest.param(True, True, True, id="text-screenshot-marks"),
+    ],
+)
+async def test_perception_delivers_exactly_the_selected_modalities(
+    site, monkeypatch, text, pixels, marked
+):
+    requests = []
+
+    async def respond(request):
+        requests.append(request)
+        if len(requests) == 1:
+            yield ModelChunk(tool_call=ToolCall("list_tabs", {}))
+        else:
+            yield ModelChunk(text="Done")
+
+    agent = Agent(
+        model=CallbackModel(respond),
+        browser=Chrome.launch(url=site),
+        plugins=[
+            BrowserPerception(
+                text=DomText(mode=DomTextMode.FULL) if text else None,
+                screenshots=Screenshots(
+                    trigger=ScreenshotTrigger.EACH_STEP,
+                    marks=SetOfMarks() if marked else None,
+                    skip_unchanged=False,
+                )
+                if pixels
+                else None,
+            ),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
+        without=(ChoreographyOverlay,),
+    )
+    async with agent.session() as session:
+        tab = session.scope[Browser].active_tab
+        await evaluate(
+            tab,
+            """document.body.innerHTML = `<button aria-label="DOM_ONLY_TARGET"
+                style="position:absolute;left:100px;top:100px;width:90px;height:32px;
+                background:white;border:none">Buy</button>`;""",
+        )
+        frames = AsyncMock(side_effect=AssertionError("Unexpected DOM extraction"))
+        probe = AsyncMock(side_effect=AssertionError("Unexpected DOM readiness probe"))
+        if not (text or marked):
+            monkeypatch.setattr(tab, "frames", frames)
+            monkeypatch.setattr(tab, "main_frame", probe)
+        result = await session.run("Inspect the page", max_steps=2)
+        snapshot = session.scope[BrowserPerception].snapshot
+        assert snapshot is not None and bool(snapshot.elements) is (text or marked)
+
+    assert result.text == "Done" and len(requests) == 2
+    images = [
+        _check_modalities(request, text=text, pixels=pixels, marked=marked)
+        for request in requests
+    ]
+    if pixels:
+        assert images[0] != images[1]
+    if not (text or marked):
+        frames.assert_not_called()
+        probe.assert_not_called()
+
+
+async def test_vision_on_request_starts_with_an_image_and_refreshes_after_wheel_input(
+    site,
+):
+    frames = []
+
+    async def respond(request):
+        (message,) = [message for message in request.messages if has_image(message)]
+        frames.append(image_id(message))
+        if len(frames) == 1:
+            yield ModelChunk(tool_call=ToolCall("scroll", {"delta_y": 800}))
+        elif len(frames) == 2:
+            yield ModelChunk(tool_call=ToolCall("screenshot", {}))
+        else:
+            yield ModelChunk(text="Done")
+
+    agent = Agent(
+        model=CallbackModel(respond),
+        browser=Chrome.launch(url=site),
+        plugins=[
+            BrowserPerception(text=None, screenshots=Screenshots(skip_unchanged=False)),
+            WheelTools(),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
+        without=(ChoreographyOverlay, InputPacing),
+    )
+    async with agent.session() as session:
+        tab = session.scope[Browser].active_tab
+        await evaluate(tab, "document.body.style.minHeight = '2400px'")
+        result = await session.run("Scroll and request a fresh view", max_steps=3)
+        position = int(await evaluate(tab, "window.scrollY"))
+
+    assert result.text == "Done" and position > 0
+    assert len(frames) == 3
+    assert frames[0] == frames[1] != frames[2]
 
 
 async def test_composed_dom_semantics_click_listeners_and_visible_text(site):
@@ -141,7 +253,7 @@ async def test_element_names_come_from_chrome_accessibility_tree(site):
             """document.body.innerHTML = `
             <button><svg width=16 height=16><title>Close</title></svg></button>
             <input placeholder='Search the web'>
-            <a href='/price'><span style='position:absolute;clip:rect(0 0 0 0)'>7,99 €</span>
+            <a href='/price'><span style='position:absolute;clip:rect(0 0 0 0)'>7,99 â‚¬</span>
                 <span aria-hidden=true>7<sup>99</sup></span> per piece</a>
             <a href='/home' style='text-transform:uppercase'>Home</a>
             <label><input type=radio name=size>Small</label>
@@ -158,7 +270,7 @@ async def test_element_names_come_from_chrome_accessibility_tree(site):
     assert {
         "Close",
         "Search the web",
-        "7,99 € per piece",
+        "7,99 â‚¬ per piece",
         "Home",
         "Small",
         "Prime",
@@ -167,8 +279,7 @@ async def test_element_names_come_from_chrome_accessibility_tree(site):
     assert re.search(r"\] div x=\d+ y=\d+ 50x40$", render(state), flags=re.M)
 
 
-@pytest.mark.parametrize("marks", [False, True])
-async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site, marks):
+async def test_raw_capture_keeps_refs_and_hidpi_geometry_without_page_mutation(site):
     async with ChromeBrowser(Launch(url=site, viewport=Viewport(scale=2))) as browser:
         devices = Input(browser.input_targets.focused)
         tab = browser.active_tab
@@ -177,7 +288,7 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
         await devices.mouse.move_to(Point(x=700, y=200))
         state = await capture(
             tab,
-            DomCapture(marks=marks, cursor=True),
+            DomCapture(),
             report,
             cursor=devices.mouse.position,
             screenshots=True,
@@ -186,7 +297,6 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
         assert state.image is not None
         with Image.open(BytesIO(base64.b64decode(state.image))) as image:
             assert image.size == (state.width, state.height)
-            assert image.getpixel((700, 200)) == (30, 30, 30)
         refs = [element.ref for element in state.elements]
         assert len(set(refs)) == len(refs)
         rendered = render(state)
@@ -194,7 +304,7 @@ async def test_marks_match_refs_and_hidpi_screenshot_without_page_mutation(site,
         assert "never-echo-this" not in rendered
         fresh = await capture(
             tab,
-            DomCapture(marks=marks, cursor=True),
+            DomCapture(),
             report,
             previous=state,
             screenshots=True,
@@ -250,9 +360,12 @@ async def test_model_cursor_marker_is_optional_after_movement_and_click(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site + "/canvas", viewport=Viewport(scale=2)),
         plugins=[
-            DomPerception(
-                capture=DomCapture(cursor=show_cursor),
-                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
+            BrowserPerception(
+                screenshots=Screenshots(
+                    trigger=ScreenshotTrigger.EACH_STEP,
+                    cursor=show_cursor,
+                    marks=SetOfMarks(),
+                ),
             ),
             Approvals(default=PolicyDecision.ALLOW),
         ],
@@ -380,7 +493,7 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
         await devices.mouse.move_to(Point(x=150, y=180))
         state = await capture(
             tab,
-            DomCapture(cursor=True),
+            DomCapture(),
             report,
             region=Region(x=100, y=150, width=400, height=200),
             zoom=2,
@@ -396,7 +509,6 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
         assert state.image is not None
         with Image.open(BytesIO(base64.b64decode(state.image))) as image:
             assert image.size == (800, 400)
-            assert image.getpixel((100, 60)) == (30, 30, 30)
         rendered = render(state)
         assert (
             f"canvas (ref {board.ref}) x=100 y=150 400x200 center=300,250" in rendered
@@ -480,3 +592,20 @@ async def test_agent_clicks_canvas_through_region_screenshot(site):
         "height": 200,
         "scale": 1,
     }
+
+
+def _check_modalities(request, *, text: bool, pixels: bool, marked: bool) -> str:
+    assert (
+        any("DOM_ONLY_TARGET" in message.text for message in request.messages) is text
+    )
+    image_messages = [message for message in request.messages if has_image(message)]
+    assert len(image_messages) == int(pixels)
+    if not pixels:
+        return ""
+    (message,) = image_messages
+    (part,) = [part for part in message.content if isinstance(part, ImagePart)]
+    encoded = part.url.split(",", 1)[1]
+    with Image.open(BytesIO(base64.b64decode(encoded))) as image:
+        rgb = image.convert("RGB")
+        assert (rgb.getpixel((102, 100)) == (34, 197, 94)) is marked
+    return image_id(message)

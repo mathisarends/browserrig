@@ -35,7 +35,6 @@ from browserrig import (
     ReadinessOptions,
     Secret,
     Secrets,
-    TextContext,
     browser_plugins,
 )
 from browserrig import PageContent as Extraction
@@ -103,7 +102,6 @@ def _agent(responses, ask, *, extra=(), store=None, **options):
             Readiness(options=ReadinessOptions(navigation_min_ms=0)),
             *extra,
             BrowserPerception(capture=_Capture(), renderer=DomRenderer()),
-            TextContext(),
             Nudges(),
             HumanHandoff(ask=ask, **options),
             _Step(),

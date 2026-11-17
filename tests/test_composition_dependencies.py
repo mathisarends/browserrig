@@ -34,7 +34,6 @@ from browserrig import (
     ChoreographyOverlay,
     Chrome,
     DomCapture,
-    DomPerception,
     Files,
     FileSystem,
     FileTools,
@@ -48,6 +47,7 @@ from browserrig import (
     Runtime,
     Screenshots,
     ScreenshotTrigger,
+    SetOfMarks,
     browser_plugins,
 )
 from browserrig.browser import BrowserEvents
@@ -71,14 +71,14 @@ async def test_browser_perception_dependency_resolves_the_configured_plugin(
             perception = self._setup_perception
             received.append(perception)
 
-    perception = DomPerception(capture=DomCapture(marks=False))
+    perception = BrowserPerception()
     agent = browserrig.Agent(model=ScriptedModel([]), plugins=[perception, Consumer()])
     assert [item for item in agent.plugins if isinstance(item, BrowserPerception)] == [
         perception
     ]
     async with agent.session() as session:
         assert received == [session.scope[BrowserPerception]]
-        assert not received[0].capture_strategy.marks
+        assert received[0].screenshots is None
     assert len(fake_chrome) == 1 and fake_chrome[0].closed
 
 
@@ -163,7 +163,7 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
         plugins=[
             KeyboardTools(),
             Actions(),
-            DomPerception(),
+            BrowserPerception(),
             Readiness(),
             DialogTools(),
         ],
@@ -181,7 +181,7 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
             Readiness,
             BrowserPerception,
         ),
-        "DomPerception": (
+        "BrowserPerception": (
             Browser,
             Input,
             BrowserCoordination,
@@ -197,9 +197,9 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
 async def test_browser_dependency_loss_and_replacement_restart_observation_state():
     async with Scope() as ctx:
         ctx.provide(ToolRegistry, ToolRegistry(ctx))
-        await ctx.install([DomPerception(), Readiness()], settle=True)
+        await ctx.install([BrowserPerception(), Readiness()], settle=True)
         assert {issue.plugin.name for issue in ctx.plugin_diagnostics()} == {
-            "DomPerception",
+            "BrowserPerception",
             "Readiness",
         }
 
@@ -236,7 +236,7 @@ async def test_browser_dependency_loss_and_replacement_restart_observation_state
         }
         assert missing == {
             "Readiness": (BrowserEvents,),
-            "DomPerception": (
+            "BrowserPerception": (
                 Browser,
                 Input,
                 BrowserCoordination,
@@ -290,24 +290,27 @@ async def test_facade_warning_policy_keeps_deferred_plugin_until_service_is_adde
 
 
 @pytest.mark.parametrize(
-    "capture,trigger",
+    "capture,trigger,marks",
     [
-        (DomCapture(), ScreenshotTrigger.ON_REQUEST),
+        (DomCapture(), ScreenshotTrigger.ON_REQUEST, SetOfMarks()),
         (
-            DomCapture(text=PageText.OFF, marks=False),
+            DomCapture(text=PageText.OFF),
             ScreenshotTrigger.EACH_STEP,
+            None,
         ),
     ],
 )
 async def test_facade_renders_configured_observation_prompt(
-    fake_chrome, capture, trigger
+    fake_chrome, capture, trigger, marks
 ):
     agent = browserrig.Agent(
         model=ScriptedModel(["unused"]),
         instructions="Custom role.",
         prompt=SystemPrompt.from_plugins(format=PromptFormat.MARKDOWN),
         plugins=[
-            DomPerception(capture=capture, screenshots=Screenshots(trigger=trigger))
+            BrowserPerception(
+                capture=capture, screenshots=Screenshots(trigger=trigger, marks=marks)
+            )
         ],
     )
     async with agent.session() as session:
@@ -317,7 +320,7 @@ async def test_facade_renders_configured_observation_prompt(
         assert "## Browser content and action results" in rendered
         assert "## Workspace and downloads" in rendered
         assert "## Element references" in rendered
-        assert ("labeled with its ref" in rendered) == capture.marks
+        assert ("labeled with its ref" in rendered) is (marks is not None)
         assert ("reading order beside its controls" in rendered) == (
             capture.text == PageText.INLINE
         )
@@ -330,7 +333,7 @@ async def test_facade_renders_configured_observation_prompt(
 async def test_native_composition_can_replace_a_complete_browser_instruction_block(
     fake_chrome,
 ):
-    class CustomPerception(DomPerception):
+    class CustomPerception(BrowserPerception):
         def instructions(self) -> SystemPrompt:
             return SystemPrompt("Custom observation guidance.")
 
@@ -536,9 +539,9 @@ async def test_runtime_browser_sections_need_explicit_context_delivery(fake_chro
     async with agent.session() as session:
         fixed_prompt = await session.prompt.render()
         with pytest.raises(ConfigError):
-            await session.mount(DomPerception())
+            await session.mount(BrowserPerception())
         handle = await session.mount(
-            DomPerception(), section_delivery=SectionDelivery.CONTEXT
+            BrowserPerception(), section_delivery=SectionDelivery.CONTEXT
         )
         request = ModelRequest(())
         mounted = await session.scope.dispatch(

@@ -16,10 +16,10 @@ from browserrig import (
     Agent,
     Browser,
     BrowserDownload,
+    BrowserPerception,
     Chrome,
     ChromeBrowser,
     DomCapture,
-    DomPerception,
     DomReferences,
     Files,
     FileSystem,
@@ -506,7 +506,9 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
         browser=Chrome.launch(url=site + "/canvas"),
         plugins=[
             Files(LocalWorkspace(tmp_path)),
-            DomPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+            BrowserPerception(
+                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
+            ),
             Readiness(options=ReadinessOptions(timeout_seconds=3)),
             Approvals(default=PolicyDecision.ALLOW),
         ],

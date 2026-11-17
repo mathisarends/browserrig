@@ -12,9 +12,9 @@ start, replace individual capabilities, or assemble your own runtime from plugin
 | Agent runtime | Model calls, sessions, approvals and persistence | Harnessed models, plugins and lifecycle hooks |
 | Browser | Tabs, frames and browser lifetime | `Browser`, `InputTargets`; local or remote `Chrome` |
 | Input | Mouse and keyboard, independent of the browser backend | `InputRuntime`, `Input`, `Targeting` |
-| Perception | Capture page state and render observations | `DomPerception` or custom `CaptureStrategy`, `References`, `Renderer` |
+| Perception | Capture page state and deliver observations | `BrowserPerception`, `DomText`, `Screenshots`, custom `CaptureStrategy` and `Renderer` |
 | Actions | Coordinate input, readiness and action chains | Tool groups, `browser_tool`, `ReadinessPolicy` |
-| Context | Select images, compact history and recover task memory | `TextContext`, `ImageContext`, `TaskMemory` |
+| Context | Compact history and recover task memory | `TaskMemory` |
 | Presentation | Pace input, show activity and record sessions | `InputPacing`, `Choreography`, `ChoreographyOverlay`, `VideoRecording` |
 
 These layers have separate contracts: changing capture does not require changing
@@ -42,7 +42,7 @@ from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
-    Agent, Chrome, Choreography, ChoreographyOverlay, DomPerception, InputPacing,
+    Agent, BrowserPerception, Chrome, Choreography, ChoreographyOverlay, InputPacing,
     Screenshots, ScreenshotTrigger,
 )
 
@@ -52,7 +52,7 @@ async def main():
         model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
         browser=Chrome.launch(url="https://example.com", headless=False),
         plugins=[
-            DomPerception(
+            BrowserPerception(
                 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             ),
             Approvals(default=PolicyDecision.ALLOW),

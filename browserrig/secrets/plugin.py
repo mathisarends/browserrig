@@ -118,6 +118,10 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
     def contains(self, text: str) -> bool:
         return self._redactor.contains(text)
 
+    @property
+    def has_known_values(self) -> bool:
+        return bool(self._redactor)
+
     def available(self, url: str) -> tuple[str, ...]:
         origin = _origin(url)
         return tuple(

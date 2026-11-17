@@ -27,7 +27,6 @@ from browserrig import (
     Readiness,
     Runtime,
     Targeting,
-    TextContext,
     wait_for_page,
 )
 from browserrig.browser import Launch
@@ -92,7 +91,6 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
             Chrome(Launch(url=site)),
             Readiness(),
             BrowserPerception(capture=_CanvasCapture(), renderer=DomRenderer()),
-            TextContext(),
             Actions(),
             Targeting(),
             PointerTools(),

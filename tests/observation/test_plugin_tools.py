@@ -1,15 +1,11 @@
 import pytest
 from harnessed import Agent, ToolCall
-from harnessed.errors import PluginDependencyError
 from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
     Actions,
     BrowserPerception,
-    DomCapture,
-    DomPerception,
-    DomRenderer,
     DomScrollTools,
     DomTypingTools,
     Files,
@@ -20,7 +16,6 @@ from browserrig import (
     Readiness,
     ScreenshotTools,
     Targeting,
-    TextContext,
 )
 from tests.fakes import FakeChrome
 
@@ -43,8 +38,7 @@ async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
     plugins = [
         FakeChrome({}),
         Readiness(),
-        DomPerception(),
-        TextContext(),
+        BrowserPerception(),
         Actions(),
         Targeting(),
         KeyboardTools(),
@@ -65,24 +59,4 @@ async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
             == {"send_keys", "click", "click_at", "move_mouse", "drag", "drag_at"}
             | expected
         )
-    assert not model.requests
-
-
-async def test_generic_perception_does_not_satisfy_dom_tool_dependencies():
-    model = ScriptedModel([])
-    agent = Agent(
-        model=model,
-        plugins=[
-            FakeChrome({}),
-            Readiness(),
-            BrowserPerception(capture=DomCapture(), renderer=DomRenderer()),
-            Actions(),
-            Targeting(),
-            DomTypingTools(),
-        ],
-    )
-    with pytest.raises(
-        PluginDependencyError, match="DomTypingTools requires ResolveDomElement"
-    ):
-        await agent.run("Type in a field")
     assert not model.requests

@@ -4,9 +4,29 @@
 
 ### Breaking changes
 
+- Replace `DomPerception`, `TextContext` and `ImageContext` with one
+  `BrowserPerception(text=..., screenshots=...)`. Use `DomText(mode=DomTextMode.DELTA)`
+  or `DomText(mode=DomTextMode.FULL)` for text. The enum values are
+  `"delta"` and `"full"`. Use `None` to omit text. Use
+  `Screenshots(...)` for images, and `None` to omit images. Add
+  `marks=SetOfMarks()` for labeled targets in either image mode. Images without
+  text or marks use screenshot capture and browser-event readiness without DOM
+  extraction. Images with marks still collect DOM targets. The default
+  `browser_pack()` keeps DOM text and marked screenshots on request.
+- Move `marks`, `cursor`, `skip_unchanged` and image `retention` to
+  `Screenshots`. For a fresh image on every model step, use
+  `Screenshots(trigger=ScreenshotTrigger.EACH_STEP, skip_unchanged=False)`.
+  `ScreenshotTools()` remains separate. Image-only sessions configured for
+  on-request capture receive an initial image for each document they enter.
+  With known `Secrets` values, screenshot-only capture withholds images because
+  it has no DOM data for redaction.
+- `DomCapture` and the low-level `capture(..., screenshots=True)` return
+  unannotated pixels. Perception applies image marks and cursor overlays when
+  projecting a model observation. Custom text renderers implement
+  `instructions()` without a screenshot argument.
 - `DomElements` is now the callable service `ResolveDomElement`. Replace
   `await scope[DomElements].resolve(tab, ref)` with
-  `await scope[ResolveDomElement](tab, ref)`. `DomPerception` provides the new
+  `await scope[ResolveDomElement](tab, ref)`. `BrowserPerception` provides the new
   service key; import it from `browserrig` or `browserrig.observation`.
 - Custom `Motor` implementations must provide
   `wheel_steps(delta_x=..., delta_y=...)`, returning `WheelStep` values from
@@ -16,6 +36,11 @@
 
 ### Changes
 
+- Add `WheelTools()` for native scrolling at the pointer in screenshot-based
+  sessions. WebArena selects a variant with `--observation text`,
+  `screenshot`, `screenshot-marks`, `text-screenshot`, or
+  `text-screenshot-marks`. Timing and tool availability are configurable via
+  `--screenshot-trigger` and `--screenshot-tool` / `--no-screenshot-tool`.
 - Enforce the reviewed Smelt source and test conventions as errors, including
   stateful dataclasses and repeated lifecycle narrowing assertions. Keep only
   the three documented import/navigation review heuristics as visible hints.

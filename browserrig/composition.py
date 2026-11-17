@@ -19,7 +19,7 @@ from .files import Files, FileTransfers
 from .input import InputRuntime
 from .memory import TaskMemory
 from .nudges import Nudges
-from .observation import DomPerception, ImageContext, TextContext
+from .observation import BrowserPerception, Screenshots, SetOfMarks
 from .overlay import ChoreographyOverlay
 from .pacing import InputPacing
 from .readiness import DownloadReadiness, Readiness
@@ -95,9 +95,7 @@ def browser_pack(
             Readiness(),
             DownloadReadiness(),
             Nudges(),
-            DomPerception(),
-            TextContext(),
-            ImageContext(),
+            BrowserPerception(screenshots=Screenshots(marks=SetOfMarks())),
             # Explain screenshot coordinates before the chains that refer to them.
             # Harnessed resolves setup dependencies independently of prompt order.
             PointerTools(),

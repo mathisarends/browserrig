@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from harnessed import PolicyDecision, ToolCall, ToolStatus
+from harnessed import Plugin, PolicyDecision, ToolCall, ToolStatus
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.kernel import PluginLike
 from harnessed.models import Message
@@ -51,6 +51,7 @@ class RunOptions:
     plugins: tuple[PluginLike, ...] = ()
     max_steps: int = 50
     timeout: int = 300
+    without: tuple[type[Plugin], ...] = ()
 
     def __post_init__(self) -> None:
         if self.max_steps < 1 or self.timeout < 1:
@@ -164,6 +165,9 @@ def _agent(options: RunOptions, workspace: Path, endpoint: str, target: str) -> 
     # pylint: disable=import-outside-toplevel
     from harnessed.models.pydantic_ai import PydanticAIModel
 
+    presentation = (
+        () if options.humanlike else (InputPacing, Choreography, ChoreographyOverlay)
+    )
     return Agent(
         model=PydanticAIModel(options.model),
         browser=Chrome.connect(endpoint=endpoint, target_id=target),
@@ -172,9 +176,7 @@ def _agent(options: RunOptions, workspace: Path, endpoint: str, target: str) -> 
             Approvals(default=PolicyDecision.ALLOW),
             *options.plugins,
         ],
-        without=()
-        if options.humanlike
-        else (InputPacing, Choreography, ChoreographyOverlay),
+        without=(*presentation, *options.without),
     )
 
 

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from browserrig import DomCapture, DomPerception, PageText
+from browserrig import BrowserPerception, DomCapture, PageText
 from browserrig.browser import Connect, Launch
 from browserrig.core import Bounds, Geometry, Point, Region, StaleElement
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
@@ -170,10 +170,8 @@ def test_cookie_context_has_its_own_block_and_leaves_navigation_available():
     assert '    <form "Consent">\n      [2] button "Reject all"' in text
     assert '[1] button "Continue"' in text and "[MAIN]" in text
     assert "interact with it first" not in text and not snapshot.text
-    observe = DomPerception()
-    assert "choose whether to interact or navigate" in observe.renderer.instructions(
-        observe.screenshots
-    )
+    observe = BrowserPerception()
+    assert "choose whether to interact or navigate" in observe.renderer.instructions()
 
 
 def test_cookie_excerpt_is_rendered_even_when_no_controls_fit_the_budget():
@@ -279,12 +277,13 @@ def test_capture_rejects_invalid_limits(settings):
 
 
 def test_default_observation_explains_context_without_enabling_screenshots():
-    observe = DomPerception()
-    instructions = observe.renderer.instructions(observe.screenshots)
+    observe = BrowserPerception()
+    instructions = observe.renderer.instructions()
     assert "reading order beside its controls" in instructions
     assert "Plain text has no action refs" in instructions
     assert "above/below previews" in instructions and "scroll(up=" in instructions
-    assert "Screenshots are included only when requested" in instructions
+    assert observe.screenshots is None
+    assert "Every observation includes a screenshot" not in instructions
 
 
 @pytest.mark.parametrize(
@@ -296,16 +295,16 @@ def test_default_observation_explains_context_without_enabling_screenshots():
     ],
 )
 def test_observation_instructions_follow_captured_page_text(text, expected):
-    observe = DomPerception(capture=DomCapture(text=text))
-    instructions = observe.renderer.instructions(observe.screenshots)
+    observe = BrowserPerception(capture=DomCapture(text=text))
+    instructions = observe.renderer.instructions()
     assert expected in instructions
     assert ("[label][ref]" in instructions) == (text != PageText.OFF)
 
 
 @pytest.mark.parametrize("landmarks", [True, False])
 def test_observation_instructions_mention_landmarks_only_when_captured(landmarks):
-    observe = DomPerception(capture=DomCapture(landmarks=landmarks))
-    instructions = observe.renderer.instructions(observe.screenshots)
+    observe = BrowserPerception(capture=DomCapture(landmarks=landmarks))
+    instructions = observe.renderer.instructions()
     assert ("landmarks like [MAIN]" in instructions) == landmarks
     assert '<form "Login">' in instructions
 

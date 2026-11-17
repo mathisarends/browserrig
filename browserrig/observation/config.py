@@ -1,6 +1,9 @@
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from browserrig.core import Options
+
+from .retention import ImageRetention, TrimInBatches
 
 
 class ScreenshotTrigger(StrEnum):
@@ -16,5 +19,30 @@ class PageText(StrEnum):
     OFF = "off"
 
 
-class Screenshots(Options):
+class DomTextMode(StrEnum):
+    """Select how much DOM text to deliver at each step."""
+
+    DELTA = "delta"
+    FULL = "full"
+
+
+class DomText(Options):
+    """Publish complete DOM observations or deltas against a retained observation."""
+
+    mode: DomTextMode = DomTextMode.DELTA
+
+
+@dataclass(frozen=True, slots=True)
+class SetOfMarks:
+    """Label screenshot targets with their observation references."""
+
+
+@dataclass(frozen=True, slots=True)
+class Screenshots:
+    """Configure screenshot timing, presentation and history."""
+
     trigger: ScreenshotTrigger = ScreenshotTrigger.ON_REQUEST
+    marks: SetOfMarks | None = None
+    cursor: bool = False
+    skip_unchanged: bool = True
+    retention: ImageRetention = field(default_factory=TrimInBatches)
