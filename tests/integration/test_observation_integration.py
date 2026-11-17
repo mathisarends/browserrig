@@ -22,6 +22,7 @@ from browserrig import (
     ChromeBrowser,
     DomCapture,
     DomText,
+    DomTextMode,
     Input,
     InputPacing,
     PageText,
@@ -74,7 +75,7 @@ async def test_perception_delivers_exactly_the_selected_modalities(
         browser=Chrome.launch(url=site),
         plugins=[
             BrowserPerception(
-                text=DomText(mode="full") if text else None,
+                text=DomText(mode=DomTextMode.FULL) if text else None,
                 screenshots=Screenshots(
                     trigger=ScreenshotTrigger.EACH_STEP,
                     marks=SetOfMarks() if marked else None,

@@ -5,8 +5,9 @@
 ### Breaking changes
 
 - Replace `DomPerception`, `TextContext` and `ImageContext` with one
-  `BrowserPerception(text=..., screenshots=...)`. Use `DomText(mode="delta")`
-  or `DomText(mode="full")` for text, and `None` to omit text. Use
+  `BrowserPerception(text=..., screenshots=...)`. Use `DomText(mode=DomTextMode.DELTA)`
+  or `DomText(mode=DomTextMode.FULL)` for text. The enum values are
+  `"delta"` and `"full"`. Use `None` to omit text. Use
   `Screenshots(...)` for images, and `None` to omit images. Add
   `marks=SetOfMarks()` for labeled targets in either image mode. Images without
   text or marks use screenshot capture and browser-event readiness without DOM

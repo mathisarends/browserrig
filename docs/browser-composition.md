@@ -286,7 +286,7 @@ Capture, image retention and text compaction are independent:
 | `Screenshots(retention=TrimInBatches(max_images=6, min_images=3))` | On overflow, trim oldest images down to three |
 | `Screenshots(retention=UntilCompaction())` | Retain images until compaction removes their steps; requires compaction to bound history |
 
-Configure `BrowserPerception(text=DomText(mode="delta"), screenshots=Screenshots())`
+Configure `BrowserPerception(text=DomText(mode=DomTextMode.DELTA), screenshots=Screenshots())`
 for both modalities. Set either option to `None` to omit that modality.
 Perception itself registers no model tools: add `ScreenshotTools()` for screenshot
 requests and `PageSearchTools()` for page search.

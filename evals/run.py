@@ -27,6 +27,7 @@ from browserrig.observation import (
     BrowserPerception,
     DomCapture,
     DomText,
+    DomTextMode,
     PageText,
     Screenshots,
     ScreenshotTrigger,
@@ -276,7 +277,7 @@ def _perception(args, parser) -> tuple[BrowserPerception, bool]:
     mode = args.observation
     text = None
     if mode is None or mode.startswith("text"):
-        text = DomText(mode="delta" if mode is None else "full")
+        text = DomText(mode=DomTextMode.DELTA if mode is None else DomTextMode.FULL)
     capture = None
     marks = SetOfMarks() if mode is None or mode.endswith("-marks") else None
     if text is not None or marks is not None:

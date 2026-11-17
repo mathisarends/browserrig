@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Literal
 
 from browserrig.core import Options
 
@@ -20,10 +19,17 @@ class PageText(StrEnum):
     OFF = "off"
 
 
+class DomTextMode(StrEnum):
+    """Select how much DOM text to deliver at each step."""
+
+    DELTA = "delta"
+    FULL = "full"
+
+
 class DomText(Options):
     """Publish complete DOM observations or deltas against a retained observation."""
 
-    mode: Literal["delta", "full"] = "delta"
+    mode: DomTextMode = DomTextMode.DELTA
 
 
 @dataclass(frozen=True, slots=True)

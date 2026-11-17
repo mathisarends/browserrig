@@ -1,6 +1,13 @@
 from .capture import CaptureContent, CaptureStrategy, capture
 from .changes import decision_change
-from .config import DomText, PageText, Screenshots, ScreenshotTrigger, SetOfMarks
+from .config import (
+    DomText,
+    DomTextMode,
+    PageText,
+    Screenshots,
+    ScreenshotTrigger,
+    SetOfMarks,
+)
 from .content import ExtractedContent, extract_document
 from .dom_capture import DomCapture
 from .find import FindMark, FoundMatch, PageMatches, close_find, find_text
@@ -60,6 +67,7 @@ __all__ = [
     "CaptureStrategy",
     "DomCapture",
     "DomText",
+    "DomTextMode",
     "SetOfMarks",
     "PageText",
     "Screenshots",
