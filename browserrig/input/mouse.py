@@ -219,8 +219,8 @@ class Mouse:
     ) -> None:
         """Turn the wheel at `point`, or where the pointer already rests.
 
-        The distance is spread over one wheel event per frame along Chrome's own smooth
-        scroll curve, so the page scrolls like `scroll-behavior: smooth` but with real input.
+        Small native wheel events accelerate and decelerate gently. Slow browser
+        replies extend the gesture instead of causing larger catch-up jumps.
         """
         if delta_y == 0 and delta_x == 0:
             return
@@ -238,24 +238,14 @@ class Mouse:
                 duration_seconds=duration_seconds,
             ),
         )
-        clock = asyncio.get_running_loop()
-        started = clock.time()
+        steps = math.ceil(duration_seconds / FRAME_SECONDS)
+        interval = duration_seconds / steps
+        deadline = monotonic() + interval
         sent = 0.0
-        frame = 0
-        while sent < 1:
-            frame += 1
-            await asyncio.sleep(
-                max(0.0, started + frame * FRAME_SECONDS - clock.time())
-            )
-            # Follow the clock so slow dispatches do not stretch the scroll.
-            elapsed = max(clock.time() - started, frame * FRAME_SECONDS)
-            progress = (
-                wheel_progress(elapsed / duration_seconds)
-                if elapsed < duration_seconds
-                else 1.0
-            )
-            if progress <= sent:
-                continue
+        for frame in range(1, steps + 1):
+            await asyncio.sleep(max(0.0, deadline - monotonic()))
+            deadline = monotonic() + interval
+            progress = wheel_progress(frame / steps)
             await target.dispatch_wheel(
                 point,
                 delta_x=delta_x * (progress - sent),

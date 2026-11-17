@@ -564,15 +564,13 @@ async def test_input_without_a_focused_tab_is_rejected():
         await devices.keyboard.press_key("a")
 
 
-def test_wheel_timing_follows_chrome_smooth_scroll():
-    # Chrome's scrollBy({behavior: 'smooth'}) takes about sqrt(distance) frames at 60 Hz.
-    assert wheel_duration(600) == pytest.approx(0.408, abs=0.001)
-    assert wheel_duration(10) == 0.15 and wheel_duration(50_000) == 1.5
-    # Progress Chrome reached at 10/25/50/75% of a smooth scroll's duration.
+def test_wheel_timing_accelerates_and_decelerates_gently():
+    assert wheel_duration(600) == pytest.approx(0.544, abs=0.001)
+    assert wheel_duration(10) == 0.2 and wheel_duration(50_000) == 1.5
     assert wheel_progress(0) == 0 and wheel_progress(1) == 1
-    measured = {0.1: 0.03, 0.25: 0.40, 0.5: 0.85, 0.75: 0.97}
-    for fraction, progress in measured.items():
-        assert wheel_progress(fraction) == pytest.approx(progress, abs=0.02)
+    assert wheel_progress(0.1) < 0.01
+    assert wheel_progress(0.5) == 0.5
+    assert wheel_progress(0.9) > 0.99
 
 
 async def test_scroll_spreads_wheel_input_over_frames_along_the_curve(monkeypatch):
@@ -580,16 +578,37 @@ async def test_scroll_spreads_wheel_input_over_frames_along_the_curve(monkeypatc
     devices, _tab, events, commands = _rig()
     await devices.mouse.scroll(delta_y=600, delta_x=-60)
     wheels = [c for c in commands if c["type"] == "mouseWheel"]
-    assert len(wheels) == 25
+    assert len(wheels) == 33
     assert sum(c["delta_y"] for c in wheels) == pytest.approx(600)
     assert sum(c["delta_x"] for c in wheels) == pytest.approx(-60)
     steps = [c["delta_y"] for c in wheels]
     assert all(step > 0 for step in steps)
-    # The largest steps come early, and the scroll settles in small ones.
-    assert steps.index(max(steps)) < len(steps) // 3 and steps[-1] < 5
+    # Speed peaks in the middle, with no abrupt start or stop.
+    assert steps.index(max(steps)) == len(steps) // 2
+    assert steps[0] < 1 and steps[-1] < 1 and max(steps) < 35
     scrolled = [event for event in events if isinstance(event, ScrolledEvent)]
     assert [(e.delta_x, e.delta_y) for e in scrolled] == [(-60, 600)]
     assert scrolled[0].duration_seconds == wheel_duration(math.hypot(600, 60))
+
+
+@pytest.mark.parametrize("delta_x,delta_y", [(-60, 600), (60, -600), (600, 0)])
+async def test_slow_wheel_dispatch_preserves_small_steps(monkeypatch, delta_x, delta_y):
+    clock, _sleep = _clocked(monkeypatch)
+    times = []
+
+    async def slow(command):
+        if command["type"] == "mouseWheel":
+            times.append(clock.now)
+            clock.now += 0.08
+
+    devices, _tab, _events, commands = _rig(dispatch=slow)
+    await devices.mouse.scroll(delta_x=delta_x, delta_y=delta_y)
+    wheels = [c for c in commands if c["type"] == "mouseWheel"]
+    assert len(wheels) == 33
+    assert sum(c["delta_x"] for c in wheels) == pytest.approx(delta_x)
+    assert sum(c["delta_y"] for c in wheels) == pytest.approx(delta_y)
+    assert all(math.hypot(c["delta_x"], c["delta_y"]) < 35 for c in wheels)
+    assert all(b - a >= 0.08 - 1e-9 for a, b in zip(times, times[1:], strict=False))
 
 
 async def test_unwatched_input_reports_nothing_and_never_pauses(monkeypatch):
