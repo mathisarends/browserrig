@@ -431,7 +431,11 @@ async def test_image_without_ocr_extra_returns_metadata_and_install_hint(
 async def test_missing_file_extra_falls_back_to_raw_text_or_install_hint(
     files, monkeypatch
 ):
-    monkeypatch.delitem(sys.modules, "browserrig.files.spreadsheets")
+    for module_name in tuple(sys.modules):
+        if module_name == "browserrig.files.spreadsheets" or module_name.startswith(
+            "browserrig.files.spreadsheets."
+        ):
+            monkeypatch.delitem(sys.modules, module_name)
     monkeypatch.setitem(sys.modules, "xlrd", None)
     (files.workspace.directory / "table.csv").write_bytes(b"a,b\n1,2\n")
     table = await files.read_file("table.csv")

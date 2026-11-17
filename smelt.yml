@@ -49,6 +49,12 @@ structure:
     recording-values:
       match: browserrig.recording
       dataclass_options: [frozen, slots]
+    observation-render:
+      match: browserrig.observation.render
+      public: ['.']
+    spreadsheet-readers:
+      match: browserrig.files.spreadsheets
+      public: ['.']
     # Packages depend on each other only through their __init__ facade
     # (SMT107 error); focused test seams need reasoned import-level exceptions.
     # SMT108 hints when one file reaches into several modules of a package.
@@ -166,7 +172,7 @@ rules:
   constructor-logic: error
   cross-module-private-attribute: error
   comprehension-in-call-argument: error
-  excess-private-definitions: hint
+  excess-private-definitions: error
   # Reviewed non-adoptions and compatibility rationale: docs/smelt-policy.md.
   stateful-dataclass: off
   duplicate-narrowing-assert: off
