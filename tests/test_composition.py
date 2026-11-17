@@ -16,11 +16,9 @@ from browserrig import (
     Choreography,
     ChoreographyOverlay,
     Chrome,
-    DomPerception,
     Files,
     FileTools,
     FormTools,
-    ImageContext,
     InputPacing,
     JavaScriptTools,
     LocalWorkspace,
@@ -73,7 +71,9 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
         browser=browser,
         instructions="Custom instructions.",
         plugins=[
-            DomPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
+            BrowserPerception(
+                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
+            ),
             Readiness(options=readiness),
             approvals,
             files,
@@ -155,18 +155,18 @@ def test_facade_import_and_scripted_model_do_not_require_provider_sdks():
 
 
 def test_plugins_replace_matching_defaults_in_place():
-    observe = DomPerception(
-        screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
+    observe = BrowserPerception(
+        screenshots=Screenshots(
+            trigger=ScreenshotTrigger.EACH_STEP, skip_unchanged=False
+        )
     )
-    images = ImageContext(skip_unchanged=False)
     compaction = Compaction(trigger=WindowRatio(0.5))
     defaults = browser_plugins()
-    composed = browser_plugins(compaction, images, observe)
+    composed = browser_plugins(compaction, observe)
     assert len(composed) == len(defaults)
     assert composed[_index(defaults, TaskMemory)] is compaction
-    assert observe in composed and images in composed and compaction in composed
+    assert observe in composed and compaction in composed
     assert composed.index(observe) == _index(defaults, BrowserPerception)
-    assert composed.index(images) == _index(defaults, ImageContext)
 
 
 def test_plugins_without_a_matching_default_are_added_and_none_is_skipped():
@@ -178,10 +178,8 @@ def test_plugins_without_a_matching_default_are_added_and_none_is_skipped():
 
 
 def test_two_plugins_for_the_same_default_conflict():
-    with pytest.raises(PluginConflict, match="DomPerception"):
-        browser_plugins(DomPerception(), DomPerception())
-    with pytest.raises(PluginConflict, match="browserrig.images"):
-        browser_plugins(ImageContext(), ImageContext())
+    with pytest.raises(PluginConflict, match="BrowserPerception"):
+        browser_plugins(BrowserPerception(), BrowserPerception())
 
 
 @pytest.mark.parametrize("group", [WorkspaceTools, BrowserFileTools])

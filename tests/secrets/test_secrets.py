@@ -23,7 +23,6 @@ from PIL import Image
 from browserrig import (
     BrowserPerception,
     CaptureContent,
-    DomPerception,
     Input,
     Readiness,
     Secret,
@@ -513,7 +512,7 @@ async def test_observe_redacts_with_secrets_mounted_after_it():
         plugins=[
             FakeChrome(holder),
             Readiness(),
-            DomPerception(),
+            BrowserPerception(),
             Hold(),
             _secrets(),
         ],

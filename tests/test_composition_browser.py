@@ -39,7 +39,6 @@ from browserrig import (
     FileTools,
     HumanHandoff,
     HumanResponse,
-    ImageContext,
     Nudges,
     Readiness,
     ReadinessOptions,
@@ -47,7 +46,6 @@ from browserrig import (
     Screenshots,
     ScreenshotTools,
     ScreenshotTrigger,
-    TextContext,
     TrimInBatches,
     UntilCompaction,
     browser_plugins,
@@ -117,7 +115,7 @@ class PageRenderer:
     def __init__(self):
         self.text = "Page A"
 
-    def instructions(self, _screenshots):
+    def instructions(self):
         return ""
 
     def refs(self):
@@ -150,14 +148,13 @@ def _agent(
             BrowserPerception(
                 capture=capture,
                 renderer=renderer or CustomRenderer(),
-                screenshots=Screenshots(trigger=trigger),
+                screenshots=Screenshots(
+                    trigger=trigger,
+                    retention=retention or TrimInBatches(max_images=2, min_images=2),
+                    skip_unchanged=skip_unchanged,
+                ),
             ),
-            TextContext(),
             ScreenshotTools(),
-            ImageContext(
-                retention or TrimInBatches(max_images=2, min_images=2),
-                skip_unchanged=skip_unchanged,
-            ),
             Approvals(default=PolicyDecision.ALLOW),
             _Step(),
             *after,
@@ -287,7 +284,7 @@ def test_invalid_image_history_size(value):
 
 
 def test_image_history_trims_to_half_by_default_and_rejects_inverted_bounds():
-    assert ImageContext().retention == TrimInBatches(max_images=1, min_images=1)
+    assert Screenshots().retention == TrimInBatches(max_images=1, min_images=1)
     assert TrimInBatches(10).min_images == 5
     with pytest.raises(ValueError, match="must not exceed"):
         TrimInBatches(max_images=2, min_images=3)

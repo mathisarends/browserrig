@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, JsonValue
 
-from browserrig.observation import PageText
+from browserrig.observation import PageText, ScreenshotTrigger
 
 
 class AgentResponse(BaseModel):
@@ -94,6 +94,9 @@ class BenchmarkResult(BaseModel):
     page_text: PageText = PageText.INLINE
     headings: bool = True
     landmarks: bool = True
+    observation_mode: str | None = None
+    screenshot_trigger: ScreenshotTrigger | None = None
+    screenshot_tool: bool | None = None
     model: str
     # Snapshots written before subscription support used API keys.
     provider: Literal["openai", "openai-codex"] = "openai"
@@ -105,7 +108,21 @@ class BenchmarkResult(BaseModel):
     @property
     def observation(self) -> str:
         """The observation arm, such as `text=off, no headings`."""
-        parts = [f"text={self.page_text}"]
+        parts = []
+        if self.observation_mode is not None:
+            parts.append(self.observation_mode)
+        if self.screenshot_trigger is not None and (
+            self.observation_mode is not None
+            or self.screenshot_trigger != ScreenshotTrigger.ON_REQUEST
+            or self.screenshot_tool is False
+        ):
+            parts.append(f"screenshots={self.screenshot_trigger}")
+            parts.append(
+                "screenshot tool" if self.screenshot_tool else "no screenshot tool"
+            )
+        if self.observation_mode in ("screenshot", "screenshot-marks"):
+            return ", ".join(parts)
+        parts.append(f"text={self.page_text}")
         parts.extend(
             f"no {name}"
             for name, kept in (

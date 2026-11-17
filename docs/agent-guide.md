@@ -70,8 +70,9 @@ use a [`PrepareRequest` hook](browser-composition.md#co-locate-tools-instruction
 to add request-only messages.
 
 The default [task memory](task-memory.md) compacts at 80% of the model window,
-falling back to 100,000 tokens when the window is unknown. `ImageContext()` keeps
-the latest screenshot. Override these policies independently in `plugins`.
+falling back to 100,000 tokens when the window is unknown. The default
+`Screenshots` policy keeps the latest screenshot. Set image retention on
+`BrowserPerception`.
 
 ## Session controls
 

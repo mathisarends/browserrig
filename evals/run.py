@@ -8,9 +8,31 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
+from harnessed import Plugin
 
+from browserrig import (
+    Actions,
+    DomScrollTools,
+    DomTypingTools,
+    FormTools,
+    JavaScriptTools,
+    Nudges,
+    PageSearchTools,
+    ScreenshotTools,
+    WheelTools,
+    WorkspaceTools,
+)
 from browserrig.core import MODEL_PROFILES
-from browserrig.observation import DomCapture, DomPerception, PageText
+from browserrig.observation import (
+    BrowserPerception,
+    DomCapture,
+    DomText,
+    DomTextMode,
+    PageText,
+    Screenshots,
+    ScreenshotTrigger,
+    SetOfMarks,
+)
 
 from . import report
 from .environments import DEFAULT_CONFIG, DEFAULT_DATA, Environments
@@ -19,6 +41,14 @@ from .results import BenchmarkResult, write_run
 from .runner import RunOptions, run_task
 from .task import Task, load_tasks, select
 from .telemetry import DEFAULT_PROJECT, tracing_plugins
+
+_OBSERVATION_MODES = (
+    "text",
+    "screenshot",
+    "screenshot-marks",
+    "text-screenshot",
+    "text-screenshot-marks",
+)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -45,6 +75,22 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--headed", action="store_true")
     parser.add_argument("--humanlike", action="store_true")
+    parser.add_argument(
+        "--observation",
+        choices=_OBSERVATION_MODES,
+        help="Observation variant. If omitted, keep the historical text and on-request marks.",
+    )
+    parser.add_argument(
+        "--screenshot-trigger",
+        type=ScreenshotTrigger,
+        choices=tuple(ScreenshotTrigger),
+        help="Explicit image variants default to each_step.",
+    )
+    parser.add_argument(
+        "--screenshot-tool",
+        action=argparse.BooleanOptionalAction,
+        help="Expose the screenshot tool. Defaults to enabled for on_request.",
+    )
     parser.add_argument(
         "--page-text",
         type=PageText,
@@ -73,6 +119,7 @@ async def main() -> None:
     args = parser.parse_args()
     if args.parallel != 1:
         parser.error("WebArena shares mutable sites: --parallel must be 1")
+    perception, screenshot_tool = _perception(args, parser)
     try:
         manifest, frozen = load_tasks(SUBSETS[args.subset])
         tasks = select(frozen, args.tasks)
@@ -132,28 +179,32 @@ async def main() -> None:
                 page_text=args.page_text,
                 headings=args.headings,
                 landmarks=args.landmarks,
+                observation_mode=args.observation,
+                screenshot_trigger=perception.screenshots.trigger
+                if perception.screenshots
+                else None,
+                screenshot_tool=screenshot_tool,
                 tasks=[],
                 **(asdict(profile) if profile is not None else {}),
             )
             output = report.RESULTS / f"{run_name}.json"
             write_run(output, benchmark)
             async with tracing_plugins(args.trace, project) as plugins:
+                inputs = (
+                    ()
+                    if perception.text is not None
+                    else (Actions(), WheelTools(), WorkspaceTools())
+                )
                 options = RunOptions(
                     model,
                     args.headed,
                     args.humanlike,
-                    (
-                        *plugins,
-                        DomPerception(
-                            capture=DomCapture(
-                                text=args.page_text,
-                                headings=args.headings,
-                                landmarks=args.landmarks,
-                            )
-                        ),
-                    ),
+                    (*plugins, perception, *inputs),
                     args.max_steps,
                     args.timeout,
+                    without=_excluded_tools(
+                        perception, screenshot_tool=screenshot_tool
+                    ),
                 )
                 await run_tasks(
                     tasks,
@@ -220,6 +271,53 @@ async def run_tasks(
                 f"({record.seconds}s) {(record.error or '')[:100]}",
                 flush=True,
             )
+
+
+def _perception(args, parser) -> tuple[BrowserPerception, bool]:
+    mode = args.observation
+    text = None
+    if mode is None or mode.startswith("text"):
+        text = DomText(mode=DomTextMode.DELTA if mode is None else DomTextMode.FULL)
+    capture = None
+    marks = SetOfMarks() if mode is None or mode.endswith("-marks") else None
+    if text is not None or marks is not None:
+        capture = DomCapture(
+            text=args.page_text, headings=args.headings, landmarks=args.landmarks
+        )
+    if mode == "text":
+        if args.screenshot_trigger is not None or args.screenshot_tool:
+            parser.error("Screenshot options require an image observation variant")
+        return BrowserPerception(text=text, capture=capture), False
+    default = (
+        ScreenshotTrigger.ON_REQUEST if mode is None else ScreenshotTrigger.EACH_STEP
+    )
+    trigger = args.screenshot_trigger or default
+    enabled = args.screenshot_tool
+    if enabled is None:
+        enabled = trigger == ScreenshotTrigger.ON_REQUEST
+    if trigger == ScreenshotTrigger.ON_REQUEST and not enabled:
+        parser.error("on_request requires the screenshot tool")
+    screenshots = Screenshots(trigger=trigger, marks=marks, skip_unchanged=mode is None)
+    return BrowserPerception(
+        text=text, screenshots=screenshots, capture=capture
+    ), enabled
+
+
+def _excluded_tools(
+    perception: BrowserPerception, *, screenshot_tool: bool
+) -> tuple[type[Plugin], ...]:
+    screenshot = () if screenshot_tool else (ScreenshotTools,)
+    if perception.text is not None:
+        return screenshot
+    return (
+        *screenshot,
+        DomTypingTools,
+        DomScrollTools,
+        FormTools,
+        JavaScriptTools,
+        Nudges,
+        PageSearchTools,
+    )
 
 
 def _positive_int(value: str) -> int:

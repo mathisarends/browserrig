@@ -28,19 +28,6 @@ class ObservedText(NamedTuple):
 
 
 @dataclass
-class BrowserPerceptionState:
-    observation: CapturedObservation | None = None
-    delivered_image: CapturedImage | None = None
-    screenshot_requested: bool = False
-    screenshot_region: Region | None = None
-    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-    context: PluginScope | None = None
-    generation: int = 0
-    # Viewport size of each tab at its last step observation, to notice window resizes.
-    viewports: dict[TargetId, ViewportSize] = field(default_factory=dict)
-
-
-@dataclass
 class ImageState:
     images: list[CapturedImage] = field(default_factory=list)
     # The last latest-screenshot note handed to the session.
@@ -58,3 +45,18 @@ class TextState:
     # ones of that page may list changes to while a request still includes it.
     bases: dict[PageView, ObservedText] = field(default_factory=dict)
     included: frozenset[str] = frozenset()
+
+
+@dataclass
+class BrowserPerceptionState:
+    observation: CapturedObservation | None = None
+    delivered_image: CapturedImage | None = None
+    screenshot_requested: bool = False
+    screenshot_region: Region | None = None
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    context: PluginScope | None = None
+    generation: int = 0
+    text: TextState = field(default_factory=TextState)
+    images: ImageState = field(default_factory=ImageState)
+    # Viewport size of each tab at its last step observation, to notice window resizes.
+    viewports: dict[TargetId, ViewportSize] = field(default_factory=dict)

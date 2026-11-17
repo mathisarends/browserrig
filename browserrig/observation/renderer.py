@@ -7,8 +7,8 @@ from .render import render
 
 
 class Renderer(Protocol):
-    def instructions(self, screenshots: Screenshots) -> str:
-        """Explain the observation format for the configured screenshot policy."""
+    def instructions(self) -> str:
+        """Explain how to read the text projection."""
 
     def refs(self) -> str | None:
         """Describe how to use target refs, or None when refs are unavailable."""
@@ -22,9 +22,8 @@ class DomRenderer:
     # Describes the text a capture supplies; custom captures promise none by default.
     text: PageText = PageText.OFF
     landmarks: bool = True
-    marks: bool = True
 
-    def instructions(self, screenshots: Screenshots) -> str:
+    def instructions(self) -> str:
         # The observation labels its own sections (previews, overlays, canvases, deltas);
         # this only explains what the labels cannot.
         groups = (
@@ -44,8 +43,7 @@ class DomRenderer:
             "are raw page metadata, not interpreted ratings. "
             "Modal dialogs can block controls outside them. [COOKIE BANNER] detection is "
             "heuristic; choose whether to interact or navigate according to the task. "
-            "Canvas content has no "
-            "refs; screenshot it and point with click_at or drag_at. "
+            "Canvas content has no refs. "
         )
         if self.text == PageText.INLINE:
             text += (
@@ -64,16 +62,6 @@ class DomRenderer:
             text += (
                 "Links within prose use [label][ref]; pass that ref to element tools. "
             )
-        text += (
-            "Every observation includes a screenshot."
-            if screenshots.trigger == ScreenshotTrigger.EACH_STEP
-            else "Screenshots are included only when requested."
-        )
-        if self.marks:
-            text += (
-                " In screenshots, each element is outlined and labeled with its ref: "
-                "links blue, buttons green, text inputs purple."
-            )
         return text
 
     def refs(self) -> str:
@@ -85,3 +73,20 @@ class DomRenderer:
 
     def render(self, snapshot: Snapshot) -> str:
         return render(snapshot)
+
+
+def screenshot_instructions(screenshots: Screenshots | None) -> str:
+    if screenshots is None:
+        return ""
+    text = (
+        "Every observation includes a screenshot."
+        if screenshots.trigger == ScreenshotTrigger.EACH_STEP
+        else "Use the screenshot tool to request a fresh image."
+    )
+    text += " Use click_at or drag_at to interact with an area shown in the image."
+    if screenshots.marks is not None:
+        text += (
+            " In screenshots, each interactive element is outlined and labeled with its ref. "
+            "Pass a visible ref to element tools."
+        )
+    return text

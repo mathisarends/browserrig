@@ -28,6 +28,7 @@ from .search import PageSearchTools
 from .tabs import TabTools
 from .targeting import Targeting
 from .typing import DomTypingTools
+from .wheel import WheelTools
 from .workspace import WorkspaceTools
 
 __all__ = [
@@ -36,6 +37,7 @@ __all__ = [
     "DomUploadTools",
     "DomTypingTools",
     "DomScrollTools",
+    "WheelTools",
     "PageSearchTools",
     "ScreenshotTools",
     "PointerTools",
