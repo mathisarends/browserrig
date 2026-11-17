@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Breaking changes
+
+- Custom `Motor` implementations must provide
+  `wheel_steps(delta_x=..., delta_y=...)`, returning `WheelStep` values from
+  `browserrig.input` with native CSS-pixel deltas and `delay_before_seconds`.
+  The deltas must total the requested distance. Inherit from `Instant` or
+  `HumanMotor` to reuse a built-in wheel plan (#61).
+
+### Changes
+
+- Wheel scrolling follows the motor installed by `InputPacing`. `HumanMotor`
+  accelerates and decelerates gently; `scroll_speed=0.5` doubles the gesture's
+  duration and `scroll_speed=2` halves it. `Instant` sends one wheel event
+  without pauses. Slow browser replies extend smooth gestures instead of
+  causing larger catch-up jumps (#61).
+
 ## 0.6.0 (2026-11-16)
 
 Upgrade from 0.5.x using the [migration guide](docs/migration-0.6.md).
