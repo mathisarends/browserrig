@@ -15,7 +15,15 @@ from harnessed.events import (
 from harnessed.models import AssistantMessage, ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
-from browserrig import Activity, Browser, Chrome, InputRuntime, Runtime, VideoRecording
+from browserrig import (
+    Activity,
+    Browser,
+    Chrome,
+    InputRuntime,
+    Runtime,
+    VideoRecording,
+    wait_for_page,
+)
 from browserrig.recording import (  # smelt: ignore[SMT107] -- test seam
     # Test and replace video capture without requiring ffmpeg.
     capture as capture_module,
@@ -49,7 +57,7 @@ async def test_native_recording_cuts_waits_across_tabs_and_closure(
         browser = session.scope[Browser]
         recording = session.scope[VideoRecording]
         first = browser.active_tab
-        await evaluate(first, "document.body.style.background='lime'")
+        await _paint_background(first, "lime")
         await asyncio.sleep(0.5)
         await session.emit(
             CompactionStartedEvent("wait", before_tokens=1000)
@@ -60,9 +68,9 @@ async def test_native_recording_cuts_waits_across_tabs_and_closure(
                 request_id="wait",
             )
         )
-        await evaluate(first, "document.body.style.background='red'")
+        await _paint_background(first, "red")
         await asyncio.sleep(1.5)
-        await evaluate(first, "document.body.style.background='lime'")
+        await _paint_background(first, "lime")
         await session.emit(
             CompactionFinishedEvent(
                 "wait", CompactionOutcome.APPLIED, before_tokens=1000
@@ -72,7 +80,7 @@ async def test_native_recording_cuts_waits_across_tabs_and_closure(
         )
         await asyncio.sleep(0.5)
         second = await browser.tabs.open(site + "/other")
-        await evaluate(second, "document.body.style.background='blue'")
+        await _paint_background(second, "blue")
         await asyncio.sleep(0.5)
         await browser.tabs.close(second.id)
         assert browser.active_tab.id == first.id
@@ -150,10 +158,10 @@ async def test_recording_follows_repeated_activation_of_existing_tabs(tmp_path, 
         browser = session.scope[Browser]
         recording = session.scope[VideoRecording]
         first = browser.active_tab
-        await evaluate(first, "document.body.style.background='lime'")
+        await _paint_background(first, "lime")
         await asyncio.sleep(0.5)
         second = await browser.tabs.open(site + "/other")
-        await evaluate(second, "document.body.style.background='blue'")
+        await _paint_background(second, "blue")
         await asyncio.sleep(0.5)
         await browser.tabs.activate(first.id)
         await asyncio.sleep(0.5)
@@ -225,6 +233,19 @@ async def test_immediate_session_exit_still_produces_a_video(
         timeout=30,
     )
     assert int(probe.stdout) >= 1
+
+
+async def _paint_background(tab, color):
+    assert (await wait_for_page(tab)).status == "ready"
+    # A style assignment can precede the first document paint. Cross a frame
+    # boundary before starting the interval whose color the recording must show.
+    async with asyncio.timeout(5):
+        await evaluate(
+            tab,
+            f"document.body.style.background={json.dumps(color)};"
+            "new Promise(resolve => requestAnimationFrame(() => "
+            "requestAnimationFrame(() => resolve())))",
+        )
 
 
 async def _video_colors(path):
