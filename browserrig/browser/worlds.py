@@ -66,9 +66,26 @@ class Worlds:
         self._ids = {
             key: value
             for key, value in self._ids.items()
-            if not (
-                (session_id is None or key.session_id == session_id)
-                and (frame_id is None or key.frame_id == frame_id)
-                and (context_id is None or value == context_id)
+            if not _matches_world(
+                key,
+                value,
+                session_id=session_id,
+                frame_id=frame_id,
+                context_id=context_id,
             )
         }
+
+
+def _matches_world(
+    key: _WorldKey,
+    value: int,
+    *,
+    session_id: str | None,
+    frame_id: str | None,
+    context_id: int | None,
+) -> bool:
+    return (
+        (session_id is None or key.session_id == session_id)
+        and (frame_id is None or key.frame_id == frame_id)
+        and (context_id is None or value == context_id)
+    )

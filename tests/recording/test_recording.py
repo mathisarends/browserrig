@@ -11,7 +11,10 @@ from harnessed.models import ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
 from browserrig import Activity, Browser, RecordingResult, VideoRecording
-from browserrig.activity import plugin as activity_module
+from browserrig.activity import (  # smelt: ignore[SMT107] -- test seam
+    # Replace activity event construction at its owning module.
+    plugin as activity_module,
+)
 from browserrig.core import ActivityKind, ActivityOutcome, BrowserError
 from browserrig.events import (
     BROWSER_EVENTS,
@@ -22,11 +25,26 @@ from browserrig.events import (
     TabActivatedEvent,
     TabClosingEvent,
 )
-from browserrig.recording import capture as capture_module
-from browserrig.recording import plugin as recording_module
-from browserrig.recording.capture import Capture
-from browserrig.recording.models import Span
-from browserrig.recording.timeline import kept_spans
+from browserrig.recording import (  # smelt: ignore[SMT107] -- test seam
+    # Test and replace video capture without requiring ffmpeg.
+    capture as capture_module,
+)
+from browserrig.recording import (  # smelt: ignore[SMT107] -- test seam
+    # Control ffmpeg discovery at the recording activation boundary.
+    plugin as recording_module,
+)
+from browserrig.recording.capture import (  # smelt: ignore[SMT107] -- test seam
+    # Test and replace video capture without requiring ffmpeg.
+    Capture,
+)
+from browserrig.recording.models import (  # smelt: ignore[SMT107] -- test seam
+    # Test trimming spans without exposing the encoding model as API.
+    Span,
+)
+from browserrig.recording.timeline import (  # smelt: ignore[SMT107] -- test seam
+    # Test span trimming independently of video encoding.
+    kept_spans,
+)
 
 
 def test_cut_timeline_merges_waits_and_preserves_concurrent_work():

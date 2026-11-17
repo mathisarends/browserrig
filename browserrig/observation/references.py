@@ -66,7 +66,7 @@ class ScrollableElement(Protocol):
         """Plan one wheel input without scrolling; None means the target is visible."""
 
 
-class EmptyReferences:
+class EmptyReferences(References):
     """A backend that has not published targets grants no reference capabilities."""
 
     async def resolve(self, tab: Tab, snapshot: Snapshot, ref: str) -> ElementHandle:

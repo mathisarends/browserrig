@@ -1,12 +1,15 @@
-from browserrig.observation import (
+from browserrig import ElementInfo, ElementRef
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
     ContentGroup,
-    ElementInfo,
-    ElementRef,
     Snapshot,
     TextBlock,
     render,
 )
-from browserrig.observation.delta import unmarked
+from browserrig.observation.delta import (  # smelt: ignore[SMT107] -- test seam
+    # Verify model-facing deltas and ref markers independently of capture.
+    unmarked,
+)
 from tests.observations import parse
 
 

@@ -31,11 +31,16 @@ from harnessed.services import Summary
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import (
+    Actions,
+    BrowserFileTools,
     BrowserPerception,
+    CaptureContent,
     DomRenderer,
+    FileTools,
     HumanHandoff,
     HumanResponse,
     ImageContext,
+    Nudges,
     Readiness,
     ReadinessOptions,
     ReadinessStrategy,
@@ -47,6 +52,7 @@ from browserrig import (
     UntilCompaction,
     browser_plugins,
 )
+from browserrig import PageContent as Extraction
 from browserrig.browser import OpenDialog
 from browserrig.core import (
     Geometry,
@@ -58,11 +64,10 @@ from browserrig.core import (
 )
 from browserrig.events import ObservationCapturedEvent, ReadinessStartedEvent
 from browserrig.files import Download
-from browserrig.nudges import Nudges
-from browserrig.observation import CaptureContent
-from browserrig.observation.delta import INTRO
-from browserrig.observation.extraction import Extraction
-from browserrig.tools import Actions, BrowserFileTools, FileTools
+from browserrig.observation.delta import (  # smelt: ignore[SMT107] -- test seam
+    # Verify model-facing deltas and ref markers independently of capture.
+    INTRO,
+)
 from tests.fakes import FakeChrome
 from tests.observations import has_image, image_id
 

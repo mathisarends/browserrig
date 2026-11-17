@@ -50,7 +50,7 @@ from .events import (
 from .images import thumbnail
 from .projection import project
 from .stage import Stage
-from .status import StatusFact, StatusProjection
+from .status import ProjectStatus, StatusFact
 
 # How each intent is staged around its step.
 _SCENES: dict[type, Callable[[scenes.Scene, Any, scenes.Step], Awaitable[Any]]] = {
@@ -72,7 +72,7 @@ class _Staging:
     screenshot: WorkPresentedEvent | None = None
     running: dict[str, WorkPresentedEvent] = field(default_factory=dict)
     handled: set[str] = field(default_factory=set)
-    status: StatusProjection = field(default_factory=StatusProjection)
+    status: ProjectStatus = field(default_factory=ProjectStatus)
 
 
 class Choreography(Plugin, slot="browserrig.choreography", provides=True):
@@ -117,7 +117,7 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
             await self._input.mouse.publish_cursor()
 
     async def _status(self, event: StatusFact) -> None:
-        if presented := self._state.status.project(event):
+        if presented := self._state.status(event):
             await self._emit(presented)
 
     async def _browser_event(self, event: BrowserEvent) -> None:

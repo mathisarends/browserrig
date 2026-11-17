@@ -6,7 +6,10 @@ import pytest
 from cdpify import CDPCommandError
 
 from browserrig.browser import Frame
-from browserrig.browser.worlds import Worlds
+from browserrig.browser.worlds import (  # smelt: ignore[SMT107] -- test seam
+    # Test isolated-world lifecycle independently of Chrome transport.
+    Worlds,
+)
 from browserrig.scripts import RESET
 
 
@@ -46,6 +49,50 @@ async def test_other_cdp_failures_are_not_retried():
     with pytest.raises(CDPCommandError):
         await frame.run(RESET)
     assert cdp.runtime.call_function_on.await_count == 1
+
+
+@pytest.mark.parametrize(
+    "selectors, expired",
+    [
+        pytest.param({}, {"first", "second", "third"}, id="all"),
+        pytest.param({"session_id": "one"}, {"first", "second"}, id="session"),
+        pytest.param({"frame_id": "main"}, {"first", "third"}, id="frame"),
+        pytest.param({"context_id": 2}, {"second"}, id="context"),
+        pytest.param({"context_id": 0}, set(), id="unmatched-context"),
+        pytest.param(
+            {"session_id": "one", "frame_id": "main"}, {"first"}, id="session-frame"
+        ),
+        pytest.param(
+            {"session_id": "two", "context_id": 1}, set(), id="mismatched-session"
+        ),
+        pytest.param(
+            {"frame_id": "child", "context_id": 3}, set(), id="mismatched-frame"
+        ),
+    ],
+)
+async def test_world_invalidation_combines_all_provided_selectors(selectors, expired):
+    worlds = Worlds()
+    identifiers = iter(range(1, 10))
+    create = AsyncMock(
+        side_effect=lambda **_: SimpleNamespace(execution_context_id=next(identifiers))
+    )
+    one = SimpleNamespace(
+        session_id="one", page=SimpleNamespace(create_isolated_world=create)
+    )
+    two = SimpleNamespace(
+        session_id="two", page=SimpleNamespace(create_isolated_world=create)
+    )
+    targets = {"first": (one, "main"), "second": (one, "child"), "third": (two, "main")}
+    original = {
+        name: await worlds.context(cdp, frame, "document")
+        for name, (cdp, frame) in targets.items()
+    }
+    worlds.invalidate(**selectors)
+    current = {
+        name: await worlds.context(cdp, frame, "document")
+        for name, (cdp, frame) in targets.items()
+    }
+    assert {name for name in targets if current[name] != original[name]} == expired
 
 
 def _frame():

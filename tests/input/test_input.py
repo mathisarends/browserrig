@@ -14,7 +14,8 @@ from harnessed.plugins import Service
 from harnessed.testing import mount_plugin
 
 from browserrig.browser import Tab
-from browserrig.choreography import (
+from browserrig.choreography import (  # smelt: ignore[SMT107] -- test seam
+    # Test scene timelines without exposing staging internals as API.
     SCENE_EVENTS,
     AddressBarFocusedEvent,
     BarTypedEvent,
@@ -23,7 +24,10 @@ from browserrig.choreography import (
     TabPressedEvent,
     scenes,
 )
-from browserrig.choreography.scenes import Scene
+from browserrig.choreography.scenes import (  # smelt: ignore[SMT107] -- test seam
+    # Test scene timelines without exposing staging internals as API.
+    Scene,
+)
 from browserrig.core import ActionContext, BrowserError, Point
 from browserrig.events import (
     INPUT_EVENTS,
@@ -46,10 +50,16 @@ from browserrig.input import (
     KeyStroke,
     Unseen,
     WheelStep,
+    movement,
 )
-from browserrig.input import keyboard as keyboard_module
-from browserrig.input import mouse as mouse_module
-from browserrig.input.pointer import movement
+from browserrig.input import (  # smelt: ignore[SMT107] -- test seam
+    # Replace input timing where the keyboard reads it.
+    keyboard as keyboard_module,
+)
+from browserrig.input import (  # smelt: ignore[SMT107] -- test seam
+    # Replace input timing where the mouse reads it.
+    mouse as mouse_module,
+)
 from browserrig.kinds import BrowserBar, CursorStyle, TabGesture
 from browserrig.tools import Actions, KeyboardTools, NavigateIntent
 from tests.fakes import FakeServices

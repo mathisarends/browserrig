@@ -18,6 +18,9 @@ from browserrig import (
     BrowserDownload,
     Chrome,
     ChromeBrowser,
+    DomCapture,
+    DomPerception,
+    DomReferences,
     Files,
     FileSystem,
     FileTools,
@@ -33,7 +36,10 @@ from browserrig import (
 from browserrig.browser import DownloadState, Launch, screenshot
 from browserrig.core import BrowserError
 from browserrig.events import DownloadCompletedEvent, DownloadStartedEvent
-from browserrig.observation import DomCapture, DomPerception, DomReferences, capture
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
+    capture,
+)
 from tests.javascript import evaluate
 from tests.observations import all_states, has_image
 

@@ -33,16 +33,16 @@ class DomPerception(BrowserPerception, provides=BrowserPerception):
 
     async def setup(self, scope: PluginScope) -> None:
         await super().setup(scope)
-        scope.provide(DomElements, DomElements(self))
+        scope.provide(ResolveDomElement, ResolveDomElement(self))
 
 
-class DomElements:
+class ResolveDomElement:
     """Typed access to DOM handles from the current published reference set."""
 
     def __init__(self, perception: BrowserPerception) -> None:
         self._perception = perception
 
-    async def resolve(self, tab: Tab, ref: str) -> DomElementHandle:
+    async def __call__(self, tab: Tab, ref: str) -> DomElementHandle:
         handle = await self._perception.element(tab, ref)
         if not isinstance(handle, DomElementHandle):
             raise BrowserError(

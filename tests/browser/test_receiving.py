@@ -5,9 +5,14 @@ from harnessed import Agent
 from harnessed.plugins import Service
 from harnessed.testing import ScriptedModel
 
-from browserrig import DownloadReceiving
-from browserrig.browser import Browser
-from browserrig.files import FileSystem, FileTransfer, LocalWorkspace, MountedWorkspace
+from browserrig import (
+    Browser,
+    DownloadReceiving,
+    FileSystem,
+    FileTransfer,
+    LocalWorkspace,
+    MountedWorkspace,
+)
 
 
 @pytest.mark.parametrize("supported", [False, True])

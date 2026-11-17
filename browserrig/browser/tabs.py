@@ -257,12 +257,12 @@ class Tabs:
             )
             self._target_context = target.target_info.browser_context_id
             return
-        assert self._stack is not None
+        stack = self._exit_stack
         context = await self.client.target.create_browser_context(
             dispose_on_detach=True
         )
         self._context = context.browser_context_id
-        self._stack.push_async_callback(
+        stack.push_async_callback(
             self.client.target.dispose_browser_context, browser_context_id=self._context
         )
 
@@ -303,6 +303,7 @@ class Tabs:
         self, target_id: str, *, opened: bool = False, opener_id: str = ""
     ) -> Tab:
         async with self._attach_lock:
+            stack = self._exit_stack
             if target_id in self._tabs:
                 return self._tabs[target_id]
             if target_id in self._closed_targets:
@@ -343,8 +344,7 @@ class Tabs:
                 # A tab attached mid-session already shows a page worth reading.
                 await tab.report_change(settled=True)
                 if self._context is None:
-                    assert self._stack is not None
-                    self._stack.push_async_callback(self._detach, attached.session_id)
+                    stack.push_async_callback(self._detach, attached.session_id)
                 return tab
             except (Exception, asyncio.CancelledError):
                 await self._detach(attached.session_id)
@@ -365,6 +365,7 @@ class Tabs:
     async def _frame_session(self, frame_id: str) -> CdpSession:
         """Reuse owned OOPIF sessions; discard stale sessions when targets disappear."""
         async with self._attach_lock:
+            stack = self._exit_stack
             sid = next(
                 (sid for sid, tid in self._sessions.items() if tid == frame_id), None
             )
@@ -374,8 +375,7 @@ class Tabs:
                 )
                 sid = attached.session_id
                 self._sessions[sid] = frame_id
-                assert self._stack is not None
-                self._stack.push_async_callback(self._detach, sid)
+                stack.push_async_callback(self._detach, sid)
                 cdp = self.client.session(sid)
                 try:
                     await _enable_session(cdp, self._options, frame=True)
@@ -383,6 +383,12 @@ class Tabs:
                     await self._detach(sid)
                     raise
             return self.client.session(sid)
+
+    @property
+    def _exit_stack(self) -> AsyncExitStack:
+        if self._stack is None:
+            raise BrowserError("Tab sessions require a started browser connection")
+        return self._stack
 
     async def _detach(self, session_id: str) -> None:
         self._sessions.pop(session_id, None)

@@ -46,12 +46,7 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
         ffmpeg: str = "ffmpeg",
     ) -> None:
         super().__init__()
-        if width <= 0 or height <= 0 or width % 2 or height % 2:
-            raise ValueError("Video width and height must be positive even integers")
-        if not 1 <= frame_rate <= 60:
-            raise ValueError("Video frame_rate must be between 1 and 60")
-        if not math.isfinite(padding) or padding < 0:
-            raise ValueError("Video padding must be finite and nonnegative")
+        _validate_encoding(width, height, frame_rate, padding)
         self.directory = Path(directory)
         self.width = width
         self.height = height
@@ -139,11 +134,9 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
                 return
             if self._capture is not None and self._capture.tab.id == tab.id:
                 return
+            directory = self._output
             await self._stop_capture()
-            assert self.output_directory is not None
-            capture = Capture(
-                tab, self.output_directory / f"{len(self._segments):04d}.mp4"
-            )
+            capture = Capture(tab, directory / f"{len(self._segments):04d}.mp4")
             await capture.start(
                 width=self.width, height=self.height, frame_rate=self.frame_rate
             )
@@ -154,7 +147,7 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
             await self._stop_capture()
         if not self._segments:
             raise BrowserError("No video was recorded")
-        assert self.output_directory is not None
+        directory = self._output
         intervals = self._activity.intervals(now=self._segments[-1].ended_at)
         spans = tuple(
             kept_spans(
@@ -184,7 +177,7 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
         self.result = await edit_video(
             tuple(self._segments),
             spans,
-            directory=self.output_directory,
+            directory=directory,
             ffmpeg=self._binary,
             width=self.width,
             height=self.height,
@@ -192,8 +185,27 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
         )
         return self.result
 
+    @property
+    def _output(self) -> Path:
+        if self.output_directory is None:
+            raise BrowserError(
+                "Video recording requires an initialized output directory"
+            )
+        return self.output_directory
+
     async def _stop_capture(self) -> None:
         capture, self._capture = self._capture, None
         if capture is not None:
             segment = await capture.stop()
             self._segments.append(segment)
+
+
+def _validate_encoding(
+    width: int, height: int, frame_rate: int, padding: float
+) -> None:
+    if width <= 0 or height <= 0 or width % 2 or height % 2:
+        raise ValueError("Video width and height must be positive even integers")
+    if not 1 <= frame_rate <= 60:
+        raise ValueError("Video frame_rate must be between 1 and 60")
+    if not math.isfinite(padding) or padding < 0:
+        raise ValueError("Video padding must be finite and nonnegative")

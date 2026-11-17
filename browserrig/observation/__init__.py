@@ -25,7 +25,7 @@ from .models import (
     Snapshot,
     TextBlock,
 )
-from .perception import DomElements, DomPerception
+from .perception import DomPerception, ResolveDomElement
 from .plugin import BrowserPerception
 from .references import (
     ElementHandle,
@@ -43,7 +43,7 @@ from .text import TextContext
 
 __all__ = [
     "DomPerception",
-    "DomElements",
+    "ResolveDomElement",
     "TextContext",
     "ProjectObservation",
     "EmptyReferences",

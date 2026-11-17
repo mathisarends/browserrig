@@ -32,7 +32,7 @@ from browserrig.files import (
     FileTransfer,
     StagedFiles,
 )
-from browserrig.observation import DomElements
+from browserrig.observation import ResolveDomElement
 from browserrig.readiness import Readiness
 
 from .effects import Effect
@@ -160,7 +160,7 @@ class DomUploadTools(Plugin):
     _browser = needs(Browser)
     _file_transfer = observes(FileTransfer)
     _events = needs(BrowserEvents)
-    _elements = needs(DomElements)
+    _elements = needs(ResolveDomElement)
     _actions = needs(Actions)
     _targets = needs(Targeting)
     events = UPLOAD_EVENTS
@@ -183,7 +183,7 @@ class DomUploadTools(Plugin):
         ],
     ) -> Effect:
         tab = self._actions.tab
-        handle = await self._elements.resolve(tab, ref)
+        handle = await self._elements(tab, ref)
         if handle.element.input_type != "file":
             raise BrowserError("Target is not a file input")
         transfer = _require_transfer(self._file_transfer)
@@ -206,8 +206,9 @@ class DomUploadTools(Plugin):
                 point = None
 
         async def assign() -> None:
-            handle = await self._elements.resolve(tab, ref)
-            await handle.upload_files([str(path) for path in staged.browser_paths])
+            handle = await self._elements(tab, ref)
+            browser_paths = [str(path) for path in staged.browser_paths]
+            await handle.upload_files(browser_paths)
             await self._events.emit(
                 FilesUploadedEvent(
                     target_id=tab.id,

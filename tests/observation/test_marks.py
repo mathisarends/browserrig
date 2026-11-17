@@ -6,7 +6,10 @@ from PIL import Image
 
 from browserrig.core import Bounds, Point
 from browserrig.observation import Element
-from browserrig.observation.marks import annotate
+from browserrig.observation.marks import (  # smelt: ignore[SMT107] -- test seam
+    # Verify screenshot redaction and annotation independently of capture.
+    annotate,
+)
 
 
 @pytest.fixture(name="screenshot")

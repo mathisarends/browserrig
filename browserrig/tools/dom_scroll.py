@@ -8,7 +8,7 @@ from pydantic import Field
 from browserrig.browser import Tab
 from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
-from browserrig.observation import DomElementHandle, DomElements
+from browserrig.observation import DomElementHandle, ResolveDomElement
 from browserrig.scripts import TARGET_SCROLL, TargetScrollArgs, TargetScrollResult
 
 from .effects import Effect
@@ -29,7 +29,7 @@ class DomScrollTools(Plugin):
     """Target a DOM page or container independently of pointer position."""
 
     _actions = needs(Actions)
-    _elements = needs(DomElements)
+    _elements = needs(ResolveDomElement)
 
     @tool(
         kind=ActionKind.SCROLL_PAGE,
@@ -72,7 +72,7 @@ class DomScrollTools(Plugin):
         if delta_y == 0 and delta_x == 0:
             raise ToolError("Provide a non-zero delta_y or delta_x")
         tab = self._actions.tab
-        handle = await self._elements.resolve(tab, ref)
+        handle = await self._elements(tab, ref)
         result = await self._actions.stage(
             DomScrollIntent(ref),
             tab,

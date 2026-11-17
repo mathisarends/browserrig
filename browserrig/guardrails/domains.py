@@ -55,12 +55,7 @@ class AllowedDomains(
             )
         except (ValueError, UnicodeError):
             valid, host = False, ""
-        if valid and any(
-            host.endswith("." + pattern[2:])
-            if pattern.startswith("*.")
-            else host == pattern
-            for pattern in self.domains
-        ):
+        if valid and any(_matches_host(host, pattern) for pattern in self.domains):
             return
         raise DomainNotAllowed(url)
 
@@ -80,6 +75,12 @@ class AllowedDomains(
                 "JavaScript execution is unavailable while allowed domains are configured."
             )
         return await next_()
+
+
+def _matches_host(host: str, pattern: str) -> bool:
+    if pattern.startswith("*."):
+        return host.endswith("." + pattern[2:])
+    return host == pattern
 
 
 def _pattern(entry: str) -> str:

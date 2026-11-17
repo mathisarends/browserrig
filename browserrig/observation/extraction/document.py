@@ -92,10 +92,8 @@ class Document:  # pylint: disable=too-many-public-methods
         # Chrome encodes empty strings as index -1, which now lands on this sentinel.
         strings = [*strings, ""]
         self.frame_id = strings[document.frame_id]
-        self.url = (
-            strings[document.document_url] if document.document_url is not None else ""
-        )
-        self.title = strings[document.title] if document.title is not None else ""
+        self.url = _optional_string(strings, document.document_url)
+        self.title = _optional_string(strings, document.title)
         self.scroll = (document.scroll_offset_x or 0.0, document.scroll_offset_y or 0.0)
         self.content_height = document.content_height or 0.0
         self.backend_ids: list[int] = nodes.backend_node_id or []
@@ -128,6 +126,40 @@ class Document:  # pylint: disable=too-many-public-methods
 
     def is_element(self, index: int) -> bool:
         return self._types[index] == _ELEMENT
+
+    def scroll_info(self, index: int) -> ScrollInfo | None:
+        """Describe actual overflow; hidden/clip and the page root are not wheel targets."""
+        layout = self._layout.get(index)
+        if (
+            self.tag(index) in {"html", "body"}
+            or layout is None
+            or layout >= len(self._client_rects)
+            or layout >= len(self._scroll_rects)
+        ):
+            return None
+        _, _, width, height = self._client_rects[layout]
+        x, y, scroll_width, scroll_height = self._scroll_rects[layout]
+        vertical = self.style(index, Style.OVERFLOW_Y) in {"auto", "scroll", "overlay"}
+        horizontal = self.style(index, Style.OVERFLOW_X) in {
+            "auto",
+            "scroll",
+            "overlay",
+        }
+        if not (
+            vertical
+            and height > 0
+            and scroll_height > height + 1
+            or horizontal
+            and width > 0
+            and scroll_width > width + 1
+        ):
+            return None
+        return ScrollInfo(
+            up=max(0, y) if vertical else 0,
+            down=max(0, scroll_height - height - y) if vertical else 0,
+            left=max(0, x) if horizontal else 0,
+            right=max(0, scroll_width - width - x) if horizontal else 0,
+        )
 
     def tag(self, index: int) -> str:
         return self._tags[index]
@@ -307,40 +339,6 @@ class Document:  # pylint: disable=too-many-public-methods
         """Visible area of `overflow: auto|scroll` ancestors; content beyond needs scrolling."""
         return self._scroll_clip[index]
 
-    def scroll_info(self, index: int) -> ScrollInfo | None:
-        """Describe actual overflow; hidden/clip and the page root are not wheel targets."""
-        layout = self._layout.get(index)
-        if (
-            self.tag(index) in {"html", "body"}
-            or layout is None
-            or layout >= len(self._client_rects)
-            or layout >= len(self._scroll_rects)
-        ):
-            return None
-        _, _, width, height = self._client_rects[layout]
-        x, y, scroll_width, scroll_height = self._scroll_rects[layout]
-        vertical = self.style(index, Style.OVERFLOW_Y) in {"auto", "scroll", "overlay"}
-        horizontal = self.style(index, Style.OVERFLOW_X) in {
-            "auto",
-            "scroll",
-            "overlay",
-        }
-        if not (
-            vertical
-            and height > 0
-            and scroll_height > height + 1
-            or horizontal
-            and width > 0
-            and scroll_width > width + 1
-        ):
-            return None
-        return ScrollInfo(
-            up=max(0, y) if vertical else 0,
-            down=max(0, scroll_height - height - y) if vertical else 0,
-            left=max(0, x) if horizontal else 0,
-            right=max(0, scroll_width - width - x) if horizontal else 0,
-        )
-
     # Text
 
     def text(self, index: int, limit: int = 150) -> str:
@@ -518,6 +516,10 @@ class Document:  # pylint: disable=too-many-public-methods
             if parent >= 0 and end[index] > end[parent]:
                 end[parent] = end[index]
         return end
+
+
+def _optional_string(strings: list[str], index: int | None) -> str:
+    return strings[index] if index is not None else ""
 
 
 def _overflow(rect: Rect, overflow_x: str, overflow_y: str, *, hard: bool) -> Rect:

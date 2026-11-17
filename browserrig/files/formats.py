@@ -76,7 +76,16 @@ FORMATS = {
     ): FileFormat("media.read_media"),
 }
 
-READERS = {str(name): format_ for names, format_ in FORMATS.items() for name in names}
+
+def _readers(formats: dict[tuple[Ext, ...], FileFormat]) -> dict[str, FileFormat]:
+    readers = {}
+    for names, format_ in formats.items():
+        for name in names:
+            readers[str(name)] = format_
+    return readers
+
+
+READERS = _readers(FORMATS)
 
 
 def signature_format(sample: bytes) -> str | None:

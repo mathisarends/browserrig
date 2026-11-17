@@ -78,12 +78,10 @@ class TextContext(Plugin, slot="browserrig.text"):
     @hook(ObservationsIncludedEvent)
     async def _included(self, event: ObservationsIncludedEvent) -> None:
         state = self._state
-        refs = {
-            ref
-            for item in event.observations
-            if item.source == "browser"
-            for ref in item.refs
-        }
+        refs: set[str] = set()
+        for item in event.observations:
+            if item.source == "browser":
+                refs.update(item.refs)
         state.visible = state.sent_ref in refs
         state.included = frozenset(refs)
         state.bases = {
@@ -91,11 +89,12 @@ class TextContext(Plugin, slot="browserrig.text"):
         }
 
     def _page_key(self, snapshot: Snapshot) -> str:
-        elements = tuple(
-            element.model_copy(update={"new": False}) if element.new else element
-            for element in snapshot.elements
-        )
+        elements = []
+        for element in snapshot.elements:
+            if element.new:
+                element = element.model_copy(update={"new": False})
+            elements.append(element)
         text = self._observe.project(
-            snapshot.model_copy(update={"elements": elements})
+            snapshot.model_copy(update={"elements": tuple(elements)})
         ).text
         return hashlib.sha256(text.encode()).hexdigest()

@@ -26,13 +26,13 @@ from .work import clipped
 type StatusFact = BrowserEvent | DownloadProgressedEvent
 
 
-class StatusProjection:
+class ProjectStatus:
     """Remember what each running download is called, so every receipt names it."""
 
     def __init__(self) -> None:
         self._filenames: dict[str, str] = {}
 
-    def project(self, event: StatusFact) -> PresentedEvent | None:
+    def __call__(self, event: StatusFact) -> PresentedEvent | None:
         """Return the receipt for a status fact, or None for any other event."""
         presented = self._project(event)
         return (

@@ -17,15 +17,15 @@ from browserrig import (
     BrowserPerception,
     Chrome,
     DomCapture,
+    DomPerception,
     Done,
     Files,
     FileTools,
+    FormTools,
     LocalWorkspace,
     browser_pack,
     browser_plugins,
 )
-from browserrig.observation import DomPerception
-from browserrig.tools import FormTools
 from tests.fakes import FakeChrome
 
 

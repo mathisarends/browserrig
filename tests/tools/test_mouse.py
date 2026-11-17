@@ -11,9 +11,9 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
+from browserrig import Actions, DomScrollTools, PointerTools, TabTools, Targeting
 from browserrig.core import BrowserError, ElementPoint
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent, ActionStartedEvent
-from browserrig.tools import Actions, DomScrollTools, PointerTools, TabTools, Targeting
 from tests.fakes import FakeServices
 
 

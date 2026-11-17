@@ -96,14 +96,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
 
     def __init__(self, secrets: Mapping[str, Secret]) -> None:
         super().__init__()
-        for name, secret in secrets.items():
-            if not isinstance(name, str) or not NAME.fullmatch(name):
-                raise ValueError(
-                    f"Secret name {name!r} may only use letters, digits, _ . and -"
-                )
-            if not isinstance(secret, Secret):
-                raise TypeError(f"Secret {name} must be a Secret")
-        self._secrets = dict(secrets)
+        self._secrets = _secret_definitions(secrets)
 
     def __repr__(self) -> str:
         return f"Secrets({', '.join(self._secrets)})"
@@ -186,11 +179,14 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
                 shown = denied if denied != "null" else "an opaque origin"
                 raise SecretError(f"Secret {name} is not allowed on {shown}")
         values = {name: await self._value(name) for name in names}
-        parts = tuple(
-            (values[segment], True) if index % 2 else (segment, False)
-            for index, segment in enumerate(segments)
-            if segment
-        )
+        parts: list[tuple[str, bool]] = []
+        for index, segment in enumerate(segments):
+            if not segment:
+                continue
+            if index % 2:
+                parts.append((values[segment], True))
+            else:
+                parts.append((segment, False))
         if field is not None:
             marked = await field.run(SECRET_FIELD, SecretFieldArgs(mask=True))
             if marked.origin != origins[0]:
@@ -205,7 +201,9 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
                     "Focus changed while preparing the secret; observe first"
                 )
             guard = _focus_guard(browser, tab.id, main, origins)
-        return SecretEntry(names, origins[0], tab.id, tab.document_id, parts, guard)
+        return SecretEntry(
+            names, origins[0], tab.id, tab.document_id, tuple(parts), guard
+        )
 
     async def enter(self, entry: SecretEntry, keyboard: Keyboard) -> bool:
         """Type prepared text; focus is re-checked before each secret character.
@@ -392,12 +390,26 @@ def _redact_message(redactor: Redactor, message: Any) -> Any:
     return message if redacted is content else replace(message, content=redacted)
 
 
+def _secret_definitions(secrets: Mapping[str, Secret]) -> dict[str, Secret]:
+    """Validate names and value sources, then snapshot the caller's mapping."""
+    for name, secret in secrets.items():
+        if not isinstance(name, str) or not NAME.fullmatch(name):
+            raise ValueError(
+                f"Secret name {name!r} may only use letters, digits, _ . and -"
+            )
+        if not isinstance(secret, Secret):
+            raise TypeError(f"Secret {name} must be a Secret")
+    return dict(secrets)
+
+
 def _redact_content(redactor: Redactor, content: Any) -> Any:
     if isinstance(content, str):
         redacted = redactor.text(content)
         return content if redacted == content else redacted
-    parts = tuple(
-        TextPart(redactor.text(part.text)) if isinstance(part, TextPart) else part
-        for part in content
-    )
-    return content if parts == tuple(content) else parts
+    parts = []
+    for part in content:
+        if isinstance(part, TextPart):
+            part = TextPart(redactor.text(part.text))
+        parts.append(part)
+    redacted = tuple(parts)
+    return content if redacted == tuple(content) else redacted

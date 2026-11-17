@@ -91,16 +91,20 @@ class Chrome(Plugin, slot="browserrig.browser"):
         downloads while the host keeps their policy and files. This call validates
         configuration without connecting.
         """
+        secret_endpoint = SecretStr(endpoint) if isinstance(endpoint, str) else endpoint
+        secret_headers: dict[str, SecretStr] = {}
+        if headers is not None:
+            for key, value in headers.items():
+                secret_headers[key] = (
+                    SecretStr(value) if isinstance(value, str) else value
+                )
         return cls(
             Connect(
-                endpoint=SecretStr(endpoint) if isinstance(endpoint, str) else endpoint,
+                endpoint=secret_endpoint,
                 target_id=target_id,
                 url=url,
                 timeout_seconds=timeout_seconds,
-                headers={
-                    key: SecretStr(value) if isinstance(value, str) else value
-                    for key, value in (headers.items() if headers is not None else ())
-                },
+                headers=secret_headers,
                 viewport=viewport,
                 session_setup=session_setup,
                 bridge=bridge,

@@ -13,13 +13,19 @@ from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
-from browserrig import Browser, Chrome, ChromeBrowser, Input, browser_plugins
+from browserrig import (
+    Browser,
+    Chrome,
+    ChromeBrowser,
+    Input,
+    Point,
+    browser_plugins,
+    wait_for_page,
+)
 from browserrig.browser import Launch
 from browserrig.choreography import Stage
-from browserrig.core import Point
 from browserrig.events import CursorStateEvent
 from browserrig.input import HumanMotor
-from browserrig.readiness import wait_for_page
 from tests.observations import latest
 
 pytestmark = pytest.mark.integration

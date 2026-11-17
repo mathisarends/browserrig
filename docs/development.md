@@ -55,8 +55,8 @@ and source policies; accepted findings live in `.smelt/debt.json`.
 `uv run --locked smelt debt --show` inspects them; `debt --prune` removes resolved
 entries without accepting new debt. When upgrading Smelt, refresh its checked-in
 schema and the skill under `.agents/skills/smelt`.
-The [Smelt policy decisions](smelt-policy.md) explain the rules adopted with
-0.10.0 and the intentionally omitted checks.
+The [Smelt policy decisions](smelt-policy.md) explain the rules reviewed through
+0.12.0, the advisory findings and the narrowly scoped test-import exceptions.
 
 ## Distribution and releases
 

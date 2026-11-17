@@ -4,7 +4,11 @@ import json
 
 import pytest
 from harnessed import Plugin, PolicyDecision, ToolCall
-from harnessed.events import ModelRequestedEvent, ToolExecutionFinishedEvent
+from harnessed.events import (
+    ModelRequestedEvent,
+    ToolExecutionFinishedEvent,
+    TurnStartedEvent,
+)
 from harnessed.kernel import needs
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
@@ -101,30 +105,38 @@ async def test_turn_start_publishes_initial_cursor_before_any_model_or_input_act
         assert 0.35 * width <= position.x <= 0.65 * width
         assert 0.35 * height <= position.y <= 0.65 * height
         first = await session.run("Inspect without moving")
+        # A tab may finish loading between turns and legitimately refresh its cursor.
+        await tab.report_change(settled=True)
         second = await session.run("Continue without moving")
         assert session.scope[Input].mouse.position == position
         events = (*first.events, *second.events)
         assert not any(isinstance(event, InputEvent) for event in events)
     await asyncio.wait_for(consumer, 30)
     states = [event for event in streamed if isinstance(event, CursorStateEvent)]
-    assert len(states) == 2
+    assert len(states) >= 3
     assert all((event.x, event.y) == (position.x, position.y) for event in states)
     assert all(
         event.browser_id and event.target_id == tab.id and not event.action_id
         for event in states
     )
     assert not any(isinstance(event, CursorMovedEvent) for event in streamed)
-    first_cursor = next(
+    turn_starts = [
         index
         for index, event in enumerate(streamed)
-        if isinstance(event, CursorStateEvent)
-    )
-    first_model = next(
+        if isinstance(event, TurnStartedEvent)
+    ]
+    model_requests = [
         index
         for index, event in enumerate(streamed)
         if isinstance(event, ModelRequestedEvent)
-    )
-    assert first_cursor < first_model
+    ]
+    assert len(turn_starts) == len(model_requests) == 2
+    for turn_start, model_request in zip(turn_starts, model_requests, strict=True):
+        assert turn_start < model_request
+        assert any(
+            isinstance(event, CursorStateEvent)
+            for event in streamed[turn_start + 1 : model_request]
+        )
     records = [json.loads(line) for line in output.getvalue().splitlines()]
     cursor = next(
         record for record in records if record["type"] == "browser.cursor.state"

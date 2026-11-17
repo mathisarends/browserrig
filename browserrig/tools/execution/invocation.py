@@ -12,7 +12,7 @@ from .policy import ACTION_KINDS, EXPECTED_CHANGES, NAVIGATION_KINDS, TAB_KINDS
 from .transaction import ActionRunner
 
 
-class ToolExecution:
+class InvokeTool:
     """Adapt raw tool returns to an action while preserving passive and rich results."""
 
     def __init__(self, runner: ActionRunner, coordination: BrowserCoordination) -> None:
@@ -20,7 +20,7 @@ class ToolExecution:
         self._coordination = coordination
         self.context = InvocationContext()
 
-    async def run(self, event: BrowserToolCall, next_: Next[object]) -> object:
+    async def __call__(self, event: BrowserToolCall, next_: Next[object]) -> object:
         kind = event.metadata.kind
         if kind not in ACTION_KINDS:
             if kind == ActionKind.WAIT:

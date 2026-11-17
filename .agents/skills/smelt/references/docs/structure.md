@@ -1,5 +1,58 @@
 # Package contracts and source conventions
 
+Opt-in [SMT366 `comprehension-in-call-argument`](rules/SMT366.md) reviews list,
+set and dict comprehensions passed directly as call arguments. Enable
+`rules: {comprehension-in-call-argument: hint}` to ask for named intermediate
+collections before construction or consumption. Unlike SMT363, this includes
+simple mappings: the concern is separating calculation from the consuming call.
+Generator expressions, starred arguments and conditionally or repeatedly evaluated
+expression contexts are excluded. No automatic rewrite is performed; preserve
+callable lookup and argument evaluation order when extracting a variable.
+
+Opt-in [SMT365 `cross-module-private-attribute`](rules/SMT365.md) complements
+Ruff SLF001 with statically resolved ownership. Enable
+`rules: {cross-module-private-attribute: warning}`. Known reads, writes, calls,
+updates and deletes of private members owned by another module are reported;
+same-module cooperation, direct own/inherited receiver accesses and dunders are
+allowed. Tests remain the responsibility of SMT420. Unresolved receivers are skipped.
+`structure.private_attribute_boundary` defaults to `module`; `package` permits
+cooperation within the same immediate Python package, including its initializer.
+Subpackages remain separate boundaries. Package contracts can override the setting,
+which is visible in `smelt context`; the option alone does not enable the rule.
+No automatic rewrite is performed. Review the documented inference limits before
+depending on the review as an error gate.
+
+Opt-in `complex-comprehension` (SMT363) reviews list, set, dict and generator
+comprehensions with multiple iteration or decision steps. Enable
+`rules: {complex-comprehension: hint}`. The global
+`structure.max_comprehension_loops` defaults to 1; override it globally or in a
+package contract to permit intentional flattening. Threshold options alone do not
+enable this review. Simple filters and conditional elements with names, attributes
+or constants on both branches remain valid. See [SMT363](rules/SMT363.md) for the
+exact triggers and repairs that preserve generator laziness.
+
+Opt-in `constructor-logic` (SMT364) reviews decision nodes in `__init__` and
+`__post_init__`. Enable `rules: {constructor-logic: hint}`; the global
+`structure.max_constructor_decisions` defaults to 2 and can be overridden in a
+package contract. Zero forbids counted decisions. Options alone do not activate
+the review. A single fallback or guard remains valid at the default threshold;
+nested helper bodies are excluded. See [SMT364](rules/SMT364.md) for the exact
+counting rules and repairs that preserve initialization behavior.
+
+Opt-in [SMT367 `excess-private-definitions`](rules/SMT367.md) reviews modules with
+many private supporting definitions. Enable `rules: {excess-private-definitions: hint}`.
+`structure.max_private_definitions` defaults to 12 and supports closest-package
+overrides, including zero; threshold options alone do not enable the rule.
+Private classes, sync/async functions and PEP 695 type aliases directly in the
+module body count once per kind and name. Private uppercase assignments with values
+are listed separately and never contribute to the limit. Imports, methods,
+nested/local and guarded definitions, dunders and ordinary assignment-style type
+aliases are excluded. A few models beside their consumer remain valid; even a
+larger cohesive model tree or parser can be intentional. Review the listed
+definitions for cohesive groups, carrying constants and validators with them and
+preserving import direction and visibility. No groups or safe moves are inferred;
+there is no automatic rewrite or required `models.py` filename.
+
 Choose canonical configuration filenames once per project:
 
 ```yaml
@@ -339,6 +392,30 @@ under these package contracts.
 
 ## Suggestions to bundle implementation imports
 
+For total coupling across all project packages, configure
+[SMT110 `module-import-fanout`](rules/SMT110.md):
+
+```yaml
+structure:
+  max_module_imports: 20
+  module_import_exempt: [facades, composition_root]  # default; [] checks both
+  contracts:
+    core:
+      match: app.core
+      max_module_imports: 12
+```
+
+Setting a threshold activates this hint. The closest package threshold overrides
+the global limit; without a threshold, even explicit selection checks nothing.
+Counts include direct internal imports across every root package, follow
+`architecture.imports.type_checking`, and retain facade paths without following
+re-exports to definitions. Repeated imports count once. Standard-library and
+third-party imports never count. Package initializers and declared composition
+roots are exempt unless `module_import_exempt` removes that exemption globally
+or in a package contract. `[]` disables both exemptions. This design review has no
+automatic rewrite: split cohesive responsibilities or review deliberate facades
+and their import cycles.
+
 Several imports from the same package can suggest a missing public facade:
 
 ```python
@@ -376,13 +453,23 @@ by default; it does not fail the usual error gate. Choose `public: ['.']` instea
 to require facade-only imports regardless of their count. No facade or import is
 rewritten automatically.
 
+These package API checks also cover discovered tests and `conftest.py` under
+`project.test_roots`, for example `backend/tests`. Tests are outside callers even
+when their configured test root is inside the contracted package. Thus
+`public: ['.']` rejects deep test imports with [SMT107](rules/SMT107.md), and
+`bundle_imports_at` reviews per-test-file fanout with [SMT108](rules/SMT108.md).
+Production implementation imports inside the package remain allowed.
+`tests.quality_exclude` only affects test-quality reviews; use ordinary reasoned
+suppressions for deliberate API exceptions. Project exclusions still apply.
+
 When the exports already exist, enable `rules: {prefer-package-import: hint}`
 or `--select SMT319`. For example, if `app.observation.__init__` directly exports
 `Observe` and `Snapshot`, it suggests replacing
 `from app.observation.models import Snapshot` with a package import that can join
 `from app.observation import Observe, Snapshot`. Every imported name must have a
 direct, unconditional public re-export; aliases and relative imports are preserved
-in suggestions. Internal imports, package initializers, uncertain exports and
+in suggestions. Tests use the same existing-export suggestions. Internal production
+imports, package initializers, uncertain exports and
 unscanned third-party packages are excluded. See [SMT319](rules/SMT319.md).
 
 To find names that are widely imported but missing from a facade, configure

@@ -79,22 +79,12 @@ class HumanHandoff(Plugin, provides=True):
         history_limit: int = 5,
     ) -> None:
         super().__init__()
-        if not callable(ask):
-            raise TypeError("ask must be an async handoff callback")
-        if (
-            isinstance(timeout_seconds, bool)
-            or not math.isfinite(timeout_seconds)
-            or timeout_seconds <= 0
-        ):
-            raise ValueError("timeout_seconds must be finite and positive")
-        if not isinstance(track_pauses, bool):
-            raise TypeError("track_pauses must be a bool")
-        if (
-            isinstance(history_limit, bool)
-            or not isinstance(history_limit, int)
-            or not 1 <= history_limit <= 20
-        ):
-            raise ValueError("history_limit must be between 1 and 20")
+        _validate_options(
+            ask=ask,
+            timeout_seconds=timeout_seconds,
+            track_pauses=track_pauses,
+            history_limit=history_limit,
+        )
         self.ask = ask
         self.timeout_seconds = timeout_seconds
         self.track_pauses = track_pauses
@@ -347,3 +337,29 @@ class HumanHandoff(Plugin, provides=True):
         if transfer is not None:
             key = str(event.type).removeprefix("browser.")
             transfer.events[key] = transfer.events.get(key, 0) + 1
+
+
+def _validate_options(
+    *,
+    ask: HandoffCallback,
+    timeout_seconds: float,
+    track_pauses: bool,
+    history_limit: int,
+) -> None:
+    """Reject invalid handoff configuration before assigning the plugin state."""
+    if not callable(ask):
+        raise TypeError("ask must be an async handoff callback")
+    if (
+        isinstance(timeout_seconds, bool)
+        or not math.isfinite(timeout_seconds)
+        or timeout_seconds <= 0
+    ):
+        raise ValueError("timeout_seconds must be finite and positive")
+    if not isinstance(track_pauses, bool):
+        raise TypeError("track_pauses must be a bool")
+    if (
+        isinstance(history_limit, bool)
+        or not isinstance(history_limit, int)
+        or not 1 <= history_limit <= 20
+    ):
+        raise ValueError("history_limit must be between 1 and 20")

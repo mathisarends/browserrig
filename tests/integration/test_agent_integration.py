@@ -14,6 +14,7 @@ from harnessed.testing import CallbackModel, ScriptedModel, call
 from browserrig import (
     Browser,
     Chrome,
+    DomPerception,
     ImageContext,
     InputRuntime,
     Readiness,
@@ -30,7 +31,6 @@ from browserrig.events import (
     NudgeQueuedEvent,
     ObservationCapturedEvent,
 )
-from browserrig.observation import DomPerception
 from tests.observations import all_states, has_image, latest
 
 pytestmark = pytest.mark.integration

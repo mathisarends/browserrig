@@ -104,10 +104,7 @@ class HumanMotor:
         typing_interval_seconds: float = TYPING_INTERVAL_SECONDS,
         scroll_speed: float = 1,
     ) -> None:
-        if typing_interval_seconds < 0:
-            raise ValueError("typing_interval_seconds must not be negative")
-        if not math.isfinite(scroll_speed) or scroll_speed <= 0:
-            raise ValueError("scroll_speed must be finite and positive")
+        _validate_pacing(typing_interval_seconds, scroll_speed)
         self._typing_interval_seconds = typing_interval_seconds
         self._scroll_speed = scroll_speed
 
@@ -132,3 +129,10 @@ class HumanMotor:
 
     def landing(self, viewport_width: float, viewport_height: float) -> Point:
         return Point(x=viewport_width / 2, y=viewport_height / 2)
+
+
+def _validate_pacing(typing_interval_seconds: float, scroll_speed: float) -> None:
+    if typing_interval_seconds < 0:
+        raise ValueError("typing_interval_seconds must not be negative")
+    if not math.isfinite(scroll_speed) or scroll_speed <= 0:
+        raise ValueError("scroll_speed must be finite and positive")

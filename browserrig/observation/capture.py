@@ -340,10 +340,12 @@ def _mark_new(
     seen = {control.ref for control in (*previous.elements, *previous.offscreen)}
     if not seen:
         return elements
-    return tuple(
-        element if element.ref in seen else element.model_copy(update={"new": True})
-        for element in elements
-    )
+    marked = []
+    for element in elements:
+        if element.ref not in seen:
+            element = element.model_copy(update={"new": True})
+        marked.append(element)
+    return tuple(marked)
 
 
 def _fingerprint(page: PageContent, document_id: str) -> str:

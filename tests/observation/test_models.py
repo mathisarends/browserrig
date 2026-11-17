@@ -1,23 +1,23 @@
 import pytest
 from pydantic import ValidationError
 
+from browserrig import DomCapture, DomPerception, PageText
 from browserrig.browser import Connect, Launch
 from browserrig.core import Bounds, Geometry, Point, Region, StaleElement
-from browserrig.observation import (
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
     Canvas,
     CookieBanner,
-    DomCapture,
-    DomPerception,
     Element,
     Heading,
     Modal,
     Offscreen,
     Option,
-    PageText,
     Snapshot,
     render,
 )
-from browserrig.observation.models import (
+from browserrig.observation.models import (  # smelt: ignore[SMT107] -- test seam
+    # Test internal change fingerprints without exposing them as API.
     ElementFingerprint,
     PageFingerprint,
 )

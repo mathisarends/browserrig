@@ -22,6 +22,8 @@ ignore:
 
 structure:
   file_naming: {yaml_extension: yml, compose_basename: compose}
+  # A ninth project dependency merits review; facades and composition roots are exempt.
+  max_module_imports: 8
   contracts:
     conventions:
       match: browserrig
@@ -47,8 +49,14 @@ structure:
     recording-values:
       match: browserrig.recording
       dataclass_options: [frozen, slots]
+    observation-render:
+      match: browserrig.observation.render
+      public: ['.']
+    spreadsheet-readers:
+      match: browserrig.files.spreadsheets
+      public: ['.']
     # Packages depend on each other only through their __init__ facade
-    # (SMT107 error); tests may still import implementation modules.
+    # (SMT107 error); focused test seams need reasoned import-level exceptions.
     # SMT108 hints when one file reaches into several modules of a package.
     package-facades:
       match: browserrig.*
@@ -115,67 +123,75 @@ tests:
     - "tests/project/**"      # repository-wide checks: architecture, release, telemetry
   max_patches_per_test: 3
 
-# error: deterministic patterns without false positives in this codebase.
-# warning: heuristics that need a look in context.
+# Enforce adopted conventions; narrow exceptions require concrete ownership evidence.
 rules:
-  information-hiding: warning
-  prefer-callable-instance: hint
+  information-hiding: error
+  missing-dataclass-option: error
+  prefer-project-base-class: error
+  unused-suppression: error
+  resolved-debt: error
+  # Review heuristics remain hints only where the complete candidate audit warrants it.
+  package-import-fanout: hint
+  module-import-fanout: hint
+  prefer-callable-instance: error
   private-class-constant: error
-  redundant-module-name: hint
+  redundant-module-name: error
   # Source conventions
   import-cycle: error
   public-definitions-first: error
   bundled-instance-assignment: error
   redundant-str-enum-value: error
-  prefer-str-enum-discriminator: hint
-  implicit-optional-default: warning
+  prefer-str-enum-discriminator: error
+  implicit-optional-default: error
   no-base-class-prefix: error
   no-base-class-suffix: error
-  secret-settings-field: warning
+  secret-settings-field: error
   package-only-dunder-all: error
-  caller-before-callee: hint
+  caller-before-callee: error
   prefer-package-import: error
   internal-public-member: error
   internal-static-helper: error
-  unnecessary-future-annotations: warning
-  prefer-match-type-dispatch: warning
+  unnecessary-future-annotations: error
+  prefer-match-type-dispatch: error
   private-symbol-import: error
   redundant-name-alias: error
   prefer-deferred-annotations: error
-  duplicate-literal-type: warning
+  duplicate-literal-type: error
   await-in-call-argument: error
   redundant-private-delegate: error
   deprecated-async-contextmanager-return: error
   str-enum-explicit-values: error
   excess-positional-parameters: error
   anonymous-tuple-type: error
-  missing-interface-docstring: warning
-  missing-broad-except-reason: warning
-  duplicate-function: warning
-  duplicate-class-name: warning
-  prefer-named-duration: warning
-  missing-duration-unit: warning
-  mutable-field-in-frozen-dataclass: warning
-  nested-conditional-expression: warning
-  # Design/performance candidates need an ownership and evaluation-order review.
-  parallel-record-fields: hint
-  loop-invariant-collection: hint
-  # Reviewed non-adoptions and compatibility rationale: docs/smelt-policy.md.
-  stateful-dataclass: off
-  duplicate-narrowing-assert: off
-  # Many chains walk the CDP SDK namespaces or plugin state, which are shaped upstream.
+  missing-interface-docstring: error
+  missing-broad-except-reason: error
+  duplicate-function: error
+  duplicate-class-name: error
+  prefer-named-duration: error
+  missing-duration-unit: error
+  mutable-field-in-frozen-dataclass: error
+  nested-conditional-expression: error
+  # Record pairing and repeated lookup construction are enforced at their reported sites.
+  parallel-record-fields: error
+  loop-invariant-collection: error
+  complex-comprehension: error
+  constructor-logic: error
+  cross-module-private-attribute: error
+  comprehension-in-call-argument: error
+  excess-private-definitions: error
+  stateful-dataclass: error
+  duplicate-narrowing-assert: error
+  # Reviewed SDK namespaces and activation-local records: docs/smelt-policy.md.
   deep-object-navigation: hint
-  facade-export-gap: warning
+  facade-export-gap: error
   # Test smells
   private-test-access: error
   string-patch-target: error
   test-only-public-function: error
-  # Attributes of exported classes (Tab, ChromeBrowser) may be read by library
-  # users, which smelt cannot see; review instead of failing.
-  test-only-public-attribute: warning
-  test-without-outcome-check: warning
-  test-only-checks-possibly-empty-data: warning
-  unbounded-test-wait: warning
-  async-mock-without-await-check: warning
-  independent-test-case-loop: hint
-  nondeterministic-test-data: warning
+  test-only-public-attribute: error
+  test-without-outcome-check: error
+  test-only-checks-possibly-empty-data: error
+  unbounded-test-wait: error
+  async-mock-without-await-check: error
+  independent-test-case-loop: error
+  nondeterministic-test-data: error

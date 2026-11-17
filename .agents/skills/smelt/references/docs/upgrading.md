@@ -1,5 +1,123 @@
 # Upgrading Smelt
 
+## 0.11.1 to 0.12.0
+
+0.12.0 retains report schema 2, YAML version 1, grouped debt baseline version 2,
+the default rule set and exit codes. No baseline rewrite is required. The two
+new reviews require explicit selection. See the
+[changelog](../CHANGELOG.md#0120---2026-11-16).
+
+### Upgrade checklist
+
+1. Update installation, dependency, hook and CI pins together:
+
+   ```bash
+   uv tool install --upgrade 'smelt-cli==0.12.0'
+   # or: python -m pip install --upgrade 'smelt-cli==0.12.0'
+   smelt --version
+   ```
+
+   Use `additional_dependencies: [smelt-cli==0.12.0]` for isolated Python hooks,
+   `rev: v0.12.0` for source hooks and `uvx --from smelt-cli==0.12.0 smelt check`
+   in CI. Run `prek install` after updating hooks.
+
+2. Refresh the editor schema with `smelt config schema > .smelt.schema.json`
+   and the agent skill with `smelt skill install --force`. Preserve local skill
+   edits first and retain `--destination` for a custom installation. Run
+   `smelt check --show-hints --fail-on warning`, plus the project's tests and
+   other checks, before relying on changed/staged comparisons.
+
+3. Adopt the new reviews deliberately:
+
+   | Rule | Activation | Review |
+   | --- | --- | --- |
+   | [SMT366](rules/SMT366.md) | `rules: {comprehension-in-call-argument: hint}` | List, set and dict comprehensions passed directly to calls |
+   | [SMT367](rules/SMT367.md) | `rules: {excess-private-definitions: hint}` | Modules above `structure.max_private_definitions` (default 12) |
+
+   Repairs remain manual. SMT366 skips generator expressions and conditional
+   or repeated expression contexts; preserve callable lookup and argument
+   evaluation order when naming intermediate collections. SMT367 counts private
+   top-level classes, functions and PEP 695 aliases, lists constants separately
+   and does not infer cohesion or safe extraction. Closest-package limits,
+   including zero, are supported; setting a threshold alone does not enable it.
+
+## 0.11.0 to 0.11.1
+
+0.11.1 retains report schema 2, YAML version 1, grouped debt baseline version 2,
+the default rule set and exit codes. No baseline rewrite is required. Existing
+package policies now also check discovered tests and `conftest.py`, including
+configured test roots inside source packages. See the
+[changelog](../CHANGELOG.md#0111---2026-11-16).
+
+### Upgrade checklist
+
+1. Update installation, dependency, hook and CI pins together:
+
+   ```bash
+   uv tool install --upgrade 'smelt-cli==0.11.1'
+   # or: python -m pip install --upgrade 'smelt-cli==0.11.1'
+   smelt --version
+   ```
+
+   Use `additional_dependencies: [smelt-cli==0.11.1]` for isolated Python hooks,
+   `rev: v0.11.1` for source hooks and `uvx --from smelt-cli==0.11.1 smelt check`
+   in CI. Run `prek install` after updating hooks.
+
+2. Refresh the editor schema with `smelt config schema > .smelt.schema.json`
+   and the agent skill with `smelt skill install --force`. Preserve local skill
+   edits first and retain `--destination` for a custom installation.
+
+3. Run `smelt check --show-hints --fail-on warning`, plus the project's tests
+   and other checks. Review previously missed test imports for public entry
+   points (SMT107), configured bundling thresholds (SMT108), and existing package
+   re-exports when SMT319 is enabled. Repair imports according to the existing
+   package policy. No new setting or automatic rewrite is introduced; SMT109's
+   `count_tests` opt-in remains unchanged.
+
+## 0.10.0 to 0.11.0
+
+0.11.0 retains report schema 2, YAML version 1, grouped debt baseline version 2,
+the default rule set and exit codes. No baseline rewrite is required. The four
+new rules require explicit selection or package policy. See the
+[changelog](../CHANGELOG.md#0110---2026-11-16).
+
+### Upgrade checklist
+
+1. Update installation, dependency, hook and CI pins together:
+
+   ```bash
+   uv tool install --upgrade 'smelt-cli==0.11.0'
+   # or: python -m pip install --upgrade 'smelt-cli==0.11.0'
+   smelt --version
+   ```
+
+   Use `additional_dependencies: [smelt-cli==0.11.0]` for isolated Python hooks,
+   `rev: v0.11.0` for source hooks and `uvx --from smelt-cli==0.11.0 smelt check`
+   in CI. Run `prek install` after updating hooks.
+
+2. Refresh the editor schema with `smelt config schema > .smelt.schema.json`
+   and the agent skill with `smelt skill install --force`. Preserve local skill
+   edits first and retain `--destination` for a custom installation. Run
+   `smelt check --show-hints --fail-on warning`, plus the project's tests and
+   other checks, before relying on changed/staged comparisons.
+
+3. Adopt the new reviews deliberately:
+
+   | Rule | Activation | Review |
+   | --- | --- | --- |
+   | [SMT110](rules/SMT110.md) | `structure.max_module_imports: 10` | Distinct direct imports across project packages; choose a threshold for your project |
+   | [SMT363](rules/SMT363.md) | `rules: {complex-comprehension: hint}` | Excessive iteration clauses, conditional elements and compound filters |
+   | [SMT364](rules/SMT364.md) | `rules: {constructor-logic: hint}` | Constructor decisions above `structure.max_constructor_decisions` (default 2) |
+   | [SMT365](rules/SMT365.md) | `rules: {cross-module-private-attribute: warning}` | Private member accesses through known project receivers owned by another module |
+
+   Repairs remain manual. SMT110 exempts package initializers and declared
+   composition roots by default; `module_import_exempt: []` includes them.
+   SMT363 supports `structure.max_comprehension_loops`; preserve generator
+   laziness when rewriting. SMT364 excludes nested helper bodies and supports
+   a zero decision limit. SMT365 skips unknown receiver types and ambiguous
+   inheritance; `structure.private_attribute_boundary: package` permits
+   cooperation within the immediate package. Closest-package overrides apply.
+
 ## 0.9.0 to 0.10.0
 
 0.10.0 retains report schema 2, YAML version 1, grouped debt baseline version 2,

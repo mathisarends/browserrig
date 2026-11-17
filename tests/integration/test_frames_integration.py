@@ -27,7 +27,10 @@ from browserrig import (
 from browserrig.browser import Launch
 from browserrig.core import BrowserError
 from browserrig.kinds import ElementOperation
-from browserrig.observation import capture
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
+    capture,
+)
 from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
 from tests.observations import latest

@@ -6,7 +6,7 @@ from collections import Counter
 
 import pytest
 
-from browserrig.observation import PageText
+from browserrig import PageText
 from evals import analyze
 from evals.freeze import LOCAL_DATA
 from evals.html_report import build

@@ -25,6 +25,7 @@ type HandoffSource = Literal["tool", "pause"]
 class EventKind(StrEnum):
     """Stable wire tags, independent of Python class names."""
 
+    TASK_MEMORY = "browserrig.memory"
     CONNECTED = "browser.connected"
     DISCONNECTED = "browser.disconnected"
     TAB_OPENED = "browser.tab.opened"

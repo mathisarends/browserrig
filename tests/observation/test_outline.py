@@ -1,15 +1,17 @@
 import pytest
 
-from browserrig.observation import (
+from browserrig import ElementInfo, ElementRef, PageContent
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
     ContentGroup,
-    ElementInfo,
-    ElementRef,
     Heading,
-    PageContent,
     Snapshot,
     render,
 )
-from browserrig.observation.outline import outline
+from browserrig.observation.outline import (  # smelt: ignore[SMT107] -- test seam
+    # Verify outline selection independently of plugin activation.
+    outline,
+)
 
 
 @pytest.mark.parametrize(

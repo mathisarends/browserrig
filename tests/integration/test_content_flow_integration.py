@@ -2,8 +2,18 @@ import pytest
 
 from browserrig import ChromeBrowser, DomCapture, Viewport, wait_for_page
 from browserrig.browser import Launch
-from browserrig.observation import ContentGroup, Snapshot, TextBlock, capture, render
-from browserrig.secrets.redaction import Redactor
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
+    ContentGroup,
+    Snapshot,
+    TextBlock,
+    capture,
+    render,
+)
+from browserrig.secrets.redaction import (  # smelt: ignore[SMT107] -- test seam
+    # Test redaction of text and pixels independently of plugin activation.
+    Redactor,
+)
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration

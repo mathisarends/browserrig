@@ -1,5 +1,8 @@
 from browserrig.choreography import WorkPhase
-from browserrig.choreography.projection import project
+from browserrig.choreography.projection import (  # smelt: ignore[SMT107] -- test seam
+    # Test event projection independently of plugin activation.
+    project,
+)
 from browserrig.core import ActionKind, ReadinessPhase
 from browserrig.events import (
     ActionFailedEvent,

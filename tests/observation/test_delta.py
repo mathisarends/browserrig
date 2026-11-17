@@ -1,4 +1,9 @@
-from browserrig.observation.delta import INTRO, delta, unmarked
+from browserrig.observation.delta import (  # smelt: ignore[SMT107] -- test seam
+    # Verify model-facing deltas and ref markers independently of capture.
+    INTRO,
+    delta,
+    unmarked,
+)
 
 HEADER = "# Form\nurl: https://example.org/form\ntab: T1\ncursor: x=1 y=2 (viewport CSS pixels)"
 BASE = f"""{HEADER}

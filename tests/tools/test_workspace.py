@@ -9,11 +9,17 @@ from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel, call
 from PIL import Image
 
-from browserrig import BrowserFileTools, Files, LocalWorkspace, WorkspaceTools
-from browserrig.browser import Browser
+from browserrig import (
+    Actions,
+    Browser,
+    BrowserFileTools,
+    Files,
+    FileSystem,
+    LocalWorkspace,
+    MountedWorkspace,
+    WorkspaceTools,
+)
 from browserrig.events import FileReadFinishedEvent, FileWrittenEvent
-from browserrig.files import FileSystem, MountedWorkspace
-from browserrig.tools import Actions
 from tests.fakes import FakeServices, mounted
 
 

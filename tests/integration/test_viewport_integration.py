@@ -17,12 +17,17 @@ from browserrig import (
     Chrome,
     ChromeBrowser,
     DomCapture,
+    PageText,
     wait_for_page,
 )
 from browserrig.browser import Launch
 from browserrig.core import StaleElement
 from browserrig.events import ActionFinishedEvent
-from browserrig.observation import PageText, capture, render
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
+    capture,
+    render,
+)
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration

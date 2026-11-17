@@ -8,7 +8,7 @@ from cdpify.domains.input import MouseButton as CdpMouseButton
 
 from browserrig.core import CursorStyle, MouseEventKind, Point, ViewportSize
 from browserrig.events import InputEvent
-from browserrig.input import InputTarget, KeyEventType, MouseButton
+from browserrig.input import InputTarget, InputTargets, KeyEventType, MouseButton
 from browserrig.scripts import CURSOR, CursorArgs
 
 if TYPE_CHECKING:
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 _CURSOR_PROBE_SECONDS = 0.25
 
 
-class ChromeInputTargets:
+class ChromeInputTargets(InputTargets):
     """Expose Chrome's focused transport without owning the input devices."""
 
     def __init__(self, tabs: Tabs) -> None:

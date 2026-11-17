@@ -13,11 +13,22 @@ from types import SimpleNamespace
 import pytest
 from harnessed import ToolError
 
-from browserrig.choreography import (
+from browserrig import (
+    Actions,
+    Choreography,
+    FileSystem,
+    FileTools,
+    InputPacing,
+    LocalWorkspace,
+    MountedWorkspace,
+    NavigationTools,
+    PageSearchTools,
+)
+from browserrig.choreography import (  # smelt: ignore[SMT107] -- test seam
+    # Test scene timelines without exposing staging internals as API.
     AddressBarFocusedEvent,
     BackPressedEvent,
     BarTypedEvent,
-    Choreography,
     CursorEnteredEvent,
     FileTransferEvent,
     FindBarEvent,
@@ -50,14 +61,20 @@ from browserrig.events import (
     KeyPressedEvent,
     NavigationStartedEvent,
 )
-from browserrig.files import FileSystem, LocalWorkspace, MountedWorkspace
-from browserrig.input import mouse as mouse_module
-from browserrig.observation.content import ExtractedContent
-from browserrig.pacing import InputPacing
+from browserrig.input import (  # smelt: ignore[SMT107] -- test seam
+    # Replace input timing where the mouse reads it.
+    mouse as mouse_module,
+)
+from browserrig.observation import ExtractedContent
 from browserrig.scripts import FindResult
-from browserrig.tools import Actions, FileTools, NavigationTools, PageSearchTools
-from browserrig.tools import search as search_module
-from browserrig.tools import targeting as targeting_module
+from browserrig.tools import (  # smelt: ignore[SMT107] -- test seam
+    # Replace document extraction where the search tool looks it up.
+    search as search_module,
+)
+from browserrig.tools import (  # smelt: ignore[SMT107] -- test seam
+    # Replace element preparation where targeting looks it up.
+    targeting as targeting_module,
+)
 from tests.fakes import mounted
 
 # The plugins that pace input like a person and stage actions for viewers.

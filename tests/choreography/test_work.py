@@ -1,8 +1,12 @@
 from harnessed import ToolCall, ToolResult, ToolStatus
 
+from browserrig import ActionKind
 from browserrig.choreography import WorkPhase
-from browserrig.choreography.work import finished, started
-from browserrig.core import ActionKind
+from browserrig.choreography.work import (  # smelt: ignore[SMT107] -- test seam
+    # Test work-event pairing independently of plugin activation.
+    finished,
+    started,
+)
 from browserrig.files import FileContent, FileEntry
 
 

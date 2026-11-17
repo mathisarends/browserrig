@@ -5,6 +5,7 @@ from typing import Literal
 from harnessed.events import DurableEvent
 
 from browserrig.core import Options
+from browserrig.events import EventKind
 
 
 class MemoryAction(StrEnum):
@@ -38,6 +39,6 @@ class TaskMemoryEvent(DurableEvent):
     compaction_id: str | None
     checkpoint_saved: bool
     restore_pending: bool
-    type: Literal["browserrig.memory"] = field(
-        default="browserrig.memory", kw_only=True
+    type: Literal[EventKind.TASK_MEMORY] = field(
+        default=EventKind.TASK_MEMORY, kw_only=True
     )

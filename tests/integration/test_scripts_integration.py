@@ -3,12 +3,17 @@ import re
 
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, wait_for_page
+from browserrig import ChromeBrowser, DomCapture, Point, wait_for_page
 from browserrig.browser import Launch
-from browserrig.core import Point
 from browserrig.kinds import CursorStyle
-from browserrig.observation import capture
-from browserrig.observation.content import extract_content
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
+    capture,
+)
+from browserrig.observation.content import (  # smelt: ignore[SMT107] -- test seam
+    # Test document extraction independently of capture strategy.
+    extract_content,
+)
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration

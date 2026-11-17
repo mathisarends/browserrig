@@ -169,11 +169,10 @@ class Region(Options):
 
 
 def _enclosing(bounds: Bounds, transform: Callable[[float, float], Position]) -> Bounds:
-    points = [
-        transform(x, y)
-        for x in (bounds.x, bounds.x + bounds.width)
-        for y in (bounds.y, bounds.y + bounds.height)
-    ]
+    points = []
+    for x in (bounds.x, bounds.x + bounds.width):
+        for y in (bounds.y, bounds.y + bounds.height):
+            points.append(transform(x, y))
     xs, ys = zip(*points, strict=True)
     return Bounds(
         x=min(xs), y=min(ys), width=max(xs) - min(xs), height=max(ys) - min(ys)

@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from browserrig.core import ActionContext
+from browserrig import ActionContext
 
 
 def test_nested_actions_restore_correlation_after_failure():

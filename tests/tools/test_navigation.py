@@ -3,10 +3,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from browserrig import Actions, NavigationTools
 from browserrig.browser import Tab
-from browserrig.tools import Actions, NavigationTools
-from browserrig.tools import navigation as navigation_module
-from browserrig.tools.intents import WaitIntent
+from browserrig.tools import WaitIntent
+from browserrig.tools import (  # smelt: ignore[SMT107] -- test seam
+    # Replace the staged wait's sleep at its navigation lookup site.
+    navigation as navigation_module,
+)
 from tests.fakes import mounted
 
 

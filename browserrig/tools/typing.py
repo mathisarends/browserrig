@@ -9,7 +9,7 @@ from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
 from browserrig.input import Input
-from browserrig.observation import DomElementHandle, DomElements
+from browserrig.observation import DomElementHandle, ResolveDomElement
 from browserrig.secrets import Secrets
 
 from .effects import Effect
@@ -25,7 +25,7 @@ class DomTypingTools(Plugin):
     _targets = needs(Targeting)
     _browser = needs(Browser)
     _input = needs(Input)
-    _elements = needs(DomElements)
+    _elements = needs(ResolveDomElement)
     _secrets = observes(Secrets)
 
     @tool(
@@ -42,9 +42,9 @@ class DomTypingTools(Plugin):
         ] = True,
     ) -> Effect:
         tab = self._actions.tab
-        await self._elements.resolve(tab, ref)
+        await self._elements(tab, ref)
         await self._targets.hover(ref=ref, tab=tab)
-        field = await self._elements.resolve(tab, ref)
+        field = await self._elements(tab, ref)
         secrets = self._secrets
         # Check the secrets' domains before the field is touched.
         entry = (

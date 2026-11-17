@@ -21,13 +21,7 @@ class WheelStep:
     delay_before_seconds: float = 0
 
     def __post_init__(self) -> None:
-        if not all(math.isfinite(value) for value in (self.delta_x, self.delta_y)):
-            raise ValueError("Wheel deltas must be finite")
-        if (
-            not math.isfinite(self.delay_before_seconds)
-            or self.delay_before_seconds < 0
-        ):
-            raise ValueError("Wheel delay must be finite and non-negative")
+        _validate_step(self.delta_x, self.delta_y, self.delay_before_seconds)
 
 
 def scrolling(*, delta_x: float, delta_y: float, speed: float) -> tuple[WheelStep, ...]:
@@ -48,6 +42,13 @@ def scrolling(*, delta_x: float, delta_y: float, speed: float) -> tuple[WheelSte
         )
         sent = progress
     return tuple(plan)
+
+
+def _validate_step(delta_x: float, delta_y: float, delay_before_seconds: float) -> None:
+    if not all(math.isfinite(value) for value in (delta_x, delta_y)):
+        raise ValueError("Wheel deltas must be finite")
+    if not math.isfinite(delay_before_seconds) or delay_before_seconds < 0:
+        raise ValueError("Wheel delay must be finite and non-negative")
 
 
 def _duration(distance: float) -> float:

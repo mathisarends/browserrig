@@ -5,7 +5,8 @@ from harnessed.models import ModelUsage
 from harnessed.plugins import ContextState
 from harnessed.services import CompactionContext, CompactionRequest, Summary
 
-from browserrig.memory.compaction import (
+from browserrig.memory.compaction import (  # smelt: ignore[SMT107] -- test seam
+    # Test compaction deferral and summaries without activating a session.
     CheckpointTrigger,
     MemoryRuntime,
     MemorySummarizer,

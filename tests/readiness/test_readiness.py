@@ -24,9 +24,15 @@ from browserrig import (
 from browserrig.core import ReadinessError, ReadinessPhase
 from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent, ReadyEvent
 from browserrig.files import Download
-from browserrig.observation import capture
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
+    capture,
+)
 from browserrig.readiness import probe_dom
-from browserrig.readiness import wait as wait_module
+from browserrig.readiness import (  # smelt: ignore[SMT107] -- test seam
+    # Control readiness checks and clocks at their owning module.
+    wait as wait_module,
+)
 from browserrig.scripts import STABILITY, DOMProbe
 from tests.fakes import FakeBrowser, FakeChrome, FakeTab
 
@@ -286,6 +292,35 @@ async def test_strict_readiness_remains_available():
     tab.navigation_pending = True
     with pytest.raises(ReadinessError, match="timed out"):
         await wait_for_page(tab, options=_fast_options(allow_degraded_dom=False))
+
+
+async def test_falsy_initial_and_ongoing_policies_are_used_for_their_own_stage():
+    selected = []
+
+    class FalsyPolicy:
+        def __init__(self, name):
+            self.name = name
+
+        def __bool__(self):
+            return False
+
+        def create(self, context):
+            selected.append((self.name, context.stage))
+            return DomReady().create(context)
+
+    holder = {}
+    readiness = Readiness(
+        options=_fast_options(),
+        initial=FalsyPolicy("initial"),
+        ongoing=FalsyPolicy("ongoing"),
+    )
+    agent = Agent(model=ScriptedModel(["ok"]), plugins=[FakeChrome(holder), readiness])
+    async with agent.session() as session:
+        readiness = session.scope[Readiness]
+        tab = holder["browser"].active_tab
+        assert (await readiness.wait(tab)).status == "ready"
+        assert (await readiness.wait(tab)).status == "ready"
+    assert selected == [("initial", "initial"), ("ongoing", "ongoing")]
 
 
 async def test_native_policy_selection_and_waterfall_are_removed_with_the_plugin():

@@ -16,6 +16,7 @@ from harnessed.testing import CallbackModel
 from browserrig import (
     Browser,
     Chrome,
+    DomPerception,
     Screenshots,
     ScreenshotTrigger,
     Secret,
@@ -24,7 +25,6 @@ from browserrig import (
     wait_for_page,
 )
 from browserrig.events import SecretEnteredEvent
-from browserrig.observation import DomPerception
 from tests.javascript import evaluate
 from tests.observations import latest
 
