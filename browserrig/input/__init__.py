@@ -13,6 +13,7 @@ from .plugin import InputRuntime
 from .pointer import Bend, CursorPath, movement
 from .presenter import Presenter, Unseen
 from .target import Focus, InputTarget, InputTargets, KeyEventType, MouseButton
+from .wheel import WheelStep
 
 __all__ = [
     "InputRuntime",
@@ -37,5 +38,6 @@ __all__ = [
     "Presenter",
     "TypedText",
     "Unseen",
+    "WheelStep",
     "movement",
 ]

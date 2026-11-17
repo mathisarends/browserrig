@@ -1,3 +1,4 @@
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
@@ -5,6 +6,7 @@ from typing import Protocol
 from browserrig.core import Aim, Point
 
 from .pointer import CursorPath, movement
+from .wheel import WheelStep, scrolling
 
 # Seconds between keys a person types, in the page and in the browser's own bars.
 TYPING_INTERVAL_SECONDS = 0.05
@@ -22,7 +24,7 @@ class KeyStroke:
 
 
 class Motor(Protocol):
-    """How the hand moves: typing rhythm, pointer routes, aim and clicks.
+    """How the hand moves: typing rhythm, pointer routes, wheel steps, aim and clicks.
 
     The devices ask it how to perform input; what viewers see is the `Presenter`'s
     concern. Without one, input runs as fast as the page accepts it.
@@ -50,6 +52,10 @@ class Motor(Protocol):
         """
         ...
 
+    def wheel_steps(self, *, delta_x: float, delta_y: float) -> Sequence[WheelStep]:
+        """Plan wheel deltas and delays whose total matches the requested CSS pixels."""
+        ...
+
     def press(self) -> float:
         """Seconds a mouse button stays down for one click."""
         ...
@@ -70,6 +76,9 @@ class Instant:
     def pointer_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
         return (CursorPath.curved(start, destination, 0),)
 
+    def wheel_steps(self, *, delta_x: float, delta_y: float) -> Sequence[WheelStep]:
+        return (WheelStep(delta_x=delta_x, delta_y=delta_y),)
+
     def aim_fractions(  # pylint: disable=unused-argument
         self, target_width: float, target_height: float
     ) -> Aim:
@@ -83,18 +92,21 @@ class Instant:
 
 
 class HumanMotor:
-    """Input at a person's pace: steady typing without slips, eased pointer paths and
-    clicks in the middle of a target.
+    """Input at a person's pace: steady typing, eased pointer paths, smooth wheel
+    gestures and clicks in the middle of a target.
+
+    `scroll_speed` multiplies wheel speed: 2 halves its duration, 0.5 doubles it.
     """
 
     def __init__(
         self,
         *,
         typing_interval_seconds: float = TYPING_INTERVAL_SECONDS,
+        scroll_speed: float = 1,
     ) -> None:
-        if typing_interval_seconds < 0:
-            raise ValueError("typing_interval_seconds must not be negative")
+        _validate_pacing(typing_interval_seconds, scroll_speed)
         self._typing_interval_seconds = typing_interval_seconds
+        self._scroll_speed = scroll_speed
 
     def keystrokes(  # pylint: disable=unused-argument
         self, text: str, *, sensitive: bool
@@ -103,6 +115,9 @@ class HumanMotor:
 
     def pointer_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
         return (movement(start, destination),)
+
+    def wheel_steps(self, *, delta_x: float, delta_y: float) -> Sequence[WheelStep]:
+        return scrolling(delta_x=delta_x, delta_y=delta_y, speed=self._scroll_speed)
 
     def aim_fractions(  # pylint: disable=unused-argument
         self, target_width: float, target_height: float
@@ -114,3 +129,10 @@ class HumanMotor:
 
     def landing(self, viewport_width: float, viewport_height: float) -> Point:
         return Point(x=viewport_width / 2, y=viewport_height / 2)
+
+
+def _validate_pacing(typing_interval_seconds: float, scroll_speed: float) -> None:
+    if typing_interval_seconds < 0:
+        raise ValueError("typing_interval_seconds must not be negative")
+    if not math.isfinite(scroll_speed) or scroll_speed <= 0:
+        raise ValueError("scroll_speed must be finite and positive")

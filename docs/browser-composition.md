@@ -297,7 +297,14 @@ coordinates for this page.
 
 ## Browser-owned presentation
 
-`InputPacing` installs a `Motor` controlling keystrokes and pointer routes.
+`InputPacing` installs a `Motor` controlling keystrokes, pointer routes and wheel
+steps. Without it, `Instant` dispatches a wheel gesture in one event without a
+pause. `HumanMotor` supplies a smooth wheel plan; use
+`InputPacing(HumanMotor(scroll_speed=0.5))` for half the default scroll speed
+(`HumanMotor` is imported from `browserrig.input`). Custom motors implement
+`wheel_steps(delta_x=..., delta_y=...)`, returning `WheelStep` values with native
+CSS-pixel deltas and `delay_before_seconds`. Their deltas must total the requested
+distance; the mouse executes their timing without selecting its own scroll curve.
 `Choreography` installs a `Presenter` controlling viewer feedback and streams it
 as events; `ChoreographyOverlay` draws them in the page. All are optional;
 tools consume the session's `Input` service in any configuration.

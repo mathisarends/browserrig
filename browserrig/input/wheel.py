@@ -1,40 +1,62 @@
-"""Timing for smooth wheel scrolling, modeled on Chrome's own smooth scroll.
-
-Measured in Chrome, `scrollBy({behavior: 'smooth'})` closely follows
-cubic-bezier(0.4, 0, 0, 1) and lasts about one 60 Hz frame per square root of the
-distance in pixels.
-"""
+"""Timing for wheel gestures with gentle acceleration and deceleration."""
 
 import math
+from dataclasses import dataclass
 
-FRAME_SECONDS = 1 / 60
-_MIN_SECONDS = 0.15
+_FRAME_SECONDS = 1 / 60
+_MIN_SECONDS = 0.2
 _MAX_SECONDS = 1.5
 
 
-def wheel_duration(distance: float) -> float:
-    return min(
-        _MAX_SECONDS, max(_MIN_SECONDS, math.sqrt(abs(distance)) * FRAME_SECONDS)
-    )
+@dataclass(frozen=True, slots=True)
+class WheelStep:
+    """Native wheel deltas in CSS pixels, with a delay before dispatch.
+
+    The delay runs from the previous dispatch's start, or the gesture's start.
+    Slow replies may extend it; steps are never combined to catch up.
+    """
+
+    delta_x: float
+    delta_y: float
+    delay_before_seconds: float = 0
+
+    def __post_init__(self) -> None:
+        _validate_step(self.delta_x, self.delta_y, self.delay_before_seconds)
 
 
-def wheel_progress(fraction: float) -> float:
-    """Chrome's smooth scroll curve: a soft start, a fast middle and a long gentle settle."""
+def scrolling(*, delta_x: float, delta_y: float, speed: float) -> tuple[WheelStep, ...]:
+    """Plan a gently eased wheel gesture at a positive speed multiplier."""
+    duration_seconds = _duration(math.hypot(delta_x, delta_y)) / speed
+    steps = max(1, math.ceil(duration_seconds / _FRAME_SECONDS))
+    interval_seconds = duration_seconds / steps
+    plan = []
+    sent = 0.0
+    for frame in range(1, steps + 1):
+        progress = _progress(frame / steps)
+        plan.append(
+            WheelStep(
+                delta_x=delta_x * (progress - sent),
+                delta_y=delta_y * (progress - sent),
+                delay_before_seconds=interval_seconds,
+            )
+        )
+        sent = progress
+    return tuple(plan)
+
+
+def _validate_step(delta_x: float, delta_y: float, delay_before_seconds: float) -> None:
+    if not all(math.isfinite(value) for value in (delta_x, delta_y)):
+        raise ValueError("Wheel deltas must be finite")
+    if not math.isfinite(delay_before_seconds) or delay_before_seconds < 0:
+        raise ValueError("Wheel delay must be finite and non-negative")
+
+
+def _duration(distance: float) -> float:
+    return min(_MAX_SECONDS, max(_MIN_SECONDS, math.sqrt(abs(distance)) / 45))
+
+
+def _progress(fraction: float) -> float:
+    """Ease in and out with zero velocity and acceleration at both ends."""
     if fraction <= 0 or fraction >= 1:
         return 0.0 if fraction <= 0 else 1.0
-    return _cubic_bezier(0.4, 0.0, 0.0, 1.0, x=fraction)
-
-
-def _cubic_bezier(x1: float, y1: float, x2: float, y2: float, *, x: float) -> float:
-    def sample(a: float, b: float, t: float) -> float:
-        return 3 * (1 - t) ** 2 * t * a + 3 * (1 - t) * t**2 * b + t**3
-
-    # x(t) increases monotonically for CSS curves, so bisection always finds t.
-    low, high = 0.0, 1.0
-    for _ in range(30):
-        middle = (low + high) / 2
-        if sample(x1, x2, middle) < x:
-            low = middle
-        else:
-            high = middle
-    return sample(y1, y2, (low + high) / 2)
+    return fraction**3 * (10 + fraction * (-15 + 6 * fraction))
