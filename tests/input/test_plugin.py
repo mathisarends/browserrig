@@ -20,7 +20,7 @@ from browserrig import (
 )
 from browserrig.core import TabGesture, ViewportSize
 from browserrig.events import TabActivatedEvent, TabClosedEvent
-from browserrig.input import Instant
+from browserrig.input import HumanMotor, Instant
 
 
 async def test_devices_can_run_against_a_transport_without_a_browser():
@@ -89,6 +89,24 @@ async def test_pacing_can_change_landing_without_a_browser_dependency():
         assert session.scope[Input].mouse.position == Point(x=3, y=5)
 
 
+async def test_pacing_mount_controls_wheel_input_and_unmount_restores_instant():
+    target = _Transport("wheel")
+    async with _agent(_Targets(target)).session() as session:
+        devices = session.scope[Input]
+        await devices.mouse.scroll(delta_y=120)
+        assert target.wheels == [(0, 120)]
+        target.wheels.clear()
+        pacing = await session.mount(InputPacing(HumanMotor()))
+        await devices.mouse.scroll(delta_y=120)
+        assert len(target.wheels) > 1
+        assert sum(dy for _dx, dy in target.wheels) == pytest.approx(120)
+        await pacing.aclose()
+        await session.scope.settle()
+        target.wheels.clear()
+        await devices.mouse.scroll(delta_y=120)
+        assert target.wheels == [(0, 120)]
+
+
 async def test_missing_transport_is_reported_before_model_use():
     model = ScriptedModel([])
     agent = Agent(model=model, plugins=[Runtime(), InputRuntime()])
@@ -139,6 +157,7 @@ class _Transport:
     id: str
     mouse: list[Point] = field(default_factory=list)
     keys: list[str] = field(default_factory=list)
+    wheels: list[tuple[float, float]] = field(default_factory=list)
 
     async def viewport_size(self):
         return ViewportSize(width=100, height=80)
@@ -148,6 +167,9 @@ class _Transport:
 
     async def dispatch_key(self, _kind, *, key, **_kwargs):
         self.keys.append(key)
+
+    async def dispatch_wheel(self, _point, *, delta_x, delta_y):
+        self.wheels.append((delta_x, delta_y))
 
     def layout_changed(self):
         pass

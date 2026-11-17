@@ -30,7 +30,7 @@ from .motor import Motor
 from .pointer import CursorPath
 from .presenter import Presenter
 from .target import Focus, InputTarget, MouseButton, focused
-from .wheel import FRAME_SECONDS, wheel_duration, wheel_progress
+from .wheel import WheelStep
 
 type Emit = Callable[[InputTarget, InputEvent], Awaitable[None]]
 type ClickCount = Literal[1, 2]
@@ -219,15 +219,21 @@ class Mouse:
     ) -> None:
         """Turn the wheel at `point`, or where the pointer already rests.
 
-        Small native wheel events accelerate and decelerate gently. Slow browser
-        replies extend the gesture instead of causing larger catch-up jumps.
+        The motor supplies wheel deltas and timing; slow browser replies extend
+        the gesture instead of combining steps into larger catch-up jumps.
         """
         if delta_y == 0 and delta_x == 0:
             return
         target = focused(self._focus)
+        motor = self._motor()
+        steps = _wheel_plan(
+            motor.wheel_steps(delta_x=delta_x, delta_y=delta_y),
+            delta_x=delta_x,
+            delta_y=delta_y,
+        )
         point = point or self._rest(target).position
         await self._move(target, point)
-        duration_seconds = wheel_duration(math.hypot(delta_x, delta_y))
+        duration_seconds = sum(step.delay_before_seconds for step in steps)
         await self._emit(
             target,
             ScrollStartedEvent(
@@ -238,21 +244,19 @@ class Mouse:
                 duration_seconds=duration_seconds,
             ),
         )
-        steps = math.ceil(duration_seconds / FRAME_SECONDS)
-        interval = duration_seconds / steps
-        deadline = monotonic() + interval
-        sent = 0.0
-        for frame in range(1, steps + 1):
-            await asyncio.sleep(max(0.0, deadline - monotonic()))
-            deadline = monotonic() + interval
-            progress = wheel_progress(frame / steps)
+        dispatched = monotonic()
+        for step in steps:
+            if step.delay_before_seconds:
+                await asyncio.sleep(
+                    max(0.0, dispatched + step.delay_before_seconds - monotonic())
+                )
+            dispatched = monotonic()
             await target.dispatch_wheel(
                 point,
-                delta_x=delta_x * (progress - sent),
-                delta_y=delta_y * (progress - sent),
+                delta_x=step.delta_x,
+                delta_y=step.delta_y,
             )
             target.layout_changed()
-            sent = progress
         await self._emit(
             target,
             ScrolledEvent(
@@ -369,6 +373,20 @@ class Mouse:
 
     def _rest(self, target: InputTarget) -> _Rest:
         return self._rests.setdefault(target.id, _Rest())
+
+
+def _wheel_plan(
+    plan: Sequence[WheelStep], *, delta_x: float, delta_y: float
+) -> tuple[WheelStep, ...]:
+    steps = tuple(plan)
+    if not steps or not (
+        math.isclose(math.fsum(step.delta_x for step in steps), delta_x, abs_tol=1e-9)
+        and math.isclose(
+            math.fsum(step.delta_y for step in steps), delta_y, abs_tol=1e-9
+        )
+    ):
+        raise BrowserError("Wheel steps must add up to the requested distance")
+    return steps
 
 
 def _joined(

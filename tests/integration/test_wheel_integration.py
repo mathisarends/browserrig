@@ -4,12 +4,14 @@ import pytest
 
 from browserrig import ChromeBrowser, Input, Point, wait_for_page
 from browserrig.browser import Launch
+from browserrig.input import HumanMotor
 
 pytestmark = pytest.mark.integration
 
 
 @pytest.mark.parametrize("delta_y", [600, -600])
-async def test_native_wheel_scroll_has_visible_intermediate_positions(site, delta_y):
+@pytest.mark.parametrize("paced", [False, True])
+async def test_native_wheel_scroll_follows_motor(site, delta_y, paced):
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         await wait_for_page(tab)
@@ -26,6 +28,8 @@ async def test_native_wheel_scroll_has_visible_intermediate_positions(site, delt
         await asyncio.sleep(0.1)
         await _evaluate(tab, "wheelSamples.length = 0")
         devices = Input(browser.input_targets.focused)
+        if paced:
+            devices.pace(HumanMotor())
         await devices.mouse.scroll(delta_y=delta_y, point=Point(x=500, y=400))
         # Chrome may finish compositing the last native wheel event after its reply.
         await asyncio.sleep(0.2)
@@ -33,11 +37,14 @@ async def test_native_wheel_scroll_has_visible_intermediate_positions(site, delt
             tab, "({y: scrollY, samples: wheelSamples, inputs: wheelInputs})"
         )
         assert state["y"] == pytest.approx(800 + delta_y, abs=2)
-        intermediate = [y for y in state["samples"] if 5 < abs(y - 800) < 595]
-        assert len(intermediate) >= 5
+        if paced:
+            intermediate = [y for y in state["samples"] if 5 < abs(y - 800) < 595]
+            assert len(intermediate) >= 5
+            assert max(abs(e["delta"]) for e in state["inputs"]) < 35
+        else:
+            assert len(state["inputs"]) == 1
         assert all(e["trusted"] for e in state["inputs"])
         assert sum(e["delta"] for e in state["inputs"]) == pytest.approx(delta_y)
-        assert max(abs(e["delta"]) for e in state["inputs"]) < 35
 
 
 async def _evaluate(tab, expression):
