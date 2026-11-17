@@ -20,7 +20,11 @@ from browserrig import (
     wait_for_page,
 )
 from browserrig.browser import Launch
-from browserrig.observation import capture, render
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
+    capture,
+    render,
+)
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration

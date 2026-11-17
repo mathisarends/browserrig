@@ -15,7 +15,10 @@ from browserrig import (
     browser_plugins,
 )
 from browserrig.browser import Connect, Launch
-from browserrig.browser import plugin as chrome_plugin
+from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
+    # Replace ChromeBrowser at the plugin connection boundary.
+    plugin as chrome_plugin,
+)
 
 
 def test_factories_validate_options_without_opening_resources(monkeypatch):

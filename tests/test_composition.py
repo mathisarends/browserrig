@@ -16,10 +16,15 @@ from browserrig import (
     Choreography,
     ChoreographyOverlay,
     Chrome,
+    DomPerception,
     Files,
+    FileTools,
+    FormTools,
     ImageContext,
     InputPacing,
+    JavaScriptTools,
     LocalWorkspace,
+    PointerTools,
     Readiness,
     ReadinessOptions,
     Screenshots,
@@ -33,13 +38,9 @@ from browserrig import (
     browser_plugins,
 )
 from browserrig.input import Instant
-from browserrig.observation import BrowserPerception as PerceptionExport
-from browserrig.observation import DomPerception
-from browserrig.tools import (
-    FileTools,
-    FormTools,
-    JavaScriptTools,
-    PointerTools,
+from browserrig.observation import (  # smelt: ignore[SMT319] -- facade identity
+    # Compare the two facade exports, not a name with itself.
+    BrowserPerception as PerceptionExport,
 )
 
 

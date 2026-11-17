@@ -25,6 +25,7 @@ from harnessed.testing import ScriptedModel
 import browserrig
 from browserrig import (
     ActionContext,
+    ActionKind,
     Actions,
     Browser,
     BrowserCoordination,
@@ -33,6 +34,7 @@ from browserrig import (
     ChoreographyOverlay,
     Chrome,
     DomCapture,
+    DomPerception,
     Files,
     FileSystem,
     FileTools,
@@ -41,6 +43,7 @@ from browserrig import (
     InputRuntime,
     LocalWorkspace,
     MountedWorkspace,
+    PageText,
     Readiness,
     Runtime,
     Screenshots,
@@ -48,9 +51,10 @@ from browserrig import (
     browser_plugins,
 )
 from browserrig.browser import BrowserEvents
-from browserrig.browser import plugin as plugin_module
-from browserrig.core import ActionKind
-from browserrig.observation import DomPerception, PageText
+from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
+    # Replace ChromeBrowser at the plugin connection boundary.
+    plugin as plugin_module,
+)
 from browserrig.tools import BrowserToolMetadata, DialogTools, KeyboardTools
 from tests.fakes import FakeBrowser
 

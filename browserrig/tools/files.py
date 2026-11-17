@@ -207,7 +207,8 @@ class DomUploadTools(Plugin):
 
         async def assign() -> None:
             handle = await self._elements.resolve(tab, ref)
-            await handle.upload_files([str(path) for path in staged.browser_paths])
+            browser_paths = [str(path) for path in staged.browser_paths]
+            await handle.upload_files(browser_paths)
             await self._events.emit(
                 FilesUploadedEvent(
                     target_id=tab.id,

@@ -4,7 +4,10 @@ from browserrig.choreography import (
     UploadPresentedEvent,
     WorkPhase,
 )
-from browserrig.choreography.status import StatusProjection
+from browserrig.choreography.status import (  # smelt: ignore[SMT107] -- test seam
+    # Test status projection independently of plugin activation.
+    StatusProjection,
+)
 from browserrig.core import ActivityKind, ActivityOutcome
 from browserrig.events import (
     ActivityFinishedEvent,

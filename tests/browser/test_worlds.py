@@ -6,7 +6,10 @@ import pytest
 from cdpify import CDPCommandError
 
 from browserrig.browser import Frame
-from browserrig.browser.worlds import Worlds
+from browserrig.browser.worlds import (  # smelt: ignore[SMT107] -- test seam
+    # Test isolated-world lifecycle independently of Chrome transport.
+    Worlds,
+)
 from browserrig.scripts import RESET
 
 

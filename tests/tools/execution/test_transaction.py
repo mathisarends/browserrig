@@ -6,7 +6,14 @@ from unittest.mock import AsyncMock
 import pytest
 from harnessed import ToolError
 
-from browserrig import FileSystem, LocalWorkspace, MountedWorkspace
+from browserrig import (
+    Actions,
+    FileSystem,
+    FileTools,
+    LocalWorkspace,
+    MountedWorkspace,
+    Targeting,
+)
 from browserrig.browser import OpenDialog, Tab
 from browserrig.core import Bounds, BrowserError, ElementPoint, Point
 from browserrig.events import (
@@ -17,8 +24,7 @@ from browserrig.events import (
 )
 from browserrig.input import Instant
 from browserrig.kinds import ActionKind, ReadinessPhase
-from browserrig.tools import Actions, FileTools, Targeting
-from browserrig.tools.effects import Effect
+from browserrig.tools import Effect
 from tests.fakes import FakeServices, mounted
 
 

@@ -27,7 +27,11 @@ from harnessed.models import AssistantMessage, ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
 from browserrig.activity import Activity, ActivityKind, ActivityOutcome
-from browserrig.activity.models import ActivityKey, project_intervals
+from browserrig.activity.models import (  # smelt: ignore[SMT107] -- test seam
+    # Test interval matching without making projection helpers public API.
+    ActivityKey,
+    project_intervals,
+)
 from browserrig.events import (
     ACTIVITY_EVENTS,
     READINESS_EVENTS,

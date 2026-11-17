@@ -6,18 +6,21 @@ from unittest.mock import AsyncMock
 import pytest
 from cdpify import CDPCommandError
 
+from browserrig import CaptureContent, DomCapture, PageText
+from browserrig import PageContent as Extraction
 from browserrig.core import Bounds, BrowserError, ReadinessPhase, StaleElement
-from browserrig.observation import (
-    CaptureContent,
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
     CookieBanner,
-    DomCapture,
     Element,
-    PageText,
     capture,
     decision_change,
 )
-from browserrig.observation.extraction import Extraction
-from browserrig.observation.models import ElementFingerprint, PageFingerprint
+from browserrig.observation.models import (  # smelt: ignore[SMT107] -- test seam
+    # Test internal change fingerprints without exposing them as API.
+    ElementFingerprint,
+    PageFingerprint,
+)
 from tests.fakes import FakeReadiness, FakeTab
 
 capture_module = import_module("browserrig.observation.capture")

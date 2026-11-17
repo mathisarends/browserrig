@@ -1,9 +1,13 @@
 import pytest
 
 from browserrig import (
+    Actions,
     BrowserPerception,
     Chrome,
+    DomActionChains,
     DomCapture,
+    DomPerception,
+    DomRenderer,
     ImageContext,
     Readiness,
     ReadinessOptions,
@@ -11,8 +15,6 @@ from browserrig import (
     TrimInBatches,
 )
 from browserrig.browser import Launch
-from browserrig.observation import DomPerception, DomRenderer
-from browserrig.tools import Actions, DomActionChains
 
 
 @pytest.mark.parametrize(

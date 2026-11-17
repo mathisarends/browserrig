@@ -4,10 +4,17 @@ from unittest.mock import AsyncMock
 from harnessed import Agent
 from harnessed.testing import ScriptedModel
 
-from browserrig import Actions, BrowserCoordination, BrowserPerception, Readiness
-from browserrig.core import ActionKind
-from browserrig.observation import CaptureContent, DomRenderer, PageContent
-from browserrig.tools.effects import Effect
+from browserrig import (
+    ActionKind,
+    Actions,
+    BrowserCoordination,
+    BrowserPerception,
+    CaptureContent,
+    DomRenderer,
+    PageContent,
+    Readiness,
+)
+from browserrig.tools import Effect
 from tests.fakes import FakeChrome
 
 

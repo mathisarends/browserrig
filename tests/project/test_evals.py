@@ -11,7 +11,7 @@ import pytest
 from harnessed import ToolCall, ToolResult, ToolStatus
 from harnessed.events import ToolCallFinishedEvent
 
-from browserrig.observation import PageText
+from browserrig import PageText
 from evals import analyze, evaluate, report, run, runner
 from evals.environments import Environments
 from evals.evaluate import Grade

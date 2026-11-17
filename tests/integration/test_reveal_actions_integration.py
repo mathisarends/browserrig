@@ -9,6 +9,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel
 
 from browserrig import (
+    Actions,
     Agent,
     Browser,
     BrowserPerception,
@@ -28,8 +29,7 @@ from browserrig.events import (
     PointerPressedEvent,
     ScrolledEvent,
 )
-from browserrig.tools import Actions
-from browserrig.tools.effects import Effect
+from browserrig.tools import Effect
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration

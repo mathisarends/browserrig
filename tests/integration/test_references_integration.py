@@ -13,22 +13,25 @@ from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
 from browserrig import (
+    Actions,
     Browser,
     BrowserPerception,
     CaptureContent,
     Chrome,
+    DomRenderer,
     ElementInfo,
     InputRuntime,
+    KeyboardTools,
     PageContent,
+    PointerTools,
     Readiness,
     Runtime,
+    Targeting,
     TextContext,
     wait_for_page,
 )
 from browserrig.browser import Launch
 from browserrig.core import Bounds, ElementPoint
-from browserrig.observation import DomRenderer
-from browserrig.tools import Actions, KeyboardTools, PointerTools, Targeting
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration

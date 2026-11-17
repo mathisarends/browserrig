@@ -20,24 +20,47 @@ from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from PIL import Image
 
-from browserrig import BrowserPerception, Readiness, Secret, Secrets, Totp, env
-from browserrig.core import ActionKind, Bounds, ReadinessPhase, SecretError
-from browserrig.events import ActionFailedEvent, KeyPressedEvent, SecretEnteredEvent
-from browserrig.input import Input
-from browserrig.input import keyboard as keyboard_module
-from browserrig.observation import (
+from browserrig import (
+    BrowserPerception,
     CaptureContent,
     DomPerception,
+    Input,
+    Readiness,
+    Secret,
+    Secrets,
+    Totp,
+    env,
+)
+from browserrig import PageContent as Extraction
+from browserrig.core import ActionKind, Bounds, ReadinessPhase, SecretError
+from browserrig.events import ActionFailedEvent, KeyPressedEvent, SecretEnteredEvent
+from browserrig.input import (  # smelt: ignore[SMT107] -- test seam
+    # Replace input timing where the keyboard reads it.
+    keyboard as keyboard_module,
+)
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
     Element,
     Snapshot,
     capture,
 )
-from browserrig.observation.extraction import Extraction
-from browserrig.observation.marks import blackout
+from browserrig.observation.marks import (  # smelt: ignore[SMT107] -- test seam
+    # Verify screenshot redaction and annotation independently of capture.
+    blackout,
+)
 from browserrig.secrets import SecretEntry
-from browserrig.secrets.models import resolve
-from browserrig.secrets.origin import OriginPattern
-from browserrig.secrets.redaction import Redactor
+from browserrig.secrets.models import (  # smelt: ignore[SMT107] -- test seam
+    # Test secret resolution without exposing it as a library operation.
+    resolve,
+)
+from browserrig.secrets.origin import (  # smelt: ignore[SMT107] -- test seam
+    # Test origin matching independently of secret entry and browser I/O.
+    OriginPattern,
+)
+from browserrig.secrets.redaction import (  # smelt: ignore[SMT107] -- test seam
+    # Test redaction of text and pixels independently of plugin activation.
+    Redactor,
+)
 from tests.fakes import FakeChrome, FakeReadiness, FakeTab
 
 PASSWORD = "hunter2-Correct-Horse"

@@ -18,7 +18,9 @@ from browserrig import (
     Chrome,
     ChromeBrowser,
     DomCapture,
+    DomPerception,
     Input,
+    PageText,
     Screenshots,
     ScreenshotTrigger,
     Viewport,
@@ -27,7 +29,11 @@ from browserrig import (
 from browserrig.browser import Launch
 from browserrig.core import Bounds, BrowserError, Geometry, Point, Region
 from browserrig.kinds import ElementOperation
-from browserrig.observation import DomPerception, PageText, capture, render
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
+    capture,
+    render,
+)
 from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
 from tests.observations import has_image

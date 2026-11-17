@@ -7,7 +7,10 @@ from pypdf import PdfWriter
 
 from browserrig import FileOptions, FileSystem, LocalWorkspace
 from browserrig.files import FileContent
-from browserrig.files.indexing import Indexing
+from browserrig.files.indexing import (  # smelt: ignore[SMT107] -- test seam
+    # Test index lifecycle without making its worker a public service.
+    Indexing,
+)
 
 
 async def test_automatic_pdf_index_preserves_raw_file_and_indexes_all_native_pages(

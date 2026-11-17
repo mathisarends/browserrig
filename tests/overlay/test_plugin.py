@@ -1,5 +1,6 @@
 import pytest
 
+from browserrig import ChoreographyOverlay
 from browserrig.browser import TabChanged
 from browserrig.choreography import (
     Choreography,
@@ -7,7 +8,6 @@ from browserrig.choreography import (
     WorkPhase,
 )
 from browserrig.events import CursorStateEvent, DownloadStartedEvent, EventKind
-from browserrig.overlay import ChoreographyOverlay
 from tests.fakes import mounted
 
 

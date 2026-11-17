@@ -6,10 +6,19 @@ from unittest.mock import AsyncMock
 import pytest
 from PIL import Image
 
+from browserrig import CaptureContent
+from browserrig import PageContent as Extraction
 from browserrig.core import Bounds, ReadinessPhase
-from browserrig.observation import CaptureContent, CookieBanner, Element, capture
-from browserrig.observation.extraction import Extraction
-from browserrig.secrets.redaction import Redactor
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
+    CookieBanner,
+    Element,
+    capture,
+)
+from browserrig.secrets.redaction import (  # smelt: ignore[SMT107] -- test seam
+    # Test redaction of text and pixels independently of plugin activation.
+    Redactor,
+)
 from tests.fakes import FakeReadiness, FakeTab
 
 

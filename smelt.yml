@@ -22,6 +22,8 @@ ignore:
 
 structure:
   file_naming: {yaml_extension: yml, compose_basename: compose}
+  # A ninth project dependency merits review; facades and composition roots are exempt.
+  max_module_imports: 8
   contracts:
     conventions:
       match: browserrig
@@ -48,7 +50,7 @@ structure:
       match: browserrig.recording
       dataclass_options: [frozen, slots]
     # Packages depend on each other only through their __init__ facade
-    # (SMT107 error); tests may still import implementation modules.
+    # (SMT107 error); focused test seams need reasoned import-level exceptions.
     # SMT108 hints when one file reaches into several modules of a package.
     package-facades:
       match: browserrig.*
@@ -160,6 +162,11 @@ rules:
   # Design/performance candidates need an ownership and evaluation-order review.
   parallel-record-fields: hint
   loop-invariant-collection: hint
+  complex-comprehension: hint
+  constructor-logic: hint
+  cross-module-private-attribute: warning
+  comprehension-in-call-argument: warning
+  excess-private-definitions: hint
   # Reviewed non-adoptions and compatibility rationale: docs/smelt-policy.md.
   stateful-dataclass: off
   duplicate-narrowing-assert: off

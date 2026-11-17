@@ -12,7 +12,7 @@ from harnessed.plugins import Approvals, CallEnvelope
 from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import ActionLabel, Secret, Secrets
+from browserrig import ActionLabel, Actions, DialogTools, Secret, Secrets
 from browserrig.browser import OpenDialog
 from browserrig.core import ActionKind, browser_tool
 from browserrig.events import (
@@ -21,8 +21,7 @@ from browserrig.events import (
     ActionFinishedEvent,
     ActionStartedEvent,
 )
-from browserrig.tools import Actions, DialogTools
-from browserrig.tools.effects import Effect
+from browserrig.tools import Effect
 from tests.fakes import FakeServices, mounted
 
 

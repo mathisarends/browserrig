@@ -7,7 +7,9 @@ from harnessed.testing import ScriptedModel
 from browserrig import (
     Actions,
     BrowserPerception,
+    DomCapture,
     DomPerception,
+    DomRenderer,
     DomScrollTools,
     DomTypingTools,
     Files,
@@ -20,7 +22,6 @@ from browserrig import (
     Targeting,
     TextContext,
 )
-from browserrig.observation import DomCapture, DomRenderer
 from tests.fakes import FakeChrome
 
 

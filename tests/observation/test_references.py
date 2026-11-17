@@ -9,13 +9,22 @@ from harnessed import Agent, Plugin, ToolError
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
+    Actions,
     BrowserPerception,
     CaptureContent,
+    DomElementHandle,
     DomElements,
+    DomReferences,
+    DomRenderer,
     DomTypingTools,
     ElementInfo,
     ElementRef,
+    FileTools,
+    FormTools,
+    KeyboardTools,
+    MouseEventKind,
     PageContent,
+    PointerTools,
     Readiness,
     ScrollStep,
     Targeting,
@@ -24,24 +33,17 @@ from browserrig import (
 from browserrig.core import Bounds, BrowserError, ElementPoint, Point, StaleElement
 from browserrig.events import ActionFailedEvent
 from browserrig.input import Instant
-from browserrig.kinds import MouseEventKind
-from browserrig.observation import (
-    DomElementHandle,
-    DomReferences,
-    DomRenderer,
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
     Element,
+    Offscreen,
     Snapshot,
     render,
 )
-from browserrig.observation.models import Offscreen
-from browserrig.tools import (
-    Actions,
-    FileTools,
-    FormTools,
-    KeyboardTools,
-    PointerTools,
+from browserrig.tools.scrolling import (  # smelt: ignore[SMT107] -- test seam
+    # Test reveal preparation independently of tool execution.
+    prepare_element,
 )
-from browserrig.tools.scrolling import prepare_element
 from tests.fakes import FakeChrome, FakeReadiness, FakeTab
 
 

@@ -8,9 +8,8 @@ from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Chrome, InputRuntime, Runtime, browser_plugins
+from browserrig import Chrome, InputRuntime, Runtime, TabStrip, browser_plugins
 from browserrig.browser import Browser, Launch
-from browserrig.choreography import TabStrip
 from browserrig.events import NavigationStartedEvent, TabOpenedEvent, TabUpdatedEvent
 
 pytestmark = pytest.mark.integration

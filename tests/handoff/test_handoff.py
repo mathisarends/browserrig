@@ -38,6 +38,7 @@ from browserrig import (
     TextContext,
     browser_plugins,
 )
+from browserrig import PageContent as Extraction
 from browserrig.browser import TabInfo
 from browserrig.core import ActivityKind, ActivityOutcome
 from browserrig.events import (
@@ -50,7 +51,6 @@ from browserrig.events import (
     TabOpenedEvent,
 )
 from browserrig.observation import CaptureContent, DomRenderer, Element
-from browserrig.observation.extraction import Extraction
 from tests.fakes import FakeChrome
 from tests.observations import latest
 

@@ -9,11 +9,16 @@ from cdpify.domains.network import (
     ResourceType,
 )
 
-from browserrig.browser import network as network_module
-from browserrig.browser.network import NetworkActivity
+from browserrig import NetworkQuiet, ReadinessContext, ReadinessOptions, wait_for_page
+from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
+    # Control the network clock and test request bookkeeping directly.
+    network as network_module,
+)
+from browserrig.browser.network import (  # smelt: ignore[SMT107] -- test seam
+    # Control the network clock and test request bookkeeping directly.
+    NetworkActivity,
+)
 from browserrig.core import ReadinessPhase, ReadinessStage
-from browserrig.readiness import NetworkQuiet, ReadinessOptions, wait_for_page
-from browserrig.readiness.policies import ReadinessContext
 from tests.fakes import FakeTab
 
 _OPTIONS = ReadinessOptions(

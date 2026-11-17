@@ -252,7 +252,8 @@ class _FrameExtractor:
             embedded=embedded,
         )
         result.headings, result.alerts = self._headings_and_alerts()
-        result.canvases = self._canvases({index for index, _ in result.elements})
+        element_indices = {index for index, _ in result.elements}
+        result.canvases = self._canvases(element_indices)
         if text_limit > 0:
             result.text, result.texts = self._text(text_limit, result)
         return result

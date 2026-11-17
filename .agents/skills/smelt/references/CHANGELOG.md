@@ -7,6 +7,85 @@ current configuration and complete rule contracts, see the [README](README.md),
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-16
+
+Report schema 2, YAML version 1, grouped debt baseline version 2, the default
+rule set and exit codes remain unchanged. The two new reviews require explicit
+selection and have no automatic rewrites. Update installation, hook and CI pins
+together to `0.12.0` (`v0.12.0`), refresh the editor schema and reinstall the
+bundled agent skill with `smelt skill install --force`. No baseline rewrite is
+required. See the [upgrade checklist](docs/upgrading.md#0111-to-0120).
+
+- Opt-in hint [SMT366](docs/rules/SMT366.md) `comprehension-in-call-argument`
+  asks for named intermediate collections when list, set or dict comprehensions
+  are passed directly to a call. Enable the rule explicitly; generator expressions
+  and conditional/repeated expression contexts are skipped. No automatic rewrite:
+  preserve callable lookup and argument evaluation order.
+  Implements [#180](https://github.com/mathisarends/smelt/issues/180).
+
+- Opt-in hint [SMT367](docs/rules/SMT367.md) `excess-private-definitions`
+  reviews modules with more than twelve private classes, functions and PEP 695
+  type aliases. Enable the rule explicitly; `structure.max_private_definitions`
+  supports global and closest-package limits, including zero. Findings list
+  definitions and their locations, with private constants as informational context.
+  The count does not prove that a cohesive implementation needs splitting; no
+  automatic rewrite. Implements [#181](https://github.com/mathisarends/smelt/issues/181).
+
+## [0.11.1] - 2026-11-16
+
+Report schema 2, YAML version 1, grouped debt baseline version 2, the default
+rule set and exit codes remain unchanged. Update installation, hook and CI pins
+together to `0.11.1` (`v0.11.1`) and refresh the bundled agent skill with
+`smelt skill install --force`. Review newly detected test imports under existing
+package policies; see the [upgrade checklist](docs/upgrading.md#0110-to-0111).
+
+- Package API checks now include discovered tests and `conftest.py`, including
+  configured test roots inside a source package. [SMT107](docs/rules/SMT107.md)
+  enforces public entry points, [SMT108](docs/rules/SMT108.md) reviews configured
+  bundling thresholds, and opt-in [SMT319](docs/rules/SMT319.md) suggests existing
+  package re-exports. Existing policies can now report previously missed test
+  imports; no new setting or automatic rewrite. SMT109's `count_tests` opt-in
+  remains unchanged. Fixes [#177](https://github.com/mathisarends/smelt/issues/177).
+
+## [0.11.0] - 2026-11-16
+
+Report schema 2, YAML version 1, grouped debt baseline version 2, the default
+rule set and exit codes remain unchanged. The four new reviews require explicit
+selection or package policy and have no automatic rewrites. Update installation,
+hook and CI pins together to `0.11.0` (`v0.11.0`), refresh the editor schema and
+reinstall the bundled agent skill with `smelt skill install --force`. No baseline
+rewrite is required. See the [upgrade checklist](docs/upgrading.md#0100-to-0110).
+
+- Optional [SMT110](docs/rules/SMT110.md) `module-import-fanout` counts distinct
+  direct imports across all project packages. Configure `structure.max_module_imports`
+  or a closest-package threshold to activate the hint. Initializers and declared
+  composition roots are exempt by default; `module_import_exempt: []` includes them.
+  Findings group imports by package and preserve dependency identities for changed
+  checks and baselines. No automatic rewrite.
+  Implements [#168](https://github.com/mathisarends/smelt/issues/168).
+
+- Opt-in warning [SMT365](docs/rules/SMT365.md) `cross-module-private-attribute`
+  reports private field/method accesses through statically known project receivers
+  owned by another module. Enable the rule explicitly. Global/package
+  `private_attribute_boundary: package` permits immediate-package cooperation;
+  same-module and own/inherited receiver accesses remain valid. Unknown types and
+  ambiguous inheritance are skipped; no automatic rewrite.
+  Implements [#170](https://github.com/mathisarends/smelt/issues/170).
+
+- Opt-in review [SMT363](docs/rules/SMT363.md) `complex-comprehension`
+  reports excessive iteration clauses, nontrivial conditional elements and
+  compound filters, once per outermost comprehension. Enable the rule explicitly;
+  `structure.max_comprehension_loops` and package overrides allow deliberate
+  flattening. No automatic rewrite; preserve generator laziness.
+  Implements [#167](https://github.com/mathisarends/smelt/issues/167).
+
+- Opt-in review [SMT364](docs/rules/SMT364.md) `constructor-logic` reports
+  `__init__`/`__post_init__` methods above a configurable decision limit, with the
+  counted node locations. Enable the rule explicitly; the global
+  `structure.max_constructor_decisions` defaults to 2 and supports closest-package
+  overrides, including zero. Nested helper bodies are excluded. No automatic rewrite.
+  Implements [#166](https://github.com/mathisarends/smelt/issues/166).
+
 ## [0.10.0] - 2026-11-16
 
 Report schema 2, YAML version 1, grouped debt baseline version 2, the default
@@ -903,7 +982,10 @@ smelt explain SMT313 --format json
 - Import fanout, match suggestions and missing-assertion checks are review aids;
   their default severities differ. Configure policy and severity deliberately.
 
-[Unreleased]: https://github.com/mathisarends/smelt/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/mathisarends/smelt/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/mathisarends/smelt/compare/v0.11.1...v0.12.0
+[0.11.1]: https://github.com/mathisarends/smelt/compare/v0.11.0...v0.11.1
+[0.11.0]: https://github.com/mathisarends/smelt/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/mathisarends/smelt/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/mathisarends/smelt/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/mathisarends/smelt/compare/v0.7.0...v0.8.0

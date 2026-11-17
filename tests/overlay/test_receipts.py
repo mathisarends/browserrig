@@ -6,7 +6,10 @@ from browserrig.choreography import (
     WorkPresentedEvent,
 )
 from browserrig.core import ActionKind, ActivityKind
-from browserrig.overlay.receipts import Receipts
+from browserrig.overlay.receipts import (  # smelt: ignore[SMT107] -- test seam
+    # Verify receipt rendering independently of browser staging.
+    Receipts,
+)
 
 
 def _work(identity, phase, **values):

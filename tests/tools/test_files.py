@@ -18,20 +18,31 @@ from harnessed.testing import ScriptedModel
 from pypdf import PdfReader, PdfWriter
 
 from browserrig import (
+    Actions,
     BrowserDownload,
     DomUploadTools,
     FileBridge,
     FileOptions,
     Files,
     FileSystem,
+    FileTools,
     LocalWorkspace,
     MountedWorkspace,
     Workspace,
 )
 from browserrig.browser import Connect, Launch, Tab
-from browserrig.browser import downloads as downloads_module
-from browserrig.browser.downloads import Downloads
-from browserrig.browser.tabs import file_url
+from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
+    # Control download expiry and browser event bookkeeping directly.
+    downloads as downloads_module,
+)
+from browserrig.browser.downloads import (  # smelt: ignore[SMT107] -- test seam
+    # Control download expiry and browser event bookkeeping directly.
+    Downloads,
+)
+from browserrig.browser.tabs import (  # smelt: ignore[SMT107] -- test seam
+    # Verify local-file URL recognition at the download boundary.
+    file_url,
+)
 from browserrig.events import (
     DownloadCanceledEvent,
     DownloadCompletedEvent,
@@ -45,9 +56,11 @@ from browserrig.events import (
     FileWrittenEvent,
 )
 from browserrig.files import DownloadState, FileStat, FileTransfer, workspace_path
-from browserrig.files.reading import FileReader
+from browserrig.files.reading import (  # smelt: ignore[SMT107] -- test seam
+    # Test file-read outcomes without exposing the reader as library API.
+    FileReader,
+)
 from browserrig.kinds import FileSource, ReadinessPhase
-from browserrig.tools import Actions, FileTools
 from tests.fakes import mounted
 
 _PENDING = PurePosixPath("downloads/.pending")

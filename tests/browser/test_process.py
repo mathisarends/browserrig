@@ -7,8 +7,14 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from browserrig.browser import Launch
-from browserrig.browser import process as process_module
-from browserrig.browser.process import ChromeProcess
+from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
+    # Test process ownership and cleanup without starting Chrome.
+    process as process_module,
+)
+from browserrig.browser.process import (  # smelt: ignore[SMT107] -- test seam
+    # Test process ownership and cleanup without starting Chrome.
+    ChromeProcess,
+)
 from browserrig.core import BrowserError
 
 

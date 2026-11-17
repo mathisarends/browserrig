@@ -16,7 +16,10 @@ from harnessed.models import AssistantMessage, ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel
 
 from browserrig import Activity, Browser, Chrome, InputRuntime, Runtime, VideoRecording
-from browserrig.recording import capture as capture_module
+from browserrig.recording import (  # smelt: ignore[SMT107] -- test seam
+    # Test and replace video capture without requiring ffmpeg.
+    capture as capture_module,
+)
 from tests.javascript import evaluate
 
 pytestmark = [

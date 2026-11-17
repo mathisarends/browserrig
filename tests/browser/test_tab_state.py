@@ -18,13 +18,20 @@ from cdpify.domains.runtime import BindingCalledEvent
 from harnessed import Agent
 from harnessed.testing import ScriptedModel
 
+from browserrig import TabStrip as TabStripPlugin
 from browserrig.browser import Tab, TabChanged
-from browserrig.browser.favicon import load_favicon
-from browserrig.choreography import TabStrip as TabStripPlugin
+from browserrig.browser.favicon import (  # smelt: ignore[SMT107] -- test seam
+    # Test favicon loading failures independently of a browser session.
+    load_favicon,
+)
 from browserrig.core import MouseEventKind, Point
 from browserrig.events import TabUpdatedEvent
 from browserrig.scripts import TabStrip
-from browserrig.tools.navigation import site_url, typed_address
+from browserrig.tools.navigation import (  # smelt: ignore[SMT107] -- test seam
+    # Test address normalization without executing navigation.
+    site_url,
+    typed_address,
+)
 from tests.fakes import FakeServices
 
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8

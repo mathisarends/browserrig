@@ -96,8 +96,9 @@ async def extract(
     ).run(max_elements, max_text, sparse_text)
     if not names:
         return extraction
+    frame_clients = {frame.id: frame.cdp for frame in frames}
     chrome = await chrome_names(
-        {frame.id: frame.cdp for frame in frames},
+        frame_clients,
         (element for element in extraction.elements if isinstance(element, Element)),
     )
     if chrome:
@@ -308,9 +309,8 @@ class _Assembler:
             self._limitations.append(
                 f"Page text truncated to {limit} characters; search_page reads it all"
             )
-        return self._frame_content(
-            self._frames[0], {el.ref: el for el in elements}, texts
-        )
+        elements_by_ref = {element.ref: element for element in elements}
+        return self._frame_content(self._frames[0], elements_by_ref, texts)
 
     def _frame_content(
         self,

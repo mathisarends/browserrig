@@ -6,8 +6,11 @@ from harnessed.models import ModelChunk
 from harnessed.testing import ScriptedModel
 
 from browserrig import Browser, PageSearchTools, Readiness, Secret, Secrets
-from browserrig.observation.content import ExtractedContent
-from browserrig.tools import search as search_module
+from browserrig.observation import ExtractedContent
+from browserrig.tools import (  # smelt: ignore[SMT107] -- test seam
+    # Replace document extraction where the search tool looks it up.
+    search as search_module,
+)
 from tests.fakes import FakeChrome
 
 _ROWS = """| Name | Email |

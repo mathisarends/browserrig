@@ -1,8 +1,10 @@
 import pytest
 
-from browserrig.observation import search_content
-from browserrig.observation.content import ExtractedContent
-from browserrig.observation.search import records
+from browserrig.observation import ExtractedContent, search_content
+from browserrig.observation.search import (  # smelt: ignore[SMT107] -- test seam
+    # Verify search record boundaries independently of page capture.
+    records,
+)
 
 _PAGE = """# Reviews
 

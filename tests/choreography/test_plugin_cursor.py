@@ -1,5 +1,5 @@
+from browserrig import Choreography
 from browserrig.browser import TabChanged
-from browserrig.choreography import Choreography
 from browserrig.events import CursorStateEvent
 from tests.fakes import mounted
 

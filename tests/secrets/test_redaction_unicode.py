@@ -1,6 +1,9 @@
 import pytest
 
-from browserrig.secrets.redaction import Redactor
+from browserrig.secrets.redaction import (  # smelt: ignore[SMT107] -- test seam
+    # Test redaction of text and pixels independently of plugin activation.
+    Redactor,
+)
 
 
 @pytest.mark.parametrize("value", ["Straße-2026", "ofﬁce-PIN", "İstanbul-1234"])

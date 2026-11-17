@@ -30,7 +30,8 @@ class TodoList(Options):
 
     @model_validator(mode="after")
     def _validate_list(self) -> Self:
-        if len({todo.id for todo in self.todos}) != len(self.todos):
+        todo_ids = {todo.id for todo in self.todos}
+        if len(todo_ids) != len(self.todos):
             raise ValueError("Todo IDs must be unique within the list")
         if sum(todo.status == "in_progress" for todo in self.todos) > 1:
             raise ValueError("At most one todo may be in_progress")

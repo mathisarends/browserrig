@@ -17,10 +17,10 @@ from browserrig import (
     Chrome,
     Input,
     InputPacing,
+    Point,
     wait_for_page,
 )
 from browserrig.choreography import ElementScrolledEvent, PageScrolledEvent
-from browserrig.core import Point
 from browserrig.events import (
     ActionFinishedEvent,
     InputEvent,

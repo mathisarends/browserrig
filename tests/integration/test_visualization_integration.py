@@ -46,7 +46,10 @@ from browserrig.events import (
     KeyPressedEvent,
     ScrollStartedEvent,
 )
-from browserrig.observation.content import extract_content
+from browserrig.observation.content import (  # smelt: ignore[SMT107] -- test seam
+    # Test document extraction independently of capture strategy.
+    extract_content,
+)
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration

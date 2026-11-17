@@ -2,8 +2,14 @@ import base64
 
 import pytest
 
-from browserrig.observation.extraction.accessibility import preferred
-from browserrig.observation.redirects import unwrap_redirect
+from browserrig.observation.extraction.accessibility import (  # smelt: ignore[SMT107] -- test seam
+    # Verify accessible-name precedence directly.
+    preferred,
+)
+from browserrig.observation.redirects import (  # smelt: ignore[SMT107] -- test seam
+    # Verify redirect decoding independently of page capture.
+    unwrap_redirect,
+)
 
 
 def _bing(target: str) -> str:

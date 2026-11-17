@@ -24,9 +24,15 @@ from browserrig import (
 from browserrig.core import ReadinessError, ReadinessPhase
 from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent, ReadyEvent
 from browserrig.files import Download
-from browserrig.observation import capture
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    # Public facade callable; SMT107 confuses it with the same-named module.
+    capture,
+)
 from browserrig.readiness import probe_dom
-from browserrig.readiness import wait as wait_module
+from browserrig.readiness import (  # smelt: ignore[SMT107] -- test seam
+    # Control readiness checks and clocks at their owning module.
+    wait as wait_module,
+)
 from browserrig.scripts import STABILITY, DOMProbe
 from tests.fakes import FakeBrowser, FakeChrome, FakeTab
 
