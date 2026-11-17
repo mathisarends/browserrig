@@ -28,7 +28,6 @@ from browserrig import (
     ResolveDomElement,
     ScrollStep,
     Targeting,
-    TextContext,
 )
 from browserrig.core import Bounds, BrowserError, ElementPoint, Point, StaleElement
 from browserrig.events import ActionFailedEvent
@@ -477,8 +476,7 @@ async def _observed(backend):
         plugins=[
             FakeChrome(holder),
             _Ready(),
-            _MixedPerception(capture=backend, renderer=DomRenderer()),
-            TextContext(),
+            BrowserPerception(capture=backend, renderer=DomRenderer()),
             Actions(),
             Targeting(),
             _Forms(),
@@ -517,9 +515,3 @@ async def _observed(backend):
             targets=session.scope[Targeting],
             events=events,
         )
-
-
-class _MixedPerception(BrowserPerception, provides=BrowserPerception):
-    async def setup(self, scope):
-        await super().setup(scope)
-        scope.provide(ResolveDomElement, ResolveDomElement(self))

@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from time import monotonic
-from typing import Protocol
+from typing import Protocol, override
 
 from browserrig.browser import Tab
-from browserrig.core import ReadinessPhase, ReadinessStage
+from browserrig.core import ReadinessPhase, ReadinessStage, ReadinessStatus
 
 from .config import ReadinessOptions
 from .dom import DomReadiness
@@ -43,3 +43,26 @@ class DomReady:
             else context.phase
         )
         return DomReadiness(context.tab, self.options or context.options, phase)
+
+
+class BrowserReady(ReadinessPolicy):
+    """Use browser load events without running a script in the page."""
+
+    @override
+    def create(self, context: ReadinessContext) -> ReadinessStrategy:
+        return _BrowserLoad(context.tab, context.options)
+
+
+class _BrowserLoad(ReadinessStrategy):
+    def __init__(self, tab: Tab, options: ReadinessOptions) -> None:
+        super().__init__(tab, options)
+        self.budget = options.timeout_seconds
+
+    async def check(self) -> bool:
+        self.reason = "The browser is still loading the page"
+        return not self._tab.loading
+
+    def timeout_status(self) -> ReadinessStatus:
+        if self._options.allow_degraded_dom:
+            return ReadinessStatus.DEGRADED
+        return ReadinessStatus.FAILED

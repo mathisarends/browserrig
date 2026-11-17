@@ -1,12 +1,11 @@
 from .capture import CaptureContent, CaptureStrategy, capture
 from .changes import decision_change
-from .config import PageText, Screenshots, ScreenshotTrigger
+from .config import DomText, PageText, Screenshots, ScreenshotTrigger, SetOfMarks
 from .content import ExtractedContent, extract_document
 from .dom_capture import DomCapture
 from .find import FindMark, FoundMatch, PageMatches, close_find, find_text
 from .handle import DomElementHandle, DomReferences
 from .hooks import ProjectObservation
-from .images import ImageContext, ImageRetention, TrimInBatches, UntilCompaction
 from .models import (
     Canvas,
     CapturedImage,
@@ -25,8 +24,7 @@ from .models import (
     Snapshot,
     TextBlock,
 )
-from .perception import DomPerception, ResolveDomElement
-from .plugin import BrowserPerception
+from .plugin import BrowserPerception, ResolveDomElement
 from .references import (
     ElementHandle,
     EmptyReferences,
@@ -38,13 +36,11 @@ from .references import (
 )
 from .render import render
 from .renderer import DomRenderer, Renderer
+from .retention import ImageRetention, TrimInBatches, UntilCompaction
 from .search import PageSearch, search_content
-from .text import TextContext
 
 __all__ = [
-    "DomPerception",
     "ResolveDomElement",
-    "TextContext",
     "ProjectObservation",
     "EmptyReferences",
     "RevealableElement",
@@ -63,10 +59,11 @@ __all__ = [
     "CaptureContent",
     "CaptureStrategy",
     "DomCapture",
+    "DomText",
+    "SetOfMarks",
     "PageText",
     "Screenshots",
     "ScreenshotTrigger",
-    "ImageContext",
     "ImageRetention",
     "TrimInBatches",
     "UntilCompaction",

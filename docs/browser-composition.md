@@ -18,19 +18,20 @@ Use the recipe and replace only what your agent needs:
 
 ```python
 from browserrig import (
-    Agent, Chrome, Choreography, ChoreographyOverlay, DomCapture, DomPerception,
-    ImageContext, Screenshots, ScreenshotTrigger, TrimInBatches,
+    Agent, BrowserPerception, Chrome, Choreography, ChoreographyOverlay,
+    Screenshots, ScreenshotTrigger, TrimInBatches,
 )
 
 agent = Agent(
     model=model,
     browser=Chrome.connect(endpoint=endpoint),
     plugins=[
-        DomPerception(
-            capture=DomCapture(marks=False),
-            screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
+        BrowserPerception(
+            screenshots=Screenshots(
+                trigger=ScreenshotTrigger.EACH_STEP,
+                retention=TrimInBatches(max_images=6, min_images=3),
+            ),
         ),
-        ImageContext(TrimInBatches(max_images=6, min_images=3)),
     ],
     without=(Choreography, ChoreographyOverlay),
 )
@@ -60,16 +61,15 @@ when needed. For a fully explicit composition, select individual plugins:
 ```python
 from harnessed import Agent
 from browserrig import (
-    Actions, Chrome, DomPerception, ImageContext, InputRuntime, KeyboardTools,
+    Actions, BrowserPerception, Chrome, InputRuntime, KeyboardTools,
     NavigationTools, PointerTools, Readiness, Runtime, TabTools, Targeting,
-    TextContext,
 )
 
 agent = Agent(
     model=model,
     plugins=[
-        Runtime(), Chrome.launch(), InputRuntime(), Readiness(), DomPerception(),
-        TextContext(), ImageContext(), Actions(), Targeting(),
+        Runtime(), Chrome.launch(), InputRuntime(), Readiness(),
+        BrowserPerception(), Actions(), Targeting(),
         PointerTools(), KeyboardTools(), NavigationTools(), TabTools(),
     ],
 )
@@ -151,7 +151,7 @@ with `scope.effect(...)`. Compose plugins in the application or a `PluginPack`.
 | Plugin state | `PluginState(factory)` creates mutable state for each activation. Reusing a recipe across sessions does not share this state. |
 | Browser action | `Runtime()` provides `ActionContext` and `BrowserCoordination`. `Actions` fixes the addressed tab; devices and the backend read the same task-local action ID. Correlation expires when the operation ends. |
 | Model context | `instructions()` supplies fixed guidance. `PrepareRequest` transforms the current request. `session.append_message(UserMessage(...))` adds durable conversation input. |
-| Observations | `BrowserPerception` captures snapshots; `TextContext` and `ImageContext` project text and images through `ProjectObservation`. `ObservationsIncludedEvent` confirms final inclusion after request hooks and compaction, so coordinates follow what the model actually saw. |
+| Observations | `BrowserPerception` captures snapshots and projects text and images through `ProjectObservation`. `ObservationsIncludedEvent` confirms final inclusion after request hooks and compaction, so coordinates follow what the model actually saw. |
 
 Application code resolves mounted services through `session.scope[T]`; plugins use
 `PluginScope` and the restricted `SessionContext`. `BrowserCoordination` serializes
@@ -262,7 +262,7 @@ DOM reveal scrolls exact containers and reports measured movement.
 
 `PageContent.content` can carry a reading tree of `ContentGroup`, `TextBlock`,
 `Heading` and `ElementRef`; leaving it unset retains flat rendering. A custom
-`fingerprint` supports change comparisons. `DomPerception` provides the callable
+`fingerprint` supports change comparisons. `BrowserPerception` provides the callable
 `ResolveDomElement`: `await scope[ResolveDomElement](tab, ref)` returns a DOM handle.
 Native forms, `DomUploadTools` and `DomTypingTools` use this service; other backends can use
 pointer input and focused `send_keys`. `DomActionChains` conservatively ends input chains with
@@ -282,16 +282,15 @@ Capture, image retention and text compaction are independent:
 | --- | --- |
 | `Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)` | Default: capture after the screenshot tool requests an image |
 | `Screenshots(trigger=ScreenshotTrigger.EACH_STEP)` | Capture before every model step |
-| `ImageContext()` | Keep the latest image; unchanged captures are skipped |
-| `ImageContext(TrimInBatches(max_images=6, min_images=3))` | On overflow, trim oldest images down to three |
-| `ImageContext(UntilCompaction())` | Retain images until compaction removes their steps; requires compaction to bound history |
+| `Screenshots()` | Keep the latest image; unchanged captures are skipped |
+| `Screenshots(retention=TrimInBatches(max_images=6, min_images=3))` | On overflow, trim oldest images down to three |
+| `Screenshots(retention=UntilCompaction())` | Retain images until compaction removes their steps; requires compaction to bound history |
 
-Manual compositions select `TextContext(mode="delta")` or `mode="full"` for text
-and `ImageContext()` for images. Image observations include matching full text.
+Configure `BrowserPerception(text=DomText(mode="delta"), screenshots=Screenshots())`
+for both modalities. Set either option to `None` to omit that modality.
 Perception itself registers no model tools: add `ScreenshotTools()` for screenshot
 requests and `PageSearchTools()` for page search.
 `DomTypingTools`, `DomScrollTools` and `FormTools` are separate DOM capabilities.
-Without context plugins, capture does not publish browser observations.
 Text observations remain until compaction. Coordinate tools use the latest
 included screenshot's geometry; an image from another document cannot supply
 coordinates for this page.

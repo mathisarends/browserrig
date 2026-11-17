@@ -1,100 +1,63 @@
 import hashlib
-from typing import Literal
+from collections.abc import Callable
 
-from harnessed import Plugin, PluginState, hook
-from harnessed.events import ObservationsIncludedEvent
-from harnessed.hooks import Next
-from harnessed.kernel import needs
 from harnessed.models import UserMessage
 
+from .config import DomText
 from .delta import delta, unmarked
-from .hooks import ProjectObservation
 from .models import Snapshot
-from .plugin import BrowserPerception
 from .state import ObservedText, PageView, TextState
 
 
-class TextContext(Plugin, slot="browserrig.text"):
-    """Publish full observations or retained-base deltas; register no tools."""
+def project_text(
+    snapshot: Snapshot,
+    state: TextState,
+    *,
+    options: DomText,
+    render: Callable[[Snapshot], str],
+    generation: int,
+    with_image: bool,
+) -> UserMessage | None:
+    if state.generation != generation:
+        state.bases.clear()
+        state.visible = False
+        state.generation = generation
+    text = render(snapshot)
+    key = hashlib.sha256(unmarked(text).encode()).hexdigest()
+    if (
+        not with_image
+        and options.mode == "delta"
+        and state.visible
+        and state.sent_key == key
+    ):
+        return None
+    state.sent_key, state.sent_ref, state.visible = key, snapshot.id, False
+    return _observation(
+        snapshot, text, state, full=with_image or options.mode == "full"
+    )
 
-    _state = PluginState(TextState)
-    _observe = needs(BrowserPerception)
 
-    def __init__(self, *, mode: Literal["delta", "full"] = "delta") -> None:
-        super().__init__()
-        if mode not in ("delta", "full"):
-            raise ValueError("Text context mode must be 'delta' or 'full'")
-        self.mode = mode
+def include_text(state: TextState, refs: frozenset[str]) -> None:
+    state.visible = state.sent_ref in refs
+    state.included = refs
+    state.bases = {page: base for page, base in state.bases.items() if base.ref in refs}
 
-    @hook(ProjectObservation)
-    async def _project(
-        self, event: ProjectObservation, next_: Next[UserMessage | None]
-    ) -> UserMessage | None:
-        message = await next_()
-        snapshot = event.snapshot
-        state = self._state
-        if state.generation != self._observe.generation:
-            state.bases.clear()
-            state.visible = False
-            state.generation = self._observe.generation
-        key = self._page_key(snapshot)
-        if message is None:
-            if (
-                self.mode == "delta"
-                and snapshot.image is None
-                and state.visible
-                and state.sent_key == key
-            ):
-                return None
-            message = self._observation(snapshot)
-        state.sent_key, state.sent_ref, state.visible = key, snapshot.id, False
-        return message
 
-    def _observation(self, snapshot: Snapshot) -> UserMessage:
-        state = self._state
-        message = self._observe.project(snapshot)
-        text = message.text
-        plain = unmarked(text)
-        page = PageView(
-            snapshot.tab_id,
-            snapshot.document_id,
-            snapshot.viewport_revision,
-            snapshot.width,
-            snapshot.height,
-        )
-        base = state.bases.get(page)
-        if (
-            self.mode == "delta"
-            and snapshot.image is None
-            and base is not None
-            and base.ref in state.included
-        ):
-            changes = delta(base.text, plain)
-            if len(changes) <= len(text) // 2:
-                return UserMessage(content=changes)
-        state.bases[page] = ObservedText(plain, snapshot.id)
-        return message
-
-    @hook(ObservationsIncludedEvent)
-    async def _included(self, event: ObservationsIncludedEvent) -> None:
-        state = self._state
-        refs: set[str] = set()
-        for item in event.observations:
-            if item.source == "browser":
-                refs.update(item.refs)
-        state.visible = state.sent_ref in refs
-        state.included = frozenset(refs)
-        state.bases = {
-            page: base for page, base in state.bases.items() if base.ref in refs
-        }
-
-    def _page_key(self, snapshot: Snapshot) -> str:
-        elements = []
-        for element in snapshot.elements:
-            if element.new:
-                element = element.model_copy(update={"new": False})
-            elements.append(element)
-        text = self._observe.project(
-            snapshot.model_copy(update={"elements": tuple(elements)})
-        ).text
-        return hashlib.sha256(text.encode()).hexdigest()
+def _observation(
+    snapshot: Snapshot, text: str, state: TextState, *, full: bool
+) -> UserMessage:
+    plain = unmarked(text)
+    page = PageView(
+        snapshot.tab_id,
+        snapshot.document_id,
+        snapshot.viewport_revision,
+        snapshot.width,
+        snapshot.height,
+    )
+    base = state.bases.get(page)
+    if not full and base is not None and base.ref in state.included:
+        changes = delta(base.text, plain)
+        if len(changes) <= len(text) // 2:
+            return UserMessage(content=changes)
+    state.bases[page] = ObservedText(plain, snapshot.id)
+    return UserMessage(content=text)

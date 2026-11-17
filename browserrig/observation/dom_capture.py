@@ -1,13 +1,10 @@
 import asyncio
 
-from cdpify import CDPCommandError
 from harnessed.tracing import record, traced
 from pydantic import Field
 
-from browserrig.browser import Tab, screenshot
+from browserrig.browser import Tab
 from browserrig.core import (
-    Bounds,
-    BrowserError,
     Options,
     Point,
     ReadinessPhase,
@@ -19,12 +16,9 @@ from .capture import CaptureContent
 from .config import PageText
 from .extraction import extract
 from .handle import DomReferences
-from .marks import annotate
 from .models import PageContent
 from .outline import outline
-
-_MAX_REGION_SIDE = 2000
-_SCREENSHOT_SECONDS = 2
+from .pixels import capture_pixels
 
 
 class DomCapture(Options):
@@ -45,8 +39,6 @@ class DomCapture(Options):
     # Page regions such as [MAIN] or [NAVIGATION] that group their controls.
     landmarks: bool = True
     viewport_expansion: int = Field(default=1000, ge=0, le=10000)
-    marks: bool = True
-    cursor: bool = False
 
     @traced
     async def collect(
@@ -59,6 +51,7 @@ class DomCapture(Options):
         zoom: float = 1,
         cursor: Point | None = None,
     ) -> CaptureContent:
+        del cursor
         # Comparison probes after actions need controls, not prose.
         text = PageText.OFF if report.phase == ReadinessPhase.ACTION else self.text
         record(
@@ -84,26 +77,9 @@ class DomCapture(Options):
             )
         viewport = frames[0].visible
         assert viewport is not None
-        geometry = None
-        notes: tuple[str, ...] = ()
-        if region is not None:
-            geometry = region.capture(viewport, zoom, _MAX_REGION_SIDE)
-            if geometry is None:
-                notes = (
-                    "Screenshot region is outside the viewport; showing the full viewport",
-                )
-        if geometry is None:
-            area, scale = (
-                Bounds(x=0, y=0, width=viewport.width, height=viewport.height),
-                1.0,
-            )
-        else:
-            area = Bounds(
-                x=geometry.x, y=geometry.y, width=geometry.width, height=geometry.height
-            )
-            scale = geometry.scale
-        # The screenshot does not depend on the extraction; only its marks do.
-        shot = asyncio.create_task(screenshot(tab, geometry))
+        shot = asyncio.create_task(
+            capture_pixels(tab, viewport, region=region, zoom=zoom)
+        )
         try:
             extracted = await extraction
             page = _limited(self._outline(extracted), tab)
@@ -111,32 +87,8 @@ class DomCapture(Options):
             shot.cancel()
             await asyncio.gather(shot, return_exceptions=True)
             raise
-        page.limitations = (*page.limitations, *notes)
-        try:
-            async with asyncio.timeout(_SCREENSHOT_SECONDS):
-                pixels = await shot
-        except (BrowserError, CDPCommandError, TimeoutError):
-            page.limitations = (
-                *page.limitations,
-                "Screenshot unavailable; DOM observation retained",
-            )
-            return CaptureContent(page=page, references=DomReferences())
-        image = await asyncio.to_thread(
-            annotate,
-            pixels,
-            page.elements if self.marks else (),
-            area,
-            scale=scale,
-            cursor=cursor if self.cursor else None,
-        )
-        return CaptureContent(
-            page=page,
-            image=image,
-            geometry=geometry,
-            area=area,
-            scale=scale,
-            references=DomReferences(),
-        )
+        pixels = await shot
+        return pixels.attach(CaptureContent(page=page, references=DomReferences()))
 
     def _outline(self, page: PageContent) -> PageContent:
         return outline(page, headings=self.headings, landmarks=self.landmarks)

@@ -46,10 +46,10 @@ new page or out-of-process frame session. Viewport configuration is applied firs
 
 ## Observations and element references
 
-`DomPerception` captures DOM controls and page text, including shadow roots and
-nested/cross-origin frames. `TextContext` delivers full observations or deltas;
-`ImageContext` delivers screenshots. These are separate plugins. Capture
-configuration belongs in `DomPerception(capture=DomCapture(...))`.
+`BrowserPerception` can deliver DOM text, screenshots, or both. DOM extraction
+includes shadow roots and nested/cross-origin frames. Select text delivery with
+`DomText(mode="delta")` or `DomText(mode="full")`. Configure DOM extraction with
+`BrowserPerception(capture=DomCapture(...))`.
 
 ```text
 # Checkout
@@ -69,7 +69,7 @@ include nearby previews up to 1,000 CSS pixels beyond the viewport; set
 `viewport_expansion=0` for a strict viewport. Hidden, inert and clipped content is
 excluded. Cookie-banner detection is heuristic and makes no consent choice.
 
-Observations always list controls with their labels. `DomCapture` adds the
+DOM text observations list controls with their labels. `DomCapture` adds the
 rest explicitly:
 
 ```python
@@ -83,8 +83,10 @@ DomCapture(
 
 `PageText.SPARSE` adds prose only when the viewport shows fewer than five named
 controls; `search_page` still reads all text when prose is off. Dialogs and
-cookie banners stay grouped. `max_elements=...` bounds controls. `marks=False` removes screenshot reference marks, and `cursor=True`
-adds a cursor marker. Unsupported frames and extraction limits are reported.
+cookie banners stay grouped. `max_elements=...` bounds controls. Use
+`Screenshots(marks=SetOfMarks())` to label controls in screenshots and
+`Screenshots(cursor=True)` to include the cursor marker. Unsupported frames and
+extraction limits are reported.
 Perspective-transformed frames remain unsupported.
 
 Custom captures supply opaque refs through `References`. Shared pointer tools

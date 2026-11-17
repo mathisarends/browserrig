@@ -49,6 +49,12 @@ class CapturedObservation:
     snapshot: Snapshot
     references: References
 
+    def with_limitation(self, note: str) -> CapturedObservation:
+        snapshot = self.snapshot.model_copy(
+            update={"limitations": (*self.snapshot.limitations, note)}
+        )
+        return replace(self, snapshot=snapshot)
+
 
 async def capture(
     tab: Tab,

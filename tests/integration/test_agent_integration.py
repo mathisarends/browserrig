@@ -13,9 +13,8 @@ from harnessed.testing import CallbackModel, ScriptedModel, call
 
 from browserrig import (
     Browser,
+    BrowserPerception,
     Chrome,
-    DomPerception,
-    ImageContext,
     InputRuntime,
     Readiness,
     ReadinessOptions,
@@ -210,8 +209,9 @@ async def test_dom_screenshots_are_native_images(site):
             Chrome(),
             Start(),
             Readiness(),
-            DomPerception(screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)),
-            ImageContext(),
+            BrowserPerception(
+                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
+            ),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

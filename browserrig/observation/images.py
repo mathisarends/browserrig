@@ -1,11 +1,8 @@
-from dataclasses import dataclass, replace
+import asyncio
+from dataclasses import replace
 from itertools import chain
-from typing import Protocol
 
-from harnessed import Instructions, Plugin, PluginState, SystemPrompt, hook
-from harnessed.events import ObservationsIncludedEvent
-from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
-from harnessed.kernel import needs
+from harnessed import SessionLog
 from harnessed.models import (
     ImagePart,
     ImageReference,
@@ -14,227 +11,117 @@ from harnessed.models import (
     UserMessage,
 )
 
-from browserrig.events import ObservationCapturedEvent
+from browserrig.core import Bounds
 
-from .hooks import ProjectObservation
-from .models import CapturedImage
-from .plugin import BrowserPerception
+from .config import Screenshots
+from .marks import annotate
+from .models import CapturedImage, Snapshot
 from .state import ImageState
 
-_INSTRUCTIONS = Instructions(
-    title="Browser image history",
-    text=(
-        "Screenshots belong to the observation they were captured with. Older screenshots "
-        "are dropped from context to save space; their observation text remains."
-    ),
-)
+NOTE_SOURCE = "browser-image"
 
 
-class ImageRetention(Protocol):
-    """Decides how many of the oldest images to drop once a new one was added."""
-
-    def overflow(self, count: int) -> int:
-        """Return how many oldest images to discard from `count` retained images."""
-
-
-@dataclass(frozen=True, slots=True, init=False)
-class TrimInBatches:
-    """Keep at most ``max_images``; on overflow drop the oldest until ``min_images`` remain.
-
-    Each trim changes the prompt prefix once instead of on every step. ``min_images``
-    defaults to half of ``max_images`` (at least one).
-    """
-
-    max_images: int
-    min_images: int
-
-    def __init__(self, max_images: int = 1, min_images: int | None = None) -> None:
-        min_images = _retention_minimum(max_images, min_images)
-        object.__setattr__(self, "max_images", max_images)
-        object.__setattr__(self, "min_images", min_images)
-
-    def overflow(self, count: int) -> int:
-        return count - self.min_images if count > self.max_images else 0
-
-
-@dataclass(frozen=True, slots=True)
-class UntilCompaction:
-    """Never trim; images leave history together with the steps compaction summarizes."""
-
-    def overflow(self, count: int) -> int:  # pylint: disable=unused-argument
-        return 0
-
-
-_NOTE_SOURCE = "browser-image"
-
-
-class ImageContext(Plugin, slot="browserrig.images"):
-    """Deliver screenshots inside immutable, session-owned browser observations.
-
-    Retention can remove old image parts while keeping their DOM text. Native
-    compaction removes text and images together in the request applying its summary.
-    Coordinate geometry follows final inclusion receipts, after all request hooks.
-    """
-
-    _state = PluginState(ImageState)
-    _observe = needs(BrowserPerception)
-
-    def instructions(self) -> SystemPrompt:
-        return SystemPrompt(_INSTRUCTIONS)
-
-    def __init__(
-        self, retention: ImageRetention | None = None, *, skip_unchanged: bool = True
-    ) -> None:
-        super().__init__()
-        self.retention = retention if retention is not None else TrimInBatches()
-        self.skip_unchanged = skip_unchanged
-
-    @property
-    def images(self) -> tuple[CapturedImage, ...]:
-        return tuple(self._state.images)
-
-    @hook(ObservationCapturedEvent)
-    async def _captured(self, event: ObservationCapturedEvent) -> None:
-        snapshot = self._observe.snapshot
-        if (
-            snapshot is None
-            or snapshot.id != event.observation_id
-            or snapshot.image is None
-        ):
-            return
-        images = self._state.images
-        if any(image.id == snapshot.id for image in images):
-            return
-        image = CapturedImage.from_snapshot(snapshot, event.browser_id)
-        if self.skip_unchanged and images and _same_screen(images[-1], image):
-            return
-        images.append(image)
-        overflow = self.retention.overflow(len(images))
-        if overflow:
-            del images[:overflow]
-
-    @hook(PreStep)
-    async def _before_step(
-        self, event: PreStep, next_: Next[StepDecision]
-    ) -> StepDecision:
-        # Wrap capture regardless of plugin order; session.observe replaces its pending source.
-        decision = await next_()
-        self._note(event)
-        return decision
-
-    @hook(ProjectObservation)
-    async def _project(
-        self, event: ProjectObservation, next_: Next[UserMessage | None]
-    ) -> UserMessage | None:
-        message = await next_()
-        snapshot = event.snapshot
-        image = next(
-            (
-                image
-                for image in self._state.images
-                if snapshot is not None and image.id == snapshot.id
-            ),
-            None,
+async def project_image(
+    snapshot: Snapshot, browser_id: str, state: ImageState, *, options: Screenshots
+) -> CapturedImage | None:
+    if snapshot.image is None:
+        return None
+    image = CapturedImage.from_snapshot(snapshot, browser_id)
+    cursor = snapshot.cursor if options.cursor else None
+    if options.marks is not None or cursor is not None:
+        area = _image_area(image)
+        pixels = await asyncio.to_thread(
+            annotate,
+            image.image,
+            snapshot.elements if options.marks is not None else (),
+            area,
+            scale=image.geometry.scale if image.geometry is not None else 1.0,
+            cursor=cursor,
         )
-        if image is not None and snapshot is not None:
-            observation = self._observe.project(snapshot)
-            return replace(
-                observation,
-                content=(
-                    TextPart(observation.text),
-                    TextPart(_caption(image)),
-                    ImagePart(f"data:image/png;base64,{image.image}"),
-                ),
-            )
-        return message
+        image = replace(image, image=pixels)
+    retained = state.images
+    if options.skip_unchanged and retained and _same_screen(retained[-1], image):
+        return None
+    retained.append(image)
+    overflow = options.retention.overflow(len(retained))
+    if overflow:
+        del retained[:overflow]
+    return image
 
-    @hook(PrepareRequest)
-    async def _prepare(
-        self, event: PrepareRequest, next_: Next[ModelRequest]
-    ) -> ModelRequest:
-        request = await next_()
-        retained = {image.id for image in self._state.images}
-        included = event.session.log.included_observations(request)
-        dropped = {
-            item.message_id
-            for item in included
-            if item.source == "browser" and not retained.intersection(item.refs)
-        }
-        shown = retained.intersection(
-            chain.from_iterable(
-                item.refs for item in included if item.source == "browser"
+
+def attach_image(message: UserMessage | None, image: CapturedImage) -> UserMessage:
+    parts = (
+        TextPart(_caption(image)),
+        ImagePart(f"data:image/png;base64,{image.image}"),
+    )
+    if message is None:
+        return UserMessage(content=parts)
+    if isinstance(message.content, str):
+        return replace(message, content=(TextPart(message.text), *parts))
+    return replace(message, content=(*message.content, *parts))
+
+
+def image_note(state: ImageState, snapshot: Snapshot) -> str:
+    if not state.images:
+        return ""
+    latest = state.images[-1]
+    text = f"Latest captured screenshot: {latest.id}"
+    if (latest.tab_id, latest.document_id) != (snapshot.tab_id, snapshot.document_id):
+        return text + " (another document)"
+    if snapshot.image is not None and snapshot.id != latest.id:
+        return text + " (screen unchanged this step)"
+    return text
+
+
+def trim_images(
+    request: ModelRequest, log: SessionLog, state: ImageState
+) -> ModelRequest:
+    retained = {image.id for image in state.images}
+    included = log.included_observations(request)
+    dropped = {
+        item.message_id
+        for item in included
+        if item.source == "browser" and not retained.intersection(item.refs)
+    }
+    shown = retained.intersection(
+        chain.from_iterable(item.refs for item in included if item.source == "browser")
+    )
+    stale = {
+        item.message_id
+        for item in included
+        if item.source == NOTE_SOURCE and not shown.intersection(item.refs)
+    }
+    messages = []
+    for message in request.messages:
+        if message.id in stale:
+            continue
+        if message.id in dropped and not isinstance(message.content, str):
+            content = tuple(
+                part
+                for part in message.content
+                if not isinstance(part, ImagePart | ImageReference)
             )
-        )
-        # A note about a screenshot leaves the context together with that screenshot.
-        stale = {
-            item.message_id
-            for item in included
-            if item.source == _NOTE_SOURCE and not shown.intersection(item.refs)
-        }
-        messages = []
-        for message in request.messages:
-            if message.id in stale:
+            if (
+                content
+                and len(content) != len(message.content)
+                and isinstance(content[-1], TextPart)
+                and content[-1].text.startswith("Screenshot ")
+            ):
+                content = content[:-1]
+            if not content:
                 continue
-            if message.id in dropped and not isinstance(message.content, str):
-                content = tuple(
-                    part
-                    for part in message.content
-                    if not isinstance(part, ImagePart | ImageReference)
-                )
-                message = replace(message, content=content)
-            messages.append(message)
-        return replace(request, messages=tuple(messages))
+            message = replace(message, content=content)
+        messages.append(message)
+    return replace(request, messages=tuple(messages))
 
-    @hook(ObservationsIncludedEvent)
-    async def _included(self, event: ObservationsIncludedEvent) -> None:
-        # Receipts reflect compaction and transformations after PrepareRequest as well.
-        refs: set[str] = set()
-        for item in event.observations:
-            if item.source == "browser":
-                refs.update(item.refs)
-        self._state.images[:] = [
-            image for image in self._state.images if image.id in refs
-        ]
-        self._observe.image_delivered(
-            self._state.images[-1] if self._state.images else None
+
+def _image_area(image: CapturedImage) -> Bounds:
+    geometry = image.geometry
+    if geometry is not None:
+        return Bounds(
+            x=geometry.x, y=geometry.y, width=geometry.width, height=geometry.height
         )
-
-    def _note(self, event: PreStep) -> None:
-        # Recorded once per change, so earlier requests stay a prefix of later ones.
-        images = self._state.images
-        text = self._latest_note(images[-1]) if images else ""
-        if text and text != self._state.note:
-            event.session.observe(
-                UserMessage(text), source=_NOTE_SOURCE, refs=(images[-1].id,)
-            )
-        self._state.note = text
-
-    def _latest_note(self, latest: CapturedImage) -> str:
-        snapshot = self._observe.snapshot
-        text = f"Latest captured screenshot: {latest.id}"
-        if snapshot is None or (latest.tab_id, latest.document_id) != (
-            snapshot.tab_id,
-            snapshot.document_id,
-        ):
-            text += " (another document)"
-        elif snapshot.image is not None and snapshot.id != latest.id:
-            text += " (screen unchanged this step)"
-        return text
-
-
-def _retention_minimum(max_images: int, min_images: int | None) -> int:
-    """Normalize and validate one retention window before freezing its bounds."""
-    if min_images is None:
-        min_images = max(1, max_images // 2) if _positive(max_images) else max_images
-    if not _positive(max_images) or not _positive(min_images):
-        raise ValueError("max_images and min_images must be positive integers")
-    if min_images > max_images:
-        raise ValueError("min_images must not exceed max_images")
-    return min_images
-
-
-def _positive(value: object) -> bool:
-    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
+    return Bounds(x=0, y=0, width=image.width, height=image.height)
 
 
 def _same_screen(kept: CapturedImage, new: CapturedImage) -> bool:
