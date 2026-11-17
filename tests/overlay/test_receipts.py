@@ -1,3 +1,5 @@
+import pytest
+
 from browserrig.choreography import (
     ActivityPresentedEvent,
     DownloadPresentedEvent,
@@ -6,6 +8,10 @@ from browserrig.choreography import (
     WorkPresentedEvent,
 )
 from browserrig.core import ActionKind, ActivityKind
+from browserrig.overlay import (  # smelt: ignore[SMT107] -- test seam
+    # Control the receipt clock to reproduce floating-point boundary cases.
+    receipts as receipts_module,
+)
 from browserrig.overlay.receipts import (  # smelt: ignore[SMT107] -- test seam
     # Verify receipt rendering independently of browser staging.
     Receipts,
@@ -52,6 +58,21 @@ def test_download_keeps_one_receipt_and_counts_down_its_retention():
     assert download.phase is WorkPhase.COMPLETED
     assert 0 < download.retention <= 2.2
     assert 0 < upload.retention <= 8
+
+
+def test_retention_stays_within_its_budget_at_coarse_clock_boundaries(monkeypatch):
+    now = 544.062
+    monkeypatch.setattr(receipts_module, "monotonic", lambda: now)
+    state = Receipts()
+    event = DownloadPresentedEvent(download_id="a", filename="r.pdf", phase="completed")
+    state.remember(event)
+    (current,) = state.snapshot()
+    assert current.retention == event.retention
+    now += 1
+    (current,) = state.snapshot()
+    assert current.retention == pytest.approx(1.2)
+    now += 1.3
+    assert not state.snapshot()
 
 
 def test_finished_activity_removes_its_receipt():

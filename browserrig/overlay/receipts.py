@@ -28,15 +28,18 @@ class _Receipt:
     expires_at: float | None
 
     def event_at(self, now: float) -> PresentedEvent:
-        if (
-            isinstance(
-                self.event,
-                (WorkPresentedEvent, DownloadPresentedEvent, UploadPresentedEvent),
-            )
-            and self.expires_at is not None
-        ):
-            return replace(self.event, retention=max(0, self.expires_at - now))
-        return self.event
+        if self.expires_at is None:
+            return self.event
+        match self.event:
+            case (
+                WorkPresentedEvent(retention=budget)
+                | DownloadPresentedEvent(retention=budget)
+                | UploadPresentedEvent(retention=budget)
+            ):
+                retention = min(budget, max(0, self.expires_at - now))
+                return replace(self.event, retention=retention)
+            case _:
+                return self.event
 
 
 class Receipts:
