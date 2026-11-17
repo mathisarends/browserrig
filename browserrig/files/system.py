@@ -283,12 +283,6 @@ class FileSystem:
                 await asyncio.to_thread(_write_atomically, copy, data)
         return copy
 
-    async def _index_source(self, path: str) -> Path:
-        target = await self.file(path)
-        if isinstance(self.workspace, LocalWorkspace):
-            return self.workspace.host_path(target.path)
-        return await self._local_copy(target)
-
     async def _index_read(self, path: str, **selectors) -> FileContent:
         source = await self._index_source(path)
         reader = self._reader
@@ -297,6 +291,12 @@ class FileSystem:
             reader.read, source, ReadRequest(**selectors), offset=0, max_chars=200000
         )
         return content.model_copy(update={"path": path})
+
+    async def _index_source(self, path: str) -> Path:
+        target = await self.file(path)
+        if isinstance(self.workspace, LocalWorkspace):
+            return self.workspace.host_path(target.path)
+        return await self._local_copy(target)
 
     def _extracted_path(self, extracted: str | None) -> str | None:
         """Report a saved extraction only when the agent can read it in the workspace."""

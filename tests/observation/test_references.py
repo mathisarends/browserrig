@@ -13,7 +13,6 @@ from browserrig import (
     BrowserPerception,
     CaptureContent,
     DomElementHandle,
-    DomElements,
     DomReferences,
     DomRenderer,
     DomTypingTools,
@@ -26,6 +25,7 @@ from browserrig import (
     PageContent,
     PointerTools,
     Readiness,
+    ResolveDomElement,
     ScrollStep,
     Targeting,
     TextContext,
@@ -188,11 +188,11 @@ async def test_dom_capabilities_are_checked_per_target_in_a_mixed_capture():
         frame = SimpleNamespace(id="native-frame")
         env.tab.frames.return_value = (frame,)
         env.tab.frames.side_effect = None
-        native = await env.scope[DomElements].resolve(env.tab, "native")
+        native = await env.scope[ResolveDomElement](env.tab, "native")
         assert isinstance(native, DomElementHandle)
         assert native.frame is frame and native.element.backend_id == 5
         with pytest.raises(BrowserError, match="requires a DOM element"):
-            await env.scope[DomElements].resolve(env.tab, "shape/a")
+            await env.scope[ResolveDomElement](env.tab, "shape/a")
         env.tab.frames.assert_awaited_once()
 
 
@@ -522,4 +522,4 @@ async def _observed(backend):
 class _MixedPerception(BrowserPerception, provides=BrowserPerception):
     async def setup(self, scope):
         await super().setup(scope)
-        scope.provide(DomElements, DomElements(self))
+        scope.provide(ResolveDomElement, ResolveDomElement(self))

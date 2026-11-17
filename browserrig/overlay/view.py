@@ -40,6 +40,10 @@ class OverlayView:
         self._receipts = Receipts()
         self._shown: _Document | None = None
 
+    async def show(self, tab: Tab, event: InputEvent | PresentedEvent) -> None:
+        self.remember(event)
+        await self._show(tab, event)
+
     def remember(self, event: InputEvent | PresentedEvent) -> None:
         """Retain receipts even when the document cannot currently render them."""
         if isinstance(event, PresentedEvent):
@@ -53,10 +57,6 @@ class OverlayView:
         """Redraw retained receipts in a document that has not shown them yet."""
         if _Document(tab.id, tab.document_id) != self._shown:
             await self._show(tab, None)
-
-    async def show(self, tab: Tab, event: InputEvent | PresentedEvent) -> None:
-        self.remember(event)
-        await self._show(tab, event)
 
     async def close(self) -> None:
         async with self._lock:

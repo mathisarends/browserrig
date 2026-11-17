@@ -29,7 +29,7 @@ from browserrig.tools.effects import Effect
 from browserrig.tools.intents import Intent, Perform
 
 from .context import LABEL_CHARS, CallIdentity
-from .invocation import ToolExecution
+from .invocation import InvokeTool
 from .transaction import ActionRunner
 
 
@@ -37,7 +37,7 @@ from .transaction import ActionRunner
 class _Mount:
     context: PluginScope | None = None
     runner: ActionRunner | None = None
-    invocation: ToolExecution | None = None
+    invocation: InvokeTool | None = None
 
 
 class Actions(Plugin, slot="browserrig.actions", provides=True):
@@ -69,7 +69,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
             actions=self._actions,
             page_change=self.page_change,
         )
-        self._mount.invocation = ToolExecution(self._runner, self._coordination)
+        self._mount.invocation = InvokeTool(self._runner, self._coordination)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(
@@ -178,7 +178,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
 
     @hook(BrowserToolCall)
     async def _run_tool(self, event: BrowserToolCall, next_: Next[object]) -> object:
-        return await self._invocation.run(event, next_)
+        return await self._invocation(event, next_)
 
     @property
     def _runner(self) -> ActionRunner:
@@ -187,7 +187,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         return runner
 
     @property
-    def _invocation(self) -> ToolExecution:
+    def _invocation(self) -> InvokeTool:
         invocation = self._mount.invocation
         assert invocation is not None
         return invocation

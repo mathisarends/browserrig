@@ -7,7 +7,7 @@ from pydantic import Field
 
 from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
-from browserrig.observation import DomElements
+from browserrig.observation import ResolveDomElement
 from browserrig.scripts import SelectionResult
 
 from .effects import Effect
@@ -17,7 +17,7 @@ from .targeting import Targeting
 
 class FormTools(Plugin):
     # Batching form fields is covered by the action-chain instructions of Actions.
-    _elements = needs(DomElements)
+    _elements = needs(ResolveDomElement)
     _actions = needs(Actions)
     _targets = needs(Targeting)
 
@@ -32,9 +32,9 @@ class FormTools(Plugin):
         value: Annotated[str, Field(description="Exact option label or value.")],
     ) -> Effect:
         tab = self._actions.tab
-        await self._elements.resolve(tab, ref)
+        await self._elements(tab, ref)
         point = await self._targets.hover(ref=ref, tab=tab)
-        handle = await self._elements.resolve(tab, ref)
+        handle = await self._elements(tab, ref)
         await handle.select(value)
         return Effect("Option selected.", prepared_scroll=point.scrolled)
 
@@ -55,10 +55,10 @@ class FormTools(Plugin):
         ],
     ) -> Effect:
         tab = self._actions.tab
-        handle = await self._elements.resolve(tab, ref)
+        handle = await self._elements(tab, ref)
         await handle.validate_options(values)
         point = await self._targets.hover(ref=ref, tab=tab)
-        handle = await self._elements.resolve(tab, ref)
+        handle = await self._elements(tab, ref)
         await handle.validate_options(values)
         result = await handle.select_options(values)
         selected = _selection(result)
@@ -85,7 +85,7 @@ class FormTools(Plugin):
         ],
     ) -> Effect:
         tab = self._actions.tab
-        handle = await self._elements.resolve(tab, ref)
+        handle = await self._elements(tab, ref)
         if handle.element.input_type not in {
             "date",
             "time",
@@ -95,7 +95,7 @@ class FormTools(Plugin):
         }:
             raise BrowserError("Element is not a native date/time input")
         point = await self._targets.hover(ref=ref, tab=tab)
-        handle = await self._elements.resolve(tab, ref)
+        handle = await self._elements(tab, ref)
         await handle.set_value(value)
         return Effect(
             "Date/time value set and verified.", prepared_scroll=point.scrolled

@@ -88,7 +88,7 @@ adds a cursor marker. Unsupported frames and extraction limits are reported.
 Perspective-transformed frames remain unsupported.
 
 Custom captures supply opaque refs through `References`. Shared pointer tools
-resolve their live positions; DOM-specific typing/forms require `DomElements`.
+resolve their live positions; DOM-specific typing/forms require `ResolveDomElement`.
 See [backend contracts](browser-composition.md#references-from-other-capture-backends).
 
 ## Input tools

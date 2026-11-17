@@ -92,6 +92,9 @@ class LocalWorkspace:
     def __repr__(self) -> str:
         return f"LocalWorkspace({str(self.directory)!r})"
 
+    async def read_bytes(self, path: PurePosixPath) -> bytes:
+        return await asyncio.to_thread(self.host_path(path).read_bytes)
+
     def host_path(self, path: PurePosixPath) -> Path:
         """The local path for `path`, rejecting links that resolve outside the workspace."""
         resolved = self.directory.joinpath(*path.parts).resolve()
@@ -105,26 +108,10 @@ class LocalWorkspace:
     async def list(self, path: PurePosixPath) -> Sequence[FileStat]:
         return await asyncio.to_thread(self._list, path)
 
-    async def read_bytes(self, path: PurePosixPath) -> bytes:
-        return await asyncio.to_thread(self.host_path(path).read_bytes)
-
     async def write_bytes(
         self, path: PurePosixPath, data: bytes, *, overwrite: bool = True
     ) -> None:
         await asyncio.to_thread(self._write, path, data, overwrite=overwrite)
-
-    def _stat(self, path: PurePosixPath) -> FileStat | None:
-        resolved = self.host_path(path)
-        if not resolved.exists():
-            return None
-        stat = resolved.stat()
-        directory = resolved.is_dir()
-        return FileStat(
-            path=path,
-            is_directory=directory,
-            size=None if directory else stat.st_size,
-            modified=stat.st_mtime,
-        )
 
     def _list(self, path: PurePosixPath) -> Sequence[FileStat]:
         if not path.parts and not self.directory.exists():
@@ -139,6 +126,19 @@ class LocalWorkspace:
             if stat is not None:
                 entries.append(stat)
         return entries
+
+    def _stat(self, path: PurePosixPath) -> FileStat | None:
+        resolved = self.host_path(path)
+        if not resolved.exists():
+            return None
+        stat = resolved.stat()
+        directory = resolved.is_dir()
+        return FileStat(
+            path=path,
+            is_directory=directory,
+            size=None if directory else stat.st_size,
+            modified=stat.st_mtime,
+        )
 
     def _write(self, path: PurePosixPath, data: bytes, *, overwrite: bool) -> None:
         resolved = self.host_path(path)

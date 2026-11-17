@@ -25,7 +25,7 @@ from .cookies import cookie_banners
 from .document import Document, Rect, clean
 from .flow import TextCollector
 from .styles import Style
-from .visibility import Occlusion, hidden, visible_area
+from .visibility import IsOccluded, hidden, visible_area
 
 _SKIPPED_TAGS = frozenset(
     {
@@ -175,7 +175,7 @@ def extract_frame(
     embedded: bool = False,
     viewport_expansion: int = 1000,
 ) -> FrameExtraction:
-    extractor = _FrameExtractor(
+    extractor = _ExtractFrame(
         document,
         frame_id=frame_id,
         transform=transform,
@@ -185,10 +185,10 @@ def extract_frame(
         fallback_section=fallback_section,
         viewport_expansion=viewport_expansion,
     )
-    return extractor.run(text_limit, embedded=embedded)
+    return extractor(text_limit, embedded=embedded)
 
 
-class _FrameExtractor:
+class _ExtractFrame:
     def __init__(
         self,
         document: Document,
@@ -231,10 +231,10 @@ class _FrameExtractor:
         self._marked = document.with_any_attribute(_HINT_ATTRIBUTES)
         self._disabling = semantics.disabling_ancestors(document)
         self._contexts: dict[int, Context] = {}
-        self._occlusion: Occlusion | None = None
+        self._occlusion: IsOccluded | None = None
         self._modal: int | None = None
 
-    def run(self, text_limit: int, *, embedded: bool = False) -> FrameExtraction:
+    def __call__(self, text_limit: int, *, embedded: bool = False) -> FrameExtraction:
         result = FrameExtraction(
             self._document, _context=self._context, _covered=self._covered
         )
@@ -579,8 +579,8 @@ class _FrameExtractor:
 
     def _occluded(self, index: int, area: Rect) -> bool:
         if self._occlusion is None:
-            self._occlusion = Occlusion(self._document, self._viewport)
-        return self._occlusion.covered(index, area)
+            self._occlusion = IsOccluded(self._document, self._viewport)
+        return self._occlusion(index, area)
 
     def _deduplicate(self, candidates: dict[int, bool]) -> list[int]:
         """Drop generic wrappers around real controls and generic boxes nested in controls."""

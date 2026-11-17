@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
-from dataclasses import dataclass
 from typing import NamedTuple
 
 from harnessed import Plugin, PluginState, hook
@@ -62,32 +61,17 @@ class TabStrip(Plugin):
         await asyncio.gather(*tasks, return_exceptions=True)
 
 
-@dataclass
 class _Strip:
-    """What one tab's strip shows, and the read that may still update it."""
+    """Own one tab's cached presentation and its cancellable background read."""
 
-    title: str = ""
-    # Chrome's title as last seen; a new one replaces whatever the document said.
-    chrome_title: str = ""
-    icon_url: str = ""
-    favicon: str = ""
-    shown: _StripState | None = None
-    task: asyncio.Task[None] | None = None
-
-    async def publish(self, tab: Tab) -> None:
-        """Emit the strip state, once per distinct state."""
-        if tab.title != self.chrome_title:
-            self.chrome_title = tab.title
-            self.title = tab.title
-        state = _StripState(tab.url, self.title, tab.loading, self.favicon)
-        if tab.closed or state == self.shown:
-            return
-        self.shown = state
-        await tab.emit(
-            TabUpdatedEvent(
-                url=tab.url, title=self.title, loading=tab.loading, favicon=self.favicon
-            )
-        )
+    def __init__(self) -> None:
+        self._title = ""
+        # A newly reported Chrome title replaces the last document-read title.
+        self._chrome_title = ""
+        self._icon_url = ""
+        self._favicon = ""
+        self._shown: _StripState | None = None
+        self.task: asyncio.Task[None] | None = None
 
     async def read(self, tab: Tab) -> None:
         try:
@@ -95,18 +79,36 @@ class _Strip:
                 if tab.dialog is None:
                     strip = await tab.read_strip()
                     # Chrome's target info often keeps the host as title; the document knows.
-                    self.title = strip.title or self.title
-                    if strip.icon != self.icon_url:
+                    self._title = strip.title or self._title
+                    if strip.icon != self._icon_url:
                         # The title should not wait for the icon.
                         await self.publish(tab)
                         favicon = await tab.load_icon(strip.icon) if strip.icon else ""
                         # An interrupted load must be retried on the next strip read.
-                        self.icon_url = strip.icon
-                        self.favicon = favicon
+                        self._icon_url = strip.icon
+                        self._favicon = favicon
                 await self.publish(tab)
         except Exception:  # pylint: disable=broad-exception-caught
             # Navigation, dialogs and detached sessions only cost the strip state.
             return
+
+    async def publish(self, tab: Tab) -> None:
+        """Emit the strip state, once per distinct state."""
+        if tab.title != self._chrome_title:
+            self._chrome_title = tab.title
+            self._title = tab.title
+        state = _StripState(tab.url, self._title, tab.loading, self._favicon)
+        if tab.closed or state == self._shown:
+            return
+        self._shown = state
+        await tab.emit(
+            TabUpdatedEvent(
+                url=tab.url,
+                title=self._title,
+                loading=tab.loading,
+                favicon=self._favicon,
+            )
+        )
 
     def cancel(self) -> None:
         if self.task is not None:

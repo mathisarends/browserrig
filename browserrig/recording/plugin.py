@@ -134,11 +134,9 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
                 return
             if self._capture is not None and self._capture.tab.id == tab.id:
                 return
+            directory = self._output
             await self._stop_capture()
-            assert self.output_directory is not None
-            capture = Capture(
-                tab, self.output_directory / f"{len(self._segments):04d}.mp4"
-            )
+            capture = Capture(tab, directory / f"{len(self._segments):04d}.mp4")
             await capture.start(
                 width=self.width, height=self.height, frame_rate=self.frame_rate
             )
@@ -149,7 +147,7 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
             await self._stop_capture()
         if not self._segments:
             raise BrowserError("No video was recorded")
-        assert self.output_directory is not None
+        directory = self._output
         intervals = self._activity.intervals(now=self._segments[-1].ended_at)
         spans = tuple(
             kept_spans(
@@ -179,13 +177,21 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
         self.result = await edit_video(
             tuple(self._segments),
             spans,
-            directory=self.output_directory,
+            directory=directory,
             ffmpeg=self._binary,
             width=self.width,
             height=self.height,
             frame_rate=self.frame_rate,
         )
         return self.result
+
+    @property
+    def _output(self) -> Path:
+        if self.output_directory is None:
+            raise BrowserError(
+                "Video recording requires an initialized output directory"
+            )
+        return self.output_directory
 
     async def _stop_capture(self) -> None:
         capture, self._capture = self._capture, None

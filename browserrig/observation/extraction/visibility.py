@@ -51,14 +51,14 @@ def visible_area(
     return None if is_empty(area) else area
 
 
-class Occlusion:
+class IsOccluded:
     """Paint-order index of opaque boxes, to drop controls hidden under overlays."""
 
     def __init__(self, document: Document, viewport: Rect | None) -> None:
         self._document = document
         self._boxes = _painted_boxes(document, viewport)
 
-    def covered(self, index: int, area: Rect) -> bool:
+    def __call__(self, index: int, area: Rect) -> bool:
         """True when one later-painted, unrelated box contains the element's visible area."""
         document = self._document
         paint = document.paint_order(index)

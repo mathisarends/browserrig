@@ -168,8 +168,7 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         return report
 
     async def _select(self, context: ReadinessContext) -> ReadinessPolicy:
-        assert self._state.context is not None
-        selected = await self._state.context.dispatch(SelectReadiness(context))
+        selected = await self._scope.dispatch(SelectReadiness(context))
         if selected is not None:
             return selected
         return (
@@ -179,10 +178,14 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
     async def _check(
         self, context: ReadinessContext, next_: Next[ReadinessCheck]
     ) -> ReadinessCheck:
-        assert self._state.context is not None
-        return await self._state.context.dispatch(
-            CheckReadiness(context), default=next_
-        )
+        return await self._scope.dispatch(CheckReadiness(context), default=next_)
+
+    @property
+    def _scope(self) -> PluginScope:
+        context = self._state.context
+        if context is None:
+            raise ReadinessError("Readiness hooks require an active plugin scope")
+        return context
 
 
 def _policy_or_default(policy: ReadinessPolicy | None) -> ReadinessPolicy:

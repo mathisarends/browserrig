@@ -4,6 +4,10 @@
 
 ### Breaking changes
 
+- `DomElements` is now the callable service `ResolveDomElement`. Replace
+  `await scope[DomElements].resolve(tab, ref)` with
+  `await scope[ResolveDomElement](tab, ref)`. `DomPerception` provides the new
+  service key; import it from `browserrig` or `browserrig.observation`.
 - Custom `Motor` implementations must provide
   `wheel_steps(delta_x=..., delta_y=...)`, returning `WheelStep` values from
   `browserrig.input` with native CSS-pixel deltas and `delay_before_seconds`.
@@ -12,6 +16,9 @@
 
 ### Changes
 
+- Enforce the reviewed Smelt source and test conventions as errors, including
+  stateful dataclasses and repeated lifecycle narrowing assertions. Keep only
+  the three documented import/navigation review heuristics as visible hints.
 - Wheel scrolling follows the motor installed by `InputPacing`. `HumanMotor`
   accelerates and decelerates gently; `scroll_speed=0.5` doubles the gesture's
   duration and `scroll_speed=2` halves it. `Instant` sends one wheel event

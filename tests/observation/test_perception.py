@@ -82,7 +82,7 @@ async def test_generic_perception_does_not_satisfy_dom_tool_dependencies():
         ],
     )
     with pytest.raises(
-        PluginDependencyError, match="DomTypingTools requires DomElements"
+        PluginDependencyError, match="DomTypingTools requires ResolveDomElement"
     ):
         await agent.run("Type in a field")
     assert not model.requests

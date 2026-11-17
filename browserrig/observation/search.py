@@ -123,36 +123,36 @@ class _Item:
     order: int
 
 
-@dataclass
 class _Parser:
-    records: list[tuple[int, Record]] = field(default_factory=list)
-    section: str = ""
-    # The list the current items belong to, kept while sibling items follow.
-    list_container: int = 0
-    lines: int = 0
-    items: list[_Item] = field(default_factory=list)
-    paragraph: list[str] = field(default_factory=list)
-    paragraph_start: int = 0
-    table: list[str] = field(default_factory=list)
-    fence: str = ""
-    containers: int = 0
+    def __init__(self) -> None:
+        self.records: list[tuple[int, Record]] = []
+        self._section = ""
+        # Keep the list's identity while sibling items follow.
+        self._list_container = 0
+        self._lines = 0
+        self._items: list[_Item] = []
+        self._paragraph: list[str] = []
+        self._paragraph_start = 0
+        self._table: list[str] = []
+        self._fence = ""
+        self._containers = 0
 
     def feed(self, line: str) -> None:
-        self.lines += 1
+        self._lines += 1
         stripped = line.strip()
-        if self.fence:
+        if self._fence:
             self._text(line)
-            if stripped.startswith(self.fence):
-                self.fence = ""
+            if stripped.startswith(self._fence):
+                self._fence = ""
             return
         if fence := _FENCE.match(line):
             self._end_table()
-            self.fence = fence[1]
+            self._fence = fence[1]
             self._text(line)
             return
         if stripped.startswith("|"):
             self._end_paragraph()
-            self.table.append(stripped)
+            self._table.append(stripped)
             return
         self._end_table()
         if not stripped:
@@ -160,21 +160,21 @@ class _Parser:
             return
         if heading := _HEADING.match(line):
             self._end_items()
-            self.section = heading[1].strip()
+            self._section = heading[1].strip()
             return
         if marker := _LIST_MARKER.match(line):
             self._end_paragraph()
             indent = len(marker[1])
             self._close_items(indent)
-            if not self.list_container:
-                self.list_container = self._container()
-            self.items.append(
+            if not self._list_container:
+                self._list_container = self._container()
+            self._items.append(
                 _Item(
                     indent,
                     len(marker[0]),
                     [line.strip()],
-                    self.list_container,
-                    self.lines,
+                    self._list_container,
+                    self._lines,
                 )
             )
             return
@@ -185,45 +185,12 @@ class _Parser:
         self._end_paragraph()
         self._end_items()
 
-    def _text(self, line: str) -> None:
-        indent = len(line) - len(line.lstrip())
-        while self.items and indent < self.items[-1].content:
-            self._emit_item(self.items.pop())
-        if self.items:
-            self.items[-1].lines.append(line.strip())
-        else:
-            self.list_container = 0
-            if not self.paragraph:
-                self.paragraph_start = self.lines
-            self.paragraph.append(line.strip())
-
-    def _close_items(self, indent: int) -> None:
-        while self.items and self.items[-1].indent >= indent:
-            self._emit_item(self.items.pop())
-
-    def _end_items(self) -> None:
-        self._end_paragraph()
-        self._close_items(0)
-        self.list_container = 0
-
-    def _emit_item(self, item: _Item) -> None:
-        self._emit(" ".join(item.lines), container=item.container, order=item.order)
-
-    def _end_paragraph(self) -> None:
-        if self.paragraph:
-            self._emit(
-                " ".join(self.paragraph),
-                container=self._container(),
-                order=self.paragraph_start,
-            )
-            self.paragraph = []
-
     def _end_table(self) -> None:
-        rows, self.table = self.table, []
+        rows, self._table = self._table, []
         if not rows:
             return
         self._end_items()
-        first = self.lines - len(rows)
+        first = self._lines - len(rows)
         header = ""
         if len(rows) > 1 and _SEPARATOR.match(rows[1]):
             # An all-empty header row stands for a table without column headers.
@@ -237,12 +204,45 @@ class _Parser:
                     row, header=header, container=container, order=first + offset
                 )
 
+    def _end_items(self) -> None:
+        self._end_paragraph()
+        self._close_items(0)
+        self._list_container = 0
+
+    def _text(self, line: str) -> None:
+        indent = len(line) - len(line.lstrip())
+        while self._items and indent < self._items[-1].content:
+            self._emit_item(self._items.pop())
+        if self._items:
+            self._items[-1].lines.append(line.strip())
+        else:
+            self._list_container = 0
+            if not self._paragraph:
+                self._paragraph_start = self._lines
+            self._paragraph.append(line.strip())
+
+    def _close_items(self, indent: int) -> None:
+        while self._items and self._items[-1].indent >= indent:
+            self._emit_item(self._items.pop())
+
+    def _emit_item(self, item: _Item) -> None:
+        self._emit(" ".join(item.lines), container=item.container, order=item.order)
+
+    def _end_paragraph(self) -> None:
+        if self._paragraph:
+            self._emit(
+                " ".join(self._paragraph),
+                container=self._container(),
+                order=self._paragraph_start,
+            )
+            self._paragraph = []
+
     def _emit(self, text: str, *, container: int, order: int, header: str = "") -> None:
-        self.records.append((order, Record(text, self.section, header, container)))
+        self.records.append((order, Record(text, self._section, header, container)))
 
     def _container(self) -> int:
-        self.containers += 1
-        return self.containers
+        self._containers += 1
+        return self._containers
 
 
 def _window(record: Record, needles: tuple[str, ...]) -> Record:

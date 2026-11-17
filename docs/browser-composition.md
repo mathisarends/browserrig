@@ -262,8 +262,9 @@ DOM reveal scrolls exact containers and reports measured movement.
 
 `PageContent.content` can carry a reading tree of `ContentGroup`, `TextBlock`,
 `Heading` and `ElementRef`; leaving it unset retains flat rendering. A custom
-`fingerprint` supports change comparisons. `DomPerception` provides `DomElements`
-for native forms, `DomUploadTools` and `DomTypingTools`; other backends can use
+`fingerprint` supports change comparisons. `DomPerception` provides the callable
+`ResolveDomElement`: `await scope[ResolveDomElement](tab, ref)` returns a DOM handle.
+Native forms, `DomUploadTools` and `DomTypingTools` use this service; other backends can use
 pointer input and focused `send_keys`. `DomActionChains` conservatively ends input chains with
 custom resolvers; supply a matching policy for stronger continuation checks.
 
