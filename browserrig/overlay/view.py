@@ -33,13 +33,7 @@ class OverlayView:
     """One session's iframe per tab, fed with serialized receipts."""
 
     def __init__(self, style: OverlayStyle) -> None:
-        self._presentation = style.model_dump(mode="json")
-        self._presentation["events"] = {kind.name: kind.value for kind in EventKind}
-        self._presentation["phases"] = {phase.name: phase.value for phase in WorkPhase}
-        self._presentation["actions"] = {kind.name: kind.value for kind in ActionKind}
-        self._presentation["activities"] = {
-            kind.name: kind.value for kind in ActivityKind
-        }
+        self._presentation = _presentation(style)
         self._overlays: dict[str, Overlay] = {}
         self._lock = asyncio.Lock()
         self._closed = False
@@ -94,6 +88,15 @@ class OverlayView:
                 ]
             await overlay.send(data)
             self._shown = identity
+
+
+def _presentation(style: OverlayStyle) -> dict[str, object]:
+    presentation = style.model_dump(mode="json")
+    presentation["events"] = {kind.name: kind.value for kind in EventKind}
+    presentation["phases"] = {phase.name: phase.value for phase in WorkPhase}
+    presentation["actions"] = {kind.name: kind.value for kind in ActionKind}
+    presentation["activities"] = {kind.name: kind.value for kind in ActivityKind}
+    return presentation
 
 
 @cache

@@ -273,12 +273,10 @@ class Nudges(Plugin, slot="browserrig.nudges", provides=True, needs=(SessionLog,
 
     @hook(ObservationsIncludedEvent)
     async def _on_request(self, event: ObservationsIncludedEvent) -> None:
-        refs = {
-            ref
-            for observation in event.observations
-            if observation.source == _SOURCE
-            for ref in observation.refs
-        }
+        refs: set[str] = set()
+        for observation in event.observations:
+            if observation.source == _SOURCE:
+                refs.update(observation.refs)
         included = tuple(
             item.nudge_id
             for item in self._state.queued.values()

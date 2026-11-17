@@ -35,13 +35,8 @@ class Secret:
     origins: tuple[OriginPattern, ...] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        domains = (
-            (self.domains,) if isinstance(self.domains, str) else tuple(self.domains)
-        )
-        if not domains:
-            raise ValueError("A secret needs at least one domain")
-        if not isinstance(self.value, str) and not callable(self.value):
-            raise TypeError("A secret value must be text or a callable returning text")
+        domains = _secret_domains(self.domains)
+        _validate_value_source(self.value)
         object.__setattr__(self, "domains", domains)
         object.__setattr__(
             self, "origins", tuple(OriginPattern.parse(d) for d in domains)
@@ -88,3 +83,15 @@ def env(name: str) -> Callable[[], str]:
 
     read.__qualname__ = read.__name__ = f"env({name})"
     return read
+
+
+def _secret_domains(domains: tuple[str, ...] | str) -> tuple[str, ...]:
+    normalized = (domains,) if isinstance(domains, str) else tuple(domains)
+    if not normalized:
+        raise ValueError("A secret needs at least one domain")
+    return normalized
+
+
+def _validate_value_source(value: SecretValue) -> None:
+    if not isinstance(value, str) and not callable(value):
+        raise TypeError("A secret value must be text or a callable returning text")

@@ -162,10 +162,10 @@ rules:
   # Design/performance candidates need an ownership and evaluation-order review.
   parallel-record-fields: hint
   loop-invariant-collection: hint
-  complex-comprehension: hint
-  constructor-logic: hint
-  cross-module-private-attribute: warning
-  comprehension-in-call-argument: warning
+  complex-comprehension: error
+  constructor-logic: error
+  cross-module-private-attribute: error
+  comprehension-in-call-argument: error
   excess-private-definitions: hint
   # Reviewed non-adoptions and compatibility rationale: docs/smelt-policy.md.
   stateful-dataclass: off

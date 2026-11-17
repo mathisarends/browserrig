@@ -145,6 +145,12 @@ def test_totp_rejects_invalid_seeds_without_echoing_them():
     assert "not base32" not in str(error.value)
 
 
+@pytest.mark.parametrize("options", [{"digits": 5}, {"period": 0}, {"digest": "md5"}])
+def test_totp_rejects_invalid_settings_before_decoding_a_literal_seed(options):
+    with pytest.raises(ValueError, match="Invalid TOTP settings"):
+        Totp("not base32 !!", **options)
+
+
 async def test_resolve_errors_name_the_secret_but_never_its_value(monkeypatch):
     def broken():
         raise RuntimeError(f"backend failed for {PASSWORD}")

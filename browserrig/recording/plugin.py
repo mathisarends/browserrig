@@ -46,12 +46,7 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
         ffmpeg: str = "ffmpeg",
     ) -> None:
         super().__init__()
-        if width <= 0 or height <= 0 or width % 2 or height % 2:
-            raise ValueError("Video width and height must be positive even integers")
-        if not 1 <= frame_rate <= 60:
-            raise ValueError("Video frame_rate must be between 1 and 60")
-        if not math.isfinite(padding) or padding < 0:
-            raise ValueError("Video padding must be finite and nonnegative")
+        _validate_encoding(width, height, frame_rate, padding)
         self.directory = Path(directory)
         self.width = width
         self.height = height
@@ -197,3 +192,14 @@ class VideoRecording(Plugin, slot="browserrig.recording", provides=True):
         if capture is not None:
             segment = await capture.stop()
             self._segments.append(segment)
+
+
+def _validate_encoding(
+    width: int, height: int, frame_rate: int, padding: float
+) -> None:
+    if width <= 0 or height <= 0 or width % 2 or height % 2:
+        raise ValueError("Video width and height must be positive even integers")
+    if not 1 <= frame_rate <= 60:
+        raise ValueError("Video frame_rate must be between 1 and 60")
+    if not math.isfinite(padding) or padding < 0:
+        raise ValueError("Video padding must be finite and nonnegative")

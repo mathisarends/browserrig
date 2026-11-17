@@ -69,22 +69,9 @@ class TaskMemory(Compaction, provides=True):
             target_tokens=target_tokens,
             max_summary_tokens=max_summary_tokens,
         )
-        normalized = workspace_path(path)
-        if (
-            normalized.suffix != ".md"
-            or '"' in str(normalized)
-            or "\n" in str(normalized)
-        ):
-            raise ValueError("Task memory needs a workspace-relative Markdown path")
-        if isinstance(warn_at, bool) or not 0 < warn_at < 0.9:
-            raise ValueError("warn_at must be between 0 and 0.9")
-        if (
-            isinstance(fallback_tokens, bool)
-            or not isinstance(fallback_tokens, int)
-            or fallback_tokens < 1
-        ):
-            raise ValueError("fallback_tokens must be a positive integer")
-        self.path = str(normalized)
+        normalized = _memory_path(path)
+        _validate_budget(warn_at, fallback_tokens)
+        self.path = normalized
         self.warn_at = warn_at
         self.fallback_tokens = fallback_tokens
 
@@ -301,6 +288,24 @@ class TaskMemory(Compaction, provides=True):
                     restore_pending=state.restore_pending,
                 )
             )
+
+
+def _memory_path(path: str) -> str:
+    normalized = workspace_path(path)
+    if normalized.suffix != ".md" or '"' in str(normalized) or "\n" in str(normalized):
+        raise ValueError("Task memory needs a workspace-relative Markdown path")
+    return str(normalized)
+
+
+def _validate_budget(warn_at: float, fallback_tokens: int) -> None:
+    if isinstance(warn_at, bool) or not 0 < warn_at < 0.9:
+        raise ValueError("warn_at must be between 0 and 0.9")
+    if (
+        isinstance(fallback_tokens, bool)
+        or not isinstance(fallback_tokens, int)
+        or fallback_tokens < 1
+    ):
+        raise ValueError("fallback_tokens must be a positive integer")
 
 
 def _default_trigger(state: ContextState) -> bool:

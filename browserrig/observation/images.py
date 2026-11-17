@@ -1,4 +1,5 @@
 from dataclasses import dataclass, replace
+from itertools import chain
 from typing import Protocol
 
 from harnessed import Instructions, Plugin, PluginState, SystemPrompt, hook
@@ -48,14 +49,7 @@ class TrimInBatches:
     min_images: int
 
     def __init__(self, max_images: int = 1, min_images: int | None = None) -> None:
-        if min_images is None:
-            min_images = (
-                max(1, max_images // 2) if _positive(max_images) else max_images
-            )
-        if not _positive(max_images) or not _positive(min_images):
-            raise ValueError("max_images and min_images must be positive integers")
-        if min_images > max_images:
-            raise ValueError("min_images must not exceed max_images")
+        min_images = _retention_minimum(max_images, min_images)
         object.__setattr__(self, "max_images", max_images)
         object.__setattr__(self, "min_images", min_images)
 
@@ -167,7 +161,9 @@ class ImageContext(Plugin, slot="browserrig.images"):
             if item.source == "browser" and not retained.intersection(item.refs)
         }
         shown = retained.intersection(
-            ref for item in included if item.source == "browser" for ref in item.refs
+            chain.from_iterable(
+                item.refs for item in included if item.source == "browser"
+            )
         )
         # A note about a screenshot leaves the context together with that screenshot.
         stale = {
@@ -175,31 +171,27 @@ class ImageContext(Plugin, slot="browserrig.images"):
             for item in included
             if item.source == _NOTE_SOURCE and not shown.intersection(item.refs)
         }
-        messages = tuple(
-            replace(
-                message,
-                content=tuple(
+        messages = []
+        for message in request.messages:
+            if message.id in stale:
+                continue
+            if message.id in dropped and not isinstance(message.content, str):
+                content = tuple(
                     part
                     for part in message.content
                     if not isinstance(part, ImagePart | ImageReference)
-                ),
-            )
-            if message.id in dropped and not isinstance(message.content, str)
-            else message
-            for message in request.messages
-            if message.id not in stale
-        )
-        return replace(request, messages=messages)
+                )
+                message = replace(message, content=content)
+            messages.append(message)
+        return replace(request, messages=tuple(messages))
 
     @hook(ObservationsIncludedEvent)
     async def _included(self, event: ObservationsIncludedEvent) -> None:
         # Receipts reflect compaction and transformations after PrepareRequest as well.
-        refs = {
-            ref
-            for item in event.observations
-            if item.source == "browser"
-            for ref in item.refs
-        }
+        refs: set[str] = set()
+        for item in event.observations:
+            if item.source == "browser":
+                refs.update(item.refs)
         self._state.images[:] = [
             image for image in self._state.images if image.id in refs
         ]
@@ -228,6 +220,17 @@ class ImageContext(Plugin, slot="browserrig.images"):
         elif snapshot.image is not None and snapshot.id != latest.id:
             text += " (screen unchanged this step)"
         return text
+
+
+def _retention_minimum(max_images: int, min_images: int | None) -> int:
+    """Normalize and validate one retention window before freezing its bounds."""
+    if min_images is None:
+        min_images = max(1, max_images // 2) if _positive(max_images) else max_images
+    if not _positive(max_images) or not _positive(min_images):
+        raise ValueError("max_images and min_images must be positive integers")
+    if min_images > max_images:
+        raise ValueError("min_images must not exceed max_images")
+    return min_images
 
 
 def _positive(value: object) -> bool:

@@ -73,20 +73,8 @@ class TextCollector:
         self._document = document
         self._limit = limit
         self._excluded = _represented(document, elements, headings)
-        links = {
-            node: ElementRef(ref=element.ref)
-            for node, element in elements
-            if element.role == "link"
-        }
-        self._links: list[ElementRef | None] = []
-        for node in document.elements():
-            parent = document.parent(node)
-            inherited = self._links[parent] if parent >= 0 else None
-            self._links.append(links.get(node, inherited))
-        self._breaks = sorted(
-            {node for node, _ in (*elements, *headings)}
-            | {node for node in document.elements() if document.tag(node) == "br"}
-        )
+        self._links = _link_owners(document, elements)
+        self._breaks = _flow_breaks(document, elements, headings)
         self._blocks: list[tuple[int, TextBlock]] = []
         self._owners: dict[int, int] = {}
         self._owner = -1
@@ -242,6 +230,34 @@ def compose(
         else:
             roots.extend(children)
     return tuple(roots)
+
+
+def _link_owners(
+    document: Document, elements: list[tuple[int, Element]]
+) -> list[ElementRef | None]:
+    """Index each DOM node by its nearest represented link ancestor."""
+    links = {
+        node: ElementRef(ref=element.ref)
+        for node, element in elements
+        if element.role == "link"
+    }
+    owners: list[ElementRef | None] = []
+    for node in document.elements():
+        parent = document.parent(node)
+        inherited = owners[parent] if parent >= 0 else None
+        owners.append(links.get(node, inherited))
+    return owners
+
+
+def _flow_breaks(
+    document: Document,
+    elements: list[tuple[int, Element]],
+    headings: list[tuple[int, Heading]],
+) -> list[int]:
+    """Preserve explicit controls, headings and line breaks between prose runs."""
+    represented = {node for node, _ in (*elements, *headings)}
+    line_breaks = {node for node in document.elements() if document.tag(node) == "br"}
+    return sorted(represented | line_breaks)
 
 
 def _is_prose(children: tuple[ContentNode, ...], links: frozenset[str]) -> bool:

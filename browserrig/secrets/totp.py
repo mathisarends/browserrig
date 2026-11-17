@@ -26,12 +26,7 @@ class Totp:
         period: int = 30,
         digest: str = "sha1",
     ) -> None:
-        if (
-            not 6 <= digits <= 10
-            or period <= 0
-            or digest not in {"sha1", "sha256", "sha512"}
-        ):
-            raise ValueError("Invalid TOTP settings")
+        _validate_settings(digits, period, digest)
         if isinstance(seed, str):
             _key(seed)
         self._seed = seed
@@ -52,6 +47,15 @@ class Totp:
         offset = mac[-1] & 0x0F
         code = struct.unpack(">I", mac[offset : offset + 4])[0] & 0x7FFFFFFF
         return f"{code % 10**self._digits:0{self._digits}d}"
+
+
+def _validate_settings(digits: int, period: int, digest: str) -> None:
+    if (
+        not 6 <= digits <= 10
+        or period <= 0
+        or digest not in {"sha1", "sha256", "sha512"}
+    ):
+        raise ValueError("Invalid TOTP settings")
 
 
 def _key(seed: str) -> bytes:

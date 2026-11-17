@@ -64,11 +64,7 @@ def _flow_body(snapshot: Snapshot) -> list[str]:
             )
             lines.extend(preview)
     uploads: list[ElementInfo | Heading] = [
-        element
-        for element in snapshot.elements
-        if element.input_type == "file"
-        and not element.in_viewport
-        and element.outside_viewport is None
+        element for element in snapshot.elements if _upload_outside_viewport(element)
     ]
     if uploads:
         lines.extend(
@@ -131,7 +127,9 @@ def _body(snapshot: Snapshot) -> list[str]:
         *(heading for heading in snapshot.headings if heading.in_viewport),
     ]
     lines = ["", "in viewport:"]
-    banner_refs = {ref for banner in snapshot.cookie_banners for ref in banner.refs}
+    banner_refs: set[str] = set()
+    for banner in snapshot.cookie_banners:
+        banner_refs.update(banner.refs)
     for banner in snapshot.cookie_banners:
         name = f": {_cut(banner.name, 80)}" if banner.name else ""
         section = f"COOKIE BANNER{name}"
@@ -160,9 +158,7 @@ def _body(snapshot: Snapshot) -> list[str]:
         preview: list[ElementInfo | Heading] = [
             item
             for item in (*snapshot.elements, *snapshot.headings)
-            if not item.in_viewport
-            and item.outside_viewport == position
-            and (not isinstance(item, ElementInfo) or not item.covered)
+            if _preview_item(item, position)
         ]
         if preview:
             lines.extend(
@@ -173,11 +169,7 @@ def _body(snapshot: Snapshot) -> list[str]:
             )
             lines.extend(_blocks(preview, snapshot.url))
     uploads: list[ElementInfo | Heading] = [
-        element
-        for element in snapshot.elements
-        if element.input_type == "file"
-        and not element.in_viewport
-        and element.outside_viewport is None
+        element for element in snapshot.elements if _upload_outside_viewport(element)
     ]
     if uploads:
         lines.extend(
@@ -185,6 +177,22 @@ def _body(snapshot: Snapshot) -> list[str]:
         )
         lines.extend(_blocks(uploads, snapshot.url))
     return lines
+
+
+def _preview_item(item: ElementInfo | Heading, position: str) -> bool:
+    return (
+        not item.in_viewport
+        and item.outside_viewport == position
+        and (not isinstance(item, ElementInfo) or not item.covered)
+    )
+
+
+def _upload_outside_viewport(element: ElementInfo) -> bool:
+    return (
+        element.input_type == "file"
+        and not element.in_viewport
+        and element.outside_viewport is None
+    )
 
 
 def _cursor(snapshot: Snapshot) -> str:

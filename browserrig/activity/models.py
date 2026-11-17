@@ -18,13 +18,7 @@ class ActivityKey:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "kind", ActivityKind(self.kind))
-        if not isinstance(self.correlation_id, str):
-            raise TypeError("Activity correlation IDs must be strings")
-        correlated = self.kind != ActivityKind.PAUSED
-        if bool(self.correlation_id) != correlated:
-            raise ValueError(
-                "Model, tool, readiness and compaction activities require a correlation ID"
-            )
+        _validate_correlation(self.kind, self.correlation_id)
 
 
 def step_outcome(reason: StepOutcome) -> ActivityOutcome:
@@ -91,3 +85,13 @@ def project_intervals(
         for event in opened.values()
     )
     return tuple(completed)
+
+
+def _validate_correlation(kind: ActivityKind, correlation_id: str) -> None:
+    if not isinstance(correlation_id, str):
+        raise TypeError("Activity correlation IDs must be strings")
+    correlated = kind != ActivityKind.PAUSED
+    if bool(correlation_id) != correlated:
+        raise ValueError(
+            "Model, tool, readiness and compaction activities require a correlation ID"
+        )

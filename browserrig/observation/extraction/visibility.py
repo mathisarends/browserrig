@@ -56,26 +56,7 @@ class Occlusion:
 
     def __init__(self, document: Document, viewport: Rect | None) -> None:
         self._document = document
-        self._boxes: list[_PaintedBox] = []
-        if viewport is None:
-            return
-        for index in document.elements():
-            if not document.is_element(index) or not document.has_layout(index):
-                continue
-            if not _paints(document, index):
-                continue
-            rect = document.rect(index)
-            if rect is None or hidden(document, index, rect):
-                continue
-            area = visible_area(document, index, rect, viewport)
-            if (
-                area is not None
-                and (area[2] - area[0]) * (area[3] - area[1]) >= _MIN_OCCLUDER_AREA
-            ):
-                self._boxes.append(
-                    _PaintedBox(document.paint_order(index), index, area)
-                )
-        self._boxes.sort(reverse=True)
+        self._boxes = _painted_boxes(document, viewport)
 
     def covered(self, index: int, area: Rect) -> bool:
         """True when one later-painted, unrelated box contains the element's visible area."""
@@ -96,6 +77,35 @@ class Occlusion:
         return False
 
 
+class _PaintedBox(NamedTuple):
+    paint_order: int
+    index: int
+    area: Rect
+
+
+def _painted_boxes(document: Document, viewport: Rect | None) -> list[_PaintedBox]:
+    """Build the descending paint-order index used by every occlusion query."""
+    boxes: list[_PaintedBox] = []
+    if viewport is None:
+        return boxes
+    for index in document.elements():
+        if not document.is_element(index) or not document.has_layout(index):
+            continue
+        if not _paints(document, index):
+            continue
+        rect = document.rect(index)
+        if rect is None or hidden(document, index, rect):
+            continue
+        area = visible_area(document, index, rect, viewport)
+        if (
+            area is not None
+            and (area[2] - area[0]) * (area[3] - area[1]) >= _MIN_OCCLUDER_AREA
+        ):
+            boxes.append(_PaintedBox(document.paint_order(index), index, area))
+    boxes.sort(reverse=True)
+    return boxes
+
+
 def _paints(document: Document, index: int) -> bool:
     """Opaque boxes that are positioned or inside a fixed box; static flow does not overlap."""
     if document.style(
@@ -109,9 +119,3 @@ def _paints(document: Document, index: int) -> bool:
     if document.tag(index) in _OPAQUE_TAGS:
         return True
     return document.style(index, Style.BACKGROUND_COLOR) not in _TRANSPARENT
-
-
-class _PaintedBox(NamedTuple):
-    paint_order: int
-    index: int
-    area: Rect

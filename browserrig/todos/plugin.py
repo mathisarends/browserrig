@@ -122,13 +122,14 @@ class Todos(Plugin, provides=True):
 
 def _steps_since_update(messages: Sequence[Message]) -> int | None:
     """Assistant steps after the last successful todo read or update in context."""
-    calls = {
-        call.id
-        for message in messages
-        if isinstance(message, AssistantMessage)
-        for call in message.tool_calls
-        if call.name in (_TOOL, "read_todos")
-    }
+    calls: set[str] = set()
+    for message in messages:
+        if isinstance(message, AssistantMessage):
+            calls.update(
+                call.id
+                for call in message.tool_calls
+                if call.name in (_TOOL, "read_todos")
+            )
     for index in range(len(messages) - 1, -1, -1):
         message = messages[index]
         if (

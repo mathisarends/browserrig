@@ -92,10 +92,8 @@ class Document:  # pylint: disable=too-many-public-methods
         # Chrome encodes empty strings as index -1, which now lands on this sentinel.
         strings = [*strings, ""]
         self.frame_id = strings[document.frame_id]
-        self.url = (
-            strings[document.document_url] if document.document_url is not None else ""
-        )
-        self.title = strings[document.title] if document.title is not None else ""
+        self.url = _optional_string(strings, document.document_url)
+        self.title = _optional_string(strings, document.title)
         self.scroll = (document.scroll_offset_x or 0.0, document.scroll_offset_y or 0.0)
         self.content_height = document.content_height or 0.0
         self.backend_ids: list[int] = nodes.backend_node_id or []
@@ -518,6 +516,10 @@ class Document:  # pylint: disable=too-many-public-methods
             if parent >= 0 and end[index] > end[parent]:
                 end[parent] = end[index]
         return end
+
+
+def _optional_string(strings: list[str], index: int | None) -> str:
+    return strings[index] if index is not None else ""
 
 
 def _overflow(rect: Rect, overflow_x: str, overflow_y: str, *, hard: bool) -> Rect:

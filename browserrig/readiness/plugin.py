@@ -42,8 +42,8 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
     ) -> None:
         super().__init__()
         self.options = options if options is not None else ReadinessOptions()
-        self._initial = initial if initial is not None else NetworkQuiet()
-        self._ongoing = ongoing if ongoing is not None else NetworkQuiet()
+        self._initial = _policy_or_default(initial)
+        self._ongoing = _policy_or_default(ongoing)
 
     async def setup(self, scope: PluginScope) -> None:
         self._state.context = scope
@@ -183,3 +183,7 @@ class Readiness(Plugin, slot="browserrig.readiness", provides=True):
         return await self._state.context.dispatch(
             CheckReadiness(context), default=next_
         )
+
+
+def _policy_or_default(policy: ReadinessPolicy | None) -> ReadinessPolicy:
+    return policy if policy is not None else NetworkQuiet()

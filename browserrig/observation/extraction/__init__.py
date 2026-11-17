@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
+from itertools import chain
 from typing import NamedTuple
 
 from cdpify import CDPCommandError, CdpSession
@@ -102,14 +103,14 @@ async def extract(
         (element for element in extraction.elements if isinstance(element, Element)),
     )
     if chrome:
-        extraction.elements = tuple(
-            element.model_copy(
-                update={"name": preferred(element.name, chrome[element.ref])}
-            )
-            if element.ref in chrome
-            else element
-            for element in extraction.elements
-        )
+        named = []
+        for element in extraction.elements:
+            if element.ref in chrome:
+                element = element.model_copy(
+                    update={"name": preferred(element.name, chrome[element.ref])}
+                )
+            named.append(element)
+        extraction.elements = tuple(named)
     return extraction
 
 
@@ -165,16 +166,16 @@ class _Assembler:
             page_height=document.content_height,
             elements=tuple(elements),
             offscreen=tuple(
-                control
-                for result in self._results.values()
-                for control in result.offscreen
+                chain.from_iterable(
+                    result.offscreen for result in self._results.values()
+                )
             ),
             headings=tuple(headings),
             alerts=tuple(
                 dict.fromkeys(
-                    alert
-                    for result in self._results.values()
-                    for alert in result.alerts
+                    chain.from_iterable(
+                        result.alerts for result in self._results.values()
+                    )
                 )
             ),
             modal=self._modal(),
@@ -278,12 +279,10 @@ class _Assembler:
         texts: dict[tuple[str, int], TextBlock] = {}
         remaining = limit
         markers: set[str] = set()
-        candidates = sorted(
-            (
-                (frame_id, index, block)
-                for frame_id, result in self._results.items()
-                for index, block in result.texts
-            ),
+        candidates = []
+        for frame_id, result in self._results.items():
+            candidates.extend((frame_id, index, block) for index, block in result.texts)
+        candidates.sort(
             key=lambda item: (
                 not item[2].in_viewport,
                 self._orders[item[0], item[1]],
@@ -374,9 +373,9 @@ class _Assembler:
                 return 0 if element.in_viewport else float("inf")
             return abs(element.bounds.y + element.bounds.height / 2 - middle)
 
-        banner_refs = {
-            ref for banner in self._cookie_banners(elements) for ref in banner.refs
-        }
+        banner_refs: set[str] = set()
+        for banner in self._cookie_banners(elements):
+            banner_refs.update(banner.refs)
         kept = {
             id(element)
             for element in sorted(
@@ -391,23 +390,23 @@ class _Assembler:
 
     def _cookie_banners(self, elements: list[Element]) -> tuple[CookieBanner, ...]:
         refs = {element.ref for element in elements if element.in_viewport}
-        return tuple(
-            banner.model_copy(
-                update={"refs": tuple(ref for ref in banner.refs if ref in refs)}
-            )
-            for frame_id, result in self._results.items()
-            if frame_id not in self._covered
-            for banner in result.cookie_banners
-        )
+        banners = []
+        for frame_id, result in self._results.items():
+            if frame_id in self._covered:
+                continue
+            for banner in result.cookie_banners:
+                visible_refs = tuple(ref for ref in banner.refs if ref in refs)
+                banners.append(banner.model_copy(update={"refs": visible_refs}))
+        return tuple(banners)
 
     def _canvases(self) -> tuple[Canvas, ...]:
         """Canvases of all uncovered frames, in page order."""
-        ordered = [
-            ((*self._keys[frame.id], index), canvas)
-            for frame in self._frames
-            if frame.id in self._results and frame.id not in self._covered
-            for index, canvas in self._results[frame.id].canvases
-        ]
+        ordered = []
+        for frame in self._frames:
+            if frame.id not in self._results or frame.id in self._covered:
+                continue
+            for index, canvas in self._results[frame.id].canvases:
+                ordered.append(((*self._keys[frame.id], index), canvas))
         ordered.sort(key=lambda item: item[0])
         return tuple(canvas for _, canvas in ordered)
 

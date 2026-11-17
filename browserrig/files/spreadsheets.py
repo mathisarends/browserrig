@@ -230,14 +230,22 @@ def read_delimited(context: ReadContext) -> ParsedContent:
                 left, right = (bounds.left, bounds.right) if bounds else (1, len(row))
                 if index == (bounds.top if bounds else 1):
                     yield _table_header(left, right)
-                cells = [
-                    _value(row[column]) if column < len(row) else ""
-                    for column in range(left - 1, right)
-                ]
+                cells = _delimited_cells(row, left, right)
                 yield "| " + str(index) + " | " + " | ".join(cells) + " |\n"
 
     details.blocks = blocks()
     return details
+
+
+def _delimited_cells(row: list[str], left: int, right: int) -> list[str]:
+    """Format the selected columns, padding fields absent from a short CSV row."""
+    cells = []
+    for column in range(left - 1, right):
+        if column < len(row):
+            cells.append(_value(row[column]))
+        else:
+            cells.append("")
+    return cells
 
 
 def _bounds(selection: str | None, rows: int, columns: int) -> _CellRange:

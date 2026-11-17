@@ -27,6 +27,17 @@ class _Receipt:
     event: PresentedEvent
     expires_at: float | None
 
+    def event_at(self, now: float) -> PresentedEvent:
+        if (
+            isinstance(
+                self.event,
+                (WorkPresentedEvent, DownloadPresentedEvent, UploadPresentedEvent),
+            )
+            and self.expires_at is not None
+        ):
+            return replace(self.event, retention=max(0, self.expires_at - now))
+        return self.event
+
 
 class Receipts:
     """A bounded cache indexed by receipt type and operation identity."""
@@ -52,16 +63,7 @@ class Receipts:
     def snapshot(self) -> tuple[PresentedEvent, ...]:
         self._prune()
         now = monotonic()
-        return tuple(
-            replace(receipt.event, retention=max(0, receipt.expires_at - now))
-            if isinstance(
-                receipt.event,
-                (WorkPresentedEvent, DownloadPresentedEvent, UploadPresentedEvent),
-            )
-            and receipt.expires_at is not None
-            else receipt.event
-            for receipt in self._items.values()
-        )
+        return tuple(receipt.event_at(now) for receipt in self._items.values())
 
     def _put(self, event: _Expiring, identity: str, *, running: bool) -> None:
         key = (event.type, identity)
