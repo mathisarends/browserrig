@@ -7,8 +7,9 @@ from browserrig.input import HumanMotor, Input, Motor
 class InputPacing(Plugin, slot="browserrig.pacing"):
     """Operate the browser's mouse and keyboard through a `Motor`.
 
-    The default motor types and moves the pointer at a person's pace. Pass another
-    motor to change how input is performed; without this plugin it runs at full speed.
+    The default motor types, moves the pointer and scrolls at a person's pace.
+    Pass another motor to change how input is performed; without this plugin it
+    runs at full speed.
     """
 
     _input = needs(Input)
