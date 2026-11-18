@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.7.0 (2026-11-18)
+
 Upgrade from 0.6.x using the [migration guide](docs/migration-0.7.md).
 
 ### Breaking changes

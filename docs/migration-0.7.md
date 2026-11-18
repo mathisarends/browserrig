@@ -1,6 +1,6 @@
 # Migrate from 0.6.x to 0.7.0
 
-[Back to README](../README.md) · [Release notes](../CHANGELOG.md#unreleased)
+[Back to README](../README.md) · [Release notes](../CHANGELOG.md#070-2026-11-18)
 
 Browserrig 0.7.0 pins Harnessed and its provider, MCP and telemetry extras to
 0.19.0. Upgrade Browserrig and the extras your application uses together.
