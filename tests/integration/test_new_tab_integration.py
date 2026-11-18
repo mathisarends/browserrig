@@ -21,6 +21,7 @@ from browserrig.choreography import TabPressedEvent
 from browserrig.events import (
     KeyPressedEvent,
     TabActivatedEvent,
+    TabClosedEvent,
     TabOpenedEvent,
 )
 from tests.javascript import evaluate
@@ -96,18 +97,24 @@ async def test_click_on_window_open_follows_into_the_loaded_tab(site):
     assert not any(isinstance(event, TabPressedEvent) for event in events)
 
 
-async def test_delayed_foreground_popup_is_adopted_between_actions(site):
-    agent = Agent(model=ScriptedModel([]), browser=Chrome.launch(url=site + "/links"))
+async def test_delayed_foreground_popup_returns_control_to_opener_on_close(site):
+    model = ScriptedModel(["Back on the opener"])
+    agent = Agent(model=model, browser=Chrome.launch(url=site + "/links"))
     activated = asyncio.Event()
+    closed = asyncio.Event()
 
     async def on_activation(_event: TabActivatedEvent) -> None:
         activated.set()
+
+    async def on_close(_event: TabClosedEvent) -> None:
+        closed.set()
 
     async with agent.session() as session:
         browser = session.scope[Browser]
         coordination = session.scope[BrowserCoordination]
         opener = browser.active_tab
         session.scope.on(TabActivatedEvent, on_activation)
+        session.scope.on(TabClosedEvent, on_close)
         async with coordination.exclusive():
             mark = browser.tabs.openings
             await evaluate(opener, "setTimeout(() => window.open('/other'), 50)")
@@ -118,6 +125,17 @@ async def test_delayed_foreground_popup_is_adopted_between_actions(site):
             await activated.wait()
         assert browser.active_tab is child
         assert await evaluate(child, "document.hasFocus() && !document.hidden") is True
+
+        activated.clear()
+        await evaluate(child, "setTimeout(() => window.close(), 0)")
+        async with asyncio.timeout(5):
+            await closed.wait()
+        await session.run("Inspect the current tab", max_steps=3)
+        assert all_states(model.requests[0].messages)[-1]["page"]["tab"] == opener.id
+        async with asyncio.timeout(5):
+            await activated.wait()
+        assert browser.active_tab is opener
+        assert await evaluate(opener, "document.hasFocus() && !document.hidden") is True
 
 
 async def test_native_background_tab_keeps_the_opener_active(site):

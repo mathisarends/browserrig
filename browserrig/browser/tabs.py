@@ -84,6 +84,7 @@ class Tabs:
         self._emit = emit
         self._on_tab_change = on_change
         self._tabs: dict[TargetId, Tab] = {}
+        self._opener_ids: dict[TargetId, TargetId] = {}
         self._active = ""
         self._context: str | None = None
         self._target_context: str | None = None
@@ -198,9 +199,7 @@ class Tabs:
         if tab.id == self._active:
             # Already in front: nothing to press, but late viewers still need the cursor.
             await tab.bring_to_front()
-            await self._emit(
-                TabActivatedEvent(target_id=tab.id, document_id=tab.document_id)
-            )
+            await self._emit_activation(tab)
             return tab
         await self._change(TabGesture.ACTIVATE, tab.id, lambda: self._focus(tab))
         return tab
@@ -371,9 +370,7 @@ class Tabs:
         if front:
             await tab.bring_to_front()
         self._active = tab.id
-        await self._emit(
-            TabActivatedEvent(target_id=tab.id, document_id=tab.document_id)
-        )
+        await self._emit_activation(tab)
 
     async def _wait_for_foreground(self, tab: Tab, opener_id: str) -> bool:
         try:
@@ -442,6 +439,8 @@ class Tabs:
                     raise BrowserError("Target closed while attaching")
                 self._tabs[target_id] = tab
                 self._sessions[attached.session_id] = target_id
+                if opener_id:
+                    self._opener_ids[target_id] = opener_id
                 if opened:
                     self._opened.append(target_id)
                     self._opening.set()
@@ -511,15 +510,28 @@ class Tabs:
     async def _forget(self, target_id: str) -> None:
         self._closed_targets.add(target_id)
         tab = self._tabs.pop(target_id, None)
+        opener_id = self._opener_ids.pop(target_id, "")
         for sid, tid in tuple(self._sessions.items()):
             if tid == target_id:
                 self._sessions.pop(sid, None)
                 self._worlds.invalidate(session_id=sid)
+        restored = None
         if self._active == target_id:
-            self._active = ""
+            opener = self._tabs.get(opener_id)
+            if opener is not None and not opener.closed:
+                restored = opener
+            # Publish the restored focus in memory before close observers can resume.
+            self._active = restored.id if restored is not None else ""
         if tab is not None:
             await tab.discard()
             await self._emit(TabClosedEvent(target_id=target_id))
+        if restored is not None and self._active == restored.id:
+            await self._emit_activation(restored)
+
+    async def _emit_activation(self, tab: Tab) -> None:
+        await self._emit(
+            TabActivatedEvent(target_id=tab.id, document_id=tab.document_id)
+        )
 
     async def _targets(self) -> tuple[TargetInfo, ...]:
         result = await self.client.target.get_targets()
