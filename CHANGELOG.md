@@ -66,6 +66,7 @@ Upgrade from 0.6.x using the [migration guide](docs/migration-0.7.md).
   wrap up near the end of its work budget.
 - Follow tabs opened by actions without simulating a tab-switch gesture. Adopt
   foreground popups discovered between actions and leave background tabs alone.
+  Resume on the opener when an active popup closes.
 - Keep browser action execution rules together by action kind. Custom tools
   still declare tool chaining with `@browser_tool(chainable=...)`.
 - Add `SingleTab()` to keep links, forms, simple popups and file previews in
