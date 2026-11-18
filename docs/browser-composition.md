@@ -261,6 +261,7 @@ operation in `coordination.exclusive()` when mixing it with agent work.
 | `PrepareRequest` | Waterfall returning `ModelRequest` | Add current application facts or transform request content |
 | `ExecuteTool` / `ReviewToolResult` | Waterfall returning `ToolResult` | Wrap execution or inspect the converted result |
 | `BrowserToolCall` | Waterfall returning the tool body's result | Extend browser execution before result conversion |
+| `CheckAction` | Emit before a managed action starts | Reject an action when application state has changed |
 | `ProjectObservation` | Waterfall returning `UserMessage` or `None` | Compose context from one immutable, redacted snapshot |
 | `ChangeTab` | Waterfall around a tab operation | Synchronize devices or stage a transition |
 | `SelectReadiness` | Bail: first non-`None` policy wins | Choose readiness for a page or application |
@@ -304,6 +305,34 @@ and later operations. The default `NetworkQuiet()` combines DOM readiness with
 bounded waits for requests caused by input/navigation. `DownloadReadiness()` adds
 download checks independently. Timeouts normally produce a degraded observation
 so the agent can inspect partial state and decide whether to wait.
+
+### Validate an action before dispatch
+
+Register `@hook(CheckAction)` to validate managed `@browser_tool` actions and
+explicit `Actions.run(...)` calls. The hook receives the addressed `Tab` and
+`ActionKind`. Browserrig runs it once after action preparation and any per-call
+`Actions.run(check=...)` check, while holding the action lock. Harnessed awaits
+all registered checks in order. Keep checks read-only and use the addressed tab.
+
+```python
+from harnessed import Plugin, hook
+from browserrig.core import BrowserError
+from browserrig.tools import CheckAction
+
+
+class ApplicationActionChecks(Plugin):
+    def __init__(self, application):
+        super().__init__()
+        self.application = application
+
+    @hook(CheckAction)
+    async def check(self, action: CheckAction) -> None:
+        if not await self.application.allows_action(action.tab, action.kind):
+            raise BrowserError("The page changed. Inspect a fresh observation.")
+```
+
+A rejected action reports `ActionFailedEvent(dispatched=False)`. The runner emits
+`ActionStartedEvent` and enters the operation only after validation succeeds.
 
 ## Add a browser tool
 

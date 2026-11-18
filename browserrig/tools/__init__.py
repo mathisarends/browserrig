@@ -4,7 +4,7 @@ from .chains import ActionChainPolicy, DomActionChains, ObserveAfterInput
 from .dialogs import DialogTools
 from .dom_scroll import DomScrollTools
 from .effects import Effect
-from .execution import Actions
+from .execution import Actions, CheckAction
 from .files import BrowserFileTools, DomUploadTools, FileTools
 from .forms import FormTools
 from .intents import (
@@ -49,6 +49,7 @@ __all__ = [
     "BrowserToolCall",
     "browser_tool",
     "Actions",
+    "CheckAction",
     "Effect",
     "DialogTools",
     "FileTools",

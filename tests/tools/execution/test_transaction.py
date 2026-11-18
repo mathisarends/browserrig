@@ -24,7 +24,7 @@ from browserrig.events import (
 )
 from browserrig.input import Instant
 from browserrig.kinds import ActionKind, ReadinessPhase
-from browserrig.tools import Effect
+from browserrig.tools import CheckAction, Effect
 from tests.fakes import FakeServices, mounted
 
 
@@ -55,6 +55,29 @@ async def test_validation_rejects_before_dispatch():
     operation.assert_not_awaited()
     assert len(services.events) == 1
     assert not _first(services.events, ActionFailedEvent).dispatched
+
+
+async def test_check_action_rejects_explicit_operation_before_dispatch():
+    operation = AsyncMock()
+    check = AsyncMock()
+    async with mounted(Actions()) as (services, ctx):
+        tab = services.browser.active_tab
+
+        def reject(action: CheckAction) -> None:
+            assert action == CheckAction(tab, ActionKind.UPLOAD)
+            check.assert_awaited_once_with(tab)
+            raise BrowserError("Action rejected")
+
+        ctx.on(CheckAction, reject)
+        with pytest.raises(ToolError, match="^Action rejected$"):
+            await ctx[Actions].run(
+                kind=ActionKind.UPLOAD, operation=operation, check=check
+            )
+
+    operation.assert_not_awaited()
+    (failure,) = services.events
+    assert isinstance(failure, ActionFailedEvent)
+    assert not failure.dispatched
 
 
 @pytest.mark.parametrize(
