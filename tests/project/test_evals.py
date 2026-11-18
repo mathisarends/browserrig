@@ -662,6 +662,19 @@ def test_legacy_results_default_to_api_provider():
     assert restored.provider == "openai"
 
 
+def test_run_timeout_serializes_with_its_unit(tmp_path):
+    payload = _benchmark([]).model_dump(exclude_unset=True)
+    benchmark = BenchmarkResult.model_validate({**payload, "timeout_seconds": 120})
+    path = tmp_path / "run.json"
+    write_run(path, benchmark)
+
+    assert benchmark.timeout_seconds == 120
+    assert json.loads(path.read_text(encoding="utf-8")) == {
+        **payload,
+        "timeout_seconds": 120,
+    }
+
+
 @pytest.mark.parametrize("option", ["--repeat", "--parallel"])
 @pytest.mark.parametrize("value", ["0", "-2"])
 async def test_cli_rejects_nonpositive_counts(option, value, monkeypatch, capsys):

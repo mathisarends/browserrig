@@ -4,6 +4,11 @@
 
 ### Breaking changes
 
+- Eval Python APIs and report JSON use `timeout_seconds`. Rename the old
+  `timeout` key in saved runs before using them for comparisons. New HTML
+  reports embed `timeout_seconds` as well. Python callers of the eval subprocess
+  helpers use `timeout_seconds=`. The CLI still takes `--timeout`
+  in seconds.
 - Replace `DomPerception`, `TextContext` and `ImageContext` with one
   `BrowserPerception(text=..., screenshots=...)`. Use `DomText(mode=DomTextMode.DELTA)`
   or `DomText(mode=DomTextMode.FULL)` for text. The enum values are

@@ -86,9 +86,9 @@ class Environments:
     async def check(self, sites: set[str], log: Path) -> None:
         """No pulls, resets, model calls or judge calls in preflight."""
         await upstream.command(
-            "docker", "info", "--format", "{{.OSType}}", log=log, timeout=20
+            "docker", "info", "--format", "{{.OSType}}", log=log, timeout_seconds=20
         )
-        await upstream.invoke("--version", log=log, timeout=60)
+        await upstream.invoke("--version", log=log, timeout_seconds=60)
         for name in sorted(sites):
             await upstream.command(
                 "docker",
@@ -96,7 +96,7 @@ class Environments:
                 "inspect",
                 self.sites[name].image,
                 log=log,
-                timeout=20,
+                timeout_seconds=20,
             )
         if "map" in sites:
             for suffix in (
@@ -116,7 +116,7 @@ class Environments:
                     "inspect",
                     f"webarena_verified_map_{suffix}",
                     log=log,
-                    timeout=20,
+                    timeout_seconds=20,
                 )
         zim = self.data_dir / "wikipedia_en_all_maxi_2022-05.zim"
         if "wikipedia" in sites and (not zim.is_file() or zim.stat().st_size == 0):
@@ -144,7 +144,7 @@ class Environments:
             ]
             if name == "wikipedia":
                 arguments.extend(("--data-dir", str(self.data_dir)))
-            await upstream.invoke(*arguments, log=log, timeout=240)
+            await upstream.invoke(*arguments, log=log, timeout_seconds=240)
             # Current official images require --base-url; the pinned host CLI only
             # sets the older WA_ENV_CTRL_EXTERNAL_SITE_URL variable on startup.
             await upstream.command(
@@ -156,7 +156,7 @@ class Environments:
                 "--base-url",
                 parsed._replace(path="", query="", fragment="").geturl(),
                 log=log,
-                timeout=180,
+                timeout_seconds=180,
             )
 
     async def prepare(self, sites: set[str], log: Path) -> None:
@@ -164,7 +164,7 @@ class Environments:
         for name in sorted(sites):
             print(f"Preparing {name}: {self.sites[name].image}", flush=True)
             await upstream.command(
-                "docker", "pull", self.sites[name].image, log=log, timeout=7200
+                "docker", "pull", self.sites[name].image, log=log, timeout_seconds=7200
             )
             if name in {"map", "wikipedia"}:
                 await upstream.invoke(
@@ -176,7 +176,7 @@ class Environments:
                     "--data-dir",
                     str(self.data_dir),
                     log=log,
-                    timeout=14400,
+                    timeout_seconds=14400,
                 )
 
 
