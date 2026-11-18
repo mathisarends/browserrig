@@ -27,6 +27,10 @@ type _ClickCount = Annotated[
     ClickCount,
     Field(description="Use 2 for a native double click."),
 ]
+_DRAG_DURATION = Field(ge=0.05, le=5, description="Drag duration in seconds.")
+_REF = Field(description="Element reference from the observation.")
+_X_COORDINATE = Field(ge=0, description="Horizontal position from the left edge.")
+_Y_COORDINATE = Field(ge=0, description="Vertical position from the top edge.")
 
 
 _INSTRUCTIONS = Instructions(
@@ -34,50 +38,75 @@ _INSTRUCTIONS = Instructions(
     text=(
         "Point in pixels from the top-left of the newest screenshot still in context; "
         "crop and scale map back to the viewport. Without an image, use viewport CSS pixels. "
-        "After the active document changes, request a fresh screenshot before pointing. "
+        "After the active document changes, use a fresh screenshot before pointing."
     ),
 )
 
 
-class PointerTools(Plugin):
-    """Mouse input by screenshot coordinates, plus by observed ref when refs exist.
+class _PointerInput(Plugin):
+    """Share native click dispatch and new-tab behavior across pointer tools."""
 
-    Coordinates also reach unreferenced regions, so text-only agents keep them too.
-    """
-
+    _actions = needs(Actions)
     _browser = needs(Browser)
     _input = needs(Input)
-    _observe = needs(BrowserPerception)
-    _actions = needs(Actions)
-    _targets = needs(Targeting)
     _tabs = observes(TabPolicy)
+
+    def _check_click(
+        self, *, count: ClickCount, button: ClickButton, new_tab: bool
+    ) -> None:
+        if new_tab and (count != 1 or button != "left"):
+            raise ToolError("new_tab needs a single left click")
+        if new_tab and self._tabs is not None:
+            self._tabs.check_new_tab()
+
+    async def _dispatch_click(
+        self,
+        point: Point,
+        *,
+        count: ClickCount,
+        button: ClickButton,
+        new_tab: bool,
+        prepared_scroll: bool = False,
+    ) -> Effect:
+        mouse = self._input.mouse
+        if new_tab:
+            # Arrive first, so the keys are held for the click alone.
+            await mouse.move_to(point)
+        async with self._new_tab_keys(new_tab) as modifiers:
+            await mouse.click(point, count=count, button=button, modifiers=modifiers)
+        return Effect(
+            _click_message(count, button, new_tab),
+            prepared_scroll=prepared_scroll,
+            break_chain=button == "right",
+            expects_new_tab=new_tab,
+        )
+
+    @asynccontextmanager
+    async def _new_tab_keys(self, new_tab: bool) -> AsyncGenerator[int]:
+        """Use Chrome's foreground new-tab shortcut and show the keys to viewers."""
+        if not new_tab:
+            yield 0
+            return
+        key = await self._browser.tabs.link_modifier()
+        async with self._input.keyboard.hold(key, "Shift") as modifiers:
+            yield modifiers
+
+
+class PointerTools(_PointerInput):
+    """Mouse input by screenshot or viewport coordinates."""
+
+    _observe = needs(BrowserPerception)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
 
     @tool(
         kind=ActionKind.MOVE_MOUSE,
-        description="Hover without clicking; address a ref or both coordinates.",
+        description="Move to a point without clicking.",
     )
     async def move_mouse(
-        self,
-        x: Annotated[float | None, Field(ge=0)] = None,
-        y: Annotated[float | None, Field(ge=0)] = None,
-        ref: str | None = None,
+        self, x: Annotated[float, _X_COORDINATE], y: Annotated[float, _Y_COORDINATE]
     ) -> Effect:
-        if ref is not None and (x is not None or y is not None):
-            raise ToolError("Provide either ref or coordinates, not both")
-        if ref is None and (x is None or y is None):
-            raise ToolError("Provide ref, or both x and y")
-
-        if ref is not None:
-            point = await self._targets.locate(ref=ref)
-            await self._input.mouse.move_to(point)
-            return Effect(
-                "Cursor moved onto the ref without clicking.",
-                prepared_scroll=point.scrolled,
-            )
-        assert x is not None and y is not None
         point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
         await self._input.mouse.move_to(point)
         return Effect("Cursor moved without clicking.")
@@ -88,49 +117,54 @@ class PointerTools(Plugin):
     )
     async def click_at(
         self,
-        x: Annotated[float, Field(ge=0)],
-        y: Annotated[float, Field(ge=0)],
+        x: Annotated[float, _X_COORDINATE],
+        y: Annotated[float, _Y_COORDINATE],
         *,
         count: _ClickCount = 1,
         button: ClickButton = "left",
         new_tab: NewTab = False,
     ) -> Effect:
-        _check_new_tab(new_tab, count, button)
-        if new_tab and self._tabs is not None:
-            self._tabs.check_new_tab()
-
+        self._check_click(count=count, button=button, new_tab=new_tab)
         point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
-        if new_tab:
-            # Arrive first, so the key is held for the click alone.
-            await self._input.mouse.move_to(point)
-        async with self._new_tab_keys(new_tab) as modifiers:
-            await self._input.mouse.click(
-                point, count=count, button=button, modifiers=modifiers
-            )
-        return Effect(
-            _click_message(count, button, new_tab),
-            break_chain=button == "right",
-            expects_new_tab=new_tab,
+        return await self._dispatch_click(
+            point, count=count, button=button, new_tab=new_tab
         )
 
     @tool(
         kind=ActionKind.DRAG_AT,
-        description="Drag between screenshot points.",
+        description="Drag between screenshot or viewport points.",
     )
     async def drag_at(
         self,
         start: Point,
         end: Point,
-        duration_seconds: Annotated[
-            float, Field(ge=0.05, le=5, description="Drag duration in seconds.")
-        ] = 0.5,
+        duration_seconds: Annotated[float, _DRAG_DURATION] = 0.5,
     ) -> Effect:
+        source = self._observe.coordinate_source()
         await self._input.mouse.drag(
-            start=_image_point(self._observe.coordinate_source(), start),
-            end=_image_point(self._observe.coordinate_source(), end),
+            start=_image_point(source, start),
+            end=_image_point(source, end),
             duration_seconds=duration_seconds,
         )
         return Effect("Drag dispatched; inspect the destination.")
+
+
+class ReferencePointerTools(_PointerInput):
+    """Mouse input by resolvable element references."""
+
+    _targets = needs(Targeting)
+
+    @tool(
+        kind=ActionKind.HOVER,
+        description="Hover an observed element, revealing it when needed.",
+    )
+    async def hover(self, ref: Annotated[str, _REF]) -> Effect:
+        point = await self._targets.locate(ref=ref)
+        await self._input.mouse.move_to(point)
+        return Effect(
+            "Cursor moved onto the ref without clicking.",
+            prepared_scroll=point.scrolled,
+        )
 
     @tool(
         kind=ActionKind.CLICK,
@@ -139,16 +173,13 @@ class PointerTools(Plugin):
     )
     async def click(
         self,
-        ref: str,
+        ref: Annotated[str, _REF],
         *,
         count: _ClickCount = 1,
         button: ClickButton = "left",
         new_tab: NewTab = False,
     ) -> Effect:
-        _check_new_tab(new_tab, count, button)
-        if new_tab and self._tabs is not None:
-            self._tabs.check_new_tab()
-
+        self._check_click(count=count, button=button, new_tab=new_tab)
         point = await self._targets.locate(ref=ref)
         await self._input.mouse.move_to(point)
         if change := await self._actions.page_change(after_input=False):
@@ -160,18 +191,12 @@ class PointerTools(Plugin):
             )
         # Hover may reveal an overlay or move the target; hit-test again.
         current = await self._targets.locate(ref=ref, scroll=False)
-        if new_tab:
-            # Arrive first, so the key is held for the click alone.
-            await self._input.mouse.move_to(current)
-        async with self._new_tab_keys(new_tab) as modifiers:
-            await self._input.mouse.click(
-                current, count=count, button=button, modifiers=modifiers
-            )
-        return Effect(
-            _click_message(count, button, new_tab),
+        return await self._dispatch_click(
+            current,
+            count=count,
+            button=button,
+            new_tab=new_tab,
             prepared_scroll=point.scrolled,
-            break_chain=button == "right",
-            expects_new_tab=new_tab,
         )
 
     @tool(
@@ -183,11 +208,9 @@ class PointerTools(Plugin):
     )
     async def drag(
         self,
-        source_ref: str,
-        target_ref: str,
-        duration_seconds: Annotated[
-            float, Field(ge=0.05, le=5, description="Drag duration in seconds.")
-        ] = 0.5,
+        source_ref: Annotated[str, _REF],
+        target_ref: Annotated[str, _REF],
+        duration_seconds: Annotated[float, _DRAG_DURATION] = 0.5,
     ) -> Effect:
         prepared = await self._targets.locate(ref=source_ref)
         target = await self._targets.locate(ref=target_ref)
@@ -205,25 +228,8 @@ class PointerTools(Plugin):
             prepared_scroll=prepared.scrolled or target.scrolled,
         )
 
-    @asynccontextmanager
-    async def _new_tab_keys(self, new_tab: bool) -> AsyncGenerator[int]:
-        """Use Chrome's foreground new-tab shortcut and show the keys to viewers."""
-        if not new_tab:
-            yield 0
-            return
-        key = await self._browser.tabs.link_modifier()
-        async with self._input.keyboard.hold(key, "Shift") as modifiers:
-            yield modifiers
 
-
-def _check_new_tab(new_tab: bool, count: int, button: str) -> None:
-    if new_tab and (count != 1 or button != "left"):
-        raise ToolError("new_tab needs a single left click")
-
-
-def _click_message(
-    count: ClickCount, button: ClickButton, new_tab: bool = False
-) -> str:
+def _click_message(count: ClickCount, button: ClickButton, new_tab: bool) -> str:
     gesture = "right click" if button == "right" else "click"
     if count == 2:
         gesture = "double " + gesture

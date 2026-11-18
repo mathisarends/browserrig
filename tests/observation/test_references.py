@@ -24,7 +24,7 @@ from browserrig import (
     MouseEventKind,
     PageContent,
     PageReadiness,
-    PointerTools,
+    ReferencePointerTools,
     ResolveDomElement,
     ScrollStep,
     Targeting,
@@ -369,7 +369,7 @@ class _Uploads(FileTools, provides=True):
     pass
 
 
-class _Pointer(PointerTools, provides=True):
+class _Pointer(ReferencePointerTools, provides=True):
     pass
 
 

@@ -11,6 +11,7 @@ from browserrig import (
     MultiTab,
     NavigationTools,
     PointerTools,
+    ReferencePointerTools,
     SingleTab,
     TabPolicy,
     TabTools,
@@ -96,6 +97,7 @@ def _agent(mode, *, model=None):
             Targeting(),
             NavigationTools(),
             PointerTools(),
+            ReferencePointerTools(),
             TabTools(),
         ],
     )

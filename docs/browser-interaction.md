@@ -90,15 +90,16 @@ cookie banners stay grouped. `max_elements=...` bounds controls. Use
 extraction limits are reported.
 Perspective-transformed frames remain unsupported.
 
-Custom captures supply opaque refs through `References`. Shared pointer tools
-resolve their live positions; DOM-specific typing/forms require `ResolveDomElement`.
+Custom captures supply opaque refs through `References`. `ReferencePointerTools`
+resolves their live positions. DOM-specific typing and forms require `ResolveDomElement`.
 See [backend contracts](browser-composition.md#references-from-other-capture-backends).
 
 ## Input tools
 
 | Capability | Tools and behavior |
 | --- | --- |
-| `PointerTools` | `click(ref, count=2)`, `move_mouse`, `drag`, `click_at`, `drag_at`; refs or viewport/image coordinates |
+| `PointerTools` | `click_at(x, y)`, `move_mouse(x, y)`, `drag_at(start, end)` by viewport or image coordinates |
+| `ReferencePointerTools` | `click(ref, count=2)`, `hover(ref)`, `drag(source_ref, target_ref)` by observed element refs |
 | `KeyboardTools` | `send_keys(text="Hello")` types text; `send_keys(key="Enter")` presses a key; modifier flags apply to keys |
 | `DomTypingTools` | `type_text(ref, text, clear=True)` focuses and replaces a DOM field; `clear=False` inserts at its selection |
 | `DomScrollTools` | `scroll_page(delta_y=..., delta_x=...)` moves the document; `scroll_element(ref=..., ...)` moves only that container |

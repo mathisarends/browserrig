@@ -62,7 +62,8 @@ when needed. For a fully explicit composition, select individual plugins:
 from harnessed import Agent
 from browserrig import (
     Actions, BrowserPerception, Chrome, InputRuntime, KeyboardTools, MultiTab,
-    NavigationTools, PointerTools, PageReadiness, Runtime, TabTools, Targeting,
+    NavigationTools, PageReadiness, PointerTools, ReferencePointerTools, Runtime,
+    TabTools, Targeting,
 )
 
 agent = Agent(
@@ -70,7 +71,8 @@ agent = Agent(
     plugins=[
         Runtime(), MultiTab(), Chrome.launch(), InputRuntime(), PageReadiness(),
         BrowserPerception(), Actions(), Targeting(),
-        PointerTools(), KeyboardTools(), NavigationTools(), TabTools(),
+        PointerTools(), ReferencePointerTools(), KeyboardTools(), NavigationTools(),
+        TabTools(),
     ],
 )
 ```
@@ -81,6 +83,24 @@ explicitly. `Actions()` observes after each input; the task recipe selects
 service dependencies; instruction order follows the configured plugin list.
 Configure Harnessed `Approvals` to allow tool side effects
 or ask through your host UI.
+
+## Choose pointer tools
+
+`PointerTools()` provides `click_at`, `drag_at` and `move_mouse(x, y)`. It
+uses screenshot or viewport geometry and works with `ScreenshotCapture()`
+without `Targeting()`.
+
+Add `Targeting()` and `ReferencePointerTools()` for `click(ref)`,
+`drag(source_ref, target_ref)` and `hover(ref)`. These tools work with
+`DomCapture()` and [custom capture backends](#references-from-other-capture-backends)
+that resolve their own refs.
+
+The default `browser_pack()` includes both plugins. For pointer input in a
+screenshot-only variant of the pack, use
+`browser_pack().without(ReferencePointerTools)` with your screenshot perception.
+If you composed a custom agent using the old `PointerTools()`, add
+`ReferencePointerTools()` to keep ref-based actions and replace
+`move_mouse(ref=...)` with `hover(ref=...)`.
 
 ## Choose tab behavior
 
@@ -250,7 +270,8 @@ so the agent can inspect partial state and decide whether to wait.
 
 ## Add a browser tool
 
-Declare browser semantics and let `Actions` coordinate execution:
+Declare browser semantics and let `Actions` coordinate execution. This example
+uses the target recheck in `Targeting.hover` to require a stable target:
 
 ```python
 from harnessed import Plugin
@@ -259,14 +280,14 @@ from browserrig import ActionKind, Targeting
 from browserrig.tools import Effect, browser_tool
 
 
-class HoverTools(Plugin):
+class StableHoverTools(Plugin):
     _targeting = needs(Targeting)
 
     @browser_tool(
-        kind=ActionKind.MOVE_MOUSE,
-        description="Hover an observed element without clicking.",
+        kind=ActionKind.HOVER,
+        description="Hover and verify that the target remains under the cursor.",
     )
-    async def hover_ref(self, ref: str) -> Effect:
+    async def hover_stable(self, ref: str) -> Effect:
         point = await self._targeting.hover(ref=ref)
         return Effect("Hovered.", prepared_scroll=point.scrolled)
 ```

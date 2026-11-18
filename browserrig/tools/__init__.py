@@ -21,7 +21,7 @@ from .intents import (
 )
 from .javascript import JavaScriptTools
 from .keyboard import KeyboardTools
-from .mouse import PointerTools
+from .mouse import PointerTools, ReferencePointerTools
 from .navigation import NavigationTools
 from .screenshots import ScreenshotTools
 from .search import PageSearchTools
@@ -41,6 +41,7 @@ __all__ = [
     "PageSearchTools",
     "ScreenshotTools",
     "PointerTools",
+    "ReferencePointerTools",
     "ActionChainPolicy",
     "DomActionChains",
     "ObserveAfterInput",

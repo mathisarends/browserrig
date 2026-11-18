@@ -312,7 +312,7 @@ async def test_scroll_and_hover_by_ref_target_the_element_not_the_cursor(site):
             )
         elif step == 2:
             ref = _ref(request, "First item", role="button")
-            yield ModelChunk(tool_call=ToolCall("move_mouse", {"ref": ref}))
+            yield ModelChunk(tool_call=ToolCall("hover", {"ref": ref}))
         else:
             yield ModelChunk(text="Done")
 

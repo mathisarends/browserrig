@@ -36,6 +36,7 @@ from .tools import (
     NavigationTools,
     PageSearchTools,
     PointerTools,
+    ReferencePointerTools,
     ScreenshotTools,
     TabTools,
     Targeting,
@@ -99,6 +100,7 @@ def browser_pack(
             # Explain screenshot coordinates before the chains that refer to them.
             # Harnessed resolves setup dependencies independently of prompt order.
             PointerTools(),
+            ReferencePointerTools(),
             Actions(chain_policy=DomActionChains()),
             MultiTab(),
             NavigationTools(),

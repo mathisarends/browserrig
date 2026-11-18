@@ -94,6 +94,7 @@ async def test_each_browser_tool_has_a_unique_stable_kind(fake_chrome):
         "click": ActionKind.CLICK,
         "click_at": ActionKind.CLICK_AT,
         "move_mouse": ActionKind.MOVE_MOUSE,
+        "hover": ActionKind.HOVER,
         "scroll_page": ActionKind.SCROLL_PAGE,
         "scroll_element": ActionKind.SCROLL_ELEMENT,
         "drag": ActionKind.DRAG,
@@ -361,6 +362,7 @@ async def test_native_composition_can_replace_a_complete_browser_instruction_blo
 
 _REF_CALLS = (
     ToolCall("click", {"ref": "stale-ref"}),
+    ToolCall("hover", {"ref": "stale-ref"}),
     ToolCall("drag", {"source_ref": "a", "target_ref": "b"}),
     ToolCall("type_text", {"ref": "stale-ref", "text": "x"}),
     ToolCall("select_option", {"ref": "stale-ref", "value": "x"}),

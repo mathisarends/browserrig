@@ -25,6 +25,7 @@ from browserrig import (
     InputPacing,
     NetworkQuiet,
     PageReadiness,
+    ReferencePointerTools,
     ScreenshotCapture,
     Screenshots,
     ScreenshotTrigger,
@@ -599,7 +600,7 @@ async def test_dom_lists_visible_canvases_and_crops_zoomed_region_screenshots(si
             assert image.size == (outside.width, outside.height)
 
 
-async def test_agent_clicks_canvas_through_region_screenshot(site):
+async def test_screenshot_only_agent_clicks_canvas_through_region_screenshot(site):
     holder = {}
 
     class Access(Plugin, needs=(Browser,)):
@@ -616,7 +617,7 @@ async def test_agent_clicks_canvas_through_region_screenshot(site):
         nonlocal step
         texts = [message.text for message in request.messages]
         if step == 0:
-            assert any("x=100 y=150 400x200 center=300,250" in text for text in texts)
+            assert any(has_image(message) for message in request.messages)
             region = {"x": 100, "y": 150, "width": 400, "height": 200}
             yield ModelChunk(tool_call=ToolCall("screenshot", {"region": region}))
         elif step == 1:
@@ -635,7 +636,14 @@ async def test_agent_clicks_canvas_through_region_screenshot(site):
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
-        plugins=[Approvals(default=PolicyDecision.ALLOW), Access()],
+        without=(ReferencePointerTools,),
+        plugins=[
+            BrowserPerception(
+                capture=ScreenshotCapture(), text=None, screenshots=Screenshots()
+            ),
+            Approvals(default=PolicyDecision.ALLOW),
+            Access(),
+        ],
     )
     async with agent.session() as session:
         tab = holder["browser"].active_tab
