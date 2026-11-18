@@ -319,7 +319,7 @@ Capture, image retention and text compaction are independent:
 
 | Setting | Behavior |
 | --- | --- |
-| `Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)` | Default: capture after the screenshot tool requests an image |
+| `Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)` | Default: capture after a screenshot request. Image-only sessions also capture when they enter a document or lack an included image. |
 | `Screenshots(trigger=ScreenshotTrigger.EACH_STEP)` | Capture before every model step |
 | `Screenshots()` | Keep the latest image; unchanged captures are skipped |
 | `Screenshots(retention=TrimInBatches(max_images=6, min_images=3))` | On overflow, trim oldest images down to three |
@@ -348,6 +348,10 @@ Perception itself registers no model tools. Add `ScreenshotTools()` for screensh
 requests and `PageSearchTools()` for page search. The screenshot tool is available
 when the session configures screenshots.
 `DomTypingTools`, `DomScrollTools` and `FormTools` are separate DOM capabilities.
+The screenshot tool acknowledges the request. The next observation supplies the
+new image, reports reuse of the previous image when unchanged, or reports why no
+image was available.
+
 Text observations remain until compaction. Coordinate tools use the latest
 included screenshot's geometry; an image from another document cannot supply
 coordinates for this page.

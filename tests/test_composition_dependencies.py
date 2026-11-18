@@ -324,7 +324,7 @@ async def test_facade_renders_configured_observation_prompt(
         assert "## Element references" in rendered
         assert ("labeled with its ref" in rendered) is (marks is not None)
         assert "When visible prose is included" in rendered
-        assert ("Every observation includes a screenshot" in rendered) == (
+        assert ("A screenshot is captured before each model step." in rendered) == (
             trigger == ScreenshotTrigger.EACH_STEP
         )
     assert fake_chrome[0].closed
