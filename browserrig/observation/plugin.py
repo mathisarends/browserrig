@@ -319,13 +319,13 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     ) -> StepDecision:
         state = self._state
         async with self._coordination.exclusive():
+            requested, region = state.screenshot_requested, state.screenshot_region
+            state.screenshot_requested, state.screenshot_region = False, None
             snapshot = await self.capture(
                 phase=ReadinessPhase.OBSERVATION,
-                screenshots=True if state.screenshot_requested else None,
-                region=state.screenshot_region,
+                screenshots=True if requested else None,
+                region=region,
             )
-        state.screenshot_requested = False
-        state.screenshot_region = None
         await self._track_viewport(snapshot, nudges)
         observations = []
         context = state.context
@@ -335,6 +335,12 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         )
         if observation is not None:
             observations.append((observation, "browser", (snapshot.id,)))
+        if requested and snapshot.image is None:
+            status = _screenshot_status(snapshot) or UserMessage(
+                "Screenshot unavailable."
+            )
+            if observation is None or status.text not in observation.text:
+                observations.append((status, "browser.screenshot", ()))
         if (
             self.text is not None
             and nudges is not None
@@ -353,7 +359,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 source=source,
                 refs=refs,
             )
-        self._publish_image_note(event, snapshot)
+        self._publish_image_note(event, snapshot, requested=requested)
         return await next_()
 
     @hook(ProjectObservation)
@@ -436,10 +442,17 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             return ()
         return await self._browser.tabs.list()
 
-    def _publish_image_note(self, event: PreStep, snapshot: Snapshot) -> None:
+    def _publish_image_note(
+        self, event: PreStep, snapshot: Snapshot, *, requested: bool
+    ) -> None:
         state = self._state.images
         text = image_note(state, snapshot)
-        if text and text != state.note:
+        reused = (
+            requested
+            and snapshot.image is not None
+            and (bool(state.images) and state.images[-1].id != snapshot.id)
+        )
+        if text and (text != state.note or reused):
             event.session.observe(
                 UserMessage(text), source=NOTE_SOURCE, refs=(state.images[-1].id,)
             )

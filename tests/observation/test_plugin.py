@@ -2,7 +2,8 @@ import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent
+from harnessed import Agent, ToolCall
+from harnessed.models import ImagePart, ModelChunk, ToolMessage
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
@@ -15,11 +16,18 @@ from browserrig import (
     MultiTab,
     PageContent,
     Readiness,
+    Screenshots,
+    ScreenshotTools,
     SingleTab,
 )
 from browserrig.browser import TabInfo
 from browserrig.tools import Effect
 from tests.fakes import FakeChrome
+
+_PNG = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aGhg"
+    "AAAAASUVORK5CYII="
+)
 
 
 @pytest.mark.parametrize("mode, overview", [(SingleTab, False), (MultiTab, True)])
@@ -116,3 +124,57 @@ async def test_step_observation_and_actions_share_session_control():
         assert action.result().text == "Executed once."
         operation.assert_awaited_once()
         assert not holder["coordination"].busy
+
+
+@pytest.mark.parametrize("image_available", [True, False])
+async def test_explicit_screenshot_reports_reuse_or_unavailability(image_available):
+    class Capture:
+        async def collect(self, tab, _report, *, screenshots, **_options):
+            return CaptureContent(
+                page=PageContent(
+                    url=tab.url,
+                    title=tab.title,
+                    width=800,
+                    height=600,
+                    scroll_y=0,
+                    page_height=600,
+                ),
+                image=_PNG if screenshots and image_available else None,
+            )
+
+    model = ScriptedModel(
+        [
+            [ModelChunk(tool_call=ToolCall("screenshot", {}))],
+            [ModelChunk(tool_call=ToolCall("screenshot", {}))],
+            "Done",
+        ]
+    )
+    agent = Agent(
+        model=model,
+        plugins=[
+            FakeChrome({}),
+            Readiness(),
+            BrowserPerception(capture=Capture(), screenshots=Screenshots()),
+            ScreenshotTools(),
+        ],
+    )
+    async with agent.session() as session:
+        result = await session.run("Request two screenshots", max_steps=3)
+    assert result.text == "Done"
+    messages = model.requests[-1].messages
+    receipts = [
+        message.text for message in messages if isinstance(message, ToolMessage)
+    ]
+    assert receipts == ["Screenshot requested.", "Screenshot requested."]
+    images = [
+        part
+        for message in messages
+        if not isinstance(message.content, str)
+        for part in message.content
+        if isinstance(part, ImagePart)
+    ]
+    status = (
+        "screen unchanged this step" if image_available else "Screenshot unavailable."
+    )
+    assert len(images) == int(image_available)
+    assert any(status in message.text for message in messages)

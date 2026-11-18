@@ -29,7 +29,4 @@ class ScreenshotTools(Plugin):
         ] = None,
     ) -> ToolResult:
         self._observe.request_screenshot(region=region)
-        target = "requested region" if region is not None else "current viewport"
-        return ToolResult(
-            f"Screenshot requested. Your next observation will show the {target}."
-        )
+        return ToolResult("Screenshot requested.")

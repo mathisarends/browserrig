@@ -79,7 +79,7 @@ def screenshot_instructions(screenshots: Screenshots | None) -> str:
     if screenshots is None:
         return ""
     text = (
-        "Every observation includes a screenshot."
+        "A screenshot is captured before each model step. Unchanged images may be reused."
         if screenshots.trigger == ScreenshotTrigger.EACH_STEP
         else "Use the screenshot tool to request a fresh image."
     )
