@@ -17,6 +17,7 @@ from browserrig import (
     BrowserPerception,
     Chrome,
     DomCapture,
+    DomRenderer,
     Done,
     Files,
     FileTools,
@@ -94,7 +95,9 @@ def test_facade_reports_kit_origins_replacements_and_exclusions_without_resource
 
 async def test_nested_pack_instructions_follow_overrides_and_exclusions():
     browser = browser_pack().without(Chrome, FileTools)
-    observe = BrowserPerception(capture=DomCapture(max_text_chars=1000))
+    observe = BrowserPerception(
+        capture=DomCapture(max_text_chars=1000), renderer=DomRenderer()
+    )
     application = PluginPack("application", [browser, observe])
     agent = Agent(
         model=ScriptedModel([]),

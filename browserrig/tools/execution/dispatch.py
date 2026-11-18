@@ -55,8 +55,9 @@ class ActionDispatch:
         )
         if not profile.follow_opened_tab or tab.closed:
             return Dispatched(effect, note, "")
+        timeout_seconds = _TAB_OPEN_SECONDS if effect.expects_new_tab else 0
         with self._actions.activate(action_id):
-            followed = await self._follow(tab, mark, expected=effect.expects_new_tab)
+            followed = await self._follow(tab, mark, timeout_seconds=timeout_seconds)
         if effect.expects_new_tab and not followed:
             # Nothing opened, so the input acted in this tab instead.
             if settled:
@@ -107,14 +108,10 @@ class ActionDispatch:
         return ""
 
     @traced
-    async def _follow(self, tab: Tab, mark: int, *, expected: bool) -> str:
-        """Activate a tab the input opened and wait for its page, as Chrome shows it.
-
-        Input that asked for a new tab gives the browser a moment to open it; other input
-        has already settled, so a tab it opened is attached by now.
-        """
+    async def _follow(self, tab: Tab, mark: int, *, timeout_seconds: float) -> str:
+        """Activate a tab the input opened and wait for its page."""
         opened = await self._browser.tabs.opened_since(
-            mark, timeout_seconds=_TAB_OPEN_SECONDS if expected else 0
+            mark, timeout_seconds=timeout_seconds
         )
         if opened is None:
             return ""

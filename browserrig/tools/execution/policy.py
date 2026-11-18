@@ -12,7 +12,7 @@ class ActionProfile:
     phase: ReadinessPhase | None = ReadinessPhase.AFTER_ACTION
     requires_observation: bool = False
     preflight: bool = False
-    expects_change: bool = False
+    warn_if_no_progress: bool = False
     follow_opened_tab: bool = False
     check_chain: bool = False
 
@@ -26,7 +26,7 @@ _PAGE = ActionProfile()
 _TAB = ActionProfile(phase=None)
 _NAVIGATION = ActionProfile(phase=ReadinessPhase.NAVIGATION)
 _POINTER = ActionProfile(requires_observation=True, follow_opened_tab=True)
-_POINTER_MUTATION = replace(_POINTER, expects_change=True)
+_POINTER_MUTATION = replace(_POINTER, warn_if_no_progress=True)
 _CLICK = replace(_POINTER_MUTATION, check_chain=True)
 _KEY = replace(_POINTER, check_chain=True)
 _FORM = replace(_KEY, preflight=True)

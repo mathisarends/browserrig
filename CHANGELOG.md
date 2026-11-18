@@ -4,15 +4,22 @@
 
 ### Breaking changes
 
-- Replace `DomPerception`, `TextContext` and `ImageContext` with one
-  `BrowserPerception(text=..., screenshots=...)`. Use `DomText(mode=DomTextMode.DELTA)`
-  or `DomText(mode=DomTextMode.FULL)` for text. The enum values are
-  `"delta"` and `"full"`. Use `None` to omit text. Use
-  `Screenshots(...)` for images, and `None` to omit images. Add
-  `marks=SetOfMarks()` for labeled targets in either image mode. Images without
-  text or marks use screenshot capture and browser-event readiness without DOM
-  extraction. Images with marks still collect DOM targets. The default
-  `browser_pack()` keeps DOM text and marked screenshots on request.
+- Eval Python APIs and report JSON use `timeout_seconds`. Rename the old
+  `timeout` key in saved runs before using them for comparisons. New HTML
+  reports embed `timeout_seconds` as well. Python callers of the eval subprocess
+  helpers use `timeout_seconds=`. The CLI still takes `--timeout`
+  in seconds.
+- Replace `DomPerception`, `TextContext` and `ImageContext` with
+  `BrowserPerception(text=..., screenshots=...)`. Configure delivery with
+  `TextObservations(mode="delta")` or `TextObservations(mode="full")` in place of
+  `DomText` and `DomTextMode`. Use `DomCapture(page_prose="inline" | "sparse" | "off")`
+  in place of `DomCapture(text=PageText...)`. `PageProse` and `TextMode` are literal
+  types. Use `DomRenderer()` without text or landmark settings.
+- The default capture is `DomCapture()`. Pass a renderer with explicit capture
+  when text is enabled. For pixel-only observations pass `ScreenshotCapture()`,
+  `text=None` and `Screenshots(...)`. Configure readiness separately. For the
+  previous browser-event readiness, use `NetworkQuiet(inner=BrowserReady())` as
+  the initial and ongoing policy. Keep DOM capture for DOM screenshot marks.
 - Move `marks`, `cursor`, `skip_unchanged` and image `retention` to
   `Screenshots`. For a fresh image on every model step, use
   `Screenshots(trigger=ScreenshotTrigger.EACH_STEP, skip_unchanged=False)`.
@@ -27,7 +34,9 @@
 - `DomElements` is now the callable service `ResolveDomElement`. Replace
   `await scope[DomElements].resolve(tab, ref)` with
   `await scope[ResolveDomElement](tab, ref)`. `BrowserPerception` provides the new
-  service key; import it from `browserrig` or `browserrig.observation`.
+  service key when the capture declares `supports_dom_refs = True`. Native DOM
+  tools require that service. Import the key from `browserrig` or
+  `browserrig.observation`. Screenshot tools require screenshot configuration.
 - Rename the page-wait plugin from `Readiness` to `PageReadiness`. Update
   plugin lists, `needs(...)` declarations and scope lookups. Readiness policies,
   checks and reports keep their names.
@@ -55,6 +64,8 @@
 - Enforce the reviewed Smelt source and test conventions as errors, including
   stateful dataclasses and repeated lifecycle narrowing assertions. Keep only
   the three documented import/navigation review heuristics as visible hints.
+- Acknowledge screenshot requests immediately and report capture or image reuse
+  in the next observation. Report unavailable images in text-and-image sessions too.
 - Wheel scrolling follows the motor installed by `InputPacing`. `HumanMotor`
   accelerates and decelerates gently; `scroll_speed=0.5` doubles the gesture's
   duration and `scroll_speed=2` halves it. `Instant` sends one wheel event

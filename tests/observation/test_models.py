@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from browserrig import BrowserPerception, DomCapture, PageText
+from browserrig import BrowserPerception, DomCapture
 from browserrig.browser import Connect, Launch
 from browserrig.core import Bounds, Geometry, Point, Region, StaleElement
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
@@ -171,7 +171,7 @@ def test_cookie_context_has_its_own_block_and_leaves_navigation_available():
     assert '[1] button "Continue"' in text and "[MAIN]" in text
     assert "interact with it first" not in text and not snapshot.text
     observe = BrowserPerception()
-    assert "choose whether to interact or navigate" in observe.renderer.instructions()
+    assert "Choose whether to interact or navigate" in observe.renderer.instructions()
 
 
 def test_cookie_excerpt_is_rendered_even_when_no_controls_fit_the_budget():
@@ -286,27 +286,9 @@ def test_default_observation_explains_context_without_enabling_screenshots():
     assert "Every observation includes a screenshot" not in instructions
 
 
-@pytest.mark.parametrize(
-    "text,expected",
-    [
-        (PageText.INLINE, "reading order beside its controls"),
-        (PageText.SPARSE, "When the viewport holds few controls"),
-        (PageText.OFF, "Observations omit page text"),
-    ],
-)
-def test_observation_instructions_follow_captured_page_text(text, expected):
-    observe = BrowserPerception(capture=DomCapture(text=text))
-    instructions = observe.renderer.instructions()
-    assert expected in instructions
-    assert ("[label][ref]" in instructions) == (text != PageText.OFF)
-
-
-@pytest.mark.parametrize("landmarks", [True, False])
-def test_observation_instructions_mention_landmarks_only_when_captured(landmarks):
-    observe = BrowserPerception(capture=DomCapture(landmarks=landmarks))
-    instructions = observe.renderer.instructions()
-    assert ("landmarks like [MAIN]" in instructions) == landmarks
-    assert '<form "Login">' in instructions
+def test_text_with_an_explicit_capture_requires_a_renderer():
+    with pytest.raises(ValueError, match="explicit capture require a renderer"):
+        BrowserPerception(capture=DomCapture(page_prose="sparse"))
 
 
 def _snapshot(*elements: Element, **fields) -> Snapshot:

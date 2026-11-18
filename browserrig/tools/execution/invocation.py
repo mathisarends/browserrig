@@ -59,7 +59,7 @@ class InvokeTool:
                 kind=kind,
                 operation=perform,
                 settle=settle,
-                expects_change=profile.expects_change,
+                expects_change=profile.warn_if_no_progress,
                 action=action,
             )
             original = action.result

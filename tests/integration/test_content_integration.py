@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, PageText, wait_for_page
+from browserrig import ChromeBrowser, DomCapture, wait_for_page
 from browserrig.browser import Launch
 from browserrig.kinds import ElementOperation
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
@@ -52,7 +52,7 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
         """,
         )
         report = await wait_for_page(tab)
-        snapshot = await capture(tab, DomCapture(text=PageText.OFF), report)
+        snapshot = await capture(tab, DomCapture(page_prose="off"), report)
         assert snapshot.image is None
         assert snapshot.text == ""
         assert not snapshot.limitations

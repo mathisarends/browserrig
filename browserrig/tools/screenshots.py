@@ -1,12 +1,16 @@
 from typing import Annotated
 
 from harnessed import Plugin, ToolResult
-from harnessed.kernel import needs
+from harnessed.kernel import Inject, needs
 from pydantic import Field
 
 from browserrig.core import ActionKind, Region
 from browserrig.core import browser_tool as tool
 from browserrig.observation import BrowserPerception
+
+
+def _screenshots_enabled(perception: Inject[BrowserPerception | None]) -> bool:
+    return perception is not None and perception.screenshots is not None
 
 
 class ScreenshotTools(Plugin):
@@ -16,6 +20,7 @@ class ScreenshotTools(Plugin):
 
     @tool(
         kind=ActionKind.SCREENSHOT,
+        enabled=_screenshots_enabled,
         readonly=True,
         description="Include one screenshot in the next observation.",
     )
@@ -29,7 +34,4 @@ class ScreenshotTools(Plugin):
         ] = None,
     ) -> ToolResult:
         self._observe.request_screenshot(region=region)
-        target = "requested region" if region is not None else "current viewport"
-        return ToolResult(
-            f"Screenshot requested. Your next observation will show the {target}."
-        )
+        return ToolResult("Screenshot requested.")
