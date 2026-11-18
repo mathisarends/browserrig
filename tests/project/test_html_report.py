@@ -6,7 +6,6 @@ from collections import Counter
 
 import pytest
 
-from browserrig import PageText
 from evals import analyze
 from evals.freeze import LOCAL_DATA
 from evals.html_report import build
@@ -64,7 +63,7 @@ def test_report_uses_local_membership_and_rejects_mixed_subsets(tmp_path):
 
 @pytest.mark.parametrize(
     "setting",
-    [{"max_steps": 100}, {"page_text": PageText.OFF}, {"headings": False}],
+    [{"max_steps": 100}, {"page_text": "off"}, {"headings": False}],
 )
 def test_report_rejects_incompatible_settings(tmp_path, setting):
     paths = [tmp_path / "one.json", tmp_path / "two.json"]
@@ -276,6 +275,6 @@ def _run(records):
         repeat=1,
         project="test",
         max_steps=50,
-        timeout=300,
+        timeout_seconds=300,
         tasks=records,
     )

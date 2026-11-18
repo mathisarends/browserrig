@@ -45,10 +45,10 @@ def summary(run: BenchmarkResult) -> str:
 
 
 def compare(run: BenchmarkResult, before: BenchmarkResult) -> str:
-    if (run.dataset_sha256, run.max_steps, run.timeout) != (
+    if (run.dataset_sha256, run.max_steps, run.timeout_seconds) != (
         before.dataset_sha256,
         before.max_steps,
-        before.timeout,
+        before.timeout_seconds,
     ):
         return "Runs have different datasets or budgets; comparison skipped."
     now, then = _by_task(run.tasks), _by_task(before.tasks)
@@ -94,10 +94,10 @@ def previous_run(current: Path) -> BenchmarkResult | None:
             earlier = BenchmarkResult.model_validate_json(path.read_text("utf-8"))
         except (ValidationError, OSError):
             continue
-        if (run.dataset_sha256, run.max_steps, run.timeout) == (
+        if (run.dataset_sha256, run.max_steps, run.timeout_seconds) == (
             earlier.dataset_sha256,
             earlier.max_steps,
-            earlier.timeout,
+            earlier.timeout_seconds,
         ) and names & {record.task for record in earlier.tasks}:
             return earlier
     return None

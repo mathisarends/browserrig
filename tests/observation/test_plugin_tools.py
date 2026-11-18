@@ -14,6 +14,8 @@ from browserrig import (
     PageReadiness,
     PageSearchTools,
     PointerTools,
+    ScreenshotCapture,
+    Screenshots,
     ScreenshotTools,
     Targeting,
 )
@@ -38,7 +40,7 @@ async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
     plugins = [
         FakeChrome({}),
         PageReadiness(),
-        BrowserPerception(),
+        BrowserPerception(screenshots=Screenshots()),
         Actions(),
         Targeting(),
         KeyboardTools(),
@@ -60,3 +62,41 @@ async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
             | expected
         )
     assert not model.requests
+
+
+@pytest.mark.parametrize("pixels", [False, True])
+async def test_model_tools_follow_the_configured_capture(pixels):
+    perception = (
+        BrowserPerception(
+            capture=ScreenshotCapture(), text=None, screenshots=Screenshots()
+        )
+        if pixels
+        else BrowserPerception()
+    )
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            FakeChrome({}),
+            PageReadiness(),
+            perception,
+            Actions(),
+            Targeting(),
+            DomScrollTools(),
+            DomTypingTools(),
+            FormTools(),
+            ScreenshotTools(),
+        ],
+    )
+    async with agent.session() as session:
+        names = {tool.name for tool in session.scope[ToolRegistry].definitions}
+        assert ("screenshot" in names) is pixels
+        assert {
+            "scroll_page",
+            "scroll_element",
+            "type_text",
+            "select_options",
+        } & names == (
+            set()
+            if pixels
+            else {"scroll_page", "scroll_element", "type_text", "select_options"}
+        )

@@ -1,4 +1,5 @@
 import asyncio
+from typing import ClassVar
 
 from harnessed.tracing import record, traced
 from pydantic import Field
@@ -13,7 +14,7 @@ from browserrig.core import (
 from browserrig.readiness import ReadinessReport
 
 from .capture import CaptureContent
-from .config import PageText
+from .config import PageProse
 from .extraction import extract
 from .handle import DomReferences
 from .models import PageContent
@@ -28,10 +29,12 @@ class DomCapture(Options):
     prose, headings and landmarks. Dialogs and cookie banners stay grouped.
     """
 
+    supports_dom_refs: ClassVar[bool] = True
+
     max_elements: int | None = Field(default=None, ge=1, le=50000)
     # INLINE interleaves visible prose with controls; SPARSE adds it only when the
     # viewport shows fewer than five named controls; OFF omits it.
-    text: PageText = PageText.INLINE
+    page_prose: PageProse = "inline"
     # Text budget for INLINE and SPARSE.
     max_text_chars: int = Field(default=3000, ge=1, le=100000)
     # Heading lines such as `## Pricing`.
@@ -53,7 +56,7 @@ class DomCapture(Options):
     ) -> CaptureContent:
         del cursor
         # Comparison probes after actions need controls, not prose.
-        text = PageText.OFF if report.phase == ReadinessPhase.ACTION else self.text
+        text = "off" if report.phase == ReadinessPhase.ACTION else self.page_prose
         record(
             screenshots=screenshots,
             page_text=text,
@@ -64,8 +67,8 @@ class DomCapture(Options):
         extraction = extract(
             frames,
             max_elements=self.max_elements,
-            max_text=self.max_text_chars if text == PageText.INLINE else 0,
-            sparse_text=self.max_text_chars if text == PageText.SPARSE else 0,
+            max_text=self.max_text_chars if text == "inline" else 0,
+            sparse_text=self.max_text_chars if text == "sparse" else 0,
             viewport_expansion=self.viewport_expansion,
             # Comparison probes match controls by identity, not by their names.
             names=report.phase != ReadinessPhase.ACTION,

@@ -11,7 +11,6 @@ import pytest
 from harnessed import ToolCall, ToolResult, ToolStatus
 from harnessed.events import ToolCallFinishedEvent
 
-from browserrig import PageText
 from evals import analyze, evaluate, report, run, runner
 from evals.environments import Environments
 from evals.evaluate import Grade
@@ -383,7 +382,7 @@ def test_comparison_still_reports_real_regressions():
 def test_comparison_names_the_observation_arms():
     before = _benchmark([_record("demo")])
     current = _benchmark([_record("demo", "fail", 0.5)])
-    current.page_text = PageText.OFF
+    current.page_text = "off"
     current.landmarks = False
 
     comparison = report.compare(current, before)
@@ -660,6 +659,19 @@ def test_legacy_results_default_to_api_provider():
     restored = BenchmarkResult.model_validate(payload)
 
     assert restored.provider == "openai"
+
+
+def test_run_timeout_serializes_with_its_unit(tmp_path):
+    payload = _benchmark([]).model_dump(exclude_unset=True)
+    benchmark = BenchmarkResult.model_validate({**payload, "timeout_seconds": 120})
+    path = tmp_path / "run.json"
+    write_run(path, benchmark)
+
+    assert benchmark.timeout_seconds == 120
+    assert json.loads(path.read_text(encoding="utf-8")) == {
+        **payload,
+        "timeout_seconds": 120,
+    }
 
 
 @pytest.mark.parametrize("option", ["--repeat", "--parallel"])

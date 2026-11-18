@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, Input, PageText, Point, wait_for_page
+from browserrig import ChromeBrowser, DomCapture, Input, Point, wait_for_page
 from browserrig.browser import Launch
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     # Public facade callable; SMT107 confuses it with the same-named module.
@@ -65,7 +65,7 @@ async def test_cookie_banner_has_context_and_existing_action_refs(site, markup):
         await wait_for_page(tab)
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        state = await capture(tab, DomCapture(text=PageText.OFF), report)
+        state = await capture(tab, DomCapture(page_prose="off"), report)
         assert not state.text
         assert len(state.cookie_banners) == 1
         banner = state.cookie_banners[0]
@@ -135,7 +135,7 @@ async def test_banner_text_survives_busy_page_and_disappears_after_normal_click(
         )
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        before = await capture(tab, DomCapture(text=PageText.OFF), report)
+        before = await capture(tab, DomCapture(page_prose="off"), report)
         assert not before.text and len(before.cookie_banners) == 1
         banner = before.cookie_banners[0]
         assert banner.name == "Privacy choices" and "analytics" in banner.text

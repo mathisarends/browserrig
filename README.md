@@ -12,7 +12,7 @@ start, replace individual capabilities, or assemble your own runtime from plugin
 | Agent runtime | Model calls, sessions, approvals and persistence | Harnessed models, plugins and lifecycle hooks |
 | Browser | Tabs, frames and browser lifetime | `Browser`, `InputTargets`; local or remote `Chrome` |
 | Input | Mouse and keyboard, independent of the browser backend | `InputRuntime`, `Input`, `Targeting` |
-| Perception | Capture page state and deliver observations | `BrowserPerception`, `DomText`, `Screenshots`, custom `CaptureStrategy` and `Renderer` |
+| Perception | Capture page state and deliver observations | `BrowserPerception`, `TextObservations`, `Screenshots`, custom `CaptureStrategy` and `Renderer` |
 | Actions | Coordinate input, readiness and action chains | Tool groups, `browser_tool`, `ReadinessPolicy` |
 | Context | Compact history and recover task memory | `TaskMemory` |
 | Presentation | Pace input, show activity and record sessions | `InputPacing`, `Choreography`, `ChoreographyOverlay`, `VideoRecording` |

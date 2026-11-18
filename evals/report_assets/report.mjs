@@ -23,7 +23,7 @@ const badge = (status) => el('span', labels[status] || status, `tag ${status}`);
 const evaluated = count('pass') + count('fail');
 const complete = evaluated + count('error');
 q('#metadata').textContent =
-  `${report.model} · ${report.provider} · ${report.max_steps} Schritte / ${report.timeout}s je Aufgabe · Commit ${report.revision} · ${new Date(report.generated).toLocaleString('de-DE')}`;
+  `${report.model} · ${report.provider} · ${report.max_steps} Schritte / ${report.timeout_seconds}s je Aufgabe · Commit ${report.revision} · ${new Date(report.generated).toLocaleString('de-DE')}`;
 q('#coverage').textContent =
   `${complete}/48 ausgeführt · ${count('pending')} ausstehend · ${count('blocked')} Infrastruktur-blockiert. ${report.name}. Die Erfolgsquote bezieht sich auf die ${evaluated} fachlich bewerteten Aufgaben; Lauf-/Evaluatorfehler und nicht ausgeführte Aufgaben sind gesondert ausgewiesen. Dies ist ein Entwicklungs-Subset, kein Score auf allen 258 offiziellen Hard-Aufgaben.`;
 const tokenTasks = tasks.filter((task) => task.input_tokens !== null);
