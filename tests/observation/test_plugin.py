@@ -12,6 +12,7 @@ from browserrig import (
     BrowserCoordination,
     BrowserPerception,
     CaptureContent,
+    CaptureStrategy,
     DomRenderer,
     MultiTab,
     PageContent,
@@ -38,7 +39,7 @@ async def test_tab_overview_is_collected_only_for_multi_tab(mode, overview):
         TabInfo(id="other", url="https://private.example/", title="Other page"),
     )
 
-    class PageCapture:
+    class PageCapture(CaptureStrategy):
         async def collect(self, tab, _report, **_options):
             return CaptureContent(
                 page=PageContent(
@@ -77,7 +78,7 @@ async def test_step_observation_and_actions_share_session_control():
     holder = {}
     entered, release = asyncio.Event(), asyncio.Event()
 
-    class BlockingCapture:
+    class BlockingCapture(CaptureStrategy):
         async def collect(self, tab, _report, **_options):
             assert holder["coordination"].busy
             entered.set()
@@ -128,7 +129,7 @@ async def test_step_observation_and_actions_share_session_control():
 
 @pytest.mark.parametrize("image_available", [True, False])
 async def test_explicit_screenshot_reports_reuse_or_unavailability(image_available):
-    class Capture:
+    class Capture(CaptureStrategy):
         async def collect(self, tab, _report, *, screenshots, **_options):
             return CaptureContent(
                 page=PageContent(

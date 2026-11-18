@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, replace
-from typing import Protocol
+from typing import ClassVar, Protocol
 from uuid import uuid4
 
 from cdpify import CDPCommandError
@@ -227,9 +227,11 @@ class CaptureStrategy(Protocol):
 
     Implementations are reusable configuration. Keep per-observation state local.
     Supply CaptureContent.references when targets exist. The default resolves no refs.
-    A backend returning DomElementHandle can declare supports_dom_refs = True to
-    enable model tools that require DOM references.
+    Set supports_dom_refs = True when the resolver returns DomElementHandle for
+    the strategy's DOM refs. This enables model tools that require DOM refs.
     """
+
+    supports_dom_refs: ClassVar[bool] = False
 
     async def collect(  # pylint: disable=unused-argument
         self,

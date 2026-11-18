@@ -12,6 +12,7 @@ from browserrig import (
     Actions,
     BrowserPerception,
     CaptureContent,
+    CaptureStrategy,
     DomElementHandle,
     DomReferences,
     DomRenderer,
@@ -387,7 +388,7 @@ class _Aiming(Instant):
         return 0.25, 0.75
 
 
-class _Backend:
+class _Backend(CaptureStrategy):
     supports_dom_refs = True
 
     """A test-only source of opaque targets; no DOM addresses or scripted mutations."""

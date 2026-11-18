@@ -36,7 +36,9 @@ Upgrade from 0.6.x using the [migration guide](docs/migration-0.7.md).
 - `DomElements` is now the callable service `ResolveDomElement`. Replace
   `await scope[DomElements].resolve(tab, ref)` with
   `await scope[ResolveDomElement](tab, ref)`. `BrowserPerception` provides the new
-  service key when the capture declares `supports_dom_refs = True`. Native DOM
+  service key when the capture declares `supports_dom_refs = True`. Custom
+  capture strategies must declare this class variable or inherit the default
+  `False` from `CaptureStrategy`. Native DOM
   tools require that service. Import the key from `browserrig` or
   `browserrig.observation`. Screenshot tools require screenshot configuration.
 - Rename the page-wait plugin from `Readiness` to `PageReadiness`. Update
