@@ -40,8 +40,8 @@ class PageSearchTools(Plugin):
         readonly=True,
         chainable=True,
         description=(
-            "Search the loaded page; return matching table rows, list items and "
-            "paragraphs with their column headers and links."
+            "Search loaded page text, including text omitted from observations. "
+            "Return matching records with their headers and links."
         ),
     )
     async def search_page(

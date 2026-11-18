@@ -22,7 +22,7 @@ class ScreenshotTools(Plugin):
         kind=ActionKind.SCREENSHOT,
         enabled=_screenshots_enabled,
         readonly=True,
-        description="Include one screenshot in the next observation.",
+        description="Request a screenshot for the next observation.",
     )
     async def screenshot(
         self,
