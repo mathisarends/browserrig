@@ -311,11 +311,17 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         async with self._coordination.exclusive():
             requested, region = state.screenshot_requested, state.screenshot_region
             state.screenshot_requested, state.screenshot_region = False, None
-            snapshot = await self.capture(
-                phase=ReadinessPhase.OBSERVATION,
-                screenshots=True if requested else None,
-                region=region,
-            )
+            try:
+                snapshot = await self.capture(
+                    phase=ReadinessPhase.OBSERVATION,
+                    screenshots=True if requested else None,
+                    region=region,
+                )
+            except BaseException:
+                # Retry after errors or cancellation unless a newer request is pending.
+                if requested and not state.screenshot_requested:
+                    state.screenshot_requested, state.screenshot_region = True, region
+                raise
         await self._track_viewport(snapshot, nudges)
         observations = []
         context = state.context

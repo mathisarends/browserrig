@@ -12,6 +12,7 @@ from browserrig import (
     BrowserCoordination,
     BrowserPerception,
     CaptureContent,
+    CaptureStrategy,
     DomRenderer,
     MultiTab,
     PageContent,
@@ -21,6 +22,7 @@ from browserrig import (
     SingleTab,
 )
 from browserrig.browser import TabInfo
+from browserrig.core import BrowserError, Region
 from browserrig.tools import Effect
 from tests.fakes import FakeChrome
 
@@ -182,3 +184,59 @@ async def test_explicit_screenshot_reports_reuse_or_unavailability(image_availab
     )
     assert len(images) == int(image_available)
     assert any(status in message.text for message in messages)
+
+
+@pytest.mark.parametrize("replace_region", [False, True])
+async def test_screenshot_request_survives_a_failed_capture(replace_region):
+    original = Region(x=2, y=3, width=8, height=8)
+    attempts = []
+
+    class FailingCapture(CaptureStrategy):
+        async def collect(self, tab, _report, *, screenshots, region, **_options):
+            attempts.append((screenshots, region))
+            if len(attempts) == 1:
+                if replace_region:
+                    active.request_screenshot()
+                raise BrowserError("Page capture timed out")
+            return CaptureContent(
+                page=PageContent(
+                    url=tab.url,
+                    title=tab.title,
+                    width=800,
+                    height=600,
+                    scroll_y=0,
+                    page_height=600,
+                ),
+                image=_PNG if screenshots else None,
+            )
+
+    model = ScriptedModel(["Recovered", "Done"])
+    agent = Agent(
+        model=model,
+        plugins=[
+            FakeChrome({}),
+            PageReadiness(),
+            BrowserPerception(
+                capture=FailingCapture(),
+                renderer=DomRenderer(),
+                screenshots=Screenshots(),
+            ),
+        ],
+    )
+    async with agent.session() as session:
+        active = session.scope[BrowserPerception]
+        active.request_screenshot(original)
+        with pytest.raises(BrowserError, match="Page capture timed out"):
+            await session.run("Observe")
+        result = await session.run("Observe again")
+    assert result.text == "Done"
+    assert attempts[:2] == [
+        (True, original),
+        (True, None if replace_region else original),
+    ]
+    assert any(
+        isinstance(part, ImagePart)
+        for message in model.requests[0].messages
+        if not isinstance(message.content, str)
+        for part in message.content
+    )
