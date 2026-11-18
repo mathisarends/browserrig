@@ -23,6 +23,7 @@ from PIL import Image
 from browserrig import (
     BrowserPerception,
     CaptureContent,
+    CaptureStrategy,
     Input,
     PageReadiness,
     Secret,
@@ -351,7 +352,7 @@ def _secrets():
     )
 
 
-class _Collected:
+class _Collected(CaptureStrategy):
     """A capture strategy that returns prepared content."""
 
     def __init__(self, content: CaptureContent) -> None:

@@ -35,6 +35,7 @@ from browserrig import (
     BrowserFileTools,
     BrowserPerception,
     CaptureContent,
+    CaptureStrategy,
     DomRenderer,
     FileTools,
     HumanHandoff,
@@ -70,7 +71,7 @@ from tests.fakes import FakeChrome
 from tests.observations import has_image, image_id
 
 
-class CountingCapture:
+class CountingCapture(CaptureStrategy):
     def __init__(self, frames=None):
         self.captures = []
         # (image, geometry scale) per capture; by default every capture shows a new screen.

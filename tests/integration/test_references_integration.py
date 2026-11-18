@@ -17,6 +17,7 @@ from browserrig import (
     Browser,
     BrowserPerception,
     CaptureContent,
+    CaptureStrategy,
     Chrome,
     DomRenderer,
     ElementInfo,
@@ -107,7 +108,7 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
     assert all(event["trusted"] for event in received["keys"])
 
 
-class _CanvasCapture:
+class _CanvasCapture(CaptureStrategy):
     async def collect(  # pylint: disable=unused-argument
         self, tab, _report, *, screenshots, region=None, zoom=1, cursor=None
     ):

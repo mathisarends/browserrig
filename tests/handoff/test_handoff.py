@@ -49,12 +49,12 @@ from browserrig.events import (
     TabClosedEvent,
     TabOpenedEvent,
 )
-from browserrig.observation import CaptureContent, DomRenderer, Element
+from browserrig.observation import CaptureContent, CaptureStrategy, DomRenderer, Element
 from tests.fakes import FakeChrome
 from tests.observations import latest
 
 
-class _Capture:
+class _Capture(CaptureStrategy):
     async def collect(self, tab, _report, **_options):
         return CaptureContent(
             page=Extraction(

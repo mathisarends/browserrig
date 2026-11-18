@@ -282,7 +282,7 @@ can manage an operation explicitly with `Actions.run(...)`.
 
 | Contract | Implement |
 | --- | --- |
-| `CaptureStrategy` | `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent` |
+| `CaptureStrategy` | `supports_dom_refs: ClassVar[bool]` and `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent` |
 | `Renderer` | `render(snapshot)`, `instructions()` and `refs()` |
 | `References` | `async resolve(tab, snapshot, ref) -> ElementHandle` |
 | `ElementHandle` | `element: ElementInfo`; `async locate(*, aim=None) -> ElementPoint` |
@@ -302,7 +302,9 @@ DOM reveal scrolls exact containers and reports measured movement.
 `Heading` and `ElementRef`; leaving it unset retains flat rendering. A custom
 `fingerprint` supports change comparisons. `BrowserPerception` provides the callable
 `ResolveDomElement` when the capture declares `supports_dom_refs = True`. The built-in
-`DomCapture` declares it. When the service is available, `await scope[ResolveDomElement](tab, ref)` returns a DOM handle.
+`DomCapture` declares it. A custom capture can inherit `CaptureStrategy` for
+the default `False` or declare the class variable itself. When the service is
+available, `await scope[ResolveDomElement](tab, ref)` returns a DOM handle.
 Native forms, `DomUploadTools` and `DomTypingTools` use this service; other backends can use
 pointer input and focused `send_keys`. `DomActionChains` conservatively ends input chains with
 custom resolvers; supply a matching policy for stronger continuation checks.
@@ -343,7 +345,8 @@ perception = BrowserPerception(
 For image-only pixel capture, select `ScreenshotCapture()` with `text=None` and a
 `Screenshots` configuration. A composition that avoids DOM readiness probes can
 set both readiness policies to `NetworkQuiet(inner=BrowserReady())`. Use
-`DomCapture()` to collect DOM refs for screenshot marks.
+`DomCapture()` to collect DOM refs. `SetOfMarks()` draws those refs as labels
+on the screenshot.
 Perception itself registers no model tools. Add `ScreenshotTools()` for screenshot
 requests and `PageSearchTools()` for page search. The screenshot tool is available
 when the session configures screenshots.

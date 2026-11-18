@@ -90,7 +90,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     async def setup(self, scope: PluginScope) -> None:
         # Secrets is looked up per capture, so it redacts wherever it sits in the plugins.
         self._state.context = scope
-        if getattr(self.capture_strategy, "supports_dom_refs", False):
+        if self.capture_strategy.supports_dom_refs:
             scope.provide(ResolveDomElement, ResolveDomElement(self))
 
     def instructions(self) -> SystemPrompt:

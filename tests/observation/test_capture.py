@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 from cdpify import CDPCommandError
 
-from browserrig import CaptureContent, DomCapture
+from browserrig import CaptureContent, CaptureStrategy, DomCapture
 from browserrig import PageContent as Extraction
 from browserrig.core import Bounds, BrowserError, ReadinessPhase, StaleElement
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
@@ -228,7 +228,7 @@ async def test_page_text_mode_selects_the_extraction_budget(
     assert (options["max_text"], options["sparse_text"]) == budgets
 
 
-class _Capture:
+class _Capture(CaptureStrategy):
     def __init__(self, fingerprint=None):
         self.fingerprint = fingerprint
         self.banners = ()
