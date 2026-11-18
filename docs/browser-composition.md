@@ -351,6 +351,9 @@ Perception itself registers no model tools. Add `ScreenshotTools()` for screensh
 requests and `PageSearchTools()` for page search. The screenshot tool is available
 when the session configures screenshots.
 `DomTypingTools`, `DomScrollTools` and `FormTools` are separate DOM capabilities.
+Tools that take DOM refs require `ResolveDomElement`. These plugins and
+`DomUploadTools` log at debug level when the service is missing.
+`DomScrollTools` also provides `scroll_page`, which works without DOM refs.
 The screenshot tool acknowledges the request. The next observation supplies the
 new image, reports reuse of the previous image when unchanged, or reports why no
 image was available.

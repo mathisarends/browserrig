@@ -8,7 +8,7 @@ from harnessed import (
     SystemPrompt,
     ToolError,
 )
-from harnessed.kernel import needs, observes
+from harnessed.kernel import PluginScope, needs, observes
 from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab
@@ -39,7 +39,7 @@ from .effects import Effect
 from .execution import Actions
 from .file_observation import FileSystemObservation
 from .intents import OpenFileIntent, UploadIntent
-from .parameters import resolve_dom_element
+from .parameters import log_missing_dom_refs, require_dom_resolver
 from .targeting import Targeting
 from .workspace import FILE_TOOLS_SLOT, WORKSPACE_GUIDANCE, WorkspaceIO, file_errors
 
@@ -172,6 +172,10 @@ class DomUploadTools(Plugin):
     _targets = needs(Targeting)
     events = UPLOAD_EVENTS
 
+    async def setup(self, scope: PluginScope) -> None:
+        await super().setup(scope)
+        log_missing_dom_refs(scope, type(self).__name__)
+
     @tool(
         kind=ActionKind.UPLOAD,
         enabled=_can_upload,
@@ -190,7 +194,8 @@ class DomUploadTools(Plugin):
         ],
     ) -> Effect:
         tab = self._actions.tab
-        handle = await resolve_dom_element(self._elements, tab, ref)
+        resolver = require_dom_resolver(self._elements)
+        handle = await resolver(tab, ref)
         if handle.element.input_type != "file":
             raise BrowserError("Target is not a file input")
         transfer = _require_transfer(self._file_transfer)
@@ -213,7 +218,7 @@ class DomUploadTools(Plugin):
                 point = None
 
         async def assign() -> None:
-            handle = await resolve_dom_element(self._elements, tab, ref)
+            handle = await resolver(tab, ref)
             browser_paths = [str(path) for path in staged.browser_paths]
             await handle.upload_files(browser_paths)
             await self._events.emit(
