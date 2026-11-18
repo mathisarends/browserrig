@@ -30,7 +30,6 @@ from browserrig.observation import (
     BrowserPerception,
     CaptureStrategy,
     DomCapture,
-    DomRenderer,
     Screenshots,
     ScreenshotTrigger,
     SetOfMarks,
@@ -299,9 +298,7 @@ def _perception(args, parser) -> tuple[BrowserPerception, bool]:
     if mode == "text":
         if args.screenshot_trigger is not None or args.screenshot_tool:
             parser.error("Screenshot options require an image observation variant")
-        return BrowserPerception(
-            text=text, capture=capture, renderer=DomRenderer()
-        ), False
+        return BrowserPerception(text=text, capture=capture), False
     default = (
         ScreenshotTrigger.ON_REQUEST if mode is None else ScreenshotTrigger.EACH_STEP
     )
@@ -316,7 +313,6 @@ def _perception(args, parser) -> tuple[BrowserPerception, bool]:
         text=text,
         screenshots=screenshots,
         capture=capture,
-        renderer=DomRenderer() if text else None,
     ), enabled
 
 

@@ -49,8 +49,8 @@ new page or out-of-process frame session. Viewport configuration is applied firs
 `BrowserPerception` can deliver DOM text, screenshots, or both. DOM extraction
 includes shadow roots and nested/cross-origin frames. Select text delivery with
 `TextObservations(mode="delta")` or `TextObservations(mode="full")`.
-Configure DOM extraction with
-`BrowserPerception(capture=DomCapture(...), renderer=DomRenderer())`.
+Configure DOM extraction with `BrowserPerception(capture=DomCapture(...))`.
+`DomRenderer()` is the default for captures that support DOM refs.
 
 ```text
 # Checkout

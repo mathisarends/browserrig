@@ -15,7 +15,6 @@ from browserrig import (
     CaptureStrategy,
     DomElementHandle,
     DomReferences,
-    DomRenderer,
     DomTypingTools,
     ElementInfo,
     ElementRef,
@@ -479,7 +478,7 @@ async def _observed(backend):
         plugins=[
             FakeChrome(holder),
             _Ready(),
-            BrowserPerception(capture=backend, renderer=DomRenderer()),
+            BrowserPerception(capture=backend),
             Actions(),
             Targeting(),
             _Forms(),

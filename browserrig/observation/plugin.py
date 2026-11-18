@@ -85,7 +85,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         self.text = text
         self.screenshots = screenshots
         self.capture_strategy = capture if capture is not None else _DEFAULT_CAPTURE
-        self.renderer = _text_renderer(capture, text, renderer)
+        self.renderer = _text_renderer(self.capture_strategy, text, renderer)
 
     async def setup(self, scope: PluginScope) -> None:
         # Secrets is looked up per capture, so it redacts wherever it sits in the plugins.
@@ -488,16 +488,14 @@ class ResolveDomElement:
 
 
 def _text_renderer(
-    capture: CaptureStrategy | None,
+    capture: CaptureStrategy,
     text: TextObservations | None,
     renderer: Renderer | None,
 ) -> Renderer:
     if renderer is not None:
         return renderer
-    if capture is not None and text is not None:
-        raise ValueError(
-            "Text observations with an explicit capture require a renderer"
-        )
+    if text is not None and not capture.supports_dom_refs:
+        raise ValueError("Text observations with this capture require a renderer")
     return DomRenderer()
 
 
