@@ -5,6 +5,7 @@ from .config import (
     Screenshots,
     ScreenshotTrigger,
     SetOfMarks,
+    TextContent,
     TextMode,
     TextObservations,
 )
@@ -71,6 +72,7 @@ __all__ = [
     "ScreenshotCapture",
     "ScreenshotStatus",
     "TextObservations",
+    "TextContent",
     "TextMode",
     "SetOfMarks",
     "PageProse",

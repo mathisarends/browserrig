@@ -44,6 +44,7 @@ from .favicon import load_favicon
 from .frame import Frame
 from .guard import NavigationGuard
 from .input import CdpInput
+from .models import PageLayout
 from .network import NetworkActivity
 from .overlays import Overlays
 from .popups import SINGLE_TAB_BLOCKED
@@ -280,8 +281,19 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self._layout_revision += 1
 
     async def viewport_size(self) -> ViewportSize:
-        viewport = (await self.cdp.page.get_layout_metrics()).css_layout_viewport
-        return ViewportSize(width=viewport.client_width, height=viewport.client_height)
+        return (await self.page_layout()).viewport
+
+    async def page_layout(self) -> PageLayout:
+        """Measure the main page via Chrome's layout metrics."""
+        metrics = await self.cdp.page.get_layout_metrics()
+        viewport = metrics.css_layout_viewport
+        return PageLayout(
+            viewport=ViewportSize(
+                width=viewport.client_width, height=viewport.client_height
+            ),
+            scroll_y=viewport.page_y,
+            page_height=metrics.css_content_size.height,
+        )
 
     async def _measure_viewport(self) -> ViewportSize | None:
         """Measure the layout viewport, or keep the last size while the page is blocked."""

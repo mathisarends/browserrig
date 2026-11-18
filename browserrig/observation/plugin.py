@@ -40,12 +40,13 @@ from .images import NOTE_SOURCE, attach_image, image_note, project_image, trim_i
 from .models import CapturedImage, ScreenshotStatus, Snapshot
 from .pixels import ScreenshotCapture
 from .references import ElementHandle, References
-from .renderer import DomRenderer, Renderer, screenshot_instructions
+from .renderer import DomRenderer, MetadataRenderer, Renderer, screenshot_instructions
 from .state import BrowserPerceptionState
 from .text import include_text, project_text
 
 _DEFAULT_TEXT = TextObservations()
 _DEFAULT_CAPTURE = DomCapture()
+_METADATA_CAPTURE = ScreenshotCapture()
 _TRUST = Instructions(
     title="Browser content and action results",
     text=(
@@ -60,7 +61,7 @@ _TRUST = Instructions(
 class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     """Provide the agent's current view of the browser before each model step.
 
-    Select DOM text, screenshots, or both. Configured modalities share one coherent
+    Select page text, metadata, screenshots, or a combination. Configured modalities share one
     snapshot and request history. The plugin registers no model tools.
     """
 
@@ -82,6 +83,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         renderer: Renderer | None = None,
     ) -> None:
         super().__init__()
+        capture = _capture_for_text(capture, text)
         self.text = text
         self.screenshots = screenshots
         self.capture_strategy = capture if capture is not None else _DEFAULT_CAPTURE
@@ -147,6 +149,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 previous=self.snapshot,
                 screenshots=False,
                 redaction=self._secrets(),
+                prefer_tab_title=_metadata_text(self.text),
             )
             return observation.snapshot
 
@@ -186,6 +189,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 cursor=self._input.mouse.position_in(selected.id),
                 screenshots=take_image and not withheld,
                 redaction=secrets,
+                prefer_tab_title=_metadata_text(self.text),
             )
             if withheld:
                 observation = observation.with_screenshot_status(
@@ -414,7 +418,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             return False
         if self.screenshots.trigger == ScreenshotTrigger.EACH_STEP:
             return True
-        if self.text is not None:
+        if self.text is not None and self.text.content == "page":
             return False
         shown = self._state.delivered_image
         return shown is None or (shown.tab_id, shown.document_id) != (
@@ -423,8 +427,9 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         )
 
     async def _tab_overview(self) -> tuple[TabInfo, ...]:
-        if self.text is None or (
-            self._tab_policy is not None and not self._tab_policy.multiple
+        text, policy = self.text, self._tab_policy
+        if text is None or (
+            text.content == "page" and policy is not None and not policy.multiple
         ):
             return ()
         return await self._browser.tabs.list()
@@ -492,11 +497,21 @@ class ResolveDomElement:
         return handle
 
 
+def _capture_for_text(
+    capture: CaptureStrategy | None, text: TextObservations | None
+) -> CaptureStrategy | None:
+    if capture is None and _metadata_text(text):
+        return _METADATA_CAPTURE
+    return capture
+
+
 def _text_renderer(
     capture: CaptureStrategy | None,
     text: TextObservations | None,
     renderer: Renderer | None,
 ) -> Renderer:
+    if renderer is None and _metadata_text(text):
+        return MetadataRenderer()
     if renderer is not None:
         return renderer
     if capture is not None and text is not None:
@@ -504,6 +519,10 @@ def _text_renderer(
             "Text observations with an explicit capture require a renderer"
         )
     return DomRenderer()
+
+
+def _metadata_text(text: TextObservations | None) -> bool:
+    return text is not None and text.content == "metadata"
 
 
 def _screenshot_status(

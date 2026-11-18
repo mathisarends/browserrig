@@ -145,7 +145,10 @@ def _emitting_tab(events):
 
 def _metrics(width, height):
     return SimpleNamespace(
-        css_layout_viewport=SimpleNamespace(client_width=width, client_height=height)
+        css_layout_viewport=SimpleNamespace(
+            client_width=width, client_height=height, page_y=0
+        ),
+        css_content_size=SimpleNamespace(height=height),
     )
 
 

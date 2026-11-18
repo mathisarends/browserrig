@@ -11,7 +11,7 @@ from harnessed.kernel import PluginScope, needs
 from harnessed.testing import ScriptedModel
 
 from browserrig import Browser, BrowserCoordination, FileSystem
-from browserrig.browser import BrowserEvents
+from browserrig.browser import BrowserEvents, PageLayout
 from browserrig.browser.network import NetworkActivity
 from browserrig.core import (
     ActionContext,
@@ -45,6 +45,10 @@ class FakeTab:
 
     async def viewport_size(self):
         return ViewportSize(width=1280, height=800)
+
+    async def page_layout(self):
+        viewport = await self.viewport_size()
+        return PageLayout(viewport, scroll_y=0, page_height=viewport.height)
 
     async def dispatch_mouse(self, *_args, **_kwargs):
         pass

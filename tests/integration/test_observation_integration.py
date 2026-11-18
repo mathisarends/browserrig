@@ -10,7 +10,7 @@ from harnessed.events import ToolExecutionFinishedEvent
 from harnessed.kernel import needs
 from harnessed.models import ImagePart, ModelChunk
 from harnessed.plugins import Approvals
-from harnessed.testing import CallbackModel
+from harnessed.testing import CallbackModel, ScriptedModel
 from PIL import Image
 
 from browserrig import (
@@ -29,6 +29,7 @@ from browserrig import (
     Screenshots,
     ScreenshotTrigger,
     SetOfMarks,
+    SingleTab,
     TextObservations,
     Viewport,
     WheelTools,
@@ -122,6 +123,65 @@ async def test_perception_delivers_exactly_the_selected_modalities(
     if not (text or marked):
         frames.assert_not_called()
         probe.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("with_image", "single_tab"),
+    [(False, False), (True, False), (False, True)],
+)
+async def test_metadata_observation_uses_chrome_layout_without_dom_extraction(
+    site, monkeypatch, with_image, single_tab
+):
+    model = ScriptedModel(["Done"])
+    policy = NetworkQuiet(inner=BrowserReady())
+    agent = Agent(
+        model=model,
+        browser=Chrome.launch(url=site),
+        plugins=[
+            SingleTab() if single_tab else None,
+            PageReadiness(initial=policy, ongoing=policy),
+            BrowserPerception(
+                text=TextObservations(content="metadata", mode="full"),
+                capture=ScreenshotCapture() if with_image else None,
+                screenshots=Screenshots() if with_image else None,
+            ),
+        ],
+        without=(ChoreographyOverlay,),
+    )
+    async with agent.session() as session:
+        browser = session.scope[Browser]
+        tab = browser.active_tab
+        if not single_tab:
+            await browser.tabs.open(site + "/other")
+            await browser.tabs.activate(tab.id)
+        await evaluate(
+            tab,
+            "document.body.style.cssText = 'min-height: 2600px; margin: 0'; "
+            "window.scrollTo(0, 400)",
+        )
+        remaining = await evaluate(
+            tab, "document.scrollingElement.scrollHeight - innerHeight - scrollY"
+        )
+        frames = AsyncMock(side_effect=AssertionError("Unexpected DOM extraction"))
+        main_frame = AsyncMock(side_effect=AssertionError("Unexpected DOM probe"))
+        monkeypatch.setattr(tab, "frames", frames)
+        monkeypatch.setattr(tab, "main_frame", main_frame)
+        result = await session.run("Inspect the page")
+
+    assert result.text == "Done"
+    (observation,) = [
+        message
+        for message in model.requests[0].messages
+        if message.text.startswith("# ") and "\nurl: " in message.text
+    ]
+    assert observation.text.startswith("# Test form\n")
+    assert f"url: {site}/" in observation.text
+    assert f"tab: {tab.id}\nopen tabs: {1 if single_tab else 2}" in observation.text
+    assert f"scroll y=400px, {remaining}px remaining to page end" in observation.text
+    assert has_image(observation) is with_image
+    assert "in viewport:" not in observation.text
+    frames.assert_not_called()
+    main_frame.assert_not_called()
 
 
 async def test_vision_on_request_starts_with_an_image_and_refreshes_after_wheel_input(
