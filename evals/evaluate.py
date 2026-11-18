@@ -79,7 +79,7 @@ async def evaluate(workspace: Path) -> Grade:
         "--config",
         str(workspace / "environment.json"),
         log=workspace / "evaluator.log",
-        timeout=60,
+        timeout_seconds=60,
         check=False,
     )
     if not output.exists():

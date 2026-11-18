@@ -84,7 +84,7 @@ class BenchmarkResult(BaseModel):
     upstream_revision: str | None = None
     upstream_version: str | None = None
     max_steps: int | None = None
-    timeout: int | None = None
+    timeout_seconds: int | None = None
     context_window: int | None = None
     reserve_tokens: int | None = None
     keep_last_steps: int | None = None

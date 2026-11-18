@@ -275,6 +275,6 @@ def _run(records):
         repeat=1,
         project="test",
         max_steps=50,
-        timeout=300,
+        timeout_seconds=300,
         tasks=records,
     )
