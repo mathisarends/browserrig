@@ -28,7 +28,7 @@ from .state import LoadedDocument, ReadinessState
 from .wait import wait_for_page
 
 
-class Readiness(Plugin, slot="browserrig.readiness", provides=True):
+class PageReadiness(Plugin, slot="browserrig.readiness", provides=True):
     events = READINESS_EVENTS
     _state = PluginState(ReadinessState)
     _events = needs(BrowserEvents)

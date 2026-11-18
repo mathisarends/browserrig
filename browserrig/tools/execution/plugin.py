@@ -17,7 +17,7 @@ from browserrig.core import (
 )
 from browserrig.events import ACTION_EVENTS
 from browserrig.observation import BrowserPerception
-from browserrig.readiness import Readiness
+from browserrig.readiness import PageReadiness
 from browserrig.secrets import Secrets
 from browserrig.tools.chains import (
     ActionChainPolicy,
@@ -49,7 +49,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     _actions = needs(ActionContext)
     _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
-    _readiness = needs(Readiness)
+    _readiness = needs(PageReadiness)
     _observe = needs(BrowserPerception)
 
     def __init__(self, *, chain_policy: ActionChainPolicy | None = None) -> None:

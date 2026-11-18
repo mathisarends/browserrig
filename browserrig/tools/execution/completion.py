@@ -14,7 +14,7 @@ from browserrig.core import (
     ReadinessPhase,
     ReadinessStatus,
 )
-from browserrig.readiness import Readiness
+from browserrig.readiness import PageReadiness
 from browserrig.tools.effects import Effect
 
 from .policy import FOLLOWED_KINDS, NAVIGATION_KINDS
@@ -27,7 +27,7 @@ class Completion:
     """Dispatch input and wait for the page or tab it leads into."""
 
     def __init__(
-        self, browser: Browser, readiness: Readiness, actions: ActionContext
+        self, browser: Browser, readiness: PageReadiness, actions: ActionContext
     ) -> None:
         self._browser = browser
         self._readiness = readiness

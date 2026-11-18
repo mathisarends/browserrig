@@ -6,10 +6,10 @@ from browserrig.browser import Browser
 from browserrig.files import DownloadState
 
 from .hooks import CheckReadiness, ReadinessCheck
-from .plugin import Readiness
+from .plugin import PageReadiness
 
 
-class DownloadReadiness(Plugin, needs=(Readiness,)):
+class DownloadReadiness(Plugin, needs=(PageReadiness,)):
     """Include active downloads in the same readiness budget as page activity."""
 
     _browser = needs(Browser)

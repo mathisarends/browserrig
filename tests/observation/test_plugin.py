@@ -14,7 +14,7 @@ from browserrig import (
     DomRenderer,
     MultiTab,
     PageContent,
-    Readiness,
+    PageReadiness,
     SingleTab,
 )
 from browserrig.browser import TabInfo
@@ -46,7 +46,7 @@ async def test_tab_overview_is_collected_only_for_multi_tab(mode, overview):
     perception = BrowserPerception(capture=PageCapture(), renderer=DomRenderer())
     agent = Agent(
         model=ScriptedModel([]),
-        plugins=[FakeChrome(holder), mode(), Readiness(), perception],
+        plugins=[FakeChrome(holder), mode(), PageReadiness(), perception],
     )
     async with agent.session() as session:
         list_tabs = AsyncMock(return_value=listed)
@@ -94,7 +94,7 @@ async def test_step_observation_and_actions_share_session_control():
         model=ScriptedModel(["Done"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(),
+            PageReadiness(),
             BrowserPerception(capture=BlockingCapture(), renderer=DomRenderer()),
             Actions(),
         ],

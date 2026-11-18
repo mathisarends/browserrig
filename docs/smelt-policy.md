@@ -39,7 +39,7 @@ The constructor refactor covers every SMT364 candidate:
 | `TaskMemory` | Normalize the workspace Markdown path, then validate its compaction budget, preserving rejection order. |
 | `VideoRecording` | Validate dimensions, frame rate and padding as encoding configuration before initializing recording state. |
 | `Secrets` | Validate credential names and value sources, then snapshot the caller's mapping without activating providers. |
-| `Readiness` | Share the explicit-None policy fallback while constructing independent initial/ongoing defaults. Caller-supplied falsy policies remain intact. |
+| `PageReadiness` | Share the explicit-None policy fallback while constructing independent initial/ongoing defaults. Caller-supplied falsy policies remain intact. |
 | `Document` | Decode optional string-table indices through one accessor; keep tag and layout indexes initialized before queries. |
 | `TextCollector` | Build inherited link ownership and ordered control/heading/line-break boundaries in separate index builders. |
 | `IsOccluded` | Build and sort the painted-box index as one operation before any coverage query. Preserve visibility guards and paint order. |
