@@ -324,7 +324,7 @@ async def test_facade_renders_configured_observation_prompt(
         assert ("reading order beside its controls" in rendered) == (
             capture.text == PageText.INLINE
         )
-        assert ("Every observation includes a screenshot" in rendered) == (
+        assert ("A screenshot is captured before each model step." in rendered) == (
             trigger == ScreenshotTrigger.EACH_STEP
         )
     assert fake_chrome[0].closed
