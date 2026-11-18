@@ -19,7 +19,7 @@ _SCREENSHOT_SECONDS = 2
 
 
 class ScreenshotCapture(CaptureStrategy):
-    """Collect pixels and viewport geometry without inspecting page elements."""
+    """Collect layout metrics and optional pixels without inspecting page elements."""
 
     @override
     async def collect(
@@ -33,14 +33,15 @@ class ScreenshotCapture(CaptureStrategy):
         cursor: Point | None = None,
     ) -> CaptureContent:
         del report, cursor
-        size = await tab.viewport_size()
+        layout = await tab.page_layout()
+        size = layout.viewport
         page = PageContent(
             url=tab.url,
             title=tab.title,
             width=size.width,
             height=size.height,
-            scroll_y=0,
-            page_height=0,
+            scroll_y=layout.scroll_y,
+            page_height=layout.page_height,
         )
         if not screenshots:
             return CaptureContent(page=page)

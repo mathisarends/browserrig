@@ -4,9 +4,9 @@ from browserrig.observation.models import Snapshot
 from .text import cut
 
 
-def header(snapshot: Snapshot) -> list[str]:
+def header(snapshot: Snapshot, *, metadata_only: bool = False) -> list[str]:
     lines = [f"# {snapshot.title or '(untitled)'}", f"url: {snapshot.url}"]
-    if len(snapshot.tabs) > 1:
+    if len(snapshot.tabs) > 1 and not metadata_only:
         lines.append("tabs (* = this tab):")
         lines.extend(
             _tab(tab.id, tab.title or tab.url, tab.id == snapshot.tab_id)
@@ -14,16 +14,10 @@ def header(snapshot: Snapshot) -> list[str]:
         )
     else:
         lines.append(f"tab: {snapshot.tab_id}")
+    if metadata_only and snapshot.tabs:
+        lines.append(f"open tabs: {len(snapshot.tabs)}")
     if snapshot.width and snapshot.height:
-        viewport = f"viewport: {snapshot.width:.0f}x{snapshot.height:.0f}"
-        if snapshot.page_height > snapshot.height:
-            above = snapshot.scroll_y / snapshot.height
-            below = max(0.0, snapshot.page_height - snapshot.scroll_y - snapshot.height)
-            viewport += (
-                f", scroll {snapshot.scroll_y:.0f} of {snapshot.page_height:.0f}px"
-                f" ({above:.1f} pages above, {below / snapshot.height:.1f} below)"
-            )
-        lines.append(viewport)
+        lines.append(_viewport(snapshot, metadata_only=metadata_only))
     lines.append(_cursor(snapshot))
     if snapshot.readiness != ReadinessStatus.READY:
         lines.append(f"readiness: {snapshot.readiness}")
@@ -31,6 +25,8 @@ def header(snapshot: Snapshot) -> list[str]:
             lines.append(snapshot.readiness_reason)
     if snapshot.image and snapshot.geometry:
         lines.append(f"image: {_region(snapshot)}")
+    if metadata_only:
+        return lines
     if snapshot.modal is not None:
         name = f' "{cut(snapshot.modal.name, 80)}"' if snapshot.modal.name else ""
         guidance = (
@@ -50,6 +46,29 @@ def header(snapshot: Snapshot) -> list[str]:
     return lines
 
 
+def _tab(tab_id: str, title: str, current: bool) -> str:
+    return f"  {'*' if current else ' '}{tab_id} {cut(title, 60)}"
+
+
+def _viewport(snapshot: Snapshot, *, metadata_only: bool) -> str:
+    viewport = f"viewport: {snapshot.width:.0f}x{snapshot.height:.0f}"
+    if snapshot.page_height <= 0:
+        return viewport
+    remaining = max(0.0, snapshot.page_height - snapshot.scroll_y - snapshot.height)
+    if metadata_only:
+        return (
+            f"{viewport}, scroll y={snapshot.scroll_y:.0f}px, "
+            f"{remaining:.0f}px remaining to page end"
+        )
+    if snapshot.page_height <= snapshot.height:
+        return viewport
+    above = snapshot.scroll_y / snapshot.height
+    return (
+        f"{viewport}, scroll {snapshot.scroll_y:.0f} of {snapshot.page_height:.0f}px"
+        f" ({above:.1f} pages above, {remaining / snapshot.height:.1f} below)"
+    )
+
+
 def _cursor(snapshot: Snapshot) -> str:
     """The pointer position matters for hover, scroll and coordinate tools without an image."""
     cursor = snapshot.cursor
@@ -67,7 +86,3 @@ def _region(snapshot: Snapshot) -> str:
         f"{geometry.width:.0f}x{geometry.height:.0f}{zoom}; move_mouse, click_at and drag_at take "
         "pixels of this image until the next observation"
     )
-
-
-def _tab(tab_id: str, title: str, current: bool) -> str:
-    return f"  {'*' if current else ' '}{tab_id} {cut(title, 60)}"

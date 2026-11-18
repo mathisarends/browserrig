@@ -1,3 +1,3 @@
-from .snapshot import render
+from .snapshot import render, render_metadata
 
-__all__ = ["render"]
+__all__ = ["render", "render_metadata"]

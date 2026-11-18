@@ -459,8 +459,9 @@ def _tab(target_id="tab-1", *, dispatch=None, events=None, viewport=(1000, 600))
             get_layout_metrics=AsyncMock(
                 return_value=SimpleNamespace(
                     css_layout_viewport=SimpleNamespace(
-                        client_width=width, client_height=height
-                    )
+                        client_width=width, client_height=height, page_y=0
+                    ),
+                    css_content_size=SimpleNamespace(height=height),
                 )
             )
         ),

@@ -321,7 +321,7 @@ Capture, image retention and text compaction are independent:
 
 | Setting | Behavior |
 | --- | --- |
-| `Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)` | Default: capture after a screenshot request. Image-only sessions also capture when they enter a document or lack an included image. |
+| `Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)` | Default. Capture after a screenshot request. Image-only and metadata-and-image sessions also capture when they enter a document or lack an included image. |
 | `Screenshots(trigger=ScreenshotTrigger.EACH_STEP)` | Capture before every model step |
 | `Screenshots()` | Keep the latest image; unchanged captures are skipped |
 | `Screenshots(retention=TrimInBatches(max_images=6, min_images=3))` | On overflow, trim oldest images down to three |
@@ -347,6 +347,28 @@ For image-only pixel capture, select `ScreenshotCapture()` with `text=None` and 
 set both readiness policies to `NetworkQuiet(inner=BrowserReady())`. Use
 `DomCapture()` to collect DOM refs. `SetOfMarks()` draws those refs as labels
 on the screenshot.
+
+Use `TextObservations(content="metadata", mode="full")` to send a compact page
+header with every observation. It includes the title, URL, current tab,
+controlled-tab count, and main-page scroll position and
+remaining distance in CSS pixels. With a new screenshot, the header and image
+are parts of the same message.
+
+```python
+from browserrig import BrowserPerception, Screenshots, TextObservations
+
+perception = BrowserPerception(
+    text=TextObservations(content="metadata", mode="full"),
+    screenshots=Screenshots(),
+)
+```
+
+Metadata text defaults to `ScreenshotCapture()`. Omit `screenshots` for
+metadata alone. This path uses Chrome's layout metrics and skips DOM extraction.
+Explicit captures and renderers can still be supplied. Use `DomCapture()` when
+the screenshot needs DOM refs for marks. With `mode="delta"`, a retained
+unchanged header can be reused when there is no new image.
+
 Perception itself registers no model tools. Add `ScreenshotTools()` for screenshot
 requests and `PageSearchTools()` for page search. The screenshot tool is available
 when the session configures screenshots.

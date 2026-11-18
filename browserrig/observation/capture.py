@@ -97,6 +97,7 @@ async def capture_observation(
     screenshots: bool = False,
     cursor: Point | None = None,
     redaction: Redaction | None = None,
+    prefer_tab_title: bool = False,
 ) -> CapturedObservation:
     """Observe `tab`. With `previous` from the same document, unseen elements get `new`.
 
@@ -157,6 +158,8 @@ async def capture_observation(
             text="The page is still loading. Observe again before using page controls.",
         )
         return CapturedObservation(snapshot, EmptyReferences())
+    if prefer_tab_title:
+        content = _use_tab_title(content, tab.id, tabs)
     if redaction is not None:
         content = await _redact(content, redaction)
     page, image = content.page, content.image
@@ -304,6 +307,18 @@ def _capture_race(error: BrowserError | CDPCommandError) -> bool:
             "could not find node with given id",
         )
     )
+
+
+def _use_tab_title(
+    content: CaptureContent, tab_id: str, tabs: tuple[TabInfo, ...]
+) -> CaptureContent:
+    # Chrome's tab inventory can be newer than the cached title in a pixel capture.
+    info = next((info for info in tabs if info.id == tab_id), None)
+    if info is None or info.url != content.page.url:
+        return content
+    if not info.title or info.title == content.page.title:
+        return content
+    return replace(content, page=replace(content.page, title=info.title))
 
 
 async def _redact(content: CaptureContent, redaction: Redaction) -> CaptureContent:

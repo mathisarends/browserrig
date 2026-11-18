@@ -14,15 +14,19 @@ from browserrig import (
     CaptureContent,
     CaptureStrategy,
     DomRenderer,
+    ElementInfo,
     MultiTab,
     PageContent,
     PageReadiness,
+    ScreenshotCapture,
     Screenshots,
     ScreenshotTools,
     SingleTab,
+    TextObservations,
 )
 from browserrig.browser import TabInfo
 from browserrig.core import BrowserError, Region
+from browserrig.observation import Snapshot
 from browserrig.tools import Effect
 from tests.fakes import FakeChrome
 
@@ -30,6 +34,41 @@ _PNG = (
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aGhg"
     "AAAAASUVORK5CYII="
 )
+
+
+def test_metadata_text_defaults_to_lightweight_capture_and_renders_only_page_facts():
+    perception = BrowserPerception(text=TextObservations(content="metadata"))
+    snapshot = Snapshot(
+        id="observation",
+        tab_id="tab",
+        document_id="document",
+        url="https://example.org/shop",
+        title="Shop",
+        readiness="ready",
+        width=1280,
+        height=800,
+        scroll_y=400,
+        page_height=2000,
+        fingerprint="fingerprint",
+        elements=(ElementInfo(ref="1", role="button", name="Page control"),),
+        text="Page prose",
+        tabs=(
+            TabInfo(
+                id="tab", url="https://example.org/shop", title="Shop", active=True
+            ),
+        ),
+    )
+
+    assert isinstance(perception.capture_strategy, ScreenshotCapture)
+    assert perception.renderer.refs() is None
+    assert perception.renderer.render(snapshot).splitlines() == [
+        "# Shop",
+        "url: https://example.org/shop",
+        "tab: tab",
+        "open tabs: 1",
+        "viewport: 1280x800, scroll y=400px, 800px remaining to page end",
+        "cursor: not in this tab yet",
+    ]
 
 
 @pytest.mark.parametrize("mode, overview", [(SingleTab, False), (MultiTab, True)])

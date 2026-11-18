@@ -2,7 +2,7 @@ from typing import Protocol
 
 from .config import Screenshots, ScreenshotTrigger
 from .models import Snapshot
-from .render import render
+from .render import render, render_metadata
 
 
 class Renderer(Protocol):
@@ -47,6 +47,23 @@ class DomRenderer:
 
     def render(self, snapshot: Snapshot) -> str:
         return render(snapshot)
+
+
+class MetadataRenderer:
+    """Render page and viewport facts as a compact observation."""
+
+    def instructions(self) -> str:
+        return (
+            "Browser observations report the active page and its tab. "
+            "The open-tab count covers tabs controlled by this session. "
+            "Scroll position and remaining distance refer to the main page in CSS pixels."
+        )
+
+    def refs(self) -> None:
+        return None
+
+    def render(self, snapshot: Snapshot) -> str:
+        return render_metadata(snapshot)
 
 
 def screenshot_instructions(screenshots: Screenshots | None) -> str:

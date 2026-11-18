@@ -21,3 +21,8 @@ def render(snapshot: Snapshot) -> str:
         lines.append("")
         lines.extend(f"note: {limitation}" for limitation in snapshot.limitations)
     return "\n".join(lines)
+
+
+def render_metadata(snapshot: Snapshot) -> str:
+    """Render the active page and viewport header."""
+    return "\n".join(header(snapshot, metadata_only=True))

@@ -58,6 +58,9 @@ Upgrade from 0.6.x using the [migration guide](docs/migration-0.7.md).
 
 ### Changes
 
+- Add `TextObservations(content="metadata")` for a compact observation with URL,
+  title, tab and main-page scroll measurements. The default metadata capture
+  uses Chrome layout metrics and supports optional screenshots.
 - Keep browser action execution rules together by action kind. Custom tools
   still declare tool chaining with `@browser_tool(chainable=...)`.
 - Add `SingleTab()` to keep links, forms, simple popups and file previews in
