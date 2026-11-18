@@ -42,8 +42,8 @@ from browserrig import (
     InputRuntime,
     LocalWorkspace,
     MountedWorkspace,
+    PageReadiness,
     PageText,
-    Readiness,
     Runtime,
     Screenshots,
     ScreenshotTrigger,
@@ -164,7 +164,7 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
             KeyboardTools(),
             Actions(),
             BrowserPerception(),
-            Readiness(),
+            PageReadiness(),
             DialogTools(),
         ],
     )
@@ -178,7 +178,7 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
             ActionContext,
             BrowserCoordination,
             BrowserEvents,
-            Readiness,
+            PageReadiness,
             BrowserPerception,
         ),
         "BrowserPerception": (
@@ -186,9 +186,9 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
             Input,
             BrowserCoordination,
             BrowserEvents,
-            Readiness,
+            PageReadiness,
         ),
-        "Readiness": (BrowserEvents,),
+        "PageReadiness": (BrowserEvents,),
         "DialogTools": (Browser,),
     }
     assert not model.requests
@@ -197,17 +197,17 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
 async def test_browser_dependency_loss_and_replacement_restart_observation_state():
     async with Scope() as ctx:
         ctx.provide(ToolRegistry, ToolRegistry(ctx))
-        await ctx.install([BrowserPerception(), Readiness()], settle=True)
+        await ctx.install([BrowserPerception(), PageReadiness()], settle=True)
         assert {issue.plugin.name for issue in ctx.plugin_diagnostics()} == {
             "BrowserPerception",
-            "Readiness",
+            "PageReadiness",
         }
 
         first_browser = FakeBrowser(None)
         remove_first = _provide(ctx, first_browser)
         await ctx.settle()
         assert not ctx.plugin_diagnostics()
-        first_readiness, first_observe = ctx[Readiness], ctx[BrowserPerception]
+        first_readiness, first_observe = ctx[PageReadiness], ctx[BrowserPerception]
         assert first_readiness._events is first_browser.events
         first_readiness._state.initialized.add(("sentinel", "doc"))
         first_observe._state.snapshot = object()
@@ -215,33 +215,33 @@ async def test_browser_dependency_loss_and_replacement_restart_observation_state
         second_browser = FakeBrowser(None)
         remove_second = _provide(ctx, second_browser)
         await ctx.settle()
-        assert ctx[Readiness] is not first_readiness
+        assert ctx[PageReadiness] is not first_readiness
         assert ctx[BrowserPerception] is not first_observe
         assert ctx[BrowserPerception]._browser is second_browser
-        assert ctx[Readiness]._events is second_browser.events
-        assert ctx[BrowserPerception]._readiness is ctx[Readiness]
-        assert not ctx[Readiness]._state.initialized
+        assert ctx[PageReadiness]._events is second_browser.events
+        assert ctx[BrowserPerception]._readiness is ctx[PageReadiness]
+        assert not ctx[PageReadiness]._state.initialized
         assert ctx[BrowserPerception].snapshot is None
         with pytest.raises(RuntimeError):
             _ = first_observe._browser
 
         await remove_second()
         await ctx.settle()
-        assert ctx[Readiness]._events is first_browser.events
+        assert ctx[PageReadiness]._events is first_browser.events
         await remove_first()
         await ctx.settle()
-        assert Readiness not in ctx and BrowserPerception not in ctx
+        assert PageReadiness not in ctx and BrowserPerception not in ctx
         missing = {
             issue.plugin.name: issue.missing for issue in ctx.plugin_diagnostics()
         }
         assert missing == {
-            "Readiness": (BrowserEvents,),
+            "PageReadiness": (BrowserEvents,),
             "BrowserPerception": (
                 Browser,
                 Input,
                 BrowserCoordination,
                 BrowserEvents,
-                Readiness,
+                PageReadiness,
             ),
         }
 
@@ -534,7 +534,7 @@ async def test_workspace_changes_replace_transfer_without_reopening_chrome(
 async def test_runtime_browser_sections_need_explicit_context_delivery(fake_chrome):
     agent = Agent(
         model=ScriptedModel(["Mounted", "Unmounted"]),
-        plugins=[Runtime(), Chrome(), InputRuntime(), Readiness()],
+        plugins=[Runtime(), Chrome(), InputRuntime(), PageReadiness()],
     )
     async with agent.session() as session:
         fixed_prompt = await session.prompt.render()

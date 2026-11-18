@@ -28,6 +28,9 @@
   `await scope[DomElements].resolve(tab, ref)` with
   `await scope[ResolveDomElement](tab, ref)`. `BrowserPerception` provides the new
   service key; import it from `browserrig` or `browserrig.observation`.
+- Rename the page-wait plugin from `Readiness` to `PageReadiness`. Update
+  plugin lists, `needs(...)` declarations and scope lookups. Readiness policies,
+  checks and reports keep their names.
 - Custom `Motor` implementations must provide
   `wheel_steps(delta_x=..., delta_y=...)`, returning `WheelStep` values from
   `browserrig.input` with native CSS-pixel deltas and `delay_before_seconds`.

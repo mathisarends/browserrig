@@ -62,13 +62,13 @@ when needed. For a fully explicit composition, select individual plugins:
 from harnessed import Agent
 from browserrig import (
     Actions, BrowserPerception, Chrome, InputRuntime, KeyboardTools, MultiTab,
-    NavigationTools, PointerTools, Readiness, Runtime, TabTools, Targeting,
+    NavigationTools, PointerTools, PageReadiness, Runtime, TabTools, Targeting,
 )
 
 agent = Agent(
     model=model,
     plugins=[
-        Runtime(), MultiTab(), Chrome.launch(), InputRuntime(), Readiness(),
+        Runtime(), MultiTab(), Chrome.launch(), InputRuntime(), PageReadiness(),
         BrowserPerception(), Actions(), Targeting(),
         PointerTools(), KeyboardTools(), NavigationTools(), TabTools(),
     ],
@@ -242,7 +242,7 @@ class ApplicationReadiness(Plugin):
 ```
 
 The application's check shares `event.context.remaining` with the page's readiness
-deadline. `Readiness(initial=..., ongoing=...)` selects policies for a new document
+deadline. `PageReadiness(initial=..., ongoing=...)` selects policies for a new document
 and later operations. The default `NetworkQuiet()` combines DOM readiness with
 bounded waits for requests caused by input/navigation. `DownloadReadiness()` adds
 download checks independently. Timeouts normally produce a degraded observation

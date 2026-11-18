@@ -21,7 +21,7 @@ from browserrig.events import (
     PageState,
 )
 from browserrig.observation import BrowserPerception
-from browserrig.readiness import Readiness
+from browserrig.readiness import PageReadiness
 from browserrig.tools.chains import observes
 from browserrig.tools.effects import Effect
 
@@ -44,7 +44,7 @@ class ActionRunner:
         browser: Browser,
         coordination: BrowserCoordination,
         events: BrowserEvents,
-        readiness: Readiness,
+        readiness: PageReadiness,
         observe: BrowserPerception,
         *,
         actions: ActionContext,

@@ -5,7 +5,7 @@ from harnessed.events import ToolCallFinishedEvent
 from harnessed.models import ModelChunk
 from harnessed.testing import ScriptedModel
 
-from browserrig import Browser, PageSearchTools, Readiness, Secret, Secrets
+from browserrig import Browser, PageReadiness, PageSearchTools, Secret, Secrets
 from browserrig.observation import ExtractedContent
 from browserrig.tools import (  # smelt: ignore[SMT107] -- test seam
     # Replace document extraction where the search tool looks it up.
@@ -44,7 +44,7 @@ async def test_searches_in_one_batch_return_records_without_another_observation(
                 "Done",
             ]
         ),
-        plugins=[FakeChrome({}), Readiness(), PageSearchTools()],
+        plugins=[FakeChrome({}), PageReadiness(), PageSearchTools()],
     )
     async with agent.session() as session:
         result = await session.run("Find customers")
@@ -87,7 +87,7 @@ async def test_secrets_are_redacted_before_they_can_be_matched(monkeypatch):
         ),
         plugins=[
             FakeChrome({}),
-            Readiness(),
+            PageReadiness(),
             Secrets({"KEY": Secret(secret, domains=("example.org",))}),
             PageSearchTools(),
         ],

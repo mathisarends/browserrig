@@ -22,7 +22,7 @@ from .nudges import Nudges
 from .observation import BrowserPerception, Screenshots, SetOfMarks
 from .overlay import ChoreographyOverlay
 from .pacing import InputPacing
-from .readiness import DownloadReadiness, Readiness
+from .readiness import DownloadReadiness, PageReadiness
 from .tools import (
     Actions,
     DialogTools,
@@ -92,7 +92,7 @@ def browser_pack(
             ChoreographyOverlay(),
             # Titles and favicons for a viewer's tab strip; the agent reads tabs without it.
             TabStrip(),
-            Readiness(),
+            PageReadiness(),
             DownloadReadiness(),
             Nudges(),
             BrowserPerception(screenshots=Screenshots(marks=SetOfMarks())),

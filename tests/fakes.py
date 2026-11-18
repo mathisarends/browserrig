@@ -22,7 +22,7 @@ from browserrig.core import (
 from browserrig.files import FileBridge, FileTransfers
 from browserrig.input import Input, InputTargets
 from browserrig.observation import BrowserPerception, DomReferences, ResolveDomElement
-from browserrig.readiness import Readiness, ReadinessReport
+from browserrig.readiness import PageReadiness, ReadinessReport
 from browserrig.scripts import DOMProbe
 from browserrig.tools import Actions, Targeting
 
@@ -207,7 +207,7 @@ class FakeServices(Plugin, provides=True):
         ctx.provide(Browser, self.browser)
         ctx.provide(BrowserEvents, self.browser.events)
         ctx.provide(BrowserCoordination, self.coordination)
-        ctx.provide(Readiness, self.readiness)
+        ctx.provide(PageReadiness, self.readiness)
         ctx.provide(BrowserPerception, self.observe)
         ctx.provide(ResolveDomElement, self.observe.dom_element)
         if self.bridge is not None:
