@@ -18,8 +18,8 @@ from browserrig import (
     JavaScriptTools,
     NetworkQuiet,
     Nudges,
+    PageReadiness,
     PageSearchTools,
-    Readiness,
     ScreenshotCapture,
     ScreenshotTools,
     WheelTools,
@@ -316,11 +316,11 @@ def _perception(args, parser) -> tuple[BrowserPerception, bool]:
     ), enabled
 
 
-def _pixel_readiness(observation: str | None) -> tuple[Readiness, ...]:
+def _pixel_readiness(observation: str | None) -> tuple[PageReadiness, ...]:
     if observation != "screenshot":
         return ()
     policy = NetworkQuiet(inner=BrowserReady())
-    return (Readiness(initial=policy, ongoing=policy),)
+    return (PageReadiness(initial=policy, ongoing=policy),)
 
 
 def _excluded_tools(

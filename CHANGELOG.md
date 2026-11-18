@@ -32,6 +32,9 @@
   service key when the capture declares `supports_dom_refs = True`. Native DOM
   tools require that service. Import the key from `browserrig` or
   `browserrig.observation`. Screenshot tools require screenshot configuration.
+- Rename the page-wait plugin from `Readiness` to `PageReadiness`. Update
+  plugin lists, `needs(...)` declarations and scope lookups. Readiness policies,
+  checks and reports keep their names.
 - Custom `Motor` implementations must provide
   `wheel_steps(delta_x=..., delta_y=...)`, returning `WheelStep` values from
   `browserrig.input` with native CSS-pixel deltas and `delay_before_seconds`.

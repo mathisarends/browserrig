@@ -7,7 +7,7 @@ from browserrig import (
     DomActionChains,
     DomCapture,
     DomRenderer,
-    Readiness,
+    PageReadiness,
     ReadinessOptions,
     Screenshots,
     TrimInBatches,
@@ -19,7 +19,9 @@ from browserrig.browser import Launch
     ("build", "attribute", "base"),
     [
         pytest.param(Chrome, "options", Launch, id="browser-options"),
-        pytest.param(Readiness, "options", ReadinessOptions, id="readiness-options"),
+        pytest.param(
+            PageReadiness, "options", ReadinessOptions, id="readiness-options"
+        ),
         pytest.param(
             lambda value: Screenshots(retention=value),
             "retention",

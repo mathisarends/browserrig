@@ -20,7 +20,7 @@ from browserrig import (
     Browser,
     BrowserPerception,
     Chrome,
-    Readiness,
+    PageReadiness,
     ReadinessOptions,
 )
 from browserrig.events import ActionFinishedEvent, ObservationCapturedEvent
@@ -343,7 +343,7 @@ async def _run(site, markup, plan):
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
         plugins=[
-            Readiness(options=ReadinessOptions(quiet_ms=30, navigation_min_ms=50)),
+            PageReadiness(options=ReadinessOptions(quiet_ms=30, navigation_min_ms=50)),
             Approvals(default=PolicyDecision.ALLOW),
             Page(),
         ],

@@ -24,7 +24,7 @@ from browserrig import (
     BrowserPerception,
     CaptureContent,
     Input,
-    Readiness,
+    PageReadiness,
     Secret,
     Secrets,
     Totp,
@@ -511,7 +511,7 @@ async def test_observe_redacts_with_secrets_mounted_after_it():
         model=ScriptedModel(["done"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(),
+            PageReadiness(),
             BrowserPerception(),
             Hold(),
             _secrets(),

@@ -4,7 +4,7 @@ from .downloads import DownloadReadiness
 from .hooks import CheckReadiness, ReadinessCheck, SelectReadiness
 from .models import ReadinessReport
 from .network import NetworkQuiet, NetworkReadiness
-from .plugin import Readiness
+from .plugin import PageReadiness
 from .policies import BrowserReady, DomReady, ReadinessContext, ReadinessPolicy
 from .strategy import ReadinessStrategy
 from .wait import wait_for_page
@@ -21,7 +21,7 @@ __all__ = [
     "ReadinessContext",
     "ReadinessPolicy",
     "ReadinessStrategy",
-    "Readiness",
+    "PageReadiness",
     "ReadinessOptions",
     "ReadinessReport",
     "wait_for_page",

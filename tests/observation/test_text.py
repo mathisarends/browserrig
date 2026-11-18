@@ -3,7 +3,7 @@ from harnessed import Agent
 from harnessed.events import IncludedObservation, ObservationsIncludedEvent
 from harnessed.testing import ScriptedModel
 
-from browserrig import Readiness
+from browserrig import PageReadiness
 from browserrig.observation import (
     BrowserPerception,
     ElementInfo,
@@ -80,7 +80,7 @@ def _agent(mode="delta"):
         model=ScriptedModel([]),
         plugins=[
             FakeChrome({}),
-            Readiness(),
+            PageReadiness(),
             BrowserPerception(text=TextObservations(mode=mode)),
         ],
     )

@@ -23,8 +23,8 @@ from browserrig import (
     KeyboardTools,
     MouseEventKind,
     PageContent,
+    PageReadiness,
     PointerTools,
-    Readiness,
     ResolveDomElement,
     ScrollStep,
     Targeting,
@@ -375,7 +375,7 @@ class _Pointer(PointerTools, provides=True):
 
 class _Ready(Plugin):
     async def setup(self, ctx):
-        ctx.provide(Readiness, FakeReadiness())
+        ctx.provide(PageReadiness, FakeReadiness())
 
 
 class _Aiming(Instant):

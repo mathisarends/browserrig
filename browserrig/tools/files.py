@@ -33,7 +33,7 @@ from browserrig.files import (
     StagedFiles,
 )
 from browserrig.observation import ResolveDomElement
-from browserrig.readiness import Readiness
+from browserrig.readiness import PageReadiness
 
 from .effects import Effect
 from .execution import Actions
@@ -78,7 +78,7 @@ class _BrowserFileActions(FileSystemObservation):
     _browser = needs(Browser)
     _file_transfer = observes(FileTransfer)
     _events = needs(BrowserEvents)
-    _readiness = needs(Readiness)
+    _readiness = needs(PageReadiness)
     _actions = needs(Actions)
 
     @tool(

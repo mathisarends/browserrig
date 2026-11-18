@@ -24,7 +24,7 @@ from browserrig import (
     Input,
     InputPacing,
     NetworkQuiet,
-    Readiness,
+    PageReadiness,
     ScreenshotCapture,
     Screenshots,
     ScreenshotTrigger,
@@ -77,7 +77,9 @@ async def test_perception_delivers_exactly_the_selected_modalities(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
         plugins=[
-            Readiness(initial=policy, ongoing=policy) if not (text or marked) else None,
+            PageReadiness(initial=policy, ongoing=policy)
+            if not (text or marked)
+            else None,
             BrowserPerception(
                 capture=ScreenshotCapture() if not (text or marked) else None,
                 text=TextObservations(mode="full") if text else None,

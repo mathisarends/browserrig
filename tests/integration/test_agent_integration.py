@@ -16,7 +16,7 @@ from browserrig import (
     BrowserPerception,
     Chrome,
     InputRuntime,
-    Readiness,
+    PageReadiness,
     ReadinessOptions,
     Runtime,
     Screenshots,
@@ -208,7 +208,7 @@ async def test_dom_screenshots_are_native_images(site):
             InputRuntime(),
             Chrome(),
             Start(),
-            Readiness(),
+            PageReadiness(),
             BrowserPerception(
                 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
             ),
@@ -250,7 +250,9 @@ async def test_no_progress_hint_is_derived_from_events(site):
         model=CallbackModel(respond),
         plugins=[
             *browser_plugins(
-                Readiness(options=ReadinessOptions(quiet_ms=50, navigation_min_ms=100))
+                PageReadiness(
+                    options=ReadinessOptions(quiet_ms=50, navigation_min_ms=100)
+                )
             ),
             Approvals(default=PolicyDecision.ALLOW),
         ],

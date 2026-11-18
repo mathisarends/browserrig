@@ -11,9 +11,9 @@ from browserrig import (
     Files,
     FormTools,
     KeyboardTools,
+    PageReadiness,
     PageSearchTools,
     PointerTools,
-    Readiness,
     ScreenshotCapture,
     Screenshots,
     ScreenshotTools,
@@ -39,7 +39,7 @@ async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
     model = ScriptedModel([])
     plugins = [
         FakeChrome({}),
-        Readiness(),
+        PageReadiness(),
         BrowserPerception(screenshots=Screenshots()),
         Actions(),
         Targeting(),
@@ -77,7 +77,7 @@ async def test_model_tools_follow_the_configured_capture(pixels):
         model=ScriptedModel([]),
         plugins=[
             FakeChrome({}),
-            Readiness(),
+            PageReadiness(),
             perception,
             Actions(),
             Targeting(),
