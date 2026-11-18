@@ -50,7 +50,7 @@ class ActionRunner:
         self._readiness = readiness
         self._observe = observe
         self._page_change = page_change
-        self._dispatch = ActionDispatch(browser, readiness, actions)
+        self._dispatch = ActionDispatch(browser.tabs, readiness, actions)
 
     @traced
     async def run(

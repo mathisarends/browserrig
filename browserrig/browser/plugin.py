@@ -7,7 +7,7 @@ from harnessed import Plugin, SessionLog
 from harnessed.kernel import Event, PluginScope, needs, observes
 from pydantic import SecretStr
 
-from browserrig.core import ActionContext, ChangeTab, TargetId
+from browserrig.core import ActionContext, BrowserCoordination, ChangeTab, TargetId
 from browserrig.events import BROWSER_EVENTS
 from browserrig.files import FileBridge, MountedWorkspace
 from browserrig.input import InputTargets
@@ -30,6 +30,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
     _navigation = observes(NavigationPolicy)
     _tabs = observes(TabPolicy)
     _actions = needs(ActionContext)
+    _coordination = needs(BrowserCoordination)
 
     def __init__(self, options: BrowserOptions | None = None) -> None:
         super().__init__()
@@ -132,6 +133,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
                 tab_policy=self._tabs,
                 current_action=lambda: self._actions.action_id,
                 change_tab=change_tab,
+                coordination=self._coordination,
             )
         )
         scope.provide(Browser, browser)

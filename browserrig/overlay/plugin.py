@@ -14,7 +14,7 @@ from browserrig.choreography import (
     PresentedEvent,
 )
 from browserrig.core import BrowserError
-from browserrig.events import InputEvent
+from browserrig.events import InputEvent, PointerReleasedEvent
 
 from .view import KeyboardLayout, OverlayStyle, OverlayView, Theme
 
@@ -106,7 +106,9 @@ class ChoreographyOverlay(
 
     async def _show(self, event: InputEvent | PresentedEvent) -> None:
         view = self._state.view
-        if view is None:
+        # The overlay animates a click on press. An unused release can block on a tab
+        # that Chrome already moved to the background.
+        if view is None or isinstance(event, PointerReleasedEvent):
             return
         view.remember(event)
         try:
