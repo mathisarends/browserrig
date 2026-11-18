@@ -12,7 +12,7 @@ PROJECT = Path(__file__).with_name("evaluator")
 async def invoke(
     *arguments: str,
     log: Path,
-    timeout: float = 180,
+    timeout_seconds: float = 180,
     check: bool = True,
 ) -> int:
     uv = shutil.which("uv")
@@ -30,13 +30,13 @@ async def invoke(
         "webarena-verified",
         *arguments,
         log=log,
-        timeout=timeout,
+        timeout_seconds=timeout_seconds,
         check=check,
     )
 
 
 async def command(
-    *arguments: str, log: Path, timeout: float = 180, check: bool = True
+    *arguments: str, log: Path, timeout_seconds: float = 180, check: bool = True
 ) -> int:
     """Capture diagnostics and reap the subprocess on timeout or cancellation."""
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -48,7 +48,7 @@ async def command(
             env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
         )
         try:
-            async with asyncio.timeout(timeout):
+            async with asyncio.timeout(timeout_seconds):
                 code = await process.wait()
         finally:
             if process.returncode is None:
