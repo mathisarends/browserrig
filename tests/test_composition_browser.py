@@ -40,7 +40,7 @@ from browserrig import (
     HumanHandoff,
     HumanResponse,
     Nudges,
-    Readiness,
+    PageReadiness,
     ReadinessOptions,
     ReadinessStrategy,
     Screenshots,
@@ -144,7 +144,7 @@ def _agent(
         plugins=[
             *extra,
             FakeChrome(holder),
-            Readiness(options=ReadinessOptions(navigation_min_ms=0)),
+            PageReadiness(options=ReadinessOptions(navigation_min_ms=0)),
             BrowserPerception(
                 capture=capture,
                 renderer=renderer or CustomRenderer(),
@@ -737,11 +737,11 @@ async def test_initial_per_document_and_ongoing_readiness_with_stream_stage():
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(initial=initial, ongoing=ongoing),
+            PageReadiness(initial=initial, ongoing=ongoing),
         ],
     )
     async with agent.session() as session:
-        readiness = session.scope[Readiness]
+        readiness = session.scope[PageReadiness]
         tab = holder["browser"].active_tab
         await readiness.wait(tab)
         await readiness.wait(tab, phase=ReadinessPhase.AFTER_ACTION)
@@ -773,11 +773,11 @@ async def test_failed_initial_retries_and_navigation_reselects_policy():
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(initial=app),
+            PageReadiness(initial=app),
         ],
     )
     async with agent.session() as session:
-        readiness = session.scope[Readiness]
+        readiness = session.scope[PageReadiness]
         tab = holder["browser"].active_tab
         for _ in range(2):
             with pytest.raises(ReadinessError):
@@ -813,11 +813,11 @@ async def test_invalidation_cancels_old_wait_and_starts_a_fresh_initial_probe():
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(initial=WaitingPolicy()),
+            PageReadiness(initial=WaitingPolicy()),
         ],
     )
     async with agent.session() as session:
-        readiness = session.scope[Readiness]
+        readiness = session.scope[PageReadiness]
         tab = holder["browser"].active_tab
         old = asyncio.create_task(readiness.wait(tab))
         await asyncio.wait_for(entered.wait(), 5)

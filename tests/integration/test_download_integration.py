@@ -26,7 +26,7 @@ from browserrig import (
     FileTools,
     FileTransfer,
     LocalWorkspace,
-    Readiness,
+    PageReadiness,
     ReadinessOptions,
     Screenshots,
     ScreenshotTrigger,
@@ -509,7 +509,7 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
             BrowserPerception(
                 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
             ),
-            Readiness(options=ReadinessOptions(timeout_seconds=3)),
+            PageReadiness(options=ReadinessOptions(timeout_seconds=3)),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     ).run("Preview the PDF and return to the original tab", max_steps=3)

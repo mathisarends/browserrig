@@ -31,7 +31,7 @@ from browserrig import (
     HumanHandoff,
     HumanResponse,
     Nudges,
-    Readiness,
+    PageReadiness,
     ReadinessOptions,
     Secret,
     Secrets,
@@ -99,7 +99,7 @@ def _agent(responses, ask, *, extra=(), store=None, **options):
         plugins=[
             Activity(),
             FakeChrome(holder),
-            Readiness(options=ReadinessOptions(navigation_min_ms=0)),
+            PageReadiness(options=ReadinessOptions(navigation_min_ms=0)),
             *extra,
             BrowserPerception(capture=_Capture(), renderer=DomRenderer()),
             Nudges(),

@@ -15,7 +15,7 @@ from browserrig import (
     CheckReadiness,
     DomReady,
     DownloadReadiness,
-    Readiness,
+    PageReadiness,
     ReadinessCheck,
     ReadinessOptions,
     SelectReadiness,
@@ -37,12 +37,12 @@ from browserrig.scripts import STABILITY, DOMProbe
 from tests.fakes import FakeBrowser, FakeChrome, FakeTab
 
 
-class Access(Plugin, needs=(Readiness,)):
+class Access(Plugin, needs=(PageReadiness,)):
     def __init__(self, holder):
         super().__init__()
         self.holder = holder
 
-    _setup_readiness = needs(Readiness)
+    _setup_readiness = needs(PageReadiness)
 
     async def setup(self, _ctx: PluginScope):
         readiness = self._setup_readiness
@@ -56,7 +56,7 @@ async def test_readiness_deduplicates_waiters_and_one_cancellation_does_not_canc
     )
     agent = Agent(
         model=ScriptedModel(["ok"]),
-        plugins=[FakeChrome(holder), Readiness(options=options), Access(holder)],
+        plugins=[FakeChrome(holder), PageReadiness(options=options), Access(holder)],
     )
     async with agent.session() as session:
         readiness, tab = holder["readiness"], holder["browser"].active_tab
@@ -81,7 +81,7 @@ async def test_endless_dom_mutation_is_explicitly_degraded():
     )
     agent = Agent(
         model=ScriptedModel(["ok"]),
-        plugins=[FakeChrome(holder), Readiness(options=options), Access(holder)],
+        plugins=[FakeChrome(holder), PageReadiness(options=options), Access(holder)],
     )
     async with agent.session() as session:
         holder["browser"].active_tab.quiet_ms = 0
@@ -95,7 +95,7 @@ async def test_plugin_state_is_per_session():
     holder = {}
     agent = Agent(
         model=ScriptedModel(["ok"]),
-        plugins=[Access(holder), Readiness(), FakeChrome(holder)],
+        plugins=[Access(holder), PageReadiness(), FakeChrome(holder)],
     )
     async with agent.session():
         first = holder["readiness"]
@@ -216,10 +216,14 @@ async def test_document_discovered_during_sync_or_dispatch_uses_initial_policy_a
     holder = {}
     agent = Agent(
         model=ScriptedModel(["ok"]),
-        plugins=[FakeChrome(holder), Readiness(options=_fast_options()), Selection()],
+        plugins=[
+            FakeChrome(holder),
+            PageReadiness(options=_fast_options()),
+            Selection(),
+        ],
     )
     async with agent.session() as session:
-        readiness, tab = session.scope[Readiness], holder["browser"].active_tab
+        readiness, tab = session.scope[PageReadiness], holder["browser"].active_tab
         await readiness.wait(tab)
 
         async def sync():
@@ -240,11 +244,11 @@ async def test_navigation_dispatches_execute_once_each_and_do_not_share_a_readon
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(options=_fast_options(timeout_seconds=0.2)),
+            PageReadiness(options=_fast_options(timeout_seconds=0.2)),
         ],
     )
     async with agent.session() as session:
-        readiness, tab = session.scope[Readiness], holder["browser"].active_tab
+        readiness, tab = session.scope[PageReadiness], holder["browser"].active_tab
         commands = [AsyncMock(), AsyncMock()]
         reports = await asyncio.gather(
             *(
@@ -271,12 +275,12 @@ async def test_cancelling_a_dispatch_cancels_its_owned_work():
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(options=_fast_options(timeout_seconds=1)),
+            PageReadiness(options=_fast_options(timeout_seconds=1)),
         ],
     )
     async with agent.session() as session:
         task = asyncio.create_task(
-            session.scope[Readiness].wait(
+            session.scope[PageReadiness].wait(
                 holder["browser"].active_tab, dispatch=dispatch
             )
         )
@@ -309,14 +313,14 @@ async def test_falsy_initial_and_ongoing_policies_are_used_for_their_own_stage()
             return DomReady().create(context)
 
     holder = {}
-    readiness = Readiness(
+    readiness = PageReadiness(
         options=_fast_options(),
         initial=FalsyPolicy("initial"),
         ongoing=FalsyPolicy("ongoing"),
     )
     agent = Agent(model=ScriptedModel(["ok"]), plugins=[FakeChrome(holder), readiness])
     async with agent.session() as session:
-        readiness = session.scope[Readiness]
+        readiness = session.scope[PageReadiness]
         tab = holder["browser"].active_tab
         assert (await readiness.wait(tab)).status == "ready"
         assert (await readiness.wait(tab)).status == "ready"
@@ -344,11 +348,11 @@ async def test_native_policy_selection_and_waterfall_are_removed_with_the_plugin
     holder = {}
     agent = Agent(
         model=ScriptedModel(["ok"]),
-        plugins=[FakeChrome(holder), Readiness(options=options)],
+        plugins=[FakeChrome(holder), PageReadiness(options=options)],
     )
     async with agent.session() as session:
         extension = await session.mount(ApplicationReadiness())
-        readiness, tab = session.scope[Readiness], holder["browser"].active_tab
+        readiness, tab = session.scope[PageReadiness], holder["browser"].active_tab
         report = await readiness.wait(tab)
         assert report.timed_out and "Application data" in report.reason
         assert chosen == ["initial"]
@@ -364,7 +368,7 @@ async def test_download_timeout_is_delivered_to_observation_without_another_wait
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(options=_fast_options()),
+            PageReadiness(options=_fast_options()),
             DownloadReadiness(),
         ],
     )
@@ -375,7 +379,7 @@ async def test_download_timeout_is_delivered_to_observation_without_another_wait
                 Download(id="download", filename="test.pdf", url="https://example.org"),
             )
         )
-        readiness, tab = session.scope[Readiness], browser.active_tab
+        readiness, tab = session.scope[PageReadiness], browser.active_tab
         report = await readiness.wait(tab, phase=ReadinessPhase.AFTER_ACTION)
         assert report.timed_out and "download" in report.reason
         command = AsyncMock()
@@ -398,7 +402,7 @@ async def test_active_downloads_can_finish_during_the_shared_wait():
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(options=_fast_options(timeout_seconds=0.2)),
+            PageReadiness(options=_fast_options(timeout_seconds=0.2)),
             DownloadReadiness(),
         ],
     )
@@ -410,7 +414,7 @@ async def test_active_downloads_can_finish_during_the_shared_wait():
                 (),
             ]
         )
-        report = await session.scope[Readiness].wait(browser.active_tab)
+        report = await session.scope[PageReadiness].wait(browser.active_tab)
         assert report.status == "ready" and browser.downloads.await_count == 2
 
 
@@ -441,12 +445,12 @@ async def test_successive_checks_share_the_remaining_budget_until_observation(
         model=ScriptedModel(["ok"]),
         plugins=[
             FakeChrome(holder),
-            Readiness(options=_fast_options(timeout_seconds=2)),
+            PageReadiness(options=_fast_options(timeout_seconds=2)),
             RecordBudget(),
         ],
     )
     async with agent.session() as session:
-        readiness, tab = session.scope[Readiness], holder["browser"].active_tab
+        readiness, tab = session.scope[PageReadiness], holder["browser"].active_tab
         first = await readiness.wait(tab, phase=ReadinessPhase.ACTION)
         second = await readiness.wait(tab, phase=ReadinessPhase.AFTER_ACTION)
         assert first.status == second.status == "ready"

@@ -4,7 +4,7 @@ from harnessed.kernel import needs
 from browserrig.browser import Browser, TabInfo
 from browserrig.core import ActionKind, ReadinessPhase
 from browserrig.core import browser_tool as tool
-from browserrig.readiness import Readiness
+from browserrig.readiness import PageReadiness
 
 from .effects import Effect
 from .execution import Actions
@@ -14,7 +14,7 @@ from .parameters import supports_new_tabs
 
 class TabTools(Plugin, needs=(Actions,)):
     _browser = needs(Browser)
-    _readiness = needs(Readiness)
+    _readiness = needs(PageReadiness)
 
     @tool(
         kind=ActionKind.LIST_TABS,

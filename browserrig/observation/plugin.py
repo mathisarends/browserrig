@@ -31,7 +31,7 @@ from browserrig.nudges import Nudges
 from browserrig.readiness import (
     BrowserReady,
     NetworkQuiet,
-    Readiness,
+    PageReadiness,
     ReadinessPolicy,
     SelectReadiness,
 )
@@ -75,7 +75,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     _input = needs(Input)
     _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
-    _readiness = needs(Readiness)
+    _readiness = needs(PageReadiness)
     _tab_policy = observes(TabPolicy)
 
     def __init__(

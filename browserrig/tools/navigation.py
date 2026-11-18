@@ -16,7 +16,7 @@ from browserrig.core import (
 )
 from browserrig.core import browser_tool as tool
 from browserrig.events import NavigationStartedEvent
-from browserrig.readiness import Readiness
+from browserrig.readiness import PageReadiness
 
 from .effects import Effect
 from .execution import Actions
@@ -49,7 +49,7 @@ class NavigationTools(Plugin):
     _browser = needs(Browser)
     _actions = needs(Actions)
     _events = needs(BrowserEvents)
-    _readiness = needs(Readiness)
+    _readiness = needs(PageReadiness)
     _tabs = observes(TabPolicy)
 
     def instructions(self) -> SystemPrompt:
