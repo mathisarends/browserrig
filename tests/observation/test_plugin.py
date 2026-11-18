@@ -14,14 +14,19 @@ from browserrig import (
     CaptureContent,
     CaptureStrategy,
     DomRenderer,
+    ElementInfo,
     MultiTab,
     PageContent,
     PageReadiness,
+    ScreenshotCapture,
     Screenshots,
     ScreenshotTools,
     SingleTab,
+    TextObservations,
 )
 from browserrig.browser import TabInfo
+from browserrig.core import BrowserError, Region
+from browserrig.observation import Snapshot
 from browserrig.tools import Effect
 from tests.fakes import FakeChrome
 
@@ -29,6 +34,41 @@ _PNG = (
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aGhg"
     "AAAAASUVORK5CYII="
 )
+
+
+def test_metadata_text_defaults_to_lightweight_capture_and_renders_only_page_facts():
+    perception = BrowserPerception(text=TextObservations(content="metadata"))
+    snapshot = Snapshot(
+        id="observation",
+        tab_id="tab",
+        document_id="document",
+        url="https://example.org/shop",
+        title="Shop",
+        readiness="ready",
+        width=1280,
+        height=800,
+        scroll_y=400,
+        page_height=2000,
+        fingerprint="fingerprint",
+        elements=(ElementInfo(ref="1", role="button", name="Page control"),),
+        text="Page prose",
+        tabs=(
+            TabInfo(
+                id="tab", url="https://example.org/shop", title="Shop", active=True
+            ),
+        ),
+    )
+
+    assert isinstance(perception.capture_strategy, ScreenshotCapture)
+    assert perception.renderer.refs() is None
+    assert perception.renderer.render(snapshot).splitlines() == [
+        "# Shop",
+        "url: https://example.org/shop",
+        "tab: tab",
+        "open tabs: 1",
+        "viewport: 1280x800, scroll y=400px, 800px remaining to page end",
+        "cursor: not in this tab yet",
+    ]
 
 
 @pytest.mark.parametrize("mode, overview", [(SingleTab, False), (MultiTab, True)])
@@ -127,6 +167,62 @@ async def test_step_observation_and_actions_share_session_control():
         assert not holder["coordination"].busy
 
 
+@pytest.mark.parametrize("replace_region", [False, True])
+async def test_screenshot_request_survives_a_failed_capture(replace_region):
+    original = Region(x=2, y=3, width=8, height=8)
+    attempts = []
+
+    class FailingCapture(CaptureStrategy):
+        async def collect(self, tab, _report, *, screenshots, region, **_options):
+            attempts.append((screenshots, region))
+            if len(attempts) == 1:
+                if replace_region:
+                    active.request_screenshot()
+                raise BrowserError("Page capture timed out")
+            return CaptureContent(
+                page=PageContent(
+                    url=tab.url,
+                    title=tab.title,
+                    width=800,
+                    height=600,
+                    scroll_y=0,
+                    page_height=600,
+                ),
+                image=_PNG if screenshots else None,
+            )
+
+    model = ScriptedModel(["Recovered", "Done"])
+    agent = Agent(
+        model=model,
+        plugins=[
+            FakeChrome({}),
+            PageReadiness(),
+            BrowserPerception(
+                capture=FailingCapture(),
+                renderer=DomRenderer(),
+                screenshots=Screenshots(),
+            ),
+        ],
+    )
+    async with agent.session() as session:
+        active = session.scope[BrowserPerception]
+        active.request_screenshot(original)
+        with pytest.raises(BrowserError, match="Page capture timed out"):
+            await session.run("Observe")
+        result = await session.run("Observe again")
+    assert result.text == "Done"
+    assert attempts[:2] == [
+        (True, original),
+        (True, None if replace_region else original),
+    ]
+    assert any(
+        isinstance(part, ImagePart)
+        for message in model.requests[0].messages
+        if not isinstance(message.content, str)
+        for part in message.content
+    )
+
+
 @pytest.mark.parametrize("image_available", [True, False])
 async def test_explicit_screenshot_reports_reuse_or_unavailability(image_available):
     class Capture(CaptureStrategy):
@@ -139,6 +235,7 @@ async def test_explicit_screenshot_reports_reuse_or_unavailability(image_availab
                     height=600,
                     scroll_y=0,
                     page_height=600,
+                    text="" if image_available else "Screenshot unavailable.",
                 ),
                 image=_PNG if screenshots and image_available else None,
             )
@@ -178,8 +275,8 @@ async def test_explicit_screenshot_reports_reuse_or_unavailability(image_availab
         for part in message.content
         if isinstance(part, ImagePart)
     ]
-    status = (
-        "screen unchanged this step" if image_available else "Screenshot unavailable."
-    )
     assert len(images) == int(image_available)
-    assert any(status in message.text for message in messages)
+    if image_available:
+        assert any("screen unchanged this step" in message.text for message in messages)
+    else:
+        assert any(message.text == "Screenshot unavailable." for message in messages)

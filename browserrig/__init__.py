@@ -16,7 +16,7 @@ from .browser import (
     Viewport,
 )
 from .choreography import ActionLabels, Choreography, TabStrip
-from .completion import Done
+from .completion import Done, StepBudgetHints
 from .composition import (  # smelt: ignore[SMT106] -- public facade
     ContextCompaction,
     WindowRatio,
@@ -70,10 +70,12 @@ from .observation import (
     ResolveDomElement,
     ScreenshotCapture,
     Screenshots,
+    ScreenshotStatus,
     ScreenshotTrigger,
     ScrollableElement,
     ScrollStep,
     SetOfMarks,
+    TextContent,
     TextMode,
     TextObservations,
     TrimInBatches,
@@ -158,6 +160,7 @@ __all__ = [
     "ReadinessCheck",
     "SelectReadiness",
     "Done",
+    "StepBudgetHints",
     "HandoffCallback",
     "HandoffReceipt",
     "HandoffStatus",
@@ -167,7 +170,9 @@ __all__ = [
     "CaptureStrategy",
     "DomCapture",
     "ScreenshotCapture",
+    "ScreenshotStatus",
     "TextObservations",
+    "TextContent",
     "TextMode",
     "SetOfMarks",
     "DomElementHandle",

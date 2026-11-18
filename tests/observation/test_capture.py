@@ -13,6 +13,7 @@ from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     # Public facade callable; SMT107 confuses it with the same-named module.
     CookieBanner,
     Element,
+    ScreenshotStatus,
     capture,
     decision_change,
 )
@@ -194,9 +195,8 @@ async def test_optional_screenshot_failure_retains_the_dom_and_cancels_stalled_w
     monkeypatch.setattr(pixels_module, "_SCREENSHOT_SECONDS", 0.02)
     snapshot = await capture(tab, DomCapture(), report, screenshots=True)
     assert snapshot.text == "Example page" and snapshot.elements[0].ref == "1"
-    assert (
-        snapshot.image is None and "Screenshot unavailable" in snapshot.limitations[-1]
-    )
+    assert snapshot.image is None
+    assert snapshot.screenshot_status is ScreenshotStatus.UNAVAILABLE
     assert cancelled == stalled
     extracted.assert_awaited_once()
     tab.frames.assert_awaited_once()

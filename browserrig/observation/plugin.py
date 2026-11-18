@@ -37,15 +37,16 @@ from .dom_capture import DomCapture
 from .handle import DomElementHandle
 from .hooks import ProjectObservation
 from .images import NOTE_SOURCE, attach_image, image_note, project_image, trim_images
-from .models import CapturedImage, Snapshot
+from .models import CapturedImage, ScreenshotStatus, Snapshot
 from .pixels import ScreenshotCapture
 from .references import ElementHandle, References
-from .renderer import DomRenderer, Renderer, screenshot_instructions
+from .renderer import DomRenderer, MetadataRenderer, Renderer, screenshot_instructions
 from .state import BrowserPerceptionState
 from .text import include_text, project_text
 
 _DEFAULT_TEXT = TextObservations()
 _DEFAULT_CAPTURE = DomCapture()
+_METADATA_CAPTURE = ScreenshotCapture()
 _TRUST = Instructions(
     title="Browser content and action results",
     text=(
@@ -60,7 +61,7 @@ _TRUST = Instructions(
 class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     """Provide the agent's current view of the browser before each model step.
 
-    Select DOM text, screenshots, or both. Configured modalities share one coherent
+    Select page text, metadata, screenshots, or a combination. Configured modalities share one
     snapshot and request history. The plugin registers no model tools.
     """
 
@@ -82,6 +83,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         renderer: Renderer | None = None,
     ) -> None:
         super().__init__()
+        capture = _capture_for_text(capture, text)
         self.text = text
         self.screenshots = screenshots
         self.capture_strategy = capture if capture is not None else _DEFAULT_CAPTURE
@@ -147,6 +149,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 previous=self.snapshot,
                 screenshots=False,
                 redaction=self._secrets(),
+                prefer_tab_title=_metadata_text(self.text),
             )
             return observation.snapshot
 
@@ -186,10 +189,11 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 cursor=self._input.mouse.position_in(selected.id),
                 screenshots=take_image and not withheld,
                 redaction=secrets,
+                prefer_tab_title=_metadata_text(self.text),
             )
             if withheld:
-                observation = observation.with_limitation(
-                    "Screenshot withheld: it may show a secret"
+                observation = observation.with_screenshot_status(
+                    ScreenshotStatus.WITHHELD
                 )
             self._state.observation = observation
             snapshot = observation.snapshot
@@ -311,11 +315,17 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         async with self._coordination.exclusive():
             requested, region = state.screenshot_requested, state.screenshot_region
             state.screenshot_requested, state.screenshot_region = False, None
-            snapshot = await self.capture(
-                phase=ReadinessPhase.OBSERVATION,
-                screenshots=True if requested else None,
-                region=region,
-            )
+            try:
+                snapshot = await self.capture(
+                    phase=ReadinessPhase.OBSERVATION,
+                    screenshots=True if requested else None,
+                    region=region,
+                )
+            except BaseException:
+                # Retry after errors or cancellation unless a newer request is pending.
+                if requested and not state.screenshot_requested:
+                    state.screenshot_requested, state.screenshot_region = True, region
+                raise
         await self._track_viewport(snapshot, nudges)
         observations = []
         context = state.context
@@ -325,12 +335,13 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         )
         if observation is not None:
             observations.append((observation, "browser", (snapshot.id,)))
-        if requested and snapshot.image is None:
-            status = _screenshot_status(snapshot) or UserMessage(
-                "Screenshot unavailable."
-            )
-            if observation is None or status.text not in observation.text:
-                observations.append((status, "browser.screenshot", ()))
+        status = _screenshot_status(
+            snapshot,
+            requested=requested,
+            image_only=self.text is None and self.screenshots is not None,
+        )
+        if status is not None:
+            observations.append((status, "browser.screenshot", ()))
         if (
             self.text is not None
             and nudges is not None
@@ -377,8 +388,6 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             )
         if image is not None:
             return attach_image(message, image)
-        if self.text is None and message is None and self.screenshots is not None:
-            return _screenshot_status(snapshot)
         return message
 
     @hook(PrepareRequest)
@@ -409,7 +418,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             return False
         if self.screenshots.trigger == ScreenshotTrigger.EACH_STEP:
             return True
-        if self.text is not None:
+        if self.text is not None and self.text.content == "page":
             return False
         shown = self._state.delivered_image
         return shown is None or (shown.tab_id, shown.document_id) != (
@@ -418,8 +427,9 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         )
 
     async def _tab_overview(self) -> tuple[TabInfo, ...]:
-        if self.text is None or (
-            self._tab_policy is not None and not self._tab_policy.multiple
+        text, policy = self.text, self._tab_policy
+        if text is None or (
+            text.content == "page" and policy is not None and not policy.multiple
         ):
             return ()
         return await self._browser.tabs.list()
@@ -487,11 +497,21 @@ class ResolveDomElement:
         return handle
 
 
+def _capture_for_text(
+    capture: CaptureStrategy | None, text: TextObservations | None
+) -> CaptureStrategy | None:
+    if capture is None and _metadata_text(text):
+        return _METADATA_CAPTURE
+    return capture
+
+
 def _text_renderer(
     capture: CaptureStrategy,
     text: TextObservations | None,
     renderer: Renderer | None,
 ) -> Renderer:
+    if renderer is None and _metadata_text(text):
+        return MetadataRenderer()
     if renderer is not None:
         return renderer
     if text is not None and not capture.supports_dom_refs:
@@ -499,16 +519,28 @@ def _text_renderer(
     return DomRenderer()
 
 
-def _screenshot_status(snapshot: Snapshot) -> UserMessage | None:
-    if snapshot.readiness == ReadinessStatus.BLOCKED:
-        return UserMessage(
-            "A browser dialog is open. Handle it to resume screenshot capture."
-        )
-    if snapshot.width == 0 and snapshot.readiness != ReadinessStatus.READY:
-        return UserMessage("The page is still loading. Observe again for a screenshot.")
-    for limit in snapshot.limitations:
-        if limit.startswith(("Screenshot unavailable", "Screenshot withheld")):
-            return UserMessage(limit)
+def _metadata_text(text: TextObservations | None) -> bool:
+    return text is not None and text.content == "metadata"
+
+
+def _screenshot_status(
+    snapshot: Snapshot, *, requested: bool, image_only: bool
+) -> UserMessage | None:
+    if snapshot.image is not None:
+        return None
+    if requested or image_only:
+        if snapshot.readiness == ReadinessStatus.BLOCKED:
+            return UserMessage(
+                "A browser dialog is open. Handle it to resume screenshot capture."
+            )
+        if snapshot.width == 0 and snapshot.readiness != ReadinessStatus.READY:
+            return UserMessage(
+                "The page is still loading. Observe again for a screenshot."
+            )
+    if snapshot.screenshot_status == ScreenshotStatus.WITHHELD:
+        return UserMessage("Screenshot withheld: it may show a secret")
+    if requested or snapshot.screenshot_status == ScreenshotStatus.UNAVAILABLE:
+        return UserMessage("Screenshot unavailable.")
     return None
 
 

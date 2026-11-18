@@ -99,6 +99,7 @@ def _parser() -> argparse.ArgumentParser:
         help="Expose the screenshot tool. Defaults to enabled for on_request.",
     )
     parser.add_argument(
+        "--page-prose",
         "--page-text",
         choices=("inline", "sparse", "off"),
         default="inline",
@@ -182,7 +183,7 @@ async def main() -> None:
                 upstream_version=manifest.version,
                 max_steps=args.max_steps,
                 timeout_seconds=args.timeout_seconds,
-                page_text=args.page_text,
+                page_text=args.page_prose,
                 headings=args.headings,
                 landmarks=args.landmarks,
                 observation_mode=args.observation,
@@ -293,7 +294,7 @@ def _perception(args, parser) -> tuple[BrowserPerception, bool]:
     marks = SetOfMarks() if mode is None or mode.endswith("-marks") else None
     if text is not None or marks is not None:
         capture = DomCapture(
-            page_prose=args.page_text, headings=args.headings, landmarks=args.landmarks
+            page_prose=args.page_prose, headings=args.headings, landmarks=args.landmarks
         )
     if mode == "text":
         if args.screenshot_trigger is not None or args.screenshot_tool:

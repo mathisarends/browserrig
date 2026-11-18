@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from contextlib import AsyncExitStack, suppress
 from pathlib import Path, PurePath, PureWindowsPath
@@ -20,7 +21,14 @@ from cdpify.domains.target import (
 )
 from harnessed.tracing import traced
 
-from browserrig.core import BrowserError, ChangeTab, TabDispatch, TabGesture, TargetId
+from browserrig.core import (
+    BrowserCoordination,
+    BrowserError,
+    ChangeTab,
+    TabDispatch,
+    TabGesture,
+    TargetId,
+)
 from browserrig.events import (
     TabActivatedEvent,
     TabClosedEvent,
@@ -41,6 +49,10 @@ from .worlds import Worlds
 if TYPE_CHECKING:
     from .base import EventSink
 
+logger = logging.getLogger(__name__)
+_FOCUS_RECHECK_SECONDS = 0.1
+_FOCUS_WINDOW_SECONDS = 1.0
+
 
 class Tabs:
     """The browser's controlled tabs, their sessions and active document."""
@@ -56,6 +68,7 @@ class Tabs:
         policy: TabPolicy | None = None,
         current_action: Callable[[], str] = str,
         change_tab: TabDispatch | None = None,
+        coordination: BrowserCoordination | None = None,
     ) -> None:
         self._options = options
         self._guard = guard
@@ -63,6 +76,10 @@ class Tabs:
         self._policy_error = ""
         self._current_action = current_action
         self._change_tab = change_tab
+        self._coordination = (
+            coordination if coordination is not None else BrowserCoordination()
+        )
+        self._foreground_checks: set[asyncio.Task[None]] = set()
         self._check = check
         self._emit = emit
         self._on_tab_change = on_change
@@ -99,6 +116,7 @@ class Tabs:
         self.client = client
         self._stack = stack
         await self._create_context()
+        stack.push_async_callback(self._stop_foreground_checks)
         return self._context
 
     async def open_initial(self) -> None:
@@ -186,6 +204,13 @@ class Tabs:
             return tab
         await self._change(TabGesture.ACTIVATE, tab.id, lambda: self._focus(tab))
         return tab
+
+    async def follow_opened(self, tab: Tab) -> None:
+        """Follow navigation into a tab that the preceding input opened."""
+        self._check()
+        if self._tabs.get(tab.id) is not tab or tab.closed:
+            raise BrowserError("Opened tab is no longer available")
+        await self._focus(tab)
 
     async def close(self, target_id: str) -> Tab:
         if target_id not in {tab.id for tab in await self.list()}:
@@ -298,14 +323,6 @@ class Tabs:
             await tab.navigate(url)
         return tab
 
-    async def _focus(self, tab: Tab, *, front: bool = True) -> None:
-        if front:
-            await tab.bring_to_front()
-        self._active = tab.id
-        await self._emit(
-            TabActivatedEvent(target_id=tab.id, document_id=tab.document_id)
-        )
-
     async def _on_target_info(self, info: TargetInfo) -> None:
         if info.target_id in self._closed_targets:
             return
@@ -323,9 +340,62 @@ class Tabs:
                 )
                 await self.client.target.close_target(target_id=info.target_id)
                 return
-            await self._attach(
+            tab = await self._attach(
                 info.target_id, opened=True, opener_id=info.opener_id or ""
             )
+            if info.opener_id and info.opener_id == self._active:
+                self._check_foreground(tab, info.opener_id)
+
+    def _check_foreground(self, tab: Tab, opener_id: str) -> None:
+        # Let the target listener discover other tabs while the current action finishes.
+        task = asyncio.create_task(self._adopt_foreground(tab, opener_id))
+        self._foreground_checks.add(task)
+        task.add_done_callback(self._foreground_checked)
+
+    async def _adopt_foreground(self, tab: Tab, opener_id: str) -> None:
+        # Chrome may still be committing the popup's first document. Probe outside
+        # the control lock so a background tab cannot delay an action or observation.
+        if not await self._wait_for_foreground(tab, opener_id):
+            return
+        async with self._coordination.exclusive():
+            if self._active != opener_id or tab.closed:
+                return
+            if (
+                await tab.has_foreground()
+                and self._active == opener_id
+                and not tab.closed
+            ):
+                await self._focus(tab, front=False)
+
+    async def _focus(self, tab: Tab, *, front: bool = True) -> None:
+        if front:
+            await tab.bring_to_front()
+        self._active = tab.id
+        await self._emit(
+            TabActivatedEvent(target_id=tab.id, document_id=tab.document_id)
+        )
+
+    async def _wait_for_foreground(self, tab: Tab, opener_id: str) -> bool:
+        try:
+            async with asyncio.timeout(_FOCUS_WINDOW_SECONDS):
+                while self._active == opener_id and not tab.closed:
+                    if await tab.has_foreground():
+                        return True
+                    await asyncio.sleep(_FOCUS_RECHECK_SECONDS)
+        except TimeoutError:
+            pass
+        return False
+
+    def _foreground_checked(self, task: asyncio.Task[None]) -> None:
+        self._foreground_checks.discard(task)
+        if not task.cancelled() and (error := task.exception()) is not None:
+            logger.error("Browser foreground check failed", exc_info=error)
+
+    async def _stop_foreground_checks(self) -> None:
+        checks = tuple(self._foreground_checks)
+        for task in checks:
+            task.cancel()
+        await asyncio.gather(*checks, return_exceptions=True)
 
     def _controlled(self, info: TargetInfo) -> bool:
         if self._context is not None:

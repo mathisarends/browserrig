@@ -6,7 +6,7 @@ from .config import BrowserOptions, Connect, Launch, Viewport
 from .downloads import DownloadEvent, DownloadSource
 from .frame import Frame
 from .images import screenshot
-from .models import TabInfo
+from .models import PageLayout, TabInfo
 from .overlays import Overlay, Overlays
 from .plugin import Chrome, TabChanged
 from .policy import DomainNotAllowed, NavigationPolicy
@@ -36,6 +36,7 @@ __all__ = [
     "Overlays",
     "SessionSetup",
     "OpenDialog",
+    "PageLayout",
     "Tab",
     "TabChanged",
     "TabInfo",

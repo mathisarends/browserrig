@@ -7,7 +7,13 @@ from browserrig.choreography import (
     DownloadPresentedEvent,
     WorkPhase,
 )
-from browserrig.events import CursorStateEvent, DownloadStartedEvent, EventKind
+from browserrig.events import (
+    CursorStateEvent,
+    DownloadStartedEvent,
+    EventKind,
+    PointerPressedEvent,
+    PointerReleasedEvent,
+)
 from tests.fakes import mounted
 
 
@@ -77,3 +83,15 @@ async def test_settled_tab_change_restores_receipts_once_per_document():
     assert len(surface.sent) == 2 and "type" not in restored
     assert [receipt["download_id"] for receipt in restored["restore"]] == ["d"]
     assert restored["presentation"]["document_id"] == "doc-2"
+
+
+async def test_overlay_animates_the_press_without_rendering_the_release():
+    async with mounted(Choreography(), ChoreographyOverlay()) as (services, ctx):
+        surface = services.browser.active_tab.overlays = _Surface()
+        await ctx.dispatch(
+            PointerPressedEvent(x=10, y=20, target_id="tab-1", click_count=1)
+        )
+        await ctx.dispatch(
+            PointerReleasedEvent(x=10, y=20, target_id="tab-1", click_count=1)
+        )
+    assert [message["type"] for message in surface.sent] == [EventKind.POINTER_PRESSED]

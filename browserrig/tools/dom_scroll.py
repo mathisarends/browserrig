@@ -2,7 +2,7 @@ from functools import partial
 from typing import Annotated
 
 from harnessed import Plugin, ToolError
-from harnessed.kernel import needs, observes
+from harnessed.kernel import PluginScope, needs, observes
 from pydantic import Field
 
 from browserrig.browser import Tab
@@ -14,7 +14,7 @@ from browserrig.scripts import TARGET_SCROLL, TargetScrollArgs, TargetScrollResu
 from .effects import Effect
 from .execution import Actions
 from .intents import DomScrollIntent
-from .parameters import resolve_dom_element, supports_dom_refs
+from .parameters import log_missing_dom_refs, require_dom_resolver, supports_dom_refs
 
 type _VerticalScroll = Annotated[
     float,
@@ -32,9 +32,12 @@ class DomScrollTools(Plugin):
     _actions = needs(Actions)
     _elements = observes(ResolveDomElement)
 
+    async def setup(self, scope: PluginScope) -> None:
+        await super().setup(scope)
+        log_missing_dom_refs(scope, type(self).__name__)
+
     @tool(
         kind=ActionKind.SCROLL_PAGE,
-        enabled=supports_dom_refs,
         description="Scroll the outer document without moving nested panels.",
     )
     async def scroll_page(
@@ -75,7 +78,8 @@ class DomScrollTools(Plugin):
         if delta_y == 0 and delta_x == 0:
             raise ToolError("Provide a non-zero delta_y or delta_x")
         tab = self._actions.tab
-        handle = await resolve_dom_element(self._elements, tab, ref)
+        resolver = require_dom_resolver(self._elements)
+        handle = await resolver(tab, ref)
         result = await self._actions.stage(
             DomScrollIntent(ref),
             tab,

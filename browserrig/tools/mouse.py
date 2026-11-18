@@ -207,12 +207,12 @@ class PointerTools(Plugin):
 
     @asynccontextmanager
     async def _new_tab_keys(self, new_tab: bool) -> AsyncGenerator[int]:
-        """Hold the key that opens a link in a new tab, so viewers see it pressed."""
+        """Use Chrome's foreground new-tab shortcut and show the keys to viewers."""
         if not new_tab:
             yield 0
             return
         key = await self._browser.tabs.link_modifier()
-        async with self._input.keyboard.hold(key) as modifiers:
+        async with self._input.keyboard.hold(key, "Shift") as modifiers:
             yield modifiers
 
 

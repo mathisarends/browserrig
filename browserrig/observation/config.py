@@ -13,12 +13,14 @@ class ScreenshotTrigger(StrEnum):
 
 
 type PageProse = Literal["inline", "sparse", "off"]
+type TextContent = Literal["page", "metadata"]
 type TextMode = Literal["delta", "full"]
 
 
 class TextObservations(Options):
-    """Publish complete DOM observations or deltas against a retained observation."""
+    """Select observation text and send it in full or as deltas."""
 
+    content: TextContent = "page"
     mode: TextMode = "delta"
 
 

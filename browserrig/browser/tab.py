@@ -34,6 +34,7 @@ from browserrig.events import (
     TabEvent,
 )
 from browserrig.scripts import (
+    FOREGROUND,
     TAB_STRIP,
     TabStrip,
     TabStripArgs,
@@ -43,6 +44,7 @@ from .favicon import load_favicon
 from .frame import Frame
 from .guard import NavigationGuard
 from .input import CdpInput
+from .models import PageLayout
 from .network import NetworkActivity
 from .overlays import Overlays
 from .popups import SINGLE_TAB_BLOCKED
@@ -52,6 +54,7 @@ from .worlds import WORLD_NAME, Worlds
 _STRIP_BINDING = "browserrigTabStripChanged"
 # Viewport metadata is presentation only and must never hold up input.
 _VIEWPORT_PROBE_SECONDS = 0.25
+_FOCUS_PROBE_SECONDS = 0.35
 
 type FrameDiscovery = Callable[
     [Tab], Awaitable[tuple[tuple[Frame, ...], tuple[str, ...]]]
@@ -278,8 +281,19 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self._layout_revision += 1
 
     async def viewport_size(self) -> ViewportSize:
-        viewport = (await self.cdp.page.get_layout_metrics()).css_layout_viewport
-        return ViewportSize(width=viewport.client_width, height=viewport.client_height)
+        return (await self.page_layout()).viewport
+
+    async def page_layout(self) -> PageLayout:
+        """Measure the main page via Chrome's layout metrics."""
+        metrics = await self.cdp.page.get_layout_metrics()
+        viewport = metrics.css_layout_viewport
+        return PageLayout(
+            viewport=ViewportSize(
+                width=viewport.client_width, height=viewport.client_height
+            ),
+            scroll_y=viewport.page_y,
+            page_height=metrics.css_content_size.height,
+        )
 
     async def _measure_viewport(self) -> ViewportSize | None:
         """Measure the layout viewport, or keep the last size while the page is blocked."""
@@ -312,6 +326,16 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
             self._frames_key = key
             self._frames = frames
         return frames
+
+    async def has_foreground(self) -> bool:
+        """Check whether Chrome has made this tab's document visible and focused."""
+        try:
+            async with asyncio.timeout(_FOCUS_PROBE_SECONDS):
+                frame = await self.main_frame()
+                return await frame.run(FOREGROUND)
+        except (BrowserError, CDPError, TimeoutError):
+            # A navigating or closed renderer may not be available for a focus check.
+            return False
 
     async def main_frame(self) -> Frame:
         tree = await self.frame_tree()

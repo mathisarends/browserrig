@@ -8,10 +8,13 @@ from pathlib import Path
 import pytest
 
 _ROOT = Path(__file__).resolve().parents[2]
+_RELEASED_GUIDES = {Path("docs/migration-0.6.md")}
 
 
 @pytest.mark.parametrize(
-    "path", [Path("README.md"), *sorted(Path("docs").glob("*.md"))], ids=str
+    "path",
+    [Path("README.md"), *sorted(set(Path("docs").glob("*.md")) - _RELEASED_GUIDES)],
+    ids=str,
 )
 def test_documented_browserrig_imports_exist(path):
     source = (_ROOT / path).read_text(encoding="utf-8")

@@ -2,7 +2,7 @@ import json
 from typing import Annotated
 
 from harnessed import Plugin
-from harnessed.kernel import needs, observes
+from harnessed.kernel import PluginScope, needs, observes
 from pydantic import Field
 
 from browserrig.core import ActionKind, BrowserError
@@ -12,7 +12,7 @@ from browserrig.scripts import SelectionResult
 
 from .effects import Effect
 from .execution import Actions
-from .parameters import resolve_dom_element, supports_dom_refs
+from .parameters import log_missing_dom_refs, require_dom_resolver, supports_dom_refs
 from .targeting import Targeting
 
 
@@ -21,6 +21,10 @@ class FormTools(Plugin):
     _elements = observes(ResolveDomElement)
     _actions = needs(Actions)
     _targets = needs(Targeting)
+
+    async def setup(self, scope: PluginScope) -> None:
+        await super().setup(scope)
+        log_missing_dom_refs(scope, type(self).__name__)
 
     @tool(
         kind=ActionKind.SELECT,
@@ -34,9 +38,10 @@ class FormTools(Plugin):
         value: Annotated[str, Field(description="Exact option label or value.")],
     ) -> Effect:
         tab = self._actions.tab
-        await resolve_dom_element(self._elements, tab, ref)
+        resolver = require_dom_resolver(self._elements)
+        await resolver(tab, ref)
         point = await self._targets.hover(ref=ref, tab=tab)
-        handle = await resolve_dom_element(self._elements, tab, ref)
+        handle = await resolver(tab, ref)
         await handle.select(value)
         return Effect("Option selected.", prepared_scroll=point.scrolled)
 
@@ -58,10 +63,11 @@ class FormTools(Plugin):
         ],
     ) -> Effect:
         tab = self._actions.tab
-        handle = await resolve_dom_element(self._elements, tab, ref)
+        resolver = require_dom_resolver(self._elements)
+        handle = await resolver(tab, ref)
         await handle.validate_options(values)
         point = await self._targets.hover(ref=ref, tab=tab)
-        handle = await resolve_dom_element(self._elements, tab, ref)
+        handle = await resolver(tab, ref)
         await handle.validate_options(values)
         result = await handle.select_options(values)
         selected = _selection(result)
@@ -89,7 +95,8 @@ class FormTools(Plugin):
         ],
     ) -> Effect:
         tab = self._actions.tab
-        handle = await resolve_dom_element(self._elements, tab, ref)
+        resolver = require_dom_resolver(self._elements)
+        handle = await resolver(tab, ref)
         if handle.element.input_type not in {
             "date",
             "time",
@@ -99,7 +106,7 @@ class FormTools(Plugin):
         }:
             raise BrowserError("Element is not a native date/time input")
         point = await self._targets.hover(ref=ref, tab=tab)
-        handle = await resolve_dom_element(self._elements, tab, ref)
+        handle = await resolver(tab, ref)
         await handle.set_value(value)
         return Effect(
             "Date/time value set and verified.", prepared_scroll=point.scrolled

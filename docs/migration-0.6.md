@@ -30,25 +30,30 @@ readers and model tool-call producers to the new names. The built-in overlay and
 terminal consumers are already migrated. Fields ending in `_ms` and upstream
 CDP, HTTP and animation APIs retain their existing units and names.
 
-## Select observation text
+## Select observation text with PageText
 
-Version 0.6.0 removed `sparse_text_chars` and introduced `text=PageText.*`.
-In the current API, use `page_prose` to select the text mode.
+`sparse_text_chars` is removed. `max_text_chars` must be at least 1; select the
+text mode separately:
 
 ```python
-from browserrig import DomCapture
+from browserrig import DomCapture, PageText
 
-inline = DomCapture(page_prose="inline", max_text_chars=3000)
-sparse = DomCapture(page_prose="sparse", max_text_chars=1000)
-controls_only = DomCapture(page_prose="off", headings=False, landmarks=False)
+inline = DomCapture(text=PageText.INLINE, max_text_chars=3000)
+sparse = DomCapture(text=PageText.SPARSE, max_text_chars=1000)
+controls_only = DomCapture(text=PageText.OFF, headings=False, landmarks=False)
 ```
 
-Use `page_prose="off"` for controls-only capture. Turn off `headings` and
-`landmarks` to omit those structural elements too. Controls keep their labels,
-and dialogs and cookie banners remain grouped. Sparse capture uses
-`max_text_chars` as its prose budget. Use `DomRenderer()` with explicit DOM capture
-when delivering text. WebArena exposes the same switches through `--page-text`,
-`--no-headings` and `--no-landmarks`.
+Replace an old controls-only configuration such as
+`DomCapture(max_text_chars=0, sparse_text_chars=0)` with `PageText.OFF`.
+Turn off `headings` and `landmarks` as above to omit those structural elements
+too; controls keep their labels and dialogs/cookie banners remain grouped.
+`PageText.SPARSE` uses `max_text_chars` as its budget. Default capture behavior
+remains unchanged.
+
+For custom rendering, `DomRenderer(text=...)` replaces its former
+`max_text_chars` and `sparse_text_chars` fields. Match the renderer's text and
+landmark settings to the capture contract. WebArena exposes the same switches
+through `--page-text`, `--no-headings` and `--no-landmarks`.
 
 ## Read model-written labels directly from host events
 

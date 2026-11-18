@@ -8,6 +8,7 @@ from browserrig import (
     BrowserPerception,
     DomScrollTools,
     DomTypingTools,
+    DomUploadTools,
     Files,
     FormTools,
     KeyboardTools,
@@ -65,7 +66,8 @@ async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
 
 
 @pytest.mark.parametrize("pixels", [False, True])
-async def test_model_tools_follow_the_configured_capture(pixels):
+async def test_model_tools_follow_the_configured_capture(pixels, caplog):
+    caplog.set_level("DEBUG", logger="browserrig.tools.parameters")
     perception = (
         BrowserPerception(
             capture=ScreenshotCapture(), text=None, screenshots=Screenshots()
@@ -83,6 +85,7 @@ async def test_model_tools_follow_the_configured_capture(pixels):
             Targeting(),
             DomScrollTools(),
             DomTypingTools(),
+            DomUploadTools(),
             FormTools(),
             ScreenshotTools(),
         ],
@@ -90,13 +93,21 @@ async def test_model_tools_follow_the_configured_capture(pixels):
     async with agent.session() as session:
         names = {tool.name for tool in session.scope[ToolRegistry].definitions}
         assert ("screenshot" in names) is pixels
+        assert "scroll_page" in names
         assert {
-            "scroll_page",
             "scroll_element",
             "type_text",
             "select_options",
         } & names == (
-            set()
+            set() if pixels else {"scroll_element", "type_text", "select_options"}
+        )
+        reported = {
+            record.message.split(":", 1)[0]
+            for record in caplog.records
+            if record.name == "browserrig.tools.parameters"
+        }
+        assert reported == (
+            {"DomScrollTools", "DomTypingTools", "DomUploadTools", "FormTools"}
             if pixels
-            else {"scroll_page", "scroll_element", "type_text", "select_options"}
+            else set()
         )
