@@ -23,10 +23,10 @@ perception = BrowserPerception(
 )
 ```
 
-`DomCapture()` is the default. Supply a renderer when enabling text with an
-explicit capture. `DomRenderer()` reads the snapshot without text or landmark
-settings. Custom text renderers implement `instructions()` without a
-screenshot argument.
+`DomCapture()` is the default. Use `DomRenderer()` for DOM text as shown above.
+It reads the snapshot without text or landmark settings. For a custom observation
+format, supply your own renderer. Custom text renderers implement
+`instructions()` without a screenshot argument.
 
 ## Configure screenshots
 
