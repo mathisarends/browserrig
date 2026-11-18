@@ -2,7 +2,7 @@ from functools import partial
 from typing import Annotated
 
 from harnessed import Plugin
-from harnessed.kernel import needs, observes
+from harnessed.kernel import PluginScope, needs, observes
 from pydantic import Field
 
 from browserrig.browser import Browser, Tab
@@ -14,7 +14,7 @@ from browserrig.secrets import Secrets
 
 from .effects import Effect
 from .execution import Actions
-from .parameters import resolve_dom_element, supports_dom_refs
+from .parameters import log_missing_dom_refs, require_dom_resolver, supports_dom_refs
 from .targeting import Targeting
 from .text_entry import entered, secret_entered
 
@@ -28,6 +28,10 @@ class DomTypingTools(Plugin):
     _input = needs(Input)
     _elements = observes(ResolveDomElement)
     _secrets = observes(Secrets)
+
+    async def setup(self, scope: PluginScope) -> None:
+        await super().setup(scope)
+        log_missing_dom_refs(scope, type(self).__name__)
 
     @tool(
         kind=ActionKind.TYPE,
@@ -44,9 +48,10 @@ class DomTypingTools(Plugin):
         ] = True,
     ) -> Effect:
         tab = self._actions.tab
-        await resolve_dom_element(self._elements, tab, ref)
+        resolver = require_dom_resolver(self._elements)
+        await resolver(tab, ref)
         await self._targets.hover(ref=ref, tab=tab)
-        field = await resolve_dom_element(self._elements, tab, ref)
+        field = await resolver(tab, ref)
         secrets = self._secrets
         # Check the secrets' domains before the field is touched.
         entry = (
