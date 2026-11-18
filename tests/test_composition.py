@@ -25,6 +25,7 @@ from browserrig import (
     PageReadiness,
     PointerTools,
     ReadinessOptions,
+    ReferencePointerTools,
     Screenshots,
     ScreenshotTrigger,
     Secret,
@@ -98,7 +99,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
 
 def test_facade_mounts_every_tool_group_once():
     agent = browserrig.Agent(model=ScriptedModel(["ok"]))
-    for plugin in (PointerTools, JavaScriptTools):
+    for plugin in (PointerTools, ReferencePointerTools, JavaScriptTools):
         assert sum(isinstance(item, plugin) for item in agent.plugins) == 1
     for plugin in (FormTools, FileTools):
         assert any(isinstance(item, plugin) for item in agent.plugins)

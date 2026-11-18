@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Breaking changes
+
+- `PointerTools` provides coordinate input. `move_mouse(x, y)` requires both
+  coordinates. Use `ReferencePointerTools` for `click(ref)`,
+  `drag(source_ref, target_ref)` and `hover(ref)`, which replaces
+  `move_mouse(ref=...)`. The default browser agent includes both plugins.
+  See [pointer tool composition](docs/browser-composition.md#choose-pointer-tools).
+
 ## 0.7.0 (2026-11-18)
 
 Upgrade from 0.6.x using the [migration guide](docs/migration-0.7.md).

@@ -16,6 +16,7 @@ from browserrig import (
     PageReadiness,
     PageSearchTools,
     PointerTools,
+    ReferencePointerTools,
     ScreenshotCapture,
     Screenshots,
     ScreenshotTools,
@@ -62,6 +63,7 @@ def test_marks_require_an_element_capture_for_metadata_observations():
     "extension,expected",
     [
         (None, set()),
+        (ReferencePointerTools(), {"click", "hover", "drag"}),
         (DomTypingTools(), {"type_text"}),
         (DomScrollTools(), {"scroll_page", "scroll_element"}),
         (FormTools(), {"select_option", "select_options", "set_date"}),
@@ -92,12 +94,31 @@ async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
             info = session.scope[ToolRegistry].plan(ToolCall("screenshot", {})).tool
             assert set(info.definition.parameters["properties"]) == {"region"}
             assert not info.definition.parameters.get("required")
-        assert (
-            names
-            == {"send_keys", "click", "click_at", "move_mouse", "drag", "drag_at"}
-            | expected
-        )
+        assert names == {"send_keys", "click_at", "move_mouse", "drag_at"} | expected
     assert not model.requests
+
+
+async def test_screenshot_only_pointer_tools_have_required_coordinates():
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            FakeChrome({}),
+            PageReadiness(),
+            BrowserPerception(
+                capture=ScreenshotCapture(), text=None, screenshots=Screenshots()
+            ),
+            Actions(),
+            PointerTools(),
+        ],
+    )
+    async with agent.session() as session:
+        assert set(session.tools) == {"click_at", "drag_at", "move_mouse"}
+        parameters = session.tools["move_mouse"].parameters
+        assert set(parameters["properties"]) == {"x", "y"}
+        assert set(parameters["required"]) == {"x", "y"}
+        assert all(
+            field["type"] == "number" for field in parameters["properties"].values()
+        )
 
 
 @pytest.mark.parametrize("pixels", [False, True])

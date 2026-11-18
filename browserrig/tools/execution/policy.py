@@ -35,6 +35,7 @@ _PROFILES = {
     ActionKind.CLICK: _CLICK,
     ActionKind.CLICK_AT: _POINTER_MUTATION,
     ActionKind.MOVE_MOUSE: _OBSERVED_INPUT,
+    ActionKind.HOVER: _OBSERVED_INPUT,
     ActionKind.DOUBLE_CLICK: _CLICK,
     ActionKind.DRAG: _POINTER_MUTATION,
     ActionKind.DRAG_AT: _POINTER_MUTATION,

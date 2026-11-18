@@ -22,7 +22,7 @@ from .task import Task, load_tasks
 
 ASSETS = Path(__file__).with_name("report_assets")
 PATTERNS = {
-    "Klicken / Zielauswahl": {"click", "click_at", "move_mouse"},
+    "Klicken / Zielauswahl": {"click", "click_at", "move_mouse", "hover"},
     "Formulare / Texteingabe": {"type_text", "send_keys", "set_date"},
     "Dropdowns": {"select_option"},
     "Scrollen": {"scroll", "scroll_page", "scroll_element"},

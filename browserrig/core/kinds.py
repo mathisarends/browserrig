@@ -54,6 +54,7 @@ class ActionKind(StrEnum):
     CLICK = "click"
     CLICK_AT = "click_at"
     MOVE_MOUSE = "move_mouse"
+    HOVER = "hover"
     DOUBLE_CLICK = "double_click"
     DRAG = "drag"
     DRAG_AT = "drag_at"

@@ -5,21 +5,36 @@ from unittest.mock import AsyncMock
 from unittest.mock import call as mock_call
 
 import pytest
-from harnessed import Agent, PolicyDecision, ToolStatus
+from harnessed import Agent, PolicyDecision, ToolCall, ToolStatus
 from harnessed.events import ToolCallFinishedEvent, ToolExecutionFinishedEvent
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Actions, DomScrollTools, PointerTools, TabTools, Targeting
+from browserrig import (
+    Actions,
+    DomScrollTools,
+    PointerTools,
+    ReferencePointerTools,
+    TabTools,
+    Targeting,
+)
 from browserrig.core import BrowserError, ElementPoint
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent, ActionStartedEvent
 from tests.fakes import FakeServices
 
 
-@pytest.mark.parametrize("arguments", [{"x": 40, "y": 30}, {"ref": "button"}])
-async def test_move_mouse_runs_as_an_action_and_stops_the_native_chain(arguments):
-    move = call(PointerTools.move_mouse, **arguments)
+@pytest.mark.parametrize(
+    "tool, arguments",
+    [
+        (PointerTools.move_mouse, {"x": 40, "y": 30}),
+        (ReferencePointerTools.hover, {"ref": "button"}),
+    ],
+)
+async def test_pointer_movement_runs_as_an_action_and_stops_the_native_chain(
+    tool, arguments
+):
+    move = call(tool, **arguments)
     trailing = call(TabTools.list_tabs)
     batch = [
         ModelChunk(tool_call=tool_call)
@@ -43,6 +58,8 @@ async def test_move_mouse_runs_as_an_action_and_stops_the_native_chain(arguments
             mock_call(services.browser.active_tab, "button"),
             mock_call(services.browser.active_tab, "button"),
         ]
+    else:
+        services.observe.element.assert_not_awaited()
     replies = [e.result for e in result.events if isinstance(e, ToolCallFinishedEvent)]
     assert replies[0].status is ToolStatus.OK and replies[0].break_chain
     assert "Cursor moved" in replies[0].text
@@ -60,22 +77,19 @@ async def test_move_mouse_runs_as_an_action_and_stops_the_native_chain(arguments
 
 @pytest.mark.parametrize(
     "arguments",
-    [{}, {"x": 1}, {"ref": "button", "x": 1, "y": 2}],
+    [{}, {"x": 1}, {"y": 2}, {"ref": "button"}, {"x": 1, "y": 2, "ref": "button"}],
 )
-async def test_move_mouse_rejects_ambiguous_arguments_without_input(arguments):
-    async with _pointer_session(
-        [call(PointerTools.move_mouse, **arguments), "Done"]
-    ) as (session, services, moved):
+async def test_move_mouse_validates_coordinates_before_running_an_action(arguments):
+    move = ModelChunk(tool_call=ToolCall("move_mouse", arguments))
+    async with _pointer_session([[move], "Done"]) as (session, services, moved):
         result = await session.run("Hover")
 
     moved.assert_not_awaited()
     reply = next(
         e.result for e in result.events if isinstance(e, ToolCallFinishedEvent)
     )
-    assert reply.status is ToolStatus.ERROR and reply.break_chain
-    assert "Provide" in reply.text
-    assert len([e for e in services.events if isinstance(e, ActionFailedEvent)]) == 1
-    assert not any(isinstance(e, ActionFinishedEvent) for e in services.events)
+    assert reply.status is ToolStatus.ERROR
+    assert not any(isinstance(e, ActionStartedEvent) for e in services.events)
     assert not services.coordination.busy
 
 
@@ -107,7 +121,7 @@ async def test_scroll_tools_reject_zero_movement_before_input(tool, arguments):
 async def test_move_mouse_keeps_input_failure_and_releases_the_action_context():
     responses = [
         call(PointerTools.move_mouse, x=40, y=30),
-        call(PointerTools.move_mouse, ref="button"),
+        call(ReferencePointerTools.hover, ref="button"),
         "Done",
     ]
     async with _pointer_session(responses) as (session, services, moved):
@@ -159,10 +173,10 @@ async def test_cancelled_move_mouse_releases_control_and_records_uncertain_input
 async def test_direct_tool_calls_keep_their_owner_session_and_release_context():
     async with _pointer_session(["Done"]) as (first, first_services, first_move):
         async with _pointer_session(["Done"]) as (second, second_services, second_move):
-            await first.scope[_PointerTools].move_mouse(ref="button")
+            await first.scope[_ReferencePointerTools].hover(ref="button")
             first_move.assert_awaited_once()
             second_move.assert_not_awaited()
-            await second.scope[_PointerTools].move_mouse(ref="button")
+            await second.scope[_ReferencePointerTools].hover(ref="button")
             second_move.assert_awaited_once()
             for session in (first, second):
                 with pytest.raises(RuntimeError, match="executing action tool"):
@@ -213,6 +227,7 @@ async def _pointer_session(responses):
             Actions(),
             Targeting(),
             _PointerTools(),
+            _ReferencePointerTools(),
             DomScrollTools(),
             TabTools(),
             Approvals(default=PolicyDecision.ALLOW),
@@ -235,3 +250,7 @@ async def _pointer_session(responses):
 
 class _PointerTools(PointerTools, provides=True):
     """Expose the mounted tools to verify direct calls across concurrent sessions."""
+
+
+class _ReferencePointerTools(ReferencePointerTools, provides=True):
+    """Expose the mounted reference tools to verify direct calls."""
