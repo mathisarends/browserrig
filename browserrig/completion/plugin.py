@@ -57,7 +57,7 @@ _INSTRUCTIONS = Instructions(
 )
 
 
-class Done(Plugin, slot="completion"):
+class Done(Plugin, slot="completion", provides=True):
     """Require done() before the final answer; ordinary text remains commentary.
 
     Mount with plugins=[Done()]. The final response uses the run's native output
@@ -72,6 +72,14 @@ class Done(Plugin, slot="completion"):
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
+
+    @property
+    def remaining_work_steps(self) -> int:
+        """Count steps through the last step where browser work can continue."""
+        closing = self._state.closing_step
+        if closing is None or self._finished():
+            return 0
+        return max(0, closing - self._state.step)
 
     @hook(PrepareRequest)
     async def _output_guidance(

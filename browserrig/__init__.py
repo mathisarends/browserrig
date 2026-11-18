@@ -16,7 +16,7 @@ from .browser import (
     Viewport,
 )
 from .choreography import ActionLabels, Choreography, TabStrip
-from .completion import Done
+from .completion import Done, StepBudgetHints
 from .composition import (  # smelt: ignore[SMT106] -- public facade
     ContextCompaction,
     WindowRatio,
@@ -159,6 +159,7 @@ __all__ = [
     "ReadinessCheck",
     "SelectReadiness",
     "Done",
+    "StepBudgetHints",
     "HandoffCallback",
     "HandoffReceipt",
     "HandoffStatus",
