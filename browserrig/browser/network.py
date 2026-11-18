@@ -61,12 +61,11 @@ class NetworkActivity:
 
     def since(self, started: float) -> tuple[Request, ...]:
         """Requests that started at or after `started`, oldest first."""
-        return tuple(
-            sorted(
-                (r for r in self._requests.values() if r.started >= started),
-                key=lambda request: request.started,
-            )
+        requests = sorted(
+            (r for r in self._requests.values() if r.started >= started),
+            key=lambda request: request.started,
         )
+        return tuple(requests)
 
     def _prune(self, now: float) -> None:
         horizon = now - _RETAIN_SECONDS

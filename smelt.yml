@@ -7,6 +7,7 @@ project:
   source_roots: [.]
   root_packages: [browserrig]
   test_roots: [tests]
+  coverage: strict
   exclude:
     - {path: ".browserrig/**", reason: "Generated browser state and temporary worktrees are not project sources."}
     - {path: ".uv-cache/**", reason: "Local uv cache contains third-party packages and downloaded checkouts."}
@@ -16,15 +17,16 @@ project:
 debt: .smelt/debt.json
 
 ignore:
-  - rule: yaml-file-extension
+  - rule: layout/file-name-convention
     paths: [pnpm-lock.yaml]
     reason: "pnpm requires this exact lockfile name."
 
-structure:
+style:
   file_naming: {yaml_extension: yml, compose_basename: compose}
   # A ninth project dependency merits review; facades and composition roots are exempt.
   max_module_imports: 8
-  contracts:
+  str_enum_values: explicit
+  overrides:
     conventions:
       match: browserrig
       # Siblings via `from .x import y`, everything further away absolute.
@@ -49,6 +51,14 @@ structure:
     recording-values:
       match: browserrig.recording
       dataclass_options: [frozen, slots]
+
+# Every package depends only on the packages listed under it (SMT101), so a new
+# dependency between packages is a decision made here, not an accident.
+architecture:
+  composition_root: [browserrig.composition, browserrig.agent]
+  # Annotations may name types from anywhere; only runtime imports couple packages.
+  import_graph: {type_checking: ignore}
+  packages:
     observation-render:
       match: browserrig.observation.render
       public: ['.']
@@ -61,14 +71,8 @@ structure:
     package-facades:
       match: browserrig.*
       public: ['.']
-      bundle_imports_at: 2
+      min_imports_to_bundle: 2
 
-# Every package depends only on the packages listed under it (SMT101), so a new
-# dependency between packages is a decision made here, not an accident.
-architecture:
-  composition_root: [browserrig.composition, browserrig.agent]
-  # Annotations may name types from anywhere; only runtime imports couple packages.
-  imports: {type_checking: ignore}
   modules:
     browserrig.kinds: core
     browserrig.events: core
@@ -118,80 +122,76 @@ tests:
   # of one module may be split off as test_<module>_<topic>.py.
   layout: mirror
   mirror_suffixes: true
-  unmirrored:
+  mirror_exclude:
     - "tests/integration/**"  # real Chrome, spans several modules (pytest -m integration)
     - "tests/project/**"      # repository-wide checks: architecture, release, telemetry
   max_patches_per_test: 3
 
 # Enforce adopted conventions; narrow exceptions require concrete ownership evidence.
 rules:
-  information-hiding: error
-  missing-dataclass-option: error
-  prefer-project-base-class: error
-  unused-suppression: error
-  resolved-debt: error
-  # Review heuristics remain hints only where the complete candidate audit warrants it.
-  package-import-fanout: hint
-  module-import-fanout: hint
-  prefer-callable-instance: error
-  private-class-constant: error
-  redundant-module-name: error
+  visibility/internal-public-member: error
+  visibility/internal-public-module-symbol: error
+  visibility/internal-public-attribute: error
+  modeling/missing-dataclass-option: error
+  modeling/prefer-project-base-class: error
+  meta/unused-suppression: error
+  meta/resolved-debt: error
+  idioms/prefer-callable-instance: error
+  layout/misplaced-private-constant: error
+  layout/redundant-module-name: error
   # Source conventions
-  import-cycle: error
-  public-definitions-first: error
-  bundled-instance-assignment: error
-  redundant-str-enum-value: error
-  prefer-str-enum-discriminator: error
-  implicit-optional-default: error
-  no-base-class-prefix: error
-  no-base-class-suffix: error
-  secret-settings-field: error
-  package-only-dunder-all: error
-  caller-before-callee: error
-  prefer-package-import: error
-  internal-public-member: error
-  internal-static-helper: error
-  unnecessary-future-annotations: error
-  prefer-match-type-dispatch: error
-  private-symbol-import: error
-  redundant-name-alias: error
-  prefer-deferred-annotations: error
-  duplicate-literal-type: error
-  await-in-call-argument: error
-  redundant-private-delegate: error
-  deprecated-async-contextmanager-return: error
-  str-enum-explicit-values: error
-  excess-positional-parameters: error
-  anonymous-tuple-type: error
-  missing-interface-docstring: error
-  missing-broad-except-reason: error
-  duplicate-function: error
-  duplicate-class-name: error
-  prefer-named-duration: error
-  missing-duration-unit: error
-  mutable-field-in-frozen-dataclass: error
-  nested-conditional-expression: error
+  architecture/import-cycle: error
+  layout/definition-order: error
+  idioms/bundled-instance-assignment: error
+  modeling/redundant-str-enum-value: error
+  modeling/prefer-str-enum-discriminator: error
+  typing/implicit-optional-default: error
+  modeling/forbidden-base-class-affix: error
+  frameworks/prefer-secret-type: error
+  visibility/misplaced-dunder-all: error
+  layout/callee-before-caller: error
+  imports/prefer-package-import: error
+  layout/misplaced-static-helper: error
+  typing/redundant-future-annotations: error
+  idioms/prefer-match-type-dispatch: error
+  visibility/foreign-private-access: error
+  idioms/redundant-name-alias: error
+  typing/prefer-deferred-annotations: error
+  typing/duplicate-literal-type: error
+  complexity/inline-call-argument: error
+  visibility/redundant-private-delegate: error
+  typing/deprecated-async-contextmanager-return: error
+  modeling/str-enum-value-convention: error
+  complexity/excess-positional-parameters: error
+  typing/anonymous-tuple-type: error
+  idioms/missing-interface-docstring: error
+  idioms/missing-broad-except-reason: error
+  complexity/duplicate-function: error
+  modeling/duplicate-class-name: error
+  modeling/implicit-duration-unit: error
+  modeling/mutable-field-in-frozen-dataclass: error
+  complexity/forbidden-nested-conditional: error
   # Record pairing and repeated lookup construction are enforced at their reported sites.
-  parallel-record-fields: error
-  loop-invariant-collection: error
-  complex-comprehension: error
-  constructor-logic: error
-  cross-module-private-attribute: error
-  comprehension-in-call-argument: error
-  excess-private-definitions: error
-  stateful-dataclass: error
-  duplicate-narrowing-assert: error
-  # Reviewed SDK namespaces and activation-local records: docs/smelt-policy.md.
-  deep-object-navigation: hint
-  facade-export-gap: error
+  modeling/parallel-record-fields: error
+  idioms/loop-invariant-collection: error
+  complexity/excess-comprehension-loops: error
+  complexity/excess-constructor-decisions: error
+  visibility/excess-private-definitions: error
+  modeling/dataclass-field-mutation: error
+  idioms/duplicate-narrowing-assert: error
+  architecture/missing-facade-export: error
+  # Review candidates and their ownership rationale are recorded in docs/smelt-policy.md.
+  imports/excess-package-imports: hint
+  imports/excess-module-imports: hint
+  complexity/excess-attribute-depth: hint
   # Test smells
-  private-test-access: error
-  string-patch-target: error
-  test-only-public-function: error
-  test-only-public-attribute: error
-  test-without-outcome-check: error
-  test-only-checks-possibly-empty-data: error
-  unbounded-test-wait: error
-  async-mock-without-await-check: error
-  independent-test-case-loop: error
-  nondeterministic-test-data: error
+  tests/private-access: error
+  tests/string-patch-target: error
+  visibility/test-only-public-function: error
+  visibility/test-only-public-attribute: error
+  tests/missing-outcome-check: error
+  tests/vacuous-assertion: error
+  tests/unbounded-wait: error
+  tests/missing-await-assertion: error
+  tests/independent-case-loop: error
+  tests/nondeterministic-data: error

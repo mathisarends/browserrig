@@ -1,5 +1,165 @@
 # Upgrading Smelt
 
+## 0.12 to 0.13
+
+0.13.0 changes configuration keys, rule names and uv workspace policy ownership.
+YAML version 1, check report schema 2 and CLI exit codes carry forward. Existing
+debt keeps its identity for rules that retain their SMT code.
+
+### Upgrade checklist
+
+1. **Migrate configuration.** Use the [key mapping](#split-style-from-package-architecture)
+   in the root, every local `extends` base and each member file. Move
+   project-wide conventions to `style`. Keep package-specific conventions
+   and source rule settings under `style.overrides`. Move required/public modules
+   and facade thresholds to `architecture.packages`.
+2. **Review workspace ownership.** Keep `project.workspace: uv`, shared
+   style and rules, graph options, canonical exports and `architecture.members`
+   in the root. Move each member's feature, layer, package API and style
+   override entries to that member's file. A member's `match` must start with
+   one of its own top-level package names. Split a pattern such as `*.domain`
+   into one entry per matching package, for example `api.domain` in the member
+   that owns `api`. Copy any root layout that previously covered member
+   packages into the members that still need it. A root project may continue to
+   declare a layout for its own packages. Review cross-member allowances
+   independently of local layers.
+3. **Update rule selectors.** Use canonical `family/finding` names or stable
+   SMT codes in root/member rules, style overrides, CI and hooks. Replace broad
+   enabling selectors with individual entries. Use the
+   [renames](#renamed-rules) and [merged codes](#merged-rules) below.
+4. **Review activation and exceptions.** Source conventions tied to a rule now
+   enable it where the option applies. Review the new findings from values such
+   as `private_attribute_boundary`, `call_argument_kinds`, `str_enum_values`
+   and the `max_*` limits. Explicit SMT345 and SMT110 use limits of 5 and 20
+   where the project sets none. Give each member exception its justification
+   with `{severity: ..., reason: ...}` or `{value: ..., reason: ...}`. Move any
+   legacy `reasons` entries beside their corresponding values. Equally specific
+   style overrides for the same package must agree on values they both set.
+5. **Migrate suppressions and debt.** Update inline comments to the surviving
+   SMT codes. For merged-code debt, run `smelt debt --prune`, review the
+   findings under the surviving rules, then record the debt you intend to
+   keep. Member debt files may take precedence over workspace root debt.
+6. **Update report consumers.** JSON check findings and `smelt rules --format json`
+   use canonical families and rule names. Merged checks may provide an
+   `expected.kind`. `smelt config show --sources` exposes member settings under
+   `workspace_members` alongside `config`. `smelt context TARGET --format json`
+   includes `style` and `rule_details` for resolved values and reasons.
+   Scripts parsing `--format concise` should account for the rule name between
+   the SMT code and the message. Explicit `--statistics` includes hints even
+   without `--show-hints`.
+7. **Refresh tools and verify.** Update dependency, hook and CI pins together
+   after migrating the policy.
+
+   ```bash
+   uv tool install --upgrade 'smelt-cli==0.13.0'
+   smelt --version
+   ```
+
+   Use `additional_dependencies: [smelt-cli==0.13.0]` for isolated Python hooks,
+   `rev: v0.13.0` for source hooks and `uvx --from smelt-cli==0.13.0 smelt check`
+   in CI. Run `prek install` after updating hooks. Regenerate the editor schema
+   with `smelt config schema > .smelt.schema.json` and refresh the installed skill
+   with `smelt skill install --force`. Inspect a source or planned path with
+   `smelt context`. Run a full `smelt check --fail-on warning` and review changes
+   in behavior before using changed or staged comparisons.
+
+A config error for a retired selector names its replacement, for example
+`private-symbol-import` becomes `visibility/foreign-private-access` and
+`SMT366` becomes SMT340 `complexity/inline-call-argument`.
+
+### Split style from package architecture
+
+Move project-wide conventions from `structure` to `style`. Split each old
+`structure.contracts` entry according to which fields it sets. Keep the same
+`match` in both new entries when one old contract supplied both kinds of policy.
+
+```yaml
+# 0.13 replacement for one mixed contract named "orders"
+style:
+  max_positional_parameters: 3
+  overrides:
+    orders:
+      match: app.orders
+      max_positional_parameters: 5
+      rules: {visibility/internal-public-member: warning}
+architecture:
+  import_graph: {type_checking: include, transitive: true}
+  packages:
+    orders:
+      match: app.orders
+      public: ['.']
+      required: [domain]
+      min_imports_to_bundle: 3
+      min_importers_to_export: 2
+```
+
+| Before | Use in 0.13 |
+| --- | --- |
+| `structure` project conventions | `style` |
+| `structure.contracts.<name>` style options, rule settings and reasons | `style.overrides.<name>` |
+| `structure.contracts.<name>` public, required and facade policy | `architecture.packages.<name>` |
+| `structure.canonical_exports` | `architecture.canonical_exports` |
+| `architecture.imports` | `architecture.import_graph` |
+| `structure.imports` | `style.imports` |
+| `bundle_imports_at` | `min_imports_to_bundle` |
+| `export_at` | `min_importers_to_export` |
+| `module_import_exempt` | `module_import_exemptions` |
+| `tests.unmirrored` | `tests.mirror_exclude` |
+| `tests.forbid_mocks_in` | `tests.forbidden_mock_paths` |
+
+Threshold values migrate verbatim. A `max_*` option permits up to that number
+and a `min_*` threshold starts reporting at that number. The facade bundle
+threshold counts distinct import paths inside a package. The export threshold
+counts external importing modules that use a symbol. `exclude` names paths
+outside the selected check, and exemptions describe an exception within a rule.
+Architecture uses `allow` and `deny` for access. Style uses `forbid` for syntax
+conventions.
+
+### Explicit rule activation
+
+Replace the former `information-hiding` selector with SMT316, SMT320, SMT335,
+SMT429 and SMT430 at the former severity. These five codes also form the
+equivalent comma-separated CLI selection. The `visibility` family covers
+additional rules. Use named entries from `smelt init --maintainability` or a
+local `extends` file to replace the unreleased `smelt:recommended` preset.
+Families and `ALL` in YAML can disable or cap active rules. Named `on` uses
+the catalog severity.
+
+### Renamed rules
+
+The following reviews use more precise names. Their SMT codes still identify the
+same checks and debt entries.
+
+| Code | Previous name | Canonical name |
+| --- | --- | --- |
+| SMT108 | `package-import-fanout` | `imports/excess-package-imports` |
+| SMT322 | `deep-object-navigation` | `complexity/excess-attribute-depth` |
+| SMT349 | `stateful-dataclass` | `modeling/dataclass-field-mutation` |
+| SMT359 | `nested-conditional-expression` | `complexity/forbidden-nested-conditional` |
+| SMT363 | `complex-comprehension` | `complexity/excess-comprehension-loops` |
+| SMT364 | `constructor-logic` | `complexity/excess-constructor-decisions` |
+
+0.13 renames every rule to `family/finding` and merges seven pairs of rules. YAML
+version 1, report schema 2, exit codes, the default rule set and every unmerged
+SMT code stay the same. See the
+[full rule-name mapping](../CHANGELOG.md#renamed-rules) in the changelog.
+
+### Merged rules
+
+| Retired | Use instead | Notes |
+| --- | --- | --- |
+| SMT325 | SMT309 `layout/module-docstring-convention` | `module_docstrings: require` and `forbid` both enable it. |
+| SMT326 | SMT323 `modeling/forbidden-base-class-affix` | It reports both prefix and suffix. |
+| SMT332 | SMT331 `layout/file-name-convention` | There is one finding per file. |
+| SMT342 | SMT341 `modeling/str-enum-value-convention` | Set `style.str_enum_values: auto` if you used SMT341 for auto values. The default `explicit` matches the former SMT342. |
+| SMT358 | SMT357 `modeling/implicit-duration-unit` | It also reports unitless duration names. |
+| SMT365 | SMT339 `visibility/foreign-private-access` | It also reports private module symbols. |
+| SMT366 | SMT340 `complexity/inline-call-argument` | Set `style.call_argument_kinds` to keep the former scope: `[await]` for SMT340 alone, `[comprehension, aggregate]` for SMT366 alone. |
+
+The SMT326, SMT357/358 and SMT339/365 merges can report more findings when the
+old config enabled only one half. Review them or narrow the scope wherever
+the surviving rule offers an option.
+
 ## 0.11.1 to 0.12.0
 
 0.12.0 retains report schema 2, YAML version 1, grouped debt baseline version 2,
@@ -31,7 +191,7 @@ new reviews require explicit selection. See the
 
    | Rule | Activation | Review |
    | --- | --- | --- |
-   | [SMT366](rules/SMT366.md) | `rules: {comprehension-in-call-argument: hint}` | List, set and dict comprehensions passed directly to calls |
+   | [SMT366](https://github.com/mathisarends/smelt/blob/v0.12.0/docs/rules/SMT366.md) | `rules: {comprehension-in-call-argument: hint}` | List, set and dict comprehensions passed directly to calls |
    | [SMT367](rules/SMT367.md) | `rules: {excess-private-definitions: hint}` | Modules above `structure.max_private_definitions` (default 12) |
 
    Repairs remain manual. SMT366 skips generator expressions and conditional
@@ -108,7 +268,7 @@ new rules require explicit selection or package policy. See the
    | [SMT110](rules/SMT110.md) | `structure.max_module_imports: 10` | Distinct direct imports across project packages; choose a threshold for your project |
    | [SMT363](rules/SMT363.md) | `rules: {complex-comprehension: hint}` | Excessive iteration clauses, conditional elements and compound filters |
    | [SMT364](rules/SMT364.md) | `rules: {constructor-logic: hint}` | Constructor decisions above `structure.max_constructor_decisions` (default 2) |
-   | [SMT365](rules/SMT365.md) | `rules: {cross-module-private-attribute: warning}` | Private member accesses through known project receivers owned by another module |
+   | [SMT365](https://github.com/mathisarends/smelt/blob/v0.11.0/docs/rules/SMT365.md) | `rules: {cross-module-private-attribute: warning}` | Private member accesses through known project receivers owned by another module |
 
    Repairs remain manual. SMT110 exempts package initializers and declared
    composition roots by default; `module_import_exempt: []` includes them.
@@ -200,7 +360,7 @@ new rules require explicit selection or package policy. See the
    | [SMT355](rules/SMT355.md) | `rules: {duplicate-class-name: warning}` | Public top-level class names repeated within a package |
    | [SMT356](rules/SMT356.md) | `rules: {duplicate-narrowing-assert: warning}` | Attribute narrowing assertions repeated across methods |
    | [SMT357](rules/SMT357.md) | `rules: {missing-duration-unit: warning}` | Numeric duration names without a unit suffix |
-   | [SMT358](rules/SMT358.md) | `rules: {prefer-named-duration: warning}` | Literal durations in supported sleep, timeout and clock expressions |
+   | [SMT358](https://github.com/mathisarends/smelt/blob/v0.9.0/docs/rules/SMT358.md) | `rules: {prefer-named-duration: warning}` | Literal durations in supported sleep, timeout and clock expressions |
    | [SMT359](rules/SMT359.md) | `rules: {nested-conditional-expression: hint}` | Conditional expressions nested in result branches |
    | [SMT360](rules/SMT360.md) | `rules: {mutable-field-in-frozen-dataclass: warning}` | Mutable container fields on frozen dataclasses |
 
@@ -287,7 +447,7 @@ new rules are opt-in. See the [changelog](../CHANGELOG.md#070---2026-11-14).
    | [SMT339](rules/SMT339.md) | `rules: {private-symbol-import: warning}` | Production access to private project symbols |
    | [SMT340](rules/SMT340.md) | `rules: {await-in-call-argument: hint}` | Awaited results passed directly as arguments |
    | [SMT341](rules/SMT341.md) | `rules: {str-enum-auto-values: hint}` | `StrEnum` values via `auto()` |
-   | [SMT342](rules/SMT342.md) | `rules: {str-enum-explicit-values: hint}` | `StrEnum` values as explicit strings |
+   | [SMT342](https://github.com/mathisarends/smelt/blob/v0.7.0/docs/rules/SMT342.md) | `rules: {str-enum-explicit-values: hint}` | `StrEnum` values as explicit strings |
 
    SMT341 and SMT342 enforce opposite conventions; enable at most one. All
    repairs remain manual.
@@ -334,7 +494,7 @@ new rules are opt-in. See the [changelog](../CHANGELOG.md#060---2026-11-08).
    | Rule | Activation | Review |
    | --- | --- | --- |
    | [SMT331](rules/SMT331.md) | `structure.file_naming.yaml_extension: yaml` (or `yml`) | Canonical YAML extensions |
-   | [SMT332](rules/SMT332.md) | `structure.file_naming.compose_basename: compose` (or `docker-compose`) | Canonical Compose basenames |
+   | [SMT332](https://github.com/mathisarends/smelt/blob/v0.6.0/docs/rules/SMT332.md) | `structure.file_naming.compose_basename: compose` (or `docker-compose`) | Canonical Compose basenames |
    | [SMT333](rules/SMT333.md) | `rules: {prefer-callable-instance: hint}` | Single public instance method |
    | [SMT334](rules/SMT334.md) | `rules: {private-class-constant: warning}` | Private literal class constants |
    | [SMT335](rules/SMT335.md) | `rules: {internal-public-attribute: warning}` | Public data without external use |
@@ -386,9 +546,9 @@ SMT321 debt identities need review. See the
    debt explicitly; pruning does not accept current findings.
 
 3. Adopt new rules deliberately through `rules` or `--select`: [SMT324](rules/SMT324.md),
-   [SMT326](rules/SMT326.md), [SMT327](rules/SMT327.md), [SMT328](rules/SMT328.md),
+   [SMT326](https://github.com/mathisarends/smelt/blob/v0.5.0/docs/rules/SMT326.md), [SMT327](rules/SMT327.md), [SMT328](rules/SMT328.md),
    [SMT329](rules/SMT329.md), [SMT330](rules/SMT330.md) and [SMT431](rules/SMT431.md).
-   Activate [SMT325](rules/SMT325.md) with a package contract's
+   Activate [SMT325](https://github.com/mathisarends/smelt/blob/v0.5.0/docs/rules/SMT325.md) with a package contract's
    `module_docstrings: require`. These new checks do not rewrite code.
 
 ### Grouped debt baselines

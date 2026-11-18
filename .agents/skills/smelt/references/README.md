@@ -22,8 +22,8 @@ uv tool install smelt-cli
 smelt init --maintainability
 ```
 
-Upgrading to 0.12.0? Follow the [upgrade checklist](docs/upgrading.md#0111-to-0120)
-for pins and the two new optional source reviews.
+Upgrading to 0.13.0? Follow the [upgrade checklist](docs/upgrading.md#012-to-013)
+for configuration keys, rule names and hook pins.
 
 Review the generated `smelt.yml`: it proposes a starting policy from your layout
 and selects source and test checks. You decide which conventions to adopt.
@@ -51,9 +51,13 @@ architecture:
     infrastructure: {path: infrastructure, may_depend_on: [domain, application]}
 
 rules:
-  information-hiding: warning
-  implicit-optional-default: warning
-  unbounded-test-wait: warning
+  visibility/internal-public-member: warning
+  visibility/internal-public-module-symbol: warning
+  visibility/internal-public-attribute: warning
+  visibility/test-only-public-function: warning
+  visibility/test-only-public-attribute: warning
+  typing/implicit-optional-default: warning
+  tests/unbounded-wait: warning
 ```
 
 Smelt catches an import that crosses the declared boundary:
@@ -85,10 +89,18 @@ The same configuration can describe [feature boundaries and third-party dependen
 [test conventions](docs/testing.md). Most checks require explicit selection or
 an applicable policy; see [rule activation](docs/rule-selection.md).
 
-Use `information-hiding` to review unnecessarily public functions, methods,
-constants, type aliases and attributes together, including APIs used only by
-tests. `smelt explain information-hiding` lists the five checks and their limits.
-Individual rule settings can override the group.
+Use the visibility rules to review unnecessarily public definitions and APIs
+whose only observed users are tests.
+
+Enable individual rules in YAML by their `family/finding` names or SMT codes.
+`on` uses the named rule's catalog severity. Families and `ALL` can
+disable or cap already-active rules in YAML. Use `smelt check --select modeling`
+to explore a family and `smelt rules --unconfigured` to discover rules to review.
+
+In a uv workspace, `project: {workspace: uv}` in the root `smelt.yml` checks
+every member as one project. A member can add its own `smelt.yml` with rule and
+convention exceptions for its files; see
+[uv workspaces](docs/configuration.md#uv-workspaces).
 
 ## Catch it at commit time
 
@@ -103,7 +115,7 @@ repos:
         name: smelt
         entry: smelt check --staged --fail-on warning
         language: python
-        additional_dependencies: [smelt-cli==0.12.0]
+        additional_dependencies: [smelt-cli==0.13.0]
         pass_filenames: false
         always_run: true
         require_serial: true

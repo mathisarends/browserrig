@@ -334,18 +334,17 @@ class Indexing:
             metadata, manifest.model_dump_json(indent=2).encode()
         )
         await self._workspace.write_bytes(markdown, "".join(parts).encode("utf-8"))
+        indexed_pages = sorted(
+            chunk.page
+            for chunk in manifest.chunks.values()
+            if chunk.page and chunk.page not in manifest.pending_ocr_pages
+        )
         self._states[manifest.source] = FileExtraction(
             path=str(markdown),
             metadata_path=str(metadata),
             status=manifest.status,
             page_count=manifest.page_count,
-            indexed_pages=tuple(
-                sorted(
-                    chunk.page
-                    for chunk in manifest.chunks.values()
-                    if chunk.page and chunk.page not in manifest.pending_ocr_pages
-                )
-            ),
+            indexed_pages=tuple(indexed_pages),
             pending_ocr_pages=tuple(manifest.pending_ocr_pages),
             error=manifest.error,
         )

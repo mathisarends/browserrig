@@ -5,27 +5,27 @@ by release, including changes to agent workflows and rule defaults.
 For the schema 1 to 2 transition, see the [upgrade checklist and parser example](upgrading.md#json-report-consumers).
 
 Most rules are opt-in. Smelt enables declared architecture/package/test policies
-without a second switch; only unknown-layer and suppression/debt diagnostics run
-by default. Import cycles and unclassified-module hints require explicit selection.
+without a second switch; only architecture/unknown-layer and suppression/debt diagnostics run
+by default. Import cycles and architecture/unclassified-module hints require explicit selection.
 See [rule activation and migration](rule-selection.md) and the
 [full catalog](rules/README.md) for the decisions and precedence rules.
 
-`smelt explain information-hiding` describes the shared visibility policy and
-lists its five members. Use `--select information-hiding` or
-`--ignore information-hiding` wherever rule selectors are accepted. Rule metadata
-in `rules --format json`, `explain` and reports adds a `groups` list; individual
-diagnostic codes and report schema version 2 remain unchanged.
+Use `smelt explain visibility` to list the visibility family. Select individual
+checks by name or by stable SMT code.
 
 ```bash
 smelt init                           # draft smelt.yml from the code (also uv workspaces)
-smelt init --maintainability         # write source/test reviews, including information-hiding
+smelt init --maintainability         # write source/test reviews by individual name
+smelt init --member packages/new    # draft one member under an existing uv workspace root
 smelt init --config other.yml       # write a config and editor schema in that directory
 smelt check                          # whole project
 smelt check --changed                # only what the working tree introduced since HEAD
 smelt check --staged --fail-on warning  # review the actual commit, including new warnings
 smelt check --staged --no-cache       # recompute to verify the cached result
 smelt check --changed --base origin/main --format json
-smelt check --changed --format concise  # one line per finding with repair advice
+smelt check --changed --format concise  # path:line:col CODE family/finding message -> repair
+smelt check --statistics              # findings per rule, hints included
+smelt check --statistics --by member  # findings per uv workspace member, hints included
 smelt check --strict-coverage         # fail on omitted or unclassified production code
 smelt check --show-coverage --format json  # include the per-file policy inventory
 smelt check --select SMT321 --fix --unsafe-fixes  # use None-only defaults after review
@@ -42,6 +42,17 @@ smelt config schema                  # the JSON schema of smelt.yml
 smelt skill install                  # install the release's official skill in this project
 smelt skill install --force          # replace an older installed skill completely
 ```
+
+In a uv workspace, `init` writes shared root policy and an independent architecture
+draft in every Python member. `init --member PATH` writes just that member's
+draft. Paths are workspace-relative; `--force` authorizes overwriting the selected
+config targets. All targets are checked before any write.
+
+`debt` from a workspace root maintains one baseline per member plus root debt;
+from a member it maintains only that member's baseline. `--prune` never creates a
+new member scope. Workspace-wide `debt --show --format json` returns one object
+with a `files` map when several baselines are selected; one selected file retains
+the normal version-2 document. Stored paths remain workspace-relative.
 
 Normal checks are read-only. `--fix` applies permitted safe ordering fixes.
 Opt-in [SMT321](rules/SMT321.md) reviews `parameter or fallback` for optional
@@ -73,7 +84,18 @@ and a `policy_hash` that is equal for reports checked under the same resolved co
 The report's `project` names the config, project root and repository root. JSON
 finding paths are project-relative; SARIF and GitHub annotation paths are rebased
 to the repository root, including when using a nested `--config`.
-`smelt context --format json` carries the same import settings, allowances and hash.
+Findings also carry `member`: a uv workspace member directory, `.` for workspace
+root files, or `null` outside a workspace or for findings without a file location.
+In text and concise output, `--statistics --by member` counts every finding,
+including hints, under its member. Unattributed findings use `<project>`.
+`--by member` requires `--statistics`; the default is `--by rule`.
+`smelt context TARGET --format json` carries the same import settings,
+allowances and hash. `style` describes effective source conventions for the
+target. `rule_details` describes resolved rules, including their severity,
+activation source and any exception reason. For production targets, the text
+view focuses on the source policy. It presents package APIs separately from
+style settings. Use `smelt config show --sources` to trace inheritance and
+review the root and member files together.
 With `--format json`, an exit `2` prints a JSON document as well, so an agent needs no
 text parser: `{"schema_version": 2, "status": "error", "error": {...}}` with `kind`
 (`usage`, `config` or `analysis`), `message`, the rejected `input` (`option`, `value`)

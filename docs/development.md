@@ -55,9 +55,10 @@ Python blocks are limited to three nesting levels. `smelt.yml` owns architecture
 and source policies; accepted findings live in `.smelt/debt.json`.
 `uv run --locked smelt debt --show` inspects them; `debt --prune` removes resolved
 entries without accepting new debt. When upgrading Smelt, refresh its checked-in
-schema and the skill under `.agents/skills/smelt`.
+schema with `uv run --locked smelt config schema` and refresh the skill under
+`.agents/skills/smelt` with `uv run --locked smelt skill install --force`.
 The [Smelt policy decisions](smelt-policy.md) explain the rules reviewed through
-0.12.0, the advisory findings and the narrowly scoped test-import exceptions.
+0.13.0, the advisory findings and the narrowly scoped test-import exceptions.
 
 ## Distribution and releases
 

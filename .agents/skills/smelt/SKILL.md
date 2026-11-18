@@ -32,31 +32,68 @@ installed skill records the CLI version that installed it.
 
 ## Policy and repair rules
 
-- Most checks are opt-in. Fixed patterns use `rules: {rule-name: severity}`.
-  `rules: {information-hiding: warning}` selects SMT316/SMT320/SMT335/SMT429/SMT430,
-  including public APIs used only by tests. Individual entries override a group
-  in the same map; closer package entries still win. Inspect the exact membership
-  with `smelt explain information-hiding`. Existing individual settings remain valid.
-  Architecture/package/test policies activate their associated rules. Use
-  `smelt rules --format json` for the installed catalog and activation metadata.
-  Do not assume a clean run means every rule or every source file was checked.
-- `--select` replaces normal selection; names, groups, SMT prefixes and `ALL` are accepted.
-  Explicit `off`, closest-package overrides and CLI ignores retain their semantics.
-  Strict coverage cannot be bypassed with selection or lower severities. Choose
-  policy for the project's intended boundaries; do not enable ALL as a default.
+- Enable rules individually by name or stable SMT code. A named `on` uses the
+  catalog severity. Families and `ALL` in YAML can only disable or cap
+  active rules. Use local `extends` files to share explicit policy.
+  Architecture, package and test options activate their associated rules.
+  Use `smelt rules --unconfigured` to find named checks to review after upgrades.
+- `--select` replaces normal selection and accepts names, families,
+  SMT prefixes and `ALL`. Explicit `off` entries still apply. Strict coverage
+  takes precedence over selection and severity settings.
 - Normal checks are read-only. `--fix` writes permitted source-ordering repairs;
   behavior-changing SMT321 repairs also need `--unsafe-fixes` and review of falsy
   values. `--unsafe-fixes` alone writes nothing. `--staged` rejects `--fix`.
-- Review new style policies before adopting them. SMT341 `str-enum-auto-values`
-  and SMT342 `str-enum-explicit-values` express opposite conventions; select at
-  most one and preserve serialized values. SMT343/SMT344 review forwarding
+- Review new style policies before adopting them. SMT341 `modeling/str-enum-value-convention`
+  follows `style.str_enum_values` (`explicit` or `auto`); choose the project's
+  convention once and preserve serialized values. SMT343/SMT344 review forwarding
   methods and name aliases. SMT346 prefers deferred annotations; verify runtime
   annotation consumers before removing quotes or adding a future import.
   SMT347 reviews anonymous tuple types; repeated shapes can represent distinct
   concepts, so name records where field meaning benefits callers rather than
-  merging unrelated types. `structure.contracts.<name>.max_positional_parameters`
-  activates SMT345; after adding keyword-only parameters, update all callers,
-  including tests and callbacks. These rules have no automatic rewrite.
+  merging unrelated types. `max_positional_parameters`, set under `style` or
+  in a style override, activates SMT345 for that scope; after adding
+  keyword-only parameters, update all callers, including tests and callbacks.
+  These rules have no automatic rewrite.
+- Keep shared conventions in `style` and package-specific choices in
+  `style.overrides`. An option tied to a rule enables it wherever the option
+  applies. `smelt context TARGET --format json` shows effective `style` and
+  `rule_details`, with sources and exception reasons.
+- In a uv workspace, keep `project.workspace: uv` in the root `smelt.yml`.
+  Check the owning file before adding a local policy.
+
+  | File | Policy |
+  | --- | --- |
+  | Root `smelt.yml` | Project setup, shared `style` and `rules`, tests, import graph and `architecture.members` |
+  | Local `extends` base | Optional root defaults. Mappings merge, lists replace and rules apply in layers. |
+  | Member `smelt.yml` | Local layers, features and package APIs. Root style and rules are inherited. Add local style/rule exceptions, ignores, exclusions or debt here. |
+
+  Keep package APIs and `style.overrides` with their owning project or member.
+  A member without local layers still inherits shared style. Boundaries between
+  members live in root `architecture.members` (SMT111).
+  Declare imported member distributions in `project.dependencies` or
+  `project.optional-dependencies` and configure their uv sources (SMT112);
+  a source entry alone is not a dependency declaration. Both checks use direct
+  production imports. `smelt check --statistics --by member` counts findings,
+  including hints, by member; JSON findings carry the member path.
+  Do not duplicate the member list or give a member an independent full config.
+  `smelt check` in a member directory checks that member under the root policy.
+  Run the root check before finishing work that changes shared packages. A
+  member override that lowers root severity must use
+  `{severity: warning, reason: "specific justification"}` (or `off`/`hint`).
+  Use the same rule syntax in `style.overrides.<name>.rules`.
+  For member style changes, use `{value: ..., reason: "specific justification"}`.
+  `on` uses the catalog
+  severity, and a winning individual entry needs its own reason. Strict coverage
+  cannot be lowered even with a reason. Review thresholds and architecture
+  replacements separately as policy decisions.
+  `smelt init` drafts root policy and one architecture per Python member;
+  `init --member <workspace-relative-path>` drafts only that member under an
+  existing root. Review every draft before using `--force`, which overwrites
+  all selected config targets. No target is written if another already exists.
+  A member may set its own member-relative `debt`; stored finding paths remain
+  workspace-relative. Root debt covers files without a member baseline. From
+  a member, `smelt debt` affects only that member; root invocations maintain
+  per-member files. `--prune` never creates a new member scope or accepts new debt.
 - Do not disable checks, broaden exclusions or record debt merely to pass a check.
   When intentionally adopting a baseline, `smelt debt` records current findings
   and changes configuration. `smelt debt --prune` removes resolved debt without

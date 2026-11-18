@@ -111,10 +111,12 @@ async def edit_video(
         raise
     if process.returncode:
         raise BrowserError(f"Video editing failed: {errors.decode(errors='replace')}")
+    sources = tuple(segment.path for segment in segments)
+    original_duration_seconds = sum(s.ended_at - s.started_at for s in segments)
     return RecordingResult(
         path=path,
         original_path=original_path,
-        sources=tuple(segment.path for segment in segments),
-        original_duration_seconds=sum(s.ended_at - s.started_at for s in segments),
+        sources=sources,
+        original_duration_seconds=original_duration_seconds,
         duration_seconds=duration_seconds,
     )

@@ -7,6 +7,426 @@ current configuration and complete rule contracts, see the [README](README.md),
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-18
+
+- Configuration now distinguishes shared `style` and `rules`, package APIs under
+  `architecture.packages`, and independent member architectures. See
+  [configuration and inheritance](docs/configuration.md).
+- The catalog uses individual `family/finding` names. The
+  [0.13 upgrade checklist](docs/upgrading.md#012-to-013) covers renamed and
+  merged rules, moved YAML keys, workspace ownership and report consumers.
+- `smelt context` explains the effective policy and exception reasons for a
+  target. Workspace initialization drafts one shared root config and local
+  member configs.
+
+- SMT316 and SMT320 preserve public runtime entry points in declared composition roots.
+
+### Breaking configuration layout
+
+- `style` sets project-wide conventions and `style.overrides` sets package style
+  and rule choices. `architecture.packages` defines public and required modules
+  with facade thresholds. Canonical exports now belong to `architecture`.
+- `architecture.import_graph` configures dependency analysis, while `style.imports`
+  configures Python import syntax. Threshold and exemption keys have clearer
+  names. See the [0.13 migration guide](docs/upgrading.md#012-to-013).
+
+### Context
+
+- `smelt context` shows effective style and rule settings, their declaring files,
+  and exception reasons. It lists package APIs separately in the text view.
+- Source-convention exceptions can use `{value: ..., reason: ...}`. The older
+  `reasons` map is still accepted. `smelt config show --sources` lists member
+  policy and explicit origins alongside the resolved root config.
+
+- Workspace context names the owner, governing configuration and rules layers.
+  Scoped workspace checks label whole-workspace totals and policy coverage.
+
+- `smelt context` now identifies the feature and layer of a planned path inside
+  a new feature, including in workspace members. JSON marks these targets
+  with `feature_planned`.
+
+### Workspace policy and initialization
+
+- Workspace init defers incomplete layer drafts and configures mirror tests
+  when every existing test matches. If pytest module names collide, init
+  lists the clashing files and leaves mirroring disabled.
+
+- **Member weakening requires a reason.** Lowering inherited rule severity or
+  setting `off` in member rules or style overrides now requires
+  `{severity: ..., reason: "..."}`. The guard resolves selectors, catalog
+  defaults and root policy activation and overrides before comparing. A winning
+  individual entry needs its own reason. Strict coverage still cannot be
+  lowered. Root settings also accept the object form; short values remain valid.
+- `smelt init` in a uv workspace writes shared root policy and member config
+  drafts. Local layers and features govern only their owning project or member.
+  Move member package APIs and style overrides out of the root and into the
+  owning member config. Init pre-fills its commented member dependency example
+  with observed cross-member imports. New members inherit root style and
+  automatically discovered roots. `init --member PATH` drafts only one declared
+  member under an existing root. Init checks every target before writing and
+  refuses existing targets without `--force`; full workspace force overwrites
+  all config targets. See [workspace init](docs/configuration.md#workspace-initialization).
+- Member-relative `debt` files accept only that member's findings, with stored
+  paths remaining workspace-relative. Root debt is the fallback for other files.
+  The debt CLI records per-member baselines at the root, or only the selected
+  member. `--prune` does not create new member scopes; multi-file JSON inspection
+  uses a `files` map. See [workspace debt](docs/adoption.md#workspace-debt).
+- Member weakening errors identify the YAML selector as written and show
+  the declaring configuration file relative to the project root.
+- Member-directory invocations also select the member when it has no local
+  config, including staged checks. The bundled skill documents the canonical
+  root-style/member-architecture/root-boundary workflow. A portable uv fixture
+  covers inheritance, different architectures, cross-member imports and debt.
+- Member source conventions that change a root setting now require a nonempty
+  reason under `reasons`, in member `style` or the relevant style override.
+  Add reasons to existing overrides when upgrading.
+
+### Workspace member boundaries
+
+- Workspace init includes a commented member allowlist draft with observed
+  cross-member imports for review.
+
+- SMT112 recommends removing or moving imports that the workspace member
+  allowlist forbids. Allowed imports still get the dependency declaration hint.
+
+- Root `architecture.members` maps workspace-relative source globs to
+  `may_depend_on` target globs and enables SMT111 `architecture/member-boundary`.
+  Unmatched members are unrestricted; overlapping source entries combine their
+  allowances. A key or allowance glob that matches no analyzed member (or `.`)
+  is a configuration error. Configure member boundaries in the root policy of a
+  uv workspace with `project.workspace: uv`. See
+  [member boundaries](docs/configuration.md#boundaries-between-members).
+- A uv workspace enables SMT112 `architecture/undeclared-member-dependency` for
+  direct production imports of another member without a static project or
+  optional dependency. It resolves distribution names and inherited/member uv
+  sources, without evaluating environment markers. Dynamic/missing metadata and
+  test imports are outside its inference limits. Both rules honor root
+  `TYPE_CHECKING` policy and check direct imports only.
+- JSON findings add `member` (workspace-relative directory, `.` for root files,
+  `null` otherwise). Text/concise `--statistics --by member` groups all findings,
+  including hints, by member. `coverage.member_boundaries` exposes the root
+  allowlists with `--show-coverage`. Report schema 2 and finding/debt identities
+  remain unchanged.
+
+**Breaking: rule taxonomy.** Every rule name now has the form
+`family/finding`, several names were corrected to the documented qualifiers, and
+seven pairs of rules that described one concept were merged. YAML
+version 1, report schema 2, exit codes and the default rule set remain unchanged,
+and every unmerged SMT code keeps its identity. Configuration that uses a 0.12
+rule name, or a retired code, fails with an error naming the replacement. See
+the [upgrade checklist](docs/upgrading.md#012-to-013).
+
+### Families
+
+- Rules are grouped into eleven families: `architecture`, `imports`, `layout`,
+  `visibility`, `modeling`, `typing`, `complexity`, `idioms`, `frameworks`,
+  `tests` and `meta`. The family is the first segment of the name.
+- A family name selects its rules for CLI exploration and ignores. In YAML it
+  can disable or cap active rules. An individual setting wins in the same map.
+  `smelt explain <family>` lists a family's rules.
+- The report `category` field and the `category` of `smelt rules --format json`
+  now carry the family (`architecture`, `layout`, ...) instead of `dependencies`,
+  `structure` and `tests`. The success line of `smelt check` lists the families
+  that ran, and the `smelt rules` text output is grouped by family.
+- Rule codes are unchanged. The SMT1xx/3xx/4xx/9xx ranges are historical and no
+  longer imply a category.
+
+### Merged rules
+
+The surviving rule keeps the lower code. The retired codes are no longer
+accepted in `rules`, `--select`, `--ignore` or inline suppressions:
+
+| Retired | Now | Rule | How the two behaviors are combined |
+| --- | --- | --- | --- |
+| SMT325 | SMT309 | `layout/module-docstring-convention` | One rule follows `module_docstrings: require` or `forbid`. Activation is unchanged: either policy enables it. |
+| SMT326 | SMT323 | `modeling/forbidden-base-class-affix` | Reports both a `Base` prefix and a `Base` suffix. The payload names the `position`. Projects that enabled only one of the two now see both. |
+| SMT332 | SMT331 | `layout/file-name-convention` | `style.file_naming.yaml_extension` and `compose_basename` produce one finding per file. That finding lists every correction, for example `filename must use .yml and compose: ...`. The payload holds one key per violated option plus the corrected `path`. |
+| SMT342 | SMT341 | `modeling/str-enum-value-convention` | New option `style.str_enum_values: explicit` (default) or `auto`. The single rule enforces whichever is chosen. The payload adds `str_enum_values`. |
+| SMT358 | SMT357 | `modeling/implicit-duration-unit` | Reports duration names without a unit and inline duration literals. The payload `kind` is `constant`, `field`, `parameter` or the new `literal`. Projects that enabled only one form now see both. |
+| SMT365 | SMT339 | `visibility/foreign-private-access` | Reports imports and reads of another module's private symbols, plus accesses to private attributes owned by another module. The payload `kind` is `symbol` or `attribute`. `style.private_attribute_boundary` still applies only to attributes. Projects that enabled only one form now see both. |
+| SMT366 | SMT340 | `complexity/inline-call-argument` | Reports awaited results, eager comprehensions and builtin reductions passed directly as call arguments. New option `style.call_argument_kinds` (default `[await, comprehension, aggregate]`) narrows the review. The payload `kind` is `await`, `comprehension` or `aggregate`. |
+
+SMT310 `typing/forbidden-future-annotations` and SMT311
+`typing/redundant-future-annotations` deliberately stay separate. SMT310 is a
+certain policy error. SMT311 is a heuristic hint about boilerplate that might
+still be needed. Merging them would force one severity onto two different levels
+of certainty.
+
+SMT340 reports generator expressions passed to an unshadowed builtin `all`,
+`any`, `max`, `min`, `sorted` or `sum` as `kind: aggregate` when the reduction
+is itself a direct call argument, for example `finished=sum(s.done for s in sessions)`. The
+whole reduction is named, so the generator stays lazy. The payload keeps
+`aggregate`, which is `null` for comprehensions.
+
+### Renamed rules
+
+These names were corrected to the qualifiers in CONTRIBUTING.md:
+
+- `no-`, `unnecessary-` and similar prefixes became `forbidden-` and `redundant-`.
+- `excess-` is used for limits.
+- `misplaced-` is used for code in the wrong place.
+- `-convention` marks rules that follow a policy option.
+- Finding names no longer repeat the family, so `forbidden-test-mock` became
+  `tests/forbidden-mock`.
+
+The full mapping:
+
+| Code | 0.12 name | 0.13 name | Change |
+| --- | --- | --- | --- |
+| SMT101 | `layer-boundary` | `architecture/layer-boundary` | family prefix |
+| SMT102 | `cross-feature-import` | `architecture/cross-feature-import` | family prefix |
+| SMT103 | `third-party-denied` | `architecture/forbidden-third-party-import` | renamed |
+| SMT104 | `import-cycle` | `architecture/import-cycle` | family prefix |
+| SMT105 | `shared-imports-feature` | `architecture/shared-imports-feature` | family prefix |
+| SMT106 | `composition-root-leak` | `architecture/composition-root-leak` | family prefix |
+| SMT107 | `private-module-import` | `architecture/non-public-module-import` | renamed |
+| SMT108 | `package-import-fanout` | `imports/excess-package-imports` | family prefix |
+| SMT109 | `facade-export-gap` | `architecture/missing-facade-export` | renamed |
+| SMT110 | `module-import-fanout` | `imports/excess-module-imports` | renamed |
+| SMT301 | `unknown-layer` | `architecture/unknown-layer` | family prefix |
+| SMT302 | `forbidden-package-name` | `layout/forbidden-module-name` | renamed |
+| SMT305 | `unclassified-module` | `architecture/unclassified-module` | family prefix |
+| SMT306 | `incomplete-coverage` | `architecture/uncovered-source` | renamed |
+| SMT307 | `missing-required-module` | `architecture/missing-required-module` | family prefix |
+| SMT308 | `import-style` | `imports/forbidden-import-style` | renamed |
+| SMT309 | `forbidden-module-docstring` | `layout/module-docstring-convention` | renamed |
+| SMT310 | `forbidden-future-annotations` | `typing/forbidden-future-annotations` | family prefix |
+| SMT311 | `unnecessary-future-annotations` | `typing/redundant-future-annotations` | renamed |
+| SMT312 | `no-private-modules` | `layout/forbidden-private-module` | renamed |
+| SMT313 | `public-definitions-first` | `layout/definition-order` | renamed |
+| SMT314 | `bundled-instance-assignment` | `idioms/bundled-instance-assignment` | family prefix |
+| SMT315 | `prefer-match-type-dispatch` | `idioms/prefer-match-type-dispatch` | family prefix |
+| SMT316 | `internal-public-member` | `visibility/internal-public-member` | family prefix |
+| SMT317 | `internal-static-helper` | `layout/misplaced-static-helper` | renamed |
+| SMT318 | `redundant-str-enum-value` | `modeling/redundant-str-enum-value` | family prefix |
+| SMT319 | `prefer-package-import` | `imports/prefer-package-import` | family prefix |
+| SMT320 | `internal-public-module-symbol` | `visibility/internal-public-module-symbol` | family prefix |
+| SMT321 | `implicit-optional-default` | `typing/implicit-optional-default` | family prefix |
+| SMT322 | `deep-object-navigation` | `complexity/excess-attribute-depth` | family prefix |
+| SMT323 | `no-base-class-prefix` | `modeling/forbidden-base-class-affix` | renamed |
+| SMT324 | `prefer-str-enum-discriminator` | `modeling/prefer-str-enum-discriminator` | family prefix |
+| SMT325 → SMT309 | `missing-module-docstring` | `layout/module-docstring-convention` | merged |
+| SMT326 → SMT323 | `no-base-class-suffix` | `modeling/forbidden-base-class-affix` | merged |
+| SMT327 | `secret-settings-field` | `frameworks/prefer-secret-type` | renamed |
+| SMT328 | `redundant-dishka-provider` | `frameworks/redundant-dishka-provider` | family prefix |
+| SMT329 | `caller-before-callee` | `layout/callee-before-caller` | renamed |
+| SMT330 | `package-only-dunder-all` | `visibility/misplaced-dunder-all` | renamed |
+| SMT331 | `yaml-file-extension` | `layout/file-name-convention` | renamed |
+| SMT332 → SMT331 | `compose-file-name` | `layout/file-name-convention` | merged |
+| SMT333 | `prefer-callable-instance` | `idioms/prefer-callable-instance` | family prefix |
+| SMT334 | `private-class-constant` | `layout/misplaced-private-constant` | renamed |
+| SMT335 | `internal-public-attribute` | `visibility/internal-public-attribute` | family prefix |
+| SMT336 | `redundant-module-name` | `layout/redundant-module-name` | family prefix |
+| SMT337 | `deprecated-async-contextmanager-return` | `typing/deprecated-async-contextmanager-return` | family prefix |
+| SMT338 | `duplicate-literal-type` | `typing/duplicate-literal-type` | family prefix |
+| SMT339 | `private-symbol-import` | `visibility/foreign-private-access` | renamed |
+| SMT340 | `await-in-call-argument` | `complexity/inline-call-argument` | renamed |
+| SMT341 | `str-enum-auto-values` | `modeling/str-enum-value-convention` | renamed |
+| SMT342 → SMT341 | `str-enum-explicit-values` | `modeling/str-enum-value-convention` | merged |
+| SMT343 | `redundant-private-delegate` | `visibility/redundant-private-delegate` | family prefix |
+| SMT344 | `redundant-name-alias` | `idioms/redundant-name-alias` | family prefix |
+| SMT345 | `excess-positional-parameters` | `complexity/excess-positional-parameters` | family prefix |
+| SMT346 | `prefer-deferred-annotations` | `typing/prefer-deferred-annotations` | family prefix |
+| SMT347 | `anonymous-tuple-type` | `typing/anonymous-tuple-type` | family prefix |
+| SMT348 | `missing-interface-docstring` | `idioms/missing-interface-docstring` | family prefix |
+| SMT349 | `stateful-dataclass` | `modeling/dataclass-field-mutation` | family prefix |
+| SMT350 | `missing-broad-except-reason` | `idioms/missing-broad-except-reason` | family prefix |
+| SMT351 | `missing-dataclass-option` | `modeling/missing-dataclass-option` | family prefix |
+| SMT352 | `duplicate-function` | `complexity/duplicate-function` | family prefix |
+| SMT353 | `prefer-project-base-class` | `modeling/prefer-project-base-class` | family prefix |
+| SMT354 | `prefer-domain-exception` | `modeling/prefer-domain-exception` | family prefix |
+| SMT355 | `duplicate-class-name` | `modeling/duplicate-class-name` | family prefix |
+| SMT356 | `duplicate-narrowing-assert` | `idioms/duplicate-narrowing-assert` | family prefix |
+| SMT357 | `missing-duration-unit` | `modeling/implicit-duration-unit` | renamed |
+| SMT358 → SMT357 | `prefer-named-duration` | `modeling/implicit-duration-unit` | merged |
+| SMT359 | `nested-conditional-expression` | `complexity/forbidden-nested-conditional` | family prefix |
+| SMT360 | `mutable-field-in-frozen-dataclass` | `modeling/mutable-field-in-frozen-dataclass` | family prefix |
+| SMT361 | `parallel-record-fields` | `modeling/parallel-record-fields` | family prefix |
+| SMT362 | `loop-invariant-collection` | `idioms/loop-invariant-collection` | family prefix |
+| SMT363 | `complex-comprehension` | `complexity/excess-comprehension-loops` | family prefix |
+| SMT364 | `constructor-logic` | `complexity/excess-constructor-decisions` | family prefix |
+| SMT365 → SMT339 | `cross-module-private-attribute` | `visibility/foreign-private-access` | merged |
+| SMT366 → SMT340 | `comprehension-in-call-argument` | `complexity/inline-call-argument` | merged |
+| SMT367 | `excess-private-definitions` | `visibility/excess-private-definitions` | family prefix |
+| SMT401 | `test-location` | `tests/misplaced-test` | renamed |
+| SMT420 | `private-test-access` | `tests/private-access` | renamed |
+| SMT421 | `forbidden-test-mock` | `tests/forbidden-mock` | renamed |
+| SMT422 | `string-patch-target` | `tests/string-patch-target` | family prefix |
+| SMT423 | `excessive-test-patches` | `tests/excess-patches` | renamed |
+| SMT424 | `test-without-outcome-check` | `tests/missing-outcome-check` | renamed |
+| SMT425 | `test-only-checks-possibly-empty-data` | `tests/vacuous-assertion` | renamed |
+| SMT426 | `unbounded-test-wait` | `tests/unbounded-wait` | renamed |
+| SMT427 | `independent-test-case-loop` | `tests/independent-case-loop` | renamed |
+| SMT428 | `async-mock-without-await-check` | `tests/missing-await-assertion` | renamed |
+| SMT429 | `test-only-public-function` | `visibility/test-only-public-function` | family prefix |
+| SMT430 | `test-only-public-attribute` | `visibility/test-only-public-attribute` | family prefix |
+| SMT431 | `nondeterministic-test-data` | `tests/nondeterministic-data` | renamed |
+| SMT901 | `unused-suppression` | `meta/unused-suppression` | family prefix |
+| SMT902 | `suppression-without-reason` | `meta/missing-suppression-reason` | renamed |
+| SMT903 | `resolved-debt` | `meta/resolved-debt` | family prefix |
+
+### Configuration model
+
+**Breaking: one definition and one activation rule per option.** Source
+conventions were split between options under `structure` and package contracts.
+Some options existed at both levels, and some enabled their rule while others did
+not.
+
+- **Shared options.** `style` and package overrides now share one set of
+  source-convention options: `imports`, `max_module_imports`,
+  `module_import_exemptions`, `module_docstrings`, `future_annotations`,
+  `private_modules`, `private_attribute_boundary`, `ordering`, `type_dispatch`,
+  `max_positional_parameters`, `max_comprehension_loops`,
+  `max_constructor_decisions`, `max_private_definitions`,
+  `call_argument_kinds`, `str_enum_values`, `dataclass_options`, `bases` and
+  `errors`. A value under `style` applies to the whole project. The closest
+  package override that sets the same option takes precedence.
+- **Package-only options.** Set `required`, `public`, `min_imports_to_bundle`,
+  `min_importers_to_export` and `count_tests` in `architecture.packages`.
+  Set package-specific `rules` in `style.overrides`.
+- **Uniform activation.** An option that belongs to a single rule now enables
+  that rule wherever the option applies. Direct `style` options apply to the
+  whole project and override options apply to matching packages. This is new for:
+  - `private_attribute_boundary` (SMT339)
+  - `call_argument_kinds` (SMT340)
+  - `str_enum_values` (SMT341)
+  - `max_comprehension_loops` (SMT363)
+  - `max_constructor_decisions` (SMT364)
+  - `max_private_definitions` (SMT367)
+
+  Each of these previously only configured its rule. `ordering` still only
+  configures `layout/definition-order`, and `module_import_exemptions` only modifies
+  SMT110.
+- **Activation scope.** An activation that comes from a package override option
+  now applies only to that package. Before, for example, a contract's
+  `max_module_imports` enabled SMT110 and the rule then fell back to the global
+  limit elsewhere.
+- **New built-in defaults.** Selecting SMT345 `complexity/excess-positional-parameters`
+  in `rules` or with `--select` now checks with a limit of 5 where no option is
+  set. Selecting SMT110 `imports/excess-module-imports` now checks with a limit
+  of 20. Before, selecting either rule without an option checked nothing.
+- **Unset globals are null.** `smelt config show` reports unset project-wide
+  options as `null` instead of their former defaults (1, 2, 12, `module`,
+  `explicit` and the full kind and exemption lists). The defaults are unchanged
+  and documented in the schema and in
+  [structure.md](docs/structure.md#project-wide-options-and-package-overrides).
+- **Conflict detection.** Two equally specific overrides that set different
+  values of any shared option for the same package are now a configuration
+  error. Before, only import style, docstring, future-annotation, private-module,
+  private-attribute, ordering and type-dispatch policies were checked.
+- **Message wording.** Findings name a project-wide setting as `style`, for
+  example `style forbids module docstrings`, and a named package policy as
+  `contract "name"`. The SMT345 message now reads `...; contract "api" allows 2`,
+  `style allows 3` or `default allows 5`, and its payload `contract` is
+  `style` for a project-wide limit and `null` for the built-in default.
+
+### Explicit rule selection
+
+- The former `information-hiding` group has been removed. Use SMT316, SMT320,
+  SMT335, SMT429 and SMT430 individually for the same selection.
+
+- Enable each rule by name or SMT code. A named `on` uses the catalog severity.
+  Families and `ALL` can disable or cap already-active rules. A broad
+  severity with no active matching rules gives a migration error. CLI
+  exploration accepts all selectors.
+- Local `extends` files apply as ordered rules layers. The built-in
+  `smelt:recommended` preset was removed before release. Use
+  `smelt init --maintainability` for explicit choices and commented optional
+  hints. Discover unconfigured rules with `smelt rules --unconfigured`.
+- Broad selections leave SMT306 at error in strict coverage. In package
+  overrides, broad settings only apply to source rules.
+- **Breaking: concise lines name the rule.** `--format concise` prints
+  `path:line:col CODE family/finding message -> repair`. Scripts that parse
+  the message after the code must skip the rule name.
+- **Breaking: `--statistics` counts hints.** Requested statistics now include
+  hint rows without `--show-hints`. The automatic statistics after a long text
+  listing still follow `--show-hints`.
+- **Schema.** The editor schema completes `ALL` and every family at project
+  level, `ALL` and the families with source rules in package overrides, and
+  offers `on` for individual names and codes.
+
+### uv workspaces
+
+One root configuration now checks a uv workspace as one project, and each
+member can refine it with its own `smelt.yml`. Existing configurations are
+unaffected until they set `project.workspace`. See
+[uv workspaces](docs/configuration.md#uv-workspaces).
+
+- **`project.workspace: uv`.** Members come from `tool.uv.workspace.members` and
+  `exclude` in `pyproject.toml`. Root `source_roots` and `test_roots` apply
+  inside every member. Without `source_roots`, each member uses `src/` when it
+  holds a package and otherwise the member directory. Root-level test roots are
+  always included, root source roots only when the root `pyproject.toml` has a
+  `[project]` table. `root_packages` defaults to every member's packages, and
+  two members with the same top-level package name are a configuration error.
+- **Member configs.** A member's `smelt.yml` or `smelt.yaml` inherits the root
+  implicitly and may set `rules`, `style` (options and `overrides`),
+  `ignore`, `project.exclude`, `debt` and `architecture`. Its paths are member-relative. `rules` apply
+  by path to the member's sources and tests, after the root layers and before
+  the closest package override. Direct member `style` options apply to each
+  of its packages. Named overrides and package API declarations must match
+  the member's own packages. A member cannot set `extends`,
+  `architecture.import_graph`, `architecture.canonical_exports`, `architecture.members`, `tests`, `suppressions` or other
+  `project` keys, and cannot lower SMT306 under strict coverage. Errors name the member
+  file and its own key.
+- **Member checks.** `smelt check` in a member directory, or
+  `--config <member>/smelt.yml`, loads the workspace root and checks only that
+  member. `smelt config show --sources` lists member files, and `origins` map
+  `members.<path>.*` keys to them. The policy hash covers member configs.
+- **Member architecture.** A member's architecture layout governs the member's
+  packages. The root layout governs only packages owned by the root project.
+  Members declare their own layers and features. Strict coverage applies to
+  members with an empty layout as well. Every module named by a member layout
+  must belong to that member. Layers without features span only its packages.
+  SMT101-SMT106, SMT301 and SMT305 run once per architecture and report only
+  the files it governs. Use `architecture.members` to govern imports between
+  members. `smelt context` shows the
+  governing member's layers, missing modules name the member file, and the
+  coverage report adds `member_architectures` (member path to packages).
+- **Test options** remain root-only. Member `rules` still apply to that member's tests.
+
+### Internal
+
+- `smelt.config.models.PackagePolicy` holds the shared options.
+  `PackageContract` and `StructureConfig` inherit from it. `POLICY_DEFAULTS`
+  holds the built-in defaults.
+- `ContractIndex.policy_for` falls back to the `structure` values.
+  `ContractIndex.threshold` returns an effective limit and its source.
+- `PolicyActivation.option` limits an activation to modules where that option is
+  set.
+- `smelt.diagnostics.violation.Category` now enumerates the families.
+- Merged rule classes: `ModuleDocstringConvention`, `ForbiddenBaseClassAffix`,
+  `FileNameConvention`, `StrEnumValueConvention`, `ImplicitDurationUnit`
+  (`structure/durations.py`), `ForeignPrivateAccess`
+  (`structure/private_access.py`) and `InlineCallArgument`
+  (`structure/call_arguments.py`).
+- `smelt/rules/renames.py` records retired names and codes for configuration
+  errors.
+- `smelt.config.models.SeverityName` became `RuleSetting` and includes `on`.
+  `SmeltConfig.rule_layers` holds the rules map of every composed file, base
+  first; `SmeltConfig.rules` remains the merged view for display.
+- uv member discovery moved to `smelt.config.workspace.member_directories`.
+  `smelt.analysis.workspace.workspace_members` builds on it. Member configs are
+  `SmeltConfig.members` (`MemberConfig`), filled by the loader and never read
+  from the root YAML. The selected member is `LoadedConfig.member`.
+- `RuleSettings.severity` takes the finding's `path` so member rules also reach
+  files outside a source module.
+- `MemberConfig.architecture` and `MemberConfig.packages`.
+  `smelt.config.workspace.architecture_scopes` returns one `ArchitectureScope`
+  (member, config, packages) per architecture, root first, or nothing when no
+  member declares one; `scope_for_path` picks the innermost.
+- `ArchitectureModel.build` takes `scope`, and `ArchitectureModel.combine` joins
+  scoped models into `parts`. `part_for(module)` returns the governing part,
+  `owns` and `roots` describe a scope, and `info` answers from the owning part.
+  `AnalysisContext.model` is combined when scopes exist, and
+  `AnalysisContext.architecture_view(scope)` returns a context whose config and
+  model are that scope's.
+- `Rule.architecture_scoped` (also in rule metadata and `catalog.json`) marks
+  rules that read the architecture config. They run once per scope and keep the
+  findings that scope governs.
+- `smelt.config.validation` validates every architecture scope against its own
+  packages and reports member issues under `members.<path>.architecture`.
+
 ## [0.12.0] - 2026-11-16
 
 Report schema 2, YAML version 1, grouped debt baseline version 2, the default
@@ -16,7 +436,7 @@ together to `0.12.0` (`v0.12.0`), refresh the editor schema and reinstall the
 bundled agent skill with `smelt skill install --force`. No baseline rewrite is
 required. See the [upgrade checklist](docs/upgrading.md#0111-to-0120).
 
-- Opt-in hint [SMT366](docs/rules/SMT366.md) `comprehension-in-call-argument`
+- Opt-in hint [SMT366](https://github.com/mathisarends/smelt/blob/v0.12.0/docs/rules/SMT366.md) `comprehension-in-call-argument`
   asks for named intermediate collections when list, set or dict comprehensions
   are passed directly to a call. Enable the rule explicitly; generator expressions
   and conditional/repeated expression contexts are skipped. No automatic rewrite:
@@ -64,7 +484,7 @@ rewrite is required. See the [upgrade checklist](docs/upgrading.md#0100-to-0110)
   checks and baselines. No automatic rewrite.
   Implements [#168](https://github.com/mathisarends/smelt/issues/168).
 
-- Opt-in warning [SMT365](docs/rules/SMT365.md) `cross-module-private-attribute`
+- Opt-in warning [SMT365](https://github.com/mathisarends/smelt/blob/v0.11.0/docs/rules/SMT365.md) `cross-module-private-attribute`
   reports private field/method accesses through statically known project receivers
   owned by another module. Enable the rule explicitly. Global/package
   `private_attribute_boundary: package` permits immediate-package cooperation;
@@ -201,7 +621,7 @@ No baseline rewrite is required. See the
   unit (`_TIMEOUT_SECONDS`, `quiet_ms`), `timedelta` values, `@overload` and
   `@override` signatures and tests are not reported. Enable it with
   `rules: {missing-duration-unit: warning}`; no automatic rewrite.
-- Optional review [SMT358](docs/rules/SMT358.md) `prefer-named-duration`
+- Optional review [SMT358](https://github.com/mathisarends/smelt/blob/v0.9.0/docs/rules/SMT358.md) `prefer-named-duration`
   reports `int` and `float` literals passed as the duration of
   `asyncio.timeout`, `asyncio.sleep`, `asyncio.wait_for`, `asyncio.wait`,
   `time.sleep` and the anyio and trio sleep and timeout scopes, and literals
@@ -303,7 +723,7 @@ See the [upgrade checklist](docs/upgrading.md#060-to-070).
   [SMT341](docs/rules/SMT341.md) `str-enum-auto-values` makes `auto()` the
   convention: it reports explicit strings equal to the lowercased member name,
   and `auto()` members in classes that need custom values such as
-  `"mouseMoved"`. [SMT342](docs/rules/SMT342.md) `str-enum-explicit-values`
+  `"mouseMoved"`. [SMT342](https://github.com/mathisarends/smelt/blob/v0.7.0/docs/rules/SMT342.md) `str-enum-explicit-values`
   makes explicit strings the convention and reports every `auto()` member.
   Enable one of them, e.g. `rules: {str-enum-auto-values: hint}`. Tests are not
   checked; no automatic rewrite. Implements
@@ -412,7 +832,7 @@ required for this upgrade. See the [upgrade checklist](docs/upgrading.md#050-to-
 
 - Declare canonical YAML extensions and Compose basenames once with
   `structure.file_naming: {yaml_extension: yaml, compose_basename: compose}`.
-  [SMT331](docs/rules/SMT331.md) and [SMT332](docs/rules/SMT332.md) flag other
+  [SMT331](docs/rules/SMT331.md) and [SMT332](https://github.com/mathisarends/smelt/blob/v0.6.0/docs/rules/SMT332.md) flag other
   spellings throughout the project, including hidden configuration directories
   and dotted Compose variants. Policies are optional, respect exclusions and
   support staged checks; renames and reference updates remain manual.
@@ -478,7 +898,7 @@ See the [upgrade checklist](docs/upgrading.md#040-to-050).
   review and explicit re-recording. See [adoption](docs/adoption.md).
 
 - Package contracts now support `module_docstrings: require`, activating
-  [SMT325](docs/rules/SMT325.md) `missing-module-docstring` for every analyzed
+  [SMT325](https://github.com/mathisarends/smelt/blob/v0.5.0/docs/rules/SMT325.md) `missing-module-docstring` for every analyzed
   production module, including empty package initializers. Empty/blank docstrings
   do not satisfy the requirement. Choose `forbid` for the existing
   [SMT309](docs/rules/SMT309.md) convention; use a reasoned file suppression or an
@@ -982,7 +1402,8 @@ smelt explain SMT313 --format json
 - Import fanout, match suggestions and missing-assertion checks are review aids;
   their default severities differ. Configure policy and severity deliberately.
 
-[Unreleased]: https://github.com/mathisarends/smelt/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/mathisarends/smelt/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/mathisarends/smelt/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/mathisarends/smelt/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/mathisarends/smelt/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/mathisarends/smelt/compare/v0.10.0...v0.11.0
