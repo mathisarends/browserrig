@@ -19,7 +19,7 @@ configuration:
 ```yaml
 tests:
   layout: mirror
-  forbid_mocks_in:
+  forbidden_mock_paths:
   - '**/tests/**/domain/**'
   max_patches_per_test: 2
   assertion_helpers:
@@ -28,14 +28,14 @@ tests:
   - tests.timing.deadline
   quality_exclude: []
 rules:
-  private-test-access: error
-  string-patch-target: error
-  test-without-outcome-check: warning
-  test-only-checks-possibly-empty-data: warning
-  unbounded-test-wait: warning
-  independent-test-case-loop: hint
-  async-mock-without-await-check: warning
-  test-only-public-function: warning
+  tests/private-access: error
+  tests/string-patch-target: error
+  tests/missing-outcome-check: warning
+  tests/vacuous-assertion: warning
+  tests/unbounded-wait: warning
+  tests/independent-case-loop: hint
+  tests/missing-await-assertion: warning
+  visibility/test-only-public-function: warning
 ```
 
 | Code | Checks |
@@ -145,7 +145,7 @@ imports count as production consumers; star imports and escaped module values
 conservatively preserve public visibility. External users, packaging entry points
 and arbitrary dynamic access remain review limits. Checks do not rename code.
 
-Enable SMT430 with `rules: {test-only-public-attribute: warning}` or
+Enable SMT430 with `rules: {visibility/test-only-public-attribute: warning}` or
 `--select SMT430`. It reviews public attributes such as `worker.pending` when only
 tests read them outside the owning class. It shares the member-use analysis with
 SMT316, SMT317 and SMT429 and suggests an available private name. Known
@@ -243,8 +243,8 @@ A test importing two modules of its name (`application/bootstrap.py` and
 `tests.mirror` sets the convention relative to the test root: the default
 `{path}/test_{module}.py` drops the root package, `{root}/{path}/test_{module}.py` keeps it,
 and `unit/{path}/{module}_test.py` puts tests under `tests/unit/` with a suffix. In a uv
-workspace each test root mirrors the package of its own member. Deliberately unmirrored
-tests go in `tests.unmirrored` (e.g. `["tests/e2e/**"]`); `tests.mirror_suffixes: true`
+workspace each test root mirrors the package of its own member. Deliberately mirror_exclude
+tests go in `tests.mirror_exclude` (e.g. `["tests/e2e/**"]`); `tests.mirror_suffixes: true`
 also allows `test_invoice_<topic>.py`.
 
 Mirroring repeats file names: `auth/presentation/test_router.py` and

@@ -21,6 +21,28 @@ Existing debt files remain readable. Run `smelt debt --prune` once before editin
 covered by an older baseline to upgrade their fingerprints; pruning accepts no new debt.
 New import fingerprints survive comments, aliases and formatting changes.
 
+### Workspace debt
+
+In a uv workspace, each member can set `debt: .smelt/debt.json` in its own
+`smelt.yml`. The file path is member-relative; paths and fingerprints inside it
+remain workspace-relative. A member baseline accepts findings only inside that
+member. The closest member baseline takes precedence over root debt; root debt
+covers the remaining files. An entry copied to another member's file cannot
+suppress that member's finding.
+
+`smelt debt` at the root records one baseline per Python member plus a root
+baseline. From a member directory, or with its config selected, it records only
+that member's debt and adds the member-relative `debt` key there. Missing member
+configs are created as policy fragments inheriting the root. This remains an
+explicit acceptance operation; it never records hints or strict-coverage gaps.
+
+`--prune` operates on configured scopes and accepts no new findings. It never
+creates an unconfigured member baseline, and preserves entries for inactive or
+hint-only rules. A member invocation does not prune other members or root debt.
+`--show` is read-only; a member without its own baseline can inspect its entries
+in legacy root debt. Workspace-wide JSON inspection groups multiple selected
+documents under `files`, keyed by workspace-relative baseline filename.
+
 ### Grouped baselines and inspection
 
 New writes use debt JSON version 2. Rule, path, message and an optional definition
@@ -83,7 +105,7 @@ may therefore reappear for review: the old fingerprints cannot establish the ful
 dependency they accepted. `smelt debt --prune` removes stale entries without accepting
 these findings; review them before explicitly recording new debt.
 
-Override severities by rule name or code, e.g. `rules: {unclassified-module: off}`.
+Override severities by rule name or code, e.g. `rules: {architecture/unclassified-module: off}`.
 
 Silence a single finding inline, always with a reason:
 
