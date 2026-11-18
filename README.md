@@ -25,11 +25,16 @@ live target resolution for the shared pointer tools.
 
 ## Quick start
 
-Requires Python 3.12+ and Chrome or Chromium:
+This example uses the API on `main`. Install from the checkout with Python 3.12+
+and Chrome or Chromium:
 
 ```sh
-python -m pip install "browserrig[openai]"
+git clone https://github.com/mathisarends/browserrig.git
+cd browserrig
+python -m pip install ".[openai]"
 ```
+
+For the published 0.6 release, use the [0.6 quick start](https://github.com/mathisarends/browserrig/tree/v0.6.0#quick-start).
 
 Set `OPENAI_API_KEY`, then run:
 
@@ -105,6 +110,7 @@ custom tools and context propagation.
 
 | Guide | Start here for… |
 | --- | --- |
+| [Migrate to 0.7](docs/migration-0.7.md) | Changes on `main` since 0.6.x |
 | [Migrate to 0.6](docs/migration-0.6.md) | API changes from 0.5.x, observation modes and host event envelopes |
 | [Composition](docs/browser-composition.md) | Layers, plugins, hooks and custom capture backends |
 | [Agent guide](docs/agent-guide.md) | Sessions, streaming, prompts, completion and persistence |

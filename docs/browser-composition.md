@@ -315,22 +315,18 @@ The input package has no browser/CDP dependency. Custom input backends can suppl
 `InputTargets` independently of `Browser`. File transfers use a separate
 [`FileBridge`](files-and-events.md#workspaces-bridges-and-remote-browsers).
 
-## Screenshot settings
+## Browser observations
 
-Capture, image retention and text compaction are independent:
+`BrowserPerception` can deliver page text, a compact metadata header, screenshots,
+or text with screenshots. Set `text=None` to omit text. Omit `screenshots` to
+deliver text alone.
 
-| Setting | Behavior |
-| --- | --- |
-| `Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)` | Default. Capture after a screenshot request. Image-only and metadata-and-image sessions also capture when they enter a document or lack an included image. |
-| `Screenshots(trigger=ScreenshotTrigger.EACH_STEP)` | Capture before every model step |
-| `Screenshots()` | Keep the latest image; unchanged captures are skipped |
-| `Screenshots(retention=TrimInBatches(max_images=6, min_images=3))` | On overflow, trim oldest images down to three |
-| `Screenshots(retention=UntilCompaction())` | Retain images until compaction removes their steps; requires compaction to bound history |
+### Page text
 
-Configure `BrowserPerception(text=TextObservations(mode="delta"), screenshots=Screenshots())`
-for both modalities. Set either option to `None` to omit that modality.
-Captures that support DOM refs use `DomRenderer()` by default. Supply a renderer
-when delivering text with another capture strategy.
+`TextObservations()` sends page text as deltas when an earlier observation is
+still in context. Use `mode="full"` to send full text on every step. The default
+page capture is `DomCapture()`. Captures that support DOM refs use `DomRenderer()`
+by default. Supply a renderer for page text with another capture strategy.
 
 ```python
 from browserrig import BrowserPerception, DomCapture, Screenshots, TextObservations
@@ -342,11 +338,7 @@ perception = BrowserPerception(
 )
 ```
 
-For image-only pixel capture, select `ScreenshotCapture()` with `text=None` and a
-`Screenshots` configuration. A composition that avoids DOM readiness probes can
-set both readiness policies to `NetworkQuiet(inner=BrowserReady())`. Use
-`DomCapture()` to collect DOM refs. `SetOfMarks()` draws those refs as labels
-on the screenshot.
+### Metadata
 
 Use `TextObservations(content="metadata", mode="full")` to send a compact page
 header with every observation. It includes the title, URL, current tab,
@@ -365,24 +357,43 @@ perception = BrowserPerception(
 
 Metadata text defaults to `ScreenshotCapture()`. Omit `screenshots` for
 metadata alone. This path uses Chrome's layout metrics and skips DOM extraction.
-Explicit captures and renderers can still be supplied. Use `DomCapture()` when
-the screenshot needs DOM refs for marks. With `mode="delta"`, a retained
-unchanged header can be reused when there is no new image.
+Explicit captures and renderers can still be supplied. With `mode="delta"`, a
+retained unchanged header can be reused when there is no new image.
 
-Perception itself registers no model tools. Add `ScreenshotTools()` for screenshot
-requests and `PageSearchTools()` for page search. The screenshot tool is available
-when the session configures screenshots.
-`DomTypingTools`, `DomScrollTools` and `FormTools` are separate DOM capabilities.
-Tools that take DOM refs require `ResolveDomElement`. These plugins and
-`DomUploadTools` log at debug level when the service is missing.
-`DomScrollTools` also provides `scroll_page`, which works without DOM refs.
-The screenshot tool acknowledges the request. The next observation supplies the
-new image, reports reuse of the previous image when unchanged, or reports why no
-image was available.
+### Screenshot settings
+
+Capture timing, image retention and text compaction are independent:
+
+| Setting | Behavior |
+| --- | --- |
+| `Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)` | Default. Capture after a screenshot request. Image-only and metadata-and-image sessions also capture when they enter a document or lack an included image. |
+| `Screenshots(trigger=ScreenshotTrigger.EACH_STEP)` | Capture before every model step |
+| `Screenshots()` | Keep the latest image; unchanged captures are skipped |
+| `Screenshots(retention=TrimInBatches(max_images=6, min_images=3))` | On overflow, trim oldest images down to three |
+| `Screenshots(retention=UntilCompaction())` | Retain images until compaction removes their steps; requires compaction to bound history |
+
+For image-only pixel capture, select `ScreenshotCapture()` with `text=None` and a
+`Screenshots` configuration. To avoid DOM readiness probes, set both readiness
+policies to `NetworkQuiet(inner=BrowserReady())`. For screenshots with ref labels,
+configure `Screenshots(marks=SetOfMarks())` with `DomCapture()`, including when
+the text mode is metadata.
+
+Add `ScreenshotTools()` to offer explicit requests in a session configured
+with screenshots. The tool acknowledges the request. The next observation
+supplies the new image, reports reuse when unchanged, or reports why no image
+was available.
 
 Text observations remain until compaction. Coordinate tools use the latest
 included screenshot's geometry; an image from another document cannot supply
 coordinates for this page.
+
+### Optional observation and DOM tools
+
+Perception itself registers no model tools. Add `PageSearchTools()` for page
+search. `DomTypingTools`, `DomScrollTools`, `FormTools` and `DomUploadTools`
+provide separate DOM capabilities. Tools that take DOM refs require
+`ResolveDomElement`. These plugins log at debug level when the service is missing.
+`DomScrollTools` also provides `scroll_page`, which works without DOM refs.
 
 ## Browser-owned presentation
 
