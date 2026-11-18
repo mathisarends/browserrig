@@ -3,7 +3,6 @@ import json
 import pytest
 from cdpify import CDPCommandError
 from harnessed import (
-    Agent,
     Plugin,
     PolicyDecision,
     ToolCall,
@@ -16,13 +15,13 @@ from harnessed.testing import CallbackModel
 
 from browserrig import (
     Actions,
+    Agent,
     Browser,
     BrowserPerception,
     Chrome,
     ChromeBrowser,
     DomCapture,
     ScreenshotStatus,
-    browser_plugins,
     wait_for_page,
 )
 from browserrig.browser import Launch
@@ -147,12 +146,10 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
 
     agent = Agent(
         model=CallbackModel(respond),
+        browser=Chrome.launch(
+            url=site + "/frame-host", arguments=("--site-per-process",)
+        ),
         plugins=[
-            *browser_plugins(
-                browser=Chrome.launch(
-                    url=site + "/frame-host", arguments=("--site-per-process",)
-                )
-            ),
             Prepare(),
             Approvals(default=PolicyDecision.ALLOW),
         ],

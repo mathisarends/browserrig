@@ -1,7 +1,7 @@
 import pytest
 from harnessed.testing import ScriptedModel
 
-from browserrig import Agent, AllowedDomains, DomainNotAllowed, browser_plugins
+from browserrig import Agent, AllowedDomains, DomainNotAllowed
 
 
 @pytest.mark.parametrize(
@@ -72,12 +72,10 @@ def test_invalid_configuration_fails_before_a_session_opens(domain):
 
 def test_optional_plugin_composes_without_changing_defaults():
     guard = AllowedDomains(["example.com", "*.example.com"])
-    defaults = browser_plugins()
+    defaults = Agent(model=ScriptedModel([])).plugins
     assert not any(isinstance(plugin, AllowedDomains) for plugin in defaults)
-    composed = browser_plugins(None, guard)
+    composed = Agent(model=ScriptedModel([]), plugins=[None, guard]).plugins
     assert composed[-1] is guard
     assert [type(plugin) for plugin in composed[:-1]] == [
         type(plugin) for plugin in defaults
     ]
-    agent = Agent(model=ScriptedModel([]), plugins=[guard])
-    assert guard in agent.plugins

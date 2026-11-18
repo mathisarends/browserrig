@@ -2,7 +2,7 @@
 
 [Back to README](../README.md)
 
-The default browser pack uses `TaskMemory` for context compaction. The agent keeps
+`browserrig.Agent` uses `TaskMemory` for context compaction. The agent keeps
 working notes in `notes/task_state.md` through ordinary file tools. Notes hold
 requirements, findings and sources, confirmed actions, open checks and the next
 step; large artifacts stay in linked files. The memory file is read on recovery

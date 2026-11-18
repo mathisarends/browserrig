@@ -35,7 +35,6 @@ from browserrig import (
     ReadinessOptions,
     Secret,
     Secrets,
-    browser_plugins,
 )
 from browserrig import PageContent as Extraction
 from browserrig.browser import TabInfo
@@ -504,14 +503,15 @@ async def test_handoff_is_opt_in_for_the_facade_and_explicit_composition():
     default = browserrig.Agent(model=ScriptedModel(["Done"]))
     assert not any(isinstance(plugin, HumanHandoff) for plugin in default.plugins)
     assert "Use request_human" not in await default.prompt.render()
-    assert not any(isinstance(plugin, HumanHandoff) for plugin in browser_plugins())
     configured = browserrig.Agent(model=ScriptedModel(["Done"]), plugins=[handoff])
     assert (
         handoff in configured.plugins
         and "Use request_human" in await configured.prompt.render()
     )
-    assert handoff in browser_plugins(handoff)
-    composed = browserrig.Agent(model=ScriptedModel(["Done"]), plugins=[handoff])
+    composed = Agent(
+        model=ScriptedModel(["Done"]),
+        plugins=[FakeChrome({}), PageReadiness(), BrowserPerception(), handoff],
+    )
     assert handoff in composed.plugins
 
 

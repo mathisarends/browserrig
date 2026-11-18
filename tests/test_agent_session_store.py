@@ -15,7 +15,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel, call
 from pydantic import BaseModel
 
-from browserrig import Activity, Agent, Done, browser_plugins
+from browserrig import Activity, Agent, Done
 from browserrig.events import ActivityFinishedEvent
 
 
@@ -31,8 +31,9 @@ def _agent(model, *, store=None, plugins=()):
         plugins=plugins,
         without=tuple(
             type(plugin)
-            for plugin in browser_plugins()
-            if not isinstance(plugin, Activity)
+            for plugin in Agent(model=ScriptedModel([])).plugins
+            if type(plugin).__module__.startswith("browserrig.")
+            and not isinstance(plugin, Activity)
         ),
     )
 

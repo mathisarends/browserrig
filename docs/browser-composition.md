@@ -3,9 +3,9 @@
 [Back to README](../README.md)
 
 Harnessed owns the agent loop. Browserrig adds independently configurable browser,
-perception, action, context and presentation capabilities. `browserrig.Agent` is a
-recipe; `browser_pack()` exposes that recipe to a Harnessed `Agent`. Both use the
-same plugins and service contracts.
+perception, action, context and presentation capabilities. Use `browserrig.Agent`
+for the standard recipe. In a custom `harnessed.Agent`, list the plugins your
+application needs at the composition root.
 
 ## Explicit plugin composition
 
@@ -43,20 +43,60 @@ type, and `None` entries are skipped. Two explicit plugins in the same slot rais
 `PluginConflict`. `agent.describe()` shows the resolved composition without opening
 Chrome.
 
-To compose inside an existing Harnessed application:
+### Compose a screenshot-driven single-tab agent
+
+This prototype starts at the configured URL. It receives screenshots and uses
+the pointer and keyboard to interact with the page.
 
 ```python
 from harnessed import Agent
-from browserrig import Chrome, browser_pack
+from browserrig import (
+    Actions,
+    BrowserPerception,
+    Chrome,
+    InputRuntime,
+    KeyboardTools,
+    PageReadiness,
+    PointerTools,
+    Runtime,
+    ScreenshotCapture,
+    Screenshots,
+    ScreenshotTrigger,
+    SingleTab,
+)
 
 agent = Agent(
     model=model,
-    plugins=[browser_pack(browser=Chrome.launch(url="https://example.com")), Sources()],
+    plugins=[
+        Runtime(),
+        Chrome.launch(url="https://example.com"),
+        InputRuntime(),
+        PageReadiness(),
+        SingleTab(),
+        BrowserPerception(
+            text=None,
+            capture=ScreenshotCapture(),
+            screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
+        ),
+        Actions(),
+        PointerTools(),
+        KeyboardTools(),
+    ],
 )
 ```
 
-`Sources` is defined below. `browser_plugins(...)` returns a resolved flat list
-when needed. For a fully explicit composition, select individual plugins:
+`Runtime`, `Chrome`, `InputRuntime` and `PageReadiness` provide the browser,
+devices and readiness checks. `Actions` coordinates tool execution.
+`PointerTools` uses screenshot coordinates and `KeyboardTools` sends keys to
+the focused control.
+`SingleTab` keeps the session in one tab. Add input pacing and viewer plugins
+where the application needs them. Configure [Harnessed approvals](agent-guide.md#configure-an-agent)
+for tools with side effects.
+
+### Select tools for a DOM-driven agent
+
+This agent uses text observations and exposes pointer, keyboard, navigation and
+tab-management tools.
 
 ```python
 from harnessed import Agent
@@ -95,12 +135,9 @@ Add `Targeting()` and `ReferencePointerTools()` for `click(ref)`,
 `DomCapture()` and [custom capture backends](#references-from-other-capture-backends)
 that resolve their own refs.
 
-The default `browser_pack()` includes both plugins. For pointer input in a
-screenshot-only variant of the pack, use
-`browser_pack().without(ReferencePointerTools)` with your screenshot perception.
-If you composed a custom agent using the old `PointerTools()`, add
-`ReferencePointerTools()` to keep ref-based actions and replace
-`move_mouse(ref=...)` with `hover(ref=...)`.
+`browserrig.Agent` includes both pointer plugins. For a screenshot-only
+configuration of the standard agent, pass `without=(ReferencePointerTools,)`
+with your screenshot perception.
 
 ## Choose tab behavior
 
@@ -190,7 +227,7 @@ class Sources(Plugin):
         ))
 ```
 
-Mount `Sources()` alongside the browser pack. Its tool declaration, fixed guidance,
+Add `Sources()` to the agent's `plugins` list. Its tool declaration, fixed guidance,
 request middleware and state stay together. `await next_()` preserves the other
 request hooks; the appended message affects only that request. The list survives
 turns within the mounted session, but this example does not persist it across

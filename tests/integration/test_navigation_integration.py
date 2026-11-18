@@ -4,7 +4,15 @@ from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Chrome, browser_plugins
+from browserrig import (
+    Actions,
+    BrowserPerception,
+    Chrome,
+    InputRuntime,
+    NavigationTools,
+    PageReadiness,
+    Runtime,
+)
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent
 
 pytestmark = pytest.mark.integration
@@ -27,7 +35,13 @@ async def test_agent_go_forward_reports_success_and_missing_or_replaced_history(
     agent = Agent(
         model=model,
         plugins=[
-            *browser_plugins(browser=Chrome.launch(url=site)),
+            Runtime(),
+            Chrome.launch(url=site),
+            InputRuntime(),
+            PageReadiness(),
+            BrowserPerception(),
+            Actions(),
+            NavigationTools(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

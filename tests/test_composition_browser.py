@@ -37,7 +37,6 @@ from browserrig import (
     CaptureContent,
     CaptureStrategy,
     DomRenderer,
-    FileTools,
     HumanHandoff,
     HumanResponse,
     Nudges,
@@ -49,7 +48,6 @@ from browserrig import (
     ScreenshotTrigger,
     TrimInBatches,
     UntilCompaction,
-    browser_plugins,
 )
 from browserrig import PageContent as Extraction
 from browserrig.browser import OpenDialog
@@ -865,13 +863,6 @@ async def test_native_stream_forwards_custom_events_and_browser_readiness_withou
         assert any(isinstance(e, ReadinessStartedEvent) for e in streamed)
         observations = [e for e in streamed if isinstance(e, ObservationCapturedEvent)]
         assert len(observations) == 1 and not hasattr(observations[0], "image")
-
-
-def test_recipe_can_omit_local_file_tools():
-    assert not any(
-        isinstance(plugin, (FileTools,))
-        for plugin in browser_plugins(without=(FileTools,))
-    )
 
 
 async def test_unchanged_page_is_not_repeated_while_the_model_still_sees_it():

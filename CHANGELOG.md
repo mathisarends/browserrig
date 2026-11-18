@@ -10,6 +10,10 @@
   `move_mouse(ref=...)`. The default browser agent includes both plugins.
   See [pointer tool composition](docs/browser-composition.md#choose-pointer-tools).
 
+- Remove `browser_pack()` and `browser_plugins()`. Use `browserrig.Agent` for
+  the standard setup or list the selected Browserrig plugins in your Harnessed
+  agent. See the [0.8 migration guide](docs/migration-0.8.md) (#93).
+
 ## 0.7.0 (2026-11-18)
 
 Upgrade from 0.6.x using the [migration guide](docs/migration-0.7.md).

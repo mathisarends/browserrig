@@ -33,7 +33,7 @@ class FileTransfers(Plugin):
     """Bind a browser host's bridge to the session's optional workspace.
 
     Workspace changes replace the transfer service without reopening the browser.
-    The browser pack includes this provider; Chrome publishes its configured bridge.
+    `browserrig.Agent` includes this provider. Chrome publishes its configured bridge.
     Explicit compositions add this plugin alongside Chrome and Files.
     """
 

@@ -11,8 +11,6 @@ from browserrig import (
     Chrome,
     MountedWorkspace,
     Viewport,
-    browser_pack,
-    browser_plugins,
 )
 from browserrig.browser import Connect, Launch
 from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
@@ -72,7 +70,7 @@ def test_factories_validate_options_without_opening_resources(monkeypatch):
 
 
 @pytest.mark.parametrize("mode", ["launch", "connect"])
-@pytest.mark.parametrize("composition", ["facade", "kit", "flat", "manual"])
+@pytest.mark.parametrize("composition", ["facade", "manual"])
 def test_configured_plugin_is_used_once_across_composition_apis(mode, composition):
     browser = (
         Chrome.launch()
@@ -82,15 +80,6 @@ def test_configured_plugin_is_used_once_across_composition_apis(mode, compositio
     match composition:
         case "facade":
             agent = Agent(model=ScriptedModel([]), browser=browser)
-        case "kit":
-            agent = HarnessedAgent(
-                model=ScriptedModel([]), plugins=[browser_pack(browser=browser)]
-            )
-        case "flat":
-            agent = HarnessedAgent(
-                model=ScriptedModel([]),
-                plugins=browser_plugins(browser=browser),
-            )
         case "manual":
             agent = HarnessedAgent(model=ScriptedModel([]), plugins=[browser])
     assert [item for item in agent.plugins if isinstance(item, Chrome)] == [browser]
@@ -110,21 +99,12 @@ def test_factory_defaults_and_secret_inputs_preserve_existing_options():
     assert connected.options.viewport is None
 
 
-@pytest.mark.parametrize("composition", ["facade", "kit", "flat"])
 @pytest.mark.parametrize(
     "options", [Launch(), Connect(endpoint=SecretStr("http://localhost:9222"))]
 )
-def test_browser_recipe_rejects_low_level_options_with_migration_guidance(
-    composition, options
-):
+def test_browser_recipe_rejects_low_level_options_with_migration_guidance(options):
     with pytest.raises(TypeError, match=r"use Chrome\.launch.*Chrome\.connect"):
-        match composition:
-            case "facade":
-                Agent(model=ScriptedModel([]), browser=options)
-            case "kit":
-                browser_pack(browser=options)
-            case "flat":
-                browser_plugins(browser=options)
+        Agent(model=ScriptedModel([]), browser=options)
 
 
 @pytest.mark.parametrize(

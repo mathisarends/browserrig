@@ -60,7 +60,7 @@ The constructor refactor covers every SMT364 candidate:
 | `TextCollector` | Build inherited link ownership and ordered control/heading/line-break boundaries in separate index builders. |
 | `IsOccluded` | Build and sort the painted-box index as one operation before any coverage query. Preserve visibility guards and paint order. |
 | `OverlayView` | Serialize options and four enum dictionaries as one presentation payload; keep wire keys and values unchanged. |
-| `Agent` | Resolve the model name independently of composing the model profile, context budget and browser pack. |
+| `Agent` | Resolve the model name independently of composing the model profile, context budget and default browser plugins. |
 | `HumanMotor` | Validate typing interval and scroll speed together before storing the pacing configuration. |
 | `WheelStep` | Validate finite deltas, then a finite nonnegative dispatch delay, before a wheel step can be used. |
 
