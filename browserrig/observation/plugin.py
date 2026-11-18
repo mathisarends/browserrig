@@ -83,10 +83,9 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         renderer: Renderer | None = None,
     ) -> None:
         super().__init__()
-        capture = _capture_for_text(capture, text)
         self.text = text
         self.screenshots = screenshots
-        self.capture_strategy = capture if capture is not None else _DEFAULT_CAPTURE
+        self.capture_strategy = _capture_for_text(capture, text, screenshots)
         self.renderer = _text_renderer(self.capture_strategy, text, renderer)
 
     async def setup(self, scope: PluginScope) -> None:
@@ -498,10 +497,22 @@ class ResolveDomElement:
 
 
 def _capture_for_text(
-    capture: CaptureStrategy | None, text: TextObservations | None
-) -> CaptureStrategy | None:
-    if capture is None and _metadata_text(text):
-        return _METADATA_CAPTURE
+    capture: CaptureStrategy | None,
+    text: TextObservations | None,
+    screenshots: Screenshots | None,
+) -> CaptureStrategy:
+    if capture is None:
+        capture = _METADATA_CAPTURE if _metadata_text(text) else _DEFAULT_CAPTURE
+    # A custom subclass can implement collect() with its own marked elements.
+    if (
+        screenshots is not None
+        and screenshots.marks is not None
+        and type(capture) is ScreenshotCapture  # pylint: disable=unidiomatic-typecheck
+    ):
+        raise ValueError(
+            "ScreenshotCapture does not collect element refs for screenshot marks; "
+            "use DomCapture or a custom capture with element refs"
+        )
     return capture
 
 

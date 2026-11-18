@@ -305,9 +305,7 @@ class _Assembler:
             )
             remaining -= len(value)
         if markers:
-            self._limitations.append(
-                f"Page text truncated to {limit} characters; search_page reads it all"
-            )
+            self._limitations.append(f"Page text truncated to {limit} characters")
         elements_by_ref = {element.ref: element for element in elements}
         return self._frame_content(self._frames[0], elements_by_ref, texts)
 

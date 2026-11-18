@@ -32,9 +32,7 @@ def flow_body(snapshot: Snapshot) -> list[str]:
         element for element in snapshot.elements if _upload_outside_viewport(element)
     ]
     if uploads:
-        lines.extend(
-            ("", "file inputs outside view (upload_files accepts these refs):")
-        )
+        lines.extend(("", "file inputs outside view (refs available):"))
         lines.extend(_blocks(uploads, snapshot.url))
     return lines
 
@@ -91,9 +89,7 @@ def render_body(snapshot: Snapshot) -> list[str]:
         element for element in snapshot.elements if _upload_outside_viewport(element)
     ]
     if uploads:
-        lines.extend(
-            ("", "file inputs outside view (upload_files accepts these refs):")
-        )
+        lines.extend(("", "file inputs outside view (refs available):"))
         lines.extend(_blocks(uploads, snapshot.url))
     return lines
 
