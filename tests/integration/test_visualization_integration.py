@@ -228,6 +228,7 @@ async def test_long_cursor_badge_stays_inside_a_compact_viewport(site):
     )
     async with agent.session() as session:
         tab = session.scope[Browser].active_tab
+        assert (await wait_for_page(tab)).status == "ready"
         for x, y in ((3, 3), (357, 637)):
             await tab.emit(CursorStateEvent(x=x, y=y))
             bounds = await _surface(

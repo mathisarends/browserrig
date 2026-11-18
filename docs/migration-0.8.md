@@ -1,11 +1,10 @@
 # Migrate from 0.7.x to 0.8.0
 
-[Back to README](../README.md) · [Changelog](../CHANGELOG.md#unreleased)
+[Back to README](../README.md) · [Release notes](../CHANGELOG.md#080-2026-11-18)
 
-Browserrig 0.8 removes `browser_pack()` and `browser_plugins()`. Both helpers
-supplied the standard browser plugin list to custom Harnessed agents. With
-explicit composition, adding a tool to the standard agent leaves your custom
-agent's tool list unchanged.
+Browserrig 0.8 removes the browser defaults helpers and splits pointer tools
+by how they address a target. Update custom Harnessed compositions, pointer
+tool calls and any event handlers that match reference-based hover actions.
 
 ## Use the standard browser agent
 
@@ -51,8 +50,24 @@ shows the infrastructure, observation, tab policy and input tools in one list.
 
 ## Select pointer tools
 
-`PointerTools()` now provides `move_mouse(x, y)`, `click_at` and `drag_at`.
-If your custom agent uses element refs, add `Targeting()` and
-`ReferencePointerTools()` for `click(ref)`, `drag(source_ref, target_ref)` and
-`hover(ref)`. Update any calls to `move_mouse(ref=...)` to use `hover(ref=...)`.
+| In 0.7.x | In 0.8.0 |
+| --- | --- |
+| `PointerTools.move_mouse(x, y)`, `click_at`, `drag_at` | Keep `PointerTools()`. Supply both coordinates to `move_mouse(x, y)`. |
+| `PointerTools.click(ref)`, `drag(source_ref, target_ref)` | Use the same tool names with `ReferencePointerTools()`. |
+| `PointerTools.move_mouse(ref=...)` | Call `hover(ref=...)` on `ReferencePointerTools()`. |
+
+In an explicit composition, add `Targeting()` for `ReferencePointerTools()` and
+configure perception to resolve element refs. If your agent only uses screenshot
+or viewport coordinates, select `PointerTools()`.
+
+The standard `browserrig.Agent` includes both plugins. If you previously passed
+`without=(PointerTools,)` to remove every pointer tool, use
+`without=(PointerTools, ReferencePointerTools)`. For screenshot-only perception
+in the standard agent, exclude `ReferencePointerTools`.
+
+Update event handlers or telemetry filters that treated reference-based hover
+as `ActionKind.MOVE_MOUSE` (`"move_mouse"`). Those actions now use
+`ActionKind.HOVER` (`"hover"`). Coordinate moves still use
+`ActionKind.MOVE_MOUSE`.
+
 See [pointer tool composition](browser-composition.md#choose-pointer-tools).

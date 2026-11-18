@@ -143,6 +143,9 @@ async def test_slow_login_has_a_separate_wait_after_submission(login_site):
 
             async def new_context(**options):
                 context = await browser.new_context(**options)
+                # Allow the sign-in page to load on a busy runner.
+                context.set_default_navigation_timeout(10_000)
+                # The click must return before the delayed sign-in response.
                 context.set_default_timeout(1000)
                 return context
 

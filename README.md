@@ -76,7 +76,7 @@ Chrome opens with the session and closes with it. Use
 
 Already using Harnessed? List the Browserrig plugins you want in its `Agent`.
 See [explicit plugin composition](docs/browser-composition.md#explicit-plugin-composition)
-and the [changelog](CHANGELOG.md#unreleased) for upgrade notes.
+and the [0.8 migration guide](docs/migration-0.8.md) for upgrade notes.
 
 ## Co-locate a capability
 
@@ -106,7 +106,7 @@ custom tools and context propagation.
 
 | Guide | Start here for… |
 | --- | --- |
-| [Migrate to 0.8](docs/migration-0.8.md) | Replace the browser defaults helpers in Harnessed agents |
+| [Migrate to 0.8](docs/migration-0.8.md) | Replace the browser defaults helpers and migrate pointer tools |
 | [Migrate to 0.7](docs/migration-0.7.md) | API changes from 0.6.x |
 | [Migrate to 0.6](docs/migration-0.6.md) | API changes from 0.5.x, observation modes and host event envelopes |
 | [Composition](docs/browser-composition.md) | Layers, plugins, hooks and custom capture backends |
