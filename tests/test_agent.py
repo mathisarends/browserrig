@@ -5,14 +5,15 @@ from harnessed.models import ModelInfo
 from harnessed.plugins import Service
 from harnessed.testing import ScriptedModel
 
-from browserrig import Agent, ContextCompaction, TaskMemory, browser_plugins
+from browserrig import Agent, ContextCompaction, TaskMemory
 
 
 def _without_browser():
     return tuple(
         type(plugin)
-        for plugin in browser_plugins()
-        if not isinstance(plugin, TaskMemory)
+        for plugin in Agent(model=ScriptedModel([])).plugins
+        if type(plugin).__module__.startswith("browserrig.")
+        and not isinstance(plugin, TaskMemory)
     )
 
 

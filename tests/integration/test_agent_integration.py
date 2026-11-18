@@ -1,6 +1,8 @@
 import pytest
 from harnessed import (
-    Agent,
+    Agent as HarnessedAgent,
+)
+from harnessed import (
     Plugin,
     PolicyDecision,
     ToolCall,
@@ -12,6 +14,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel, call
 
 from browserrig import (
+    Agent,
     Browser,
     BrowserPerception,
     Chrome,
@@ -21,7 +24,6 @@ from browserrig import (
     Runtime,
     Screenshots,
     ScreenshotTrigger,
-    browser_plugins,
 )
 from browserrig.events import (
     ActionFinishedEvent,
@@ -66,8 +68,8 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
     )
     agent = Agent(
         model=model,
+        browser=Chrome.launch(url=site),
         plugins=[
-            *browser_plugins(browser=Chrome.launch(url=site)),
             CountScreenshots(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
@@ -146,7 +148,7 @@ async def test_model_tools_yaml_and_activity(site):
     model = CallbackModel(respond)
     agent = Agent(
         model=model,
-        plugins=[*browser_plugins(), Approvals(default=PolicyDecision.ALLOW)],
+        plugins=[Approvals(default=PolicyDecision.ALLOW)],
     )
     result = await agent.run("Fill the form and submit", max_steps=5)
     assert result.text == "Completed"
@@ -201,7 +203,7 @@ async def test_dom_screenshots_are_native_images(site):
             browser = self._setup_browser
             await browser.active_tab.navigate(site + "/canvas")
 
-    agent = Agent(
+    agent = HarnessedAgent(
         model=model,
         plugins=[
             Runtime(),
@@ -249,11 +251,7 @@ async def test_no_progress_hint_is_derived_from_events(site):
     agent = Agent(
         model=CallbackModel(respond),
         plugins=[
-            *browser_plugins(
-                PageReadiness(
-                    options=ReadinessOptions(quiet_ms=50, navigation_min_ms=100)
-                )
-            ),
+            PageReadiness(options=ReadinessOptions(quiet_ms=50, navigation_min_ms=100)),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

@@ -8,7 +8,8 @@ from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Chrome, InputRuntime, Runtime, TabStrip, browser_plugins
+import browserrig
+from browserrig import Chrome, InputRuntime, Runtime, TabStrip
 from browserrig.browser import Browser, Launch
 from browserrig.events import NavigationStartedEvent, TabOpenedEvent, TabUpdatedEvent
 
@@ -164,10 +165,10 @@ async def test_navigate_can_open_the_url_in_a_new_tab(icon_site):
     model = ScriptedModel(
         [call("navigate", url=icon_site + "/", new_tab=True), call("list_tabs"), "Done"]
     )
-    agent = Agent(
+    agent = browserrig.Agent(
         model=model,
+        browser=Chrome.launch(url=icon_site + "/inline"),
         plugins=[
-            *browser_plugins(browser=Chrome.launch(url=icon_site + "/inline")),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

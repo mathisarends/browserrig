@@ -2,11 +2,11 @@ import asyncio
 from contextlib import suppress
 
 import pytest
-from harnessed import Agent
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
     Actions,
+    Agent,
     Browser,
     BrowserPerception,
     Chrome,
@@ -16,7 +16,6 @@ from browserrig import (
     PageReadiness,
     Point,
     ReadinessOptions,
-    browser_plugins,
     wait_for_page,
 )
 from browserrig.browser import Launch
@@ -87,10 +86,8 @@ async def readiness_server():
 async def test_delayed_click_navigation_settles_the_destination(readiness_site):
     agent = Agent(
         model=ScriptedModel(["Done"]),
-        plugins=browser_plugins(
-            browser=Chrome.launch(url=readiness_site),
-            without=(FileTools,),
-        ),
+        browser=Chrome.launch(url=readiness_site),
+        without=(FileTools,),
     )
     async with agent.session() as session:
         observe = session.scope[BrowserPerception]
@@ -138,11 +135,11 @@ async def test_navigation_command_itself_is_bounded_before_the_response_commits(
 ):
     agent = Agent(
         model=ScriptedModel(["Done"]),
-        plugins=browser_plugins(
-            PageReadiness(options=_options(timeout_seconds=0.5, navigation_min_ms=0)),
-            browser=Chrome.launch(url=readiness_site),
-            without=(FileTools,),
-        ),
+        browser=Chrome.launch(url=readiness_site),
+        without=(FileTools,),
+        plugins=[
+            PageReadiness(options=_options(timeout_seconds=0.5, navigation_min_ms=0))
+        ],
     )
     async with agent.session() as session:
         observe = session.scope[BrowserPerception]
@@ -241,11 +238,9 @@ async def test_timeout_reaches_the_next_model_iteration_with_an_explicit_receipt
     model = ScriptedModel(["Done"])
     agent = Agent(
         model=model,
-        plugins=browser_plugins(
-            PageReadiness(options=_options(timeout_seconds=0.5, action_min_ms=0)),
-            browser=Chrome.launch(url=readiness_site),
-            without=(FileTools,),
-        ),
+        browser=Chrome.launch(url=readiness_site),
+        without=(FileTools,),
+        plugins=[PageReadiness(options=_options(timeout_seconds=0.5, action_min_ms=0))],
     )
     async with agent.session() as session:
         observe = session.scope[BrowserPerception]

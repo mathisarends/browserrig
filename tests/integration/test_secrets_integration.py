@@ -2,7 +2,6 @@ import json
 
 import pytest
 from harnessed import (
-    Agent,
     Plugin,
     PolicyDecision,
     ToolCall,
@@ -14,6 +13,7 @@ from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
 from browserrig import (
+    Agent,
     Browser,
     BrowserPerception,
     Chrome,
@@ -21,7 +21,6 @@ from browserrig import (
     ScreenshotTrigger,
     Secret,
     Secrets,
-    browser_plugins,
     wait_for_page,
 )
 from browserrig.events import SecretEnteredEvent
@@ -81,17 +80,14 @@ class _Hold(Plugin, needs=(Browser,)):
 def _agent(site, model, domains, holder, *, path="/", screenshots=False, live=None):
     secrets = Secrets({"pw": Secret(PASSWORD, domains=domains)})
     plugins = [
-        *browser_plugins(
-            BrowserPerception(
-                screenshots=Screenshots(
-                    trigger=ScreenshotTrigger.EACH_STEP
-                    if screenshots
-                    else ScreenshotTrigger.ON_REQUEST
-                )
-            ),
-            secrets,
-            browser=Chrome.launch(url=site + path, arguments=("--site-per-process",)),
+        BrowserPerception(
+            screenshots=Screenshots(
+                trigger=ScreenshotTrigger.EACH_STEP
+                if screenshots
+                else ScreenshotTrigger.ON_REQUEST
+            )
         ),
+        secrets,
         _Hold(holder),
         Approvals(default=PolicyDecision.ALLOW),
     ]
@@ -99,6 +95,7 @@ def _agent(site, model, domains, holder, *, path="/", screenshots=False, live=No
         plugins.append(live)
     return Agent(
         model=model,
+        browser=Chrome.launch(url=site + path, arguments=("--site-per-process",)),
         plugins=plugins,
     )
 

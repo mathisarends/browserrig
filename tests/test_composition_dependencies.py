@@ -48,7 +48,7 @@ from browserrig import (
     Screenshots,
     ScreenshotTrigger,
     SetOfMarks,
-    browser_plugins,
+    Targeting,
 )
 from browserrig.browser import BrowserEvents
 from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
@@ -340,7 +340,17 @@ async def test_native_composition_can_replace_a_complete_browser_instruction_blo
 
     agent = Agent(
         model=ScriptedModel(["unused"]),
-        plugins=browser_plugins(CustomPerception()),
+        plugins=[
+            Runtime(),
+            Chrome(),
+            InputRuntime(),
+            PageReadiness(),
+            CustomPerception(),
+            Actions(),
+            Targeting(),
+            Files(),
+            FileTools(),
+        ],
         instructions="Custom role.",
         prompt=SystemPrompt.from_plugins(
             format=PromptFormat.XML,

@@ -1,10 +1,10 @@
 import pytest
-from harnessed import Agent, PolicyDecision, ToolCall
+from harnessed import PolicyDecision, ToolCall
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
-from browserrig import Chrome, browser_plugins
+from browserrig import Agent, Chrome
 from tests.observations import latest
 
 pytestmark = pytest.mark.integration
@@ -37,8 +37,8 @@ async def test_browser_methods_nest_below_harnessed_spans(site, trace_hooks):
 
     agent = Agent(
         model=CallbackModel(respond),
+        browser=Chrome.launch(url=site),
         plugins=[
-            *browser_plugins(browser=Chrome.launch(url=site)),
             Approvals(default=PolicyDecision.ALLOW),
             OpenTelemetryTracer(tracer_provider=provider, trace_hooks=trace_hooks),
         ],

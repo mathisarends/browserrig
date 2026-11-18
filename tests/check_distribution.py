@@ -24,9 +24,11 @@ from harnessed.testing import ScriptedModel
 from browserrig.scripts import CHOREOGRAPHY, CONTENT, ELEMENT, OVERLAY, SECRET_FIELD
 
 assert callable(Session.append_message)
+assert not any(hasattr(browserrig, name) for name in ('browser_pack', 'browser_plugins'))
 assert ActionKind.MOVE_MOUSE.value == 'move_mouse'
-assert any(isinstance(plugin, FileTransfers) for plugin in browserrig.browser_plugins())
-assert any(isinstance(plugin, DownloadReceiving) for plugin in browserrig.browser_plugins())
+browser_agent = browserrig.Agent(model=ScriptedModel([]))
+assert any(isinstance(plugin, FileTransfers) for plugin in browser_agent.plugins)
+assert any(isinstance(plugin, DownloadReceiving) for plugin in browser_agent.plugins)
 assert browserrig.__version__ == importlib.metadata.version('browserrig')
 distribution = importlib.metadata.distribution('browserrig')
 assert distribution.metadata['License-Expression']

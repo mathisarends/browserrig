@@ -20,8 +20,6 @@ from .completion import Done, StepBudgetHints
 from .composition import (  # smelt: ignore[SMT106] -- public facade
     ContextCompaction,
     WindowRatio,
-    browser_pack,
-    browser_plugins,
 )
 from .core import (
     ActionContext,
@@ -256,7 +254,5 @@ __all__ = [
     "Todo",
     "TodoList",
     "Todos",
-    "browser_plugins",
-    "browser_pack",
     "wait_for_page",
 ]

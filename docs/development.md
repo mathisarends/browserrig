@@ -47,7 +47,7 @@ types/constants come first. Apply this to production code, examples and tests.
 
 Keep plugin configuration reusable and state activation-local. Declare lifetime
 services with `needs`/`observes`; acquire resources in setup and register cleanup.
-Compose capabilities in the application or a pack. See
+List capabilities at the application's composition root. See
 [composition](browser-composition.md) and [AGENTS.md](../AGENTS.md) for tool guidance.
 
 JavaScript requires braces, at most two nested blocks and no nested ternaries.

@@ -34,7 +34,6 @@ from browserrig import (
     TaskMemory,
     WindowRatio,
     WorkspaceTools,
-    browser_plugins,
 )
 from browserrig.input import Instant
 from browserrig.observation import (  # smelt: ignore[SMT319] -- facade identity
@@ -162,8 +161,10 @@ def test_plugins_replace_matching_defaults_in_place():
         )
     )
     compaction = Compaction(trigger=WindowRatio(0.5))
-    defaults = browser_plugins()
-    composed = browser_plugins(compaction, observe)
+    defaults = browserrig.Agent(model=ScriptedModel([])).plugins
+    composed = browserrig.Agent(
+        model=ScriptedModel([]), plugins=[compaction, observe]
+    ).plugins
     assert len(composed) == len(defaults)
     assert composed[_index(defaults, TaskMemory)] is compaction
     assert observe in composed and compaction in composed
@@ -172,22 +173,26 @@ def test_plugins_replace_matching_defaults_in_place():
 
 def test_plugins_without_a_matching_default_are_added_and_none_is_skipped():
     secrets = Secrets({"pw": Secret("value", domains="example.org")})
-    composed = browser_plugins(None, secrets, None)
+    composed = browserrig.Agent(
+        model=ScriptedModel([]), plugins=[None, secrets, None]
+    ).plugins
     assert composed[-1] is secrets
     assert None not in composed
-    assert len(composed) == len(browser_plugins()) + 1
+    assert len(composed) == len(browserrig.Agent(model=ScriptedModel([])).plugins) + 1
 
 
 def test_two_plugins_for_the_same_default_conflict():
     with pytest.raises(PluginConflict, match="BrowserPerception"):
-        browser_plugins(BrowserPerception(), BrowserPerception())
+        browserrig.Agent(
+            model=ScriptedModel([]), plugins=[BrowserPerception(), BrowserPerception()]
+        )
 
 
 @pytest.mark.parametrize("group", [WorkspaceTools, BrowserFileTools])
 def test_one_file_tool_group_replaces_the_combined_default_in_place(group):
-    defaults = browser_plugins()
+    defaults = browserrig.Agent(model=ScriptedModel([])).plugins
     tools = group()
-    composed = browser_plugins(tools)
+    composed = browserrig.Agent(model=ScriptedModel([]), plugins=[tools]).plugins
     assert len(composed) == len(defaults)
     assert composed[_index(defaults, FileTools)] is tools
     assert not any(isinstance(plugin, FileTools) for plugin in composed)
@@ -196,33 +201,38 @@ def test_one_file_tool_group_replaces_the_combined_default_in_place(group):
 def test_without_matches_each_file_tool_group_exactly():
     assert not isinstance(FileTools(), (WorkspaceTools, BrowserFileTools))
     with pytest.raises(ValueError, match="no recipes matching: BrowserFileTools"):
-        browser_plugins(without=(BrowserFileTools,))
+        browserrig.Agent(model=ScriptedModel([]), without=(BrowserFileTools,))
 
 
 def test_two_file_tool_groups_conflict():
     with pytest.raises(PluginConflict, match="browserrig.file-tools"):
-        browser_plugins(WorkspaceTools(), BrowserFileTools())
+        browserrig.Agent(
+            model=ScriptedModel([]), plugins=[WorkspaceTools(), BrowserFileTools()]
+        )
 
 
 def test_configured_pacing_and_choreography_replace_their_defaults_in_place():
-    defaults = browser_plugins()
+    defaults = browserrig.Agent(model=ScriptedModel([])).plugins
     pacing, choreography = InputPacing(Instant()), Choreography()
-    composed = browser_plugins(choreography, pacing)
+    composed = browserrig.Agent(
+        model=ScriptedModel([]), plugins=[choreography, pacing]
+    ).plugins
     assert len(composed) == len(defaults)
     assert composed[_index(defaults, InputPacing)] is pacing
     assert composed[_index(defaults, Choreography)] is choreography
 
 
 def test_without_drops_defaults_and_rejects_types_that_are_not_defaults():
-    composed = browser_plugins(
-        without=(Choreography, ChoreographyOverlay, TabStrip, Compaction)
-    )
+    composed = browserrig.Agent(
+        model=ScriptedModel([]),
+        without=(Choreography, ChoreographyOverlay, TabStrip, Compaction),
+    ).plugins
     assert not any(
         isinstance(plugin, (Choreography, ChoreographyOverlay, TabStrip, Compaction))
         for plugin in composed
     )
     with pytest.raises(ValueError, match="contains no recipes matching: Secrets"):
-        browser_plugins(without=(Secrets,))
+        browserrig.Agent(model=ScriptedModel([]), without=(Secrets,))
 
 
 def _index(plugins, kind):

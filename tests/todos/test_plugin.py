@@ -6,7 +6,8 @@ from harnessed.plugins import Compaction
 from harnessed.services import Summary
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Todo, TodoList, Todos, browser_plugins
+import browserrig
+from browserrig import Todo, TodoList, Todos
 
 _CHOOSE = {"id": "choose", "title": "Pick the best-rated shoe", "status": "in_progress"}
 _BUY = {"id": "buy", "title": "Purchase and inspect confirmation"}
@@ -31,7 +32,8 @@ async def test_update_result_shows_the_list_without_reminders_or_prompt_changes(
     model = ScriptedModel(["Done"])
     await Agent(model=model).run("Simple question")
     assert not model.requests[0].tools
-    assert not any(isinstance(plugin, Todos) for plugin in browser_plugins())
+    browser_agent = browserrig.Agent(model=model)
+    assert not any(isinstance(plugin, Todos) for plugin in browser_agent.plugins)
 
     model = ScriptedModel([_update(_CHOOSE, _BUY), "Done"])
     async with Agent(model=model, plugins=[Todos()]).session() as session:

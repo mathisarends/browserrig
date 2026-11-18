@@ -53,9 +53,7 @@ schemas, including tools from other plugins and MCP servers. It costs extra
 output tokens per call. The envelope is
 validated and removed before the tool runs; tool implementations do not change.
 Missing or invalid labels are dropped by default and the call still runs.
-Without the plugin, schemas and presentation stay unchanged. For a native
-Harnessed agent, compose `plugins=[browser_pack(), ActionLabels()]`;
-no separate pack flag is needed.
+Add `ActionLabels()` to the `plugins` list of your Browserrig or Harnessed agent.
 
 Hosts access the label directly in their stream's `match`:
 

@@ -7,7 +7,17 @@ from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Browser, Chrome, ChromeBrowser, browser_plugins
+from browserrig import (
+    Actions,
+    Browser,
+    BrowserPerception,
+    Chrome,
+    ChromeBrowser,
+    InputRuntime,
+    JavaScriptTools,
+    PageReadiness,
+    Runtime,
+)
 from browserrig.browser import Launch
 from browserrig.core import BrowserError
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent
@@ -42,7 +52,13 @@ async def test_agent_javascript_shell_retains_main_world_state_awaits_and_report
     agent = Agent(
         model=model,
         plugins=[
-            *browser_plugins(browser=Chrome.launch(url=url)),
+            Runtime(),
+            Chrome.launch(url=url),
+            InputRuntime(),
+            PageReadiness(),
+            BrowserPerception(),
+            Actions(),
+            JavaScriptTools(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

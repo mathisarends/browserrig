@@ -2,7 +2,7 @@
 
 [Back to README](../README.md) · [Composition and hooks](browser-composition.md)
 
-`browserrig.Agent` composes Harnessed's native runtime with the browser pack.
+`browserrig.Agent` composes Harnessed's native runtime with the standard browser plugins.
 `run()`, `session()`, streaming, controls and persistence remain Harnessed APIs.
 See the [quick start](../README.md#quick-start) for a complete runnable example.
 
@@ -34,10 +34,10 @@ rejected without an approval handler or an allow policy.
 
 A supplied plugin replaces the default in the same slot; other plugins are added.
 `without=(PluginType, ...)` removes defaults, and `None` entries are skipped.
-Conflicting explicit plugins raise `PluginConflict`. Use `browser_pack()` in an
-existing Harnessed agent, or mount individual capabilities. The
-[composition guide](browser-composition.md) covers recipes, dependency injection,
-co-located features and extension hooks.
+Conflicting explicit plugins raise `PluginConflict`. In a custom Harnessed agent,
+list the capabilities your application needs. The
+[composition guide](browser-composition.md) covers explicit plugin lists,
+dependency injection, co-located features and extension hooks.
 
 `agent.describe()` reports the resolved plugins and replacements. Startup validates
 required services and raises `PluginDependencyError` for missing dependencies.
@@ -184,7 +184,7 @@ prioritize unfinished checks. The loop still enforces the step limit.
 
 ## System prompts and optional MCP tools
 
-The browser pack collects each selected plugin's `instructions()` in configured
+The standard agent collects each selected plugin's `instructions()` in configured
 list order. `instructions=` prepends caller guidance. Use
 `prompt=SystemPrompt.from_plugins(format=PromptFormat.XML)` to change formatting;
 a standalone `SystemPrompt(...)` document omits plugin blocks. These types come
