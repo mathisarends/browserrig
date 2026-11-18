@@ -283,7 +283,7 @@ can manage an operation explicitly with `Actions.run(...)`.
 | Contract | Implement |
 | --- | --- |
 | `CaptureStrategy` | `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent` |
-| `Renderer` | `render(snapshot)`, `instructions(screenshots)` and `refs()` |
+| `Renderer` | `render(snapshot)`, `instructions()` and `refs()` |
 | `References` | `async resolve(tab, snapshot, ref) -> ElementHandle` |
 | `ElementHandle` | `element: ElementInfo`; `async locate(*, aim=None) -> ElementPoint` |
 | `ReadinessPolicy` | `create(context) -> ReadinessStrategy`, with a fresh mutable probe per wait |
@@ -301,7 +301,8 @@ DOM reveal scrolls exact containers and reports measured movement.
 `PageContent.content` can carry a reading tree of `ContentGroup`, `TextBlock`,
 `Heading` and `ElementRef`; leaving it unset retains flat rendering. A custom
 `fingerprint` supports change comparisons. `BrowserPerception` provides the callable
-`ResolveDomElement`: `await scope[ResolveDomElement](tab, ref)` returns a DOM handle.
+`ResolveDomElement` when the capture declares `supports_dom_refs = True`. The built-in
+`DomCapture` declares it. When the service is available, `await scope[ResolveDomElement](tab, ref)` returns a DOM handle.
 Native forms, `DomUploadTools` and `DomTypingTools` use this service; other backends can use
 pointer input and focused `send_keys`. `DomActionChains` conservatively ends input chains with
 custom resolvers; supply a matching policy for stronger continuation checks.
@@ -324,10 +325,28 @@ Capture, image retention and text compaction are independent:
 | `Screenshots(retention=TrimInBatches(max_images=6, min_images=3))` | On overflow, trim oldest images down to three |
 | `Screenshots(retention=UntilCompaction())` | Retain images until compaction removes their steps; requires compaction to bound history |
 
-Configure `BrowserPerception(text=DomText(mode=DomTextMode.DELTA), screenshots=Screenshots())`
-for both modalities. Set either option to `None` to omit that modality.
-Perception itself registers no model tools: add `ScreenshotTools()` for screenshot
-requests and `PageSearchTools()` for page search.
+Configure `BrowserPerception(text=TextObservations(mode="delta"), screenshots=Screenshots())`
+for both modalities. Set either option to `None` to omit that modality. Pair an
+explicit capture with a renderer when delivering text.
+
+```python
+from browserrig import BrowserPerception, DomCapture, DomRenderer, Screenshots, TextObservations
+
+perception = BrowserPerception(
+    capture=DomCapture(page_prose="sparse"),
+    text=TextObservations(mode="delta"),
+    renderer=DomRenderer(),
+    screenshots=Screenshots(),
+)
+```
+
+For image-only pixel capture, select `ScreenshotCapture()` with `text=None` and a
+`Screenshots` configuration. A composition that avoids DOM readiness probes can
+set both readiness policies to `NetworkQuiet(inner=BrowserReady())`. Use
+`DomCapture()` to collect DOM refs for screenshot marks.
+Perception itself registers no model tools. Add `ScreenshotTools()` for screenshot
+requests and `PageSearchTools()` for page search. The screenshot tool is available
+when the session configures screenshots.
 `DomTypingTools`, `DomScrollTools` and `FormTools` are separate DOM capabilities.
 Text observations remain until compaction. Coordinate tools use the latest
 included screenshot's geometry; an image from another document cannot supply

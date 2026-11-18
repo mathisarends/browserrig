@@ -2,7 +2,7 @@ import json
 from typing import Annotated
 
 from harnessed import Plugin
-from harnessed.kernel import needs
+from harnessed.kernel import needs, observes
 from pydantic import Field
 
 from browserrig.core import ActionKind, BrowserError
@@ -12,17 +12,19 @@ from browserrig.scripts import SelectionResult
 
 from .effects import Effect
 from .execution import Actions
+from .parameters import resolve_dom_element, supports_dom_refs
 from .targeting import Targeting
 
 
 class FormTools(Plugin):
     # Batching form fields is covered by the action-chain instructions of Actions.
-    _elements = needs(ResolveDomElement)
+    _elements = observes(ResolveDomElement)
     _actions = needs(Actions)
     _targets = needs(Targeting)
 
     @tool(
         kind=ActionKind.SELECT,
+        enabled=supports_dom_refs,
         chainable=True,
         description="Select an option in a native single-select.",
     )
@@ -32,14 +34,15 @@ class FormTools(Plugin):
         value: Annotated[str, Field(description="Exact option label or value.")],
     ) -> Effect:
         tab = self._actions.tab
-        await self._elements(tab, ref)
+        await resolve_dom_element(self._elements, tab, ref)
         point = await self._targets.hover(ref=ref, tab=tab)
-        handle = await self._elements(tab, ref)
+        handle = await resolve_dom_element(self._elements, tab, ref)
         await handle.select(value)
         return Effect("Option selected.", prepared_scroll=point.scrolled)
 
     @tool(
         kind=ActionKind.SELECT_OPTIONS,
+        enabled=supports_dom_refs,
         chainable=True,
         description="Replace and verify a native multi-select's selection.",
     )
@@ -55,10 +58,10 @@ class FormTools(Plugin):
         ],
     ) -> Effect:
         tab = self._actions.tab
-        handle = await self._elements(tab, ref)
+        handle = await resolve_dom_element(self._elements, tab, ref)
         await handle.validate_options(values)
         point = await self._targets.hover(ref=ref, tab=tab)
-        handle = await self._elements(tab, ref)
+        handle = await resolve_dom_element(self._elements, tab, ref)
         await handle.validate_options(values)
         result = await handle.select_options(values)
         selected = _selection(result)
@@ -74,6 +77,7 @@ class FormTools(Plugin):
 
     @tool(
         kind=ActionKind.SET_DATE,
+        enabled=supports_dom_refs,
         chainable=True,
         description="Set and verify a native date/time field.",
     )
@@ -85,7 +89,7 @@ class FormTools(Plugin):
         ],
     ) -> Effect:
         tab = self._actions.tab
-        handle = await self._elements(tab, ref)
+        handle = await resolve_dom_element(self._elements, tab, ref)
         if handle.element.input_type not in {
             "date",
             "time",
@@ -95,7 +99,7 @@ class FormTools(Plugin):
         }:
             raise BrowserError("Element is not a native date/time input")
         point = await self._targets.hover(ref=ref, tab=tab)
-        handle = await self._elements(tab, ref)
+        handle = await resolve_dom_element(self._elements, tab, ref)
         await handle.set_value(value)
         return Effect(
             "Date/time value set and verified.", prepared_scroll=point.scrolled

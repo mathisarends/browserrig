@@ -3,7 +3,7 @@ from collections.abc import Callable
 
 from harnessed.models import UserMessage
 
-from .config import DomText, DomTextMode
+from .config import TextObservations
 from .delta import delta, unmarked
 from .models import Snapshot
 from .state import ObservedText, PageView, TextState
@@ -13,7 +13,7 @@ def project_text(
     snapshot: Snapshot,
     state: TextState,
     *,
-    options: DomText,
+    options: TextObservations,
     render: Callable[[Snapshot], str],
     generation: int,
     with_image: bool,
@@ -26,14 +26,14 @@ def project_text(
     key = hashlib.sha256(unmarked(text).encode()).hexdigest()
     if (
         not with_image
-        and options.mode == DomTextMode.DELTA
+        and options.mode == "delta"
         and state.visible
         and state.sent_key == key
     ):
         return None
     state.sent_key, state.sent_ref, state.visible = key, snapshot.id, False
     return _observation(
-        snapshot, text, state, full=with_image or options.mode == DomTextMode.FULL
+        snapshot, text, state, full=with_image or options.mode == "full"
     )
 
 

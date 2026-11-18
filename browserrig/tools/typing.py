@@ -14,6 +14,7 @@ from browserrig.secrets import Secrets
 
 from .effects import Effect
 from .execution import Actions
+from .parameters import resolve_dom_element, supports_dom_refs
 from .targeting import Targeting
 from .text_entry import entered, secret_entered
 
@@ -25,11 +26,12 @@ class DomTypingTools(Plugin):
     _targets = needs(Targeting)
     _browser = needs(Browser)
     _input = needs(Input)
-    _elements = needs(ResolveDomElement)
+    _elements = observes(ResolveDomElement)
     _secrets = observes(Secrets)
 
     @tool(
         kind=ActionKind.TYPE,
+        enabled=supports_dom_refs,
         chainable=True,
         description="Type into an observed DOM field and verify its value.",
     )
@@ -42,9 +44,9 @@ class DomTypingTools(Plugin):
         ] = True,
     ) -> Effect:
         tab = self._actions.tab
-        await self._elements(tab, ref)
+        await resolve_dom_element(self._elements, tab, ref)
         await self._targets.hover(ref=ref, tab=tab)
-        field = await self._elements(tab, ref)
+        field = await resolve_dom_element(self._elements, tab, ref)
         secrets = self._secrets
         # Check the secrets' domains before the field is touched.
         entry = (

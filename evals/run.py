@@ -16,8 +16,11 @@ from browserrig import (
     DomTypingTools,
     FormTools,
     JavaScriptTools,
+    NetworkQuiet,
     Nudges,
+    PageReadiness,
     PageSearchTools,
+    ScreenshotCapture,
     ScreenshotTools,
     WheelTools,
     WorkspaceTools,
@@ -25,14 +28,15 @@ from browserrig import (
 from browserrig.core import MODEL_PROFILES
 from browserrig.observation import (
     BrowserPerception,
+    CaptureStrategy,
     DomCapture,
-    DomText,
-    DomTextMode,
-    PageText,
+    DomRenderer,
     Screenshots,
     ScreenshotTrigger,
     SetOfMarks,
+    TextObservations,
 )
+from browserrig.readiness import BrowserReady
 
 from . import report
 from .environments import DEFAULT_CONFIG, DEFAULT_DATA, Environments
@@ -97,9 +101,8 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--page-text",
-        type=PageText,
-        choices=tuple(PageText),
-        default=PageText.INLINE,
+        choices=("inline", "sparse", "off"),
+        default="inline",
         help="Prose in observations; compare arms such as inline and off",
     )
     parser.add_argument("--no-headings", dest="headings", action="store_false")
@@ -203,7 +206,12 @@ async def main() -> None:
                     model,
                     args.headed,
                     args.humanlike,
-                    (*plugins, perception, *inputs),
+                    (
+                        *plugins,
+                        perception,
+                        *inputs,
+                        *_pixel_readiness(args.observation),
+                    ),
                     args.max_steps,
                     args.timeout_seconds,
                     without=_excluded_tools(
@@ -281,17 +289,19 @@ def _perception(args, parser) -> tuple[BrowserPerception, bool]:
     mode = args.observation
     text = None
     if mode is None or mode.startswith("text"):
-        text = DomText(mode=DomTextMode.DELTA if mode is None else DomTextMode.FULL)
-    capture = None
+        text = TextObservations(mode="delta" if mode is None else "full")
+    capture: CaptureStrategy = ScreenshotCapture()
     marks = SetOfMarks() if mode is None or mode.endswith("-marks") else None
     if text is not None or marks is not None:
         capture = DomCapture(
-            text=args.page_text, headings=args.headings, landmarks=args.landmarks
+            page_prose=args.page_text, headings=args.headings, landmarks=args.landmarks
         )
     if mode == "text":
         if args.screenshot_trigger is not None or args.screenshot_tool:
             parser.error("Screenshot options require an image observation variant")
-        return BrowserPerception(text=text, capture=capture), False
+        return BrowserPerception(
+            text=text, capture=capture, renderer=DomRenderer()
+        ), False
     default = (
         ScreenshotTrigger.ON_REQUEST if mode is None else ScreenshotTrigger.EACH_STEP
     )
@@ -303,8 +313,18 @@ def _perception(args, parser) -> tuple[BrowserPerception, bool]:
         parser.error("on_request requires the screenshot tool")
     screenshots = Screenshots(trigger=trigger, marks=marks, skip_unchanged=mode is None)
     return BrowserPerception(
-        text=text, screenshots=screenshots, capture=capture
+        text=text,
+        screenshots=screenshots,
+        capture=capture,
+        renderer=DomRenderer() if text else None,
     ), enabled
+
+
+def _pixel_readiness(observation: str | None) -> tuple[PageReadiness, ...]:
+    if observation != "screenshot":
+        return ()
+    policy = NetworkQuiet(inner=BrowserReady())
+    return (PageReadiness(initial=policy, ongoing=policy),)
 
 
 def _excluded_tools(

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 from cdpify import CDPCommandError
 
-from browserrig import CaptureContent, DomCapture, PageText
+from browserrig import CaptureContent, DomCapture
 from browserrig import PageContent as Extraction
 from browserrig.core import Bounds, BrowserError, ReadinessPhase, StaleElement
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
@@ -205,10 +205,10 @@ async def test_optional_screenshot_failure_retains_the_dom_and_cancels_stalled_w
 @pytest.mark.parametrize(
     "text,phase,budgets",
     [
-        (PageText.INLINE, ReadinessPhase.OBSERVATION, (500, 0)),
-        (PageText.SPARSE, ReadinessPhase.OBSERVATION, (0, 500)),
-        (PageText.OFF, ReadinessPhase.OBSERVATION, (0, 0)),
-        (PageText.INLINE, ReadinessPhase.ACTION, (0, 0)),
+        ("inline", ReadinessPhase.OBSERVATION, (500, 0)),
+        ("sparse", ReadinessPhase.OBSERVATION, (0, 500)),
+        ("off", ReadinessPhase.OBSERVATION, (0, 0)),
+        ("inline", ReadinessPhase.ACTION, (0, 0)),
     ],
 )
 async def test_page_text_mode_selects_the_extraction_budget(
@@ -221,7 +221,7 @@ async def test_page_text_mode_selects_the_extraction_budget(
     tab.frame_limitations = ()
     extracted = AsyncMock(return_value=page)
     monkeypatch.setattr(dom_capture_module, "extract", extracted)
-    strategy = DomCapture(text=text, max_text_chars=500)
+    strategy = DomCapture(page_prose=text, max_text_chars=500)
     await strategy.collect(tab, report, screenshots=False)
     extracted.assert_awaited_once()
     options = extracted.await_args.kwargs
