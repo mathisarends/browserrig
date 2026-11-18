@@ -21,8 +21,9 @@ Upgrade from 0.6.x using the [migration guide](docs/migration-0.7.md).
   `DomText` and `DomTextMode`. Use `DomCapture(page_prose="inline" | "sparse" | "off")`
   in place of `DomCapture(text=PageText...)`. `PageProse` and `TextMode` are literal
   types. Use `DomRenderer()` without text or landmark settings.
-- The default capture is `DomCapture()`. Pass a renderer with explicit capture
-  when text is enabled. For pixel-only observations pass `ScreenshotCapture()`,
+- The default capture is `DomCapture()`. With text enabled, captures that support
+  DOM refs use `DomRenderer()` by default. Pass a renderer for other capture
+  strategies. For pixel-only observations pass `ScreenshotCapture()`,
   `text=None` and `Screenshots(...)`. Configure readiness separately. For the
   previous browser-event readiness, use `NetworkQuiet(inner=BrowserReady())` as
   the initial and ongoing policy. Keep DOM capture for DOM screenshot marks.

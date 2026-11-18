@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from browserrig import BrowserPerception, DomCapture
+from browserrig import BrowserPerception, DomCapture, DomRenderer, ScreenshotCapture
 from browserrig.browser import Connect, Launch
 from browserrig.core import Bounds, Geometry, Point, Region, StaleElement
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
@@ -286,9 +286,19 @@ def test_default_observation_explains_context_without_enabling_screenshots():
     assert "Every observation includes a screenshot" not in instructions
 
 
-def test_text_with_an_explicit_capture_requires_a_renderer():
-    with pytest.raises(ValueError, match="explicit capture require a renderer"):
-        BrowserPerception(capture=DomCapture(page_prose="sparse"))
+def test_explicit_dom_capture_uses_the_default_text_renderer():
+    capture = DomCapture(page_prose="sparse")
+    perception = BrowserPerception(capture=capture)
+    assert perception.capture_strategy is capture
+    assert isinstance(perception.renderer, DomRenderer)
+
+
+def test_text_with_a_capture_without_dom_refs_requires_a_renderer():
+    capture = ScreenshotCapture()
+    with pytest.raises(ValueError, match="this capture require a renderer"):
+        BrowserPerception(capture=capture)
+    renderer = DomRenderer()
+    assert BrowserPerception(capture=capture, renderer=renderer).renderer is renderer
 
 
 def _snapshot(*elements: Element, **fields) -> Snapshot:

@@ -328,16 +328,16 @@ Capture, image retention and text compaction are independent:
 | `Screenshots(retention=UntilCompaction())` | Retain images until compaction removes their steps; requires compaction to bound history |
 
 Configure `BrowserPerception(text=TextObservations(mode="delta"), screenshots=Screenshots())`
-for both modalities. Set either option to `None` to omit that modality. Pair an
-explicit capture with a renderer when delivering text.
+for both modalities. Set either option to `None` to omit that modality.
+Captures that support DOM refs use `DomRenderer()` by default. Supply a renderer
+when delivering text with another capture strategy.
 
 ```python
-from browserrig import BrowserPerception, DomCapture, DomRenderer, Screenshots, TextObservations
+from browserrig import BrowserPerception, DomCapture, Screenshots, TextObservations
 
 perception = BrowserPerception(
     capture=DomCapture(page_prose="sparse"),
     text=TextObservations(mode="delta"),
-    renderer=DomRenderer(),
     screenshots=Screenshots(),
 )
 ```
