@@ -115,12 +115,10 @@ multi-tab guidance comes from `MultiTab()`. The current tab's internal identity
 is retained for input, references and observation coherence. `TabStrip()` remains
 an independent viewer feature in either mode.
 
-**Pending Harnessed integration:** the shared `NewTab` annotation in
-`browserrig/tools/parameters.py` is prepared for
-[`ToolParameter(enabled=...)`](https://github.com/mathisarends/harnessed/issues/120).
-Until that API is available, `new_tab` remains in navigation and pointer schemas;
-single-tab mode already rejects `new_tab=True` before dispatching input. Finish
-this dependency integration before treating the single-tab model API as complete.
+With `SingleTab()`, the `navigate`, `click` and `click_at` tool schemas omit
+`new_tab`. Tool calls that explicitly supply it are rejected before browser input,
+even if the supplied value is `False`. `MultiTab()` exposes the parameter with
+its usual default of `False`. These schemas are selected when the tools activate.
 
 ## Co-locate tools, instructions, hooks and state
 

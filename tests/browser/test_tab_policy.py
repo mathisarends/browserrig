@@ -27,7 +27,8 @@ async def test_tab_mode_controls_tools_and_prompt(mode, multiple):
         item for item in agent.plugins if isinstance(item, (SingleTab, MultiTab))
     ]
     assert selected == [recipe]
-    async with _agent(recipe).session() as session:
+    model = ScriptedModel(["Done"])
+    async with _agent(recipe, model=model).session() as session:
         assert session.scope[TabPolicy].multiple is multiple
         names = set(session.tools)
         assert (
@@ -36,6 +37,16 @@ async def test_tab_mode_controls_tools_and_prompt(mode, multiple):
         prompt = await session.prompt.render()
         assert ("new_tab" in prompt) is multiple
         assert ("This session uses one browser tab" in prompt) is not multiple
+        result = await session.run("Inspect browser tools")
+        assert result.text == "Done"
+        offered = {tool.name: tool for tool in model.requests[0].tools}
+        for name in ("navigate", "click", "click_at"):
+            definition = session.tools[name]
+            assert definition == offered[name]
+            properties = definition.parameters["properties"]
+            assert ("new_tab" in properties) is multiple
+            if multiple:
+                assert properties["new_tab"]["default"] is False
         if not multiple:
             result = await session.scope[ToolRegistry].execute(
                 ToolCall("open_tab", {"url": "https://example.com"})
@@ -58,7 +69,8 @@ async def test_default_mode_is_multi_tab_and_policies_are_activation_local():
 
 
 @pytest.mark.parametrize("name", ["navigate", "click", "click_at"])
-async def test_single_tab_rejects_explicit_new_tab_before_input(name):
+@pytest.mark.parametrize("new_tab", [True, False])
+async def test_single_tab_rejects_explicit_new_tab_before_input(name, new_tab):
     agent = _agent(SingleTab())
     arguments = {
         "navigate": {"url": "https://example.com"},
@@ -67,17 +79,16 @@ async def test_single_tab_rejects_explicit_new_tab_before_input(name):
     }[name]
     async with agent.session() as session:
         result = await session.scope[ToolRegistry].execute(
-            ToolCall(name, {**arguments, "new_tab": True})
+            ToolCall(name, {**arguments, "new_tab": new_tab})
         )
-        assert result.is_error and "single-tab mode" in result.text
+        assert result.is_error and "Disabled tool parameters" in result.text
         services = session.scope[FakeServices]
-        assert services.browser.active_tab.url == "https://example.org/"
-        assert services.input.mouse.position_in("tab-1") is None
+        assert "new_tab" in result.text and not services.events
 
 
-def _agent(mode):
+def _agent(mode, *, model=None):
     return HarnessedAgent(
-        model=ScriptedModel([]),
+        model=ScriptedModel([]) if model is None else model,
         plugins=[
             FakeServices(),
             mode,

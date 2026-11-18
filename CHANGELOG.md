@@ -36,6 +36,10 @@
 
 ### Changes
 
+- Add `SingleTab()` to keep links, forms, simple popups and file previews in
+  one tab. Single-tab sessions omit the tab overview and tab management tools.
+  `MultiTab()` remains the default. Upgrade to Harnessed 0.19.0 so single-tab
+  tool schemas omit `new_tab` and reject it when supplied explicitly.
 - Add `WheelTools()` for native scrolling at the pointer in screenshot-based
   sessions. WebArena selects a variant with `--observation text`,
   `screenshot`, `screenshot-marks`, `text-screenshot`, or

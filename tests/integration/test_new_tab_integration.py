@@ -6,14 +6,14 @@ from harnessed.models import ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
 
-from browserrig import Agent, Choreography, Chrome
+from browserrig import Agent, Choreography, Chrome, SingleTab
 from browserrig.events import KeyPressedEvent, TabOpenedEvent
 from tests.observations import all_states
 
 pytestmark = pytest.mark.integration
 
 
-async def _click(site, name, **arguments):
+async def _click(site, name, *, tab_mode=None, **arguments):
     """Click the element called `name` on /links; return what the agent saw next and
     every event, including those only streamed to viewers.
     """
@@ -38,7 +38,7 @@ async def _click(site, name, **arguments):
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site + "/links"),
-        plugins=[Approvals(default=PolicyDecision.ALLOW), Choreography()],
+        plugins=[Approvals(default=PolicyDecision.ALLOW), Choreography(), tab_mode],
     )
     streamed = []
     ready = asyncio.Event()
@@ -66,6 +66,13 @@ async def test_click_on_a_target_blank_link_follows_into_the_loaded_tab(site):
     assert seen["first_tab"] in seen["reply"]
     assert not any("A tab opened" in text for text in seen["nudges"])
     assert not any(isinstance(event, KeyPressedEvent) for event in events)
+
+
+async def test_click_without_new_tab_parameter_follows_link_in_single_tab(site):
+    seen, events = await _click(site, "Blank link", tab_mode=SingleTab())
+    assert seen["page"]["tab"] == seen["first_tab"]
+    assert seen["page"]["url"] == site + "/other"
+    assert not any(isinstance(event, TabOpenedEvent) for event in events)
 
 
 async def test_new_tab_click_holds_the_link_modifier_and_follows(site):
