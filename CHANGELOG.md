@@ -2,22 +2,32 @@
 
 ## Unreleased
 
-### Breaking changes
+## 0.8.0 (2026-11-18)
 
-- `PointerTools` provides coordinate input. `move_mouse(x, y)` requires both
-  coordinates. Use `ReferencePointerTools` for `click(ref)`,
-  `drag(source_ref, target_ref)` and `hover(ref)`, which replaces
-  `move_mouse(ref=...)`. The default browser agent includes both plugins.
-  See [pointer tool composition](docs/browser-composition.md#choose-pointer-tools).
+Upgrade from 0.7.x using the [migration guide](docs/migration-0.8.md).
+
+### Breaking changes
 
 - Remove `browser_pack()` and `browser_plugins()`. Use `browserrig.Agent` for
   the standard setup or list the selected Browserrig plugins in your Harnessed
-  agent. See the [0.8 migration guide](docs/migration-0.8.md) (#93).
+  agent (#98).
+- Split coordinate and element-reference input. `PointerTools` provides
+  `click_at`, `drag_at` and `move_mouse(x, y)`. Use `ReferencePointerTools` for
+  `click(ref)`, `drag(source_ref, target_ref)` and `hover(ref)`, which replaces
+  `move_mouse(ref=...)`. Managed reference-based hovers use `ActionKind.HOVER`.
+  The standard agent includes both plugins (#95).
 
 ### Added
 
-- Plugins can register `@hook(CheckAction)` to validate managed browser actions
-  before dispatch. See [action validation](docs/browser-composition.md#validate-an-action-before-dispatch).
+- Register `@hook(CheckAction)` to inspect the tab and action kind and reject a
+  managed browser action before dispatch. See
+  [action validation](docs/browser-composition.md#validate-an-action-before-dispatch)
+  (#99).
+
+### Development
+
+- Upgrade the development checks to Smelt 0.13.0 and refresh the project policy
+  and schema (#92).
 
 ## 0.7.0 (2026-11-18)
 
