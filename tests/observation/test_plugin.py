@@ -196,6 +196,7 @@ async def test_explicit_screenshot_reports_reuse_or_unavailability(image_availab
                     height=600,
                     scroll_y=0,
                     page_height=600,
+                    text="" if image_available else "Screenshot unavailable.",
                 ),
                 image=_PNG if screenshots and image_available else None,
             )
@@ -235,8 +236,8 @@ async def test_explicit_screenshot_reports_reuse_or_unavailability(image_availab
         for part in message.content
         if isinstance(part, ImagePart)
     ]
-    status = (
-        "screen unchanged this step" if image_available else "Screenshot unavailable."
-    )
     assert len(images) == int(image_available)
-    assert any(status in message.text for message in messages)
+    if image_available:
+        assert any("screen unchanged this step" in message.text for message in messages)
+    else:
+        assert any(message.text == "Screenshot unavailable." for message in messages)

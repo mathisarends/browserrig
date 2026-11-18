@@ -59,7 +59,7 @@ class DomCapture(Options):
         text = "off" if report.phase == ReadinessPhase.ACTION else self.page_prose
         record(
             screenshots=screenshots,
-            page_text=text,
+            page_prose=text,
             headings=self.headings,
             landmarks=self.landmarks,
         )

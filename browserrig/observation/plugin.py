@@ -37,7 +37,7 @@ from .dom_capture import DomCapture
 from .handle import DomElementHandle
 from .hooks import ProjectObservation
 from .images import NOTE_SOURCE, attach_image, image_note, project_image, trim_images
-from .models import CapturedImage, Snapshot
+from .models import CapturedImage, ScreenshotStatus, Snapshot
 from .pixels import ScreenshotCapture
 from .references import ElementHandle, References
 from .renderer import DomRenderer, Renderer, screenshot_instructions
@@ -188,8 +188,8 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 redaction=secrets,
             )
             if withheld:
-                observation = observation.with_limitation(
-                    "Screenshot withheld: it may show a secret"
+                observation = observation.with_screenshot_status(
+                    ScreenshotStatus.WITHHELD
                 )
             self._state.observation = observation
             snapshot = observation.snapshot
@@ -331,12 +331,13 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         )
         if observation is not None:
             observations.append((observation, "browser", (snapshot.id,)))
-        if requested and snapshot.image is None:
-            status = _screenshot_status(snapshot) or UserMessage(
-                "Screenshot unavailable."
-            )
-            if observation is None or status.text not in observation.text:
-                observations.append((status, "browser.screenshot", ()))
+        status = _screenshot_status(
+            snapshot,
+            requested=requested,
+            image_only=self.text is None and self.screenshots is not None,
+        )
+        if status is not None:
+            observations.append((status, "browser.screenshot", ()))
         if (
             self.text is not None
             and nudges is not None
@@ -383,8 +384,6 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             )
         if image is not None:
             return attach_image(message, image)
-        if self.text is None and message is None and self.screenshots is not None:
-            return _screenshot_status(snapshot)
         return message
 
     @hook(PrepareRequest)
@@ -507,16 +506,24 @@ def _text_renderer(
     return DomRenderer()
 
 
-def _screenshot_status(snapshot: Snapshot) -> UserMessage | None:
-    if snapshot.readiness == ReadinessStatus.BLOCKED:
-        return UserMessage(
-            "A browser dialog is open. Handle it to resume screenshot capture."
-        )
-    if snapshot.width == 0 and snapshot.readiness != ReadinessStatus.READY:
-        return UserMessage("The page is still loading. Observe again for a screenshot.")
-    for limit in snapshot.limitations:
-        if limit.startswith(("Screenshot unavailable", "Screenshot withheld")):
-            return UserMessage(limit)
+def _screenshot_status(
+    snapshot: Snapshot, *, requested: bool, image_only: bool
+) -> UserMessage | None:
+    if snapshot.image is not None:
+        return None
+    if requested or image_only:
+        if snapshot.readiness == ReadinessStatus.BLOCKED:
+            return UserMessage(
+                "A browser dialog is open. Handle it to resume screenshot capture."
+            )
+        if snapshot.width == 0 and snapshot.readiness != ReadinessStatus.READY:
+            return UserMessage(
+                "The page is still loading. Observe again for a screenshot."
+            )
+    if snapshot.screenshot_status == ScreenshotStatus.WITHHELD:
+        return UserMessage("Screenshot withheld: it may show a secret")
+    if requested or snapshot.screenshot_status == ScreenshotStatus.UNAVAILABLE:
+        return UserMessage("Screenshot unavailable.")
     return None
 
 

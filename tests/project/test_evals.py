@@ -568,6 +568,18 @@ async def test_cli_defaults_to_subscription_and_terra(
     assert saved["subset"] == LOCAL_SUBSET
 
 
+@pytest.mark.parametrize("flag", ["--page-prose", "--page-text"])
+async def test_cli_page_prose_preserves_the_report_key(
+    benchmark_cli, monkeypatch, flag
+):
+    monkeypatch.setattr(sys, "argv", ["evals.run", "--tasks", "29", flag, "off"])
+
+    await run.main()
+
+    saved = json.loads(benchmark_cli["output"].read_text(encoding="utf-8"))
+    assert saved["page_text"] == "off"
+
+
 @pytest.mark.parametrize(
     ("provider", "model_args", "expected_model"),
     [
