@@ -9,11 +9,11 @@ from harnessed import (
 )
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
-from harnessed.kernel import PluginScope, needs
+from harnessed.kernel import PluginScope, needs, observes
 from harnessed.models import ModelRequest, UserMessage
 from harnessed.tracing import traced
 
-from browserrig.browser import Browser, BrowserEvents, Tab, TabInfo
+from browserrig.browser import Browser, BrowserEvents, Tab, TabInfo, TabPolicy
 from browserrig.core import (
     BrowserCoordination,
     BrowserError,
@@ -76,6 +76,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
     _readiness = needs(Readiness)
+    _tab_policy = observes(TabPolicy)
 
     def __init__(
         self,
@@ -429,7 +430,9 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         )
 
     async def _tab_overview(self) -> tuple[TabInfo, ...]:
-        if self.text is None:
+        if self.text is None or (
+            self._tab_policy is not None and not self._tab_policy.multiple
+        ):
             return ()
         return await self._browser.tabs.list()
 

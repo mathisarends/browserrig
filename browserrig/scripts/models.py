@@ -197,6 +197,11 @@ class TabStripArgs(ScriptArgs):
     binding: str
 
 
+class SingleTabArgs(ScriptArgs):
+    enabled: bool = True
+    binding: str
+
+
 class TabStrip(Options):
     """The document title and best icon URL; `icon` is empty for non-web pages."""
 

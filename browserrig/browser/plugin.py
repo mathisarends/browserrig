@@ -19,6 +19,7 @@ from .downloads import DownloadSource
 from .policy import NavigationPolicy
 from .setup import SessionSetup
 from .tab import Tab
+from .tab_policy import TabPolicy
 
 
 class Chrome(Plugin, slot="browserrig.browser"):
@@ -27,6 +28,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
     events = BROWSER_EVENTS
     _log = needs(SessionLog)
     _navigation = observes(NavigationPolicy)
+    _tabs = observes(TabPolicy)
     _actions = needs(ActionContext)
 
     def __init__(self, options: BrowserOptions | None = None) -> None:
@@ -127,6 +129,7 @@ class Chrome(Plugin, slot="browserrig.browser"):
                 emit=self._log.emit,
                 on_tab_change=tab_changed,
                 navigation_policy=self._navigation,
+                tab_policy=self._tabs,
                 current_action=lambda: self._actions.action_id,
                 change_tab=change_tab,
             )

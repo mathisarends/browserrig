@@ -92,7 +92,7 @@ rather than moving published tags; PyPI versions cannot be overwritten.
 
 ## Compatibility and coverage
 
-Harnessed/provider extras are pinned to 0.18.0. State/checkpoint format 3 and audit
+Harnessed/provider extras are pinned to 0.19.0. State/checkpoint format 3 and audit
 envelope 6 reject older data; keep old stores separate. Review the
 [changelog](../CHANGELOG.md) when upgrading.
 

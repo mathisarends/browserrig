@@ -45,6 +45,7 @@ from .guard import NavigationGuard
 from .input import CdpInput
 from .network import NetworkActivity
 from .overlays import Overlays
+from .popups import SINGLE_TAB_BLOCKED
 from .worlds import WORLD_NAME, Worlds
 
 # Called by the page once its title or icon changes after the last strip read.
@@ -111,6 +112,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self._on_change = on_change
         self._guard = guard
         self._strip_bound = False
+        self._popup_blocked = False
 
     async def handle(self, event: object) -> None:
         """Apply a page event that arrived on this tab's own CDP session."""
@@ -160,9 +162,8 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
                 self.loading = False
                 self.navigation_pending = False
                 await self.report_change(settled=True)
-            case BindingCalledEvent(name=name) if name == _STRIP_BINDING:
-                # Scripts and SPAs retitle a page or swap its icon without navigating.
-                await self.report_change(settled=not self.loading)
+            case BindingCalledEvent():
+                await self._binding(event)
             case FrameResizedEvent():
                 self.viewport_revision += 1
                 self.layout_changed()
@@ -362,6 +363,18 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         """Report an intercepted navigation once, before an action reports success."""
         if self._guard is not None:
             self._guard.raise_if_blocked(self.id)
+        if self._popup_blocked:
+            self._popup_blocked = False
+            raise BrowserError(
+                "The page requested a popup that cannot be redirected in single-tab mode"
+            )
+
+    async def _binding(self, event: BindingCalledEvent) -> None:
+        if event.name == SINGLE_TAB_BLOCKED:
+            self._popup_blocked = True
+        elif event.name == _STRIP_BINDING:
+            # Scripts and SPAs retitle a page or swap its icon without navigating.
+            await self.report_change(settled=not self.loading)
 
     async def _history(self, offset: int) -> bool:
         history = await self.cdp.page.get_navigation_history()

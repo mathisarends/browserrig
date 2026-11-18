@@ -16,6 +16,7 @@ from browserrig import (
     ChromeBrowser,
     DomainNotAllowed,
     InputPacing,
+    TabPolicy,
     TabStrip,
     wait_for_page,
 )
@@ -93,6 +94,25 @@ async def test_explicit_navigation_and_open_are_rejected_before_requests(guarded
                 await operation(denied)
         assert len(receipts) == 2
         assert all("Host: localhost:" not in request for request in requests)
+
+
+async def test_single_tab_popup_routing_keeps_the_navigation_guard(guarded_site):
+    allowed, _, requests, blocked, receipts, emit = guarded_site
+    async with ChromeBrowser(
+        Launch(url=allowed),
+        navigation_policy=AllowedDomains("127.0.0.1"),
+        tab_policy=TabPolicy(multiple=False),
+        emit=emit,
+    ) as browser:
+        tab = browser.active_tab
+        await wait_for_page(tab)
+        await tab.evaluate("document.querySelector('button').click()")
+        await asyncio.wait_for(blocked.wait(), timeout=5)
+        assert len(receipts) == 1
+        assert all("Host: localhost:" not in request for request in requests)
+        with pytest.raises(DomainNotAllowed):
+            tab.check_navigation()
+        assert [entry.id for entry in await browser.tabs.list()] == [tab.id]
 
 
 @pytest.mark.parametrize(

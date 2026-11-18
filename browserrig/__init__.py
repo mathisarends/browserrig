@@ -7,9 +7,12 @@ from .browser import (
     DomainNotAllowed,
     DownloadReceiving,
     DownloadSource,
+    MultiTab,
     Overlay,
     Overlays,
     SessionSetup,
+    SingleTab,
+    TabPolicy,
     Viewport,
 )
 from .choreography import ActionLabels, Choreography, TabStrip
@@ -197,6 +200,9 @@ __all__ = [
     "Overlay",
     "Overlays",
     "TabStrip",
+    "MultiTab",
+    "SingleTab",
+    "TabPolicy",
     "FormTools",
     "PointerTools",
     "KeyboardTools",

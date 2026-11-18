@@ -9,6 +9,7 @@ from browserrig.readiness import Readiness
 from .effects import Effect
 from .execution import Actions
 from .navigation import NEW_TAB_URL
+from .parameters import supports_new_tabs
 
 
 class TabTools(Plugin, needs=(Actions,)):
@@ -17,6 +18,7 @@ class TabTools(Plugin, needs=(Actions,)):
 
     @tool(
         kind=ActionKind.LIST_TABS,
+        enabled=supports_new_tabs,
         chainable=True,
         readonly=True,
         description="List controlled tabs and identify the active tab.",
@@ -26,6 +28,7 @@ class TabTools(Plugin, needs=(Actions,)):
 
     @tool(
         kind=ActionKind.OPEN_TAB,
+        enabled=supports_new_tabs,
         description="Open and activate a new tab.",
     )
     async def open_tab(
@@ -38,6 +41,7 @@ class TabTools(Plugin, needs=(Actions,)):
 
     @tool(
         kind=ActionKind.SWITCH_TAB,
+        enabled=supports_new_tabs,
         description="Activate a listed tab.",
     )
     async def switch_tab(
@@ -50,6 +54,7 @@ class TabTools(Plugin, needs=(Actions,)):
 
     @tool(
         kind=ActionKind.CLOSE_TAB,
+        enabled=supports_new_tabs,
         description="Close a controlled tab. A remaining tab is explicitly selected if needed.",
     )
     async def close_tab(

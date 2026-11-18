@@ -4,10 +4,10 @@ from typing import Annotated
 from urllib.parse import quote_plus, urljoin, urlsplit
 
 from harnessed import Instructions, Plugin, SystemPrompt
-from harnessed.kernel import needs
+from harnessed.kernel import needs, observes
 from pydantic import Field
 
-from browserrig.browser import Browser, BrowserEvents, Tab, validated_url
+from browserrig.browser import Browser, BrowserEvents, Tab, TabPolicy, validated_url
 from browserrig.core import (
     ActionKind,
     BrowserControl,
@@ -21,6 +21,7 @@ from browserrig.readiness import Readiness
 from .effects import Effect
 from .execution import Actions
 from .intents import ControlIntent, NavigateIntent, WaitIntent
+from .parameters import NewTab
 
 # Where a new tab lands when the agent gives no URL.
 NEW_TAB_URL = "https://duckduckgo.com/"
@@ -32,8 +33,8 @@ _INSTRUCTIONS = Instructions(
         "When an observation shows a link with a ref, follow it with click(ref=...). "
         "The displayed URL identifies the destination; use the ref to open it. "
         "This also applies to search results and links in above/below previews, since "
-        "click scrolls the target into view. Use click(ref=..., new_tab=True) to keep "
-        "the current page open. When already on DuckDuckGo with an observed search field, "
+        "click scrolls the target into view. When already on DuckDuckGo with an observed "
+        "search field, "
         "enter or revise the query there with type_text(ref=..., text=...), then submit "
         "with send_keys(key='Enter') or click the observed search button. "
         "Use search(query=...) to start a DuckDuckGo web search from another site, "
@@ -49,6 +50,7 @@ class NavigationTools(Plugin):
     _actions = needs(Actions)
     _events = needs(BrowserEvents)
     _readiness = needs(Readiness)
+    _tabs = observes(TabPolicy)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
@@ -65,10 +67,10 @@ class NavigationTools(Plugin):
                 description="HTTP(S) URL, or a path starting with / on the current site."
             ),
         ],
-        new_tab: Annotated[
-            bool, Field(description="Open and activate a new tab instead.")
-        ] = False,
+        new_tab: NewTab = False,
     ) -> Effect:
+        if new_tab and self._tabs is not None:
+            self._tabs.check_new_tab()
         url = site_url(url, self._browser.active_tab.url)
         return await self._navigate(url, typed=typed_address(url), new_tab=new_tab)
 

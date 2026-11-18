@@ -49,6 +49,7 @@ from .guard import NavigationGuard
 from .input import ChromeInputTargets
 from .policy import NavigationPolicy
 from .tab import Tab, TabListener
+from .tab_policy import TabPolicy
 from .tabs import Tabs
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ class ChromeBrowser:
         emit: EventSink = discard_event,
         on_tab_change: TabListener | None = None,
         navigation_policy: NavigationPolicy | None = None,
+        tab_policy: TabPolicy | None = None,
         current_action: Callable[[], str] = str,
         change_tab: TabDispatch | None = None,
     ) -> None:
@@ -108,6 +110,7 @@ class ChromeBrowser:
             emit=self.events.emit,
             on_change=on_tab_change,
             guard=self._guard,
+            policy=tab_policy,
             current_action=current_action,
             change_tab=change_tab,
         )
@@ -201,6 +204,7 @@ class ChromeBrowser:
         return CdpEndpoint(url=url, headers=endpoint.headers)
 
     def _check(self) -> None:
+        self.tabs.check_policy()
         if self._guard is not None:
             self._guard.raise_if_blocked()
         if self._stack is None or not self.client.is_connected:
