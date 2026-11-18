@@ -29,6 +29,7 @@ from browserrig.tools.effects import Effect
 from browserrig.tools.intents import Intent, Perform
 
 from .context import LABEL_CHARS, CallIdentity
+from .hooks import CheckAction
 from .invocation import InvokeTool
 from .transaction import ActionRunner
 
@@ -68,6 +69,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
             self._observe,
             actions=self._actions,
             page_change=self.page_change,
+            check_action=self._check_action,
         )
         self._mount.invocation = InvokeTool(self._runner, self._coordination)
 
@@ -179,6 +181,11 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     @hook(BrowserToolCall)
     async def _run_tool(self, event: BrowserToolCall, next_: Next[object]) -> object:
         return await self._invocation(event, next_)
+
+    async def _check_action(self, tab: Tab, kind: ActionKind) -> None:
+        context = self._mount.context
+        assert context is not None
+        await context.dispatch(CheckAction(tab, kind))
 
     @property
     def _runner(self) -> ActionRunner:

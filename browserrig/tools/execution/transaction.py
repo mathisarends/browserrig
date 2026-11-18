@@ -43,6 +43,7 @@ class ActionRunner:
         *,
         actions: ActionContext,
         page_change: Callable[[Tab], Awaitable[str]],
+        check_action: Callable[[Tab, ActionKind], Awaitable[None]],
     ) -> None:
         self._browser = browser
         self._coordination = coordination
@@ -50,6 +51,7 @@ class ActionRunner:
         self._readiness = readiness
         self._observe = observe
         self._page_change = page_change
+        self._check_action = check_action
         self._dispatch = ActionDispatch(browser.tabs, readiness, actions)
 
     @traced
@@ -79,6 +81,7 @@ class ActionRunner:
                 before = await self._prepare(tab, kind, profile)
                 if check is not None:
                     await check(tab)
+                await self._check_action(tab, kind)
                 if action is None or not profile.preflight:
                     await self._events.emit(
                         ActionStartedEvent(

@@ -14,6 +14,11 @@
   the standard setup or list the selected Browserrig plugins in your Harnessed
   agent. See the [0.8 migration guide](docs/migration-0.8.md) (#93).
 
+### Added
+
+- Plugins can register `@hook(CheckAction)` to validate managed browser actions
+  before dispatch. See [action validation](docs/browser-composition.md#validate-an-action-before-dispatch).
+
 ## 0.7.0 (2026-11-18)
 
 Upgrade from 0.6.x using the [migration guide](docs/migration-0.7.md).
