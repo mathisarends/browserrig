@@ -62,6 +62,10 @@ Upgrade from 0.6.x using the [migration guide](docs/migration-0.7.md).
 - Add `TextObservations(content="metadata")` for a compact observation with URL,
   title, tab and main-page scroll measurements. The default metadata capture
   uses Chrome layout metrics and supports optional screenshots.
+- Add opt-in `StepBudgetHints()` to show the step limit and remind the model to
+  wrap up near the end of its work budget.
+- Follow tabs opened by actions without simulating a tab-switch gesture. Adopt
+  foreground popups discovered between actions and leave background tabs alone.
 - Keep browser action execution rules together by action kind. Custom tools
   still declare tool chaining with `@browser_tool(chainable=...)`.
 - Add `SingleTab()` to keep links, forms, simple popups and file previews in

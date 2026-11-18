@@ -23,10 +23,10 @@ perception = BrowserPerception(
 )
 ```
 
-`DomCapture()` is the default. Use `DomRenderer()` for DOM text as shown above.
-It reads the snapshot without text or landmark settings. For a custom observation
-format, supply your own renderer. Custom text renderers implement
-`instructions()` without a screenshot argument.
+`DomCapture()` and `DomRenderer()` are the defaults for page text. The renderer
+reads the snapshot without text or landmark settings. Supply a renderer for a
+custom observation format. Custom text renderers implement `instructions()`
+without a screenshot argument.
 
 ## Configure screenshots
 
@@ -50,6 +50,9 @@ It withholds screenshots when `Secrets` has known values. Use `DomCapture()`
 when you need screenshot marks. Low-level `capture(..., screenshots=True)`
 returns unannotated pixels, with marks and cursor overlays added when perception
 projects the model observation.
+
+Read unavailable and withheld image outcomes from `Snapshot.screenshot_status`.
+`Snapshot.limitations` carries other capture notes.
 
 ## Update DOM tools
 

@@ -24,7 +24,7 @@ from browserrig import (
     SingleTab,
     TextObservations,
 )
-from browserrig.browser import TabInfo
+from browserrig.browser import OpenDialog, TabInfo
 from browserrig.core import BrowserError, Region
 from browserrig.observation import Snapshot
 from browserrig.tools import Effect
@@ -69,6 +69,31 @@ def test_metadata_text_defaults_to_lightweight_capture_and_renders_only_page_fac
         "viewport: 1280x800, scroll y=400px, 800px remaining to page end",
         "cursor: not in this tab yet",
     ]
+
+
+@pytest.mark.parametrize("content", ["metadata", "page"])
+async def test_observation_reports_javascript_dialog_kind_and_message_once(content):
+    holder = {}
+    model = ScriptedModel(["Done"])
+    agent = Agent(
+        model=model,
+        plugins=[
+            FakeChrome(holder),
+            PageReadiness(),
+            BrowserPerception(text=TextObservations(content=content)),
+        ],
+    )
+    async with agent.session() as session:
+        holder["browser"].active_tab.dialog = OpenDialog("confirm", "Discard changes?")
+        await session.run("Inspect the page")
+
+    (observation,) = [
+        message.text
+        for message in model.requests[0].messages
+        if "readiness: blocked" in message.text
+    ]
+    assert observation.count("Open confirm dialog: Discard changes?") == 1
+    assert ("page text:" in observation) is (content == "page")
 
 
 @pytest.mark.parametrize("mode, overview", [(SingleTab, False), (MultiTab, True)])

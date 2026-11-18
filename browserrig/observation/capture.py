@@ -108,7 +108,10 @@ async def capture_observation(
     snapshot_id = uuid4().hex
     # A resize while collecting leaves the whole capture outdated, including its image.
     viewport_revision = tab.viewport_revision
-    if tab.dialog:
+    if dialog := tab.dialog:
+        detail = f"Open {dialog.kind} dialog: {dialog.message}"
+        if redaction is not None:
+            detail = redaction.redact(detail)
         snapshot = Snapshot(
             id=snapshot_id,
             tab_id=tab.id,
@@ -116,13 +119,14 @@ async def capture_observation(
             url=tab.url,
             title=tab.title,
             readiness=ReadinessStatus.BLOCKED,
+            readiness_reason=detail,
             width=0,
             height=0,
             scroll_y=0,
             fingerprint="dialog",
             viewport_revision=viewport_revision,
             tabs=tabs,
-            text=f"Open {tab.dialog.kind} dialog: {tab.dialog.message}",
+            text=detail,
             cursor=cursor,
         )
         return CapturedObservation(snapshot, EmptyReferences())

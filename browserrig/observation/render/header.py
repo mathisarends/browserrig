@@ -21,8 +21,11 @@ def header(snapshot: Snapshot, *, metadata_only: bool = False) -> list[str]:
     lines.append(_cursor(snapshot))
     if snapshot.readiness != ReadinessStatus.READY:
         lines.append(f"readiness: {snapshot.readiness}")
-        if snapshot.readiness_reason:
-            lines.append(snapshot.readiness_reason)
+        reason = snapshot.readiness_reason
+        if reason and (
+            metadata_only or snapshot.content is not None or reason != snapshot.text
+        ):
+            lines.append(reason)
     if snapshot.image and snapshot.geometry:
         lines.append(f"image: {_region(snapshot)}")
     if metadata_only:
