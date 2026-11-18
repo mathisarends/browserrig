@@ -9,7 +9,6 @@ from harnessed.tracing import span, traced
 from browserrig.browser import Browser, Tab
 from browserrig.core import (
     ActionContext,
-    ActionKind,
     BrowserError,
     ReadinessPhase,
     ReadinessStatus,
@@ -17,13 +16,13 @@ from browserrig.core import (
 from browserrig.readiness import Readiness
 from browserrig.tools.effects import Effect
 
-from .policy import FOLLOWED_KINDS, NAVIGATION_KINDS
+from .policy import ActionProfile
 
 # Input that requests a new tab gives the browser time to open it.
 _TAB_OPEN_SECONDS = 3.0
 
 
-class Completion:
+class ActionDispatch:
     """Dispatch input and wait for the page or tab it leads into."""
 
     def __init__(
@@ -36,10 +35,10 @@ class Completion:
     async def dispatch(
         self,
         tab: Tab,
-        kind: ActionKind,
         action_id: str,
         operation: Callable[[Tab], Awaitable[Effect]],
         *,
+        profile: ActionProfile,
         settle: bool,
     ) -> Dispatched:
         """Run input in `tab`, then wait for its page, or for a tab the input opened."""
@@ -47,20 +46,21 @@ class Completion:
         mark = self._browser.tabs.openings
         with self._actions.activate(action_id), span("browserrig.operation"):
             effect = await operation(tab)
+        phase = profile.phase or ReadinessPhase.AFTER_ACTION
         settled = settle and not tab.closed
         note = (
-            await self._settle(tab, kind, started)
-            if settled and not effect.opens_tab
+            await self._settle(tab, phase, started)
+            if settled and not effect.expects_new_tab
             else ""
         )
-        if kind not in FOLLOWED_KINDS or tab.closed:
+        if not profile.follow_opened_tab or tab.closed:
             return Dispatched(effect, note, "")
         with self._actions.activate(action_id):
-            followed = await self._follow(tab, mark, expected=effect.opens_tab)
-        if effect.opens_tab and not followed:
+            followed = await self._follow(tab, mark, expected=effect.expects_new_tab)
+        if effect.expects_new_tab and not followed:
             # Nothing opened, so the input acted in this tab instead.
             if settled:
-                note = await self._settle(tab, kind, started)
+                note = await self._settle(tab, phase, started)
             followed = " No new tab opened; the input acted in this tab."
         return Dispatched(effect, note, followed)
 
@@ -94,12 +94,7 @@ class Completion:
         return effect, note
 
     @traced
-    async def _settle(self, tab: Tab, kind: ActionKind, started: float) -> str:
-        phase = (
-            ReadinessPhase.NAVIGATION
-            if kind in NAVIGATION_KINDS
-            else ReadinessPhase.AFTER_ACTION
-        )
+    async def _settle(self, tab: Tab, phase: ReadinessPhase, started: float) -> str:
         try:
             report = await self._readiness.wait(tab, phase=phase, since=started)
         except BrowserError as error:
