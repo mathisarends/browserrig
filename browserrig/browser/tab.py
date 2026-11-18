@@ -34,6 +34,7 @@ from browserrig.events import (
     TabEvent,
 )
 from browserrig.scripts import (
+    FOREGROUND,
     TAB_STRIP,
     TabStrip,
     TabStripArgs,
@@ -52,6 +53,7 @@ from .worlds import WORLD_NAME, Worlds
 _STRIP_BINDING = "browserrigTabStripChanged"
 # Viewport metadata is presentation only and must never hold up input.
 _VIEWPORT_PROBE_SECONDS = 0.25
+_FOCUS_PROBE_SECONDS = 0.35
 
 type FrameDiscovery = Callable[
     [Tab], Awaitable[tuple[tuple[Frame, ...], tuple[str, ...]]]
@@ -312,6 +314,16 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
             self._frames_key = key
             self._frames = frames
         return frames
+
+    async def has_foreground(self) -> bool:
+        """Check whether Chrome has made this tab's document visible and focused."""
+        try:
+            async with asyncio.timeout(_FOCUS_PROBE_SECONDS):
+                frame = await self.main_frame()
+                return await frame.run(FOREGROUND)
+        except (BrowserError, CDPError, TimeoutError):
+            # A navigating or closed renderer may not be available for a focus check.
+            return False
 
     async def main_frame(self) -> Frame:
         tree = await self.frame_tree()

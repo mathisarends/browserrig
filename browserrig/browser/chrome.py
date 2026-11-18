@@ -34,7 +34,12 @@ from cdpify.domains.target import (
     TargetInfoChangedEvent,
 )
 
-from browserrig.core import BrowserClosed, BrowserError, TabDispatch
+from browserrig.core import (
+    BrowserClosed,
+    BrowserCoordination,
+    BrowserError,
+    TabDispatch,
+)
 from browserrig.events import (
     ConnectedEvent,
     DisconnectedEvent,
@@ -89,6 +94,7 @@ class ChromeBrowser:
         tab_policy: TabPolicy | None = None,
         current_action: Callable[[], str] = str,
         change_tab: TabDispatch | None = None,
+        coordination: BrowserCoordination | None = None,
     ) -> None:
         self._options = options if options is not None else Launch()
         self.id = uuid4().hex
@@ -113,6 +119,7 @@ class ChromeBrowser:
             policy=tab_policy,
             current_action=current_action,
             change_tab=change_tab,
+            coordination=coordination,
         )
         self.input_targets: InputTargets = ChromeInputTargets(self.tabs)
         self._close_task: asyncio.Task[None] | None = None

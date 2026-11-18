@@ -52,6 +52,7 @@ __all__ = [
     "FILE_INPUT",
     "FIND",
     "FOCUSED",
+    "FOREGROUND",
     "OWNER_HITS",
     "OVERLAY",
     "OVERLAY_STYLES",
@@ -214,6 +215,7 @@ SELECT_OPTIONS: Script[SelectOptionsArgs, SelectionResult] = Script.load(
 SEED: Script[SeedArgs, None] = Script.load("seed", SeedArgs, type(None))
 RESET: Script[ScriptArgs, None] = Script.load("reset", ScriptArgs, type(None))
 FOCUSED: Script[ScriptArgs, Any] = Script.load("focused", ScriptArgs, Any)
+FOREGROUND: Script[ScriptArgs, bool] = Script.load("foreground", ScriptArgs, bool)
 CURSOR: Script[CursorArgs, str] = Script.load("cursor", CursorArgs, str)
 TAB_STRIP: Script[TabStripArgs, TabStrip] = Script.load(
     "tab_strip", TabStripArgs, TabStrip
