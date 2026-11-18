@@ -40,6 +40,8 @@
 - Rename the page-wait plugin from `Readiness` to `PageReadiness`. Update
   plugin lists, `needs(...)` declarations and scope lookups. Readiness policies,
   checks and reports keep their names.
+- In custom pointer tools, replace `Effect(opens_tab=True)` with
+  `Effect(expects_new_tab=True)` to allow time for a possible new tab to open.
 - Custom `Motor` implementations must provide
   `wheel_steps(delta_x=..., delta_y=...)`, returning `WheelStep` values from
   `browserrig.input` with native CSS-pixel deltas and `delay_before_seconds`.
@@ -48,6 +50,8 @@
 
 ### Changes
 
+- Keep browser action execution rules together by action kind. Custom tools
+  still declare tool chaining with `@browser_tool(chainable=...)`.
 - Add `SingleTab()` to keep links, forms, simple popups and file previews in
   one tab. Single-tab sessions omit the tab overview and tab management tools.
   `MultiTab()` remains the default. Upgrade to Harnessed 0.19.0 so single-tab

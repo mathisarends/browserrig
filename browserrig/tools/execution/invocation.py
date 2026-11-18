@@ -4,11 +4,16 @@ from harnessed import ToolError, ToolResult
 from harnessed.hooks import Next
 
 from browserrig.browser import Tab
-from browserrig.core import ActionKind, BrowserCoordination, BrowserToolCall
+from browserrig.core import (
+    ActionKind,
+    BrowserCoordination,
+    BrowserToolCall,
+    ReadinessPhase,
+)
 from browserrig.tools.effects import Effect
 
 from .context import InvocationContext, ToolActionError
-from .policy import ACTION_KINDS, EXPECTED_CHANGES, NAVIGATION_KINDS, TAB_KINDS
+from .policy import action_profile
 from .transaction import ActionRunner
 
 
@@ -22,7 +27,8 @@ class InvokeTool:
 
     async def __call__(self, event: BrowserToolCall, next_: Next[object]) -> object:
         kind = event.metadata.kind
-        if kind not in ACTION_KINDS:
+        profile = action_profile(kind)
+        if profile is None:
             if kind == ActionKind.WAIT:
                 async with self._coordination.exclusive():
                     return await next_()
@@ -45,14 +51,15 @@ class InvokeTool:
                     "Page input tools must return Effect, ToolResult or text"
                 )
 
-            settle = kind not in TAB_KINDS and not (
-                kind in NAVIGATION_KINDS and event.arguments.get("new_tab", False)
+            settle = profile.phase is not None and not (
+                profile.phase is ReadinessPhase.NAVIGATION
+                and event.arguments.get("new_tab", False)
             )
             result = await self._runner.run(
                 kind=kind,
                 operation=perform,
                 settle=settle,
-                expects_change=kind in EXPECTED_CHANGES,
+                expects_change=profile.warn_if_no_progress,
                 action=action,
             )
             original = action.result

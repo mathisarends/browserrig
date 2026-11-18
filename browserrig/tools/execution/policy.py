@@ -1,68 +1,62 @@
 """Lifecycle defaults selected from a browser tool's stable action kind."""
 
-from browserrig.core import ActionKind
+from dataclasses import dataclass, replace
 
-# Pointer actions aim at coordinates from the last observation, so it must still be current.
-POINTER_KINDS = frozenset(
-    {
-        ActionKind.CLICK,
-        ActionKind.CLICK_AT,
-        ActionKind.MOVE_MOUSE,
-        ActionKind.DOUBLE_CLICK,
-        ActionKind.DRAG,
-        ActionKind.DRAG_AT,
-    }
-)
-CHAINABLE_KINDS = {
-    ActionKind.CLICK,
-    ActionKind.DOUBLE_CLICK,
-    ActionKind.TYPE,
-    ActionKind.PRESS,
-    ActionKind.SELECT,
-    ActionKind.SELECT_OPTIONS,
-    ActionKind.SET_DATE,
+from browserrig.core import ActionKind, ReadinessPhase
+
+
+@dataclass(frozen=True, slots=True)
+class ActionProfile:
+    """The preparation and follow-up performed around one browser action."""
+
+    phase: ReadinessPhase | None = ReadinessPhase.AFTER_ACTION
+    requires_observation: bool = False
+    preflight: bool = False
+    warn_if_no_progress: bool = False
+    follow_opened_tab: bool = False
+    check_chain: bool = False
+
+
+def action_profile(kind: ActionKind) -> ActionProfile | None:
+    """Return the lifecycle for an action, or None for a passive tool."""
+    return _PROFILES.get(kind)
+
+
+_PAGE = ActionProfile()
+_TAB = ActionProfile(phase=None)
+_NAVIGATION = ActionProfile(phase=ReadinessPhase.NAVIGATION)
+_POINTER = ActionProfile(requires_observation=True, follow_opened_tab=True)
+_POINTER_MUTATION = replace(_POINTER, warn_if_no_progress=True)
+_CLICK = replace(_POINTER_MUTATION, check_chain=True)
+_KEY = replace(_POINTER, check_chain=True)
+_FORM = replace(_KEY, preflight=True)
+
+_PROFILES = {
+    ActionKind.CLICK: _CLICK,
+    ActionKind.CLICK_AT: _POINTER_MUTATION,
+    ActionKind.MOVE_MOUSE: _POINTER,
+    ActionKind.DOUBLE_CLICK: _CLICK,
+    ActionKind.DRAG: _POINTER_MUTATION,
+    ActionKind.DRAG_AT: _POINTER_MUTATION,
+    ActionKind.TYPE: _FORM,
+    ActionKind.PRESS: _KEY,
+    ActionKind.SELECT: _FORM,
+    ActionKind.SELECT_OPTIONS: _FORM,
+    ActionKind.SET_DATE: _FORM,
+    ActionKind.TAB: _TAB,
+    ActionKind.OPEN_TAB: _TAB,
+    ActionKind.SWITCH_TAB: _TAB,
+    ActionKind.CLOSE_TAB: _TAB,
+    ActionKind.OPEN_FILE: _TAB,
+    ActionKind.OPEN_DOWNLOADED_FILE: _TAB,
+    ActionKind.NAVIGATE: _NAVIGATION,
+    ActionKind.SEARCH: _NAVIGATION,
+    ActionKind.GO_BACK: _NAVIGATION,
+    ActionKind.GO_FORWARD: _NAVIGATION,
+    ActionKind.RELOAD: _NAVIGATION,
+    ActionKind.SCROLL: _PAGE,
+    ActionKind.SCROLL_PAGE: _PAGE,
+    ActionKind.SCROLL_ELEMENT: _PAGE,
+    ActionKind.JAVASCRIPT: _PAGE,
+    ActionKind.UPLOAD: ActionProfile(preflight=True),
 }
-TAB_KINDS = {
-    ActionKind.TAB,
-    ActionKind.OPEN_TAB,
-    ActionKind.SWITCH_TAB,
-    ActionKind.CLOSE_TAB,
-    ActionKind.OPEN_FILE,
-    ActionKind.OPEN_DOWNLOADED_FILE,
-}
-NAVIGATION_KINDS = {
-    ActionKind.NAVIGATE,
-    ActionKind.SEARCH,
-    ActionKind.GO_BACK,
-    ActionKind.GO_FORWARD,
-    ActionKind.RELOAD,
-}
-ACTION_KINDS = (
-    POINTER_KINDS
-    | CHAINABLE_KINDS
-    | TAB_KINDS
-    | NAVIGATION_KINDS
-    | {
-        ActionKind.SCROLL,
-        ActionKind.SCROLL_PAGE,
-        ActionKind.SCROLL_ELEMENT,
-        ActionKind.JAVASCRIPT,
-        ActionKind.UPLOAD,
-    }
-)
-PREFLIGHT_KINDS = {
-    ActionKind.TYPE,
-    ActionKind.SELECT,
-    ActionKind.SELECT_OPTIONS,
-    ActionKind.SET_DATE,
-    ActionKind.UPLOAD,
-}
-EXPECTED_CHANGES = {
-    ActionKind.CLICK,
-    ActionKind.CLICK_AT,
-    ActionKind.DOUBLE_CLICK,
-    ActionKind.DRAG,
-    ActionKind.DRAG_AT,
-}
-# Page input that opens a tab, like a target=_blank link, leads into it as in Chrome.
-FOLLOWED_KINDS = POINTER_KINDS | CHAINABLE_KINDS

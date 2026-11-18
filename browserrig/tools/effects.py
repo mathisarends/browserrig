@@ -7,4 +7,4 @@ class Effect:
     prepared_scroll: bool = False
     break_chain: bool = False
     # The input asked the browser to open a new tab, such as a Ctrl+click on a link.
-    opens_tab: bool = False
+    expects_new_tab: bool = False

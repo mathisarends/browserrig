@@ -110,7 +110,7 @@ class PointerTools(Plugin):
         return Effect(
             _click_message(count, button, new_tab),
             break_chain=button == "right",
-            opens_tab=new_tab,
+            expects_new_tab=new_tab,
         )
 
     @tool(
@@ -171,7 +171,7 @@ class PointerTools(Plugin):
             _click_message(count, button, new_tab),
             prepared_scroll=point.scrolled,
             break_chain=button == "right",
-            opens_tab=new_tab,
+            expects_new_tab=new_tab,
         )
 
     @tool(

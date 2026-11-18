@@ -25,15 +25,9 @@ from browserrig.readiness import PageReadiness
 from browserrig.tools.chains import observes
 from browserrig.tools.effects import Effect
 
-from .completion import Completion
 from .context import NO_CALL, CallIdentity, ToolAction, ToolActionError
-from .policy import (
-    CHAINABLE_KINDS,
-    NAVIGATION_KINDS,
-    POINTER_KINDS,
-    PREFLIGHT_KINDS,
-    TAB_KINDS,
-)
+from .dispatch import ActionDispatch
+from .policy import ActionProfile, action_profile
 
 
 class ActionRunner:
@@ -56,7 +50,7 @@ class ActionRunner:
         self._readiness = readiness
         self._observe = observe
         self._page_change = page_change
-        self._completion = Completion(browser, readiness, actions)
+        self._dispatch = ActionDispatch(browser, readiness, actions)
 
     @traced
     async def run(
@@ -71,6 +65,7 @@ class ActionRunner:
         call: CallIdentity = NO_CALL,
     ) -> ToolResult:
         """Run one mutation once. Its addressed tab cannot change with global focus."""
+        profile = action_profile(kind) or ActionProfile()
         record(kind=kind)
         async with self._coordination.exclusive():
             tab = self._browser.active_tab
@@ -81,10 +76,10 @@ class ActionRunner:
                 call = CallIdentity(action.call_id, action.label)
             dispatched = False
             try:
-                before = await self._prepare(tab, kind)
+                before = await self._prepare(tab, kind, profile)
                 if check is not None:
                     await check(tab)
-                if action is None or kind not in PREFLIGHT_KINDS:
+                if action is None or not profile.preflight:
                     await self._events.emit(
                         ActionStartedEvent(
                             action_id=action_id,
@@ -99,13 +94,13 @@ class ActionRunner:
                     if action is not None:
                         action.started = True
                 followed = ""
-                if settle and kind in NAVIGATION_KINDS:
-                    effect, note = await self._completion.navigate(
+                if settle and profile.phase is ReadinessPhase.NAVIGATION:
+                    effect, note = await self._dispatch.navigate(
                         tab, action_id, operation
                     )
                 else:
-                    effect, note, followed = await self._completion.dispatch(
-                        tab, kind, action_id, operation, settle=settle
+                    effect, note, followed = await self._dispatch.dispatch(
+                        tab, action_id, operation, profile=profile, settle=settle
                     )
                 if action is not None and not action.started:
                     await self.start(action)
@@ -126,7 +121,7 @@ class ActionRunner:
                 )
                 return await self._result(
                     tab,
-                    kind,
+                    profile,
                     effect,
                     followed=followed,
                     note=note,
@@ -189,7 +184,7 @@ class ActionRunner:
     async def _result(
         self,
         tab: Tab,
-        kind: ActionKind,
+        profile: ActionProfile,
         effect: Effect,
         *,
         followed: str,
@@ -197,12 +192,7 @@ class ActionRunner:
         preparation: str,
     ) -> ToolResult:
         change = ""
-        if (
-            not effect.break_chain
-            and not note
-            and not followed
-            and kind in CHAINABLE_KINDS
-        ):
+        if not effect.break_chain and not note and not followed and profile.check_chain:
             change = await self._page_change(tab)
         result = ToolResult(
             effect.text + followed + note + preparation,
@@ -224,15 +214,17 @@ class ActionRunner:
             active.check_navigation()
 
     @traced
-    async def _prepare(self, tab: Tab, kind: ActionKind) -> PageState:
+    async def _prepare(
+        self, tab: Tab, kind: ActionKind, profile: ActionProfile
+    ) -> PageState:
         """Return the pre-action baseline once the page accepts input."""
         if kind is ActionKind.GO_FORWARD and not await tab.can_go_forward():
             raise BrowserError("Cannot go forward: no next history entry")
         if kind is ActionKind.GO_BACK and not await tab.can_go_back():
             raise BrowserError("No previous history entry")
-        if kind in NAVIGATION_KINDS and tab.dialog:
+        if profile.phase is ReadinessPhase.NAVIGATION and tab.dialog:
             raise BrowserError("A JavaScript dialog must be handled first")
-        if kind in TAB_KINDS | NAVIGATION_KINDS:
+        if profile.phase is not ReadinessPhase.AFTER_ACTION:
             # Page management must work even when the current DOM never settles.
             return PageState(url=tab.url, document_id=tab.document_id)
         report = await self._readiness.wait(tab, phase=ReadinessPhase.ACTION)
@@ -243,7 +235,7 @@ class ActionRunner:
         before = self._observe.snapshot
         if (
             before is not None
-            and kind in POINTER_KINDS | CHAINABLE_KINDS
+            and profile.requires_observation
             and not observes(before, tab)
         ):
             raise BrowserError(
