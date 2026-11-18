@@ -50,11 +50,11 @@ class RunOptions:
     humanlike: bool = False
     plugins: tuple[PluginLike, ...] = ()
     max_steps: int = 50
-    timeout: int = 300
+    timeout_seconds: int = 300
     without: tuple[type[Plugin], ...] = ()
 
     def __post_init__(self) -> None:
-        if self.max_steps < 1 or self.timeout < 1:
+        if self.max_steps < 1 or self.timeout_seconds < 1:
             raise ValueError("Step and time budgets must be at least 1")
 
 
@@ -100,7 +100,7 @@ async def run_task(
                 record.session_id = session.id
                 phase = "execution"
                 try:
-                    async with asyncio.timeout(options.timeout):
+                    async with asyncio.timeout(options.timeout_seconds):
                         result = await session.run(
                             task_prompt(task, environments),
                             output=AgentResponse,

@@ -4,6 +4,9 @@
 
 ### Breaking changes
 
+- Python eval callers use `timeout_seconds` on `RunOptions` and
+  `BenchmarkResult`. The WebArena `--timeout` flag and saved run JSON key
+  `timeout` still accept durations in seconds.
 - Replace `DomPerception`, `TextContext` and `ImageContext` with one
   `BrowserPerception(text=..., screenshots=...)`. Use `DomText(mode=DomTextMode.DELTA)`
   or `DomText(mode=DomTextMode.FULL)` for text. The enum values are

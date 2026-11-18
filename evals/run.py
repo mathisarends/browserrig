@@ -71,7 +71,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--parallel", type=_positive_int, default=1)
     parser.add_argument("--max-steps", type=_positive_int, default=50)
     parser.add_argument(
-        "--timeout", type=_positive_int, default=300, help="Agent seconds per task"
+        "--timeout",
+        dest="timeout_seconds",
+        type=_positive_int,
+        default=300,
+        help="Agent seconds per task",
     )
     parser.add_argument("--headed", action="store_true")
     parser.add_argument("--humanlike", action="store_true")
@@ -175,7 +179,7 @@ async def main() -> None:
                 upstream_revision=manifest.revision,
                 upstream_version=manifest.version,
                 max_steps=args.max_steps,
-                timeout=args.timeout,
+                timeout_seconds=args.timeout_seconds,
                 page_text=args.page_text,
                 headings=args.headings,
                 landmarks=args.landmarks,
@@ -201,7 +205,7 @@ async def main() -> None:
                     args.humanlike,
                     (*plugins, perception, *inputs),
                     args.max_steps,
-                    args.timeout,
+                    args.timeout_seconds,
                     without=_excluded_tools(
                         perception, screenshot_tool=screenshot_tool
                     ),

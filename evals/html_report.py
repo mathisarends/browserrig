@@ -12,7 +12,7 @@ from string import Template
 from typing import Any, Literal
 from urllib.parse import quote
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from . import analyze, network_evidence
 from .freeze import LOCAL_DATA, LOCAL_SUBSET, PILOT_DATA, PILOT_SUBSET
@@ -76,6 +76,8 @@ class ReportTask(BaseModel):
 
 
 class HtmlReport(BaseModel):
+    model_config = ConfigDict(validate_by_name=True, serialize_by_alias=True)
+
     name: str
     dataset_sha256: str
     generated: str
@@ -84,7 +86,7 @@ class HtmlReport(BaseModel):
     model: str
     provider: str
     max_steps: int | None
-    timeout: int | None
+    timeout_seconds: int | None = Field(alias="timeout")
     pattern_tools: dict[str, list[str]]
     setup_attempts: dict[str, str] = Field(default_factory=dict)
     runtime: dict[str, Any] = Field(default_factory=dict)
@@ -113,13 +115,13 @@ def build(
             run.model,
             run.provider,
             run.max_steps,
-            run.timeout,
+            run.timeout_seconds,
             run.observation,
         ) != (
             baseline.model,
             baseline.provider,
             baseline.max_steps,
-            baseline.timeout,
+            baseline.timeout_seconds,
             baseline.observation,
         ):
             raise ValueError(
@@ -180,7 +182,7 @@ def build(
         model=baseline.model,
         provider=baseline.provider,
         max_steps=baseline.max_steps,
-        timeout=baseline.timeout,
+        timeout_seconds=baseline.timeout_seconds,
         pattern_tools={name: sorted(tools) for name, tools in PATTERNS.items()},
         setup_attempts=_setup_attempts(paths[0].parent, output),
         runtime=json.loads(output.with_suffix(".runtime.json").read_bytes())
@@ -448,7 +450,7 @@ def _findings(view: ReportTask) -> list[Finding]:
             )
         )
     if record.completed is False or record.stop_reason in {
-        "timeout",
+        "timeout_seconds",
         "max_steps",
         "token_budget",
     }:
