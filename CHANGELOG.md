@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Upgrade from 0.6.x using the [migration guide](docs/migration-0.7.md).
+
 ### Breaking changes
 
 - Eval Python APIs and report JSON use `timeout_seconds`. Rename the old
