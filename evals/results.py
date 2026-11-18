@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, Field, JsonValue
 
 from browserrig.observation import PageText, ScreenshotTrigger
 
@@ -78,15 +78,13 @@ class TaskResult(BaseModel):
 
 
 class BenchmarkResult(BaseModel):
-    model_config = ConfigDict(validate_by_name=True, serialize_by_alias=True)
-
     run: str
     subset: str | None = None
     dataset_sha256: str | None = None
     upstream_revision: str | None = None
     upstream_version: str | None = None
     max_steps: int | None = None
-    timeout_seconds: int | None = Field(default=None, alias="timeout")
+    timeout_seconds: int | None = None
     context_window: int | None = None
     reserve_tokens: int | None = None
     keep_last_steps: int | None = None

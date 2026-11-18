@@ -662,14 +662,17 @@ def test_legacy_results_default_to_api_provider():
     assert restored.provider == "openai"
 
 
-def test_run_timeout_round_trips_through_the_legacy_json_field(tmp_path):
+def test_run_timeout_serializes_with_its_unit(tmp_path):
     payload = _benchmark([]).model_dump(exclude_unset=True)
-    benchmark = BenchmarkResult.model_validate({**payload, "timeout": 120})
+    benchmark = BenchmarkResult.model_validate({**payload, "timeout_seconds": 120})
     path = tmp_path / "run.json"
     write_run(path, benchmark)
 
     assert benchmark.timeout_seconds == 120
-    assert json.loads(path.read_text(encoding="utf-8")) == {**payload, "timeout": 120}
+    assert json.loads(path.read_text(encoding="utf-8")) == {
+        **payload,
+        "timeout_seconds": 120,
+    }
 
 
 @pytest.mark.parametrize("option", ["--repeat", "--parallel"])

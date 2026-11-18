@@ -4,9 +4,10 @@
 
 ### Breaking changes
 
-- Python eval callers use `timeout_seconds` on `RunOptions` and
-  `BenchmarkResult`. The WebArena `--timeout` flag and saved run JSON key
-  `timeout` still accept durations in seconds.
+- Eval Python APIs and report JSON use `timeout_seconds`. Rename the old
+  `timeout` key in saved runs before using them for comparisons. New HTML
+  reports embed `timeout_seconds` as well. The CLI still takes `--timeout`
+  in seconds.
 - Replace `DomPerception`, `TextContext` and `ImageContext` with one
   `BrowserPerception(text=..., screenshots=...)`. Use `DomText(mode=DomTextMode.DELTA)`
   or `DomText(mode=DomTextMode.FULL)` for text. The enum values are

@@ -12,7 +12,7 @@ from string import Template
 from typing import Any, Literal
 from urllib.parse import quote
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from . import analyze, network_evidence
 from .freeze import LOCAL_DATA, LOCAL_SUBSET, PILOT_DATA, PILOT_SUBSET
@@ -76,8 +76,6 @@ class ReportTask(BaseModel):
 
 
 class HtmlReport(BaseModel):
-    model_config = ConfigDict(validate_by_name=True, serialize_by_alias=True)
-
     name: str
     dataset_sha256: str
     generated: str
@@ -86,7 +84,7 @@ class HtmlReport(BaseModel):
     model: str
     provider: str
     max_steps: int | None
-    timeout_seconds: int | None = Field(alias="timeout")
+    timeout_seconds: int | None
     pattern_tools: dict[str, list[str]]
     setup_attempts: dict[str, str] = Field(default_factory=dict)
     runtime: dict[str, Any] = Field(default_factory=dict)
