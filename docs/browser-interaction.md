@@ -48,9 +48,9 @@ new page or out-of-process frame session. Viewport configuration is applied firs
 
 `BrowserPerception` can deliver DOM text, screenshots, or both. DOM extraction
 includes shadow roots and nested/cross-origin frames. Select text delivery with
-`DomText(mode=DomTextMode.DELTA)` or `DomText(mode=DomTextMode.FULL)`.
+`TextObservations(mode="delta")` or `TextObservations(mode="full")`.
 Configure DOM extraction with
-`BrowserPerception(capture=DomCapture(...))`.
+`BrowserPerception(capture=DomCapture(...), renderer=DomRenderer())`.
 
 ```text
 # Checkout
@@ -75,14 +75,14 @@ rest explicitly:
 
 ```python
 DomCapture(
-    text=PageText.INLINE,  # prose beside controls; SPARSE or OFF
+    page_prose="inline",   # prose beside controls, or "sparse" / "off"
     max_text_chars=3000,
     headings=True,         # lines such as `## Pricing`
     landmarks=True,        # regions such as [MAIN] grouping their controls
 )
 ```
 
-`PageText.SPARSE` adds prose only when the viewport shows fewer than five named
+`page_prose="sparse"` adds prose only when the viewport shows fewer than five named
 controls; `search_page` still reads all text when prose is off. Dialogs and
 cookie banners stay grouped. `max_elements=...` bounds controls. Use
 `Screenshots(marks=SetOfMarks())` to label controls in screenshots and

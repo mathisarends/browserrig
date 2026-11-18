@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, JsonValue
 
-from browserrig.observation import PageText, ScreenshotTrigger
+from browserrig.observation import PageProse, ScreenshotTrigger
 
 
 class AgentResponse(BaseModel):
@@ -91,7 +91,7 @@ class BenchmarkResult(BaseModel):
     target_ratio: float | None = None
     max_summary_tokens: int | None = None
     # Runs recorded before these options observed inline text, headings and landmarks.
-    page_text: PageText = PageText.INLINE
+    page_text: PageProse = "inline"
     headings: bool = True
     landmarks: bool = True
     observation_mode: str | None = None

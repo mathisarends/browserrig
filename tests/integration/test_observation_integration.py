@@ -21,14 +21,15 @@ from browserrig import (
     Chrome,
     ChromeBrowser,
     DomCapture,
-    DomText,
-    DomTextMode,
     Input,
     InputPacing,
-    PageText,
+    NetworkQuiet,
+    Readiness,
+    ScreenshotCapture,
     Screenshots,
     ScreenshotTrigger,
     SetOfMarks,
+    TextObservations,
     Viewport,
     WheelTools,
     wait_for_page,
@@ -41,6 +42,7 @@ from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     capture,
     render,
 )
+from browserrig.readiness import BrowserReady
 from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
 from tests.observations import has_image, image_id
@@ -70,12 +72,15 @@ async def test_perception_delivers_exactly_the_selected_modalities(
         else:
             yield ModelChunk(text="Done")
 
+    policy = NetworkQuiet(inner=BrowserReady())
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
         plugins=[
+            Readiness(initial=policy, ongoing=policy) if not (text or marked) else None,
             BrowserPerception(
-                text=DomText(mode=DomTextMode.FULL) if text else None,
+                capture=ScreenshotCapture() if not (text or marked) else None,
+                text=TextObservations(mode="full") if text else None,
                 screenshots=Screenshots(
                     trigger=ScreenshotTrigger.EACH_STEP,
                     marks=SetOfMarks() if marked else None,
@@ -136,7 +141,11 @@ async def test_vision_on_request_starts_with_an_image_and_refreshes_after_wheel_
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
         plugins=[
-            BrowserPerception(text=None, screenshots=Screenshots(skip_unchanged=False)),
+            BrowserPerception(
+                capture=ScreenshotCapture(),
+                text=None,
+                screenshots=Screenshots(skip_unchanged=False),
+            ),
             WheelTools(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
@@ -232,7 +241,7 @@ async def test_controls_only_capture_keeps_labels_and_dialogs(site):
         """,
         )
         report = await wait_for_page(tab)
-        controls = DomCapture(text=PageText.OFF, headings=False, landmarks=False)
+        controls = DomCapture(page_prose="off", headings=False, landmarks=False)
         text = render(await capture(tab, controls, report))
         for expected in ('link "Plans"', '"Seats"', 'button "Buy"'):
             assert expected in text
@@ -427,7 +436,7 @@ async def test_default_text_preserves_dense_page_guidance_with_an_explicit_opt_o
         busy = await capture(tab, DomCapture(), report, previous=sparse)
         assert "Your request was blocked." in busy.text
         assert busy.fingerprint != sparse.fingerprint
-        controls_only = await capture(tab, DomCapture(text=PageText.OFF), report)
+        controls_only = await capture(tab, DomCapture(page_prose="off"), report)
         assert controls_only.text == ""
 
 

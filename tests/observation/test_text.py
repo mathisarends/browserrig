@@ -6,16 +6,15 @@ from harnessed.testing import ScriptedModel
 from browserrig import Readiness
 from browserrig.observation import (
     BrowserPerception,
-    DomText,
-    DomTextMode,
     ElementInfo,
     ProjectObservation,
     Snapshot,
+    TextObservations,
 )
 from tests.fakes import FakeChrome
 
 
-@pytest.mark.parametrize("mode,repeat", [("delta", False), (DomTextMode.FULL, True)])
+@pytest.mark.parametrize("mode,repeat", [("delta", False), ("full", True)])
 async def test_unchanged_observation_delivery_is_an_explicit_context_policy(
     mode, repeat
 ):
@@ -76,13 +75,13 @@ async def test_a_lost_base_or_changed_geometry_requires_a_complete_observation(
         assert '"Continue"' in message.text
 
 
-def _agent(mode=DomTextMode.DELTA):
+def _agent(mode="delta"):
     return Agent(
         model=ScriptedModel([]),
         plugins=[
             FakeChrome({}),
             Readiness(),
-            BrowserPerception(text=DomText(mode=mode)),
+            BrowserPerception(text=TextObservations(mode=mode)),
         ],
     )
 

@@ -17,7 +17,6 @@ from browserrig import (
     Chrome,
     ChromeBrowser,
     DomCapture,
-    PageText,
     wait_for_page,
 )
 from browserrig.browser import Launch
@@ -48,7 +47,7 @@ async def test_strict_viewport_controls_are_described_and_the_rest_are_known(sit
         """,
         )
         report = await wait_for_page(tab)
-        strategy = DomCapture(viewport_expansion=0, text=PageText.OFF)
+        strategy = DomCapture(viewport_expansion=0, page_prose="off")
         state = await capture(tab, strategy, report)
         assert 0 < len(state.elements) < 300
         assert all(element.in_viewport for element in state.elements)

@@ -388,6 +388,8 @@ class _Aiming(Instant):
 
 
 class _Backend:
+    supports_dom_refs = True
+
     """A test-only source of opaque targets; no DOM addresses or scripted mutations."""
 
     def __init__(self):

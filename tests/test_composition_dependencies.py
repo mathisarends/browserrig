@@ -34,6 +34,7 @@ from browserrig import (
     ChoreographyOverlay,
     Chrome,
     DomCapture,
+    DomRenderer,
     Files,
     FileSystem,
     FileTools,
@@ -42,7 +43,6 @@ from browserrig import (
     InputRuntime,
     LocalWorkspace,
     MountedWorkspace,
-    PageText,
     Readiness,
     Runtime,
     Screenshots,
@@ -294,7 +294,7 @@ async def test_facade_warning_policy_keeps_deferred_plugin_until_service_is_adde
     [
         (DomCapture(), ScreenshotTrigger.ON_REQUEST, SetOfMarks()),
         (
-            DomCapture(text=PageText.OFF),
+            DomCapture(page_prose="off"),
             ScreenshotTrigger.EACH_STEP,
             None,
         ),
@@ -309,7 +309,9 @@ async def test_facade_renders_configured_observation_prompt(
         prompt=SystemPrompt.from_plugins(format=PromptFormat.MARKDOWN),
         plugins=[
             BrowserPerception(
-                capture=capture, screenshots=Screenshots(trigger=trigger, marks=marks)
+                capture=capture,
+                renderer=DomRenderer(),
+                screenshots=Screenshots(trigger=trigger, marks=marks),
             )
         ],
     )
@@ -321,9 +323,7 @@ async def test_facade_renders_configured_observation_prompt(
         assert "## Workspace and downloads" in rendered
         assert "## Element references" in rendered
         assert ("labeled with its ref" in rendered) is (marks is not None)
-        assert ("reading order beside its controls" in rendered) == (
-            capture.text == PageText.INLINE
-        )
+        assert "When visible prose is included" in rendered
         assert ("Every observation includes a screenshot" in rendered) == (
             trigger == ScreenshotTrigger.EACH_STEP
         )

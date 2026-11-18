@@ -227,6 +227,8 @@ class CaptureStrategy(Protocol):
 
     Implementations are reusable configuration. Keep per-observation state local.
     Supply CaptureContent.references when targets exist. The default resolves no refs.
+    A backend returning DomElementHandle can declare supports_dom_refs = True to
+    enable model tools that require DOM references.
     """
 
     async def collect(  # pylint: disable=unused-argument

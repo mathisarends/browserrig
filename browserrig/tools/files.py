@@ -39,12 +39,19 @@ from .effects import Effect
 from .execution import Actions
 from .file_observation import FileSystemObservation
 from .intents import OpenFileIntent, UploadIntent
+from .parameters import resolve_dom_element
 from .targeting import Targeting
 from .workspace import FILE_TOOLS_SLOT, WORKSPACE_GUIDANCE, WorkspaceIO, file_errors
 
 
 def _reaches_chrome(transfer: Inject[FileTransfer | None]) -> bool:
     return transfer is not None
+
+
+def _can_upload(
+    transfer: Inject[FileTransfer | None], resolver: Inject[ResolveDomElement | None]
+) -> bool:
+    return transfer is not None and resolver is not None
 
 
 _INSTRUCTIONS = Instructions(
@@ -160,14 +167,14 @@ class DomUploadTools(Plugin):
     _browser = needs(Browser)
     _file_transfer = observes(FileTransfer)
     _events = needs(BrowserEvents)
-    _elements = needs(ResolveDomElement)
+    _elements = observes(ResolveDomElement)
     _actions = needs(Actions)
     _targets = needs(Targeting)
     events = UPLOAD_EVENTS
 
     @tool(
         kind=ActionKind.UPLOAD,
-        enabled=_reaches_chrome,
+        enabled=_can_upload,
         description="Upload workspace files through a DOM file input.",
     )
     async def upload_files(
@@ -183,7 +190,7 @@ class DomUploadTools(Plugin):
         ],
     ) -> Effect:
         tab = self._actions.tab
-        handle = await self._elements(tab, ref)
+        handle = await resolve_dom_element(self._elements, tab, ref)
         if handle.element.input_type != "file":
             raise BrowserError("Target is not a file input")
         transfer = _require_transfer(self._file_transfer)
@@ -206,7 +213,7 @@ class DomUploadTools(Plugin):
                 point = None
 
         async def assign() -> None:
-            handle = await self._elements(tab, ref)
+            handle = await resolve_dom_element(self._elements, tab, ref)
             browser_paths = [str(path) for path in staged.browser_paths]
             await handle.upload_files(browser_paths)
             await self._events.emit(

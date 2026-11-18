@@ -28,17 +28,11 @@ from browserrig.events import (
 )
 from browserrig.input import Input
 from browserrig.nudges import Nudges
-from browserrig.readiness import (
-    BrowserReady,
-    NetworkQuiet,
-    Readiness,
-    ReadinessPolicy,
-    SelectReadiness,
-)
+from browserrig.readiness import Readiness
 from browserrig.secrets import Secrets
 
 from .capture import CaptureStrategy, capture_observation
-from .config import DomText, Screenshots, ScreenshotTrigger
+from .config import Screenshots, ScreenshotTrigger, TextObservations
 from .dom_capture import DomCapture
 from .handle import DomElementHandle
 from .hooks import ProjectObservation
@@ -50,7 +44,8 @@ from .renderer import DomRenderer, Renderer, screenshot_instructions
 from .state import BrowserPerceptionState
 from .text import include_text, project_text
 
-_DEFAULT_TEXT = DomText()
+_DEFAULT_TEXT = TextObservations()
+_DEFAULT_CAPTURE = DomCapture()
 _TRUST = Instructions(
     title="Browser content and action results",
     text=(
@@ -81,7 +76,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     def __init__(
         self,
         *,
-        text: DomText | None = _DEFAULT_TEXT,
+        text: TextObservations | None = _DEFAULT_TEXT,
         screenshots: Screenshots | None = None,
         capture: CaptureStrategy | None = None,
         renderer: Renderer | None = None,
@@ -89,19 +84,14 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         super().__init__()
         self.text = text
         self.screenshots = screenshots
-        self.capture_strategy = (
-            capture if capture is not None else _default_capture(text, screenshots)
-        )
-        self.renderer = (
-            renderer
-            if renderer is not None
-            else _default_renderer(self.capture_strategy)
-        )
+        self.capture_strategy = capture if capture is not None else _DEFAULT_CAPTURE
+        self.renderer = _text_renderer(capture, text, renderer)
 
     async def setup(self, scope: PluginScope) -> None:
         # Secrets is looked up per capture, so it redacts wherever it sits in the plugins.
         self._state.context = scope
-        scope.provide(ResolveDomElement, ResolveDomElement(self))
+        if getattr(self.capture_strategy, "supports_dom_refs", False):
+            scope.provide(ResolveDomElement, ResolveDomElement(self))
 
     def instructions(self) -> SystemPrompt:
         text = self.renderer.instructions() if self.text is not None else ""
@@ -408,14 +398,6 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         images[:] = [image for image in images if image.id in refs]
         state.delivered_image = images[-1] if images else None
 
-    @hook(SelectReadiness)
-    async def _readiness_policy(
-        self, _event: SelectReadiness
-    ) -> ReadinessPolicy | None:
-        if isinstance(self.capture_strategy, ScreenshotCapture):
-            return NetworkQuiet(inner=BrowserReady())
-        return None
-
     def _screenshot_due(self, tab: Tab) -> bool:
         if self.screenshots is None:
             return False
@@ -492,17 +474,17 @@ class ResolveDomElement:
         return handle
 
 
-def _default_capture(
-    text: DomText | None, screenshots: Screenshots | None
-) -> CaptureStrategy:
-    if text is not None or (screenshots is not None and screenshots.marks is not None):
-        return DomCapture()
-    return ScreenshotCapture()
-
-
-def _default_renderer(capture: CaptureStrategy) -> Renderer:
-    if isinstance(capture, DomCapture):
-        return DomRenderer(text=capture.text, landmarks=capture.landmarks)
+def _text_renderer(
+    capture: CaptureStrategy | None,
+    text: TextObservations | None,
+    renderer: Renderer | None,
+) -> Renderer:
+    if renderer is not None:
+        return renderer
+    if capture is not None and text is not None:
+        raise ValueError(
+            "Text observations with an explicit capture require a renderer"
+        )
     return DomRenderer()
 
 

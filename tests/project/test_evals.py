@@ -11,7 +11,6 @@ import pytest
 from harnessed import ToolCall, ToolResult, ToolStatus
 from harnessed.events import ToolCallFinishedEvent
 
-from browserrig import PageText
 from evals import analyze, evaluate, report, run, runner
 from evals.environments import Environments
 from evals.evaluate import Grade
@@ -383,7 +382,7 @@ def test_comparison_still_reports_real_regressions():
 def test_comparison_names_the_observation_arms():
     before = _benchmark([_record("demo")])
     current = _benchmark([_record("demo", "fail", 0.5)])
-    current.page_text = PageText.OFF
+    current.page_text = "off"
     current.landmarks = False
 
     comparison = report.compare(current, before)

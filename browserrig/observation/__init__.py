@@ -1,12 +1,12 @@
 from .capture import CaptureContent, CaptureStrategy, capture
 from .changes import decision_change
 from .config import (
-    DomText,
-    DomTextMode,
-    PageText,
+    PageProse,
     Screenshots,
     ScreenshotTrigger,
     SetOfMarks,
+    TextMode,
+    TextObservations,
 )
 from .content import ExtractedContent, extract_document
 from .dom_capture import DomCapture
@@ -31,6 +31,7 @@ from .models import (
     Snapshot,
     TextBlock,
 )
+from .pixels import ScreenshotCapture
 from .plugin import BrowserPerception, ResolveDomElement
 from .references import (
     ElementHandle,
@@ -66,10 +67,11 @@ __all__ = [
     "CaptureContent",
     "CaptureStrategy",
     "DomCapture",
-    "DomText",
-    "DomTextMode",
+    "ScreenshotCapture",
+    "TextObservations",
+    "TextMode",
     "SetOfMarks",
-    "PageText",
+    "PageProse",
     "Screenshots",
     "ScreenshotTrigger",
     "ImageRetention",

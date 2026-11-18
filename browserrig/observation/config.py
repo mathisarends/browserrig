@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Literal
 
 from browserrig.core import Options
 
@@ -11,25 +12,14 @@ class ScreenshotTrigger(StrEnum):
     ON_REQUEST = "on_request"
 
 
-class PageText(StrEnum):
-    """Which visible prose observations carry beside the controls."""
-
-    INLINE = "inline"
-    SPARSE = "sparse"
-    OFF = "off"
+type PageProse = Literal["inline", "sparse", "off"]
+type TextMode = Literal["delta", "full"]
 
 
-class DomTextMode(StrEnum):
-    """Select how much DOM text to deliver at each step."""
-
-    DELTA = "delta"
-    FULL = "full"
-
-
-class DomText(Options):
+class TextObservations(Options):
     """Publish complete DOM observations or deltas against a retained observation."""
 
-    mode: DomTextMode = DomTextMode.DELTA
+    mode: TextMode = "delta"
 
 
 @dataclass(frozen=True, slots=True)
