@@ -154,7 +154,11 @@ async def test_explicit_screenshot_reports_reuse_or_unavailability(image_availab
         plugins=[
             FakeChrome({}),
             PageReadiness(),
-            BrowserPerception(capture=Capture(), screenshots=Screenshots()),
+            BrowserPerception(
+                capture=Capture(),
+                renderer=DomRenderer(),
+                screenshots=Screenshots(),
+            ),
             ScreenshotTools(),
         ],
     )
