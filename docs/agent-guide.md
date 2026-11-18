@@ -145,6 +145,43 @@ For a reserved final text summary, configure
 `harnessed.plugins`. The summary consumes the last step and returns
 `completed=False`; it does not extend the budget.
 
+### Model-facing step hints
+
+Add `StepBudgetHints` to make the effective step limit visible to the model.
+
+```python
+from browserrig import Agent, Done, StepBudgetHints
+from harnessed.plugins import AgentLoop
+
+agent = Agent(
+    model=model,
+    plugins=[AgentLoop(max_steps=25), StepBudgetHints(warn_at_remaining=3), Done()],
+)
+result = await agent.run("Verify the delivery options.")
+```
+
+`AgentLoop` supplies the default limit. A per-turn `max_steps=` override also
+updates the hints. `StepBudgetHints()` shows the limit on the first working
+request and adds an actionable reminder to each request when three or fewer
+work steps remain, including the current step. Set `show_every_step=True` to
+also show progress on intermediate working requests.
+
+With the example above, the first warning is at step 21. Steps 21–23 are still
+available for work. `Done()` takes over at step 24 and reserves step 25 for
+the answer.
+
+> Model step 21 of 25. 3 work steps left, including this step. Prioritize the
+> most important remaining check and prepare to finish.
+
+With no `Done()`, the hint asks for the final answer on the last step. If
+`FinalStepPolicy.SUMMARIZE` is enabled, the native summary instruction owns that
+step. The hints work with plain Harnessed agents too.
+
+Each hint appears only in its current model request. This keeps the browser
+observation about the page and prevents stale counts from accumulating in the
+conversation. Showing the count near the limit gives the model a chance to
+prioritize unfinished checks. The loop still enforces the step limit.
+
 ## System prompts and optional MCP tools
 
 The browser pack collects each selected plugin's `instructions()` in configured
