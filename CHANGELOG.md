@@ -4,6 +4,10 @@
 
 ### Breaking changes
 
+- Read unavailable and withheld screenshot outcomes from
+  `Snapshot.screenshot_status` instead of `Snapshot.limitations`. DOM capture
+  traces name the prose mode `page_prose`.
+
 - Eval Python APIs and report JSON use `timeout_seconds`. Rename the old
   `timeout` key in saved runs before using them for comparisons. New HTML
   reports embed `timeout_seconds` as well. Python callers of the eval subprocess
@@ -66,6 +70,7 @@
   the three documented import/navigation review heuristics as visible hints.
 - Acknowledge screenshot requests immediately and report capture or image reuse
   in the next observation. Report unavailable images in text-and-image sessions too.
+- Use `--page-prose` to select the WebArena prose mode. `--page-text` remains an alias.
 - Wheel scrolling follows the motor installed by `InputPacing`. `HumanMotor`
   accelerates and decelerates gently; `scroll_speed=0.5` doubles the gesture's
   duration and `scroll_speed=2` halves it. `Instant` sends one wheel event

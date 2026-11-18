@@ -25,16 +25,16 @@ def action_profile(kind: ActionKind) -> ActionProfile | None:
 _PAGE = ActionProfile()
 _TAB = ActionProfile(phase=None)
 _NAVIGATION = ActionProfile(phase=ReadinessPhase.NAVIGATION)
-_POINTER = ActionProfile(requires_observation=True, follow_opened_tab=True)
-_POINTER_MUTATION = replace(_POINTER, warn_if_no_progress=True)
+_OBSERVED_INPUT = ActionProfile(requires_observation=True, follow_opened_tab=True)
+_POINTER_MUTATION = replace(_OBSERVED_INPUT, warn_if_no_progress=True)
 _CLICK = replace(_POINTER_MUTATION, check_chain=True)
-_KEY = replace(_POINTER, check_chain=True)
+_KEY = replace(_OBSERVED_INPUT, check_chain=True)
 _FORM = replace(_KEY, preflight=True)
 
 _PROFILES = {
     ActionKind.CLICK: _CLICK,
     ActionKind.CLICK_AT: _POINTER_MUTATION,
-    ActionKind.MOVE_MOUSE: _POINTER,
+    ActionKind.MOVE_MOUSE: _OBSERVED_INPUT,
     ActionKind.DOUBLE_CLICK: _CLICK,
     ActionKind.DRAG: _POINTER_MUTATION,
     ActionKind.DRAG_AT: _POINTER_MUTATION,

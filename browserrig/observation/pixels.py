@@ -94,7 +94,7 @@ async def capture_pixels(
         async with asyncio.timeout(_SCREENSHOT_SECONDS):
             raw = await screenshot(tab, geometry)
     except (BrowserError, CDPCommandError, TimeoutError):
-        return ScreenshotPixels(None, area, None, (*notes, "Screenshot unavailable"))
+        return ScreenshotPixels(None, area, None, notes)
     scale = geometry.scale if geometry is not None else 1.0
     image = await asyncio.to_thread(_normalize, raw, area, scale=scale)
     return ScreenshotPixels(image, area, geometry, notes)

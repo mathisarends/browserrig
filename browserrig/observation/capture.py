@@ -27,6 +27,7 @@ from .models import (
     ElementInfo,
     PageContent,
     PageFingerprint,
+    ScreenshotStatus,
     Snapshot,
 )
 from .references import EmptyReferences, References
@@ -49,10 +50,8 @@ class CapturedObservation:
     snapshot: Snapshot
     references: References
 
-    def with_limitation(self, note: str) -> CapturedObservation:
-        snapshot = self.snapshot.model_copy(
-            update={"limitations": (*self.snapshot.limitations, note)}
-        )
+    def with_screenshot_status(self, status: ScreenshotStatus) -> CapturedObservation:
+        snapshot = self.snapshot.model_copy(update={"screenshot_status": status})
         return replace(self, snapshot=snapshot)
 
 
@@ -158,9 +157,12 @@ async def capture_observation(
             text="The page is still loading. Observe again before using page controls.",
         )
         return CapturedObservation(snapshot, EmptyReferences())
-    page, image = content.page, content.image
     if redaction is not None:
-        page, image = await _redact(page, image, content, redaction)
+        content = await _redact(content, redaction)
+    page, image = content.page, content.image
+    screenshot_status = content.screenshot_status
+    if screenshots and image is None and screenshot_status is None:
+        screenshot_status = ScreenshotStatus.UNAVAILABLE
     refs = [element.ref for element in (*page.elements, *page.offscreen)]
     if len(set(refs)) != len(refs):
         raise BrowserError("Capture returned duplicate element refs")
@@ -196,6 +198,7 @@ async def capture_observation(
         canvases=page.canvases,
         limitations=page.limitations,
         image=image,
+        screenshot_status=screenshot_status,
         geometry=content.geometry,
         cursor=cursor,
         viewport_revision=viewport_revision,
@@ -211,6 +214,7 @@ class CaptureContent:
     """`area` is the viewport region `image` shows, at `scale` image pixels per CSS pixel.
 
     `fingerprint=None` uses the runner's semantic PageContent fingerprint.
+    Set `screenshot_status` when reporting why an image was withheld.
     """
 
     page: PageContent
@@ -220,6 +224,7 @@ class CaptureContent:
     scale: float = 1
     fingerprint: str | None = None
     references: References | None = None
+    screenshot_status: ScreenshotStatus | None = None
 
 
 class CaptureStrategy(Protocol):
@@ -299,17 +304,16 @@ def _capture_race(error: BrowserError | CDPCommandError) -> bool:
     )
 
 
-async def _redact(
-    page: PageContent, image: str | None, content: CaptureContent, redaction: Redaction
-) -> tuple[PageContent, str | None]:
+async def _redact(content: CaptureContent, redaction: Redaction) -> CaptureContent:
     """Redact page text before the snapshot and its fingerprint are built.
 
     Elements whose text holds a secret are blacked out in the image. Withhold the image
     when a secret also occurs in page text or in an element without known bounds.
     """
+    page, image = content.page, content.image
     redacted = redaction.redact(page)
     if image is None or redacted is page:
-        return redacted, image
+        return replace(content, page=redacted)
     changed = tuple(
         element
         for element, clean in zip(page.elements, redacted.elements, strict=True)
@@ -319,18 +323,20 @@ async def _redact(
         element.bounds is None for element in changed
     )
     if content.area is None or unlocated:
-        redacted.limitations = (
-            *redacted.limitations,
-            "Screenshot withheld: it may show a secret",
+        return replace(
+            content,
+            page=redacted,
+            image=None,
+            screenshot_status=ScreenshotStatus.WITHHELD,
         )
-        return redacted, None
-    return redacted, await asyncio.to_thread(
+    image = await asyncio.to_thread(
         blackout,
         image,
         tuple(element.bounds for element in changed if element.bounds is not None),
         content.area,
         scale=content.scale,
     )
+    return replace(content, page=redacted, image=image)
 
 
 def _mark_new(

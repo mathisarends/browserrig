@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Literal, Self
 
 from pydantic import Field
@@ -200,6 +201,13 @@ class PageContent:
     cookie_banners: tuple[CookieBanner, ...] = ()
 
 
+class ScreenshotStatus(StrEnum):
+    """Why an attempted observation has no image."""
+
+    UNAVAILABLE = "unavailable"
+    WITHHELD = "withheld"
+
+
 class Snapshot(Options):
     id: str
     tab_id: str
@@ -226,6 +234,7 @@ class Snapshot(Options):
     canvases: tuple[Canvas, ...] = ()
     limitations: tuple[str, ...] = ()
     image: str | None = Field(default=None, repr=False)
+    screenshot_status: ScreenshotStatus | None = None
     # The viewport area the image shows; coordinate tools map image pixels through it.
     geometry: Geometry | None = None
     # Where the mouse rests, in viewport CSS pixels; None before it entered this tab.

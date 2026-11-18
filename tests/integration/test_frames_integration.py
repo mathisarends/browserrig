@@ -21,6 +21,7 @@ from browserrig import (
     Chrome,
     ChromeBrowser,
     DomCapture,
+    ScreenshotStatus,
     browser_plugins,
     wait_for_page,
 )
@@ -315,4 +316,4 @@ async def test_capture_keeps_dom_when_chrome_cannot_take_a_screenshot(
         snapshot = await capture(tab, DomCapture(), report, screenshots=True)
         assert snapshot.image is None
         assert any(element.name == "Email" for element in snapshot.elements)
-        assert "Screenshot unavailable" in snapshot.limitations[-1]
+        assert snapshot.screenshot_status is ScreenshotStatus.UNAVAILABLE

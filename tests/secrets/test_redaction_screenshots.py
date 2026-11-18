@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 from PIL import Image
 
-from browserrig import CaptureContent
+from browserrig import CaptureContent, ScreenshotStatus
 from browserrig import PageContent as Extraction
 from browserrig.core import Bounds, ReadinessPhase
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
@@ -78,4 +78,4 @@ async def test_unlocated_secrets_withhold_images_even_with_other_bounded_hits(
     )
     assert secret not in repr(snapshot)
     assert snapshot.image is None
-    assert "Screenshot withheld: it may show a secret" in snapshot.limitations
+    assert snapshot.screenshot_status is ScreenshotStatus.WITHHELD
