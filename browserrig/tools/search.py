@@ -9,7 +9,7 @@ from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind, BrowserCoordination, ReadinessStatus
 from browserrig.core import browser_tool as tool
 from browserrig.observation import PageSearch, extract_document, search_content
-from browserrig.readiness import Readiness
+from browserrig.readiness import PageReadiness
 from browserrig.secrets import Secrets
 
 from .execution import Actions
@@ -30,7 +30,7 @@ class PageSearchTools(Plugin):
 
     _browser = needs(Browser)
     _coordination = needs(BrowserCoordination)
-    _readiness = needs(Readiness)
+    _readiness = needs(PageReadiness)
     _secrets = observes(Secrets)
     # Lets viewers watch the search in the find bar.
     _actions = observes(Actions)

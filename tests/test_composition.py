@@ -22,8 +22,8 @@ from browserrig import (
     InputPacing,
     JavaScriptTools,
     LocalWorkspace,
+    PageReadiness,
     PointerTools,
-    Readiness,
     ReadinessOptions,
     Screenshots,
     ScreenshotTrigger,
@@ -74,7 +74,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
             BrowserPerception(
                 screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
             ),
-            Readiness(options=readiness),
+            PageReadiness(options=readiness),
             approvals,
             files,
             extension,
@@ -84,7 +84,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     assert isinstance(agent, Agent)
     assert next(item for item in agent.plugins if isinstance(item, Chrome)) is browser
     assert (
-        next(item for item in agent.plugins if isinstance(item, Readiness)).options
+        next(item for item in agent.plugins if isinstance(item, PageReadiness)).options
         == readiness
     )
     assert extension in agent.plugins

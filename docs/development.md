@@ -8,13 +8,14 @@ integration tests. On Linux/macOS, use `pnpm` instead of `pnpm.cmd`.
 ## Setup and checks
 
 ```powershell
-uv sync --locked --extra openai --extra ocr
+uv sync --locked --group evals --extra openai --extra mcp --extra otel --extra ocr
 pnpm.cmd install --frozen-lockfile
 uv run prek install --overwrite
 uv run prek run --all-files
 ```
 
-The hooks use pinned dependencies and the same checks as CI. Individual checks:
+The Python setup matches the offline CI job. It includes the eval and telemetry
+dependencies used by the checks. Individual checks:
 
 ```powershell
 uv run ruff check browserrig examples evals tests
