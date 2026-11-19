@@ -253,6 +253,7 @@ class CaptureStrategy(Protocol):
     """Collect content; the shared capture runner owns dialogs and document coherence.
 
     Implementations are reusable configuration. Keep per-observation state local.
+    A plugin provides the strategy as a session service when it needs mount-local services.
     Supply CaptureContent.references when targets exist. The default resolves no refs.
     Set supports_dom_refs = True when the resolver returns DomElementHandle for
     the strategy's DOM refs. This enables model tools that require DOM refs.

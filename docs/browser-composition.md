@@ -472,6 +472,38 @@ metadata alone. This path uses Chrome's layout metrics and skips DOM extraction.
 Explicit captures and renderers can still be supplied. With `mode="delta"`, a
 retained unchanged header can be reused when there is no new image.
 
+### Capture with application services
+
+A capture strategy passed as `capture=` is reusable configuration. When capture
+needs a mount-local service, such as an application runtime, provide the strategy
+from a plugin instead. `BrowserPerception` observes `CaptureStrategy`, uses a
+provided strategy in place of its default and validates it during setup.
+Configure the renderer on `BrowserPerception`, because system instructions are
+read before setup.
+
+```python
+from harnessed import Plugin
+from harnessed.kernel import PluginScope, needs
+
+from browserrig import BrowserPerception, CaptureStrategy, TextObservations
+
+
+class CanvasView(Plugin):
+    _runtime = needs(CanvasRuntime)
+
+    async def setup(self, scope: PluginScope) -> None:
+        scope.provide(CaptureStrategy, CanvasCapture(self._runtime))
+
+
+plugins = [
+    BrowserPerception(text=TextObservations(mode="full"), renderer=CanvasRenderer()),
+    CanvasRuntime(),
+    CanvasView(),
+]
+```
+
+Setup fails when `capture=` is also configured.
+
 ### Screenshot settings
 
 Capture timing, image retention and text compaction are independent:
