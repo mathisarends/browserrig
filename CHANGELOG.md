@@ -7,7 +7,7 @@
 - Catch `browserrig.core.BrowserError` for CDP failures from `Tab` and `Frame`
   methods, `screenshot()` and observation capture strategies. The original cdpify
   exception is available as `__cause__`. Direct calls through `tab.cdp` or
-  `frame.cdp` can still raise raw `CDPError` exceptions.
+  `frame.cdp` can still raise raw `CDPError` exceptions (#103).
 
 ## 0.8.0 (2026-11-18)
 
