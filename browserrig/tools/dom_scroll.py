@@ -8,7 +8,7 @@ from pydantic import Field
 from browserrig.browser import Tab
 from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
-from browserrig.observation import DomElementHandle, ResolveDomElement
+from browserrig.dom import DomElementHandle, ResolveDomElement
 from browserrig.scripts import TARGET_SCROLL, TargetScrollArgs, TargetScrollResult
 
 from .effects import Effect

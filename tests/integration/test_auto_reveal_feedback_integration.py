@@ -37,7 +37,7 @@ async def test_reveal_targets_container_and_reports_only_measured_movement(site,
         target = next(
             (
                 item
-                for item in holder["observe"].snapshot.elements
+                for item in holder["observe"].snapshot.targets
                 if item.name == "Target"
             ),
             None,

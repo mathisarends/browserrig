@@ -8,8 +8,8 @@ from pydantic import Field
 from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
+from browserrig.dom import DomElementHandle, ResolveDomElement
 from browserrig.input import Input
-from browserrig.observation import DomElementHandle, ResolveDomElement
 from browserrig.secrets import Secrets
 
 from .effects import Effect

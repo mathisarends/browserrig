@@ -152,18 +152,31 @@ from browserrig import Agent
 
 
 async def run_traced(model, token):
-    provider = TracerProvider(resource=Resource.create({
-        "service.name": "browserrig",
-        "openinference.project.name": "browserrig",
-    }))
-    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(
-        endpoint="http://127.0.0.1:6006/v1/traces",
-    )))
+    provider = TracerProvider(
+        resource=Resource.create(
+            {
+                "service.name": "browserrig",
+                "openinference.project.name": "browserrig",
+            }
+        )
+    )
+    provider.add_span_processor(
+        BatchSpanProcessor(
+            OTLPSpanExporter(
+                endpoint="http://127.0.0.1:6006/v1/traces",
+            )
+        )
+    )
     try:
-        agent = Agent(model=model, plugins=[OpenTelemetryTracer(
-            tracer_provider=provider,
-            capture_content=ContentCapture.redacted(token),
-        )])
+        agent = Agent(
+            model=model,
+            plugins=[
+                OpenTelemetryTracer(
+                    tracer_provider=provider,
+                    capture_content=ContentCapture.redacted(token),
+                )
+            ],
+        )
         return await agent.run("Describe the current page.")
     finally:
         await asyncio.to_thread(provider.shutdown)

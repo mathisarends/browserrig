@@ -33,12 +33,11 @@ from browserrig import (
     Actions,
     BrowserFileTools,
     BrowserPerception,
-    CaptureContent,
-    CaptureStrategy,
-    DomRenderer,
+    Frame,
     HumanHandoff,
     HumanResponse,
     Nudges,
+    PageCapture,
     PageReadiness,
     ReadinessOptions,
     ReadinessStrategy,
@@ -48,9 +47,9 @@ from browserrig import (
     TrimInBatches,
     UntilCompaction,
 )
-from browserrig import PageContent as Extraction
 from browserrig.browser import OpenDialog
 from browserrig.core import (
+    Bounds,
     Geometry,
     ReadinessError,
     ReadinessPhase,
@@ -58,29 +57,30 @@ from browserrig.core import (
     ReadinessStatus,
     StaleElement,
 )
+from browserrig.dom import Extraction
 from browserrig.events import ObservationCapturedEvent, ReadinessStartedEvent
 from browserrig.files import Download
 from browserrig.observation.delta import (  # smelt: ignore[SMT107] -- test seam
     # Verify model-facing deltas and ref markers independently of capture.
     INTRO,
 )
-from tests.fakes import FakeChrome
+from tests.fakes import FakeChrome, UseModel
 from tests.observations import has_image, image_id
 
 
-class CountingCapture(CaptureStrategy):
-    def __init__(self, frames=None):
+class CountingCapture:
+    """Read a fixed page and capture its frames; also the model's frame source."""
+
+    def __init__(self, frames=None, renderer=None):
         self.captures = []
         # (image, geometry scale) per capture; by default every capture shows a new screen.
         self.frames = frames
+        self.renderer = renderer
         self.size = (800, 600)
 
-    async def collect(  # pylint: disable=unused-argument
-        self, tab, _report, *, screenshots, region=None, zoom=1, cursor=None
-    ):
-        self.captures.append(screenshots)
-        image, scale = self._frame() if screenshots else (None, 2)
-        return CaptureContent(
+    async def collect(self, tab, request):
+        self.captures.append(request.screenshots)
+        return PageCapture(
             page=Extraction(
                 url=tab.url,
                 title="Example",
@@ -88,23 +88,25 @@ class CountingCapture(CaptureStrategy):
                 height=self.size[1],
                 scroll_y=0,
                 page_height=600,
-            ),
-            image=base64.b64encode(image.encode()).decode()
-            if image is not None
-            else None,
-            geometry=Geometry(x=100, y=50, width=200, height=100, scale=scale)
-            if screenshots
-            else None,
+            ).page()
         )
+
+    async def capture(self, tab, request):
+        del tab, request
+        image, scale = self._frame()
+        geometry = Geometry(x=100, y=50, width=200, height=100, scale=scale)
+        area = Bounds(x=100, y=50, width=200, height=100)
+        encoded = base64.b64encode(image.encode()).decode() if image else None
+        return Frame(encoded, area, geometry)
+
+    def render(self, snapshot):
+        if self.renderer is not None:
+            return self.renderer.render(snapshot)
+        return f"Custom view: {snapshot.id}"
 
     def _frame(self):
         count = sum(self.captures)
         return (f"png-{count}", 2) if self.frames is None else self.frames[count - 1]
-
-
-class CustomRenderer(DomRenderer):
-    def render(self, snapshot):
-        return f"Custom view: {snapshot.id}"
 
 
 class PageRenderer:
@@ -112,12 +114,6 @@ class PageRenderer:
 
     def __init__(self):
         self.text = "Page A"
-
-    def instructions(self):
-        return ""
-
-    def refs(self):
-        return None
 
     def render(self, _snapshot):
         return self.text
@@ -135,7 +131,7 @@ def _agent(
     renderer=None,
 ):
     holder = {}
-    capture = CountingCapture(frames)
+    capture = CountingCapture(frames, renderer)
     model = ScriptedModel(responses)
     agent = Agent(
         model=model,
@@ -143,15 +139,13 @@ def _agent(
             *extra,
             FakeChrome(holder),
             PageReadiness(options=ReadinessOptions(navigation_min_ms=0)),
-            BrowserPerception(
-                capture=capture,
-                renderer=renderer or CustomRenderer(),
-                screenshots=Screenshots(
-                    trigger=trigger,
-                    retention=retention or TrimInBatches(max_images=2, min_images=2),
-                    skip_unchanged=skip_unchanged,
-                ),
+            BrowserPerception(),
+            Screenshots(
+                trigger=trigger,
+                retention=retention or TrimInBatches(max_images=2, min_images=2),
+                skip_unchanged=skip_unchanged,
             ),
+            UseModel(capture, frames=capture),
             ScreenshotTools(),
             Approvals(default=PolicyDecision.ALLOW),
             _Step(),
@@ -282,7 +276,7 @@ def test_invalid_image_history_size(value):
 
 
 def test_image_history_trims_to_half_by_default_and_rejects_inverted_bounds():
-    assert Screenshots().retention == TrimInBatches(max_images=1, min_images=1)
+    assert Screenshots().policy.retention == TrimInBatches(max_images=1, min_images=1)
     assert TrimInBatches(10).min_images == 5
     with pytest.raises(ValueError, match="must not exceed"):
         TrimInBatches(max_images=2, min_images=3)

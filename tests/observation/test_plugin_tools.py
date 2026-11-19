@@ -6,7 +6,7 @@ from harnessed.tools import ToolRegistry
 from browserrig import (
     Actions,
     BrowserPerception,
-    DomCapture,
+    DomPage,
     DomScrollTools,
     DomTypingTools,
     DomUploadTools,
@@ -17,12 +17,10 @@ from browserrig import (
     PageSearchTools,
     PointerTools,
     ReferencePointerTools,
-    ScreenshotCapture,
     Screenshots,
     ScreenshotTools,
     SetOfMarks,
     Targeting,
-    TextObservations,
 )
 from tests.fakes import FakeChrome
 
@@ -33,7 +31,10 @@ async def test_observation_guidance_works_without_browser_tools():
         plugins=[
             FakeChrome({}),
             PageReadiness(),
-            BrowserPerception(screenshots=Screenshots(marks=SetOfMarks())),
+            BrowserPerception(),
+            Screenshots(),
+            DomPage(),
+            SetOfMarks(),
         ],
     )
     async with agent.session() as session:
@@ -46,17 +47,6 @@ async def test_observation_guidance_works_without_browser_tools():
     assert "scroll_element" not in prompt and "scroll_page" not in prompt
     assert "type_text" not in prompt and "search_page" not in prompt
     assert "screenshot tool" not in prompt and "click_at" not in prompt
-
-
-def test_marks_require_an_element_capture_for_metadata_observations():
-    text = TextObservations(content="metadata")
-    screenshots = Screenshots(marks=SetOfMarks())
-    with pytest.raises(ValueError, match="element refs for screenshot marks"):
-        BrowserPerception(text=text, screenshots=screenshots)
-
-    capture = DomCapture()
-    perception = BrowserPerception(text=text, screenshots=screenshots, capture=capture)
-    assert perception.capture_strategy is capture
 
 
 @pytest.mark.parametrize(
@@ -78,7 +68,9 @@ async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
     plugins = [
         FakeChrome({}),
         PageReadiness(),
-        BrowserPerception(screenshots=Screenshots()),
+        BrowserPerception(),
+        Screenshots(),
+        DomPage(),
         Actions(),
         Targeting(),
         KeyboardTools(),
@@ -104,9 +96,8 @@ async def test_screenshot_only_pointer_tools_have_required_coordinates():
         plugins=[
             FakeChrome({}),
             PageReadiness(),
-            BrowserPerception(
-                capture=ScreenshotCapture(), text=None, screenshots=Screenshots()
-            ),
+            BrowserPerception(text=None),
+            Screenshots(),
             Actions(),
             PointerTools(),
         ],
@@ -125,18 +116,16 @@ async def test_screenshot_only_pointer_tools_have_required_coordinates():
 async def test_model_tools_follow_the_configured_capture(pixels, caplog):
     caplog.set_level("DEBUG", logger="browserrig.tools.parameters")
     perception = (
-        BrowserPerception(
-            capture=ScreenshotCapture(), text=None, screenshots=Screenshots()
-        )
+        (BrowserPerception(text=None), Screenshots())
         if pixels
-        else BrowserPerception()
+        else (BrowserPerception(), DomPage())
     )
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
             FakeChrome({}),
             PageReadiness(),
-            perception,
+            *perception,
             Actions(),
             Targeting(),
             DomScrollTools(),

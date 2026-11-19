@@ -161,7 +161,7 @@ async def test_element_actions_reveal_scroll_containers_and_project_the_cursor(
         state = await observe.capture()
         target = next(
             element
-            for element in state.elements
+            for element in state.targets
             if element.name == "Action target"
             and element.tag
             == {
@@ -270,7 +270,7 @@ async def test_same_action_reprojects_after_programmatic_iframe_motion(site):
         await wait_for_page(tab)
         state = await observe.capture()
         ref = next(
-            element.ref for element in state.elements if element.name == "Moving frame"
+            element.ref for element in state.targets if element.name == "Moving frame"
         )
         points = []
 

@@ -7,7 +7,7 @@ from harnessed import (
     PolicyDecision,
     ToolCall,
 )
-from harnessed.kernel import needs
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel
@@ -16,13 +16,10 @@ from browserrig import (
     Actions,
     Browser,
     BrowserPerception,
-    CaptureContent,
-    CaptureStrategy,
     Chrome,
-    DomRenderer,
-    ElementInfo,
     InputRuntime,
     KeyboardTools,
+    PageCapture,
     PageContent,
     PageReadiness,
     ReferencePointerTools,
@@ -32,6 +29,7 @@ from browserrig import (
 )
 from browserrig.browser import Launch
 from browserrig.core import Bounds, ElementPoint
+from browserrig.observation import Target, header
 from tests.javascript import evaluate
 
 pytestmark = pytest.mark.integration
@@ -91,7 +89,8 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
             InputRuntime(),
             Chrome(Launch(url=site)),
             PageReadiness(),
-            BrowserPerception(capture=_CanvasCapture(), renderer=DomRenderer()),
+            BrowserPerception(),
+            _CanvasPage(),
             Actions(),
             Targeting(),
             ReferencePointerTools(),
@@ -108,13 +107,21 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
     assert all(event["trusted"] for event in received["keys"])
 
 
-class _CanvasCapture(CaptureStrategy):
-    async def collect(  # pylint: disable=unused-argument
-        self, tab, _report, *, screenshots, region=None, zoom=1, cursor=None
-    ):
+class _CanvasPage(Plugin):
+    """Read the canvas through the app's own scene, without the DOM."""
+
+    _perception = needs(BrowserPerception)
+
+    async def setup(self, scope: PluginScope) -> None:
+        scope.effect(self._perception.use_model(_CanvasModel()))
+
+
+class _CanvasModel:
+    async def collect(self, tab, request):
+        del request
         shape = Bounds.model_validate(await evaluate(tab, "shape"))
         viewport = await tab.viewport_size()
-        return CaptureContent(
+        return PageCapture(
             page=PageContent(
                 url=tab.url,
                 title=tab.title,
@@ -122,8 +129,9 @@ class _CanvasCapture(CaptureStrategy):
                 height=viewport.height,
                 scroll_y=0,
                 page_height=viewport.height,
-                elements=(
-                    ElementInfo(
+                # Geometry is not part of the comparison key, as in the DOM digest.
+                targets=(
+                    Target(
                         ref="drawing/rectangle",
                         role="button",
                         name="Rectangle",
@@ -131,20 +139,22 @@ class _CanvasCapture(CaptureStrategy):
                     ),
                 ),
             ),
-            # As with the DOM digest, geometry alone does not change this comparison key.
-            fingerprint="rectangle",
             references=_CanvasReferences(),
         )
+
+    def render(self, snapshot):
+        lines = [f'  [{t.ref}] {t.role} "{t.name}"' for t in snapshot.targets]
+        return "\n".join([*header(snapshot), *lines])
 
 
 class _CanvasReferences:
     async def resolve(self, tab, snapshot, ref):
-        return _CanvasHandle(snapshot.element(ref), tab)
+        return _CanvasHandle(snapshot.target(ref), tab)
 
 
 @dataclass(frozen=True)
 class _CanvasHandle:
-    element: ElementInfo
+    target: Target
     tab: object
 
     async def locate(self, *, aim=None):

@@ -2,11 +2,8 @@ import pytest
 
 from browserrig import (
     Actions,
-    BrowserPerception,
     Chrome,
     DomActionChains,
-    DomCapture,
-    DomRenderer,
     PageReadiness,
     ReadinessOptions,
     Screenshots,
@@ -23,22 +20,10 @@ from browserrig.browser import Launch
             PageReadiness, "options", ReadinessOptions, id="readiness-options"
         ),
         pytest.param(
-            lambda value: Screenshots(retention=value),
+            lambda value: Screenshots(retention=value).policy,
             "retention",
             TrimInBatches,
             id="image-retention",
-        ),
-        pytest.param(
-            lambda value: BrowserPerception(capture=value, renderer=DomRenderer()),
-            "capture_strategy",
-            DomCapture,
-            id="capture-strategy",
-        ),
-        pytest.param(
-            lambda value: BrowserPerception(screenshots=value),
-            "screenshots",
-            Screenshots,
-            id="screenshots",
         ),
         pytest.param(
             lambda value: Actions(chain_policy=value),

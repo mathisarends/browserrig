@@ -6,7 +6,7 @@ from harnessed.tracing import traced
 from browserrig.browser import Tab
 from browserrig.core import BrowserError, StaleElement
 from browserrig.input import Mouse
-from browserrig.observation import ElementHandle, RevealableElement, ScrollableElement
+from browserrig.observation import RevealableElement, ScrollableElement, TargetHandle
 
 _WHEEL_REVEAL_SECONDS = 20
 _WHEEL_SETTLE_SECONDS = 0.05
@@ -15,7 +15,7 @@ _WHEEL_SETTLE_SECONDS = 0.05
 @traced
 async def prepare_element(
     tab: Tab,
-    handle: ElementHandle,
+    handle: TargetHandle,
     mouse: Mouse,
     *,
     document_id: str,

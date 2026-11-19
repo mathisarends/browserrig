@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 _ROOT = Path(__file__).resolve().parents[2]
-_RELEASED_GUIDES = {Path("docs/migration-0.6.md")}
+_RELEASED_GUIDES = {Path("docs/migration-0.6.md"), Path("docs/migration-0.7.md")}
 
 
 @pytest.mark.parametrize(

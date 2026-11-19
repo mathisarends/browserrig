@@ -5,15 +5,15 @@ from typing import Protocol, runtime_checkable
 from browserrig.browser import Tab
 from browserrig.core import Aim, ElementPoint, Point, StaleElement
 
-from .models import ElementInfo, Snapshot
+from .models import Snapshot, Target
 
 
-class ElementHandle(Protocol):
+class TargetHandle(Protocol):
     """Locate a live target in viewport CSS pixels without performing input."""
 
     @property
-    def element(self) -> ElementInfo:
-        """Return the target metadata published by the originating capture."""
+    def target(self) -> Target:
+        """Return the target as the originating capture published it."""
 
     async def locate(  # pylint: disable=unused-argument
         self, *, aim: Aim | None = None
@@ -30,7 +30,7 @@ class References(Protocol):
 
     async def resolve(  # pylint: disable=unused-argument
         self, tab: Tab, snapshot: Snapshot, ref: str
-    ) -> ElementHandle:
+    ) -> TargetHandle:
         """Validate `ref` against this tab/document; raise StaleElement if invalid."""
 
 
@@ -69,7 +69,7 @@ class ScrollableElement(Protocol):
 class EmptyReferences(References):
     """A backend that has not published targets grants no reference capabilities."""
 
-    async def resolve(self, tab: Tab, snapshot: Snapshot, ref: str) -> ElementHandle:
+    async def resolve(self, tab: Tab, snapshot: Snapshot, ref: str) -> TargetHandle:
         raise StaleElement("This observation has no element references")
 
 

@@ -71,8 +71,8 @@ to add request-only messages.
 
 The default [task memory](task-memory.md) compacts at 80% of the model window,
 falling back to 100,000 tokens when the window is unknown. The default
-`Screenshots` policy keeps the latest screenshot. Set image retention on
-`BrowserPerception`.
+`Screenshots` plugin keeps the latest screenshot. Set image retention with
+`Screenshots(retention=...)`.
 
 ## Token usage
 

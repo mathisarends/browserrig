@@ -7,7 +7,7 @@ from pydantic import Field
 
 from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
-from browserrig.observation import ResolveDomElement
+from browserrig.dom import ResolveDomElement
 from browserrig.scripts import SelectionResult
 
 from .effects import Effect

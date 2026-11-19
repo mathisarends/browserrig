@@ -17,6 +17,7 @@ from browserrig.core import (
     Point,
     Position,
 )
+from browserrig.dom import PageSearch, close_find, find_text
 from browserrig.events import (
     InputEvent,
     KeyboardVisibilityEvent,
@@ -24,7 +25,6 @@ from browserrig.events import (
     TabEvent,
 )
 from browserrig.input import TYPING_INTERVAL_SECONDS
-from browserrig.observation import PageSearch, close_find, find_text
 from browserrig.scripts import TargetScrollResult
 from browserrig.tools import (
     ControlIntent,

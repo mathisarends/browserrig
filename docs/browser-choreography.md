@@ -158,6 +158,7 @@ def project(x, y, viewport, width, height):
     top = (height - viewport.height * scale) / 2
     return left + x * scale, top + y * scale
 
+
 # project(*event.control_point_1, event.viewport, 1920, 1080)
 ```
 
@@ -191,6 +192,7 @@ execution:
 
 ```python
 from browserrig.choreography import ElementScrolledEvent, PageScrolledEvent
+
 
 async def consume(session):
     async for event in session.subscribe(transient=True):

@@ -15,12 +15,13 @@ from browserrig import (
     Choreography,
     ChoreographyOverlay,
     Chrome,
+    DomPage,
     Generation,
     InputPacing,
     PageReadiness,
-    ScreenshotCapture,
     Screenshots,
     ScreenshotTrigger,
+    SetOfMarks,
     wait_for_page,
 )
 from browserrig.core import ReadinessStatus, StaleElement
@@ -59,15 +60,18 @@ async def test_board_revision_check_rejects_stale_screenshot_then_allows_click(s
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
         plugins=[
-            BrowserPerception(
-                capture=ScreenshotCapture(),
-                text=None,
-                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
-            ),
+            BrowserPerception(text=None),
+            Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             _BoardChecks(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
-        without=(InputPacing, Choreography, ChoreographyOverlay),
+        without=(
+            InputPacing,
+            Choreography,
+            ChoreographyOverlay,
+            DomPage,
+            SetOfMarks,
+        ),
     )
     async with agent.session() as session:
         checks = session.scope[_BoardChecks]
@@ -136,7 +140,7 @@ async def test_app_generation_checks_managed_actions(site, change, tool, error):
             "wait": {"seconds": 0},
         }
         if tool == "click":
-            card = next((el for el in observed.elements if el.name == "A"), None)
+            card = next((el for el in observed.targets if el.name == "A"), None)
             assert card is not None
             options["click"] = {"ref": card.ref}
         yield ModelChunk(tool_call=ToolCall(tool, options[tool]))
@@ -209,9 +213,7 @@ def _app_agent(site, respond):
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
         plugins=[
-            BrowserPerception(
-                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
-            ),
+            Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             _App(),
             Approvals(default=PolicyDecision.ALLOW),
         ],

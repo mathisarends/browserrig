@@ -11,7 +11,7 @@ from tests.fakes import FakeTab, mounted
 async def test_hover_follows_one_target_move_and_preserves_reveal_receipt():
     async with mounted(Actions()) as (services, scope):
         first, moved = ElementPoint(x=10, y=20), ElementPoint(x=30, y=40)
-        services.observe.element = AsyncMock(return_value=_handle(first, moved, moved))
+        services.observe.target = AsyncMock(return_value=_handle(first, moved, moved))
         move = services.input.mouse.move_to = AsyncMock()
         result = await scope[Targeting].hover(
             ref="field", tab=services.browser.active_tab
@@ -27,7 +27,7 @@ async def test_hover_follows_one_target_move_and_preserves_reveal_receipt():
 async def test_hover_stops_when_its_document_or_focus_changes(change):
     async with mounted(Actions()) as (services, scope):
         tab = services.browser.active_tab
-        services.observe.element = AsyncMock(
+        services.observe.target = AsyncMock(
             return_value=_handle(ElementPoint(x=1, y=2))
         )
 
@@ -47,7 +47,7 @@ async def test_hover_stops_when_its_document_or_focus_changes(change):
 
 async def test_hover_stops_after_a_bounded_number_of_target_moves():
     async with mounted(Actions()) as (services, scope):
-        services.observe.element = AsyncMock(
+        services.observe.target = AsyncMock(
             return_value=_handle(
                 ElementPoint(x=1, y=2),
                 ElementPoint(x=3, y=4),
@@ -63,7 +63,7 @@ async def test_hover_stops_after_a_bounded_number_of_target_moves():
 async def test_focus_change_during_document_sync_is_checked_before_moving():
     async with mounted(Actions()) as (services, scope):
         tab = services.browser.active_tab
-        services.observe.element = AsyncMock(
+        services.observe.target = AsyncMock(
             return_value=_handle(ElementPoint(x=1, y=2))
         )
 
@@ -81,7 +81,7 @@ async def test_focus_change_during_document_sync_is_checked_before_moving():
 
 def _handle(*points):
     return SimpleNamespace(
-        element=SimpleNamespace(bounds=None),
+        target=SimpleNamespace(bounds=None),
         reveal=AsyncMock(return_value=True),
         locate=AsyncMock(side_effect=points),
     )

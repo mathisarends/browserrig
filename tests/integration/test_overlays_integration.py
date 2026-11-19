@@ -16,7 +16,7 @@ from browserrig import (
     ChoreographyOverlay,
     Chrome,
     ChromeBrowser,
-    DomCapture,
+    DomModel,
     Input,
     InputRuntime,
     Point,
@@ -27,15 +27,15 @@ from browserrig import (
 from browserrig.browser import Launch, screenshot
 from browserrig.choreography import FindBarEvent, FindResultsEvent
 from browserrig.core import ReadinessStatus
+from browserrig.dom import find_text
+from browserrig.dom.content import (  # smelt: ignore[SMT107] -- test seam
+    # Test document extraction independently of capture strategy.
+    extract_content,
+)
 from browserrig.events import KeyPressedEvent
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     # Public facade callable; SMT107 confuses it with the same-named module.
     capture,
-    find_text,
-)
-from browserrig.observation.content import (  # smelt: ignore[SMT107] -- test seam
-    # Test document extraction independently of capture strategy.
-    extract_content,
 )
 from browserrig.scripts import Script, ScriptArgs
 from tests.javascript import evaluate
@@ -74,10 +74,10 @@ async def test_overlay_is_visible_click_through_and_absent_from_all_page_reads(s
         )
         report = await wait_for_page(tab)
         assert report.status == ReadinessStatus.READY
-        snapshot = await capture(tab, DomCapture(), report)
+        snapshot = await capture(tab, DomModel(), report)
         assert "OVERLAY_ONLY" not in snapshot.text
-        assert all(element.name != "OVERLAY_ONLY" for element in snapshot.elements)
-        assert any(element.name == "Inside" for element in snapshot.elements)
+        assert all(element.name != "OVERLAY_ONLY" for element in snapshot.targets)
+        assert any(element.name == "Inside" for element in snapshot.targets)
         content = await extract_content(tab)
         assert "OVERLAY_ONLY" not in content.markdown
         found = await find_text(tab, ("OVERLAY_ONLY",), session="overlay")
@@ -86,7 +86,7 @@ async def test_overlay_is_visible_click_through_and_absent_from_all_page_reads(s
         clean = _pixel(await screenshot(tab))
         assert visible == (255, 0, 0) and clean != visible
         submit = next(
-            element for element in snapshot.elements if element.name == "Submit"
+            element for element in snapshot.targets if element.name == "Submit"
         )
         point = submit.bounds
         await devices.mouse.click(

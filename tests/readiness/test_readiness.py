@@ -485,7 +485,7 @@ async def test_timed_out_capture_has_a_bounded_fallback_without_stale_controls()
     assert (
         snapshot.readiness == "degraded" and snapshot.readiness_reason == report.reason
     )
-    assert not snapshot.elements and snapshot.image is None
+    assert not snapshot.targets and snapshot.image is None
     assert "still loading" in snapshot.text
 
 

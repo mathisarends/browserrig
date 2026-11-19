@@ -20,12 +20,13 @@ from browserrig import (
     BrowserPerception,
     Chrome,
     ChromeBrowser,
-    DomCapture,
+    DomModel,
     ScreenshotStatus,
     wait_for_page,
 )
 from browserrig.browser import Launch
 from browserrig.core import BrowserError
+from browserrig.dom import DomView
 from browserrig.kinds import ElementOperation
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     # Public facade callable; SMT107 confuses it with the same-named module.
@@ -42,9 +43,9 @@ async def test_frame_extraction_and_old_reference_is_rejected(site):
     async with ChromeBrowser(Launch(url=site + "/frames")) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
-        snapshot = await capture(tab, DomCapture(), report)
+        snapshot = await capture(tab, DomModel(), report)
         inside = next(
-            element for element in snapshot.elements if element.name == "Inside"
+            element for element in snapshot.targets if element.name == "Inside"
         )
         assert inside.frame_id != (await tab.main_frame()).id
         frame = next(
@@ -167,8 +168,8 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
         )
         browser = holder["browser"]
         observe = session.scope[BrowserPerception]
-        entry = next(e for e in observe.snapshot.elements if e.name == "Frame button")
-        frame = (await observe.element(browser.active_tab, entry.ref)).frame
+        entry = next(e for e in observe.snapshot.targets if e.name == "Frame button")
+        frame = (await observe.target(browser.active_tab, entry.ref)).frame
         assert (
             await evaluate(frame, "document.querySelector('input').value")
             == "Across frames"
@@ -184,9 +185,9 @@ async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_d
     async with ChromeBrowser(Launch(url=site + "/frame-host")) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
-        before = await capture(tab, DomCapture(), report)
-        assert all(e.tag != "iframe" for e in before.elements)
-        entry = next(e for e in before.elements if e.name == "Frame button")
+        before = await capture(tab, DomModel(), report)
+        assert all(e.tag != "iframe" for e in before.targets)
+        entry = next(e for e in before.targets if e.name == "Frame button")
         frame = next(
             frame for frame in await tab.frames() if frame.id == entry.frame_id
         )
@@ -199,8 +200,8 @@ async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_d
         )
         with pytest.raises(BrowserError, match="ELEMENT_BLOCKED"):
             await frame.check_point(x, y)
-        covered = await capture(tab, DomCapture(), report)
-        assert covered.elements and all(element.covered for element in covered.elements)
+        covered = await capture(tab, DomModel(), report)
+        assert covered.targets and all(element.covered for element in covered.targets)
         await evaluate(
             tab,
             "document.body.lastElementChild.remove();document.querySelector('iframe').style.display='none'",
@@ -211,8 +212,8 @@ async def test_hidden_and_covered_frames_are_excluded_and_offscreen_frames_are_d
             "document.querySelector('iframe').style.cssText='display:block;top:2000px'",
         )
         assert len(await tab.frames()) == 2
-        offscreen = await capture(tab, DomCapture(), report)
-        assert not offscreen.elements and offscreen.offscreen
+        offscreen = await capture(tab, DomModel(), report)
+        assert not offscreen.targets and DomView.of(offscreen).offscreen
 
 
 async def test_unrendered_sibling_does_not_discard_usable_frame(site):
@@ -224,8 +225,8 @@ async def test_unrendered_sibling_does_not_discard_usable_frame(site):
             '\'<iframe style="display:none" src="/frame-leaf"></iframe>\')',
         )
         report = await wait_for_page(tab)
-        state = await capture(tab, DomCapture(), report)
-        assert sum(e.name == "Frame button" for e in state.elements) == 1
+        state = await capture(tab, DomModel(), report)
+        assert sum(e.name == "Frame button" for e in state.targets) == 1
         assert not state.limitations
 
 
@@ -251,8 +252,8 @@ async def test_detaching_sibling_retains_root_and_other_frame(site, monkeypatch)
         monkeypatch.setattr(
             type(tab.cdp.dom), "get_frame_owner", detach_during_inspection
         )
-        state = await capture(tab, DomCapture(), report)
-        assert {"Root button", "Frame button"} <= {e.name for e in state.elements}
+        state = await capture(tab, DomModel(), report)
+        assert {"Root button", "Frame button"} <= {e.name for e in state.targets}
         assert any(removed_id in limitation for limitation in state.limitations)
 
 
@@ -266,7 +267,7 @@ async def test_main_snapshot_failure_asks_to_observe_again(site, monkeypatch):
 
         monkeypatch.setattr(type(tab.cdp.dom_snapshot), "capture_snapshot", unavailable)
         with pytest.raises(BrowserError, match="Page snapshot failed"):
-            await capture(tab, DomCapture(), report)
+            await capture(tab, DomModel(), report)
 
 
 async def test_capture_recovers_from_navigation_during_the_first_snapshot(
@@ -292,10 +293,10 @@ async def test_capture_recovers_from_navigation_during_the_first_snapshot(
             return result
 
         monkeypatch.setattr(domain, "capture_snapshot", navigating_snapshot)
-        snapshot = await capture(tab, DomCapture(), report)
+        snapshot = await capture(tab, DomModel(), report)
         assert calls == 2 and snapshot.url == site + "/other"
         assert snapshot.document_id == tab.document_id != report.document_id
-        assert [element.name for element in snapshot.elements] == ["Destination"]
+        assert [element.name for element in snapshot.targets] == ["Destination"]
         assert snapshot.readiness == "degraded"
 
 
@@ -310,7 +311,7 @@ async def test_capture_keeps_dom_when_chrome_cannot_take_a_screenshot(
             raise CDPCommandError("Page.captureScreenshot", -32000, "unavailable")
 
         monkeypatch.setattr(type(tab.cdp.page), "capture_screenshot", unavailable)
-        snapshot = await capture(tab, DomCapture(), report, screenshots=True)
+        snapshot = await capture(tab, DomModel(), report, screenshots=True)
         assert snapshot.image is None
-        assert any(element.name == "Email" for element in snapshot.elements)
+        assert any(element.name == "Email" for element in snapshot.targets)
         assert snapshot.screenshot_status is ScreenshotStatus.UNAVAILABLE

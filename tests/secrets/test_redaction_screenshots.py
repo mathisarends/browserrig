@@ -6,13 +6,12 @@ from unittest.mock import AsyncMock
 import pytest
 from PIL import Image
 
-from browserrig import CaptureContent, ScreenshotStatus
-from browserrig import PageContent as Extraction
+from browserrig import PageCapture, ScreenshotStatus
 from browserrig.core import Bounds, ReadinessPhase
+from browserrig.dom import CookieBanner, Element, Extraction
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    Frame,
     # Public facade callable; SMT107 confuses it with the same-named module.
-    CookieBanner,
-    Element,
     capture,
 )
 from browserrig.secrets.redaction import (  # smelt: ignore[SMT107] -- test seam
@@ -64,15 +63,15 @@ async def test_unlocated_secrets_withhold_images_even_with_other_bounded_hits(
     image = base64.b64encode(output.getvalue()).decode()
     redactor = Redactor()
     redactor.add("pw", secret)
-    content = CaptureContent(
-        page, image=image, area=Bounds(x=0, y=0, width=100, height=50)
-    )
+    content = PageCapture(page.page())
+    frame = Frame(image, Bounds(x=0, y=0, width=100, height=50))
     tab = FakeTab()
     report = await FakeReadiness().wait(tab, phase=ReadinessPhase.OBSERVATION)
     snapshot = await capture(
         tab,
         SimpleNamespace(collect=AsyncMock(return_value=content)),
         report,
+        frames=SimpleNamespace(capture=AsyncMock(return_value=frame)),
         screenshots=True,
         redaction=SimpleNamespace(redact=redactor.scrub),
     )

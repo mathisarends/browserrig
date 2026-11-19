@@ -1,6 +1,6 @@
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, wait_for_page
+from browserrig import ChromeBrowser, DomModel, wait_for_page
 from browserrig.browser import Launch
 from browserrig.core import BrowserError
 from browserrig.kinds import ElementOperation
@@ -34,9 +34,9 @@ async def test_select_notifies_bubbling_listeners_and_rejects_disabled_options(s
             "  });"
             "}",
         )
-        snapshot = await capture(tab, DomCapture(), report)
+        snapshot = await capture(tab, DomModel(), report)
         select = next(
-            element for element in snapshot.elements if element.tag == "select"
+            element for element in snapshot.targets if element.tag == "select"
         )
         result = await frame.run_on_node(
             select.backend_id,
@@ -72,8 +72,8 @@ async def test_focus_selects_text_in_native_and_contenteditable_controls(site, m
         frame = await tab.main_frame()
         # Both tags are fixed test cases, with no page-controlled JavaScript.
         await evaluate(frame, f"document.body.innerHTML = '{markup}'")
-        snapshot = await capture(tab, DomCapture(), report)
-        element = snapshot.elements[0]
+        snapshot = await capture(tab, DomModel(), report)
+        element = snapshot.targets[0]
         assert await frame.run_on_node(
             element.backend_id,
             ELEMENT,
@@ -99,10 +99,10 @@ async def test_native_value_setter_preserves_password_redaction_and_value_valida
     async with ChromeBrowser(Launch(url=site)) as browser:
         tab = browser.active_tab
         report = await wait_for_page(tab)
-        snapshot = await capture(tab, DomCapture(), report)
+        snapshot = await capture(tab, DomModel(), report)
         frame = await tab.main_frame()
         secret = next(
-            element for element in snapshot.elements if element.input_type == "password"
+            element for element in snapshot.targets if element.input_type == "password"
         )
         assert secret.value is None
         assert await frame.run_on_node(
@@ -119,7 +119,7 @@ async def test_native_value_setter_preserves_password_redaction_and_value_valida
             == "new-secret"
         )
         date = next(
-            element for element in snapshot.elements if element.input_type == "date"
+            element for element in snapshot.targets if element.input_type == "date"
         )
         with pytest.raises(BrowserError, match="INVALID_VALUE"):
             await frame.run_on_node(
@@ -131,4 +131,4 @@ async def test_native_value_setter_preserves_password_redaction_and_value_valida
                 ),
                 user_gesture=True,
             )
-        assert any(element.name == "Shadow button" for element in snapshot.elements)
+        assert any(element.name == "Shadow button" for element in snapshot.targets)

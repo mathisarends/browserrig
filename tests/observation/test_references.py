@@ -6,13 +6,12 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from harnessed import Agent, Plugin, ToolError
+from harnessed.kernel import PluginScope, needs
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
     Actions,
     BrowserPerception,
-    CaptureContent,
-    CaptureStrategy,
     DomElementHandle,
     DomReferences,
     DomTypingTools,
@@ -22,6 +21,7 @@ from browserrig import (
     FormTools,
     KeyboardTools,
     MouseEventKind,
+    PageCapture,
     PageContent,
     PageReadiness,
     ReferencePointerTools,
@@ -30,25 +30,20 @@ from browserrig import (
     Targeting,
 )
 from browserrig.core import Bounds, BrowserError, ElementPoint, Point, StaleElement
+from browserrig.dom import DomContent, Element, Offscreen, render
 from browserrig.events import ActionFailedEvent
 from browserrig.input import Instant
-from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
-    # Public facade callable; SMT107 confuses it with the same-named module.
-    Element,
-    Offscreen,
-    Snapshot,
-    render,
-)
+from browserrig.observation import EmptyReferences, PagePart
 from browserrig.tools.scrolling import (  # smelt: ignore[SMT107] -- test seam
     # Test reveal preparation independently of tool execution.
     prepare_element,
 )
-from tests.fakes import FakeChrome, FakeReadiness, FakeTab
+from tests.fakes import DomStub, FakeChrome, FakeReadiness, FakeTab, UseModel
+from tests.snapshots import with_dom
 
 
-async def test_dom_and_backend_data_round_trip_without_runtime_resolvers():
+async def test_dom_and_backend_targets_serialize_their_own_fields_without_resolvers():
     async with _observed(_Backend()) as env:
-        snapshot = env.observe.snapshot
         native = Element(
             ref="native",
             frame_id="frame",
@@ -57,25 +52,22 @@ async def test_dom_and_backend_data_round_trip_without_runtime_resolvers():
             name="Native",
             tag="button",
         )
-        snapshot = snapshot.model_copy(
-            update={
-                "elements": (*snapshot.elements, native),
-                "offscreen": (
-                    ElementRef(ref="hidden"),
-                    Offscreen(ref="below", frame_id="frame", backend_id=13),
-                ),
-            }
+        snapshot = with_dom(
+            env.observe.snapshot,
+            elements=(*env.observe.snapshot.targets, native),
+            offscreen=(
+                ElementRef(ref="hidden"),
+                Offscreen(ref="below", frame_id="frame", backend_id=13),
+            ),
         )
-        restored = Snapshot.model_validate_json(snapshot.model_dump_json())
-        assert isinstance(restored.element("shape/a"), ElementInfo)
-        assert not hasattr(restored.element("shape/a"), "backend_id")
-        assert isinstance(restored.element("native"), Element)
-        assert restored.element("native").backend_id == 12
-        assert isinstance(restored.offscreen[0], ElementRef)
-        assert not hasattr(restored.offscreen[0], "backend_id")
-        assert isinstance(restored.offscreen[1], Offscreen)
-        assert "references" not in restored.model_dump()
-        assert '[shape/a] button "Shape A"' in render(restored)
+        data = snapshot.model_dump()
+        shape, element = data["targets"]
+        assert "backend_id" not in shape and element["backend_id"] == 12
+        (dom,) = (part for part in data["parts"] if "offscreen" in part)
+        assert "backend_id" not in dom["offscreen"][0]
+        assert dom["offscreen"][1]["backend_id"] == 13
+        assert "references" not in data
+        assert '[shape/a] button "Shape A"' in render(snapshot)
 
 
 async def test_backend_locates_live_geometry_and_uses_the_common_motor_aim():
@@ -101,15 +93,15 @@ async def test_probe_keeps_the_published_refs_until_a_full_capture():
         original, references = env.observe.snapshot, env.observe.references
         backend.objects["new/item"] = Bounds(x=250, y=50, width=50, height=30)
         probe = await env.observe.probe(env.tab)
-        assert probe.element("new/item").ref == "new/item"
+        assert probe.target("new/item").ref == "new/item"
         assert env.observe.snapshot is original
         assert env.observe.references is references
         assert backend.resolvers[-1] is not references
         with pytest.raises(StaleElement, match="Unknown"):
-            await env.observe.element(env.tab, "new/item")
+            await env.observe.target(env.tab, "new/item")
         fresh = await env.observe.capture()
-        handle = await env.observe.element(env.tab, "new/item")
-        assert handle.element is fresh.element("new/item")
+        handle = await env.observe.target(env.tab, "new/item")
+        assert handle.target is fresh.target("new/item")
         assert env.observe.references is backend.resolvers[-1]
         assert env.observe.references is not references
 
@@ -135,7 +127,7 @@ async def test_invalid_refs_are_rejected_before_the_backend_is_called(invalid):
         else:
             env.observe.invalidate()
         with pytest.raises(StaleElement):
-            await env.observe.element(tab, ref)
+            await env.observe.target(tab, ref)
         assert references.resolved == []
         env.tab.dispatch_mouse.assert_not_awaited()
 
@@ -143,7 +135,7 @@ async def test_invalid_refs_are_rejected_before_the_backend_is_called(invalid):
 async def test_a_removed_backend_object_cannot_be_located_with_an_old_handle():
     backend = _Backend()
     async with _observed(backend) as env:
-        handle = await env.observe.element(env.tab, "shape/a")
+        handle = await env.observe.target(env.tab, "shape/a")
         del backend.objects["shape/a"]
         with pytest.raises(StaleElement, match="no longer exists"):
             await handle.locate()
@@ -156,10 +148,10 @@ async def test_refs_removed_from_a_new_capture_do_not_reuse_old_bindings():
         backend.objects = {"another/ref": Bounds(x=10, y=20, width=30, height=40)}
         await env.observe.capture()
         with pytest.raises(StaleElement, match="Unknown"):
-            await env.observe.element(env.tab, "shape/a")
+            await env.observe.target(env.tab, "shape/a")
         assert env.observe.references.resolved == []
-        handle = await env.observe.element(env.tab, "another/ref")
-        assert handle.element.ref == "another/ref"
+        handle = await env.observe.target(env.tab, "another/ref")
+        assert handle.target.ref == "another/ref"
 
 
 async def test_non_dom_data_needs_a_resolver_instead_of_invented_dom_addresses():
@@ -167,7 +159,7 @@ async def test_non_dom_data_needs_a_resolver_instead_of_invented_dom_addresses()
     backend.use_references = False
     async with _observed(backend) as env:
         with pytest.raises(BrowserError, match="no element references"):
-            await env.observe.element(env.tab, "shape/a")
+            await env.observe.target(env.tab, "shape/a")
         env.tab.frames.assert_not_awaited()
 
 
@@ -189,7 +181,7 @@ async def test_dom_capabilities_are_checked_per_target_in_a_mixed_capture():
         env.tab.frames.side_effect = None
         native = await env.scope[ResolveDomElement](env.tab, "native")
         assert isinstance(native, DomElementHandle)
-        assert native.frame is frame and native.element.backend_id == 5
+        assert native.frame is frame and native.target.backend_id == 5
         with pytest.raises(BrowserError, match="requires a DOM element"):
             await env.scope[ResolveDomElement](env.tab, "shape/a")
         env.tab.frames.assert_awaited_once()
@@ -208,7 +200,7 @@ async def test_resolution_keeps_its_capture_binding_across_awaits(refresh):
             return await original(tab, snapshot, ref)
 
         references.resolve = blocked
-        task = asyncio.create_task(env.observe.element(env.tab, "shape/a"))
+        task = asyncio.create_task(env.observe.target(env.tab, "shape/a"))
         await asyncio.wait_for(entered.wait(), 2)
         try:
             if refresh == "capture":
@@ -222,7 +214,7 @@ async def test_resolution_keeps_its_capture_binding_across_awaits(refresh):
                 await asyncio.wait_for(task, 2)
         else:
             handle = await asyncio.wait_for(task, 2)
-            assert handle.element.ref == "shape/a"
+            assert handle.target.ref == "shape/a"
 
 
 @pytest.mark.parametrize("invalid", ["document", "target"])
@@ -231,7 +223,7 @@ async def test_resolver_cannot_change_documents_or_return_another_ref(invalid):
     async with _observed(backend) as env:
         backend.resolution_error = invalid
         with pytest.raises(StaleElement):
-            await env.observe.element(env.tab, "shape/a")
+            await env.observe.target(env.tab, "shape/a")
         assert env.observe.references.resolved == ["shape/a"]
         env.tab.dispatch_mouse.assert_not_awaited()
 
@@ -387,9 +379,20 @@ class _Aiming(Instant):
         return 0.25, 0.75
 
 
-class _Backend(CaptureStrategy):
-    supports_dom_refs = True
+class _Revision(PagePart):
+    revision: int
 
+
+class _DomResolver(Plugin):
+    """Resolve DOM handles for the backend's DOM elements, as DomPage would."""
+
+    _perception = needs(BrowserPerception)
+
+    async def setup(self, scope: PluginScope) -> None:
+        scope.provide(ResolveDomElement, ResolveDomElement(self._perception))
+
+
+class _Backend(DomStub):
     """A test-only source of opaque targets; no DOM addresses or scripted mutations."""
 
     def __init__(self):
@@ -403,9 +406,7 @@ class _Backend(CaptureStrategy):
         self.use_references = True
         self.extra_elements = ()
 
-    async def collect(  # pylint: disable=unused-argument
-        self, tab, _report, *, screenshots, region=None, zoom=1, cursor=None
-    ):
+    async def collect(self, tab, request):
         if self.capture_error == "failure":
             raise BrowserError("Capture failed")
         if self.capture_error == "navigation":
@@ -416,7 +417,7 @@ class _Backend(CaptureStrategy):
         )
         references = _References(self)
         self.resolvers.append(references)
-        return CaptureContent(
+        return PageCapture(
             page=PageContent(
                 url=tab.url,
                 title=tab.title,
@@ -424,13 +425,17 @@ class _Backend(CaptureStrategy):
                 height=600,
                 scroll_y=0,
                 page_height=600,
-                elements=(*elements, *self.extra_elements),
-                offscreen=(ElementRef(ref="shape/a"),)
-                if self.capture_error == "duplicate"
-                else self.offscreen,
+                targets=(*elements, *self.extra_elements),
+                parts=(
+                    DomContent(
+                        offscreen=(ElementRef(ref="shape/a"),)
+                        if self.capture_error == "duplicate"
+                        else self.offscreen
+                    ),
+                    _Revision(revision=self.revision),
+                ),
             ),
-            fingerprint=f"revision:{self.revision}",
-            references=references if self.use_references else None,
+            references=references if self.use_references else EmptyReferences(),
         )
 
 
@@ -441,7 +446,7 @@ class _References:
 
     async def resolve(self, tab, snapshot, ref):
         self.resolved.append(ref)
-        element = snapshot.element(ref)
+        element = snapshot.target(ref)
         if isinstance(element, Element):
             references = DomReferences()
             return await references.resolve(tab, snapshot, ref)
@@ -454,12 +459,12 @@ class _References:
 
 @dataclass
 class _Handle:
-    element: ElementInfo
+    target: ElementInfo
     backend: _Backend
 
     async def locate(self, *, aim=None):
         self.backend.aims.append(aim)
-        bounds = self.backend.objects.get(self.element.ref)
+        bounds = self.backend.objects.get(self.target.ref)
         if bounds is None:
             raise StaleElement("Target no longer exists")
         fx, fy = aim if aim is not None else (0.5, 0.5)
@@ -478,7 +483,9 @@ async def _observed(backend):
         plugins=[
             FakeChrome(holder),
             _Ready(),
-            BrowserPerception(capture=backend),
+            BrowserPerception(),
+            UseModel(backend),
+            _DomResolver(),
             Actions(),
             Targeting(),
             _Forms(),

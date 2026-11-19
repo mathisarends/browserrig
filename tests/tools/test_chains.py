@@ -18,8 +18,8 @@ from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import ActionKind
+from browserrig.dom import Element, Offscreen, decision_change
 from browserrig.events import ActionFailedEvent, ActionFinishedEvent
-from browserrig.observation import Element, Offscreen, Snapshot, decision_change
 from browserrig.tools import (
     Actions,
     BrowserToolMetadata,
@@ -28,6 +28,7 @@ from browserrig.tools import (
     browser_tool,
 )
 from tests.fakes import FakeServices, mounted
+from tests.snapshots import dom_snapshot
 
 
 def _element(**values):
@@ -240,21 +241,18 @@ async def test_failed_comparison_keeps_input_successful_and_breaks_the_chain():
     assert not any(isinstance(event, ActionFailedEvent) for event in services.events)
 
 
-def _snapshot(**values):
+def _snapshot(*, elements=None, **values):
     fields = {
         "id": "before",
-        "tab_id": "tab",
         "document_id": "doc",
         "url": "https://example.org/",
         "title": "Form",
-        "readiness": "ready",
+        "fingerprint": "first",
         "width": 800,
         "height": 600,
-        "scroll_y": 0,
-        "fingerprint": "first",
-        "elements": (_element(),),
     }
-    return Snapshot.model_validate(fields | values)
+    targets = (_element(),) if elements is None else elements
+    return dom_snapshot(*targets, **(fields | values))
 
 
 def _batch(*responses):

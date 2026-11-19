@@ -1,11 +1,10 @@
 import pytest
 from pydantic import ValidationError
 
-from browserrig import BrowserPerception, DomCapture, DomRenderer, ScreenshotCapture
+from browserrig import BrowserPerception, DomModel, DomPage
 from browserrig.browser import Connect, Launch
 from browserrig.core import Bounds, Geometry, Point, Region, StaleElement
-from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
-    # Public facade callable; SMT107 confuses it with the same-named module.
+from browserrig.dom import (
     Canvas,
     CookieBanner,
     Element,
@@ -13,14 +12,15 @@ from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     Modal,
     Offscreen,
     Option,
-    Snapshot,
     render,
 )
+from browserrig.observation import Snapshot
 from browserrig.observation.models import (  # smelt: ignore[SMT107] -- test seam
     # Test internal change fingerprints without exposing them as API.
-    ElementFingerprint,
     PageFingerprint,
+    TargetFingerprint,
 )
+from tests.snapshots import dom_snapshot, with_dom
 
 
 def test_public_capture_models_describe_selected_options():
@@ -33,8 +33,8 @@ def test_public_capture_models_describe_selected_options():
     )
     rendered = render(_snapshot(element))
     assert "Voyager" in rendered and "Pioneer" in rendered
-    restored = Snapshot.model_validate_json(_snapshot(element).model_dump_json())
-    assert restored.element("choice").options == element.options
+    # Serialization keeps the fields of DOM targets beyond the generic Target.
+    assert '"label":"Pioneer"' in _snapshot(element).model_dump_json()
 
 
 def test_render_lists_visible_elements_by_section_and_group_without_routing_data():
@@ -170,8 +170,7 @@ def test_cookie_context_has_its_own_block_and_leaves_navigation_available():
     assert '    <form "Consent">\n      [2] button "Reject all"' in text
     assert '[1] button "Continue"' in text and "[MAIN]" in text
     assert "interact with it first" not in text and not snapshot.text
-    observe = BrowserPerception()
-    assert "Choose whether to interact or navigate" in observe.renderer.instructions()
+    assert "Choose whether to interact or navigate" in str(DomPage().instructions())
 
 
 def test_cookie_excerpt_is_rendered_even_when_no_controls_fit_the_budget():
@@ -225,23 +224,23 @@ def test_zoomed_geometry_maps_image_pixels_back_to_viewport():
 
 def test_unknown_ref_is_stale():
     with pytest.raises(StaleElement, match="Unknown"):
-        _snapshot(_element("1", 0)).element("2")
-    offscreen = _snapshot(_element("1", 0)).model_copy(
-        update={"offscreen": (Offscreen(ref="2", frame_id="f", backend_id=2),)}
+        _snapshot(_element("1", 0)).target("2")
+    offscreen = with_dom(
+        _snapshot(_element("1", 0)),
+        offscreen=(Offscreen(ref="2", frame_id="f", backend_id=2),),
     )
     with pytest.raises(StaleElement, match="outside the viewport"):
-        offscreen.element("2")
+        offscreen.target("2")
 
 
 def test_fingerprint_changes_with_semantics_and_url():
     original = PageFingerprint(
         url="https://example.org",
         document_id="doc",
-        text=("hello",),
+        text="hello",
         scroll_y=0,
-        elements=(
-            ElementFingerprint(role="button", name="Go", value=None, disabled=False),
-        ),
+        targets=(TargetFingerprint(role="button", name="Go"),),
+        parts=("dom-digest",),
     )
     restored = PageFingerprint.model_validate_json(original.model_dump_json())
     assert restored.digest() == original.digest()
@@ -250,6 +249,9 @@ def test_fingerprint_changes_with_semantics_and_url():
         != original.digest()
     )
     assert original.model_copy(update={"scroll_y": 5}).digest() != original.digest()
+    assert (
+        original.model_copy(update={"parts": ("other",)}).digest() != original.digest()
+    )
 
 
 def test_browser_options_hide_credentials_and_reject_owned_flags():
@@ -266,57 +268,34 @@ def test_browser_options_hide_credentials_and_reject_owned_flags():
         {"max_elements": 50001},
         {"max_text_chars": 0},
         {"max_text_chars": 100001},
-        {"text": "prose"},
+        {"prose": "verbose"},
         {"viewport_expansion": -1},
         {"viewport_expansion": 10001},
     ],
 )
 def test_capture_rejects_invalid_limits(settings):
     with pytest.raises(ValidationError):
-        DomCapture(**settings)
+        DomModel(**settings)
 
 
-def test_default_observation_explains_context_without_enabling_screenshots():
-    observe = BrowserPerception()
-    instructions = observe.renderer.instructions()
+def test_dom_page_explains_its_elements_and_prose_without_enabling_screenshots():
+    instructions = str(DomPage().instructions())
     assert "reading order beside its controls" in instructions
     assert "Plain text has no action refs" in instructions
     assert "above/below previews" in instructions and "scroll(up=" in instructions
-    assert observe.screenshots is None
-    assert "Every observation includes a screenshot" not in instructions
+    assert "screenshot" not in instructions.lower()
+    assert "reading order" not in str(DomPage(prose="off").instructions())
 
 
-def test_explicit_dom_capture_uses_the_default_text_renderer():
-    capture = DomCapture(page_prose="sparse")
-    perception = BrowserPerception(capture=capture)
-    assert perception.capture_strategy is capture
-    assert isinstance(perception.renderer, DomRenderer)
-
-
-def test_text_with_a_capture_without_dom_refs_requires_a_renderer():
-    capture = ScreenshotCapture()
-    with pytest.raises(ValueError, match="this capture require a renderer"):
-        BrowserPerception(capture=capture)
-    renderer = DomRenderer()
-    assert BrowserPerception(capture=capture, renderer=renderer).renderer is renderer
+def test_perception_alone_explains_only_the_page_header():
+    instructions = str(BrowserPerception().instructions())
+    assert "Each observation starts with a header" in instructions
+    assert "[ref]" not in instructions
 
 
 def _snapshot(*elements: Element, **fields) -> Snapshot:
-    return Snapshot(
-        id="observation",
-        tab_id="tab",
-        document_id="document",
-        url="https://example.org/shop",
-        title="Shop",
-        readiness="ready",
-        width=1280,
-        height=800,
-        scroll_y=0,
-        page_height=4000,
-        fingerprint="fingerprint",
-        elements=elements,
-        **fields,
-    )
+    defaults = {"url": "https://example.org/shop", "title": "Shop", "page_height": 4000}
+    return dom_snapshot(*elements, **{**defaults, **fields})
 
 
 def _element(ref: str, order: int, **fields) -> Element:

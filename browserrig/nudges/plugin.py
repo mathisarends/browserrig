@@ -290,12 +290,10 @@ class Nudges(Plugin, slot="browserrig.nudges", provides=True, needs=(SessionLog,
 
 
 def _challenge(snapshot: Snapshot) -> bool:
-    if len(snapshot.elements) + len(snapshot.offscreen) > _CHALLENGE_MAX_CONTROLS:
+    if len(snapshot.known_refs()) > _CHALLENGE_MAX_CONTROLS:
         return False
-    parts = (
-        snapshot.title,
-        snapshot.text[:2000],
-        *(heading.text for heading in snapshot.headings),
-        *(element.name for element in snapshot.elements),
-    )
-    return any(_CHALLENGE.search(part) for part in parts)
+    texts = [snapshot.title, snapshot.text[:2000]]
+    for part in snapshot.parts:
+        texts.extend(part.labels())
+    texts.extend(target.name for target in snapshot.targets)
+    return any(_CHALLENGE.search(text) for text in texts)

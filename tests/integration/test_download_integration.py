@@ -16,10 +16,9 @@ from browserrig import (
     Agent,
     Browser,
     BrowserDownload,
-    BrowserPerception,
     Chrome,
     ChromeBrowser,
-    DomCapture,
+    DomModel,
     DomReferences,
     Files,
     FileSystem,
@@ -215,8 +214,8 @@ async def test_upload_validates_the_live_input_before_assigning_files(
             '<label for="upload">Report</label><input type="file" id="upload" hidden>' +
             '<input id="text">';""",
         )
-        state = await capture(tab, DomCapture(), await wait_for_page(tab))
-        label = next(element for element in state.elements if element.tag == "label")
+        state = await capture(tab, DomModel(), await wait_for_page(tab))
+        label = next(element for element in state.targets if element.tag == "label")
         handle = await DomReferences().resolve(tab, state, label.ref)
         changes = {
             "disabled": "document.querySelector('#upload').disabled = true",
@@ -506,9 +505,7 @@ async def test_agent_previews_pdf_with_full_viewport_and_returns_to_original_tab
         browser=Chrome.launch(url=site + "/canvas"),
         plugins=[
             Files(LocalWorkspace(tmp_path)),
-            BrowserPerception(
-                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
-            ),
+            Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             PageReadiness(options=ReadinessOptions(timeout_seconds=3)),
             Approvals(default=PolicyDecision.ALLOW),
         ],

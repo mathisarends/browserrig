@@ -49,7 +49,7 @@ class Targeting(Plugin, slot="browserrig.targeting", provides=True):
         await self._actions.begin_preparation()
         tab = tab if tab is not None else self._actions.tab
         tab.invalidate_frames()
-        handle = await self._observe.element(tab, ref)
+        handle = await self._observe.target(tab, ref)
         scrolled = False
         if scroll:
             scrolled = await prepare_element(
@@ -59,8 +59,8 @@ class Targeting(Plugin, slot="browserrig.targeting", provides=True):
                 document_id=tab.document_id,
                 report=self._actions.record_preparation,
             )
-            handle = await self._observe.element(tab, ref)
-        point = await handle.locate(aim=self._aim(ref, handle.element.bounds))
+            handle = await self._observe.target(tab, ref)
+        point = await handle.locate(aim=self._aim(ref, handle.target.bounds))
         context = self._state.context
         assert context is not None
         if point.bounds is not None:

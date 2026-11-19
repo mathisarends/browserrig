@@ -15,15 +15,15 @@ from browserrig import (
     ChoreographyOverlay,
     Chrome,
     ChromeBrowser,
-    DomCapture,
+    DomModel,
     InputPacing,
     wait_for_page,
 )
 from browserrig.browser import Launch
+from browserrig.dom import render
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     # Public facade callable; SMT107 confuses it with the same-named module.
     capture,
-    render,
 )
 from tests.javascript import evaluate
 
@@ -62,7 +62,7 @@ async def test_select_options_replaces_exact_set_or_reports_atomic_failure(
         target = next(
             (
                 item
-                for item in holder["observe"].snapshot.elements
+                for item in holder["observe"].snapshot.targets
                 if item.name == "Groups"
             ),
             None,
@@ -140,8 +140,8 @@ async def test_selection_metadata_preserves_explicit_values_ids_groups_and_title
             <div role=listbox aria-label=Custom aria-multiselectable=true
               style="width:180px;height:40px">Choices</div>`;""",
         )
-        state = await capture(tab, DomCapture(), await wait_for_page(tab))
-    radios = [item for item in state.elements if item.role == "radio"]
+        state = await capture(tab, DomModel(), await wait_for_page(tab))
+    radios = [item for item in state.targets if item.role == "radio"]
     assert len(radios) == 3
     assert [(item.control_id, item.value, item.checked) for item in radios] == [
         ("Rating_5", "20", False),
@@ -150,13 +150,11 @@ async def test_selection_metadata_preserves_explicit_values_ids_groups_and_title
     ]
     assert radios[0].selection_group == radios[1].selection_group == "ratings[4]"
     assert radios[1].description == "Lowest score"
-    group = next(item for item in state.elements if item.name == "Groups")
+    group = next(item for item in state.targets if item.name == "Groups")
     assert group.multiple and group.options[0].value == "1"
     assert group.options[0].selected and not group.options[1].selected
-    assert next(item for item in state.elements if item.name == "Custom").multiple
-    assert (
-        next(item for item in state.elements if item.name == "Password").value is None
-    )
+    assert next(item for item in state.targets if item.name == "Custom").multiple
+    assert next(item for item in state.targets if item.name == "Password").value is None
     text = render(state)
     assert 'value="20" id="Rating_5" selection_group="ratings[4]"' in text
     assert 'General value="1"*' in text and "multiple" in text

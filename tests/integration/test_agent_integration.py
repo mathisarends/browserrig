@@ -18,6 +18,7 @@ from browserrig import (
     Browser,
     BrowserPerception,
     Chrome,
+    DomPage,
     InputRuntime,
     PageReadiness,
     ReadinessOptions,
@@ -211,9 +212,9 @@ async def test_dom_screenshots_are_native_images(site):
             Chrome(),
             Start(),
             PageReadiness(),
-            BrowserPerception(
-                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
-            ),
+            BrowserPerception(),
+            Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
+            DomPage(),
             Approvals(default=PolicyDecision.ALLOW),
         ],
     )

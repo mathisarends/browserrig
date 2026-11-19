@@ -20,6 +20,7 @@ from browserrig.core import (
     ReadinessPhase,
 )
 from browserrig.core import browser_tool as tool
+from browserrig.dom import ResolveDomElement
 from browserrig.events import (
     FILE_EVENTS,
     UPLOAD_EVENTS,
@@ -32,7 +33,6 @@ from browserrig.files import (
     FileTransfer,
     StagedFiles,
 )
-from browserrig.observation import ResolveDomElement
 from browserrig.readiness import PageReadiness
 
 from .effects import Effect

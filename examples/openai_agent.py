@@ -13,13 +13,11 @@ from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
     Agent,
-    BrowserPerception,
     Chrome,
     Done,
     Files,
     LocalWorkspace,
     Screenshots,
-    SetOfMarks,
     TerminalEvents,
     UntilCompaction,
     VideoRecording,
@@ -86,12 +84,7 @@ async def main() -> None:
             ),
             plugins=[
                 Files(LocalWorkspace(args.workspace)),
-                BrowserPerception(
-                    screenshots=Screenshots(
-                        marks=SetOfMarks(),
-                        retention=UntilCompaction(),
-                    )
-                ),
+                Screenshots(retention=UntilCompaction()),
                 VideoRecording(args.video) if args.video is not None else None,
                 Approvals(default=PolicyDecision.ALLOW),
                 *telemetry,

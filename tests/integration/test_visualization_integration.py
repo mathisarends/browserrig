@@ -36,6 +36,10 @@ from browserrig.choreography import (
     WorkPresentedEvent,
 )
 from browserrig.core import FileTransferDirection
+from browserrig.dom.content import (  # smelt: ignore[SMT107] -- test seam
+    # Test document extraction independently of capture strategy.
+    extract_content,
+)
 from browserrig.events import (
     ActionFinishedEvent,
     ActionStartedEvent,
@@ -45,10 +49,6 @@ from browserrig.events import (
     FilesUploadedEvent,
     KeyPressedEvent,
     ScrollStartedEvent,
-)
-from browserrig.observation.content import (  # smelt: ignore[SMT107] -- test seam
-    # Test document extraction independently of capture strategy.
-    extract_content,
 )
 from tests.javascript import evaluate
 

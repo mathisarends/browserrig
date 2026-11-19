@@ -240,9 +240,9 @@ async def test_an_action_aims_once_at_each_target():
     async with mounted(Actions()) as (services, ctx):
         services.input.pace(motor)
         bounds = Bounds(x=0, y=0, width=80, height=20)
-        services.observe.element = AsyncMock(
+        services.observe.target = AsyncMock(
             return_value=SimpleNamespace(
-                element=SimpleNamespace(bounds=bounds), locate=locate
+                target=SimpleNamespace(bounds=bounds), locate=locate
             )
         )
         tab = services.browser.active_tab
@@ -284,7 +284,8 @@ async def _uploads(files):
             ),
             upload_files=AsyncMock(),
         )
-        services.observe.element = AsyncMock(return_value=handle)
+        handle.target = handle.element
+        services.observe.target = AsyncMock(return_value=handle)
         targets = ctx[Targeting]
         targets.hover = AsyncMock(return_value=ElementPoint(x=40, y=30))
         yield _Upload(services, targets, ctx[_FileTools], handle)

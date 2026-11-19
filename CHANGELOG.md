@@ -2,12 +2,49 @@
 
 ## Unreleased
 
+Upgrade from 0.9.x using the [migration guide](docs/migration-0.10.md).
+
+### Breaking changes
+
+- Compose perception from plugins. `BrowserPerception(text=...)` keeps the
+  observation lifecycle and takes `"delta"`, `"full"` or `None`; `capture=`,
+  `renderer=` and `screenshots=` are removed. `Screenshots(...)` is now a plugin;
+  mount it, `DomPage(...)`, `SetOfMarks()` and `CursorMarker()` beside it.
+  `browserrig.Agent` includes all but `CursorMarker`; replace or remove them by
+  type.
+- Replace `DomCapture(page_prose=...)` with `DomPage(prose=...)` and
+  `Screenshots(marks=SetOfMarks(), cursor=True)` with the `SetOfMarks()` and
+  `CursorMarker()` plugins. Marks label targets with bounds from any page model.
+- Remove `TextObservations`, `TextContent`, `ScreenshotCapture`, `DomRenderer`,
+  `Renderer`, `CaptureStrategy`, `CaptureContent` and `ElementHandle`. A
+  composition without a page model sends the metadata header. Custom models
+  implement `PageModel` with `collect(tab, request) -> PageCapture` and
+  `render(snapshot)`, and register through `BrowserPerception.use_model`.
+  Custom images register a `FrameSource` through `use_frames`, and image overlays an
+  `ImageAnnotator` through `add_annotator`. `supports_dom_refs` is removed;
+  `DomPage` provides `ResolveDomElement`.
+- Read generic targets from snapshots. `Snapshot.elements` is now `targets`,
+  `Snapshot.element(ref)` is `target(ref)` and `BrowserPerception.element(...)`
+  is `target(...)`. Resolvers return a `TargetHandle` whose `target` replaces
+  `element`. DOM fields such as `headings`, `content`, `offscreen`, `modal`,
+  `alerts`, `cookie_banners` and `canvases` move to a `DomContent` part; read them
+  with `DomView.of(snapshot)`. `PageContent` carries `targets`, `parts` and raw
+  `text`.
+- Import DOM extraction, rendering, search and handles from `browserrig.dom`
+  instead of `browserrig.observation`. The top-level `browserrig` facade keeps
+  its existing DOM exports.
+- Serialize snapshots with `model_dump` only; `Snapshot.model_validate_json` no
+  longer restores DOM targets and parts. Page fingerprints now also cover the raw
+  page text, so unchanged checks may differ from 0.9 for the same page.
+
 ### Added
 
-- Provide a `CaptureStrategy` from a plugin when capture needs mount-local
-  services. `BrowserPerception` observes it in place of its default capture and
-  validates it with the configured renderer during setup. Configuring
-  `capture=` as well fails during setup.
+- Supply an application view from a plugin: register a `PageModel` and
+  `FrameSource` with `BrowserPerception` during setup, for example to read a
+  canvas application's nodes and frames. Registrations return their removal, and
+  a second model or frame source fails setup.
+- Draw custom overlays on screenshots with an `ImageAnnotator`; layers order
+  marks below the cursor.
 
 ## 0.9.0 (2026-11-19)
 

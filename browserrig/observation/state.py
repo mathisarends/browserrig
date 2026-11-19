@@ -6,7 +6,10 @@ from harnessed.kernel import PluginScope
 
 from browserrig.core import DocumentId, Region, TargetId, ViewportSize
 
-from .capture import CapturedObservation
+from .capture import CapturedObservation, PageModel
+from .config import ScreenshotPolicy
+from .drawing import ImageAnnotator
+from .frames import FrameSource
 from .models import CapturedImage
 
 
@@ -50,7 +53,18 @@ class TextState:
 
 
 @dataclass
+class Extensions:
+    """What other plugins registered with BrowserPerception during their setup."""
+
+    model: PageModel | None = None
+    frames: FrameSource | None = None
+    screenshots: ScreenshotPolicy | None = None
+    annotators: list[ImageAnnotator] = field(default_factory=list)
+
+
+@dataclass
 class BrowserPerceptionState:
+    extensions: Extensions = field(default_factory=Extensions)
     observation: CapturedObservation | None = None
     delivered_image: CapturedImage | None = None
     screenshot_requested: bool = False

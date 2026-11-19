@@ -51,11 +51,10 @@ new page or out-of-process frame session. Viewport configuration is applied firs
 
 ## Observations and element references
 
-`BrowserPerception` can deliver DOM text, screenshots, or both. DOM extraction
-includes shadow roots and nested/cross-origin frames. Select text delivery with
-`TextObservations(mode="delta")` or `TextObservations(mode="full")`.
-Configure DOM extraction with `BrowserPerception(capture=DomCapture(...))`.
-`DomRenderer()` is the default for captures that support DOM refs.
+`BrowserPerception` delivers observations; the page model and image plugins
+decide what they contain. `DomPage()` reads the DOM, including shadow roots and
+nested/cross-origin frames, and `Screenshots()` adds viewport images. Select text
+delivery with `BrowserPerception(text="delta")`, `"full"` or `None`.
 
 ```text
 # Checkout
@@ -75,29 +74,29 @@ include nearby previews up to 1,000 CSS pixels beyond the viewport; set
 `viewport_expansion=0` for a strict viewport. Hidden, inert and clipped content is
 excluded. Cookie-banner detection is heuristic and makes no consent choice.
 
-DOM text observations list controls with their labels. `DomCapture` adds the
+DOM text observations list controls with their labels. `DomPage` adds the
 rest explicitly:
 
 ```python
-DomCapture(
-    page_prose="inline",   # prose beside controls, or "sparse" / "off"
+DomPage(
+    prose="inline",  # prose beside controls, or "sparse" / "off"
     max_text_chars=3000,
-    headings=True,         # lines such as `## Pricing`
-    landmarks=True,        # regions such as [MAIN] grouping their controls
+    headings=True,  # lines such as `## Pricing`
+    landmarks=True,  # regions such as [MAIN] grouping their controls
 )
 ```
 
-`page_prose="sparse"` adds prose only when the viewport shows fewer than five named
+`prose="sparse"` adds prose only when the viewport shows fewer than five named
 controls; `search_page` still reads all text when prose is off. Dialogs and
 cookie banners stay grouped. `max_elements=...` bounds controls. Use
-`Screenshots(marks=SetOfMarks())` to label controls in screenshots and
-`Screenshots(cursor=True)` to include the cursor marker. Unsupported frames and
+`SetOfMarks()` to label controls in screenshots and `CursorMarker()` to draw
+the cursor. Unsupported frames and
 extraction limits are reported.
 Perspective-transformed frames remain unsupported.
 
-Custom captures supply opaque refs through `References`. `ReferencePointerTools`
+Custom page models supply opaque refs through `References`. `ReferencePointerTools`
 resolves their live positions. DOM-specific typing and forms require `ResolveDomElement`.
-See [backend contracts](browser-composition.md#references-from-other-capture-backends).
+See [custom page models](browser-composition.md#custom-page-models).
 
 ## Input tools
 

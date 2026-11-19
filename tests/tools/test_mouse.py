@@ -54,12 +54,12 @@ async def test_pointer_movement_runs_as_an_action_and_stops_the_native_chain(
     assert moved.await_args.args[0].x == 40
     assert moved.await_args.args[0].y == 30
     if "ref" in arguments:
-        assert services.observe.element.await_args_list == [
+        assert services.observe.target.await_args_list == [
             mock_call(services.browser.active_tab, "button"),
             mock_call(services.browser.active_tab, "button"),
         ]
     else:
-        services.observe.element.assert_not_awaited()
+        services.observe.target.assert_not_awaited()
     replies = [e.result for e in result.events if isinstance(e, ToolCallFinishedEvent)]
     assert replies[0].status is ToolStatus.OK and replies[0].break_chain
     assert "Cursor moved" in replies[0].text
@@ -109,7 +109,7 @@ async def test_scroll_tools_reject_zero_movement_before_input(tool, arguments):
         result = await session.run("Scroll")
 
     moved.assert_not_awaited()
-    services.observe.element.assert_not_awaited()
+    services.observe.target.assert_not_awaited()
     reply = next(
         e.result for e in result.events if isinstance(e, ToolCallFinishedEvent)
     )
@@ -239,9 +239,9 @@ async def _pointer_session(responses):
         services.observe.coordinate_source = lambda: SimpleNamespace(
             geometry=None, width=800, height=600
         )
-        services.observe.element = AsyncMock(
+        services.observe.target = AsyncMock(
             return_value=SimpleNamespace(
-                element=SimpleNamespace(bounds=None),
+                target=SimpleNamespace(bounds=None),
                 locate=AsyncMock(return_value=ElementPoint(x=40, y=30)),
             )
         )

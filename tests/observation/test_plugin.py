@@ -13,26 +13,23 @@ from browserrig import (
     Actions,
     BrowserCoordination,
     BrowserPerception,
-    CaptureContent,
-    CaptureStrategy,
-    DomCapture,
-    DomRenderer,
+    DomPage,
     ElementInfo,
+    MetadataPage,
     MultiTab,
+    PageCapture,
     PageContent,
     PageReadiness,
     ResolveDomElement,
-    ScreenshotCapture,
     Screenshots,
     ScreenshotTools,
     SingleTab,
-    TextObservations,
 )
 from browserrig.browser import OpenDialog, TabInfo
-from browserrig.core import BrowserError, Region
-from browserrig.observation import Snapshot
+from browserrig.core import Bounds, BrowserError, Region
+from browserrig.observation import Frame, Snapshot
 from browserrig.tools import Effect
-from tests.fakes import FakeChrome
+from tests.fakes import DomStub, FakeChrome, UseModel
 
 _PNG = (
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aGhg"
@@ -40,8 +37,7 @@ _PNG = (
 )
 
 
-def test_metadata_text_defaults_to_lightweight_capture_and_renders_only_page_facts():
-    perception = BrowserPerception(text=TextObservations(content="metadata"))
+def test_metadata_page_renders_only_page_facts():
     snapshot = Snapshot(
         id="observation",
         tab_id="tab",
@@ -54,7 +50,7 @@ def test_metadata_text_defaults_to_lightweight_capture_and_renders_only_page_fac
         scroll_y=400,
         page_height=2000,
         fingerprint="fingerprint",
-        elements=(ElementInfo(ref="1", role="button", name="Page control"),),
+        targets=(ElementInfo(ref="1", role="button", name="Page control"),),
         text="Page prose",
         tabs=(
             TabInfo(
@@ -63,9 +59,7 @@ def test_metadata_text_defaults_to_lightweight_capture_and_renders_only_page_fac
         ),
     )
 
-    assert isinstance(perception.capture_strategy, ScreenshotCapture)
-    assert perception.renderer.refs() is None
-    assert perception.renderer.render(snapshot).splitlines() == [
+    assert MetadataPage().render(snapshot).splitlines() == [
         "# Shop",
         "url: https://example.org/shop",
         "tab: tab",
@@ -84,7 +78,8 @@ async def test_observation_reports_javascript_dialog_kind_and_message_once(conte
         plugins=[
             FakeChrome(holder),
             PageReadiness(),
-            BrowserPerception(text=TextObservations(content=content)),
+            BrowserPerception(text="full"),
+            *((DomPage(),) if content == "page" else ()),
         ],
     )
     async with agent.session() as session:
@@ -108,9 +103,9 @@ async def test_tab_overview_is_collected_only_for_multi_tab(mode, overview):
         TabInfo(id="other", url="https://private.example/", title="Other page"),
     )
 
-    class PageCapture(CaptureStrategy):
-        async def collect(self, tab, _report, **_options):
-            return CaptureContent(
+    class Capture(DomStub):
+        async def collect(self, tab, request):
+            return PageCapture(
                 page=PageContent(
                     url=tab.url,
                     title=tab.title,
@@ -121,10 +116,15 @@ async def test_tab_overview_is_collected_only_for_multi_tab(mode, overview):
                 )
             )
 
-    perception = BrowserPerception(capture=PageCapture(), renderer=DomRenderer())
     agent = Agent(
         model=ScriptedModel([]),
-        plugins=[FakeChrome(holder), mode(), PageReadiness(), perception],
+        plugins=[
+            FakeChrome(holder),
+            mode(),
+            PageReadiness(),
+            BrowserPerception(),
+            UseModel(Capture()),
+        ],
     )
     async with agent.session() as session:
         list_tabs = AsyncMock(return_value=listed)
@@ -147,12 +147,12 @@ async def test_step_observation_and_actions_share_session_control():
     holder = {}
     entered, release = asyncio.Event(), asyncio.Event()
 
-    class BlockingCapture(CaptureStrategy):
-        async def collect(self, tab, _report, **_options):
+    class BlockingCapture(DomStub):
+        async def collect(self, tab, request):
             assert holder["coordination"].busy
             entered.set()
             await release.wait()
-            return CaptureContent(
+            return PageCapture(
                 page=PageContent(
                     url=tab.url,
                     title=tab.title,
@@ -173,7 +173,8 @@ async def test_step_observation_and_actions_share_session_control():
         plugins=[
             FakeChrome(holder),
             PageReadiness(),
-            BrowserPerception(capture=BlockingCapture(), renderer=DomRenderer()),
+            BrowserPerception(),
+            UseModel(BlockingCapture()),
             Actions(),
         ],
     )
@@ -201,14 +202,14 @@ async def test_screenshot_request_survives_a_failed_capture(replace_region):
     original = Region(x=2, y=3, width=8, height=8)
     attempts = []
 
-    class FailingCapture(CaptureStrategy):
-        async def collect(self, tab, _report, *, screenshots, region, **_options):
-            attempts.append((screenshots, region))
+    class FailingCapture(DomStub):
+        async def collect(self, tab, request):
+            attempts.append((request.screenshots, request.region))
             if len(attempts) == 1:
                 if replace_region:
                     active.request_screenshot()
                 raise BrowserError("Page capture timed out")
-            return CaptureContent(
+            return PageCapture(
                 page=PageContent(
                     url=tab.url,
                     title=tab.title,
@@ -217,7 +218,6 @@ async def test_screenshot_request_survives_a_failed_capture(replace_region):
                     scroll_y=0,
                     page_height=600,
                 ),
-                image=_PNG if screenshots else None,
             )
 
     model = ScriptedModel(["Recovered", "Done"])
@@ -226,11 +226,9 @@ async def test_screenshot_request_survives_a_failed_capture(replace_region):
         plugins=[
             FakeChrome({}),
             PageReadiness(),
-            BrowserPerception(
-                capture=FailingCapture(),
-                renderer=DomRenderer(),
-                screenshots=Screenshots(),
-            ),
+            BrowserPerception(),
+            Screenshots(),
+            UseModel(FailingCapture(), frames=_Frames(available=True)),
         ],
     )
     async with agent.session() as session:
@@ -254,9 +252,9 @@ async def test_screenshot_request_survives_a_failed_capture(replace_region):
 
 @pytest.mark.parametrize("image_available", [True, False])
 async def test_explicit_screenshot_reports_reuse_or_unavailability(image_available):
-    class Capture(CaptureStrategy):
-        async def collect(self, tab, _report, *, screenshots, **_options):
-            return CaptureContent(
+    class Capture(DomStub):
+        async def collect(self, tab, request):
+            return PageCapture(
                 page=PageContent(
                     url=tab.url,
                     title=tab.title,
@@ -266,7 +264,6 @@ async def test_explicit_screenshot_reports_reuse_or_unavailability(image_availab
                     page_height=600,
                     text="" if image_available else "Screenshot unavailable.",
                 ),
-                image=_PNG if screenshots and image_available else None,
             )
 
     model = ScriptedModel(
@@ -281,11 +278,9 @@ async def test_explicit_screenshot_reports_reuse_or_unavailability(image_availab
         plugins=[
             FakeChrome({}),
             PageReadiness(),
-            BrowserPerception(
-                capture=Capture(),
-                renderer=DomRenderer(),
-                screenshots=Screenshots(),
-            ),
+            BrowserPerception(),
+            Screenshots(),
+            UseModel(Capture(), frames=_Frames(available=image_available)),
             ScreenshotTools(),
         ],
     )
@@ -311,16 +306,28 @@ async def test_explicit_screenshot_reports_reuse_or_unavailability(image_availab
         assert any(message.text == "Screenshot unavailable." for message in messages)
 
 
+class _Frames:
+    """Capture a one-pixel frame of the viewport, or report it unavailable."""
+
+    def __init__(self, *, available):
+        self.available = available
+
+    async def capture(self, tab, request):
+        del tab, request
+        area = Bounds(x=0, y=0, width=1, height=1)
+        return Frame(_PNG if self.available else None, area)
+
+
 class _AppRuntime(Plugin, provides=True):
-    """A mount-local app service that a capture strategy needs."""
+    """A mount-local app service that a page model needs."""
 
 
 @dataclass(frozen=True)
-class _AppCapture(CaptureStrategy):
+class _AppModel(DomStub):
     runtime: _AppRuntime
 
-    async def collect(self, tab, _report, **_options):
-        return CaptureContent(
+    async def collect(self, tab, request):
+        return PageCapture(
             page=PageContent(
                 url=tab.url,
                 title=tab.title,
@@ -332,58 +339,45 @@ class _AppCapture(CaptureStrategy):
             )
         )
 
+    def render(self, snapshot):
+        return snapshot.text
+
 
 class _AppView(Plugin):
     _runtime = needs(_AppRuntime)
+    _perception = needs(BrowserPerception)
 
     async def setup(self, scope: PluginScope) -> None:
-        scope.provide(CaptureStrategy, _AppCapture(self._runtime))
+        scope.effect(self._perception.use_model(_AppModel(self._runtime)))
 
 
-class _AppRenderer(DomRenderer):
-    def refs(self) -> None:
-        return None
-
-
-async def test_provided_capture_binds_mount_local_services():
+async def test_a_page_model_plugin_binds_mount_local_services():
     holder = {}
-    perception = BrowserPerception(renderer=_AppRenderer())
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
             FakeChrome(holder),
             PageReadiness(),
-            perception,
+            BrowserPerception(),
             _AppView(),
             _AppRuntime(),
         ],
     )
     async with agent.session() as session:
         active = session.scope[BrowserPerception]
-        assert active.capture_strategy == _AppCapture(session.scope[_AppRuntime])
+        assert active.model == _AppModel(session.scope[_AppRuntime])
         assert ResolveDomElement not in session.scope
         assert (await active.capture()).text == "app content"
-    assert isinstance(perception.capture_strategy, DomCapture)
 
 
-@pytest.mark.parametrize(
-    "perception, message",
-    [
-        pytest.param(
-            BrowserPerception(capture=DomCapture()),
-            "conflicts with a provided CaptureStrategy",
-            id="configured-capture",
-        ),
-        pytest.param(BrowserPerception(), "require a renderer", id="missing-renderer"),
-    ],
-)
-async def test_provided_capture_is_validated_during_setup(perception, message):
+async def test_two_page_models_conflict_during_setup():
     agent = Agent(
         model=ScriptedModel([]),
         plugins=[
             FakeChrome({}),
             PageReadiness(),
-            perception,
+            BrowserPerception(),
+            DomPage(),
             _AppView(),
             _AppRuntime(),
         ],
@@ -393,4 +387,4 @@ async def test_provided_capture_is_validated_during_setup(perception, message):
             pytest.fail("Setup should fail")
     (error,) = caught.value.exceptions
     assert isinstance(error, ValueError)
-    assert message in str(error)
+    assert "already supplies the page model" in str(error)
