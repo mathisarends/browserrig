@@ -121,6 +121,7 @@ from .tools import (
     ScreenshotTools,
     TabTools,
     Targeting,
+    WaitTools,
     WheelTools,
     WorkspaceTools,
 )
@@ -218,6 +219,7 @@ __all__ = [
     "ReferencePointerTools",
     "KeyboardTools",
     "NavigationTools",
+    "WaitTools",
     "TabTools",
     "ObserveAfterInput",
     "DomActionChains",

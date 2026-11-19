@@ -1,10 +1,9 @@
-import asyncio
 from functools import partial
 from typing import Annotated
 from urllib.parse import quote_plus, urljoin, urlsplit
 
 from harnessed import Instructions, Plugin, SystemPrompt
-from harnessed.kernel import needs, observes
+from harnessed.kernel import PluginScope, needs, observes
 from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab, TabPolicy, validated_url
@@ -20,8 +19,9 @@ from browserrig.readiness import PageReadiness
 
 from .effects import Effect
 from .execution import Actions
-from .intents import ControlIntent, NavigateIntent, WaitIntent
+from .intents import ControlIntent, NavigateIntent
 from .parameters import NewTab
+from .wait import WaitTools, mount_default_wait
 
 # Where a new tab lands when the agent gives no URL.
 NEW_TAB_URL = "https://duckduckgo.com/"
@@ -51,9 +51,15 @@ class NavigationTools(Plugin):
     _events = needs(BrowserEvents)
     _readiness = needs(PageReadiness)
     _tabs = observes(TabPolicy)
+    _wait = observes(WaitTools)
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
+
+    async def setup(self, scope: PluginScope) -> None:
+        await super().setup(scope)
+        if self._wait is None:
+            await mount_default_wait()
 
     @tool(
         kind=ActionKind.NAVIGATE,
@@ -117,25 +123,6 @@ class NavigationTools(Plugin):
         tab = self._actions.tab
         await self._actions.stage(ControlIntent(BrowserControl.RELOAD), tab, tab.reload)
         return Effect("Reload executed.")
-
-    @tool(
-        kind=ActionKind.WAIT,
-        readonly=True,
-        description="Wait briefly for an expected asynchronous page update.",
-    )
-    async def wait(
-        self,
-        seconds: Annotated[float, Field(ge=0, le=10)] = 1,
-    ) -> str:
-        await self._actions.stage(
-            WaitIntent(seconds),
-            self._browser.active_tab,
-            partial(self._pause, seconds),
-        )
-        return "Wait completed; the next observation shows the current state."
-
-    async def _pause(self, seconds: float) -> None:
-        await asyncio.sleep(seconds)
 
     async def _navigate(
         self,

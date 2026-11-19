@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Mount `WaitTools(max_seconds=10, description=None)` to offer `wait` independently
+  of navigation. `NavigationTools` still includes `wait` by default, and an
+  explicitly mounted `WaitTools` supplies its configuration when both are used.
+
 ## 0.8.0 (2026-11-18)
 
 Upgrade from 0.7.x using the [migration guide](docs/migration-0.8.md).
