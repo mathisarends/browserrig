@@ -4,9 +4,9 @@ import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Literal, Self
+from typing import Self
 
-from pydantic import Field
+from pydantic import Field, SerializeAsAny
 
 from browserrig.browser import TabInfo
 from browserrig.core import (
@@ -19,169 +19,42 @@ from browserrig.core import (
     StaleElement,
 )
 
-type Tristate = bool | Literal["mixed"] | None
-type ViewportSide = Literal["above", "below"]
-CHECKABLE_ROLES = frozenset(
-    {"checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio"}
-)
 
+class Target(Options):
+    """Something an agent can address by `ref` within one tab and document.
 
-class Option(Options):
-    label: str
-    value: str | None = None
-    selected: bool = False
-    disabled: bool = False
-
-
-class ScrollInfo(Options):
-    """Remaining wheel-scroll distances inside a control, in CSS pixels."""
-
-    up: float = 0
-    down: float = 0
-    left: float = 0
-    right: float = 0
-
-
-class ElementRef(Options):
-    """An opaque reference owned by a capture backend within one tab and document."""
+    A page model reports targets; subclasses add the model's own data. `bounds` use
+    viewport CSS pixels. `new` marks targets absent from the previous observation.
+    """
 
     ref: str
-
-
-class ElementInfo(ElementRef):
-    """Observed target data, independent of how the backend finds the target."""
-
-    order: int = 0
     role: str
     name: str
-    tag: str = ""
-    input_type: str = ""
-    value: str | None = None
-    placeholder: str = ""
-    description: str = ""
-    href: str = ""
-    options: tuple[Option, ...] = ()
-    multiple: bool = False
-    control_id: str = ""
-    selection_group: str = ""
-    section: str = ""
-    group: str = ""
+    bounds: Bounds | None = None
     in_viewport: bool = True
-    outside_viewport: ViewportSide | None = None
-    scroll: ScrollInfo | None = None
-    covered: bool = False
-    pinned: bool = False
     new: bool = False
-    bounds: Bounds | None = None
-    disabled: bool = False
-    checked: Tristate = None
-    selected: bool = False
-    expanded: bool | None = None
-    pressed: Tristate = None
-    required: bool = False
-    readonly: bool = False
-    invalid: bool = False
-    focused: bool = False
-    has_popup: str = ""
-    current: str = ""
-    draggable: bool = False
 
 
-class Element(ElementInfo):
-    """A DOM target. Existing DOM refs stay valid while their node stays in its document."""
+class PagePart(Options):
+    """Model-specific observation data that a page model adds to a snapshot."""
 
-    frame_id: str
-    backend_id: int
-    tag: str
-    # An explicitly associated rendered label, used to reveal a hidden file input.
-    upload_label_ref: str | None = None
+    def refs(self) -> tuple[str, ...]:
+        """Known refs that are not current targets, such as controls outside the viewport."""
+        return ()
 
+    def labels(self) -> tuple[str, ...]:
+        """Short page labels such as headings, for heuristics that read any page model."""
+        return ()
 
-class Offscreen(ElementRef):
-    """A DOM control outside the viewport, known by identity until scrolled in."""
-
-    frame_id: str
-    backend_id: int
-
-
-class Heading(Options):
-    level: int
-    text: str
-    frame_id: str
-    order: int = 0
-    in_viewport: bool = True
-    outside_viewport: ViewportSide | None = None
-    section: str = ""
-
-
-class TextBlock(Options):
-    """Rendered text at its reading position, without an action reference.
-
-    Bounds use the main viewport's CSS pixels, including for embedded frames.
-    """
-
-    text: str
-    frame_id: str
-    order: int = 0
-    bounds: Bounds | None = None
-    in_viewport: bool = True
-    outside_viewport: ViewportSide | None = None
-    truncated: bool = False
-    leading_space: bool = False
-    trailing_space: bool = False
-    preformatted: bool = False
-    # Visible text owned by a control whose accessible name may differ.
-    control: ElementRef | None = None
-
-
-class ContentGroup(Options):
-    """A semantic container; children retain composed-document reading order.
-
-    ElementRef leaves address the current element index, so names, states and
-    new-element markers have one source of truth.
-    """
-
-    id: str
-    role: str
-    name: str = ""
-    bounds: Bounds | None = None
-    children: tuple[ContentGroup | TextBlock | Heading | ElementRef, ...] = ()
-
-
-type ContentNode = ContentGroup | TextBlock | Heading | ElementRef
-
-
-class Modal(Options):
-    role: str
-    name: str
-
-
-class CookieBanner(Options):
-    """A likely visible consent UI, with the refs of its ordinary page controls."""
-
-    name: str = ""
-    text: str = ""
-    refs: tuple[str, ...] = ()
-    modal: bool = False
-
-
-class Canvas(Options):
-    """A visible canvas; its pixels have no element refs, so agents point with coordinates.
-
-    `bounds` is the visible part in viewport CSS pixels. `ref` is set when the canvas is
-    also listed as an interactive element.
-    """
-
-    frame_id: str
-    bounds: Bounds
-    name: str = ""
-    ref: str = ""
-    clipped: bool = False
+    def fingerprint(self, targets: tuple[Target, ...]) -> str:
+        """Comparison data for this part, so unchanged pages can be recognized."""
+        del targets
+        return self.model_dump_json()
 
 
 @dataclass(slots=True)
 class PageContent:
-    """Captured page data shared by DOM and non-DOM strategies."""
+    """What a page model observed: page metrics, targets and its own snapshot parts."""
 
     url: str
     title: str
@@ -189,17 +62,10 @@ class PageContent:
     height: float
     scroll_y: float
     page_height: float
-    elements: tuple[ElementInfo, ...] = ()
-    offscreen: tuple[ElementRef, ...] = ()
-    headings: tuple[Heading, ...] = ()
-    alerts: tuple[str, ...] = ()
-    modal: Modal | None = None
-    canvases: tuple[Canvas, ...] = ()
+    targets: tuple[Target, ...] = ()
+    parts: tuple[PagePart, ...] = ()
     text: str = ""
-    # None lets existing capture backends keep their flat rendering contract.
-    content: tuple[ContentNode, ...] | None = None
     limitations: tuple[str, ...] = ()
-    cookie_banners: tuple[CookieBanner, ...] = ()
 
 
 class ScreenshotStatus(StrEnum):
@@ -224,15 +90,8 @@ class Snapshot(Options):
     fingerprint: str
     tabs: tuple[TabInfo, ...] = ()
     text: str = ""
-    content: tuple[ContentNode, ...] | None = None
-    # Visible controls and nearby previews are described; distant controls keep identities.
-    elements: tuple[Element | ElementInfo, ...] = ()
-    offscreen: tuple[Offscreen | ElementRef, ...] = Field(default=(), repr=False)
-    headings: tuple[Heading, ...] = ()
-    alerts: tuple[str, ...] = ()
-    modal: Modal | None = None
-    cookie_banners: tuple[CookieBanner, ...] = ()
-    canvases: tuple[Canvas, ...] = ()
+    targets: tuple[SerializeAsAny[Target], ...] = ()
+    parts: tuple[SerializeAsAny[PagePart], ...] = ()
     limitations: tuple[str, ...] = ()
     image: str | None = Field(default=None, repr=False)
     screenshot_status: ScreenshotStatus | None = None
@@ -250,15 +109,26 @@ class Snapshot(Options):
         )
     )
 
-    def element(self, ref: str) -> ElementInfo:
-        for element in self.elements:
-            if element.ref == ref:
-                return element
-        if any(control.ref == ref for control in self.offscreen):
+    def target(self, ref: str) -> Target:
+        for target in self.targets:
+            if target.ref == ref:
+                return target
+        if any(ref in part.refs() for part in self.parts):
             raise StaleElement("Element is outside the viewport; scroll to it first")
         raise StaleElement(
             "Unknown element reference; use refs from the next observation"
         )
+
+    def part[P: PagePart](self, kind: type[P]) -> P | None:
+        """The part a page model of this kind added, if any."""
+        return next((part for part in self.parts if isinstance(part, kind)), None)
+
+    def known_refs(self) -> frozenset[str]:
+        """Refs of targets and of known targets outside the viewport."""
+        refs = {target.ref for target in self.targets}
+        for part in self.parts:
+            refs.update(part.refs())
+        return frozenset(refs)
 
 
 @dataclass(frozen=True, slots=True)
@@ -301,34 +171,21 @@ class CapturedImage:
         )
 
 
-class ElementFingerprint(Options):
+class TargetFingerprint(Options):
     role: str
     name: str
-    options: tuple[Option, ...] = ()
-    multiple: bool = False
-    description: str = ""
-    scroll: ScrollInfo | None = None
     in_viewport: bool = True
-    value: str | None
-    disabled: bool
-    checked: Tristate = None
-    expanded: bool | None = None
-    selected: bool = False
-    pressed: Tristate = None
 
 
 class PageFingerprint(Options):
-    """Typed comparison data; element refs never affect equality."""
+    """Typed comparison data; target refs never affect equality."""
 
     url: str
     document_id: str
-    text: tuple[str, ...]
-    elements: tuple[ElementFingerprint, ...]
-    alerts: tuple[str, ...] = ()
-    modal: Modal | None = None
-    cookie_banners: tuple[CookieBanner, ...] = ()
+    text: str = ""
+    targets: tuple[TargetFingerprint, ...] = ()
+    parts: tuple[str, ...] = ()
     scroll_y: float
 
     def digest(self) -> str:
-        data = self.model_dump_json(exclude={"cookie_banners": {"__all__": {"refs"}}})
-        return hashlib.sha256(data.encode("utf-8")).hexdigest()
+        return hashlib.sha256(self.model_dump_json().encode("utf-8")).hexdigest()

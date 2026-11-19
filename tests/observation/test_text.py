@@ -3,13 +3,11 @@ from harnessed import Agent
 from harnessed.events import IncludedObservation, ObservationsIncludedEvent
 from harnessed.testing import ScriptedModel
 
-from browserrig import PageReadiness
+from browserrig import DomPage, ElementInfo, PageReadiness
 from browserrig.observation import (
     BrowserPerception,
-    ElementInfo,
     ProjectObservation,
     Snapshot,
-    TextObservations,
 )
 from tests.fakes import FakeChrome
 
@@ -29,7 +27,7 @@ async def test_unchanged_observation_delivery_is_an_explicit_context_policy(
         marked = snapshot.model_copy(
             update={
                 "id": "second",
-                "elements": (snapshot.elements[0].model_copy(update={"new": True}),),
+                "targets": (snapshot.targets[0].model_copy(update={"new": True}),),
             }
         )
         again = await session.scope.dispatch(ProjectObservation(marked), default=_empty)
@@ -37,7 +35,7 @@ async def test_unchanged_observation_delivery_is_an_explicit_context_policy(
         changed = marked.model_copy(
             update={
                 "id": "third",
-                "elements": (marked.elements[0].model_copy(update={"name": "Finish"}),),
+                "targets": (marked.targets[0].model_copy(update={"name": "Finish"}),),
             }
         )
         message = await session.scope.dispatch(
@@ -81,7 +79,8 @@ def _agent(mode="delta"):
         plugins=[
             FakeChrome({}),
             PageReadiness(),
-            BrowserPerception(text=TextObservations(mode=mode)),
+            BrowserPerception(text=mode),
+            DomPage(),
         ],
     )
 
@@ -98,7 +97,7 @@ def _snapshot():
         height=600,
         scroll_y=0,
         fingerprint="page",
-        elements=(ElementInfo(ref="button", role="button", name="Continue"),),
+        targets=(ElementInfo(ref="button", role="button", name="Continue"),),
     )
 
 

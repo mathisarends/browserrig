@@ -31,14 +31,15 @@ from browserrig import (
     HumanHandoff,
     HumanResponse,
     Nudges,
+    PageCapture,
     PageReadiness,
     ReadinessOptions,
     Secret,
     Secrets,
 )
-from browserrig import PageContent as Extraction
 from browserrig.browser import TabInfo
 from browserrig.core import ActivityKind, ActivityOutcome
+from browserrig.dom import Element, Extraction
 from browserrig.events import (
     BROWSER_EVENTS,
     HANDOFF_EVENTS,
@@ -48,14 +49,13 @@ from browserrig.events import (
     TabClosedEvent,
     TabOpenedEvent,
 )
-from browserrig.observation import CaptureContent, CaptureStrategy, DomRenderer, Element
-from tests.fakes import FakeChrome
+from tests.fakes import DomStub, FakeChrome, UseModel
 from tests.observations import latest
 
 
-class _Capture(CaptureStrategy):
-    async def collect(self, tab, _report, **_options):
-        return CaptureContent(
+class _Capture(DomStub):
+    async def collect(self, tab, request):
+        return PageCapture(
             page=Extraction(
                 url=tab.url,
                 title=tab.title,
@@ -77,7 +77,7 @@ class _Capture(CaptureStrategy):
                         input_type="password",
                     ),
                 ),
-            ),
+            ).page(),
         )
 
 
@@ -100,7 +100,8 @@ def _agent(responses, ask, *, extra=(), store=None, **options):
             FakeChrome(holder),
             PageReadiness(options=ReadinessOptions(navigation_min_ms=0)),
             *extra,
-            BrowserPerception(capture=_Capture(), renderer=DomRenderer()),
+            BrowserPerception(),
+            UseModel(_Capture()),
             Nudges(),
             HumanHandoff(ask=ask, **options),
             _Step(),

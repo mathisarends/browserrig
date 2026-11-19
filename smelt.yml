@@ -59,8 +59,8 @@ architecture:
   # Annotations may name types from anywhere; only runtime imports couple packages.
   import_graph: {type_checking: ignore}
   packages:
-    observation-render:
-      match: browserrig.observation.render
+    dom-rendering:
+      match: browserrig.dom.rendering
       public: ['.']
     spreadsheet-readers:
       match: browserrig.files.spreadsheets
@@ -93,24 +93,26 @@ architecture:
     observation:
       path: observation
       may_depend_on: [core, scripts, files, input, browser, readiness, nudges, secrets]
+    # Reading pages from the DOM is one page model; observation knows none of it.
+    dom: {path: dom, may_depend_on: [core, scripts, browser, observation]}
     nudges: {path: nudges, may_depend_on: [core, browser]}
     # Observation redacts with secrets; the way back is recorded debt.
     secrets: {path: secrets, may_depend_on: [core, scripts, input, browser]}
     tools:
       path: tools
-      may_depend_on: [core, scripts, files, input, browser, readiness, observation, secrets]
+      may_depend_on: [core, scripts, files, input, browser, readiness, observation, dom, secrets]
       third_party: {deny: [cdpify]}
     activity: {path: activity, may_depend_on: [core]}
     recording: {path: recording, may_depend_on: [core, browser, activity]}
     handoff:
       path: handoff
-      may_depend_on: [core, browser, nudges, observation, secrets]
+      may_depend_on: [core, browser, nudges, observation, dom, secrets]
     # Input behavior depends on the devices, independently of the browser backend.
     pacing: {path: pacing, may_depend_on: [core, input]}
     # Staging for viewers is optional: it builds on the rest, nothing builds on it.
     choreography:
       path: choreography
-      may_depend_on: [core, scripts, input, browser, observation, tools, files, secrets]
+      may_depend_on: [core, scripts, input, browser, observation, dom, tools, files, secrets]
     # Drawing that staging in the page only consumes its events; staging never draws.
     overlay: {path: overlay, may_depend_on: [core, scripts, browser, choreography]}
     terminal: {path: terminal, may_depend_on: [core, usage]}

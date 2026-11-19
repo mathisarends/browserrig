@@ -4,12 +4,12 @@ import json
 
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, Input, Point, wait_for_page
+from browserrig import ChromeBrowser, DomModel, Input, Point, wait_for_page
 from browserrig.browser import Launch
+from browserrig.dom import DomView, render
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     # Public facade callable; SMT107 confuses it with the same-named module.
     capture,
-    render,
 )
 from tests.javascript import evaluate
 
@@ -65,20 +65,20 @@ async def test_cookie_banner_has_context_and_existing_action_refs(site, markup):
         await wait_for_page(tab)
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        state = await capture(tab, DomCapture(page_prose="off"), report)
+        state = await capture(tab, DomModel(prose="off"), report)
         assert not state.text
-        assert len(state.cookie_banners) == 1
-        banner = state.cookie_banners[0]
+        assert len(DomView.of(state).cookie_banners) == 1
+        banner = DomView.of(state).cookie_banners[0]
         assert banner.text and banner.refs
         if "analytics" in markup:
             assert "analytics" in banner.text
-        assert all(state.element(ref).in_viewport for ref in banner.refs)
+        assert all(state.target(ref).in_viewport for ref in banner.refs)
         text = render(state)
         assert "cookie banners: 1 detected heuristically" in text
         assert "[COOKIE BANNER:" in text and banner.text in text
         for ref in banner.refs:
             assert text.count(f"[{ref}]") == 1
-        if state.modal:
+        if DomView.of(state).modal:
             assert banner.modal and "interact with it first" not in text
 
 
@@ -117,8 +117,8 @@ async def test_content_and_invisible_banners_are_not_reported(site, markup):
         await wait_for_page(tab)
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        state = await capture(tab, DomCapture(), report)
-        assert not state.cookie_banners
+        state = await capture(tab, DomModel(), report)
+        assert not DomView.of(state).cookie_banners
         assert "COOKIE BANNER" not in render(state)
 
 
@@ -135,19 +135,22 @@ async def test_banner_text_survives_busy_page_and_disappears_after_normal_click(
         )
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        before = await capture(tab, DomCapture(page_prose="off"), report)
-        assert not before.text and len(before.cookie_banners) == 1
-        banner = before.cookie_banners[0]
+        before = await capture(tab, DomModel(prose="off"), report)
+        assert not before.text and len(DomView.of(before).cookie_banners) == 1
+        banner = DomView.of(before).cookie_banners[0]
         assert banner.name == "Privacy choices" and "analytics" in banner.text
-        button = before.element(banner.refs[0])
+        button = before.target(banner.refs[0])
         assert button.name == "Reject all" and button.bounds is not None
         bounds = button.bounds
         await devices.mouse.click(
             Point(x=bounds.x + bounds.width / 2, y=bounds.y + bounds.height / 2)
         )
         report = await wait_for_page(tab)
-        after = await capture(tab, DomCapture(), report, previous=before)
-        assert not after.cookie_banners and after.fingerprint != before.fingerprint
+        after = await capture(tab, DomModel(), report, previous=before)
+        assert (
+            not DomView.of(after).cookie_banners
+            and after.fingerprint != before.fingerprint
+        )
         assert "COOKIE BANNER" not in render(after)
 
 
@@ -178,9 +181,11 @@ async def test_consent_inside_composed_documents(site, surface):
                 + json.dumps(_NOTICE),
             )
         report = await wait_for_page(tab)
-        state = await capture(tab, DomCapture(), report)
-        assert len(state.cookie_banners) == 1
-        assert {state.element(ref).name for ref in state.cookie_banners[0].refs} == {
+        state = await capture(tab, DomModel(), report)
+        assert len(DomView.of(state).cookie_banners) == 1
+        assert {
+            state.target(ref).name for ref in DomView.of(state).cookie_banners[0].refs
+        } == {
             "Accept all",
             "Reject all",
         }
@@ -194,10 +199,10 @@ async def test_banner_remains_actionable_under_element_limit(site):
         markup += f"<div id=cookie-banner>{_NOTICE}</div>"
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        state = await capture(tab, DomCapture(max_elements=1), report)
-        assert len(state.elements) == 1 and len(state.cookie_banners) == 1
-        assert state.cookie_banners[0].refs == (state.elements[0].ref,)
-        assert state.elements[0].name == "Accept all"
+        state = await capture(tab, DomModel(max_elements=1), report)
+        assert len(state.targets) == 1 and len(DomView.of(state).cookie_banners) == 1
+        assert DomView.of(state).cookie_banners[0].refs == (state.targets[0].ref,)
+        assert state.targets[0].name == "Accept all"
 
 
 async def test_multiple_banners_have_separate_bounded_excerpts(site):
@@ -211,9 +216,10 @@ async def test_multiple_banners_have_separate_bounded_excerpts(site):
         )
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        state = await capture(tab, DomCapture(), report)
-        assert len(state.cookie_banners) == 2
-        first, second = state.cookie_banners
+        state = await capture(tab, DomModel(), report)
+        banners = DomView.of(state).cookie_banners
+        assert len(banners) == 2
+        first, second = banners[0], banners[1]
         assert len(first.text) == 600 and first.text.endswith("…")
         assert "personalize" in second.text
         assert not set(first.refs).intersection(second.refs)

@@ -14,10 +14,12 @@ from browserrig import Agent, FileOptions, Files, LocalWorkspace
 
 agent = Agent(
     model=model,
-    plugins=[Files(
-        LocalWorkspace(".browserrig/research"),
-        options=FileOptions(max_file_bytes=20_000_000),
-    )],
+    plugins=[
+        Files(
+            LocalWorkspace(".browserrig/research"),
+            options=FileOptions(max_file_bytes=20_000_000),
+        )
+    ],
 )
 ```
 

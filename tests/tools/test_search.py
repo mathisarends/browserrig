@@ -6,7 +6,7 @@ from harnessed.models import ModelChunk
 from harnessed.testing import ScriptedModel
 
 from browserrig import Browser, PageReadiness, PageSearchTools, Secret, Secrets
-from browserrig.observation import ExtractedContent
+from browserrig.dom import ExtractedContent
 from browserrig.tools import (  # smelt: ignore[SMT107] -- test seam
     # Replace document extraction where the search tool looks it up.
     search as search_module,

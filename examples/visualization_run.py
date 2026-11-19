@@ -13,13 +13,13 @@ from browserrig import Browser, Input, Point, wait_for_page
 from browserrig.browser import Tab, screenshot
 from browserrig.choreography import BarTypedEvent, HighlightElementEvent, scenes
 from browserrig.core import ActivityKind, ActivityOutcome, BrowserBar
+from browserrig.dom import extract_document, search_content
 from browserrig.events import (
     ActivityFinishedEvent,
     ActivityStartedEvent,
     DownloadCompletedEvent,
     FilesUploadedEvent,
 )
-from browserrig.observation import extract_document, search_content
 from browserrig.tools import NavigateIntent, SearchIntent, UploadIntent
 
 

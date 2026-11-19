@@ -20,6 +20,7 @@ from .browser import Chrome, DownloadReceiving, MultiTab
 from .choreography import Choreography, TabStrip
 from .composition import WindowRatio
 from .core import MODEL_PROFILES, ModelProfile, Runtime
+from .dom import DomPage
 from .files import Files, FileTransfers
 from .input import InputRuntime
 from .memory import TaskMemory
@@ -146,7 +147,11 @@ def _browser_defaults(
         PageReadiness(),
         DownloadReadiness(),
         Nudges(),
-        BrowserPerception(screenshots=Screenshots(marks=SetOfMarks())),
+        BrowserPerception(),
+        Screenshots(),
+        # Reads pages into controls with refs and prose; screenshots label those refs.
+        DomPage(),
+        SetOfMarks(),
         # Explain screenshot coordinates before the chains that refer to them.
         # Harnessed resolves setup dependencies independently of prompt order.
         PointerTools(),

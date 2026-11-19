@@ -5,11 +5,8 @@ from harnessed import ToolInfo, ToolResult, ToolStatus
 
 from browserrig.browser import Tab
 from browserrig.core import BrowserToolMetadata, ReadinessStatus
-from browserrig.observation import (
-    BrowserPerception,
-    DomReferences,
-    decision_change,
-)
+from browserrig.dom import DomReferences, decision_change
+from browserrig.observation import BrowserPerception
 
 
 class ActionChainPolicy(Protocol):

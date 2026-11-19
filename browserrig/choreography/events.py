@@ -18,6 +18,7 @@ from browserrig.core import (
     TabGesture,
     ViewportSize,
 )
+from browserrig.dom import FindMark
 from browserrig.events import (
     EventKind,
     InputEvent,
@@ -26,7 +27,6 @@ from browserrig.events import (
     TabEvent,
 )
 from browserrig.files import FileReadStatus
-from browserrig.observation import FindMark
 
 
 @dataclass(frozen=True, slots=True)

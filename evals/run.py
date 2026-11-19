@@ -3,7 +3,7 @@
 import argparse
 import asyncio
 import os
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -20,20 +20,17 @@ from browserrig import (
     Nudges,
     PageReadiness,
     PageSearchTools,
-    ScreenshotCapture,
     ScreenshotTools,
     WheelTools,
     WorkspaceTools,
 )
 from browserrig.core import MODEL_PROFILES
+from browserrig.dom import DomPage
 from browserrig.observation import (
     BrowserPerception,
-    CaptureStrategy,
-    DomCapture,
     Screenshots,
     ScreenshotTrigger,
     SetOfMarks,
-    TextObservations,
 )
 from browserrig.readiness import BrowserReady
 
@@ -126,7 +123,7 @@ async def main() -> None:
     args = parser.parse_args()
     if args.parallel != 1:
         parser.error("WebArena shares mutable sites: --parallel must be 1")
-    perception, screenshot_tool = _perception(args, parser)
+    observation = _observation(args, parser)
     try:
         manifest, frozen = load_tasks(SUBSETS[args.subset])
         tasks = select(frozen, args.tasks)
@@ -187,10 +184,8 @@ async def main() -> None:
                 headings=args.headings,
                 landmarks=args.landmarks,
                 observation_mode=args.observation,
-                screenshot_trigger=perception.screenshots.trigger
-                if perception.screenshots
-                else None,
-                screenshot_tool=screenshot_tool,
+                screenshot_trigger=observation.trigger,
+                screenshot_tool=observation.screenshot_tool,
                 tasks=[],
                 **(asdict(profile) if profile is not None else {}),
             )
@@ -199,7 +194,7 @@ async def main() -> None:
             async with tracing_plugins(args.trace, project) as plugins:
                 inputs = (
                     ()
-                    if perception.text is not None
+                    if observation.text
                     else (Actions(), WheelTools(), WorkspaceTools())
                 )
                 options = RunOptions(
@@ -208,15 +203,13 @@ async def main() -> None:
                     args.humanlike,
                     (
                         *plugins,
-                        perception,
+                        *observation.plugins,
                         *inputs,
                         *_pixel_readiness(args.observation),
                     ),
                     args.max_steps,
                     args.timeout_seconds,
-                    without=_excluded_tools(
-                        perception, screenshot_tool=screenshot_tool
-                    ),
+                    without=_excluded_tools(observation),
                 )
                 await run_tasks(
                     tasks,
@@ -285,21 +278,34 @@ async def run_tasks(
             )
 
 
-def _perception(args, parser) -> tuple[BrowserPerception, bool]:
+@dataclass(frozen=True, slots=True)
+class _Observation:
+    plugins: tuple[Plugin, ...]
+    text: bool
+    trigger: ScreenshotTrigger | None
+    screenshot_tool: bool
+
+
+def _observation(args, parser) -> _Observation:
     mode = args.observation
-    text = None
-    if mode is None or mode.startswith("text"):
-        text = TextObservations(mode="delta" if mode is None else "full")
-    capture: CaptureStrategy = ScreenshotCapture()
-    marks = SetOfMarks() if mode is None or mode.endswith("-marks") else None
-    if text is not None or marks is not None:
-        capture = DomCapture(
-            page_prose=args.page_prose, headings=args.headings, landmarks=args.landmarks
+    text = mode is None or mode.startswith("text")
+    perception = BrowserPerception(
+        text=("delta" if mode is None else "full") if text else None
+    )
+    marks = mode is None or mode.endswith("-marks")
+    dom = (
+        (
+            DomPage(
+                prose=args.page_prose, headings=args.headings, landmarks=args.landmarks
+            ),
         )
+        if text or marks
+        else ()
+    )
     if mode == "text":
         if args.screenshot_trigger is not None or args.screenshot_tool:
             parser.error("Screenshot options require an image observation variant")
-        return BrowserPerception(text=text, capture=capture), False
+        return _Observation((perception, *dom), text, None, False)
     default = (
         ScreenshotTrigger.ON_REQUEST if mode is None else ScreenshotTrigger.EACH_STEP
     )
@@ -309,12 +315,9 @@ def _perception(args, parser) -> tuple[BrowserPerception, bool]:
         enabled = trigger == ScreenshotTrigger.ON_REQUEST
     if trigger == ScreenshotTrigger.ON_REQUEST and not enabled:
         parser.error("on_request requires the screenshot tool")
-    screenshots = Screenshots(trigger=trigger, marks=marks, skip_unchanged=mode is None)
-    return BrowserPerception(
-        text=text,
-        screenshots=screenshots,
-        capture=capture,
-    ), enabled
+    screenshots = Screenshots(trigger=trigger, skip_unchanged=mode is None)
+    plugins = (perception, screenshots, *dom, *((SetOfMarks(),) if marks else ()))
+    return _Observation(plugins, text, trigger, enabled)
 
 
 def _pixel_readiness(observation: str | None) -> tuple[PageReadiness, ...]:
@@ -324,11 +327,9 @@ def _pixel_readiness(observation: str | None) -> tuple[PageReadiness, ...]:
     return (PageReadiness(initial=policy, ongoing=policy),)
 
 
-def _excluded_tools(
-    perception: BrowserPerception, *, screenshot_tool: bool
-) -> tuple[type[Plugin], ...]:
-    screenshot = () if screenshot_tool else (ScreenshotTools,)
-    if perception.text is not None:
+def _excluded_tools(observation: _Observation) -> tuple[type[Plugin], ...]:
+    screenshot = () if observation.screenshot_tool else (ScreenshotTools,)
+    if observation.text:
         return screenshot
     return (
         *screenshot,

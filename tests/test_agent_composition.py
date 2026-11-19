@@ -19,6 +19,8 @@ from browserrig import (
     FormTools,
     LocalWorkspace,
     Screenshots,
+    ScreenshotTrigger,
+    SetOfMarks,
 )
 from tests.fakes import FakeChrome
 
@@ -109,9 +111,11 @@ async def test_facade_renders_complete_blocks_in_plugin_list_order(completion_la
     assert rendered.startswith("Custom role.\n\n## Browser observations")
     assert headings == [
         "## Browser observations",
-        "## Element references",
         "## Browser content and action results",
-        "## Browser image history",
+        "## Browser screenshots",
+        "## Page elements",
+        "## Element references",
+        "## Screenshot marks",
         "## Screenshot coordinates",
         "## Browser action chains",
         "## Multiple browser tabs",
@@ -127,11 +131,10 @@ async def test_facade_renders_complete_blocks_in_plugin_list_order(completion_la
 
 
 async def test_facade_prompt_follows_removals_and_replacements():
-    observe = BrowserPerception(screenshots=Screenshots())
     agent = browserrig.Agent(
         model=ScriptedModel([]),
-        plugins=[observe, FakeChrome({})],
-        without=(Chrome, FileTools, FormTools),
+        plugins=[Screenshots(trigger=ScreenshotTrigger.EACH_STEP), FakeChrome({})],
+        without=(Chrome, FileTools, FormTools, SetOfMarks),
         instructions="Role.",
     )
     async with agent.session() as session:
@@ -141,7 +144,7 @@ async def test_facade_prompt_follows_removals_and_replacements():
     assert "The file system observation identifies" not in rendered
     assert "Form filling" not in rendered
     assert (
-        rendered.index("Browser image history")
+        rendered.index("Browser screenshots")
         < rendered.index("Screenshot coordinates")
         < rendered.index("Browser action chains")
     )

@@ -3,16 +3,16 @@ import re
 
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, Point, wait_for_page
+from browserrig import ChromeBrowser, DomModel, Point, wait_for_page
 from browserrig.browser import Launch
+from browserrig.dom.content import (  # smelt: ignore[SMT107] -- test seam
+    # Test document extraction independently of capture strategy.
+    extract_content,
+)
 from browserrig.kinds import CursorStyle
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     # Public facade callable; SMT107 confuses it with the same-named module.
     capture,
-)
-from browserrig.observation.content import (  # smelt: ignore[SMT107] -- test seam
-    # Test document extraction independently of capture strategy.
-    extract_content,
 )
 from tests.javascript import evaluate
 
@@ -33,8 +33,8 @@ async def test_visible_descendant_of_hidden_parent_is_extracted_and_inert_conten
         )
         await evaluate(tab, f"document.body.innerHTML = {json.dumps(markup)}")
         report = await wait_for_page(tab)
-        snapshot = await capture(tab, DomCapture(), report)
-        assert [element.name for element in snapshot.elements] == ["Visible child"]
+        snapshot = await capture(tab, DomModel(), report)
+        assert [element.name for element in snapshot.targets] == ["Visible child"]
         content = await extract_content(tab)
         assert (
             "Visible child" in content.markdown and "Contents text" in content.markdown

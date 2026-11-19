@@ -6,69 +6,68 @@ from unittest.mock import AsyncMock
 import pytest
 from cdpify import CDPCommandError
 
-from browserrig import CaptureContent, CaptureStrategy, DomCapture, Generation
-from browserrig import PageContent as Extraction
+from browserrig import DomModel, Generation, PageCapture
 from browserrig.core import Bounds, BrowserError, ReadinessPhase, StaleElement
-from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
-    # Public facade callable; SMT107 confuses it with the same-named module.
+from browserrig.dom import (
     CookieBanner,
+    DomView,
     Element,
-    ScreenshotStatus,
-    capture,
+    Extraction,
     decision_change,
+)
+from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+    CaptureRequest,
+    PagePart,
+    ScreenshotStatus,
+    # Public facade callable; SMT107 confuses it with the same-named module.
+    capture,
 )
 from browserrig.observation.models import (  # smelt: ignore[SMT107] -- test seam
     # Test internal change fingerprints without exposing them as API.
-    ElementFingerprint,
     PageFingerprint,
+    TargetFingerprint,
 )
-from tests.fakes import FakeReadiness, FakeTab
+from tests.fakes import DomStub, FakeReadiness, FakeTab
 
 capture_module = import_module("browserrig.observation.capture")
-dom_capture_module = import_module("browserrig.observation.dom_capture")
-pixels_module = import_module("browserrig.observation.pixels")
+dom_model_module = import_module("browserrig.dom.model")
+frames_module = import_module("browserrig.observation.frames")
 
 
-@pytest.mark.parametrize("fingerprint", ["canvas:revision-1", ""])
-async def test_strategy_fingerprint_is_used_verbatim_and_tracks_its_own_changes(
-    fingerprint,
-):
+class _Revision(PagePart):
+    """App state that only the page model can see, such as a canvas revision."""
+
+    revision: str = ""
+
+
+async def test_a_page_part_fingerprint_tracks_state_the_targets_cannot_show():
     tab = FakeTab()
-    readiness = FakeReadiness()
-    report = await readiness.wait(tab, phase=ReadinessPhase.OBSERVATION)
-    strategy = _Capture(fingerprint)
-    before = await capture(tab, strategy, report)
-    assert before.fingerprint == fingerprint
-    strategy.fingerprint = "canvas:revision-2"
-    after = await capture(tab, strategy, report)
-    assert after.fingerprint == "canvas:revision-2"
-    assert before.text == after.text and before.elements == after.elements
+    report = await FakeReadiness().wait(tab, phase=ReadinessPhase.OBSERVATION)
+    model = _Capture(revision="canvas:revision-1")
+    before = await capture(tab, model, report)
+    model.revision = "canvas:revision-2"
+    after = await capture(tab, model, report)
+    assert after.fingerprint != before.fingerprint
+    assert before.text == after.text and before.targets == after.targets
 
 
-async def test_capture_without_strategy_fingerprint_keeps_the_dom_digest():
+async def test_fingerprint_digests_text_targets_and_parts_without_refs():
     tab = FakeTab()
-    readiness = FakeReadiness()
-    report = await readiness.wait(tab, phase=ReadinessPhase.OBSERVATION)
-    strategy = _Capture()
-    snapshot = await capture(tab, strategy, report)
+    report = await FakeReadiness().wait(tab, phase=ReadinessPhase.OBSERVATION)
+    model = _Capture()
+    snapshot = await capture(tab, model, report)
+    page = (await model.collect(tab, CaptureRequest(report))).page
     expected = PageFingerprint(
         url=tab.url,
         document_id=tab.document_id,
-        text=("Example page",),
+        text="Example page",
         scroll_y=25,
-        elements=(
-            ElementFingerprint(
-                role="checkbox",
-                name="Enabled",
-                value=None,
-                disabled=False,
-                checked=True,
-            ),
-        ),
+        targets=(TargetFingerprint(role="checkbox", name="Enabled"),),
+        parts=tuple(part.fingerprint(page.targets) for part in page.parts),
     )
     assert snapshot.fingerprint == expected.digest()
     tab.document_id = "next-document"
-    changed = await capture(tab, strategy, report)
+    changed = await capture(tab, model, report)
     assert changed.fingerprint != snapshot.fingerprint
 
 
@@ -79,7 +78,7 @@ async def test_cookie_context_survives_capture_and_updates_semantic_fingerprint(
     before = await capture(tab, strategy, report)
     strategy.banners = (CookieBanner(text="We use cookies.", refs=("1",)),)
     banner = await capture(tab, strategy, report)
-    assert banner.cookie_banners == strategy.banners
+    assert DomView.of(banner).cookie_banners == strategy.banners
     assert banner.fingerprint != before.fingerprint
     assert "cookie banner" in decision_change(before, banner)
     strategy.banners = (strategy.banners[0].model_copy(update={"refs": ("other",)}),)
@@ -181,7 +180,7 @@ async def test_exhausted_readiness_does_not_start_another_capture_attempt():
     strategy = _RacingCapture(["navigate", None])
     snapshot = await capture(tab, strategy, report)
     assert strategy.calls == 1
-    assert not snapshot.elements and snapshot.image is None
+    assert not snapshot.targets and snapshot.image is None
     assert "still loading" in snapshot.text
 
 
@@ -203,7 +202,7 @@ async def test_optional_screenshot_failure_retains_the_dom_and_cancels_stalled_w
 ):
     tab = FakeTab()
     report = await FakeReadiness().wait(tab, phase=ReadinessPhase.OBSERVATION)
-    page = (await _Capture().collect(tab, report, screenshots=False)).page
+    page = await _extraction(tab)
     frame = SimpleNamespace(visible=Bounds(x=0, y=0, width=1280, height=800))
     tab.frames = AsyncMock(return_value=(frame,))
     tab.frame_limitations = ()
@@ -219,11 +218,11 @@ async def test_optional_screenshot_failure_retains_the_dom_and_cancels_stalled_w
         finally:
             cancelled = True
 
-    monkeypatch.setattr(dom_capture_module, "extract", extracted)
-    monkeypatch.setattr(pixels_module, "screenshot", screenshot)
-    monkeypatch.setattr(pixels_module, "_SCREENSHOT_SECONDS", 0.02)
-    snapshot = await capture(tab, DomCapture(), report, screenshots=True)
-    assert snapshot.text == "Example page" and snapshot.elements[0].ref == "1"
+    monkeypatch.setattr(dom_model_module, "extract", extracted)
+    monkeypatch.setattr(frames_module, "screenshot", screenshot)
+    monkeypatch.setattr(frames_module, "_SCREENSHOT_SECONDS", 0.02)
+    snapshot = await capture(tab, DomModel(), report, screenshots=True)
+    assert snapshot.text == "Example page" and snapshot.targets[0].ref == "1"
     assert snapshot.image is None
     assert snapshot.screenshot_status is ScreenshotStatus.UNAVAILABLE
     assert cancelled == stalled
@@ -245,50 +244,54 @@ async def test_page_text_mode_selects_the_extraction_budget(
 ):
     tab = FakeTab()
     report = await FakeReadiness().wait(tab, phase=phase)
-    page = (await _Capture().collect(tab, report, screenshots=False)).page
+    page = await _extraction(tab)
     tab.frames = AsyncMock(return_value=())
     tab.frame_limitations = ()
     extracted = AsyncMock(return_value=page)
-    monkeypatch.setattr(dom_capture_module, "extract", extracted)
-    strategy = DomCapture(page_prose=text, max_text_chars=500)
-    await strategy.collect(tab, report, screenshots=False)
+    monkeypatch.setattr(dom_model_module, "extract", extracted)
+    strategy = DomModel(prose=text, max_text_chars=500)
+    await strategy.collect(tab, CaptureRequest(report))
     extracted.assert_awaited_once()
     options = extracted.await_args.kwargs
     assert (options["max_text"], options["sparse_text"]) == budgets
 
 
-class _Capture(CaptureStrategy):
-    def __init__(self, fingerprint=None):
-        self.fingerprint = fingerprint
+async def _extraction(tab):
+    return Extraction(
+        url=tab.url,
+        title=tab.title,
+        width=1280,
+        height=800,
+        scroll_y=25,
+        page_height=1600,
+        text="Example page",
+        elements=(
+            Element(
+                ref="1",
+                frame_id="frame",
+                backend_id=1,
+                role="checkbox",
+                tag="input",
+                name="Enabled",
+                checked=True,
+            ),
+        ),
+    )
+
+
+class _Capture(DomStub):
+    def __init__(self, revision=None):
+        self.revision = revision
         self.banners = ()
 
-    async def collect(  # pylint: disable=unused-argument
-        self, tab, _report, *, screenshots, region=None, zoom=1, cursor=None
-    ):
-        return CaptureContent(
-            page=Extraction(
-                url=tab.url,
-                title=tab.title,
-                width=1280,
-                height=800,
-                scroll_y=25,
-                page_height=1600,
-                text="Example page",
-                cookie_banners=self.banners,
-                elements=(
-                    Element(
-                        ref="1",
-                        frame_id="frame",
-                        backend_id=1,
-                        role="checkbox",
-                        tag="input",
-                        name="Enabled",
-                        checked=True,
-                    ),
-                ),
-            ),
-            fingerprint=self.fingerprint,
-        )
+    async def collect(self, tab, request):
+        del request
+        extraction = await _extraction(tab)
+        extraction.cookie_banners = self.banners
+        page = extraction.page()
+        if self.revision is not None:
+            page.parts = (*page.parts, _Revision(revision=self.revision))
+        return PageCapture(page)
 
 
 class _RacingCapture(_Capture):
@@ -298,7 +301,7 @@ class _RacingCapture(_Capture):
         self.calls = 0
         self.cancelled = False
 
-    async def collect(self, tab, report, **kwargs):
+    async def collect(self, tab, request):
         self.calls += 1
         fault = next(self.faults, None)
         if isinstance(fault, BaseException):
@@ -308,7 +311,7 @@ class _RacingCapture(_Capture):
                 await asyncio.Future()
             finally:
                 self.cancelled = True
-        content = await super().collect(tab, report, **kwargs)
+        content = await super().collect(tab, request)
         content.page.text = tab.document_id
         if fault == "navigate":
             tab.document_id += "-next"

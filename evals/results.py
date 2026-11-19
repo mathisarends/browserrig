@@ -5,7 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, JsonValue
 
-from browserrig.observation import PageProse, ScreenshotTrigger
+from browserrig.dom import PageProse
+from browserrig.observation import ScreenshotTrigger
 
 
 class AgentResponse(BaseModel):

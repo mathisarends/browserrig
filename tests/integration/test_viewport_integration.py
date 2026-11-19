@@ -16,16 +16,16 @@ from browserrig import (
     BrowserPerception,
     Chrome,
     ChromeBrowser,
-    DomCapture,
+    DomModel,
     wait_for_page,
 )
 from browserrig.browser import Launch
 from browserrig.core import StaleElement
+from browserrig.dom import DomView, render
 from browserrig.events import ActionFinishedEvent
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     # Public facade callable; SMT107 confuses it with the same-named module.
     capture,
-    render,
 )
 from tests.javascript import evaluate
 
@@ -47,22 +47,22 @@ async def test_strict_viewport_controls_are_described_and_the_rest_are_known(sit
         """,
         )
         report = await wait_for_page(tab)
-        strategy = DomCapture(viewport_expansion=0, page_prose="off")
+        strategy = DomModel(viewport_expansion=0, prose="off")
         state = await capture(tab, strategy, report)
-        assert 0 < len(state.elements) < 300
-        assert all(element.in_viewport for element in state.elements)
-        assert len(state.elements) + len(state.offscreen) == 300
+        assert 0 < len(state.targets) < 300
+        assert all(element.in_viewport for element in state.targets)
+        assert len(state.targets) + len(DomView.of(state).offscreen) == 300
         assert not any("truncated" in item for item in state.limitations)
         rendered = render(state)
         assert '"Button 0"' in rendered and '"Button 299"' not in rendered
         assert "below viewport" not in rendered and "page text:" not in rendered
         with pytest.raises(StaleElement, match="outside the viewport"):
-            state.element(state.offscreen[-1].ref)
+            state.target(DomView.of(state).offscreen[-1].ref)
         assert await evaluate(tab, "scrollY") == 0
         visual = await capture(tab, strategy, report, screenshots=True)
         assert visual.image is not None
-        limited = await capture(tab, DomCapture(max_elements=10), report)
-        assert len(limited.elements) == 10
+        limited = await capture(tab, DomModel(max_elements=10), report)
+        assert len(limited.targets) == 10
         assert any("truncated" in item for item in limited.limitations)
 
 
@@ -297,9 +297,9 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(
         observe = session.scope[BrowserPerception]
         tab = browser.active_tab
         element = next(
-            el for el in observe.snapshot.elements if el.name == "Frame button"
+            el for el in observe.snapshot.targets if el.name == "Frame button"
         )
-        frame = (await observe.element(tab, element.ref)).frame
+        frame = (await observe.target(tab, element.ref)).frame
         assert await evaluate(frame, "document.body.dataset.clicked") == "true"
         assert await evaluate(tab, "scrollY") > 0
 

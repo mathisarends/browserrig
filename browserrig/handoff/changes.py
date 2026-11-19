@@ -1,5 +1,6 @@
 from urllib.parse import urlsplit, urlunsplit
 
+from browserrig.dom import DomView
 from browserrig.observation import Snapshot
 
 
@@ -31,7 +32,7 @@ def page_changes(before: Snapshot | None, after: Snapshot | None) -> tuple[str, 
         changes.append("The observed page content changed.")
     password_visible = any(
         element.input_type == "password" and element.in_viewport and not element.covered
-        for element in after.elements
+        for element in DomView.of(after).elements
     )
     if password_visible:
         changes.append(

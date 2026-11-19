@@ -6,7 +6,7 @@ from harnessed.kernel import Inject, PluginScope
 from pydantic import Field
 
 from browserrig.browser import TabPolicy
-from browserrig.observation import ResolveDomElement
+from browserrig.dom import ResolveDomElement
 
 logger = logging.getLogger(__name__)
 

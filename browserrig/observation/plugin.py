@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from harnessed import (
     Inject,
     Instructions,
@@ -26,7 +28,6 @@ from browserrig.browser import (
 )
 from browserrig.core import (
     BrowserCoordination,
-    BrowserError,
     ReadinessPhase,
     ReadinessStatus,
     Region,
@@ -41,10 +42,10 @@ from browserrig.nudges import Nudges
 from browserrig.readiness import PageReadiness
 from browserrig.secrets import Secrets
 
-from .capture import CaptureStrategy, capture_observation
-from .config import Screenshots, ScreenshotTrigger, TextObservations
-from .dom_capture import DomCapture
-from .handle import DomElementHandle
+from .capture import PageModel, capture_observation
+from .config import ScreenshotPolicy, ScreenshotTrigger, TextMode
+from .drawing import ImageAnnotator
+from .frames import FrameSource
 from .hooks import ProjectObservation
 from .images import (
     NOTE_SOURCE,
@@ -55,18 +56,20 @@ from .images import (
     project_image,
     trim_images,
 )
+from .metadata import MetadataPage
 from .models import CapturedImage, ScreenshotStatus, Snapshot
-from .pixels import ScreenshotCapture
-from .references import ElementHandle, References
-from .renderer import DomRenderer, MetadataRenderer, Renderer, screenshot_instructions
+from .references import References, TargetHandle
 from .state import BrowserPerceptionState
 from .telemetry import trace_capture
 from .text import include_text, project_text
 from .validity import check_coordinates, check_observation
 
-_DEFAULT_TEXT = TextObservations()
-_DEFAULT_CAPTURE = DomCapture()
-_METADATA_CAPTURE = ScreenshotCapture()
+_METADATA = MetadataPage()
+_HEADER = (
+    "Each observation starts with a header: the page title and URL, its tab, the viewport "
+    "with its scroll position, and where the cursor rests in viewport CSS pixels. "
+    "Scroll distances refer to the main page in CSS pixels."
+)
 _TRUST = Instructions(
     title="Browser content and action results",
     text=(
@@ -81,9 +84,9 @@ _TRUST = Instructions(
 class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     """Provide the agent's current view of the browser before each model step.
 
-    Select page text, metadata, screenshots, or a combination. Configured modalities share one
-    snapshot and request history. The plugin registers no model tools. A plugin can provide
-    the CaptureStrategy as a session service when capture needs its mount-local services.
+    Alone it reports page and viewport facts. Plugins that need it extend one shared
+    snapshot during their setup: a page model such as DomPage reads the page, Screenshots
+    adds images and annotators such as SetOfMarks draw on them. It registers no tools.
     """
 
     events = (ObservationCapturedEvent,)
@@ -95,53 +98,61 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     _readiness = needs(PageReadiness)
     _tab_policy = observes(TabPolicy)
     _app_state = observes(AppState)
-    _provided_capture = observes(CaptureStrategy)
 
-    def __init__(
-        self,
-        *,
-        text: TextObservations | None = _DEFAULT_TEXT,
-        screenshots: Screenshots | None = None,
-        capture: CaptureStrategy | None = None,
-        renderer: Renderer | None = None,
-    ) -> None:
+    def __init__(self, *, text: TextMode | None = "delta") -> None:
+        """`text` sends page text in full or as changes to the last one; None omits it."""
         super().__init__()
         self.text = text
-        self.screenshots = screenshots
-        self._configured = (capture, renderer)
-        self.capture_strategy = _capture_for_text(capture, text, screenshots)
-        self.renderer = _text_renderer(self.capture_strategy, text, renderer)
 
     async def setup(self, scope: PluginScope) -> None:
         # Secrets is looked up per capture, so it redacts wherever it sits in the plugins.
         self._state.context = scope
-        if self._provided_capture is not None:
-            self.capture_strategy = self._use_provided_capture(self._provided_capture)
-        if self.capture_strategy.supports_dom_refs:
-            scope.provide(ResolveDomElement, ResolveDomElement(self))
 
     def instructions(self) -> SystemPrompt:
-        text = self.renderer.instructions() if self.text is not None else ""
-        screenshots = screenshot_instructions(self.screenshots)
-        blocks = [block.strip() for block in (text, screenshots) if block.strip()]
-        description = "\n\n".join(blocks)
-        refs = self.renderer.refs() if self.text is not None else None
         return SystemPrompt(
-            Instructions(
-                title="Browser observations",
-                text=description,
-            )
-            if description
+            Instructions(title="Browser observations", text=_HEADER)
+            if self.text is not None
             else None,
-            Instructions(title="Element references", text=refs) if refs else None,
             _TRUST,
-            Instructions(
-                title="Browser image history",
-                text="Screenshots belong to the observation they were captured with.",
-            )
-            if self.screenshots is not None
-            else None,
         )
+
+    def use_model(self, model: PageModel) -> Callable[[], None]:
+        """Read pages with `model` instead of page metadata; returns its removal."""
+        extensions = self._state.extensions
+        if extensions.model is not None:
+            raise ValueError("Another plugin already supplies the page model")
+        extensions.model = model
+        return lambda: setattr(extensions, "model", None)
+
+    def use_frames(self, frames: FrameSource) -> Callable[[], None]:
+        """Capture images with `frames` instead of the viewport; returns its removal."""
+        extensions = self._state.extensions
+        if extensions.frames is not None:
+            raise ValueError("Another plugin already supplies the frame source")
+        extensions.frames = frames
+        return lambda: setattr(extensions, "frames", None)
+
+    def use_screenshots(self, policy: ScreenshotPolicy) -> Callable[[], None]:
+        """Capture and project screenshots under `policy`; returns its removal."""
+        extensions = self._state.extensions
+        if extensions.screenshots is not None:
+            raise ValueError("Screenshots are already configured")
+        extensions.screenshots = policy
+        return lambda: setattr(extensions, "screenshots", None)
+
+    def add_annotator(self, annotator: ImageAnnotator) -> Callable[[], None]:
+        """Draw `annotator` on every projected screenshot; returns its removal."""
+        annotators = self._state.extensions.annotators
+        annotators.append(annotator)
+        return lambda: annotators.remove(annotator)
+
+    @property
+    def model(self) -> PageModel:
+        return self._state.extensions.model or _METADATA
+
+    @property
+    def screenshots(self) -> ScreenshotPolicy | None:
+        return self._state.extensions.screenshots
 
     @property
     def snapshot(self) -> Snapshot | None:
@@ -168,13 +179,13 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             tabs = await self._tab_overview()
             observation = await capture_observation(
                 tab,
-                self.capture_strategy,
+                self.model,
                 report,
                 tabs=tuple(tabs),
                 previous=self.snapshot,
                 screenshots=False,
                 redaction=self._secrets(),
-                prefer_tab_title=_metadata_text(self.text),
+                prefer_tab_title=self._state.extensions.model is None,
                 app_state=self._app_state,
             )
             return observation.snapshot
@@ -197,7 +208,8 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             project=False,
         )
 
-    async def element(self, tab: Tab, ref: str) -> ElementHandle:
+    async def target(self, tab: Tab, ref: str) -> TargetHandle:
+        """Resolve a ref of the delivered observation while it still describes the page."""
         observation = self._state.observation
         snapshot = observation.snapshot if observation is not None else None
         app_state = self._app_state
@@ -215,10 +227,10 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             ),
         )
         assert snapshot is not None
-        snapshot.element(ref)
+        snapshot.target(ref)
         assert observation is not None
         handle = await observation.references.resolve(tab, snapshot, ref)
-        if handle.element.ref != ref:
+        if handle.target.ref != ref:
             raise StaleElement(
                 "Resolver returned another target; use refs from the next observation"
             )
@@ -264,8 +276,8 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         self._state.screenshot_region = region
 
     def project(self, snapshot: Snapshot) -> UserMessage:
-        """Render the configured text projection of a snapshot."""
-        text = self.renderer.render(snapshot) if self.text is not None else ""
+        """Render the page model's text projection of a snapshot."""
+        text = self.model.render(snapshot) if self.text is not None else ""
         observation = UserMessage(content=text)
         secrets = self._secrets()
         return secrets.redact(observation) if secrets else observation
@@ -295,18 +307,6 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         assert coordinates is not None
         return coordinates
 
-    def _use_provided_capture(self, provided: CaptureStrategy) -> CaptureStrategy:
-        capture, renderer = self._configured
-        if capture is not None:
-            raise ValueError(
-                "BrowserPerception(capture=...) conflicts with a provided CaptureStrategy; "
-                "configure only one"
-            )
-        provided = _capture_for_text(provided, self.text, self.screenshots)
-        # The prompt reads the renderer before setup, so it cannot follow the capture.
-        _text_renderer(provided, self.text, renderer)
-        return provided
-
     @traced
     async def _capture(
         self,
@@ -327,16 +327,19 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 self._screenshot_due(selected) if screenshots is None else screenshots
             )
             secrets = self._secrets()
+            extensions = self._state.extensions
+            # Without targets nothing locates a secret on screen, so no image can be cleaned.
             withheld = (
                 take_image
-                and isinstance(self.capture_strategy, ScreenshotCapture)
+                and extensions.model is None
                 and secrets is not None
                 and secrets.has_known_values
             )
             observation = await capture_observation(
                 selected,
-                self.capture_strategy,
+                self.model,
                 report,
+                frames=extensions.frames,
                 tabs=tuple(tabs),
                 previous=self.snapshot,
                 region=region,
@@ -344,7 +347,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 cursor=self._input.mouse.position_in(selected.id),
                 screenshots=take_image and not withheld,
                 redaction=secrets,
-                prefer_tab_title=_metadata_text(self.text),
+                prefer_tab_title=extensions.model is None,
                 app_state=self._app_state,
             )
             if withheld:
@@ -445,19 +448,20 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     ) -> UserMessage | None:
         message = await next_()
         state, snapshot = self._state, event.snapshot
-        image = None
-        if self.screenshots is not None:
+        image, policy = None, self.screenshots
+        if policy is not None:
             image = await project_image(
                 snapshot,
                 self._events.browser_id,
                 state.images,
-                options=self.screenshots,
+                options=policy,
+                annotators=tuple(state.extensions.annotators),
             )
         if message is None and self.text is not None:
             message = project_text(
                 snapshot,
                 state.text,
-                options=self.text,
+                mode=self.text,
                 render=self._render_text,
                 generation=state.generation,
                 with_image=image is not None,
@@ -500,11 +504,13 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         trace_capture(snapshot, self._events.browser_id, outcome)
 
     def _screenshot_due(self, tab: Tab) -> bool:
-        if self.screenshots is None:
+        policy = self.screenshots
+        if policy is None:
             return False
-        if self.screenshots.trigger == ScreenshotTrigger.EACH_STEP:
+        if policy.trigger == ScreenshotTrigger.EACH_STEP:
             return True
-        if self.text is not None and self.text.content == "page":
+        # Page text describes the page; metadata alone needs an image of each new page.
+        if self.text is not None and self._state.extensions.model is not None:
             return False
         shown = self._state.delivered_image
         return shown is None or (shown.tab_id, shown.document_id) != (
@@ -513,9 +519,9 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         )
 
     async def _tab_overview(self) -> tuple[TabInfo, ...]:
-        text, policy = self.text, self._tab_policy
-        if text is None or (
-            text.content == "page" and policy is not None and not policy.multiple
+        model, policy = self._state.extensions.model, self._tab_policy
+        if self.text is None or (
+            model is not None and policy is not None and not policy.multiple
         ):
             return ()
         return await self._browser.tabs.list()
@@ -566,59 +572,6 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
 
     def _render_text(self, snapshot: Snapshot) -> str:
         return self.project(snapshot).text
-
-
-class ResolveDomElement:
-    """Resolve a DOM handle from an observation with a DOM target backend."""
-
-    def __init__(self, perception: BrowserPerception) -> None:
-        self._perception = perception
-
-    async def __call__(self, tab: Tab, ref: str) -> DomElementHandle:
-        handle = await self._perception.element(tab, ref)
-        if not isinstance(handle, DomElementHandle):
-            raise BrowserError(
-                "This tool requires a DOM element; use pointer and keyboard tools"
-            )
-        return handle
-
-
-def _capture_for_text(
-    capture: CaptureStrategy | None,
-    text: TextObservations | None,
-    screenshots: Screenshots | None,
-) -> CaptureStrategy:
-    if capture is None:
-        capture = _METADATA_CAPTURE if _metadata_text(text) else _DEFAULT_CAPTURE
-    # A custom subclass can implement collect() with its own marked elements.
-    if (
-        screenshots is not None
-        and screenshots.marks is not None
-        and type(capture) is ScreenshotCapture  # pylint: disable=unidiomatic-typecheck
-    ):
-        raise ValueError(
-            "ScreenshotCapture does not collect element refs for screenshot marks; "
-            "use DomCapture or a custom capture with element refs"
-        )
-    return capture
-
-
-def _text_renderer(
-    capture: CaptureStrategy,
-    text: TextObservations | None,
-    renderer: Renderer | None,
-) -> Renderer:
-    if renderer is None and _metadata_text(text):
-        return MetadataRenderer()
-    if renderer is not None:
-        return renderer
-    if text is not None and not capture.supports_dom_refs:
-        raise ValueError("Text observations with this capture require a renderer")
-    return DomRenderer()
-
-
-def _metadata_text(text: TextObservations | None) -> bool:
-    return text is not None and text.content == "metadata"
 
 
 def _screenshot_status(

@@ -33,8 +33,7 @@ from browserrig import (
     Choreography,
     ChoreographyOverlay,
     Chrome,
-    DomCapture,
-    DomRenderer,
+    DomPage,
     Files,
     FileSystem,
     FileTools,
@@ -72,7 +71,11 @@ async def test_browser_perception_dependency_resolves_the_configured_plugin(
             received.append(perception)
 
     perception = BrowserPerception()
-    agent = browserrig.Agent(model=ScriptedModel([]), plugins=[perception, Consumer()])
+    agent = browserrig.Agent(
+        model=ScriptedModel([]),
+        plugins=[perception, Consumer()],
+        without=(Screenshots,),
+    )
     assert [item for item in agent.plugins if isinstance(item, BrowserPerception)] == [
         perception
     ]
@@ -291,30 +294,21 @@ async def test_facade_warning_policy_keeps_deferred_plugin_until_service_is_adde
 
 
 @pytest.mark.parametrize(
-    "capture,trigger,marks",
+    "prose,trigger,marks",
     [
-        (DomCapture(), ScreenshotTrigger.ON_REQUEST, SetOfMarks()),
-        (
-            DomCapture(page_prose="off"),
-            ScreenshotTrigger.EACH_STEP,
-            None,
-        ),
+        ("inline", ScreenshotTrigger.ON_REQUEST, True),
+        ("off", ScreenshotTrigger.EACH_STEP, False),
     ],
 )
 async def test_facade_renders_configured_observation_prompt(
-    fake_chrome, capture, trigger, marks
+    fake_chrome, prose, trigger, marks
 ):
     agent = browserrig.Agent(
         model=ScriptedModel(["unused"]),
         instructions="Custom role.",
         prompt=SystemPrompt.from_plugins(format=PromptFormat.MARKDOWN),
-        plugins=[
-            BrowserPerception(
-                capture=capture,
-                renderer=DomRenderer(),
-                screenshots=Screenshots(trigger=trigger, marks=marks),
-            )
-        ],
+        plugins=[DomPage(prose=prose), Screenshots(trigger=trigger)],
+        without=() if marks else (SetOfMarks,),
     )
     async with agent.session() as session:
         rendered = await session.prompt.render()
@@ -323,8 +317,8 @@ async def test_facade_renders_configured_observation_prompt(
         assert "## Browser content and action results" in rendered
         assert "## Workspace and downloads" in rendered
         assert "## Element references" in rendered
-        assert ("labeled with its ref" in rendered) is (marks is not None)
-        assert "When visible prose is included" in rendered
+        assert ("labeled with its ref" in rendered) is marks
+        assert ("When visible prose is included" in rendered) is (prose != "off")
         assert ("A screenshot is captured before each model step." in rendered) == (
             trigger == ScreenshotTrigger.EACH_STEP
         )

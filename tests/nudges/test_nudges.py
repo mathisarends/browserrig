@@ -18,6 +18,7 @@ from harnessed.models import ModelInfo, ModelRequest, UserMessage
 from harnessed.testing import ScriptedModel
 
 from browserrig import Nudges
+from browserrig.dom import Element
 from browserrig.events import (
     ActionFinishedEvent,
     ActionStartedEvent,
@@ -27,7 +28,7 @@ from browserrig.events import (
     PageState,
     TabClosedEvent,
 )
-from browserrig.observation import Element, Snapshot
+from browserrig.observation import Snapshot
 from tests.fakes import FakeChrome
 
 
@@ -373,7 +374,7 @@ async def test_bot_checks_get_one_hint_per_document(title, text, controls, expec
         for index in range(controls)
     )
     snapshot = _snapshot().model_copy(
-        update={"title": title, "text": text, "elements": elements}
+        update={"title": title, "text": text, "targets": elements}
     )
 
     class Hints(Plugin, needs=(Nudges,)):

@@ -9,8 +9,9 @@ import asyncio
 
 from browserrig import ChromeBrowser, wait_for_page
 from browserrig.browser import Launch
-from browserrig.observation import DomCapture, capture, render
-from browserrig.observation.content import extract_content
+from browserrig.dom import DomModel, render
+from browserrig.dom.content import extract_content
+from browserrig.observation import capture
 
 
 async def main() -> None:
@@ -33,7 +34,7 @@ async def main() -> None:
         for expression in args.js:
             print(f"--- js: {expression[:80]}\n{await tab.evaluate(expression)}")
         if not args.no_observe:
-            snapshot = await capture(tab, DomCapture(), report)
+            snapshot = await capture(tab, DomModel(), report)
             text = render(snapshot)
             print(f"--- observation ({len(text)} chars)\n{text}")
         if args.extract:

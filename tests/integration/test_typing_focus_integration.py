@@ -110,7 +110,7 @@ def _agent(site, clear):
             target = next(
                 (
                     element
-                    for element in holder["perception"].snapshot.elements
+                    for element in holder["perception"].snapshot.targets
                     if element.name == "Username"
                 ),
                 None,

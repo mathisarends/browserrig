@@ -22,29 +22,29 @@ from PIL import Image
 
 from browserrig import (
     BrowserPerception,
-    CaptureContent,
-    CaptureStrategy,
     Input,
+    PageCapture,
     PageReadiness,
     Secret,
     Secrets,
     Totp,
     env,
 )
-from browserrig import PageContent as Extraction
 from browserrig.core import ActionKind, Bounds, ReadinessPhase, SecretError
+from browserrig.dom import Element, Extraction
 from browserrig.events import ActionFailedEvent, KeyPressedEvent, SecretEnteredEvent
 from browserrig.input import (  # smelt: ignore[SMT107] -- test seam
     # Replace input timing where the keyboard reads it.
     keyboard as keyboard_module,
 )
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
-    # Public facade callable; SMT107 confuses it with the same-named module.
-    Element,
+    Frame,
+    ScreenshotStatus,
     Snapshot,
+    # Public facade callable; SMT107 confuses it with the same-named module.
     capture,
 )
-from browserrig.observation.marks import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.observation.drawing import (  # smelt: ignore[SMT107] -- test seam
     # Verify screenshot redaction and annotation independently of capture.
     blackout,
 )
@@ -61,7 +61,7 @@ from browserrig.secrets.redaction import (  # smelt: ignore[SMT107] -- test seam
     # Test redaction of text and pixels independently of plugin activation.
     Redactor,
 )
-from tests.fakes import FakeChrome, FakeReadiness, FakeTab
+from tests.fakes import DomStub, FakeChrome, FakeReadiness, FakeTab
 
 PASSWORD = "hunter2-Correct-Horse"
 
@@ -269,26 +269,34 @@ async def test_capture_redacts_page_text_and_blacks_out_fields_showing_a_secret(
     area = Bounds(x=0, y=0, width=100, height=50)
     tab = FakeTab()
     report = await FakeReadiness().wait(tab, phase=ReadinessPhase.OBSERVATION)
-    content = CaptureContent(page=page, image=image, area=area)
+    frames = _Frames(Frame(image, area))
     redacted = await capture(
-        tab, _Collected(content), report, screenshots=True, redaction=redaction
+        tab,
+        _Collected(PageCapture(page.page())),
+        report,
+        frames=frames,
+        screenshots=True,
+        redaction=redaction,
     )
     assert PASSWORD not in repr(redacted)
-    assert redacted.elements[0].value == "{{secret:pw}}"
-    assert redacted.elements[1].value == "visible"
+    assert redacted.targets[0].value == "{{secret:pw}}"
+    assert redacted.targets[1].value == "visible"
     assert redacted.image is not None
     with Image.open(BytesIO(base64.b64decode(redacted.image))) as result:
         assert result.getpixel((20, 15)) == (0, 0, 0)
         assert result.getpixel((80, 40)) == (255, 255, 255)
-    # Without a known image area the screenshot is withheld instead of shown.
+    # A secret without known bounds cannot be blacked out, so the image is withheld.
+    page.elements = (field.model_copy(update={"bounds": None}), other)
     withheld = await capture(
         tab,
-        _Collected(CaptureContent(page=page, image=image)),
+        _Collected(PageCapture(page.page())),
         report,
+        frames=frames,
         screenshots=True,
         redaction=redaction,
     )
     assert withheld.image is None
+    assert withheld.screenshot_status is ScreenshotStatus.WITHHELD
 
 
 async def test_sensitive_typing_hides_keys_and_stops_when_the_guard_fails(monkeypatch):
@@ -352,14 +360,26 @@ def _secrets():
     )
 
 
-class _Collected(CaptureStrategy):
-    """A capture strategy that returns prepared content."""
+class _Collected(DomStub):
+    """A page model that returns prepared content."""
 
-    def __init__(self, content: CaptureContent) -> None:
+    def __init__(self, content: PageCapture) -> None:
         self.content = content
 
-    async def collect(self, *_: object, **__: object) -> CaptureContent:
+    async def collect(self, tab, request) -> PageCapture:
+        del tab, request
         return self.content
+
+
+class _Frames:
+    """A frame source that returns a prepared frame."""
+
+    def __init__(self, frame: Frame) -> None:
+        self.frame = frame
+
+    async def capture(self, tab, request) -> Frame:
+        del tab, request
+        return self.frame
 
 
 class Leaky(Plugin):

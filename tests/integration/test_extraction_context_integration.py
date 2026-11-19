@@ -12,16 +12,16 @@ from browserrig import (
     BrowserPerception,
     Chrome,
     ChromeBrowser,
-    DomCapture,
+    DomModel,
     Viewport,
     wait_for_page,
 )
 from browserrig.browser import Launch
 from browserrig.core import ReadinessPhase
+from browserrig.dom import DomView, render
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     # Public facade callable; SMT107 confuses it with the same-named module.
     capture,
-    render,
 )
 from tests.javascript import evaluate
 
@@ -50,8 +50,8 @@ async def test_vertical_preview_is_bounded_and_separate_from_the_real_viewport(s
         assert await evaluate(
             tab, "document.body.textContent.includes('Current guidance')"
         )
-        state = await capture(tab, DomCapture(), report)
-        elements = {element.name: element for element in state.elements}
+        state = await capture(tab, DomModel(), report)
+        elements = {element.name: element for element in state.targets}
         assert set(elements) == {"Above", "Visible", "Below"}
         assert elements["Visible"].in_viewport
         assert (
@@ -63,7 +63,7 @@ async def test_vertical_preview_is_bounded_and_separate_from_the_real_viewport(s
             and elements["Below"].outside_viewport == "below"
         )
         assert state.height == 600 and state.scroll_y == 1200
-        assert {heading.text for heading in state.headings} == {
+        assert {heading.text for heading in DomView.of(state).headings} == {
             "Previous section",
             "Next section",
         }
@@ -77,9 +77,9 @@ async def test_vertical_preview_is_bounded_and_separate_from_the_real_viewport(s
             value in state.text
             for value in ("Current guidance", "Earlier guidance", "Upcoming guidance")
         )
-        strict = await capture(tab, DomCapture(viewport_expansion=0), report)
-        assert [element.name for element in strict.elements] == ["Visible"]
-        assert "Upcoming guidance" not in strict.text and strict.offscreen
+        strict = await capture(tab, DomModel(viewport_expansion=0), report)
+        assert [element.name for element in strict.targets] == ["Visible"]
+        assert "Upcoming guidance" not in strict.text and DomView.of(strict).offscreen
 
 
 async def test_preview_stays_within_document_edges(site):
@@ -98,11 +98,11 @@ async def test_preview_stays_within_document_edges(site):
             <button style="position:fixed;top:2000px">Unreachable below</button>`;""",
         )
         report = await wait_for_page(tab)
-        top = await capture(tab, DomCapture(), report)
-        assert [element.name for element in top.elements] == ["Top edge"]
+        top = await capture(tab, DomModel(), report)
+        assert [element.name for element in top.targets] == ["Top edge"]
         await evaluate(tab, "scrollTo(0,document.documentElement.scrollHeight)")
-        bottom = await capture(tab, DomCapture(), report)
-        assert [element.name for element in bottom.elements] == ["Bottom edge"]
+        bottom = await capture(tab, DomModel(), report)
+        assert [element.name for element in bottom.targets] == ["Bottom edge"]
         assert bottom.scroll_y + bottom.height == bottom.page_height
 
 
@@ -129,15 +129,15 @@ async def test_inner_scroll_targets_report_directions_and_keep_clipped_children_
             </div>`;""",
         )
         report = await wait_for_page(tab)
-        state = await capture(tab, DomCapture(), report)
-        named = {element.name: element for element in state.elements}
+        state = await capture(tab, DomModel(), report)
+        named = {element.name: element for element in state.targets}
         assert not {"Clipped result", "Hard clipped"} & named.keys()
         assert named["Results"].scroll.down >= 700 and named["Results"].scroll.up == 0
         assert named["Carousel"].scroll.right >= 600
         assert "scroll(down=" in render(state) and "scroll(right=" in render(state)
         await evaluate(tab, "document.querySelector('#panel').scrollTop=300")
-        moved = await capture(tab, DomCapture(), report)
-        panel = next(element for element in moved.elements if element.name == "Results")
+        moved = await capture(tab, DomModel(), report)
+        panel = next(element for element in moved.targets if element.name == "Results")
         assert (
             panel.scroll.up == 300 and panel.scroll.down < named["Results"].scroll.down
         )
@@ -158,8 +158,8 @@ async def test_dense_form_keeps_guidance_and_probe_omits_the_text_budget(site):
         )
         await evaluate(tab, f"document.body.innerHTML={json.dumps(markup)}")
         report = await wait_for_page(tab)
-        state = await capture(tab, DomCapture(), report)
-        field = next(element for element in state.elements if element.name == "Email")
+        state = await capture(tab, DomModel(), report)
+        field = next(element for element in state.targets if element.name == "Email")
         assert (
             "personal accounts" in state.text
             and "personal accounts" in field.description
@@ -170,13 +170,13 @@ async def test_dense_form_keeps_guidance_and_probe_omits_the_text_budget(site):
             "document.body.insertAdjacentHTML('beforeend',"
             "'<p>'+ 'Extra context '.repeat(1000)+'</p>')",
         )
-        bounded = await capture(tab, DomCapture(max_text_chars=120), report)
+        bounded = await capture(tab, DomModel(max_text_chars=120), report)
         assert len(bounded.text) <= 120 and any(
             "truncated" in item for item in bounded.limitations
         )
         probe = await capture(
             tab,
-            DomCapture(),
+            DomModel(),
             report.model_copy(update={"phase": ReadinessPhase.ACTION}),
         )
         assert probe.text == "" and not probe.limitations
@@ -209,7 +209,7 @@ async def test_element_action_reveals_a_preview_before_clicking(site):
         )
         state = await observe.capture()
         preview = next(
-            element for element in state.elements if element.name == "Preview target"
+            element for element in state.targets if element.name == "Preview target"
         )
         assert not preview.in_viewport and preview.outside_viewport == "below"
         result = await session.run("Click the preview target", max_steps=2)
@@ -237,8 +237,8 @@ async def test_iframe_preview_uses_its_own_visible_scrollport(site):
             f"document.querySelector('iframe').srcdoc={json.dumps(content)}",
         )
         report = await wait_for_page(tab)
-        state = await capture(tab, DomCapture(), report)
-        named = {element.name: element for element in state.elements}
+        state = await capture(tab, DomModel(), report)
+        named = {element.name: element for element in state.targets}
         assert named["Frame visible"].in_viewport
         assert (
             not named["Frame below"].in_viewport

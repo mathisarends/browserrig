@@ -8,7 +8,7 @@ from pydantic import Field
 from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind, BrowserCoordination, ReadinessStatus
 from browserrig.core import browser_tool as tool
-from browserrig.observation import PageSearch, extract_document, search_content
+from browserrig.dom import PageSearch, extract_document, search_content
 from browserrig.readiness import PageReadiness
 from browserrig.secrets import Secrets
 

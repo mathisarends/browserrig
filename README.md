@@ -12,15 +12,15 @@ start, replace individual capabilities, or assemble your own runtime from plugin
 | Agent runtime | Model calls, sessions, approvals and persistence | Harnessed models, plugins and lifecycle hooks |
 | Browser | Tabs, frames and browser lifetime | `Browser`, `InputTargets`; local or remote `Chrome` |
 | Input | Mouse and keyboard, independent of the browser backend | `InputRuntime`, `Input`, `Targeting` |
-| Perception | Capture page state and deliver observations | `BrowserPerception`, `TextObservations`, `Screenshots`, custom `CaptureStrategy` and `Renderer` |
+| Perception | Capture page state and deliver observations | `BrowserPerception`, `DomPage`, `Screenshots`, `SetOfMarks`, `CursorMarker`; custom `PageModel`, `FrameSource` and `ImageAnnotator` |
 | Actions | Coordinate input, readiness and action chains | Tool groups, `browser_tool`, `ReadinessPolicy` |
 | Context | Compact history and recover task memory | `TaskMemory` |
 | Presentation | Pace input, show activity and record sessions | `InputPacing`, `Choreography`, `ChoreographyOverlay`, `VideoRecording` |
 
 These layers have separate contracts: changing capture does not require changing
 the model loop; a workspace can run without a browser; input pacing and
-visualization can be configured independently. Chrome/CDP and DOM capture are the
-built-in adapters. Custom capture backends can supply their own references and
+visualization can be configured independently. Chrome/CDP and `DomPage` are the
+built-in adapters. Custom page models can supply their own targets, references and
 live target resolution for the shared pointer tools.
 
 ## Quick start
@@ -42,8 +42,13 @@ from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
-    Agent, BrowserPerception, Chrome, Choreography, ChoreographyOverlay, InputPacing,
-    Screenshots, ScreenshotTrigger,
+    Agent,
+    Chrome,
+    Choreography,
+    ChoreographyOverlay,
+    InputPacing,
+    Screenshots,
+    ScreenshotTrigger,
 )
 
 
@@ -52,9 +57,7 @@ async def main():
         model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
         browser=Chrome.launch(url="https://example.com", headless=False),
         plugins=[
-            BrowserPerception(
-                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
-            ),
+            Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             Approvals(default=PolicyDecision.ALLOW),
         ],
         without=(InputPacing, Choreography, ChoreographyOverlay),
@@ -76,7 +79,7 @@ Chrome opens with the session and closes with it. Use
 
 Already using Harnessed? List the Browserrig plugins you want in its `Agent`.
 See [explicit plugin composition](docs/browser-composition.md#explicit-plugin-composition)
-and the [0.9 migration guide](docs/migration-0.9.md) for upgrade notes.
+and the [0.10 migration guide](docs/migration-0.10.md) for upgrade notes.
 
 ## Co-locate a capability
 
@@ -107,11 +110,12 @@ custom tools and context propagation.
 
 | Guide | Start here for… |
 | --- | --- |
+| [Migrate to 0.10](docs/migration-0.10.md) | Composable perception plugins, page models and generic targets |
 | [Migrate to 0.9](docs/migration-0.9.md) | Harnessed 0.20, browser errors, screenshot freshness and wait tools |
 | [Migrate to 0.8](docs/migration-0.8.md) | Replace the browser defaults helpers and migrate pointer tools |
 | [Migrate to 0.7](docs/migration-0.7.md) | API changes from 0.6.x |
 | [Migrate to 0.6](docs/migration-0.6.md) | API changes from 0.5.x, observation modes and host event envelopes |
-| [Composition](docs/browser-composition.md) | Layers, plugins, hooks and custom capture backends |
+| [Composition](docs/browser-composition.md) | Layers, plugins, hooks and custom page models |
 | [Agent guide](docs/agent-guide.md) | Sessions, streaming, prompts, completion and persistence |
 | [Browser interaction](docs/browser-interaction.md) | Direct browser access, refs, coordinates and input |
 | [Files and events](docs/files-and-events.md) | Workspaces, remote file bridges, downloads and streams |

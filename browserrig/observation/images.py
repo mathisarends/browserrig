@@ -16,8 +16,8 @@ from harnessed.models import (
 
 from browserrig.core import Bounds
 
-from .config import Screenshots
-from .marks import annotate
+from .config import ScreenshotPolicy
+from .drawing import ImageAnnotator, annotate
 from .models import CapturedImage, Snapshot
 from .state import ImageState
 from .telemetry import trace_image
@@ -26,21 +26,24 @@ NOTE_SOURCE = "browser-image"
 
 
 async def project_image(
-    snapshot: Snapshot, browser_id: str, state: ImageState, *, options: Screenshots
+    snapshot: Snapshot,
+    browser_id: str,
+    state: ImageState,
+    *,
+    options: ScreenshotPolicy,
+    annotators: tuple[ImageAnnotator, ...] = (),
 ) -> CapturedImage | None:
     if snapshot.image is None:
         return None
     image = CapturedImage.from_snapshot(snapshot, browser_id)
-    cursor = snapshot.cursor if options.cursor else None
-    if options.marks is not None or cursor is not None:
-        area = _image_area(image)
+    if annotators:
         pixels = await asyncio.to_thread(
             annotate,
             image.image,
-            snapshot.elements if options.marks is not None else (),
-            area,
+            snapshot,
+            annotators,
+            _image_area(image),
             scale=image.geometry.scale if image.geometry is not None else 1.0,
-            cursor=cursor,
         )
         image = replace(image, image=pixels)
     retained = state.images

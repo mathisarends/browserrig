@@ -11,8 +11,8 @@ from harnessed.testing import CallbackModel, ScriptedModel, call
 from browserrig import (
     Actions,
     Agent,
-    BrowserPerception,
     Chrome,
+    CursorMarker,
     Screenshots,
     ScreenshotTrigger,
     Viewport,
@@ -104,8 +104,8 @@ async def test_browser_methods_nest_below_harnessed_spans(
     )
     assert isinstance(settle.attributes["code.line.number"], int)
     expected = {
-        "browserrig.observation.extraction.extract",
-        "browserrig.observation.extraction.accessibility.chrome_names",
+        "browserrig.dom.extraction.extract",
+        "browserrig.dom.extraction.accessibility.chrome_names",
         "browserrig.browser.tab.Tab.frames",
         "browserrig.input.mouse.Mouse.click",
         "browserrig.operation",
@@ -142,11 +142,8 @@ async def test_screenshot_assets_link_to_actions_and_model_spans(site, trace_pro
         ),
         browser=Chrome.launch(url=site + "/gestures", viewport=Viewport(scale=2)),
         plugins=[
-            BrowserPerception(
-                screenshots=Screenshots(
-                    trigger=ScreenshotTrigger.EACH_STEP, cursor=True
-                )
-            ),
+            Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
+            CursorMarker(),
             Approvals(default=PolicyDecision.ALLOW),
             _HotspotReceipt(),
             OpenTelemetryTracer(

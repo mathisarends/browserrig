@@ -362,7 +362,7 @@ async def test_element_highlight_uses_live_bounds_after_scroll(site):
         tab = session.scope[Browser].active_tab
         ref = next(
             element.ref
-            for element in session.scope[BrowserPerception].snapshot.elements
+            for element in session.scope[BrowserPerception].snapshot.targets
             if element.name == "Email"
         )
         await evaluate(

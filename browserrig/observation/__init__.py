@@ -1,113 +1,81 @@
-from .capture import CaptureContent, CaptureStrategy, capture
-from .changes import decision_change
-from .config import (
-    PageProse,
-    Screenshots,
-    ScreenshotTrigger,
-    SetOfMarks,
-    TextContent,
-    TextMode,
-    TextObservations,
+from .capture import (
+    CapturedObservation,
+    PageCapture,
+    PageModel,
+    capture,
+    capture_observation,
 )
-from .content import ExtractedContent, extract_document
-from .dom_capture import DomCapture
-from .find import FindMark, FoundMatch, PageMatches, close_find, find_text
-from .handle import DomElementHandle, DomReferences
+from .config import ScreenshotPolicy, ScreenshotTrigger, TextMode
+from .cursor import CursorAnnotator, CursorMarker
+from .drawing import ImageAnnotator, ImageView
+from .frames import Frame, FrameSource, ViewportFrames
 from .hooks import ProjectObservation
+from .marks import MarksAnnotator, SetOfMarks
+from .metadata import MetadataPage
 from .models import (
-    Canvas,
     CapturedImage,
-    ContentGroup,
-    ContentNode,
-    CookieBanner,
-    Element,
-    ElementInfo,
-    ElementRef,
-    Heading,
-    Modal,
-    Offscreen,
-    Option,
     PageContent,
+    PagePart,
     ScreenshotStatus,
-    ScrollInfo,
     Snapshot,
-    TextBlock,
+    Target,
 )
-from .pixels import ScreenshotCapture
-from .plugin import BrowserPerception, ResolveDomElement
+from .page_header import header
+from .plugin import BrowserPerception
 from .references import (
-    ElementHandle,
     EmptyReferences,
     References,
     RevealableElement,
     RevealStep,
     ScrollableElement,
     ScrollStep,
+    TargetHandle,
 )
-from .render import render
-from .renderer import DomRenderer, Renderer
+from .request import CaptureRequest
 from .retention import ImageRetention, TrimInBatches, UntilCompaction
-from .search import PageSearch, search_content
+from .screenshots import Screenshots
 from .validity import check_coordinates, check_observation
 
 __all__ = [
-    "check_coordinates",
-    "check_observation",
-    "ResolveDomElement",
-    "ProjectObservation",
-    "EmptyReferences",
-    "RevealableElement",
-    "extract_document",
-    "search_content",
-    "PageSearch",
-    "Canvas",
-    "ContentGroup",
-    "ContentNode",
-    "TextBlock",
-    "Heading",
-    "Modal",
-    "Offscreen",
-    "Option",
-    "ScrollInfo",
-    "CaptureContent",
-    "CaptureStrategy",
-    "DomCapture",
-    "ScreenshotCapture",
-    "ScreenshotStatus",
-    "TextObservations",
-    "TextContent",
-    "TextMode",
-    "SetOfMarks",
-    "PageProse",
-    "Screenshots",
-    "ScreenshotTrigger",
-    "ImageRetention",
-    "TrimInBatches",
-    "UntilCompaction",
-    "CapturedImage",
-    "CookieBanner",
-    "ExtractedContent",
-    "DomRenderer",
-    "Renderer",
-    "capture",
     "BrowserPerception",
-    "Element",
-    "FindMark",
-    "FoundMatch",
-    "PageMatches",
-    "ElementHandle",
-    "DomElementHandle",
-    "DomReferences",
-    "ElementInfo",
+    "CaptureRequest",
+    "CapturedImage",
+    "CapturedObservation",
+    "CursorAnnotator",
+    "CursorMarker",
+    "EmptyReferences",
+    "Frame",
+    "FrameSource",
+    "ImageAnnotator",
+    "ImageRetention",
+    "ImageView",
+    "MarksAnnotator",
+    "MetadataPage",
+    "PageCapture",
     "PageContent",
-    "ElementRef",
+    "PageModel",
+    "PagePart",
+    "ProjectObservation",
     "References",
     "RevealStep",
-    "ScrollableElement",
+    "RevealableElement",
+    "ScreenshotPolicy",
+    "ScreenshotStatus",
+    "ScreenshotTrigger",
+    "Screenshots",
+    "SetOfMarks",
     "ScrollStep",
+    "ScrollableElement",
     "Snapshot",
-    "close_find",
-    "decision_change",
-    "find_text",
-    "render",
+    "Target",
+    "TargetHandle",
+    "TextMode",
+    "TrimInBatches",
+    "UntilCompaction",
+    "ViewportFrames",
+    "capture",
+    "capture_observation",
+    "check_coordinates",
+    "check_observation",
+    "header",
 ]

@@ -35,7 +35,7 @@ async def test_blocked_click_reports_measured_layout_facts(site, obstruction):
             target = next(
                 (
                     element
-                    for element in holder["perception"].snapshot.elements
+                    for element in holder["perception"].snapshot.targets
                     if element.name == "Target"
                 ),
                 None,
@@ -93,7 +93,7 @@ async def test_click_failure_after_native_input_keeps_uncertainty(site, monkeypa
             target = next(
                 (
                     element
-                    for element in holder["perception"].snapshot.elements
+                    for element in holder["perception"].snapshot.targets
                     if element.name == "Target"
                 ),
                 None,
@@ -157,7 +157,7 @@ async def test_fixed_body_remains_clickable_when_root_layout_height_is_zero(
             target = next(
                 (
                     element
-                    for element in holder["perception"].snapshot.elements
+                    for element in holder["perception"].snapshot.targets
                     if element.name == "Target"
                 ),
                 None,

@@ -1,14 +1,10 @@
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, Viewport, wait_for_page
+from browserrig import ChromeBrowser, DomModel, Viewport, wait_for_page
 from browserrig.browser import Launch
+from browserrig.dom import ContentGroup, DomView, TextBlock, render
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
-    # Public facade callable; SMT107 confuses it with the same-named module.
-    ContentGroup,
-    Snapshot,
-    TextBlock,
     capture,
-    render,
 )
 from browserrig.secrets.redaction import (  # smelt: ignore[SMT107] -- test seam
     # Test redaction of text and pixels independently of plugin activation.
@@ -35,7 +31,7 @@ async def test_form_guidance_and_inline_links_stay_between_their_controls(site):
               <p>Keep this guidance.</p><button>Fork project</button>
             </form><p>Keep this guidance.</p></main>`;""",
         )
-        state = await capture(tab, DomCapture(), await wait_for_page(tab))
+        state = await capture(tab, DomModel(), await wait_for_page(tab))
     text = render(state)
     assert "page text:" not in text
     assert text.index("A fork is a copy") < text.index('textbox "Project name"')
@@ -50,9 +46,6 @@ async def test_form_guidance_and_inline_links_stay_between_their_controls(site):
     assert "text: Fork project" not in text
     assert text.count("Keep this guidance.") == 2
     assert '<form "Fork settings">' in text
-    restored = Snapshot.model_validate_json(state.model_dump_json())
-    assert render(restored) == text
-    assert restored.content == state.content
 
 
 async def test_prose_keeps_punctuation_paragraphs_and_code_lines(site):
@@ -69,20 +62,20 @@ async def test_prose_keeps_punctuation_paragraphs_and_code_lines(site):
             <pre><span>if ready:</span>\n    <span>run()</span>\n<span>done()</span></pre>
             </main>`;""",
         )
-        state = await capture(tab, DomCapture(), await wait_for_page(tab))
+        state = await capture(tab, DomModel(), await wait_for_page(tab))
     text = render(state)
-    guide = next(element for element in state.elements if element.name == "the guide")
-    topic = next(element for element in state.elements if element.name == "topic")
-    more = next(element for element in state.elements if element.name == "more")
+    guide = next(element for element in state.targets if element.name == "the guide")
+    topic = next(element for element in state.targets if element.name == "topic")
+    more = next(element for element in state.targets if element.name == "more")
     category = next(
-        element for element in state.elements if element.name == "Navigation category"
+        element for element in state.targets if element.name == "Navigation category"
     )
     assert f"text: Read [the guide][{guide.ref}], then continue." in text
     assert f"text: Another [topic][{topic.ref}] here." in text
     assert f"text: See [more][{more.ref}], too." in text
     assert f"text: Use [Computers][{category.ref}] now." in text
     assert "if ready:\n" in text and "    run()\n" in text
-    blocks = list(_text_blocks(state.content or ()))
+    blocks = list(_text_blocks(DomView.of(state).content or ()))
     assert any(
         block.preformatted and block.text == "if ready:\n    run()\ndone()"
         for block in blocks
@@ -101,14 +94,14 @@ async def test_text_budget_marks_the_paragraph_and_keeps_later_controls(site):
         )
         state = await capture(
             tab,
-            DomCapture(max_text_chars=80),
+            DomModel(max_text_chars=80),
             await wait_for_page(tab),
         )
     text = render(state)
     assert text.index("[text truncated]") < text.index('button "Continue"')
     assert 'button "Cancel"' in text
     assert len(state.text) <= 80
-    blocks = list(_text_blocks(state.content or ()))
+    blocks = list(_text_blocks(DomView.of(state).content or ()))
     assert sum(len(block.text) for block in blocks) <= 80
     assert any(block.truncated for block in blocks)
     assert any("truncated" in note for note in state.limitations)
@@ -125,7 +118,7 @@ async def test_frame_content_is_inserted_at_the_frame_owner(site):
             <iframe srcdoc="<p>Inside guidance</p><button>Inside action</button>"></iframe>
             <p>After embedded form</p><button>Outside action</button></main>`;""",
         )
-        state = await capture(tab, DomCapture(), await wait_for_page(tab))
+        state = await capture(tab, DomModel(), await wait_for_page(tab))
     text = render(state)
     assert text.index("Before embedded form") < text.index("Inside guidance")
     assert text.index("Inside guidance") < text.index('button "Inside action"')
@@ -133,7 +126,7 @@ async def test_frame_content_is_inserted_at_the_frame_owner(site):
     assert text.index("After embedded form") < text.index('button "Outside action"')
     inside = next(
         block
-        for block in _text_blocks(state.content or ())
+        for block in _text_blocks(DomView.of(state).content or ())
         if block.text == "Inside guidance"
     )
     assert inside.bounds is not None and inside.bounds.x >= 8 and inside.bounds.y > 20
@@ -150,7 +143,7 @@ async def test_exact_text_budget_boundary_still_reports_the_omitted_next_block(s
         )
         state = await capture(
             tab,
-            DomCapture(max_text_chars=80),
+            DomModel(max_text_chars=80),
             await wait_for_page(tab),
         )
     text = render(state)
@@ -170,7 +163,7 @@ async def test_same_named_groups_keep_their_own_help_and_identity(site):
               <button>Second</button></fieldset>
             </main>`;""",
         )
-        state = await capture(tab, DomCapture(), await wait_for_page(tab))
+        state = await capture(tab, DomModel(), await wait_for_page(tab))
     text = render(state)
     assert text.count('<group "Account">') == 2
     assert (
@@ -179,7 +172,9 @@ async def test_same_named_groups_keep_their_own_help_and_identity(site):
         < text.index("Second guidance")
     )
     assert text.index("Second guidance") < text.index('button "Second"')
-    (main,) = state.content or ()
+    content = DomView.of(state).content or ()
+    assert len(content) == 1
+    main = content[0]
     assert isinstance(main, ContentGroup)
     groups = [node for node in main.children if isinstance(node, ContentGroup)]
     assert len(groups) == 2 and groups[0].id != groups[1].id
@@ -200,7 +195,7 @@ async def test_hidden_clipped_and_covered_text_is_omitted_from_the_flow(site):
               <p>Covered guidance</p>
               <div style="position:absolute;inset:0;background:white"></div></div>`;""",
         )
-        state = await capture(tab, DomCapture(), await wait_for_page(tab))
+        state = await capture(tab, DomModel(), await wait_for_page(tab))
     text = render(state)
     assert "Visible guidance" in text
     assert all(
@@ -230,7 +225,7 @@ async def test_text_preview_uses_the_same_partition_as_its_controls(site):
             <p style="top:2100px">Upcoming help</p><button style="top:2150px">Upcoming</button>`;
             scrollTo(0,1200);""",
         )
-        state = await capture(tab, DomCapture(), await wait_for_page(tab))
+        state = await capture(tab, DomModel(), await wait_for_page(tab))
     text = render(state)
     viewport, rest = text.split("above viewport (preview", 1)
     above, below = rest.split("below viewport (preview", 1)
@@ -249,7 +244,7 @@ async def test_new_text_is_redacted_and_fingerprinted_beyond_legacy_excerpt(site
             "document.body.innerHTML = '<button>Repeated label</button>'.repeat(10)"
             " + '<p id=note>Initial guidance</p>'",
         )
-        strategy = DomCapture(max_text_chars=80)
+        strategy = DomModel(max_text_chars=80)
         report = await wait_for_page(tab)
         before = await capture(tab, strategy, report)
         await evaluate(

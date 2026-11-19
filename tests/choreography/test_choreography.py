@@ -50,6 +50,7 @@ from browserrig.core import (
     TabGesture,
     ViewportSize,
 )
+from browserrig.dom import ExtractedContent
 from browserrig.events import (
     ActionFailedEvent,
     ActionFinishedEvent,
@@ -67,7 +68,6 @@ from browserrig.input import (  # smelt: ignore[SMT107] -- test seam
     # Replace input timing where the mouse reads it.
     mouse as mouse_module,
 )
-from browserrig.observation import ExtractedContent
 from browserrig.scripts import FindResult
 from browserrig.tools import (  # smelt: ignore[SMT107] -- test seam
     # Replace document extraction where the search tool looks it up.
@@ -550,6 +550,7 @@ async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
         upload_files=upload,
         locate=locate,
     )
+    handle.target = handle.element
 
     async def element(_tab, _ref):
         return handle
@@ -559,7 +560,7 @@ async def test_upload_highlights_the_input_and_drops_the_files_onto_it(
 
     monkeypatch.setattr(targeting_module, "prepare_element", prepare)
     async with _staged(timeline, _FileTools(), files=files) as (services, ctx):
-        services.observe.element = element
+        services.observe.target = element
         # Already resting on the input, so the pointer does not travel.
         await services.input.mouse.move_to(Point(x=40, y=30))
         timeline.clear()

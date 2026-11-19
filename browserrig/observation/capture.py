@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, replace
-from typing import ClassVar, Protocol
+from typing import Protocol
 from uuid import uuid4
 
 from cdpify import CDPCommandError, CDPError
@@ -10,10 +10,8 @@ from harnessed.tracing import traced
 
 from browserrig.browser import AppState, Tab, TabInfo, dom_generation, read_generation
 from browserrig.core import (
-    Bounds,
     BrowserError,
     Generation,
-    Geometry,
     Point,
     ReadinessStatus,
     Region,
@@ -21,17 +19,18 @@ from browserrig.core import (
 )
 from browserrig.readiness import ReadinessReport
 
-from .flow import semantic_text
-from .marks import blackout
+from .drawing import blackout
+from .frames import Frame, FrameSource, ViewportFrames
 from .models import (
-    ElementFingerprint,
-    ElementInfo,
     PageContent,
     PageFingerprint,
     ScreenshotStatus,
     Snapshot,
+    Target,
+    TargetFingerprint,
 )
 from .references import EmptyReferences, References
+from .request import CaptureRequest
 
 # Both attempts share this budget; an exhausted readiness wait gets only one second.
 _CAPTURE_SECONDS = 10
@@ -58,9 +57,10 @@ class CapturedObservation:
 
 async def capture(
     tab: Tab,
-    strategy: CaptureStrategy,
+    model: PageModel,
     report: ReadinessReport,
     *,
+    frames: FrameSource | None = None,
     tabs: tuple[TabInfo, ...] = (),
     previous: Snapshot | None = None,
     region: Region | None = None,
@@ -73,8 +73,9 @@ async def capture(
     """Capture a serializable snapshot; BrowserPerception also retains its reference resolver."""
     observation = await capture_observation(
         tab,
-        strategy,
+        model,
         report,
+        frames=frames,
         tabs=tabs,
         previous=previous,
         region=region,
@@ -90,9 +91,10 @@ async def capture(
 @traced
 async def capture_observation(
     tab: Tab,
-    strategy: CaptureStrategy,
+    model: PageModel,
     report: ReadinessReport,
     *,
+    frames: FrameSource | None = None,
     tabs: tuple[TabInfo, ...] = (),
     previous: Snapshot | None = None,
     region: Region | None = None,
@@ -103,11 +105,12 @@ async def capture_observation(
     prefer_tab_title: bool = False,
     app_state: AppState | None = None,
 ) -> CapturedObservation:
-    """Observe `tab`. With `previous` from the same document, unseen elements get `new`.
+    """Observe `tab`. With `previous` from the same document, unseen targets get `new`.
 
+    `model` reads the page; `frames` captures its image, the viewport by default.
     `region` crops a screenshot to a viewport area, magnified by `zoom`.
-    `cursor` is where the browser's mouse rests in `tab`; screenshots mark it.
-    `redaction` hides secrets in all text and blacks out elements showing one.
+    `cursor` is where the browser's mouse rests in `tab`.
+    `redaction` hides secrets in all text and blacks out targets showing one.
     """
     snapshot_id = uuid4().hex
     dialog = tab.dialog
@@ -140,15 +143,14 @@ async def capture_observation(
         )
         return CapturedObservation(snapshot, EmptyReferences())
     try:
+        request = CaptureRequest(
+            report, screenshots=screenshots, region=region, zoom=zoom, cursor=cursor
+        )
         collected = await _collect(
             tab,
-            strategy,
-            report,
+            _Sources(model, frames if frames is not None else ViewportFrames()),
+            request,
             app_state=app_state,
-            screenshots=screenshots,
-            region=region,
-            zoom=zoom,
-            cursor=cursor,
         )
     except (BrowserError, TimeoutError) as error:
         if not report.timed_out:
@@ -178,14 +180,17 @@ async def capture_observation(
         content = _use_tab_title(content, tab.id, tabs)
     if redaction is not None:
         content = await _redact(content, redaction)
-    page, image = content.page, content.image
+    page, frame = content.page, content.frame
+    image = frame.image if frame is not None else None
     screenshot_status = content.screenshot_status
     if screenshots and image is None and screenshot_status is None:
         screenshot_status = ScreenshotStatus.UNAVAILABLE
-    refs = [element.ref for element in (*page.elements, *page.offscreen)]
+    refs = [target.ref for target in page.targets]
+    for part in page.parts:
+        refs.extend(part.refs())
     if len(set(refs)) != len(refs):
         raise BrowserError("Capture returned duplicate element refs")
-    elements = _mark_new(page.elements, previous, tab.id, document_id)
+    targets = _mark_new(page.targets, previous, tab.id, document_id)
     snapshot = Snapshot(
         id=snapshot_id,
         tab_id=tab.id,
@@ -202,81 +207,64 @@ async def capture_observation(
         readiness_reason=report.reason
         if document_id == report.document_id
         else "Document changed during capture; readiness has not been confirmed.",
-        fingerprint=content.fingerprint
-        if content.fingerprint is not None
-        else _fingerprint(page, document_id),
+        fingerprint=_fingerprint(page, document_id),
         tabs=tabs,
         text=page.text,
-        content=page.content,
-        elements=elements,
-        offscreen=page.offscreen,
-        headings=page.headings,
-        alerts=page.alerts,
-        modal=page.modal,
-        cookie_banners=page.cookie_banners,
-        canvases=page.canvases,
+        targets=targets,
+        parts=page.parts,
         limitations=page.limitations,
         image=image,
         screenshot_status=screenshot_status,
-        geometry=content.geometry,
-        device_scale=content.device_scale,
+        geometry=frame.geometry if frame is not None else None,
+        device_scale=frame.device_scale if frame is not None else None,
         cursor=cursor,
         viewport_revision=collected.viewport_revision,
         generation=collected.generation,
     )
-    references = (
-        content.references if content.references is not None else EmptyReferences()
-    )
-    return CapturedObservation(snapshot, references)
+    return CapturedObservation(snapshot, content.references)
 
 
 @dataclass(frozen=True, slots=True)
-class CaptureContent:
-    """`area` is the viewport region `image` shows, at `scale` image pixels per CSS pixel.
-
-    `fingerprint=None` uses the runner's semantic PageContent fingerprint.
-    Set `screenshot_status` when reporting why an image was withheld.
-    """
+class PageCapture:
+    """What a page model observed, with the resolver for the refs of its targets."""
 
     page: PageContent
-    image: str | None = None
-    geometry: Geometry | None = None
-    area: Bounds | None = None
-    scale: float = 1
-    fingerprint: str | None = None
-    references: References | None = None
-    screenshot_status: ScreenshotStatus | None = None
-    device_scale: float | None = None
+    references: References = EmptyReferences()
 
 
-class CaptureStrategy(Protocol):
-    """Collect content; the shared capture runner owns dialogs and document coherence.
+class PageModel(Protocol):
+    """Read a page into targets and parts; the capture runner owns coherence.
 
     Implementations are reusable configuration. Keep per-observation state local.
-    A plugin provides the strategy as a session service when it needs mount-local services.
-    Supply CaptureContent.references when targets exist. The default resolves no refs.
-    Set supports_dom_refs = True when the resolver returns DomElementHandle for
-    the strategy's DOM refs. This enables model tools that require DOM refs.
+    The runner retries a collection once when the document or layout changes.
     """
 
-    supports_dom_refs: ClassVar[bool] = False
-
     async def collect(  # pylint: disable=unused-argument
-        self,
-        tab: Tab,
-        report: ReadinessReport,
-        *,
-        screenshots: bool,
-        region: Region | None = None,
-        zoom: float = 1,
-        cursor: Point | None = None,
-    ) -> CaptureContent:
-        """Collect current page data and requested image/region with its resolver."""
+        self, tab: Tab, request: CaptureRequest
+    ) -> PageCapture:
+        """Collect the current page and a resolver for the refs of its targets."""
+
+    def render(self, snapshot: Snapshot) -> str:  # pylint: disable=unused-argument
+        """Format a snapshot of this model as the observation text for the agent."""
+
+
+@dataclass(frozen=True, slots=True)
+class _Sources:
+    model: PageModel
+    frames: FrameSource
+
+
+@dataclass(frozen=True, slots=True)
+class _Content:
+    page: PageContent
+    references: References
+    frame: Frame | None = None
+    screenshot_status: ScreenshotStatus | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class _Collected:
-    content: CaptureContent
+    content: _Content
     document_id: str
     viewport_revision: int
     generation: Generation
@@ -284,17 +272,14 @@ class _Collected:
 
 async def _collect(
     tab: Tab,
-    strategy: CaptureStrategy,
-    report: ReadinessReport,
+    sources: _Sources,
+    request: CaptureRequest,
     *,
     app_state: AppState | None,
-    screenshots: bool,
-    region: Region | None,
-    zoom: float,
-    cursor: Point | None,
 ) -> _Collected:
     """Retry a read-only observation once if its generation changes."""
     retried = False
+    report = request.report
     async with asyncio.timeout(1 if report.timed_out else _CAPTURE_SECONDS):
         while True:
             try:
@@ -302,14 +287,7 @@ async def _collect(
                 generation = await read_generation(tab, app_state)
                 document_id = tab.document_id
                 viewport_revision = tab.viewport_revision
-                content = await strategy.collect(
-                    tab,
-                    report,
-                    screenshots=screenshots,
-                    region=region,
-                    zoom=zoom,
-                    cursor=cursor,
-                )
+                content = await _gather(tab, sources, request)
                 await tab.sync_document()
                 if tab.document_id != document_id:
                     raise StaleElement("Document changed during capture; observe again")
@@ -319,7 +297,7 @@ async def _collect(
                     )
                 return _Collected(content, document_id, viewport_revision, generation)
             except (BrowserError, CDPError) as error:
-                # Capture strategies can issue raw commands through the CDP session.
+                # Page models can issue raw commands through the CDP session.
                 if not retried and not report.timed_out and _capture_race(error):
                     retried = True
                     tab.invalidate_frames()
@@ -327,6 +305,25 @@ async def _collect(
                 if isinstance(error, CDPError) and not isinstance(error, TimeoutError):
                     raise BrowserError("Cannot collect page content") from error
                 raise
+
+
+async def _gather(tab: Tab, sources: _Sources, request: CaptureRequest) -> _Content:
+    """Read the page while its frame is captured, so both show the same moment."""
+    if not request.screenshots:
+        collected = await sources.model.collect(tab, request)
+        return _Content(collected.page, collected.references)
+    shot = asyncio.create_task(sources.frames.capture(tab, request))
+    try:
+        collected = await sources.model.collect(tab, request)
+    except BaseException:
+        shot.cancel()
+        await asyncio.gather(shot, return_exceptions=True)
+        raise
+    frame = await shot
+    page = collected.page
+    if frame.notes:
+        page = replace(page, limitations=(*page.limitations, *frame.notes))
+    return _Content(page, collected.references, frame)
 
 
 def _capture_race(error: BrowserError | CDPError) -> bool:
@@ -349,8 +346,8 @@ def _capture_race(error: BrowserError | CDPError) -> bool:
 
 
 def _use_tab_title(
-    content: CaptureContent, tab_id: str, tabs: tuple[TabInfo, ...]
-) -> CaptureContent:
+    content: _Content, tab_id: str, tabs: tuple[TabInfo, ...]
+) -> _Content:
     # Chrome's tab inventory can be newer than the cached title in a pixel capture.
     info = next((info for info in tabs if info.id == tab_id), None)
     if info is None or info.url != content.page.url:
@@ -360,96 +357,75 @@ def _use_tab_title(
     return replace(content, page=replace(content.page, title=info.title))
 
 
-async def _redact(content: CaptureContent, redaction: Redaction) -> CaptureContent:
+async def _redact(content: _Content, redaction: Redaction) -> _Content:
     """Redact page text before the snapshot and its fingerprint are built.
 
-    Elements whose text holds a secret are blacked out in the image. Withhold the image
-    when a secret also occurs in page text or in an element without known bounds.
+    Targets whose text holds a secret are blacked out in the image. Withhold the image
+    when a secret also occurs in page text, a part or a target without known bounds.
     """
-    page, image = content.page, content.image
+    page, frame = content.page, content.frame
     redacted = redaction.redact(page)
-    if image is None or redacted is page:
+    if frame is None or frame.image is None or redacted is page:
         return replace(content, page=redacted)
     changed = tuple(
-        element
-        for element, clean in zip(page.elements, redacted.elements, strict=True)
-        if clean is not element
+        target
+        for target, clean in zip(page.targets, redacted.targets, strict=True)
+        if clean is not target
     )
-    unlocated = replace(page, elements=redacted.elements) != redacted or any(
-        element.bounds is None for element in changed
+    unlocated = replace(page, targets=redacted.targets) != redacted or any(
+        target.bounds is None for target in changed
     )
-    if content.area is None or unlocated:
+    if unlocated:
         return replace(
             content,
             page=redacted,
-            image=None,
+            frame=replace(frame, image=None),
             screenshot_status=ScreenshotStatus.WITHHELD,
         )
     image = await asyncio.to_thread(
         blackout,
-        image,
-        tuple(element.bounds for element in changed if element.bounds is not None),
-        content.area,
-        scale=content.scale,
+        frame.image,
+        tuple(target.bounds for target in changed if target.bounds is not None),
+        frame.area,
+        scale=frame.scale,
     )
-    return replace(content, page=redacted, image=image)
+    return replace(content, page=redacted, frame=replace(frame, image=image))
 
 
 def _mark_new(
-    elements: tuple[ElementInfo, ...],
+    targets: tuple[Target, ...],
     previous: Snapshot | None,
     tab_id: str,
     document_id: str,
-) -> tuple[ElementInfo, ...]:
+) -> tuple[Target, ...]:
     if (
         previous is None
         or previous.tab_id != tab_id
         or previous.document_id != document_id
     ):
-        return elements
-    seen = {control.ref for control in (*previous.elements, *previous.offscreen)}
+        return targets
+    seen = previous.known_refs()
     if not seen:
-        return elements
+        return targets
     marked = []
-    for element in elements:
-        if element.ref not in seen:
-            element = element.model_copy(update={"new": True})
-        marked.append(element)
+    for target in targets:
+        new = target.ref not in seen
+        marked.append(target.model_copy(update={"new": True}) if new else target)
     return tuple(marked)
 
 
 def _fingerprint(page: PageContent, document_id: str) -> str:
-    if page.content is not None:
-        text = semantic_text(page.content)
-    elif page.text:
-        text = (page.text,)
-    else:
-        text = ()
     fingerprint = PageFingerprint(
         url=page.url,
         document_id=document_id,
-        text=text,
+        text=page.text,
         scroll_y=page.scroll_y,
-        elements=tuple(
-            ElementFingerprint(
-                role=element.role,
-                name=element.name,
-                in_viewport=element.in_viewport,
-                value=element.value,
-                description=element.description,
-                options=element.options,
-                multiple=element.multiple,
-                scroll=element.scroll,
-                disabled=element.disabled,
-                checked=element.checked,
-                expanded=element.expanded,
-                selected=element.selected,
-                pressed=element.pressed,
+        targets=tuple(
+            TargetFingerprint(
+                role=target.role, name=target.name, in_viewport=target.in_viewport
             )
-            for element in page.elements
+            for target in page.targets
         ),
-        alerts=page.alerts,
-        modal=page.modal,
-        cookie_banners=page.cookie_banners,
+        parts=tuple(part.fingerprint(page.targets) for part in page.parts),
     )
     return fingerprint.digest()

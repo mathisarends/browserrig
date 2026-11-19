@@ -3,16 +3,16 @@ import re
 
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, wait_for_page
+from browserrig import ChromeBrowser, DomModel, wait_for_page
 from browserrig.browser import Launch
+from browserrig.dom.content import (  # smelt: ignore[SMT107] -- test seam
+    # Test document extraction independently of capture strategy.
+    extract_content,
+)
 from browserrig.kinds import ElementOperation
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     # Public facade callable; SMT107 confuses it with the same-named module.
     capture,
-)
-from browserrig.observation.content import (  # smelt: ignore[SMT107] -- test seam
-    # Test document extraction independently of capture strategy.
-    extract_content,
 )
 from browserrig.scripts import ELEMENT, ElementArgs
 from tests.javascript import evaluate
@@ -52,7 +52,7 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
         """,
         )
         report = await wait_for_page(tab)
-        snapshot = await capture(tab, DomCapture(page_prose="off"), report)
+        snapshot = await capture(tab, DomModel(prose="off"), report)
         assert snapshot.image is None
         assert snapshot.text == ""
         assert not snapshot.limitations
@@ -98,7 +98,7 @@ async def test_structured_markdown_reads_full_document_and_preserves_element_ref
         ):
             assert excluded not in text
         button = next(
-            element for element in snapshot.elements if element.name == "Continue"
+            element for element in snapshot.targets if element.name == "Continue"
         )
         await (await tab.main_frame()).run_on_node(
             button.backend_id,

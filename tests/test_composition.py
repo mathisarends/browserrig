@@ -71,9 +71,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
         browser=browser,
         instructions="Custom instructions.",
         plugins=[
-            BrowserPerception(
-                screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP)
-            ),
+            Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             PageReadiness(options=readiness),
             approvals,
             files,
@@ -155,11 +153,7 @@ def test_facade_import_and_scripted_model_do_not_require_provider_sdks():
 
 
 def test_plugins_replace_matching_defaults_in_place():
-    observe = BrowserPerception(
-        screenshots=Screenshots(
-            trigger=ScreenshotTrigger.EACH_STEP, skip_unchanged=False
-        )
-    )
+    observe = Screenshots(trigger=ScreenshotTrigger.EACH_STEP, skip_unchanged=False)
     compaction = Compaction(trigger=WindowRatio(0.5))
     defaults = browserrig.Agent(model=ScriptedModel([])).plugins
     composed = browserrig.Agent(
@@ -168,7 +162,7 @@ def test_plugins_replace_matching_defaults_in_place():
     assert len(composed) == len(defaults)
     assert composed[_index(defaults, TaskMemory)] is compaction
     assert observe in composed and compaction in composed
-    assert composed.index(observe) == _index(defaults, BrowserPerception)
+    assert composed.index(observe) == _index(defaults, Screenshots)
 
 
 def test_plugins_without_a_matching_default_are_added_and_none_is_skipped():

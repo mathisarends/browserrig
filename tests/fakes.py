@@ -19,14 +19,10 @@ from browserrig.core import (
     ReadinessStatus,
     ViewportSize,
 )
+from browserrig.dom import DomReferences, ResolveDomElement, render
 from browserrig.files import FileBridge, FileTransfers
 from browserrig.input import Input, InputTargets
-from browserrig.observation import (
-    BrowserPerception,
-    DomReferences,
-    ResolveDomElement,
-    Snapshot,
-)
+from browserrig.observation import BrowserPerception, Snapshot
 from browserrig.readiness import PageReadiness, ReadinessReport
 from browserrig.scripts import DOMProbe
 from browserrig.tools import Actions, Targeting
@@ -181,11 +177,11 @@ class FakeObserve:
     def coordinates(self):
         return self.snapshot
 
-    async def element(self, _tab, _ref):
+    async def target(self, _tab, _ref):
         raise AssertionError("No fake element resolver configured")
 
     async def dom_element(self, tab, ref):
-        return await self.element(tab, ref)
+        return await self.target(tab, ref)
 
     async def capture(self, tab):
         self.snapshot = Snapshot(
@@ -270,3 +266,29 @@ async def mounted(*plugins, bridge=None, files=None):
     )
     async with agent.session() as session:
         yield session.scope[FakeServices], session.scope
+
+
+class UseModel(Plugin):
+    """Register a test page model, and optionally a frame source, with perception."""
+
+    _perception = needs(BrowserPerception)
+
+    def __init__(self, model, frames=None):
+        super().__init__()
+        self.model = model
+        self.frames = frames
+
+    async def setup(self, ctx: PluginScope):
+        ctx.effect(self._perception.use_model(self.model))
+        if self.frames is not None:
+            ctx.effect(self._perception.use_frames(self.frames))
+
+
+class DomStub:
+    """A test page model that renders its snapshots like DomPage."""
+
+    async def collect(self, tab, request):
+        raise NotImplementedError
+
+    def render(self, snapshot):
+        return render(snapshot)

@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from browserrig import ChromeBrowser, DomCapture, wait_for_page
+from browserrig import ChromeBrowser, DomModel, wait_for_page
 from browserrig.browser import Launch
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
     # Public facade callable; SMT107 confuses it with the same-named module.
@@ -29,10 +29,10 @@ async def test_static_password_echo_is_redacted_and_screenshot_withheld(site):
             f"document.body.replaceChildren();document.body.textContent = '{secret}'",
         )
         report = await wait_for_page(tab)
-        raw = await capture(tab, DomCapture(), report, screenshots=True)
+        raw = await capture(tab, DomModel(), report, screenshots=True)
         clean = await capture(
             tab,
-            DomCapture(),
+            DomModel(),
             report,
             screenshots=True,
             redaction=SimpleNamespace(redact=redactor.scrub),

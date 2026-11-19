@@ -15,7 +15,6 @@ from harnessed.testing import CallbackModel
 from browserrig import (
     Agent,
     Browser,
-    BrowserPerception,
     Chrome,
     Screenshots,
     ScreenshotTrigger,
@@ -80,12 +79,10 @@ class _Hold(Plugin, needs=(Browser,)):
 def _agent(site, model, domains, holder, *, path="/", screenshots=False, live=None):
     secrets = Secrets({"pw": Secret(PASSWORD, domains=domains)})
     plugins = [
-        BrowserPerception(
-            screenshots=Screenshots(
-                trigger=ScreenshotTrigger.EACH_STEP
-                if screenshots
-                else ScreenshotTrigger.ON_REQUEST
-            )
+        Screenshots(
+            trigger=ScreenshotTrigger.EACH_STEP
+            if screenshots
+            else ScreenshotTrigger.ON_REQUEST
         ),
         secrets,
         _Hold(holder),

@@ -48,8 +48,9 @@ from .state import SecretsState
 
 if TYPE_CHECKING:
     from browserrig.browser import Frame
+    from browserrig.dom import DomElementHandle
     from browserrig.input import Keyboard
-    from browserrig.observation import DomElementHandle, Snapshot
+    from browserrig.observation import Snapshot
 
 # Only these tools resolve placeholders, and only in their `text` argument.
 _TYPING_TOOLS = frozenset({"type_text", "send_keys"})

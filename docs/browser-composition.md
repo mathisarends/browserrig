@@ -18,19 +18,22 @@ Use the recipe and replace only what your agent needs:
 
 ```python
 from browserrig import (
-    Agent, BrowserPerception, Chrome, Choreography, ChoreographyOverlay,
-    Screenshots, ScreenshotTrigger, TrimInBatches,
+    Agent,
+    Chrome,
+    Choreography,
+    ChoreographyOverlay,
+    Screenshots,
+    ScreenshotTrigger,
+    TrimInBatches,
 )
 
 agent = Agent(
     model=model,
     browser=Chrome.connect(endpoint=endpoint),
     plugins=[
-        BrowserPerception(
-            screenshots=Screenshots(
-                trigger=ScreenshotTrigger.EACH_STEP,
-                retention=TrimInBatches(max_images=6, min_images=3),
-            ),
+        Screenshots(
+            trigger=ScreenshotTrigger.EACH_STEP,
+            retention=TrimInBatches(max_images=6, min_images=3),
         ),
     ],
     without=(Choreography, ChoreographyOverlay),
@@ -59,7 +62,6 @@ from browserrig import (
     PageReadiness,
     PointerTools,
     Runtime,
-    ScreenshotCapture,
     Screenshots,
     ScreenshotTrigger,
     SingleTab,
@@ -73,11 +75,8 @@ agent = Agent(
         InputRuntime(),
         PageReadiness(),
         SingleTab(),
-        BrowserPerception(
-            text=None,
-            capture=ScreenshotCapture(),
-            screenshots=Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
-        ),
+        BrowserPerception(text=None),
+        Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
         Actions(),
         PointerTools(),
         KeyboardTools(),
@@ -86,7 +85,8 @@ agent = Agent(
 ```
 
 `Runtime`, `Chrome`, `InputRuntime` and `PageReadiness` provide the browser,
-devices and readiness checks. `Actions` coordinates tool execution.
+devices and readiness checks. Without a page model, perception reads only page
+metadata and skips DOM extraction. `Actions` coordinates tool execution.
 `PointerTools` uses screenshot coordinates and `KeyboardTools` sends keys to
 the focused control.
 `SingleTab` keeps the session in one tab. Add input pacing and viewer plugins
@@ -95,23 +95,48 @@ for tools with side effects.
 
 ### Select tools for a DOM-driven agent
 
-This agent uses text observations and exposes pointer, keyboard, navigation and
-tab-management tools.
+This agent reads the DOM, labels controls in requested screenshots and exposes
+pointer, keyboard, navigation and tab-management tools.
 
 ```python
 from harnessed import Agent
 from browserrig import (
-    Actions, BrowserPerception, Chrome, InputRuntime, KeyboardTools, MultiTab,
-    NavigationTools, PageReadiness, PointerTools, ReferencePointerTools, Runtime,
-    TabTools, Targeting,
+    Actions,
+    BrowserPerception,
+    Chrome,
+    DomPage,
+    InputRuntime,
+    KeyboardTools,
+    MultiTab,
+    NavigationTools,
+    PageReadiness,
+    PointerTools,
+    ReferencePointerTools,
+    Runtime,
+    Screenshots,
+    SetOfMarks,
+    TabTools,
+    Targeting,
 )
 
 agent = Agent(
     model=model,
     plugins=[
-        Runtime(), MultiTab(), Chrome.launch(), InputRuntime(), PageReadiness(),
-        BrowserPerception(), Actions(), Targeting(),
-        PointerTools(), ReferencePointerTools(), KeyboardTools(), NavigationTools(),
+        Runtime(),
+        MultiTab(),
+        Chrome.launch(),
+        InputRuntime(),
+        PageReadiness(),
+        BrowserPerception(),
+        Screenshots(),
+        DomPage(prose="inline"),
+        SetOfMarks(),
+        Actions(),
+        Targeting(),
+        PointerTools(),
+        ReferencePointerTools(),
+        KeyboardTools(),
+        NavigationTools(),
         TabTools(),
     ],
 )
@@ -138,12 +163,12 @@ precedence. Removing that plugin restores navigation's default while
 ## Choose pointer tools
 
 `PointerTools()` provides `click_at`, `drag_at` and `move_mouse(x, y)`. It
-uses screenshot or viewport geometry and works with `ScreenshotCapture()`
-without `Targeting()`.
+uses screenshot or viewport geometry and works without a page model or
+`Targeting()`.
 
 Add `Targeting()` and `ReferencePointerTools()` for `click(ref)`,
 `drag(source_ref, target_ref)` and `hover(ref)`. These tools work with
-`DomCapture()` and [custom capture backends](#references-from-other-capture-backends)
+`DomPage()` and [custom page models](#custom-page-models)
 that resolve their own refs.
 
 `browserrig.Agent` includes both pointer plugins. For a screenshot-only
@@ -214,10 +239,12 @@ class Sources(Plugin):
     _state = PluginState(SourceState)
 
     def instructions(self) -> SystemPrompt:
-        return SystemPrompt(Instructions(
-            title="Research sources",
-            text="Use remember_source to keep pages you intend to cite.",
-        ))
+        return SystemPrompt(
+            Instructions(
+                title="Research sources",
+                text="Use remember_source to keep pages you intend to cite.",
+            )
+        )
 
     @tool(description="Remember the current page as a research source.", readonly=True)
     async def remember_source(self) -> str:
@@ -233,9 +260,9 @@ class Sources(Plugin):
         request = await next_()
         if not self._state.urls:
             return request
-        return request.append_message(UserMessage(
-            "Remembered source URLs:\n" + "\n".join(self._state.urls)
-        ))
+        return request.append_message(
+            UserMessage("Remembered source URLs:\n" + "\n".join(self._state.urls))
+        )
 ```
 
 Add `Sources()` to the agent's `plugins` list. Its tool declaration, fixed guidance,
@@ -390,36 +417,75 @@ again. Mounted direct calls use their owner's scope too. Model-requested calls
 also pass through Harnessed policy and approval checks. Trusted application code
 can manage an operation explicitly with `Actions.run(...)`.
 
-## References from other capture backends
+## Custom page models
+
+`BrowserPerception` owns the observation lifecycle: readiness, capture coherence,
+redaction, delivery and image history. Plugins supply what an observation
+contains by registering with it during setup. Each registration returns its
+removal; pass it to `scope.effect`.
+
+| Registration | Contract |
+| --- | --- |
+| `use_model(PageModel)` | `async collect(tab, request) -> PageCapture` and `render(snapshot) -> str`. One plugin supplies the model; `DomPage` is the built-in one. |
+| `use_frames(FrameSource)` | `async capture(tab, request) -> Frame`, such as an application canvas instead of the viewport. One plugin supplies frames. |
+| `use_screenshots(ScreenshotPolicy)` | Capture timing, unchanged-image reuse and retention. `Screenshots` registers it. |
+| `add_annotator(ImageAnnotator)` | `layer` and `draw(canvas, snapshot, view)`; draws on each projected screenshot. `SetOfMarks` and `CursorMarker` register one. |
+
+A second model, frame source or screenshot policy fails setup. Instructions are
+read before setup, so a model plugin also contributes its own `instructions()`.
 
 | Contract | Implement |
 | --- | --- |
-| `CaptureStrategy` | `supports_dom_refs: ClassVar[bool]` and `collect(tab, report, *, screenshots, region=None, zoom=1, cursor=None) -> CaptureContent` |
-| `Renderer` | `render(snapshot)`, `instructions()` and `refs()` |
-| `References` | `async resolve(tab, snapshot, ref) -> ElementHandle` |
-| `ElementHandle` | `element: ElementInfo`; `async locate(*, aim=None) -> ElementPoint` |
+| `PageCapture` | `page: PageContent` and `references: References` for the refs of its targets |
+| `PageContent` | Page metrics, `targets`, model-specific `parts`, raw `text` for secret checks and `limitations` |
+| `Target` | `ref`, `role`, `name`, optional viewport `bounds`; subclass it for model data |
+| `PagePart` | Model data with optional `refs()`, `labels()` and `fingerprint(targets)` |
+| `References` | `async resolve(tab, snapshot, ref) -> TargetHandle` |
+| `TargetHandle` | `target: Target`; `async locate(*, aim=None) -> ElementPoint` |
 | `ReadinessPolicy` | `create(context) -> ReadinessStrategy`, with a fresh mutable probe per wait |
 | `ImageRetention` | `overflow(count) -> int`, the number of oldest images to drop |
 
-Return `CaptureContent(page=PageContent(...), references=resolver)` from a custom
-capture. Keep bindings in that capture's resolver. Refs are opaque, unique within
-an observation and stable for the same object; never reuse one for a different
+```python
+from harnessed import Instructions, Plugin, SystemPrompt
+from harnessed.kernel import PluginScope, needs
+
+from browserrig import BrowserPerception
+
+
+class CanvasPage(Plugin):
+    _perception = needs(BrowserPerception)
+    _runtime = needs(CanvasRuntime)
+
+    async def setup(self, scope: PluginScope) -> None:
+        scope.effect(self._perception.use_model(CanvasModel(self._runtime)))
+        scope.effect(self._perception.use_frames(CanvasFrames(self._runtime)))
+
+    def instructions(self) -> SystemPrompt:
+        return SystemPrompt(
+            Instructions(title="Canvas", text="Refs name canvas nodes.")
+        )
+```
+
+Keep bindings in the model's resolver. Refs are opaque, unique within an
+observation and stable for the same object; never reuse one for a different
 object in the same document. Location must validate the live target, visibility
 and hit testing, returning current viewport CSS coordinates. A cached rectangle
 alone is insufficient. `RevealableElement` optionally performs backend-owned
 reveal; `ScrollableElement` provides a wheel plan for devices to execute.
-DOM reveal scrolls exact containers and reports measured movement.
+`BrowserPerception.target(tab, ref)` resolves a ref of the delivered observation.
 
-`PageContent.content` can carry a reading tree of `ContentGroup`, `TextBlock`,
-`Heading` and `ElementRef`; leaving it unset retains flat rendering. A custom
-`fingerprint` supports change comparisons. `BrowserPerception` provides the callable
-`ResolveDomElement` when the capture declares `supports_dom_refs = True`. The built-in
-`DomCapture` declares it. A custom capture can inherit `CaptureStrategy` for
-the default `False` or declare the class variable itself. When the service is
-available, `await scope[ResolveDomElement](tab, ref)` returns a DOM handle.
-Native forms, `DomUploadTools` and `DomTypingTools` use this service; other backends can use
-pointer input and focused `send_keys`. `DomActionChains` conservatively ends input chains with
-custom resolvers; supply a matching policy for stronger continuation checks.
+The capture runner starts the frame capture, then collects the page model. It
+retries once when the document or layout changes, blacks out secret targets with
+bounds and withholds an image when a secret occurs elsewhere in the page.
+Snapshot fingerprints combine page metrics, raw text, target identities and each
+part's fingerprint.
+
+`DomPage` reads the DOM into `ElementInfo` targets and a `DomContent` part. It
+also provides `ResolveDomElement`; `await scope[ResolveDomElement](tab, ref)`
+returns a DOM handle. Native forms, `DomUploadTools` and `DomTypingTools` use this
+service; other models can use pointer input and focused `send_keys`.
+`DomActionChains` conservatively ends input chains with other models; supply a
+matching policy for stronger continuation checks.
 
 Custom browser providers publish `Browser`, `BrowserEvents` and `InputTargets`.
 `Runtime` owns coordination and action correlation; `InputRuntime` owns devices.
@@ -429,80 +495,43 @@ The input package has no browser/CDP dependency. Custom input backends can suppl
 
 ## Browser observations
 
-`BrowserPerception` can deliver page text, a compact metadata header, screenshots,
-or text with screenshots. Set `text=None` to omit text. Omit `screenshots` to
+`BrowserPerception` delivers page text, a compact metadata header, screenshots,
+or text with screenshots. Set `text=None` to omit text. Omit `Screenshots` to
 deliver text alone.
 
 ### Page text
 
-`TextObservations()` sends page text as deltas when an earlier observation is
-still in context. Use `mode="full"` to send full text on every step. The default
-page capture is `DomCapture()`. Captures that support DOM refs use `DomRenderer()`
-by default. Supply a renderer for page text with another capture strategy.
+`BrowserPerception(text="delta")` sends page text as deltas when an earlier
+observation is still in context. Use `text="full"` to send full text on every
+step. The page model renders the text; `DomPage()` reads controls, prose,
+headings and landmarks.
 
 ```python
-from browserrig import BrowserPerception, DomCapture, Screenshots, TextObservations
+from browserrig import BrowserPerception, DomPage, Screenshots
 
-perception = BrowserPerception(
-    capture=DomCapture(page_prose="sparse"),
-    text=TextObservations(mode="delta"),
-    screenshots=Screenshots(),
-)
+plugins = [
+    BrowserPerception(text="delta"),
+    DomPage(prose="sparse"),
+    Screenshots(),
+]
 ```
 
 ### Metadata
 
-Use `TextObservations(content="metadata", mode="full")` to send a compact page
-header with every observation. It includes the title, URL, current tab,
-controlled-tab count, and main-page scroll position and
+Without a page model, observations carry a compact page header. It includes the
+title, URL, current tab, controlled-tab count, and main-page scroll position and
 remaining distance in CSS pixels. With a new screenshot, the header and image
-are parts of the same message.
+are parts of the same message. This path uses Chrome's layout metrics and skips
+DOM extraction.
 
 ```python
-from browserrig import BrowserPerception, Screenshots, TextObservations
+from browserrig import Agent, DomPage, SetOfMarks
 
-perception = BrowserPerception(
-    text=TextObservations(content="metadata", mode="full"),
-    screenshots=Screenshots(),
-)
+agent = Agent(model=model, without=(DomPage, SetOfMarks))
 ```
 
-Metadata text defaults to `ScreenshotCapture()`. Omit `screenshots` for
-metadata alone. This path uses Chrome's layout metrics and skips DOM extraction.
-Explicit captures and renderers can still be supplied. With `mode="delta"`, a
-retained unchanged header can be reused when there is no new image.
-
-### Capture with application services
-
-A capture strategy passed as `capture=` is reusable configuration. When capture
-needs a mount-local service, such as an application runtime, provide the strategy
-from a plugin instead. `BrowserPerception` observes `CaptureStrategy`, uses a
-provided strategy in place of its default and validates it during setup.
-Configure the renderer on `BrowserPerception`, because system instructions are
-read before setup.
-
-```python
-from harnessed import Plugin
-from harnessed.kernel import PluginScope, needs
-
-from browserrig import BrowserPerception, CaptureStrategy, TextObservations
-
-
-class CanvasView(Plugin):
-    _runtime = needs(CanvasRuntime)
-
-    async def setup(self, scope: PluginScope) -> None:
-        scope.provide(CaptureStrategy, CanvasCapture(self._runtime))
-
-
-plugins = [
-    BrowserPerception(text=TextObservations(mode="full"), renderer=CanvasRenderer()),
-    CanvasRuntime(),
-    CanvasView(),
-]
-```
-
-Setup fails when `capture=` is also configured.
+With `text="delta"`, a retained unchanged header can be reused when there is no
+new image.
 
 ### Screenshot settings
 
@@ -510,17 +539,17 @@ Capture timing, image retention and text compaction are independent:
 
 | Setting | Behavior |
 | --- | --- |
-| `Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)` | Default. Capture after a screenshot request. Image-only and metadata-and-image sessions also capture when they enter a document or lack an included image. |
+| `Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)` | Default. Capture after a screenshot request. Without page text, also capture when entering a document or lacking an included image. |
 | `Screenshots(trigger=ScreenshotTrigger.EACH_STEP)` | Capture before every model step |
 | `Screenshots()` | Keep the latest image; unchanged captures are skipped |
 | `Screenshots(retention=TrimInBatches(max_images=6, min_images=3))` | On overflow, trim oldest images down to three |
 | `Screenshots(retention=UntilCompaction())` | Retain images until compaction removes their steps; requires compaction to bound history |
 
-For image-only pixel capture, select `ScreenshotCapture()` with `text=None` and a
-`Screenshots` configuration. To avoid DOM readiness probes, set both readiness
-policies to `NetworkQuiet(inner=BrowserReady())`. For screenshots with ref labels,
-configure `Screenshots(marks=SetOfMarks())` with `DomCapture()`, including when
-the text mode is metadata.
+For image-only pixel capture, use `BrowserPerception(text=None)` with
+`Screenshots` and no page model. To avoid DOM readiness probes, set both
+readiness policies to `NetworkQuiet(inner=BrowserReady())`. `SetOfMarks()` labels
+targets with bounds in screenshots and `CursorMarker()` draws the cursor; both
+work with any page model.
 
 Add `ScreenshotTools()` to offer explicit requests in a session configured
 with screenshots. The tool acknowledges the request. The next observation
