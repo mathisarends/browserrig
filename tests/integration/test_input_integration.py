@@ -175,7 +175,7 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
             )
 
     # Exercise both a crop and viewport coordinates.
-    requests = (
+    screenshot = (
         []
         if coordinates
         else [
@@ -185,20 +185,20 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
             )
         ]
     )
-    requests.extend(
-        [
-            (
-                "move_mouse",
-                {"x": 70 if coordinates else 50, "y": 160 if coordinates else 80},
-            ),
-            ("scroll_element", {"ref_name": "First panel", "delta_y": 300}),
-            (
-                "move_mouse",
-                {"x": 370 if coordinates else 350, "y": 160 if coordinates else 80},
-            ),
-            ("scroll_element", {"ref_name": "Second panel", "delta_y": 180}),
-        ]
-    )
+    requests = [
+        *screenshot,
+        (
+            "move_mouse",
+            {"x": 70 if coordinates else 50, "y": 160 if coordinates else 80},
+        ),
+        ("scroll_element", {"ref_name": "First panel", "delta_y": 300}),
+        *screenshot,
+        (
+            "move_mouse",
+            {"x": 370 if coordinates else 350, "y": 160 if coordinates else 80},
+        ),
+        ("scroll_element", {"ref_name": "Second panel", "delta_y": 180}),
+    ]
     agent = Agent(
         model=_ref_model(requests),
         browser=Chrome.launch(url=site),
@@ -206,7 +206,7 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
     )
     async with agent.session() as session:
         result = await session.run(
-            "Hover and scroll each panel without clicking", max_steps=6
+            "Hover and scroll each panel without clicking", max_steps=7
         )
         assert result.text == "Done"
         receipts = [

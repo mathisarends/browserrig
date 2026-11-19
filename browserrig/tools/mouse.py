@@ -38,7 +38,8 @@ _INSTRUCTIONS = Instructions(
     text=(
         "Point in pixels from the top-left of the newest screenshot still in context; "
         "crop and scale map back to the viewport. Without an image, use viewport CSS pixels. "
-        "After the active document changes, use a fresh screenshot before pointing."
+        "After scrolling or other changes to the page layout or document, "
+        "use a fresh screenshot before pointing."
     ),
 )
 

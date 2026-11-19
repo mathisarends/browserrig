@@ -22,7 +22,6 @@ from browserrig.events import (
 )
 from browserrig.observation import BrowserPerception
 from browserrig.readiness import PageReadiness
-from browserrig.tools.chains import observes
 from browserrig.tools.effects import Effect
 
 from .context import NO_CALL, CallIdentity, ToolAction, ToolActionError
@@ -225,8 +224,6 @@ class ActionRunner:
             raise BrowserError("Cannot go forward: no next history entry")
         if kind is ActionKind.GO_BACK and not await tab.can_go_back():
             raise BrowserError("No previous history entry")
-        if profile.phase is ReadinessPhase.NAVIGATION and tab.dialog:
-            raise BrowserError("A JavaScript dialog must be handled first")
         if profile.phase is not ReadinessPhase.AFTER_ACTION:
             # Page management must work even when the current DOM never settles.
             return PageState(url=tab.url, document_id=tab.document_id)
@@ -236,15 +233,9 @@ class ActionRunner:
         ):
             raise BrowserError(report.reason + "; inspect the next observation")
         before = self._observe.snapshot
-        if (
-            before is not None
-            and profile.requires_observation
-            and not observes(before, tab)
+        if before is None or (
+            before.tab_id != tab.id and not profile.requires_observation
         ):
-            raise BrowserError(
-                "The observed tab or document changed; act on the next observation"
-            )
-        if before is None or before.tab_id != tab.id:
             before = await self._observe.capture(tab)
         return PageState(
             url=before.url,

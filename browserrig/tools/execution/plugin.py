@@ -4,19 +4,31 @@ from typing import cast
 
 from harnessed import Instructions, Plugin, PluginState, SystemPrompt, ToolResult, hook
 from harnessed.hooks import ExecuteTool, Next, ReviewToolResult
-from harnessed.kernel import PluginScope, needs
+from harnessed.kernel import PluginScope, needs, observes
 from harnessed.tracing import record, traced
 
-from browserrig.browser import Browser, BrowserEvents, Tab
+from browserrig.browser import (
+    AppState,
+    Browser,
+    BrowserEvents,
+    Tab,
+    blocked_reason,
+    read_generation,
+)
 from browserrig.core import (
     ActionContext,
     ActionKind,
     ActionLabel,
     BrowserCoordination,
+    BrowserError,
     BrowserToolCall,
 )
 from browserrig.events import ACTION_EVENTS
-from browserrig.observation import BrowserPerception
+from browserrig.observation import (
+    BrowserPerception,
+    check_coordinates,
+    check_observation,
+)
 from browserrig.readiness import PageReadiness
 from browserrig.secrets import Secrets
 from browserrig.tools.chains import (
@@ -31,6 +43,7 @@ from browserrig.tools.intents import Intent, Perform
 from .context import LABEL_CHARS, CallIdentity
 from .hooks import CheckAction
 from .invocation import InvokeTool
+from .policy import COORDINATE_KINDS, ActionProfile, action_profile
 from .transaction import ActionRunner
 
 
@@ -52,6 +65,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
     _events = needs(BrowserEvents)
     _readiness = needs(PageReadiness)
     _observe = needs(BrowserPerception)
+    _app_state = observes(AppState)
 
     def __init__(self, *, chain_policy: ActionChainPolicy | None = None) -> None:
         super().__init__()
@@ -183,9 +197,31 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         return await self._invocation(event, next_)
 
     async def _check_action(self, tab: Tab, kind: ActionKind) -> None:
+        profile = action_profile(kind) or ActionProfile()
+        app_state = self._app_state
+        if (profile.phase is not None or app_state is not None) and (
+            reason := await blocked_reason(tab, app_state)
+        ) is not None:
+            raise BrowserError(reason)
+        observation = self._observe.snapshot
+        coordinates = self._observe.coordinates
+        if profile.requires_observation:
+            current = await read_generation(tab, app_state)
+            check_observation(
+                tab,
+                current,
+                observation,
+                reason=(
+                    "The observed tab or document changed; act on the next observation"
+                    if app_state is None
+                    else "The observed page state changed; act on the next observation"
+                ),
+            )
+            if kind in COORDINATE_KINDS:
+                check_coordinates(tab, current, observation, coordinates)
         context = self._mount.context
         assert context is not None
-        await context.dispatch(CheckAction(tab, kind))
+        await context.dispatch(CheckAction(tab, kind, observation, coordinates))
 
     @property
     def _runner(self) -> ActionRunner:

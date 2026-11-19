@@ -5,10 +5,10 @@ from uuid import uuid4
 from harnessed import Plugin, PluginState, hook
 from harnessed.events import ControlState, SessionControlChangedEvent
 from harnessed.hooks import Next
-from harnessed.kernel import PluginScope, needs
+from harnessed.kernel import PluginScope, needs, observes
 from harnessed.tracing import traced
 
-from browserrig.browser import BrowserEvents, Tab
+from browserrig.browser import AppState, BrowserEvents, Tab, blocked_reason
 from browserrig.core import (
     ReadinessError,
     ReadinessPhase,
@@ -32,6 +32,7 @@ class PageReadiness(Plugin, slot="browserrig.readiness", provides=True):
     events = READINESS_EVENTS
     _state = PluginState(ReadinessState)
     _events = needs(BrowserEvents)
+    _app_state = observes(AppState)
 
     def __init__(
         self,
@@ -61,6 +62,15 @@ class PageReadiness(Plugin, slot="browserrig.readiness", provides=True):
         """`since` is when the cause of this wait began, such as the action's input."""
         phase = ReadinessPhase(phase)
         if report := self._state.deferred.get(tab.id):
+            reason = await blocked_reason(tab, self._app_state)
+            if reason is not None:
+                report = report.model_copy(
+                    update={
+                        "status": ReadinessStatus.BLOCKED,
+                        "reason": reason,
+                        "timed_out": False,
+                    }
+                )
             if dispatch is not None:
                 raise ReadinessError(
                     report.reason
@@ -146,6 +156,7 @@ class PageReadiness(Plugin, slot="browserrig.readiness", provides=True):
             check=self._check,
             dispatch=dispatch,
             since=since,
+            app_state=self._app_state,
         )
         self._state.spent[tab.id] = (
             self._state.spent.get(tab.id, 0) + report.duration_seconds

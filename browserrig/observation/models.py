@@ -11,6 +11,7 @@ from pydantic import Field
 from browserrig.browser import TabInfo
 from browserrig.core import (
     Bounds,
+    Generation,
     Geometry,
     Options,
     Point,
@@ -242,6 +243,11 @@ class Snapshot(Options):
     captured_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     # Resize generation at capture start, including for retained screenshots.
     viewport_revision: int = 0
+    generation: Generation = Field(
+        default_factory=lambda data: Generation(
+            state=data["document_id"], layout=(data["viewport_revision"], 0)
+        )
+    )
 
     def element(self, ref: str) -> ElementInfo:
         for element in self.elements:
@@ -268,6 +274,7 @@ class CapturedImage:
     height: float
     geometry: Geometry | None
     viewport_revision: int = 0
+    generation: Generation = Generation(state="")
 
     @classmethod
     def from_snapshot(cls, snapshot: Snapshot, browser_id: str) -> Self:
@@ -284,6 +291,7 @@ class CapturedImage:
             snapshot.height,
             snapshot.geometry,
             snapshot.viewport_revision,
+            snapshot.generation,
         )
 
 

@@ -56,7 +56,7 @@ class CdpInput:
         return await self._tab.viewport_size()
 
     def layout_changed(self) -> None:
-        self._tab.layout_changed()
+        self._tab.invalidate_frames()
 
     async def emit(self, event: InputEvent) -> None:
         await self._tab.emit(event)
@@ -97,6 +97,8 @@ class CdpInput:
                 click_count=click_count,
             )
         )
+        if kind is not MouseEventKind.MOVED or buttons:
+            self._tab.invalidate_image_coordinates()
 
     async def dispatch_wheel(
         self, point: Point, *, delta_x: float, delta_y: float
@@ -110,6 +112,7 @@ class CdpInput:
                 delta_y=delta_y,
             )
         )
+        self._tab.invalidate_image_coordinates()
 
     async def dispatch_key(
         self,

@@ -4,6 +4,7 @@ from harnessed.kernel import Emit
 
 from browserrig.browser import Tab
 from browserrig.core import ActionKind
+from browserrig.observation import CapturedImage, Snapshot
 
 
 @dataclass(frozen=True)
@@ -12,3 +13,5 @@ class CheckAction(Emit):
 
     tab: Tab
     kind: ActionKind
+    observation: Snapshot | None = None
+    coordinates: Snapshot | CapturedImage | None = None
