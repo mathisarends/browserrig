@@ -7,7 +7,7 @@ from typing import NamedTuple
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-from cdpify import UNSET, CDPCommandError, CDPError, CdpSession
+from cdpify import UNSET, CDPCommandError, CdpSession
 from cdpify.domains.page import (
     FrameNavigatedEvent,
     FrameResizedEvent,
@@ -40,6 +40,7 @@ from browserrig.scripts import (
     TabStripArgs,
 )
 
+from .errors import translate_cdp_errors
 from .favicon import load_favicon
 from .frame import Frame
 from .guard import NavigationGuard
@@ -71,6 +72,11 @@ class OpenDialog(NamedTuple):
 
 
 class Tab:  # pylint: disable=too-many-public-methods  # document API
+    """A browser tab whose operations report CDP failures as BrowserError.
+
+    Use `tab.cdp` for direct access to the CDP session and its raw cdpify errors.
+    """
+
     def __init__(
         self,
         target_id: str,
@@ -182,6 +188,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
                 self.input.dialog_closed()
                 await self.emit(DialogHandledEvent(accepted=accepted))
 
+    @translate_cdp_errors("Cannot deliver the browser event")
     async def emit(self, event: BrowserEvent | LiveEvent | TabEvent) -> None:
         if self._emit is None:
             return
@@ -202,11 +209,13 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self.closed = True
         await self.report_change()
 
+    @translate_cdp_errors("Cannot report the tab change")
     async def report_change(self, *, settled: bool = False) -> None:
         """Tell the change listener that url, title or loading may have changed."""
         if self._on_change is not None:
             await self._on_change(self, settled)
 
+    @translate_cdp_errors("Cannot read the tab title and icon")
     async def read_strip(self) -> TabStrip:
         """Read the title and icon URL the document declares for a tab strip.
 
@@ -239,6 +248,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self._main_frame_id = tree.frame.id
 
     @traced
+    @translate_cdp_errors("Cannot evaluate JavaScript")
     async def evaluate(self, expression: str, *, timeout_seconds: float = 10) -> str:
         """Evaluate once in the main page world and render its completion value."""
         group = f"browserrig-evaluate-{uuid4().hex}"
@@ -271,6 +281,8 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
                     "JavaScript executed, but its result cannot be returned by value; "
                     "return JSON-serializable data"
                 ) from error
+            if error.message == "Execution was terminated":
+                raise BrowserError("JavaScript execution was terminated") from error
             raise
         finally:
             self.layout_changed()
@@ -298,6 +310,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
     async def viewport_size(self) -> ViewportSize:
         return (await self.page_layout()).viewport
 
+    @translate_cdp_errors("Cannot measure the page layout")
     async def page_layout(self) -> PageLayout:
         """Measure the main page via Chrome's layout metrics."""
         metrics = await self.cdp.page.get_layout_metrics()
@@ -314,12 +327,13 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         """Measure the layout viewport, or keep the last size while the page is blocked."""
         if self.dialog is not None:
             return self._viewport
-        with suppress(CDPError, TimeoutError):
+        with suppress(BrowserError, TimeoutError):
             async with asyncio.timeout(_VIEWPORT_PROBE_SECONDS):
                 self._viewport = await self.viewport_size()
         return self._viewport
 
     @traced
+    @translate_cdp_errors("Cannot discover page frames")
     async def frames(self) -> tuple[Frame, ...]:
         """Return every frame with its viewport transform; `frame_limitations` explains gaps.
 
@@ -346,7 +360,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
             async with asyncio.timeout(_FOCUS_PROBE_SECONDS):
                 frame = await self.main_frame()
                 return await frame.run(FOREGROUND)
-        except (BrowserError, CDPError, TimeoutError):
+        except (BrowserError, TimeoutError):
             # A navigating or closed renderer may not be available for a focus check.
             return False
 
@@ -359,6 +373,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
             worlds=self.worlds,
         )
 
+    @translate_cdp_errors("Cannot read the page frame tree")
     async def frame_tree(self) -> FrameTree:
         result = await self.cdp.page.get_frame_tree()
         return result.frame_tree
@@ -369,25 +384,31 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
     async def go_forward(self) -> bool:
         return await self._history(1)
 
+    @translate_cdp_errors("Cannot read the navigation history")
     async def can_go_back(self) -> bool:
         history = await self.cdp.page.get_navigation_history()
         return history.current_index > 0
 
+    @translate_cdp_errors("Cannot read the navigation history")
     async def can_go_forward(self) -> bool:
         history = await self.cdp.page.get_navigation_history()
         return history.current_index + 1 < len(history.entries)
 
     @traced
+    @translate_cdp_errors("Cannot reload the page")
     async def reload(self) -> None:
         await self.cdp.page.reload()
 
+    @translate_cdp_errors("Cannot handle the JavaScript dialog")
     async def handle_dialog(self, *, accept: bool, text: str = "") -> None:
         await self.cdp.page.handle_java_script_dialog(accept=accept, prompt_text=text)
 
+    @translate_cdp_errors("Cannot bring the tab to the front")
     async def bring_to_front(self) -> None:
         await self.cdp.page.bring_to_front()
 
     @traced
+    @translate_cdp_errors("Cannot navigate to the page")
     async def navigate(self, url: str) -> None:
         if self._guard is not None:
             await self._guard.check(url, self.id)
@@ -413,6 +434,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
             # Scripts and SPAs retitle a page or swap its icon without navigating.
             await self.report_change(settled=not self.loading)
 
+    @translate_cdp_errors("Cannot navigate the tab history")
     async def _history(self, offset: int) -> bool:
         history = await self.cdp.page.get_navigation_history()
         index = history.current_index + offset

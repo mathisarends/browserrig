@@ -8,8 +8,6 @@ from time import monotonic
 from typing import Any
 from uuid import uuid4
 
-from cdpify import CDPCommandError
-
 from browserrig.browser import Tab
 from browserrig.core import (
     BrowserBar,
@@ -115,7 +113,7 @@ async def search(scene: Scene, intent: SearchIntent, step: Step) -> PageSearch:
     async def results(text: str, queries: tuple[str, ...], label: str = "") -> None:
         try:
             found = await find_text(scene.tab, queries, session=session, ticks=True)
-        except (CDPCommandError, BrowserError, TimeoutError):
+        except (BrowserError, TimeoutError):
             # Presentation must never fail the search itself.
             return
         await scene.show(

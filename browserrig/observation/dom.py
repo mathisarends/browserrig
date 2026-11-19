@@ -6,6 +6,7 @@ from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from harnessed.tracing import traced
 
 from browserrig.browser import Frame
+from browserrig.core import BrowserError
 from browserrig.scripts import RESET, SEED, SeedArgs
 
 _SNAPSHOT_SECONDS = 2
@@ -32,7 +33,11 @@ async def seed_frame(
             limitations.append(
                 f"Supplementary DOM metadata incomplete for frame {frame.id}"
             )
-    except (CDPCommandError, TimeoutError):
+    except (BrowserError, CDPCommandError, TimeoutError) as error:
+        if isinstance(error, BrowserError) and not isinstance(
+            error.__cause__, (CDPCommandError, TimeoutError)
+        ):
+            raise
         limitations.append(
             f"Supplementary DOM metadata unavailable for frame {frame.id}"
         )

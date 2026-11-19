@@ -10,6 +10,7 @@ from browserrig.browser.worlds import (  # smelt: ignore[SMT107] -- test seam
     # Test isolated-world lifecycle independently of Chrome transport.
     Worlds,
 )
+from browserrig.core import BrowserError
 from browserrig.scripts import RESET
 
 
@@ -43,11 +44,13 @@ async def test_missing_context_recreates_world_and_retries_once():
 
 async def test_other_cdp_failures_are_not_retried():
     frame, cdp = _frame()
-    cdp.runtime.call_function_on.side_effect = CDPCommandError(
+    error = CDPCommandError(
         "Runtime.callFunctionOn", -32000, "Execution context was destroyed"
     )
-    with pytest.raises(CDPCommandError):
+    cdp.runtime.call_function_on.side_effect = error
+    with pytest.raises(BrowserError) as failure:
         await frame.run(RESET)
+    assert failure.value.__cause__ is error
     assert cdp.runtime.call_function_on.await_count == 1
 
 
