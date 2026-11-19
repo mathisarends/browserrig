@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from cdpify import CDPCommandError
 from harnessed import Agent, Plugin, hook
 from harnessed.hooks import Next
 from harnessed.kernel import PluginScope, needs
@@ -21,7 +22,7 @@ from browserrig import (
     SelectReadiness,
     wait_for_page,
 )
-from browserrig.core import ReadinessError, ReadinessPhase
+from browserrig.core import BrowserError, ReadinessError, ReadinessPhase
 from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent, ReadyEvent
 from browserrig.files import Download
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
@@ -183,6 +184,21 @@ async def test_redirect_chain_restarts_probes_without_extending_the_deadline(
     assert [document for document, _ in selected] == ["doc-1", "doc-1x", "doc-1xx"]
     assert len({id(strategy) for strategy in checked}) == 3
     assert len({deadline for _, deadline in selected}) == 1
+
+
+async def test_readiness_retries_a_normalized_context_failure():
+    tab = FakeTab()
+    state = await tab.run(STABILITY)
+    error = BrowserError("Cannot run JavaScript in the frame")
+    error.__cause__ = CDPCommandError(
+        "Runtime.callFunctionOn", -32000, "Execution context was destroyed"
+    )
+    tab.run = AsyncMock(side_effect=[error, state])
+
+    report = await wait_for_page(tab, options=_fast_options(timeout_seconds=1))
+
+    assert report.status == "ready"
+    assert tab.run.await_count == 2
 
 
 async def test_after_action_requires_fresh_observation_time_even_when_dom_was_quiet():

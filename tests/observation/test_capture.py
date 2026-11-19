@@ -153,19 +153,23 @@ async def test_capture_retries_a_change_in_app_generation(stabilizes):
 
 
 @pytest.mark.parametrize(
-    "error",
+    "error, expected",
     [
-        BrowserError("broken capture"),
-        CDPCommandError("DOMSnapshot.captureSnapshot", -32000, "unavailable"),
-        asyncio.CancelledError(),
+        (BrowserError("broken capture"), BrowserError),
+        (
+            CDPCommandError("DOMSnapshot.captureSnapshot", -32000, "unavailable"),
+            BrowserError,
+        ),
+        (asyncio.CancelledError(), asyncio.CancelledError),
     ],
 )
-async def test_capture_does_not_retry_unrelated_errors_or_cancellation(error):
+async def test_capture_does_not_retry_unrelated_errors_or_cancellation(error, expected):
     tab = FakeTab()
     report = await FakeReadiness().wait(tab, phase=ReadinessPhase.OBSERVATION)
     strategy = _RacingCapture([error, None])
-    with pytest.raises(type(error)):
+    with pytest.raises(expected) as failure:
         await capture(tab, strategy, report)
+    assert failure.value is error or failure.value.__cause__ is error
     assert strategy.calls == 1
 
 
@@ -209,7 +213,7 @@ async def test_optional_screenshot_failure_retains_the_dom_and_cancels_stalled_w
     async def screenshot(_tab, _geometry):
         nonlocal cancelled
         if not stalled:
-            raise CDPCommandError("Page.captureScreenshot", -32000, "unavailable")
+            raise BrowserError("Cannot capture a page screenshot")
         try:
             await asyncio.Future()
         finally:

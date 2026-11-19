@@ -3,10 +3,12 @@ from harnessed.tracing import traced
 
 from browserrig.core import Geometry
 
+from .errors import translate_cdp_errors
 from .tab import Tab
 
 
 @traced
+@translate_cdp_errors("Cannot capture a page screenshot")
 async def screenshot(
     tab: Tab, geometry: Geometry | None = None, *, overlays: bool = False
 ) -> str:

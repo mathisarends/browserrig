@@ -2,7 +2,6 @@ import re
 from typing import Self
 from urllib.parse import urljoin, urlsplit
 
-from cdpify import CDPCommandError
 from cdpify.domains.domsnapshot import CaptureSnapshotResult
 from harnessed.tracing import traced
 
@@ -150,7 +149,7 @@ async def _extract_document(
                 )
             parts.append(prefix[:remaining] + _unwrap_links(body, state.url, origin))
             remaining -= len(parts[-1])
-        except (CDPCommandError, BrowserError, TimeoutError):
+        except (BrowserError, TimeoutError):
             if frame.parent is None:
                 raise
             limitations.append(f"Frame {frame.id} changed or could not be inspected")

@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 
-from cdpify import CDPCommandError
-
 from browserrig.browser import Frame, Tab
 from browserrig.core import Bounds, Box, BrowserError
 from browserrig.scripts import FIND, FindArgs, FoundText
@@ -85,7 +83,7 @@ async def find_text(
         )
         try:
             result = await frame.run(FIND, args)
-        except (CDPCommandError, BrowserError, TimeoutError):
+        except (BrowserError, TimeoutError):
             if frame.parent is None:
                 raise
             limitations.append(f"Frame {frame.id} changed or could not be searched")
@@ -127,12 +125,12 @@ async def close_find(tab: Tab) -> None:
     """Drop the page text cached for find in every frame that still has it."""
     try:
         frames = await tab.frames()
-    except (CDPCommandError, BrowserError, TimeoutError):
+    except (BrowserError, TimeoutError):
         return
     for frame in frames:
         try:
             await frame.run(FIND, FindArgs(close=True))
-        except (CDPCommandError, BrowserError, TimeoutError):
+        except (BrowserError, TimeoutError):
             # A frame that changed or went away took its cache with it.
             continue
 

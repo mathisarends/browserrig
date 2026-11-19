@@ -5,7 +5,7 @@ from dataclasses import dataclass, replace
 from typing import ClassVar, Protocol
 from uuid import uuid4
 
-from cdpify import CDPCommandError
+from cdpify import CDPCommandError, CDPError
 from harnessed.tracing import traced
 
 from browserrig.browser import AppState, Tab, TabInfo, dom_generation, read_generation
@@ -150,7 +150,7 @@ async def capture_observation(
             zoom=zoom,
             cursor=cursor,
         )
-    except (BrowserError, CDPCommandError, TimeoutError) as error:
+    except (BrowserError, TimeoutError) as error:
         if not report.timed_out:
             if isinstance(error, TimeoutError):
                 raise BrowserError("Page capture timed out; observe again") from error
@@ -315,17 +315,21 @@ async def _collect(
                         "Page state or layout changed during capture; observe again"
                     )
                 return _Collected(content, document_id, viewport_revision, generation)
-            except (BrowserError, CDPCommandError) as error:
-                if retried or report.timed_out or not _capture_race(error):
-                    raise
-                retried = True
-                tab.invalidate_frames()
+            except (BrowserError, CDPError) as error:
+                # Capture strategies can issue raw commands through the CDP session.
+                if not retried and not report.timed_out and _capture_race(error):
+                    retried = True
+                    tab.invalidate_frames()
+                    continue
+                if isinstance(error, CDPError) and not isinstance(error, TimeoutError):
+                    raise BrowserError("Cannot collect page content") from error
+                raise
 
 
-def _capture_race(error: BrowserError | CDPCommandError) -> bool:
+def _capture_race(error: BrowserError | CDPError) -> bool:
     if isinstance(error, StaleElement):
         return True
-    cause = error.__cause__ if error.__cause__ is not None else error
+    cause = error.__cause__ if isinstance(error, BrowserError) else error
     return isinstance(cause, CDPCommandError) and any(
         message in cause.message.lower()
         for message in (

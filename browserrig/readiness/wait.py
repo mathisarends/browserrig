@@ -293,9 +293,10 @@ async def _discard(_event: BrowserEvent) -> None:
 async def _check(strategy: ReadinessStrategy) -> bool:
     try:
         return await strategy.check()
-    except CDPCommandError as error:
-        if not any(
-            text in error.message.lower() for text in ("context", "frame", "navigat")
+    except (BrowserError, CDPCommandError) as error:
+        cause = error.__cause__ if isinstance(error, BrowserError) else error
+        if not isinstance(cause, CDPCommandError) or not any(
+            text in cause.message.lower() for text in ("context", "frame", "navigat")
         ):
             raise
         strategy.reason = "document changed during readiness"

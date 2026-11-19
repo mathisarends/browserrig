@@ -20,6 +20,7 @@ from browserrig.scripts import (
     failure,
 )
 
+from .errors import translate_cdp_errors
 from .worlds import Worlds
 
 
@@ -30,6 +31,8 @@ class Frame:
     Its isolated JavaScript world belongs to that frame, not to browser focus.
     `transform` maps frame-local CSS pixels to the tab's viewport; `visible` is the
     part of the frame left unclipped by its ancestors, in viewport pixels.
+    Frame operations report CDP failures as BrowserError. Direct calls through
+    `frame.cdp` can raise raw cdpify errors.
     """
 
     id: str
@@ -50,10 +53,12 @@ class Frame:
             else None
         )
 
+    @translate_cdp_errors("Cannot read the page frame tree")
     async def frame_tree(self) -> FrameTree:
         result = await self.cdp.page.get_frame_tree()
         return result.frame_tree
 
+    @translate_cdp_errors("Cannot upload files to the page")
     async def upload_files(self, backend_node_id: int, paths: list[str]) -> None:
         target = await self.run_on_node(
             backend_node_id, FILE_INPUT, UploadArgs(count=len(paths)), by_value=False
@@ -151,6 +156,7 @@ class Frame:
             current = current.parent
         return tuple(visible)
 
+    @translate_cdp_errors("Cannot create the frame's JavaScript context")
     async def context(self) -> int:
         return await self.worlds.context(self.cdp, self.id, self.document_id)
 
@@ -178,6 +184,7 @@ class Frame:
         user_gesture: bool = False,
     ) -> RemoteObject: ...
 
+    @translate_cdp_errors("Cannot run JavaScript in the frame")
     async def run[A: BaseModel, R](
         self,
         script: Script[A, R],

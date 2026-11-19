@@ -15,6 +15,16 @@ from browserrig.core import BrowserError, ViewportSize
 from browserrig.events import CursorStateEvent, KeyPressedEvent
 
 
+async def test_frame_discovery_preserves_the_cdp_failure_as_cause():
+    error = CDPCommandError("Target.getTargets", -32000, "Unavailable")
+    tab = Tab("tab", SimpleNamespace(), discover_frames=AsyncMock(side_effect=error))
+
+    with pytest.raises(BrowserError) as failure:
+        await tab.frames()
+
+    assert failure.value.__cause__ is error
+
+
 @pytest.mark.parametrize(
     "value, expected",
     [

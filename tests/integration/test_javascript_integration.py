@@ -1,7 +1,6 @@
 import json
 
 import pytest
-from cdpify import CDPCommandError
 from harnessed import Agent, PolicyDecision
 from harnessed.models import ToolMessage
 from harnessed.plugins import Approvals
@@ -117,8 +116,6 @@ async def test_runtime_shell_values_and_execution_deadlines_in_chrome(site):
         with pytest.raises(BrowserError, match="JavaScript timed out"):
             await tab.evaluate("await new Promise(() => {})", timeout_seconds=0.1)
         assert await tab.evaluate("1 + 1") == "2"
-        with pytest.raises(
-            (BrowserError, CDPCommandError), match="terminated|timed out"
-        ):
+        with pytest.raises(BrowserError, match="terminated|timed out"):
             await tab.evaluate("while (true) {}", timeout_seconds=0.1)
         assert await tab.evaluate("2 + 2") == "4"

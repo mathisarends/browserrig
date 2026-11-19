@@ -4,7 +4,6 @@ from dataclasses import dataclass, replace
 from io import BytesIO
 from typing import override
 
-from cdpify import CDPCommandError
 from PIL import Image
 
 from browserrig.browser import Tab, screenshot
@@ -94,7 +93,7 @@ async def capture_pixels(
     try:
         async with asyncio.timeout(_SCREENSHOT_SECONDS):
             raw = await screenshot(tab, geometry)
-    except (BrowserError, CDPCommandError, TimeoutError):
+    except (BrowserError, TimeoutError):
         return ScreenshotPixels(None, area, None, notes)
     scale = geometry.scale if geometry is not None else 1.0
     image = await asyncio.to_thread(_normalize, raw, area, scale=scale)
