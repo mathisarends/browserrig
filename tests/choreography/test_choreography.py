@@ -109,6 +109,8 @@ class _Tab:
         self.document_id = f"{tab_id}-document"
         self.url = "https://example.org/"
         self.title = "Example"
+        self.viewport_revision = 0
+        self.layout_revision = 0
         self.dialog = None
         self.navigation_pending = False
         self.closed = False
@@ -122,6 +124,9 @@ class _Tab:
 
     async def frames(self):
         return (self._frame,)
+
+    def invalidate_frames(self):
+        pass
 
     def check_navigation(self):
         pass

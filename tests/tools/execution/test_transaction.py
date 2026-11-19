@@ -64,7 +64,9 @@ async def test_check_action_rejects_explicit_operation_before_dispatch():
         tab = services.browser.active_tab
 
         def reject(action: CheckAction) -> None:
-            assert action == CheckAction(tab, ActionKind.UPLOAD)
+            snapshot = services.observe.snapshot
+            assert snapshot is not None
+            assert action == CheckAction(tab, ActionKind.UPLOAD, snapshot, snapshot)
             check.assert_awaited_once_with(tab)
             raise BrowserError("Action rejected")
 
@@ -191,7 +193,8 @@ async def test_input_rejects_a_document_changed_between_calls(kind):
     operation = AsyncMock()
     async with mounted(Actions()) as (services, ctx):
         tab = services.browser.active_tab
-        services.observe.snapshot = SimpleNamespace(tab_id=tab.id, document_id="old")
+        await services.observe.capture(tab)
+        tab.document_id = "updated-document"
         with pytest.raises(ToolError, match="act on the next observation"):
             await ctx[Actions].run(kind=kind, operation=operation)
     operation.assert_not_awaited()

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 from cdpify import CDPCommandError
 
-from browserrig import CaptureContent, CaptureStrategy, DomCapture
+from browserrig import CaptureContent, CaptureStrategy, DomCapture, Generation
 from browserrig import PageContent as Extraction
 from browserrig.core import Bounds, BrowserError, ReadinessPhase, StaleElement
 from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
@@ -125,6 +125,31 @@ async def test_capture_retries_a_repeated_race_only_once():
     with pytest.raises(StaleElement, match="Document changed"):
         await capture(tab, strategy, report)
     assert strategy.calls == 2
+
+
+@pytest.mark.parametrize("stabilizes", [True, False])
+async def test_capture_retries_a_change_in_app_generation(stabilizes):
+    tab = FakeTab()
+    report = await FakeReadiness().wait(tab, phase=ReadinessPhase.OBSERVATION)
+    strategy = _RacingCapture([None, None])
+    layouts = [0, 1, 1, 1] if stabilizes else [0, 1, 1, 2]
+    app = SimpleNamespace(
+        generation=AsyncMock(
+            side_effect=[
+                Generation(state="canvas", layout=layout) for layout in layouts
+            ]
+        )
+    )
+    if stabilizes:
+        snapshot = await capture(tab, strategy, report, app_state=app)
+        assert snapshot.generation == Generation(
+            state=(tab.document_id, "canvas"), layout=((0, 0), 1)
+        )
+    else:
+        with pytest.raises(StaleElement, match="changed during capture"):
+            await capture(tab, strategy, report, app_state=app)
+    assert strategy.calls == 2
+    assert app.generation.await_count == 4
 
 
 @pytest.mark.parametrize(

@@ -4,6 +4,10 @@ from dataclasses import dataclass, replace
 
 from browserrig.core import ActionKind, ReadinessPhase
 
+COORDINATE_KINDS = frozenset(
+    {ActionKind.CLICK_AT, ActionKind.DRAG_AT, ActionKind.MOVE_MOUSE}
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ActionProfile:

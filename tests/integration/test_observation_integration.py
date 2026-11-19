@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import re
@@ -223,6 +224,87 @@ async def test_vision_on_request_starts_with_an_image_and_refreshes_after_wheel_
     assert result.text == "Done" and position > 0
     assert len(frames) == 3
     assert frames[0] == frames[1] != frames[2]
+
+
+async def test_pointer_rejects_old_screenshot_after_wheel_scroll(site):
+    old_point = {"x": 400, "y": 600}
+    calls = iter(
+        [
+            ToolCall("screenshot", {}),
+            ToolCall("scroll", {"delta_y": 500}),
+            ToolCall("click_at", old_point),
+            ToolCall("screenshot", {}),
+            ToolCall("move_mouse", {"x": 300, "y": 100}),
+            ToolCall("click_at", {"x": 400, "y": 100}),
+        ]
+    )
+    shown_images = []
+
+    async def respond(request):
+        images = [
+            image_id(message) for message in request.messages if has_image(message)
+        ]
+        shown_images.append(images[-1] if images else None)
+        call = next(calls, None)
+        if len(shown_images) == 3:
+            # Native wheel input can finish compositing after Chrome acknowledges it.
+            async with asyncio.timeout(3):
+                while await evaluate(tab, "scrollY") != 500:
+                    await asyncio.sleep(0.02)
+            assert (
+                await evaluate(tab, "document.elementFromPoint(400, 600).id") == "other"
+            )
+        yield (
+            ModelChunk(tool_call=call) if call is not None else ModelChunk(text="Done")
+        )
+
+    agent = Agent(
+        model=CallbackModel(respond),
+        browser=Chrome.launch(url=site),
+        plugins=[
+            BrowserPerception(
+                screenshots=Screenshots(trigger=ScreenshotTrigger.ON_REQUEST)
+            ),
+            WheelTools(),
+            Approvals(default=PolicyDecision.ALLOW),
+        ],
+        without=(ChoreographyOverlay, InputPacing),
+    )
+    async with agent.session() as session:
+        tab = session.scope[Browser].active_tab
+        await evaluate(
+            tab,
+            """document.body.style.cssText = 'margin:0; min-height:2400px';
+            document.body.innerHTML = `
+                <style>button {position:absolute; left:350px; width:100px; height:40px}</style>
+                <button id="target" style="top:580px">Target</button>
+                <button id="other" style="top:1080px">Other</button>`;
+            const clicks = document.body.dataset;
+            clicks.buttons = '';
+            document.addEventListener('click', event => {clicks.buttons += event.target.id});""",
+        )
+        assert await evaluate(tab, "document.elementFromPoint(400, 600).id") == "target"
+        result = await session.run(
+            "Point at the target before and after scrolling", max_steps=7
+        )
+        clicked = await evaluate(tab, "document.body.dataset.buttons")
+
+    assert result.text == "Done"
+    assert len(shown_images) == 7
+    assert shown_images[0] is None and shown_images[1] is not None
+    assert shown_images[1:4] == [shown_images[1]] * 3
+    assert shown_images[4] is not None and shown_images[4] != shown_images[1]
+    assert shown_images[5] == shown_images[4]
+    replies = [
+        e.result for e in result.events if isinstance(e, ToolExecutionFinishedEvent)
+    ]
+    first_screenshot, scroll, stale_click, new_screenshot, move, fresh_click = replies
+    assert not any(
+        reply.is_error
+        for reply in (first_screenshot, scroll, new_screenshot, move, fresh_click)
+    )
+    assert stale_click.is_error and "screenshot again" in stale_click.text, clicked
+    assert clicked == "target"
 
 
 async def test_composed_dom_semantics_click_listeners_and_visible_text(site):

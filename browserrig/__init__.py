@@ -1,6 +1,7 @@
 from .activity import Activity
 from .agent import Agent  # smelt: ignore[SMT106] -- public facade
 from .browser import (
+    AppState,
     Browser,
     Chrome,
     ChromeBrowser,
@@ -27,6 +28,7 @@ from .core import (
     ActionLabel,
     BrowserCoordination,
     ChangeTab,
+    Generation,
     HandoffStatus,
     Point,
     Runtime,
@@ -126,6 +128,8 @@ from .tools import (
 __version__ = "0.8.0"
 
 __all__ = [
+    "AppState",
+    "Generation",
     "ActionLabels",
     "ActionLabel",
     "Runtime",

@@ -9,7 +9,7 @@ from cdpify import CDPCommandError
 from harnessed.hooks import Next
 from harnessed.tracing import record, traced
 
-from browserrig.browser import BrowserEvents, Tab
+from browserrig.browser import AppState, BrowserEvents, Tab, blocked_reason
 from browserrig.core import (
     BrowserError,
     ReadinessError,
@@ -51,6 +51,7 @@ async def wait_for_page(
     check: ReadinessMiddleware | None = None,
     dispatch: Callable[[], Awaitable[None]] | None = None,
     since: float | None = None,
+    app_state: AppState | None = None,
 ) -> ReadinessReport:
     """Wait until `tab` is ready. `since` is when its cause began, before this wait."""
     emit = events.emit if events is not None else _discard
@@ -82,6 +83,7 @@ async def wait_for_page(
         select=select,
         middleware=check,
         since=started if since is None else since,
+        app_state=app_state,
     )
     timed_out = False
     try:
@@ -186,6 +188,7 @@ class _Runner:
         select: PolicySelector | None,
         middleware: ReadinessMiddleware | None,
         since: float,
+        app_state: AppState | None,
     ) -> None:
         self._tab = tab
         self._options = options
@@ -194,6 +197,7 @@ class _Runner:
         self._select = select
         self._middleware = middleware
         self._since = since
+        self._app_state = app_state
         self._strategy: ReadinessStrategy | None = None
         self.stage = stage
         self.reason = "The document could not be inspected yet"
@@ -203,8 +207,7 @@ class _Runner:
     async def run(self, timeout: asyncio.Timeout, document: str) -> ReadinessStatus:
         probe: _Probe | None = None
         while True:
-            if self._tab.dialog:
-                self.reason = "A JavaScript dialog must be handled first"
+            if await self._is_blocked():
                 return ReadinessStatus.BLOCKED
             await self._tab.sync_document()
             if probe is None or document != self._tab.document_id:
@@ -248,7 +251,11 @@ class _Runner:
             if self._tab.navigation_pending:
                 self.reason = "A navigation is still in progress"
             elif result.ready:
-                return ReadinessStatus.READY
+                return (
+                    ReadinessStatus.BLOCKED
+                    if await self._is_blocked()
+                    else ReadinessStatus.READY
+                )
             await asyncio.sleep(probe.strategy.delay)
 
     def timeout_status(self) -> ReadinessStatus:
@@ -259,6 +266,13 @@ class _Runner:
             if self._options.allow_degraded_dom
             else ReadinessStatus.FAILED
         )
+
+    async def _is_blocked(self) -> bool:
+        reason = await blocked_reason(self._tab, self._app_state)
+        if reason is None:
+            return False
+        self.reason = reason
+        return True
 
 
 @dataclass(frozen=True, slots=True)

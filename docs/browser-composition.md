@@ -308,9 +308,23 @@ so the agent can inspect partial state and decide whether to wait.
 
 ### Validate an action before dispatch
 
+Provide an `AppState` session service when the application has its own target
+identity, coordinate layout, or input availability. A plugin can declare
+`provides=AppState`. To also expose its concrete class, use `provides=True` and
+call `scope.provide(AppState, self)` during setup.
+
+- `generation(tab)` returns a `Generation` with hashable `state` and `layout`
+  values. Browserrig stamps both onto observations and images alongside the DOM
+  generation. A state change invalidates targets. A layout change invalidates
+  coordinate actions. Use scalar values and tuples for JSON snapshot round trips.
+- `blocked(tab)` returns a reason when the app cannot accept input, or `None`.
+  Readiness reports the reason with status `BLOCKED`. Pass `app_state` to
+  `wait_for_page` when calling it outside the session's `PageReadiness` service.
+
 Register `@hook(CheckAction)` to validate managed `@browser_tool` actions and
-explicit `Actions.run(...)` calls. The hook receives the addressed `Tab` and
-`ActionKind`. Browserrig runs it once after action preparation and any per-call
+explicit `Actions.run(...)` calls. The hook receives the addressed tab, action
+kind, observation snapshot, and coordinate source in context when available.
+Browserrig runs it once after generation validation and any per-call
 `Actions.run(check=...)` check, while holding the action lock. Harnessed awaits
 all registered checks in order. Keep checks read-only and use the addressed tab.
 

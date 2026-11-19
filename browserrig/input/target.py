@@ -65,7 +65,7 @@ class InputTarget(Protocol):
         """Read the cursor at viewport CSS pixels, or None when unavailable."""
 
     def layout_changed(self) -> None:
-        """Invalidate cached document geometry after input changes the layout."""
+        """Invalidate cached frame geometry after input, including pointer movement."""
 
     async def emit(self, event: InputEvent) -> None:
         """Publish input feedback stamped with this target's browser and tab."""

@@ -9,6 +9,7 @@ from .errors import (
     SecretError,
     StaleElement,
 )
+from .generation import Generation
 from .geometry import (
     Aim,
     Bounds,
@@ -75,6 +76,7 @@ __all__ = [
     "FileTransferDirection",
     "FrameTransform",
     "Geometry",
+    "Generation",
     "HandoffStatus",
     "MouseEventKind",
     "Options",

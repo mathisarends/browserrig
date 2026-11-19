@@ -104,6 +104,7 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         self.worlds = worlds if worlds is not None else Worlds()
         self._emit = emit
         self._discover_frames = discover_frames
+        self._frame_revision = 0
         self._layout_revision = 0
         # Counts viewport resizes, as when a person resizes the browser window.
         self.viewport_revision = 0
@@ -276,8 +277,22 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
             with suppress(CDPCommandError):
                 await self.cdp.runtime.release_object_group(object_group=group)
 
+    @property
+    def layout_revision(self) -> int:
+        """Identify the layout used by screenshot coordinates."""
+        return self._layout_revision
+
     def layout_changed(self) -> None:
-        """Forget cached frame geometry after input, scrolling or navigation moved content."""
+        """Invalidate frame geometry and screenshot coordinates after a layout change."""
+        self.invalidate_frames()
+        self.invalidate_image_coordinates()
+
+    def invalidate_frames(self) -> None:
+        """Forget cached frame geometry, including after a cursor-only move."""
+        self._frame_revision += 1
+
+    def invalidate_image_coordinates(self) -> None:
+        """Mark screenshot coordinates stale when input can move the page content."""
         self._layout_revision += 1
 
     async def viewport_size(self) -> ViewportSize:
@@ -312,16 +327,14 @@ class Tab:  # pylint: disable=too-many-public-methods  # document API
         """
         if self._discover_frames is None:
             raise BrowserError("Frame discovery is unavailable for this tab")
-        key = _FramesKey(
-            self.document_id, self._current_action(), self._layout_revision
-        )
+        key = _FramesKey(self.document_id, self._current_action(), self._frame_revision)
         cached = bool(key.action_id) and key == self._frames_key
         record(cached=cached)
         if cached:
             return self._frames
         frames, self.frame_limitations = await self._discover_frames(self)
         if key.action_id and key == _FramesKey(
-            self.document_id, self._current_action(), self._layout_revision
+            self.document_id, self._current_action(), self._frame_revision
         ):
             self._frames_key = key
             self._frames = frames
@@ -433,4 +446,4 @@ def _javascript_value(value: RemoteObject) -> str:
 class _FramesKey(NamedTuple):
     document_id: str
     action_id: str
-    layout_revision: int
+    frame_revision: int

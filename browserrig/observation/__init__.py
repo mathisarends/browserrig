@@ -48,8 +48,11 @@ from .render import render
 from .renderer import DomRenderer, Renderer
 from .retention import ImageRetention, TrimInBatches, UntilCompaction
 from .search import PageSearch, search_content
+from .validity import check_coordinates, check_observation
 
 __all__ = [
+    "check_coordinates",
+    "check_observation",
     "ResolveDomElement",
     "ProjectObservation",
     "EmptyReferences",

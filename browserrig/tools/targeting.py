@@ -48,7 +48,7 @@ class Targeting(Plugin, slot="browserrig.targeting", provides=True):
         """Reveal a reference and return a hit-tested, action-stable aim point."""
         await self._actions.begin_preparation()
         tab = tab if tab is not None else self._actions.tab
-        tab.layout_changed()
+        tab.invalidate_frames()
         handle = await self._observe.element(tab, ref)
         scrolled = False
         if scroll:

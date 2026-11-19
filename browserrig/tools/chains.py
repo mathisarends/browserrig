@@ -8,7 +8,6 @@ from browserrig.core import BrowserToolMetadata, ReadinessStatus
 from browserrig.observation import (
     BrowserPerception,
     DomReferences,
-    Snapshot,
     decision_change,
 )
 
@@ -76,7 +75,3 @@ def stop_on_failure(result: ToolResult, tool: ToolInfo | None) -> ToolResult:
     ):
         return replace(result, break_chain=True)
     return result
-
-
-def observes(snapshot: Snapshot, tab: Tab) -> bool:
-    return snapshot.tab_id == tab.id and snapshot.document_id == tab.document_id

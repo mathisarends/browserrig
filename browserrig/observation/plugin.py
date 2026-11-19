@@ -13,7 +13,16 @@ from harnessed.kernel import PluginScope, needs, observes
 from harnessed.models import ModelRequest, UserMessage
 from harnessed.tracing import traced
 
-from browserrig.browser import Browser, BrowserEvents, Tab, TabInfo, TabPolicy
+from browserrig.browser import (
+    AppState,
+    Browser,
+    BrowserEvents,
+    Tab,
+    TabInfo,
+    TabPolicy,
+    dom_generation,
+    read_generation,
+)
 from browserrig.core import (
     BrowserCoordination,
     BrowserError,
@@ -43,6 +52,7 @@ from .references import ElementHandle, References
 from .renderer import DomRenderer, MetadataRenderer, Renderer, screenshot_instructions
 from .state import BrowserPerceptionState
 from .text import include_text, project_text
+from .validity import check_coordinates, check_observation
 
 _DEFAULT_TEXT = TextObservations()
 _DEFAULT_CAPTURE = DomCapture()
@@ -73,6 +83,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     _events = needs(BrowserEvents)
     _readiness = needs(PageReadiness)
     _tab_policy = observes(TabPolicy)
+    _app_state = observes(AppState)
 
     def __init__(
         self,
@@ -149,6 +160,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 screenshots=False,
                 redaction=self._secrets(),
                 prefer_tab_title=_metadata_text(self.text),
+                app_state=self._app_state,
             )
             return observation.snapshot
 
@@ -189,6 +201,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 screenshots=take_image and not withheld,
                 redaction=secrets,
                 prefer_tab_title=_metadata_text(self.text),
+                app_state=self._app_state,
             )
             if withheld:
                 observation = observation.with_screenshot_status(
@@ -212,15 +225,21 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     async def element(self, tab: Tab, ref: str) -> ElementHandle:
         observation = self._state.observation
         snapshot = observation.snapshot if observation is not None else None
+        app_state = self._app_state
         await tab.sync_document()
-        if (
-            snapshot is None
-            or snapshot.tab_id != tab.id
-            or snapshot.document_id != tab.document_id
-        ):
-            raise StaleElement(
-                "Observation belongs to another tab or document; use refs from the next observation"
-            )
+        generation = await read_generation(tab, app_state)
+        check_observation(
+            tab,
+            generation,
+            snapshot,
+            reason=(
+                "Observation belongs to another tab or document; "
+                "use refs from the next observation"
+                if app_state is None
+                else "Observed page state changed; use refs from the next observation"
+            ),
+        )
+        assert snapshot is not None
         snapshot.element(ref)
         assert observation is not None
         handle = await observation.references.resolve(tab, snapshot, ref)
@@ -229,14 +248,21 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 "Resolver returned another target; use refs from the next observation"
             )
         await tab.sync_document()
+        generation = await read_generation(tab, app_state)
         if self._state.observation is not observation:
             raise StaleElement(
                 "Observation changed while resolving the target; use refs from the next observation"
             )
-        if snapshot.document_id != tab.document_id:
-            raise StaleElement(
+        check_observation(
+            tab,
+            generation,
+            snapshot,
+            reason=(
                 "Document changed while resolving the target; use refs from the next observation"
-            )
+                if app_state is None
+                else "Page state changed while resolving the target; use the next observation"
+            ),
+        )
         return handle
 
     def request_screenshot(self, region: Region | None = None) -> None:
@@ -269,39 +295,30 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         secrets = self._secrets()
         return secrets.redact(observation) if secrets else observation
 
-    def coordinate_source(self) -> Snapshot | CapturedImage:
+    @property
+    def coordinates(self) -> Snapshot | CapturedImage | None:
+        """Return the coordinate source in context for pre-dispatch validation."""
         snapshot = self.snapshot
         if snapshot is None:
-            raise StaleElement("Observe before using coordinates")
-        tab = self._browser.active_tab
-        if (
-            tab.id == snapshot.tab_id
-            and tab.viewport_revision != snapshot.viewport_revision
-        ):
-            raise StaleElement(
-                "The browser window was resized after the last observation; "
-                "coordinates are outdated, observe again"
-            )
-        image = self._state.delivered_image
-        if image is not None:
-            if (image.width, image.height) != (snapshot.width, snapshot.height):
-                raise StaleElement(
-                    "The viewport changed size since the last shown image; screenshot again"
-                )
-            if image.viewport_revision != snapshot.viewport_revision:
-                raise StaleElement(
-                    "The browser window was resized since the last shown image; screenshot again"
-                )
-            if (image.tab_id, image.document_id) != (
-                snapshot.tab_id,
-                snapshot.document_id,
-            ):
-                raise StaleElement(
-                    "The last shown image belongs to another document; screenshot again"
-                )
-            return image
+            return None
+        if self._state.delivered_image is not None:
+            return self._state.delivered_image
         # Without an included image, coordinates refer to the textual viewport.
         return snapshot.model_copy(update={"geometry": None})
+
+    def coordinate_source(self) -> Snapshot | CapturedImage:
+        """Resolve coordinates and check browser freshness. Actions also check app state."""
+        tab = self._browser.active_tab
+        coordinates = self.coordinates
+        check_coordinates(
+            tab,
+            dom_generation(tab),
+            self.snapshot,
+            coordinates,
+            dom_only=self._app_state is not None,
+        )
+        assert coordinates is not None
+        return coordinates
 
     @hook(PreStep)
     async def _before_step(
@@ -541,9 +558,12 @@ def _screenshot_status(
         return None
     if requested or image_only:
         if snapshot.readiness == ReadinessStatus.BLOCKED:
-            return UserMessage(
+            reason = (
                 "A browser dialog is open. Handle it to resume screenshot capture."
+                if snapshot.fingerprint == "dialog"
+                else f"Screenshot unavailable. {snapshot.readiness_reason}"
             )
+            return UserMessage(reason)
         if snapshot.width == 0 and snapshot.readiness != ReadinessStatus.READY:
             return UserMessage(
                 "The page is still loading. Observe again for a screenshot."

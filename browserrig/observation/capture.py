@@ -8,10 +8,11 @@ from uuid import uuid4
 from cdpify import CDPCommandError
 from harnessed.tracing import traced
 
-from browserrig.browser import Tab, TabInfo
+from browserrig.browser import AppState, Tab, TabInfo, dom_generation, read_generation
 from browserrig.core import (
     Bounds,
     BrowserError,
+    Generation,
     Geometry,
     Point,
     ReadinessStatus,
@@ -67,6 +68,7 @@ async def capture(
     screenshots: bool = False,
     cursor: Point | None = None,
     redaction: Redaction | None = None,
+    app_state: AppState | None = None,
 ) -> Snapshot:
     """Capture a serializable snapshot; BrowserPerception also retains its reference resolver."""
     observation = await capture_observation(
@@ -80,6 +82,7 @@ async def capture(
         screenshots=screenshots,
         cursor=cursor,
         redaction=redaction,
+        app_state=app_state,
     )
     return observation.snapshot
 
@@ -98,6 +101,7 @@ async def capture_observation(
     cursor: Point | None = None,
     redaction: Redaction | None = None,
     prefer_tab_title: bool = False,
+    app_state: AppState | None = None,
 ) -> CapturedObservation:
     """Observe `tab`. With `previous` from the same document, unseen elements get `new`.
 
@@ -106,10 +110,14 @@ async def capture_observation(
     `redaction` hides secrets in all text and blacks out elements showing one.
     """
     snapshot_id = uuid4().hex
-    # A resize while collecting leaves the whole capture outdated, including its image.
-    viewport_revision = tab.viewport_revision
-    if dialog := tab.dialog:
-        detail = f"Open {dialog.kind} dialog: {dialog.message}"
+    dialog = tab.dialog
+    if dialog is not None or report.status == ReadinessStatus.BLOCKED:
+        detail = (
+            f"Open {dialog.kind} dialog: {dialog.message}" if dialog else report.reason
+        )
+        generation = (
+            dom_generation(tab) if dialog else await read_generation(tab, app_state)
+        )
         if redaction is not None:
             detail = redaction.redact(detail)
         snapshot = Snapshot(
@@ -123,18 +131,20 @@ async def capture_observation(
             width=0,
             height=0,
             scroll_y=0,
-            fingerprint="dialog",
-            viewport_revision=viewport_revision,
+            fingerprint="dialog" if dialog else "blocked",
+            viewport_revision=tab.viewport_revision,
+            generation=generation,
             tabs=tabs,
             text=detail,
             cursor=cursor,
         )
         return CapturedObservation(snapshot, EmptyReferences())
     try:
-        content, document_id = await _collect(
+        collected = await _collect(
             tab,
             strategy,
             report,
+            app_state=app_state,
             screenshots=screenshots,
             region=region,
             zoom=zoom,
@@ -157,11 +167,13 @@ async def capture_observation(
             height=0,
             scroll_y=0,
             fingerprint=f"readiness:{report.id}",
-            viewport_revision=viewport_revision,
+            viewport_revision=tab.viewport_revision,
+            generation=dom_generation(tab),
             tabs=tabs,
             text="The page is still loading. Observe again before using page controls.",
         )
         return CapturedObservation(snapshot, EmptyReferences())
+    content, document_id = collected.content, collected.document_id
     if prefer_tab_title:
         content = _use_tab_title(content, tab.id, tabs)
     if redaction is not None:
@@ -208,7 +220,8 @@ async def capture_observation(
         screenshot_status=screenshot_status,
         geometry=content.geometry,
         cursor=cursor,
-        viewport_revision=viewport_revision,
+        viewport_revision=collected.viewport_revision,
+        generation=collected.generation,
     )
     references = (
         content.references if content.references is not None else EmptyReferences()
@@ -258,23 +271,34 @@ class CaptureStrategy(Protocol):
         """Collect current page data and requested image/region with its resolver."""
 
 
+@dataclass(frozen=True, slots=True)
+class _Collected:
+    content: CaptureContent
+    document_id: str
+    viewport_revision: int
+    generation: Generation
+
+
 async def _collect(
     tab: Tab,
     strategy: CaptureStrategy,
     report: ReadinessReport,
     *,
+    app_state: AppState | None,
     screenshots: bool,
     region: Region | None,
     zoom: float,
     cursor: Point | None,
-) -> tuple[CaptureContent, str]:
-    """Retry a read-only observation once after a document/context race."""
+) -> _Collected:
+    """Retry a read-only observation once if its generation changes."""
     retried = False
     async with asyncio.timeout(1 if report.timed_out else _CAPTURE_SECONDS):
         while True:
             try:
                 await tab.sync_document()
+                generation = await read_generation(tab, app_state)
                 document_id = tab.document_id
+                viewport_revision = tab.viewport_revision
                 content = await strategy.collect(
                     tab,
                     report,
@@ -286,12 +310,16 @@ async def _collect(
                 await tab.sync_document()
                 if tab.document_id != document_id:
                     raise StaleElement("Document changed during capture; observe again")
-                return content, document_id
+                if generation != await read_generation(tab, app_state):
+                    raise StaleElement(
+                        "Page state or layout changed during capture; observe again"
+                    )
+                return _Collected(content, document_id, viewport_revision, generation)
             except (BrowserError, CDPCommandError) as error:
                 if retried or report.timed_out or not _capture_race(error):
                     raise
                 retried = True
-                tab.layout_changed()
+                tab.invalidate_frames()
 
 
 def _capture_race(error: BrowserError | CDPCommandError) -> bool:

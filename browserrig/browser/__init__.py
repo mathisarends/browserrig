@@ -1,5 +1,6 @@
 from browserrig.files import Download, DownloadState
 
+from .app_state import AppState, blocked_reason, dom_generation, read_generation
 from .base import Browser, BrowserEvents
 from .chrome import ChromeBrowser
 from .config import BrowserOptions, Connect, Launch, Viewport
@@ -17,6 +18,10 @@ from .tab_policy import MultiTab, SingleTab, TabPolicy
 from .tabs import Tabs
 
 __all__ = [
+    "AppState",
+    "blocked_reason",
+    "dom_generation",
+    "read_generation",
     "Browser",
     "BrowserEvents",
     "BrowserOptions",

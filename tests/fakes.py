@@ -11,7 +11,7 @@ from harnessed.kernel import PluginScope, needs
 from harnessed.testing import ScriptedModel
 
 from browserrig import Browser, BrowserCoordination, FileSystem
-from browserrig.browser import BrowserEvents, PageLayout
+from browserrig.browser import BrowserEvents, PageLayout, dom_generation
 from browserrig.browser.network import NetworkActivity
 from browserrig.core import (
     ActionContext,
@@ -21,7 +21,12 @@ from browserrig.core import (
 )
 from browserrig.files import FileBridge, FileTransfers
 from browserrig.input import Input, InputTargets
-from browserrig.observation import BrowserPerception, DomReferences, ResolveDomElement
+from browserrig.observation import (
+    BrowserPerception,
+    DomReferences,
+    ResolveDomElement,
+    Snapshot,
+)
 from browserrig.readiness import PageReadiness, ReadinessReport
 from browserrig.scripts import DOMProbe
 from browserrig.tools import Actions, Targeting
@@ -42,6 +47,7 @@ class FakeTab:
         self.probes = 0
         self.network = NetworkActivity()
         self.viewport_revision = 0
+        self.layout_revision = 0
 
     async def viewport_size(self):
         return ViewportSize(width=1280, height=800)
@@ -57,6 +63,9 @@ class FakeTab:
         pass
 
     def layout_changed(self):
+        pass
+
+    def invalidate_frames(self):
         pass
 
     def check_navigation(self):
@@ -168,6 +177,10 @@ class FakeObserve:
         self.snapshot = None
         self.references = DomReferences()
 
+    @property
+    def coordinates(self):
+        return self.snapshot
+
     async def element(self, _tab, _ref):
         raise AssertionError("No fake element resolver configured")
 
@@ -175,13 +188,21 @@ class FakeObserve:
         return await self.element(tab, ref)
 
     async def capture(self, tab):
-        return SimpleNamespace(
+        self.snapshot = Snapshot(
+            id="observation",
             tab_id=tab.id,
             url=tab.url,
             document_id=tab.document_id,
+            title=tab.title,
+            readiness=ReadinessStatus.READY,
+            width=1280,
+            height=800,
             fingerprint="",
             scroll_y=0,
+            viewport_revision=tab.viewport_revision,
+            generation=dom_generation(tab),
         )
+        return self.snapshot
 
 
 class FakeServices(Plugin, provides=True):
