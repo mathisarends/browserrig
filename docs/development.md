@@ -96,7 +96,7 @@ rather than moving published tags; PyPI versions cannot be overwritten.
 
 ## Compatibility and coverage
 
-Harnessed and its provider, MCP and OTel extras are pinned to 0.20.0.
+Harnessed and its provider, MCP and OTel extras are pinned to 0.21.0.
 State/checkpoint format 3 and audit envelope 6 carry forward from Browserrig 0.8.
 Keep stores from earlier format versions separate. See the
 [0.9 migration guide](migration-0.9.md) when upgrading.

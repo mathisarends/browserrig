@@ -80,7 +80,13 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
 async def test_terminal_includes_turn_usage_in_its_json_output():
     output = io.StringIO()
     model = ScriptedModel(
-        [[ModelChunk(text="Answer", usage=ModelUsage(20, 5, 10, 3, 2))]]
+        [
+            [
+                ModelChunk(tool_call=ToolCall("unknown", {})),
+                ModelChunk(usage=ModelUsage(8, 2, 4, 1, 1)),
+            ],
+            [ModelChunk(text="Answer", usage=ModelUsage(12, 3, 6, 2, 1))],
+        ]
     )
     agent = Agent(model=model, plugins=[TerminalEvents(output)])
     result = await agent.run("Task")

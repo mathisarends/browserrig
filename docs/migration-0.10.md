@@ -2,6 +2,14 @@
 
 [Back to README](../README.md) · [Release notes](../CHANGELOG.md#unreleased)
 
+## Upgrade Harnessed
+
+Browserrig pins Harnessed and its provider, MCP and OTel extras to 0.21.0.
+Conversation state, checkpoints and JSON stores keep format 3. In a staged
+rollout, upgrade standalone audit readers before writers. The 0.20.0 reader
+rejects the new `usage` field in `turn.ended` records.
+See the [Harnessed 0.21.0 release notes](https://github.com/mathisarends/harnessed/releases/tag/v0.21.0).
+
 ## Compose perception from plugins
 
 `BrowserPerception` keeps the observation lifecycle: readiness, capture,
