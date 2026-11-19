@@ -22,6 +22,7 @@ from harnessed.events import (
     ModelRetryScheduledEvent,
     ToolCallFinishedEvent,
 )
+from harnessed.models import ModelChunk, ModelUsage
 from harnessed.testing import ScriptedModel
 
 from browserrig import TerminalEvents
@@ -74,6 +75,29 @@ async def test_terminal_observes_native_and_live_events_without_model_or_log_pol
     )
     assert "PRIVATE PROMPT" not in output.getvalue()
     assert "Final answer" not in output.getvalue()
+
+
+async def test_terminal_includes_turn_usage_in_its_json_output():
+    output = io.StringIO()
+    model = ScriptedModel(
+        [[ModelChunk(text="Answer", usage=ModelUsage(20, 5, 10, 3, 2))]]
+    )
+    agent = Agent(model=model, plugins=[TerminalEvents(output)])
+    result = await agent.run("Task")
+
+    records = [json.loads(line) for line in output.getvalue().splitlines()]
+    record = next(item for item in records if item["type"] == "turn.ended")
+    assert record["turn_id"] == result.turn_id
+    assert record["usage"] == {
+        "input_tokens": 20,
+        "output_tokens": 5,
+        "total_tokens": 25,
+        "cache_read_tokens": 10,
+        "cache_write_tokens": 3,
+        "reasoning_tokens": 2,
+        "cache_hit_rate": 0.5,
+        "cost": None,
+    }
 
 
 async def test_terminal_omits_arbitrary_page_and_form_value_fields():

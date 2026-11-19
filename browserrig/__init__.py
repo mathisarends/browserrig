@@ -125,6 +125,7 @@ from .tools import (
     WheelTools,
     WorkspaceTools,
 )
+from .usage import TokenUsageTracker, TurnUsageEvent
 
 __version__ = "0.9.0"
 
@@ -257,6 +258,8 @@ __all__ = [
     "Viewport",
     "WindowRatio",
     "TerminalEvents",
+    "TokenUsageTracker",
+    "TurnUsageEvent",
     "Todo",
     "TodoList",
     "Todos",
