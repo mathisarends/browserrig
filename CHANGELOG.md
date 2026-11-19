@@ -46,6 +46,10 @@ Upgrade from 0.9.x using the [migration guide](docs/migration-0.10.md).
 - Draw custom overlays on screenshots with an `ImageAnnotator`; layers order
   marks below the cursor.
 
+### Changed
+
+- Upgrade Harnessed and its provider, MCP and OTel extras to 0.21.0.
+
 ## 0.9.0 (2026-11-19)
 
 Upgrade from 0.8.x using the [migration guide](docs/migration-0.9.md).
