@@ -5,8 +5,8 @@ from harnessed import Agent, Plugin, ToolCall, ToolError, envelope_value, tool
 from harnessed.events import ToolCallFinishedEvent, ToolCallRequestedEvent
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals, CallEnvelope
-from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel
+from harnessed.tools import ToolRegistry
 
 from browserrig import ActionLabel, Choreography, Secret, Secrets
 from browserrig.choreography import WorkPhase, WorkPresentedEvent

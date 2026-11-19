@@ -2,13 +2,12 @@ from dataclasses import replace
 
 import pytest
 from harnessed import Agent, Plugin, ToolResult, ToolStatus
-from harnessed.core.errors import SessionFormatError
+from harnessed.errors import SessionFormatError
 from harnessed.events import (
     AssistantMessageEvent,
     CompactionFinishedEvent,
     CompactionStartedEvent,
     ControlState,
-    EventRegistry,
     ModelRequestedEvent,
     ModelRequestFailedEvent,
     ModelRequestOutcome,
@@ -22,6 +21,7 @@ from harnessed.events import (
     TurnOutcome,
     TurnStartedEvent,
 )
+from harnessed.events.registry import EventRegistry
 from harnessed.kernel import PluginScope, needs
 from harnessed.models import AssistantMessage, ModelInfo, ModelRequest
 from harnessed.testing import ScriptedModel

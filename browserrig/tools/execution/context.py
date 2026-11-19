@@ -18,6 +18,7 @@ class ToolAction:
     action_id: str = ""
     call_id: str = ""
     label: str = ""
+    tool_name: str = ""
     started: bool = False
     preparation_notes: list[str] = field(default_factory=list)
     preparation_omitted: int = 0
@@ -31,6 +32,7 @@ class CallIdentity:
 
     call_id: str = ""
     label: str = ""
+    tool_name: str = ""
 
 
 NO_CALL = CallIdentity()
@@ -59,8 +61,10 @@ class InvocationContext:
         return self._call.get()
 
     @contextmanager
-    def bind_call(self, call_id: str, label: str) -> Generator[None, None, None]:
-        token = self._call.set(CallIdentity(call_id, label[:LABEL_CHARS]))
+    def bind_call(
+        self, call_id: str, label: str, tool_name: str
+    ) -> Generator[None, None, None]:
+        token = self._call.set(CallIdentity(call_id, label[:LABEL_CHARS], tool_name))
         try:
             yield
         finally:
@@ -79,9 +83,16 @@ class InvocationContext:
         return action.tab
 
     @contextmanager
-    def activate(self, kind: ActionKind) -> Generator[ToolAction, None, None]:
+    def activate(
+        self, kind: ActionKind, tool_name: str
+    ) -> Generator[ToolAction, None, None]:
         call = self.call
-        action = ToolAction(kind, call_id=call.call_id, label=call.label)
+        action = ToolAction(
+            kind,
+            call_id=call.call_id,
+            label=call.label,
+            tool_name=call.tool_name or tool_name,
+        )
         token = self._current.set(action)
         try:
             yield action

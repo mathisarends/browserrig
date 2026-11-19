@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock
 import pytest
 from cdpify.domains.browser import DownloadProgressEvent, DownloadWillBeginEvent
 from harnessed import Agent, ToolError
-from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel
+from harnessed.tools import ToolRegistry
 from pypdf import PdfReader, PdfWriter
 
 from browserrig import (

@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 from harnessed import ToolCall
 from harnessed.kernel import PluginActivated
-from harnessed.services import ToolRegistry
+from harnessed.tools import ToolRegistry
 
 from browserrig import ActionKind, Actions, NavigationTools, WaitTools
 from browserrig.tools import BrowserToolMetadata, WaitIntent

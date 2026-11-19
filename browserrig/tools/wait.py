@@ -6,7 +6,7 @@ from math import inf
 
 from harnessed import Plugin, ToolChain
 from harnessed.kernel import Disposer, Key, PluginScope, Scope
-from harnessed.services import ToolRegistry
+from harnessed.tools import ToolRegistry
 from pydantic import Field
 
 from browserrig.browser import Browser

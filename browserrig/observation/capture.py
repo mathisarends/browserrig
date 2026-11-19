@@ -219,6 +219,7 @@ async def capture_observation(
         image=image,
         screenshot_status=screenshot_status,
         geometry=content.geometry,
+        device_scale=content.device_scale,
         cursor=cursor,
         viewport_revision=collected.viewport_revision,
         generation=collected.generation,
@@ -245,6 +246,7 @@ class CaptureContent:
     fingerprint: str | None = None
     references: References | None = None
     screenshot_status: ScreenshotStatus | None = None
+    device_scale: float | None = None
 
 
 class CaptureStrategy(Protocol):

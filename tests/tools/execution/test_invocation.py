@@ -9,8 +9,8 @@ from harnessed.events import ToolCallFinishedEvent, ToolExecutionFinishedEvent
 from harnessed.kernel import needs
 from harnessed.models import ImagePart, ImageReference, ModelChunk, TextPart
 from harnessed.plugins import Approvals, CallEnvelope
-from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel, call
+from harnessed.tools import ToolRegistry
 
 from browserrig import ActionLabel, Actions, DialogTools, Secret, Secrets
 from browserrig.browser import OpenDialog

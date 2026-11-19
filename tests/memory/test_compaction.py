@@ -1,9 +1,9 @@
 import pytest
-from harnessed.core.compaction import SummaryError
-from harnessed.core.tokens import ApproximateTokenCounter
 from harnessed.models import ModelUsage
 from harnessed.plugins import ContextState
-from harnessed.services import CompactionContext, CompactionRequest, Summary
+from harnessed.plugins.compaction import CompactionContext, CompactionRequest, Summary
+from harnessed.runtime.compaction import SummaryError
+from harnessed.runtime.tokens import ApproximateTokenCounter
 
 from browserrig.memory.compaction import (  # smelt: ignore[SMT107] -- test seam
     # Test compaction deferral and summaries without activating a session.

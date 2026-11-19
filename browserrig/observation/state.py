@@ -30,6 +30,8 @@ class ObservedText(NamedTuple):
 @dataclass
 class ImageState:
     images: list[CapturedImage] = field(default_factory=list)
+    projected_id: str | None = None
+    pending: CapturedImage | None = None
     # The last latest-screenshot note handed to the session.
     note: str = ""
 

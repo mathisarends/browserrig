@@ -1,7 +1,7 @@
 import pytest
 from harnessed import Agent, ToolCall
-from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel
+from harnessed.tools import ToolRegistry
 
 from browserrig import (
     Actions,

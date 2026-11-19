@@ -26,8 +26,7 @@ from harnessed.events import (
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
 from harnessed.models import ImagePart, ImageReference, ModelRequest, ToolMessage
 from harnessed.plugins import Approvals, LatestObservationOnly
-from harnessed.plugins.compaction import Compaction
-from harnessed.services import Summary
+from harnessed.plugins.compaction import Compaction, Summary
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import (

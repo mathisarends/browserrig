@@ -44,6 +44,7 @@ class BrowserToolCall(Waterfall[object]):
 
     metadata: BrowserToolMetadata
     arguments: Mapping[str, object]
+    name: str = ""
 
 
 def browser_tool[F: Callable[..., Awaitable[object]]](
@@ -75,6 +76,7 @@ def browser_tool[F: Callable[..., Awaitable[object]]](
             )
         binding = _ToolBinding()
         parameters = signature(callback)
+        name = getattr(callback, "__name__", "")
 
         @wraps(callback)
         async def execute(*args, **kwargs):
@@ -93,7 +95,8 @@ def browser_tool[F: Callable[..., Awaitable[object]]](
             arguments = parameters.bind(*args, **kwargs)
             arguments.apply_defaults()
             return await scope.dispatch(
-                BrowserToolCall(metadata, arguments.arguments), default=perform
+                BrowserToolCall(metadata, arguments.arguments, name),
+                default=perform,
             )
 
         return registration(binding)(register(cast(F, execute)))

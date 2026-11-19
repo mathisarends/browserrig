@@ -1,8 +1,11 @@
 import asyncio
+import base64
+import hashlib
 from dataclasses import replace
 from itertools import chain
 
 from harnessed import SessionLog
+from harnessed.events import ObservationsIncludedEvent
 from harnessed.models import (
     ImagePart,
     ImageReference,
@@ -17,6 +20,7 @@ from .config import Screenshots
 from .marks import annotate
 from .models import CapturedImage, Snapshot
 from .state import ImageState
+from .telemetry import trace_image
 
 NOTE_SOURCE = "browser-image"
 
@@ -41,11 +45,20 @@ async def project_image(
         image = replace(image, image=pixels)
     retained = state.images
     if options.skip_unchanged and retained and _same_screen(retained[-1], image):
+        state.projected_id = image.id
+        trace_image(image, "skipped_unchanged", reused_id=retained[-1].id)
         return None
+    asset_id = await asyncio.to_thread(_asset_id, image.image)
+    image = replace(image, asset_id=asset_id)
     retained.append(image)
     overflow = options.retention.overflow(len(retained))
     if overflow:
+        for dropped in retained[:overflow]:
+            trace_image(dropped, "dropped_by_retention")
         del retained[:overflow]
+    if retained:
+        state.pending = image
+    state.projected_id = image.id
     return image
 
 
@@ -113,6 +126,56 @@ def trim_images(
             message = replace(message, content=content)
         messages.append(message)
     return replace(request, messages=tuple(messages))
+
+
+def include_images(
+    event: ObservationsIncludedEvent, log: SessionLog, state: ImageState
+) -> CapturedImage | None:
+    """Confirm assets in the final request, including after compaction and request hooks."""
+    if not state.images:
+        return None
+    recorded = log.request(event.request_id)
+    message_ids = {
+        item.message_id for item in event.observations if item.source == "browser"
+    }
+    assets_by_message = (
+        {
+            message.id: {
+                part.asset.sha256
+                for part in message.content
+                if isinstance(part, ImageReference)
+            }
+            for message in recorded.messages
+            if message.id in message_ids and not isinstance(message.content, str)
+        }
+        if recorded is not None
+        else {}
+    )
+    assets_by_ref = {}
+    for item in event.observations:
+        assets = assets_by_message.get(item.message_id)
+        if item.source == "browser" and assets:
+            assets_by_ref.update(dict.fromkeys(item.refs, assets))
+    images = state.images
+    images[:] = [
+        image for image in images if image.asset_id in assets_by_ref.get(image.id, ())
+    ]
+    pending, state.pending = state.pending, None
+    if pending is not None:
+        outcome = "delivered" if pending in images else "not_included"
+        trace_image(pending, outcome, request_id=event.request_id)
+    return images[-1] if images else None
+
+
+def discard_pending_image(state: ImageState) -> None:
+    pending, state.pending = state.pending, None
+    if pending is not None:
+        state.images[:] = [image for image in state.images if image.id != pending.id]
+        trace_image(pending, "not_included")
+
+
+def _asset_id(image: str) -> str:
+    return hashlib.sha256(base64.b64decode(image)).hexdigest()
 
 
 def _image_area(image: CapturedImage) -> Bounds:

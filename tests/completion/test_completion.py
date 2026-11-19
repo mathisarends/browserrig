@@ -18,13 +18,13 @@ from harnessed.events import (
     AssistantMessageEvent,
     OutputValidatedEvent,
     TextDeltaEvent,
-    TurnResultEvent,
 )
+from harnessed.events.stream import TurnResultEvent
 from harnessed.hooks import OutputDecision, PrepareOutput, TurnStopping
 from harnessed.kernel import needs
 from harnessed.models import ModelChunk, ModelInfo, ModelUsage
 from harnessed.plugins import AgentLoop, Approvals, FinalStepPolicy
-from harnessed.services import SessionContext
+from harnessed.sessions import SessionContext
 from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel, Field
 

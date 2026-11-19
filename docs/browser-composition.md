@@ -261,7 +261,7 @@ operation in `coordination.exclusive()` when mixing it with agent work.
 | `PrepareRequest` | Waterfall returning `ModelRequest` | Add current application facts or transform request content |
 | `ExecuteTool` / `ReviewToolResult` | Waterfall returning `ToolResult` | Wrap execution or inspect the converted result |
 | `BrowserToolCall` | Waterfall returning the tool body's result | Extend browser execution before result conversion |
-| `CheckAction` | Emit before a managed action starts | Reject an action when application state has changed |
+| `CheckAction` | Emit before a managed action starts | Reject an action when application state has changed or [record receipt fields](telemetry.md#add-receipt-attributes-from-a-plugin) |
 | `ProjectObservation` | Waterfall returning `UserMessage` or `None` | Compose context from one immutable, redacted snapshot |
 | `ChangeTab` | Waterfall around a tab operation | Synchronize devices or stage a transition |
 | `SelectReadiness` | Bail: first non-`None` policy wins | Choose readiness for a page or application |

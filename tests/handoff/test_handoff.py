@@ -12,13 +12,13 @@ from harnessed import (
 )
 from harnessed.events import (
     CompactionAppliedEvent,
-    EventRegistry,
     ToolCallFinishedEvent,
 )
+from harnessed.events.registry import EventRegistry
 from harnessed.integrations.json import JsonSessionStore
 from harnessed.models import ModelChunk, ToolMessage
 from harnessed.plugins import AgentLoop, Approvals, Compaction
-from harnessed.services import Summary
+from harnessed.plugins.compaction import Summary
 from harnessed.testing import ScriptedModel, call
 from pydantic import ValidationError
 

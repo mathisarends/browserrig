@@ -34,7 +34,7 @@ class InvokeTool:
                     return await next_()
             return await next_()
 
-        with self.context.activate(kind) as action:
+        with self.context.activate(kind, event.name) as action:
 
             async def perform(_tab: Tab) -> Effect:
                 value = await next_()
@@ -61,6 +61,7 @@ class InvokeTool:
                 settle=settle,
                 expects_change=profile.warn_if_no_progress,
                 action=action,
+                arguments=event.arguments,
             )
             original = action.result
             if original is None:

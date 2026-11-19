@@ -13,11 +13,13 @@ import re
 import shutil
 import subprocess
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 from .results import BenchmarkResult, TaskResult
 
 _LINK_LINE = re.compile(r"^\s*(?:[-*\d.]+\s*)?\[[^\]]*\]\(<?[^)]*>?\)\s*$")
+_IMAGE_PLACEHOLDER = re.compile(r"^\[image [0-9a-f]{64}, .+\]$")
 
 
 def px_spans(project: str, session_id: str) -> list[dict]:
@@ -156,11 +158,13 @@ def _analyze_steps(
     seen: set[str] = set()
     noise: list[dict] = []
     call_names: dict[str, str] = {}
+    prior_output: dict = {}
     for index, span in enumerate(models, 1):
         attrs = span["attributes"]
         prompt = attrs.get("llm.token_count.prompt") or 0
         cached = attrs.get("llm.token_count.prompt_details.cache_read") or 0
-        messages = _messages(span)
+        inherited = [*previous, prior_output] if prior_output else previous
+        messages = _messages(attrs, inherited)
         added: dict[str, int] = {}
         if messages is not None:
             added, rewritten, message_lines, message_noise = _context_delta(
@@ -178,13 +182,8 @@ def _analyze_steps(
             previous = messages
         else:
             rewritten = None
-        try:
-            output = json.loads(attrs.get("output.value") or "{}")
-        except json.JSONDecodeError:
-            output = {}
-        if not isinstance(output, dict):
-            output = {}
-        calls = [c["name"] for c in output.get("tool_calls") or []]
+        prior_output = _output(attrs)
+        calls = [c["name"] for c in prior_output.get("tool_calls") or []]
         steps.append(
             {
                 "step": index,
@@ -234,15 +233,81 @@ def _context_delta(
     return added, rewritten, lines, noise
 
 
-def _messages(span: dict) -> list[dict] | None:
-    attrs = span["attributes"]
+def _messages(attrs: dict, previous: list[dict]) -> list[dict] | None:
+    inherited = attrs.get("harnessed.input_messages.inherited")
+    if isinstance(inherited, int):
+        if not 0 <= inherited <= len(previous) or attrs.get(
+            "harnessed.input.serialization_error"
+        ):
+            return None
+        return [*previous[:inherited], *_openinference_messages(attrs, "input")]
     if attrs.get("harnessed.input.truncated"):
         return None
+    messages = _json(attrs.get("input.value"))
+    return messages if isinstance(messages, list) else None
+
+
+def _output(attrs: dict) -> dict:
+    messages = _openinference_messages(attrs, "output")
+    if messages:
+        return messages[0]
+    output = _json(attrs.get("output.value"))
+    return output if isinstance(output, dict) else {}
+
+
+def _openinference_messages(attrs: dict, direction: str) -> list[dict]:
+    return [
+        _openinference_message(fields)
+        for fields in _indexed(attrs, f"llm.{direction}_messages.", "message")
+    ]
+
+
+def _openinference_message(fields: dict) -> dict:
+    parts = _indexed(fields, "contents.", "message_content")
+    calls = _indexed(fields, "tool_calls.", "tool_call")
+    return {
+        "role": fields.get("role", "?"),
+        "tool_call_id": fields.get("tool_call_id", ""),
+        "content": [_openinference_part(part) for part in parts]
+        if parts
+        else fields.get("content", ""),
+        "tool_calls": [
+            {
+                "id": call.get("id", ""),
+                "name": call["function.name"],
+                "arguments": _json(call.get("function.arguments")),
+            }
+            for call in calls
+            if "function.name" in call
+        ],
+    }
+
+
+def _openinference_part(part: dict) -> dict:
+    text = part.get("text", "")
+    if part.get("type") == "image" or _IMAGE_PLACEHOLDER.fullmatch(text):
+        return {"type": "image"}
+    return {"type": "text", "text": text}
+
+
+def _indexed(attrs: dict, prefix: str, key: str) -> list[dict]:
+    items: dict[int, dict] = defaultdict(dict)
+    for name, value in attrs.items():
+        if not name.startswith(prefix):
+            continue
+        index, separator, field = name[len(prefix) :].partition(f".{key}.")
+        if separator and index.isdecimal():
+            items[int(index)][field] = value
+    return [items[index] for index in sorted(items)]
+
+
+def _json(value: str | None):
+    if value is None:
+        return None
     try:
-        messages = json.loads(attrs.get("input.value") or "null")
+        return json.loads(value)
     except json.JSONDecodeError:
         return None
-    return messages if isinstance(messages, list) else None
 
 
 def _text(message: dict) -> str:

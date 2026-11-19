@@ -14,11 +14,11 @@ from harnessed import (
     hook,
     tool,
 )
-from harnessed.core.prompt.plugin_instructions import PluginInstructions
 from harnessed.events import ControlState, SessionControlChangedEvent
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
 from harnessed.kernel import PluginScope, needs
 from harnessed.models import ModelRequest, UserMessage
+from harnessed.prompts.plugin_instructions import PluginInstructions
 from pydantic import Field, TypeAdapter, ValidationError
 
 from browserrig.browser import Browser, BrowserEvents

@@ -2,7 +2,7 @@ from dataclasses import fields
 from typing import get_args, get_type_hints
 
 import pytest
-from harnessed.events import EventRegistry
+from harnessed.events.registry import EventRegistry
 from pydantic import TypeAdapter
 
 from browserrig import events

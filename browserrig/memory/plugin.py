@@ -3,20 +3,21 @@ from collections.abc import Callable
 from dataclasses import replace
 
 from harnessed import Instructions, PluginState, SystemPrompt, hook
-from harnessed.core.budget import ContextBudget
-from harnessed.core.compaction import (
-    CompactionPolicy,
-    CompactionPrompt,
-    ModelSummarizer,
-)
-from harnessed.core.prompt.plugin_instructions import PluginInstructions
-from harnessed.core.tokens import TokenCounter, count_request
 from harnessed.events import CompactionAppliedEvent
 from harnessed.hooks import Next, PrepareRequest, PreStep, SessionAppended, StepDecision
 from harnessed.kernel import PluginScope, needs, observes
 from harnessed.models import Model, ModelRequest, UserMessage
 from harnessed.plugins import Compaction, ContextState
-from harnessed.services import SessionContext, Summarizer
+from harnessed.plugins.compaction import Summarizer
+from harnessed.prompts.plugin_instructions import PluginInstructions
+from harnessed.runtime.budget import ContextBudget
+from harnessed.runtime.compaction import (
+    CompactionPolicy,
+    CompactionPrompt,
+    ModelSummarizer,
+)
+from harnessed.runtime.tokens import TokenCounter, count_request
+from harnessed.sessions import SessionContext
 from harnessed.tracing import span
 
 from browserrig.events import FileReadFinishedEvent, FileWrittenEvent

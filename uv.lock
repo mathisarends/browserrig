@@ -199,11 +199,11 @@ requires-dist = [
     { name = "cdpify", extras = ["websocket"], specifier = "==0.5.0" },
     { name = "charset-normalizer", specifier = ">=3.4,<4" },
     { name = "defusedxml", marker = "extra == 'files'", specifier = ">=0.7.1,<0.8" },
-    { name = "harnessed", specifier = "==0.19.0" },
-    { name = "harnessed", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = "==0.19.0" },
-    { name = "harnessed", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==0.19.0" },
-    { name = "harnessed", extras = ["openai"], marker = "extra == 'openai'", specifier = "==0.19.0" },
-    { name = "harnessed", extras = ["otel"], marker = "extra == 'otel'", specifier = "==0.19.0" },
+    { name = "harnessed", specifier = "==0.20.0" },
+    { name = "harnessed", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = "==0.20.0" },
+    { name = "harnessed", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==0.20.0" },
+    { name = "harnessed", extras = ["openai"], marker = "extra == 'openai'", specifier = "==0.20.0" },
+    { name = "harnessed", extras = ["otel"], marker = "extra == 'otel'", specifier = "==0.20.0" },
     { name = "httpx2", specifier = ">=2.16,<3" },
     { name = "markdownify", marker = "extra == 'files'", specifier = ">=1.2,<2" },
     { name = "mutagen", marker = "extra == 'files'", specifier = ">=1.47,<2" },
@@ -965,14 +965,14 @@ wheels = [
 
 [[package]]
 name = "harnessed"
-version = "0.19.0"
+version = "0.20.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e6/aa/463b672ae71330b7b8d99d728ea5bd7cb94982cdbe106a59edde1acbea02/harnessed-0.19.0.tar.gz", hash = "sha256:d5b2b125bbdf0b589f7ef4ed893f5471ff371c168d5b2ad12cc72c7f1de3f1e6", size = 242639, upload-time = "2026-11-17T22:26:04.828Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e6/5c/c06915e5f40e1c9070b704d7f31e3b314b723249b93266b1daf522580a9c/harnessed-0.20.0.tar.gz", hash = "sha256:22fef3e259b768ba5f7ef74f2f0ae9640942df8605e36f16c7b75d1de1b638f0", size = 245429, upload-time = "2026-11-19T15:31:41.874Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7a/af/286881ccee4db0d5caca7e1c5b398f88f5e7533ab22e0826916a67acc1ec/harnessed-0.19.0-py3-none-any.whl", hash = "sha256:1b511297e33b36751400866efa7c4bce3a9adeeb39ec1c7d0f4b8c74620ece4d", size = 301088, upload-time = "2026-11-17T22:26:03.134Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/a8/63aea480dad17044cdf100046f0918dcee3cac20409ce5cda1f7be4c5f37/harnessed-0.20.0-py3-none-any.whl", hash = "sha256:d5b7253376c2d5cbe1b75b9f14e40b23db9d3a7eebcb91685ed04c7260b6e9f8", size = 303018, upload-time = "2026-11-19T15:31:40.335Z" },
 ]
 
 [package.optional-dependencies]

@@ -1,8 +1,10 @@
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
+from contextlib import AsyncExitStack
 from uuid import uuid4
 
 from harnessed import ToolError, ToolResult
+from harnessed.kernel import PluginScope
 from harnessed.tracing import record, traced
 
 from browserrig.browser import Browser, BrowserEvents, Tab
@@ -20,13 +22,14 @@ from browserrig.events import (
     ActionStartedEvent,
     PageState,
 )
-from browserrig.observation import BrowserPerception
+from browserrig.observation import BrowserPerception, CapturedImage
 from browserrig.readiness import PageReadiness
 from browserrig.tools.effects import Effect
 
 from .context import NO_CALL, CallIdentity, ToolAction, ToolActionError
-from .dispatch import ActionDispatch
-from .policy import ActionProfile, action_profile
+from .dispatch import ActionDispatch, Dispatched
+from .policy import COORDINATE_KINDS, ActionProfile, action_profile
+from .telemetry import operation_span, record_operation, record_target
 
 
 class ActionRunner:
@@ -43,6 +46,8 @@ class ActionRunner:
         actions: ActionContext,
         page_change: Callable[[Tab], Awaitable[str]],
         check_action: Callable[[Tab, ActionKind], Awaitable[None]],
+        scope: PluginScope,
+        redact: Callable[[str], str],
     ) -> None:
         self._browser = browser
         self._coordination = coordination
@@ -51,6 +56,8 @@ class ActionRunner:
         self._observe = observe
         self._page_change = page_change
         self._check_action = check_action
+        self._scope = scope
+        self._redact = redact
         self._dispatch = ActionDispatch(browser.tabs, readiness, actions)
 
     @traced
@@ -64,23 +71,39 @@ class ActionRunner:
         settle: bool = True,
         action: ToolAction | None = None,
         call: CallIdentity = NO_CALL,
+        arguments: Mapping[str, object] | None = None,
     ) -> ToolResult:
         """Run one mutation once. Its addressed tab cannot change with global focus."""
         profile = action_profile(kind) or ActionProfile()
         record(kind=kind)
-        async with self._coordination.exclusive():
+        async with self._coordination.exclusive(), AsyncExitStack() as stack:
             tab = self._browser.active_tab
             action_id = uuid4().hex
             if action is not None:
                 action.tab = tab
                 action.action_id = action_id
-                call = CallIdentity(action.call_id, action.label)
+                call = CallIdentity(action.call_id, action.label, action.tool_name)
+            stack.enter_context(
+                operation_span(
+                    self._scope,
+                    **{
+                        "browserrig.action.id": action_id,
+                        "browserrig.action.kind": kind,
+                        "browserrig.tool.name": call.tool_name or kind.value,
+                        "browserrig.tab_id": tab.id,
+                        "browserrig.document_id": tab.document_id,
+                    },
+                )
+            )
+            self._record_context(call, kind, arguments)
             dispatched = False
+            checking = True
             try:
                 before = await self._prepare(tab, kind, profile)
                 if check is not None:
                     await check(tab)
                 await self._check_action(tab, kind)
+                checking = False
                 if action is None or not profile.preflight:
                     await self._events.emit(
                         ActionStartedEvent(
@@ -95,15 +118,9 @@ class ActionRunner:
                     dispatched = True
                     if action is not None:
                         action.started = True
-                followed = ""
-                if settle and profile.phase is ReadinessPhase.NAVIGATION:
-                    effect, note = await self._dispatch.navigate(
-                        tab, action_id, operation
-                    )
-                else:
-                    effect, note, followed = await self._dispatch.dispatch(
-                        tab, action_id, operation, profile=profile, settle=settle
-                    )
+                effect, note, followed = await self._dispatch_action(
+                    tab, action_id, operation, profile=profile, settle=settle
+                )
                 if action is not None and not action.started:
                     await self.start(action)
                 self._check_navigation(tab)
@@ -121,7 +138,7 @@ class ActionRunner:
                         label=call.label,
                     )
                 )
-                return await self._result(
+                result = await self._result(
                     tab,
                     profile,
                     effect,
@@ -129,6 +146,12 @@ class ActionRunner:
                     note=note,
                     preparation=_preparation(action),
                 )
+                self._record_outcome(
+                    "blocked" if effect.blocked_reason else "dispatched",
+                    started=True,
+                    reason=effect.blocked_reason,
+                )
+                return result
             except asyncio.CancelledError:
                 if action is not None:
                     dispatched = action.started
@@ -144,7 +167,7 @@ class ActionRunner:
                     call,
                     dispatched=dispatched,
                     reason=reason,
-                    cancelled=True,
+                    outcome="cancelled",
                 )
                 raise
             except Exception as error:
@@ -157,7 +180,15 @@ class ActionRunner:
                     else f"{type(error).__name__}: {error}"
                 )
                 await self._fail(
-                    tab, action_id, kind, call, dispatched=dispatched, reason=reason
+                    tab,
+                    action_id,
+                    kind,
+                    call,
+                    dispatched=dispatched,
+                    reason=reason,
+                    outcome="blocked"
+                    if checking and isinstance(error, (BrowserError, ToolError))
+                    else "failed",
                 )
                 hint = (
                     "; the action may have run. Observe before retrying."
@@ -182,6 +213,49 @@ class ActionRunner:
             )
         )
         action.started = True
+
+    async def _dispatch_action(
+        self,
+        tab: Tab,
+        action_id: str,
+        operation: Callable[[Tab], Awaitable[Effect]],
+        *,
+        profile: ActionProfile,
+        settle: bool,
+    ) -> Dispatched:
+        if settle and profile.phase is ReadinessPhase.NAVIGATION:
+            effect, note = await self._dispatch.navigate(tab, action_id, operation)
+            return Dispatched(effect, note, "")
+        return await self._dispatch.dispatch(
+            tab, action_id, operation, profile=profile, settle=settle
+        )
+
+    def _record_context(
+        self,
+        call: CallIdentity,
+        kind: ActionKind,
+        arguments: Mapping[str, object] | None,
+    ) -> None:
+        if call.call_id:
+            record_operation(**{"tool.call_id": call.call_id})
+        snapshot = self._observe.snapshot
+        if snapshot is not None:
+            record_operation(**{"observation.id": snapshot.id})
+        source = self._observe.coordinates
+        if kind in COORDINATE_KINDS and source is not None:
+            record_operation(
+                **{
+                    "input.space": "screenshot"
+                    if isinstance(source, CapturedImage)
+                    else "viewport"
+                }
+            )
+        if isinstance(source, CapturedImage):
+            record_operation(**{"screenshot.id": source.id})
+            if source.asset_id is not None:
+                record_operation(**{"screenshot.asset_id": source.asset_id})
+        if arguments:
+            record_target(kind, arguments)
 
     async def _result(
         self,
@@ -253,8 +327,9 @@ class ActionRunner:
         *,
         dispatched: bool,
         reason: str,
-        cancelled: bool = False,
+        outcome: str,
     ) -> None:
+        self._record_outcome(outcome, started=dispatched, reason=reason)
         await self._events.emit(
             ActionFailedEvent(
                 action_id=action_id,
@@ -263,11 +338,16 @@ class ActionRunner:
                 document_id=tab.document_id,
                 dispatched=dispatched,
                 reason=reason,
-                cancelled=cancelled,
+                cancelled=outcome == "cancelled",
                 call_id=call.call_id,
                 label=call.label,
             )
         )
+
+    def _record_outcome(self, outcome: str, *, started: bool, reason: str) -> None:
+        record_operation(**{"action.outcome": outcome, "action.started": started})
+        if reason:
+            record_operation(**{"action.reason": self._redact(reason)})
 
 
 def _preparation(action: ToolAction | None) -> str:

@@ -19,7 +19,7 @@ from browserrig import ActionKind, Browser, DownloadReceiving, FileTransfers, Wo
 from browserrig.files import FileSystem, LocalWorkspace
 from harnessed import Agent, Session
 from harnessed.plugins import Service
-from harnessed.services import ToolRegistry
+from harnessed.tools import ToolRegistry
 from harnessed.testing import ScriptedModel
 from browserrig.scripts import CHOREOGRAPHY, CONTENT, ELEMENT, OVERLAY, SECRET_FIELD
 

@@ -94,8 +94,9 @@ rather than moving published tags; PyPI versions cannot be overwritten.
 
 ## Compatibility and coverage
 
-Harnessed/provider extras are pinned to 0.19.0. State/checkpoint format 3 and audit
-envelope 6 reject older data; keep old stores separate. Review the
+Harnessed and its provider, MCP and OTel extras are pinned to 0.20.0.
+State/checkpoint format 3 and audit envelope 6 reject older data. Keep older stores
+separate. Review the
 [changelog](../CHANGELOG.md) when upgrading.
 
 Persistence adapters in handoff/todos and compaction integration in task memory
