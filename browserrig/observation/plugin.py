@@ -82,7 +82,8 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     """Provide the agent's current view of the browser before each model step.
 
     Select page text, metadata, screenshots, or a combination. Configured modalities share one
-    snapshot and request history. The plugin registers no model tools.
+    snapshot and request history. The plugin registers no model tools. A plugin can provide
+    the CaptureStrategy as a session service when capture needs its mount-local services.
     """
 
     events = (ObservationCapturedEvent,)
@@ -94,6 +95,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     _readiness = needs(PageReadiness)
     _tab_policy = observes(TabPolicy)
     _app_state = observes(AppState)
+    _provided_capture = observes(CaptureStrategy)
 
     def __init__(
         self,
@@ -106,12 +108,15 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         super().__init__()
         self.text = text
         self.screenshots = screenshots
+        self._configured = (capture, renderer)
         self.capture_strategy = _capture_for_text(capture, text, screenshots)
         self.renderer = _text_renderer(self.capture_strategy, text, renderer)
 
     async def setup(self, scope: PluginScope) -> None:
         # Secrets is looked up per capture, so it redacts wherever it sits in the plugins.
         self._state.context = scope
+        if self._provided_capture is not None:
+            self.capture_strategy = self._use_provided_capture(self._provided_capture)
         if self.capture_strategy.supports_dom_refs:
             scope.provide(ResolveDomElement, ResolveDomElement(self))
 
@@ -289,6 +294,18 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         )
         assert coordinates is not None
         return coordinates
+
+    def _use_provided_capture(self, provided: CaptureStrategy) -> CaptureStrategy:
+        capture, renderer = self._configured
+        if capture is not None:
+            raise ValueError(
+                "BrowserPerception(capture=...) conflicts with a provided CaptureStrategy; "
+                "configure only one"
+            )
+        provided = _capture_for_text(provided, self.text, self.screenshots)
+        # The prompt reads the renderer before setup, so it cannot follow the capture.
+        _text_renderer(provided, self.text, renderer)
+        return provided
 
     @traced
     async def _capture(

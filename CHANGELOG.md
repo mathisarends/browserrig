@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Provide a `CaptureStrategy` from a plugin when capture needs mount-local
+  services. `BrowserPerception` observes it in place of its default capture and
+  validates it with the configured renderer during setup. Configuring
+  `capture=` as well fails during setup.
+
 ## 0.9.0 (2026-11-19)
 
 Upgrade from 0.8.x using the [migration guide](docs/migration-0.9.md).

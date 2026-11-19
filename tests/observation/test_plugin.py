@@ -1,8 +1,10 @@
 import asyncio
+from dataclasses import dataclass
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent, ToolCall
+from harnessed import Agent, Plugin, ToolCall
+from harnessed.kernel import PluginScope, needs
 from harnessed.models import ImagePart, ModelChunk, ToolMessage
 from harnessed.testing import ScriptedModel
 
@@ -13,11 +15,13 @@ from browserrig import (
     BrowserPerception,
     CaptureContent,
     CaptureStrategy,
+    DomCapture,
     DomRenderer,
     ElementInfo,
     MultiTab,
     PageContent,
     PageReadiness,
+    ResolveDomElement,
     ScreenshotCapture,
     Screenshots,
     ScreenshotTools,
@@ -305,3 +309,88 @@ async def test_explicit_screenshot_reports_reuse_or_unavailability(image_availab
         assert any("screen unchanged this step" in message.text for message in messages)
     else:
         assert any(message.text == "Screenshot unavailable." for message in messages)
+
+
+class _AppRuntime(Plugin, provides=True):
+    """A mount-local app service that a capture strategy needs."""
+
+
+@dataclass(frozen=True)
+class _AppCapture(CaptureStrategy):
+    runtime: _AppRuntime
+
+    async def collect(self, tab, _report, **_options):
+        return CaptureContent(
+            page=PageContent(
+                url=tab.url,
+                title=tab.title,
+                width=800,
+                height=600,
+                scroll_y=0,
+                page_height=600,
+                text="app content",
+            )
+        )
+
+
+class _AppView(Plugin):
+    _runtime = needs(_AppRuntime)
+
+    async def setup(self, scope: PluginScope) -> None:
+        scope.provide(CaptureStrategy, _AppCapture(self._runtime))
+
+
+class _AppRenderer(DomRenderer):
+    def refs(self) -> None:
+        return None
+
+
+async def test_provided_capture_binds_mount_local_services():
+    holder = {}
+    perception = BrowserPerception(renderer=_AppRenderer())
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            FakeChrome(holder),
+            PageReadiness(),
+            perception,
+            _AppView(),
+            _AppRuntime(),
+        ],
+    )
+    async with agent.session() as session:
+        active = session.scope[BrowserPerception]
+        assert active.capture_strategy == _AppCapture(session.scope[_AppRuntime])
+        assert ResolveDomElement not in session.scope
+        assert (await active.capture()).text == "app content"
+    assert isinstance(perception.capture_strategy, DomCapture)
+
+
+@pytest.mark.parametrize(
+    "perception, message",
+    [
+        pytest.param(
+            BrowserPerception(capture=DomCapture()),
+            "conflicts with a provided CaptureStrategy",
+            id="configured-capture",
+        ),
+        pytest.param(BrowserPerception(), "require a renderer", id="missing-renderer"),
+    ],
+)
+async def test_provided_capture_is_validated_during_setup(perception, message):
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            FakeChrome({}),
+            PageReadiness(),
+            perception,
+            _AppView(),
+            _AppRuntime(),
+        ],
+    )
+    with pytest.raises(ExceptionGroup) as caught:
+        async with agent.session():
+            pytest.fail("Setup should fail")
+    (error,) = caught.value.exceptions
+    assert isinstance(error, ValueError)
+    assert message in str(error)
