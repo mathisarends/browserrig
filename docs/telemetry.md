@@ -33,7 +33,7 @@ uv run --extra openai --extra otel python -m examples.openai_agent --headed --tr
 | `--trace` | Names, IDs, durations, outcomes and reported usage |
 | `--trace-content` | Also messages, responses, arguments/results and request definitions; implies tracing |
 | `--trace-hooks` | Hook invocation spans; implies tracing |
-| `--trace-max-content-length 65536` | Raise the per-field limit from 16,384 characters |
+| `--trace-max-content-length 65536` | Raise the 16,384-character limit for content fields and model message parts |
 | `--quiet` | Disable terminal events independently of tracing |
 
 Content capture can retain page text, credentials and file contents. CLI
@@ -51,8 +51,12 @@ harnessed.turn
 ```
 
 Use `session.id` to follow turns. `harnessed.outcome` and
-`harnessed.output.partial` identify incomplete work. Model spans expose bounded
-request tools/settings/output schemas when content capture is enabled.
+`harnessed.output.partial` identify incomplete work. With content capture enabled,
+Harnessed 0.20 model spans expose `llm.input_messages`, `llm.output_messages`,
+`llm.tools`, and `llm.invocation_parameters` using OpenInference. Input spans show
+new messages by default. `harnessed.input_messages.inherited` counts messages
+already shown on earlier spans. Use `full_input_messages=True` on the tracer to
+include the full message list on each model span.
 
 For slow runs, compare model time, browser operation time and lock acquisition
 (`BrowserCoordination.acquire`). Hook spans identify handlers with
@@ -61,9 +65,72 @@ the continuation they await, so nested durations overlap. Readiness includes
 polling waits, and input spans include configured pacing. Individual CDP commands
 and provider HTTP retries do not have separate spans.
 
-Captured fields contain valid JSON; truncation is marked with
-`harnessed.<field>.truncated`, `.original_length` and `.omitted_items`. Hook/content
-instrumentation adds work: enable it when diagnosing those parts.
+JSON content fields mark truncation with `harnessed.<field>.truncated`,
+`.original_length` and `.omitted_items`. On model spans, text and tool arguments
+are limited individually and include an inline truncation marker.
+
+## Screenshot and action attributes
+
+Start with `browserrig.operation` and find `browserrig.screenshot.id` on a
+`browserrig.observation` span with outcome `delivered`. Join that observation's
+`browserrig.request.id` to `harnessed.request_id` on a `harnessed.model` span.
+In Phoenix, the screenshot caption and image appear together in the model
+input. Harnessed exports each distinct image once per session. If the image
+reappears, its placeholder gives the digest and the first model span ID. Image
+export requires content capture, allows up to 5 MiB per image by default, and
+respects the tracer's content filter. The Browserrig spans carry metadata.
+
+The following `browserrig.*` keys are stable. Fields appear when applicable.
+
+| `browserrig.observation` attribute | Value |
+| --- | --- |
+| `browserrig.observation.id` | ID of the captured snapshot |
+| `browserrig.tab_id`, `browserrig.document_id`, `browserrig.url` | Page identity at capture |
+| `browserrig.screenshot.id` | Browserrig screenshot ID, also shown in the model's caption |
+| `browserrig.screenshot.asset_id` | SHA-256 of the PNG bytes after applying marks and cursor rendering, matching Harnessed's `AssetRef.sha256` |
+| `browserrig.screenshot.width`, `browserrig.screenshot.height` | Image dimensions in pixels |
+| `browserrig.screenshot.scale` | Delivered image pixels per viewport CSS pixel, including crop zoom |
+| `browserrig.screenshot.device_scale` | Chrome's capture density before normalization, when available |
+| `browserrig.screenshot.reused_id` | Earlier screenshot kept when the new capture is unchanged |
+| `browserrig.request.id` | Final model request that determined inclusion |
+| `browserrig.observation.outcome` | `delivered`, `skipped_unchanged`, `dropped_by_retention`, `not_included`, `not_projected`, `not_requested`, `unavailable`, or `withheld` |
+
+`delivered` means the final request contains the screenshot asset. An image
+evicted by the configured retention policy gets a `dropped_by_retention` span
+with the same screenshot ID, even if it was delivered previously.
+`not_included` means the projected image did not reach the final request.
+`not_projected` covers direct captures and projection hooks that bypass image
+projection. `withheld` covers captures suppressed by secret redaction.
+
+| `browserrig.operation` attribute | Value |
+| --- | --- |
+| `browserrig.action.id`, `browserrig.action.kind` | ID and kind shared with Browserrig action events |
+| `browserrig.tool.name`, `browserrig.tool.call_id` | Tool name and Harnessed call ID. Explicit operations outside a tool use the action kind as the name |
+| `browserrig.tab_id`, `browserrig.document_id` | Addressed page before the action |
+| `browserrig.observation.id` | Current snapshot when the action began |
+| `browserrig.screenshot.id`, `browserrig.screenshot.asset_id` | Latest screenshot visible to the model when the action began, including a retained screenshot |
+| `browserrig.input.space` | `screenshot` for image pixels or `viewport` for CSS pixels |
+| `browserrig.input.x`, `browserrig.input.y` | Coordinates supplied to a point tool, including rejected input |
+| `browserrig.input.start.x`, `browserrig.input.start.y`, `browserrig.input.end.x`, `browserrig.input.end.y` | Coordinates supplied to a drag tool |
+| `browserrig.viewport.x`, `browserrig.viewport.y`, `browserrig.viewport.start.*`, `browserrig.viewport.end.*` | Mapped or resolved pointer coordinates in viewport CSS pixels |
+| `browserrig.target.ref`, `browserrig.target.source_ref`, `browserrig.target.target_ref`, `browserrig.target.target_id` | Supplied element references or target tab identifier |
+| `browserrig.action.outcome` | `dispatched`, `blocked`, `failed`, or `cancelled` |
+| `browserrig.action.started`, `browserrig.action.reason` | Whether the action reached its start boundary and why dispatch was blocked, failed, or cancelled |
+| `browserrig.receipt.*` | Application-defined scalar attributes |
+
+The operation span covers checks, dispatch and follow-up. A `dispatched` action
+may still need a new observation to verify its effect on the page.
+
+### Add receipt attributes from a plugin
+
+Call `Actions.record_receipt` from `CheckAction` before dispatch or from
+`ActionFinishedEvent` and `ActionFailedEvent` handlers to record the result.
+Staging hooks and managed tool implementations can use the same method. It writes
+to the enclosing operation span even when hook tracing adds a nested span. In an
+`@hook(ActionFinishedEvent)` handler with an injected `Actions` service, call
+`actions.record_receipt(hotspot_hit=matched)` to write
+`browserrig.receipt.hotspot_hit`. Use booleans, numbers or strings. Calls outside
+a managed action have no effect.
 
 ## Use in an application
 
@@ -105,7 +172,9 @@ It does not scan the environment or Browserrig's `Secrets` plugin; recreate the
 policy when credentials rotate. Exception text is disabled unless explicitly
 enabled. A synchronous `content_filter` can replace or omit detached `TraceContent`
 fields. Apply rules to every content kind that may contain the same value.
-Explicit diagnostic `record(...)` attributes are outside content filtering.
+Explicit diagnostic attributes, including Browserrig URLs, action reasons and
+extension receipts, are outside Harnessed's content filter. Browserrig applies
+its `Secrets` redaction to captured URLs, action reasons and receipt strings.
 
 Reuse a backend's existing provider when available; do not shut down a shared
 provider per session. See [examples/telemetry.py](../examples/telemetry.py) for

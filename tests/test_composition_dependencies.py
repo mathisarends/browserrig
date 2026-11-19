@@ -14,13 +14,13 @@ from harnessed import (
     SystemPrompt,
     ToolCall,
 )
-from harnessed.core.tools.registry import ToolRegistry
 from harnessed.errors import ConfigError, PluginDependencyError, PluginDependencyWarning
 from harnessed.hooks import PrepareRequest
 from harnessed.kernel import Scope, needs
 from harnessed.models import ModelRequest
 from harnessed.plugins import Service
 from harnessed.testing import ScriptedModel
+from harnessed.tools import ToolRegistry
 
 import browserrig
 from browserrig import (

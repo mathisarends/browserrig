@@ -1,7 +1,7 @@
 from harnessed import Plugin, SessionLog, envelope_value, hook
 from harnessed.events import ToolCallFinishedEvent, ToolCallRequestedEvent
 from harnessed.kernel import PluginScope, needs, observes
-from harnessed.services import ToolRegistry
+from harnessed.tools import ToolRegistry
 
 from browserrig.core import ActionLabel
 from browserrig.secrets import Secrets

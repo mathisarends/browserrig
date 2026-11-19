@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 from harnessed import ToolCall, ToolError
-from harnessed.services import ToolRegistry
+from harnessed.tools import ToolRegistry
 
 from browserrig import (
     Actions,

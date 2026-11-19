@@ -55,6 +55,7 @@ class ScreenshotPixels:
     area: Bounds
     geometry: Geometry | None
     notes: tuple[str, ...]
+    device_scale: float | None = None
 
     def attach(self, content: CaptureContent) -> CaptureContent:
         page = replace(
@@ -67,6 +68,7 @@ class ScreenshotPixels:
             area=self.area,
             geometry=self.geometry,
             scale=self.geometry.scale if self.geometry else 1.0,
+            device_scale=self.device_scale,
         )
 
 
@@ -96,17 +98,18 @@ async def capture_pixels(
     except (BrowserError, TimeoutError):
         return ScreenshotPixels(None, area, None, notes)
     scale = geometry.scale if geometry is not None else 1.0
-    image = await asyncio.to_thread(_normalize, raw, area, scale=scale)
-    return ScreenshotPixels(image, area, geometry, notes)
+    image, device_scale = await asyncio.to_thread(_normalize, raw, area, scale=scale)
+    return ScreenshotPixels(image, area, geometry, notes, device_scale=device_scale)
 
 
-def _normalize(image: str, area: Bounds, *, scale: float) -> str:
+def _normalize(image: str, area: Bounds, *, scale: float) -> tuple[str, float]:
     """Keep untouched PNGs when possible; map HiDPI captures to tool coordinates."""
     size = (round(area.width * scale), round(area.height * scale))
     with Image.open(BytesIO(base64.b64decode(image))) as source:
+        device_scale = source.width / size[0]
         if source.size == size:
-            return image
+            return image, device_scale
         canvas = source.convert("RGB").resize(size, Image.Resampling.LANCZOS)
     output = BytesIO()
     canvas.save(output, format="PNG")
-    return base64.b64encode(output.getvalue()).decode("ascii")
+    return base64.b64encode(output.getvalue()).decode("ascii"), device_scale

@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import ToolError
-from harnessed.events import EventRegistry
+from harnessed.events.registry import EventRegistry
 from harnessed.plugins import Service
 from harnessed.testing import mount_plugin
 

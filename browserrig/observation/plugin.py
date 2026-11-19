@@ -3,15 +3,16 @@ from harnessed import (
     Instructions,
     Plugin,
     PluginState,
+    SessionLog,
     SystemPrompt,
     ToolError,
     hook,
 )
-from harnessed.events import ObservationsIncludedEvent
+from harnessed.events import ObservationsIncludedEvent, TurnEndedEvent
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
 from harnessed.kernel import PluginScope, needs, observes
 from harnessed.models import ModelRequest, UserMessage
-from harnessed.tracing import traced
+from harnessed.tracing import record, traced
 
 from browserrig.browser import (
     AppState,
@@ -45,12 +46,21 @@ from .config import Screenshots, ScreenshotTrigger, TextObservations
 from .dom_capture import DomCapture
 from .handle import DomElementHandle
 from .hooks import ProjectObservation
-from .images import NOTE_SOURCE, attach_image, image_note, project_image, trim_images
+from .images import (
+    NOTE_SOURCE,
+    attach_image,
+    discard_pending_image,
+    image_note,
+    include_images,
+    project_image,
+    trim_images,
+)
 from .models import CapturedImage, ScreenshotStatus, Snapshot
 from .pixels import ScreenshotCapture
 from .references import ElementHandle, References
 from .renderer import DomRenderer, MetadataRenderer, Renderer, screenshot_instructions
 from .state import BrowserPerceptionState
+from .telemetry import trace_capture
 from .text import include_text, project_text
 from .validity import check_coordinates, check_observation
 
@@ -164,7 +174,6 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             )
             return observation.snapshot
 
-    @traced
     async def capture(
         self,
         tab: Tab | None = None,
@@ -174,53 +183,14 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         region: Region | None = None,
         zoom: float = 1,
     ) -> Snapshot:
-        browser, readiness = self._browser, self._readiness
-        async with self._state.lock:
-            selected = tab if tab is not None else browser.active_tab
-            report = await readiness.wait(selected, phase=phase)
-            tabs = await self._tab_overview()
-            take_image = (
-                self._screenshot_due(selected) if screenshots is None else screenshots
-            )
-            secrets = self._secrets()
-            withheld = (
-                take_image
-                and isinstance(self.capture_strategy, ScreenshotCapture)
-                and secrets is not None
-                and secrets.has_known_values
-            )
-            observation = await capture_observation(
-                selected,
-                self.capture_strategy,
-                report,
-                tabs=tuple(tabs),
-                previous=self.snapshot,
-                region=region,
-                zoom=zoom,
-                cursor=self._input.mouse.position_in(selected.id),
-                screenshots=take_image and not withheld,
-                redaction=secrets,
-                prefer_tab_title=_metadata_text(self.text),
-                app_state=self._app_state,
-            )
-            if withheld:
-                observation = observation.with_screenshot_status(
-                    ScreenshotStatus.WITHHELD
-                )
-            self._state.observation = observation
-            snapshot = observation.snapshot
-            await self._events.emit(
-                ObservationCapturedEvent(
-                    observation_id=snapshot.id,
-                    target_id=snapshot.tab_id,
-                    document_id=snapshot.document_id,
-                    url=snapshot.url,
-                    fingerprint=snapshot.fingerprint,
-                    scroll_y=snapshot.scroll_y,
-                    readiness=snapshot.readiness,
-                )
-            )
-            return snapshot
+        return await self._capture(
+            tab,
+            phase=phase,
+            screenshots=screenshots,
+            region=region,
+            zoom=zoom,
+            project=False,
+        )
 
     async def element(self, tab: Tab, ref: str) -> ElementHandle:
         observation = self._state.observation
@@ -320,6 +290,73 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         assert coordinates is not None
         return coordinates
 
+    @traced
+    async def _capture(
+        self,
+        tab: Tab | None = None,
+        *,
+        phase: ReadinessPhase = ReadinessPhase.OBSERVATION,
+        screenshots: bool | None = None,
+        region: Region | None = None,
+        zoom: float = 1,
+        project: bool,
+    ) -> Snapshot:
+        browser, readiness = self._browser, self._readiness
+        async with self._state.lock:
+            selected = tab if tab is not None else browser.active_tab
+            report = await readiness.wait(selected, phase=phase)
+            tabs = await self._tab_overview()
+            take_image = (
+                self._screenshot_due(selected) if screenshots is None else screenshots
+            )
+            secrets = self._secrets()
+            withheld = (
+                take_image
+                and isinstance(self.capture_strategy, ScreenshotCapture)
+                and secrets is not None
+                and secrets.has_known_values
+            )
+            observation = await capture_observation(
+                selected,
+                self.capture_strategy,
+                report,
+                tabs=tuple(tabs),
+                previous=self.snapshot,
+                region=region,
+                zoom=zoom,
+                cursor=self._input.mouse.position_in(selected.id),
+                screenshots=take_image and not withheld,
+                redaction=secrets,
+                prefer_tab_title=_metadata_text(self.text),
+                app_state=self._app_state,
+            )
+            if withheld:
+                observation = observation.with_screenshot_status(
+                    ScreenshotStatus.WITHHELD
+                )
+            self._state.observation = observation
+            snapshot = observation.snapshot
+            record(**{"browserrig.observation.id": snapshot.id})
+            if snapshot.image is None:
+                outcome = snapshot.screenshot_status or (
+                    "unavailable" if take_image else "not_requested"
+                )
+                self._trace_capture(snapshot, outcome)
+            elif not project:
+                self._trace_capture(snapshot, "not_projected")
+            await self._events.emit(
+                ObservationCapturedEvent(
+                    observation_id=snapshot.id,
+                    target_id=snapshot.tab_id,
+                    document_id=snapshot.document_id,
+                    url=snapshot.url,
+                    fingerprint=snapshot.fingerprint,
+                    scroll_y=snapshot.scroll_y,
+                    readiness=snapshot.readiness,
+                )
+            )
+            return snapshot
+
     @hook(PreStep)
     async def _before_step(
         self,
@@ -328,27 +365,33 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         nudges: Inject[Nudges | None],
     ) -> StepDecision:
         state = self._state
+        discard_pending_image(state.images)
         async with self._coordination.exclusive():
             requested, region = state.screenshot_requested, state.screenshot_region
             state.screenshot_requested, state.screenshot_region = False, None
             try:
-                snapshot = await self.capture(
+                snapshot = await self._capture(
                     phase=ReadinessPhase.OBSERVATION,
                     screenshots=True if requested else None,
                     region=region,
+                    project=True,
                 )
             except BaseException:
                 # Retry after errors or cancellation unless a newer request is pending.
                 if requested and not state.screenshot_requested:
                     state.screenshot_requested, state.screenshot_region = True, region
                 raise
-        await self._track_viewport(snapshot, nudges)
+        try:
+            await self._track_viewport(snapshot, nudges)
+            context = state.context
+            assert context is not None
+            observation = await context.dispatch(
+                ProjectObservation(snapshot), default=_no_projection
+            )
+        finally:
+            if snapshot.image is not None and state.images.projected_id != snapshot.id:
+                self._trace_capture(snapshot, "not_projected")
         observations = []
-        context = state.context
-        assert context is not None
-        observation = await context.dispatch(
-            ProjectObservation(snapshot), default=_no_projection
-        )
         if observation is not None:
             observations.append((observation, "browser", (snapshot.id,)))
         status = _screenshot_status(
@@ -416,7 +459,9 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         return trim_images(request, event.session.log, self._state.images)
 
     @hook(ObservationsIncludedEvent)
-    async def _included(self, event: ObservationsIncludedEvent) -> None:
+    async def _included(
+        self, event: ObservationsIncludedEvent, log: Inject[SessionLog]
+    ) -> None:
         refs: set[str] = set()
         for item in event.observations:
             if item.source == "browser":
@@ -425,9 +470,17 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
         if self.text is not None:
             included = frozenset(refs)
             include_text(state.text, included)
-        images = state.images.images
-        images[:] = [image for image in images if image.id in refs]
-        state.delivered_image = images[-1] if images else None
+        state.delivered_image = include_images(event, log, state.images)
+
+    @hook(TurnEndedEvent)
+    def _discard_pending(self, _event: TurnEndedEvent) -> None:
+        discard_pending_image(self._state.images)
+
+    def _trace_capture(self, snapshot: Snapshot, outcome: str) -> None:
+        secrets = self._secrets()
+        if secrets is not None:
+            snapshot = snapshot.model_copy(update={"url": secrets.redact(snapshot.url)})
+        trace_capture(snapshot, self._events.browser_id, outcome)
 
     def _screenshot_due(self, tab: Tab) -> bool:
         if self.screenshots is None:

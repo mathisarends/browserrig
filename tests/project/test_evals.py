@@ -421,6 +421,50 @@ def test_analysis_does_not_reuse_tool_names_between_sessions(monkeypatch):
     assert "tool:click" not in second["steps_detail"][0]["added"]
 
 
+def test_analysis_reads_openinference_deltas_and_image_parts(tmp_path):
+    first = {
+        "name": "harnessed.model",
+        "start_time": "2026-11-19T12:00:00Z",
+        "attributes": {
+            "harnessed.input_messages.inherited": 0,
+            "llm.input_messages.0.message.role": "user",
+            "llm.input_messages.0.message.contents.0.message_content.type": "text",
+            "llm.input_messages.0.message.contents.0.message_content.text": "# Page\nurl: /",
+            "llm.input_messages.0.message.contents.1.message_content.type": "image",
+            "llm.input_messages.0.message.contents.1.message_content.image.image.url": (
+                "data:image/png;base64,AAAA"
+            ),
+            "llm.output_messages.0.message.role": "assistant",
+            "llm.output_messages.0.message.tool_calls.0.tool_call.id": "click-1",
+            "llm.output_messages.0.message.tool_calls.0.tool_call.function.name": "click_at",
+            "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments": (
+                '{"x":2,"y":3}'
+            ),
+        },
+    }
+    second = {
+        "name": "harnessed.model",
+        "start_time": "2026-11-19T12:00:01Z",
+        "attributes": {
+            "harnessed.input_messages.inherited": 2,
+            "llm.input_messages.0.message.role": "tool",
+            "llm.input_messages.0.message.tool_call_id": "click-1",
+            "llm.input_messages.0.message.content": "Clicked.",
+        },
+    }
+    analysis = analyze.analyze(_record("demo"), "test", tmp_path, spans=[second, first])
+
+    steps = analysis["steps_detail"]
+    assert len(steps) == 2
+    observed, clicked = steps[0], steps[1]
+    assert observed["calls"] == ["click_at"]
+    assert observed["added"]["observation"] == len("# Page\nurl: /\n<image>")
+    assert clicked["rewritten"] == 0
+    assert clicked["added"]["tool:click_at"] == len("Clicked.")
+    dump = (tmp_path / "demo-1.md").read_text(encoding="utf-8")
+    assert "<image>" in dump and "base64" not in dump
+
+
 @pytest.mark.parametrize("output", ["null", '"truncated"', "incomplete JSON"])
 def test_analysis_handles_unavailable_model_content(monkeypatch, output):
     span = _model_span([])

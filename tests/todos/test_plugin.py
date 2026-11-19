@@ -3,7 +3,7 @@ from harnessed import Agent, SessionState, ToolStatus
 from harnessed.events import CompactionAppliedEvent, ToolCallFinishedEvent
 from harnessed.integrations.json import JsonSessionStore
 from harnessed.plugins import Compaction
-from harnessed.services import Summary
+from harnessed.plugins.compaction import Summary
 from harnessed.testing import ScriptedModel, call
 
 import browserrig

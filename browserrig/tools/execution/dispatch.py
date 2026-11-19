@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 from time import monotonic
 from typing import NamedTuple
 
-from harnessed.tracing import span, traced
+from harnessed.tracing import traced
 
 from browserrig.browser import Tab, Tabs
 from browserrig.core import (
@@ -45,7 +45,7 @@ class ActionDispatch:
         """Run input in `tab`, then wait for its page, or for a tab the input opened."""
         started = monotonic()
         mark = self._tabs.openings
-        with self._actions.activate(action_id), span("browserrig.operation"):
+        with self._actions.activate(action_id):
             effect = await operation(tab)
         phase = profile.phase or ReadinessPhase.AFTER_ACTION
         settled = settle and not tab.closed
@@ -89,7 +89,7 @@ class ActionDispatch:
         effects: list[Effect] = []
 
         async def dispatch() -> None:
-            with self._actions.activate(action_id), span("browserrig.operation"):
+            with self._actions.activate(action_id):
                 effect = await operation(tab)
                 effects.append(effect)
 
@@ -99,7 +99,10 @@ class ActionDispatch:
         effect = (
             effects[0]
             if effects
-            else Effect("Navigation requested; completion is not confirmed.")
+            else Effect(
+                "Navigation requested; completion is not confirmed.",
+                blocked_reason=report.reason or "Navigation did not dispatch",
+            )
         )
         note = (
             ""

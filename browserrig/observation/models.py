@@ -238,6 +238,7 @@ class Snapshot(Options):
     screenshot_status: ScreenshotStatus | None = None
     # The viewport area the image shows; coordinate tools map image pixels through it.
     geometry: Geometry | None = None
+    device_scale: float | None = None
     # Where the mouse rests, in viewport CSS pixels; None before it entered this tab.
     cursor: Point | None = None
     captured_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -275,6 +276,9 @@ class CapturedImage:
     geometry: Geometry | None
     viewport_revision: int = 0
     generation: Generation = Generation(state="")
+    url: str = ""
+    device_scale: float | None = None
+    asset_id: str | None = None
 
     @classmethod
     def from_snapshot(cls, snapshot: Snapshot, browser_id: str) -> Self:
@@ -292,6 +296,8 @@ class CapturedImage:
             snapshot.geometry,
             snapshot.viewport_revision,
             snapshot.generation,
+            url=snapshot.url,
+            device_scale=snapshot.device_scale,
         )
 
 

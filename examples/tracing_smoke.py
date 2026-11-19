@@ -24,6 +24,8 @@ async def _serve_page(
         await reader.readuntil(b"\r\n\r\n")
         body = (
             b"<!doctype html><title>Browserrig tracing</title><h1>Trace smoke test</h1>"
+            b'<button style="position:absolute;left:20px;top:80px;width:120px;height:40px" '
+            b"onclick=\"this.textContent='Clicked'\">Click me</button>"
         )
         writer.write(
             b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
@@ -57,23 +59,28 @@ async def main() -> None:
     ):
         agent = Agent(
             model=ScriptedModel(
-                [call("navigate", url=page), "Browserrig tracing smoke test completed."]
+                [
+                    call("navigate", url=page),
+                    call("screenshot"),
+                    call("click_at", x=50, y=100),
+                    "Browserrig tracing smoke test completed.",
+                ]
             ),
             browser=Chrome.launch(url="about:blank"),
             plugins=[Approvals(default=PolicyDecision.ALLOW), *telemetry],
         )
         async with agent.session() as session:
             result = await session.run(
-                "Open the local smoke-test page and confirm completion."
+                "Open the local smoke-test page, take a screenshot and click the button."
             )
             tools = [
                 event
                 for event in result.events
                 if isinstance(event, ToolCallFinishedEvent)
             ]
-            if len(tools) != 1 or tools[0].result.is_error:
+            if len(tools) != 3 or any(event.result.is_error for event in tools):
                 raise RuntimeError(
-                    "Smoke-test navigation failed; inspect the tool span in Phoenix"
+                    "A smoke-test action failed; inspect the tool spans in Phoenix"
                 )
             print(result.text)
             print(f"Session: {session.id}")

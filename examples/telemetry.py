@@ -48,7 +48,7 @@ def add_tracing_arguments(parser: argparse.ArgumentParser) -> None:
         "--trace-max-content-length",
         type=_positive_int,
         default=16_384,
-        help="Maximum characters per captured input/output field (default: 16384)",
+        help="Character limit for captured fields and model message parts (default: 16384)",
     )
 
 

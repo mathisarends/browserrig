@@ -4,8 +4,8 @@ import pytest
 from harnessed import Agent, Plugin, ToolCall, ToolChain, ToolError, ToolStatus, tool
 from harnessed.models import ModelChunk
 from harnessed.plugins import Approvals
-from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel
+from harnessed.tools import ToolRegistry
 from pydantic import TypeAdapter
 
 from browserrig import ActionLabels, Secret, Secrets

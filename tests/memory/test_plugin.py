@@ -12,7 +12,7 @@ from harnessed.models import (
     StopReason,
 )
 from harnessed.plugins import Approvals
-from harnessed.services import Summary
+from harnessed.plugins.compaction import Summary
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import (

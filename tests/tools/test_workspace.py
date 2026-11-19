@@ -5,8 +5,8 @@ from harnessed import Agent, PolicyDecision
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.models import ImagePart, ImageReference
 from harnessed.plugins import Approvals
-from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel, call
+from harnessed.tools import ToolRegistry
 from PIL import Image
 
 from browserrig import (

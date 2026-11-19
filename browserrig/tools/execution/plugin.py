@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import cast
 
 from harnessed import Instructions, Plugin, PluginState, SystemPrompt, ToolResult, hook
@@ -40,10 +40,11 @@ from browserrig.tools.chains import (
 from browserrig.tools.effects import Effect
 from browserrig.tools.intents import Intent, Perform
 
-from .context import LABEL_CHARS, CallIdentity
+from .context import LABEL_CHARS
 from .hooks import CheckAction
 from .invocation import InvokeTool
 from .policy import COORDINATE_KINDS, ActionProfile, action_profile
+from .telemetry import Attribute, record_operation
 from .transaction import ActionRunner
 
 
@@ -84,6 +85,8 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
             actions=self._actions,
             page_change=self.page_change,
             check_action=self._check_action,
+            scope=scope,
+            redact=self._redact_trace,
         )
         self._mount.invocation = InvokeTool(self._runner, self._coordination)
 
@@ -109,7 +112,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         record(kind=kind)
         call = self._invocation.context.call
         if label:
-            call = CallIdentity(call.call_id, label[:LABEL_CHARS])
+            call = replace(call, label=label[:LABEL_CHARS])
         return await self._runner.run(
             kind=kind,
             operation=operation,
@@ -167,6 +170,12 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         else:
             action.preparation_omitted += 1
 
+    def record_receipt(self, **attributes: Attribute) -> None:
+        """Add extension attributes to the current managed action's operation span."""
+        for key, value in attributes.items():
+            redacted = self._redact_trace(value) if isinstance(value, str) else value
+            record_operation(**{f"receipt.{key}": redacted})
+
     @property
     def tab(self) -> Tab:
         """The fixed addressed tab of the browser tool currently executing."""
@@ -181,7 +190,7 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         context = self._mount.context
         if context is not None and Secrets in context:
             text = context[Secrets].redact(text)
-        with self._invocation.context.bind_call(event.call.id, text):
+        with self._invocation.context.bind_call(event.call.id, text, event.call.name):
             return await next_()
 
     @hook(ExecuteTool, ReviewToolResult)
@@ -222,6 +231,14 @@ class Actions(Plugin, slot="browserrig.actions", provides=True):
         context = self._mount.context
         assert context is not None
         await context.dispatch(CheckAction(tab, kind, observation, coordinates))
+
+    def _redact_trace(self, value: str) -> str:
+        context = self._mount.context
+        return (
+            context[Secrets].redact(value)
+            if context is not None and Secrets in context
+            else value
+        )
 
     @property
     def _runner(self) -> ActionRunner:

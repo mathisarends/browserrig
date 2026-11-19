@@ -14,6 +14,14 @@
 - Mount `WaitTools(max_seconds=10, description=None)` to offer `wait` independently
   of navigation. `NavigationTools` still includes `wait` by default, and an
   explicitly mounted `WaitTools` supplies its configuration when both are used.
+- Trace screenshot delivery and retention and link managed browser actions to
+  the screenshot asset visible in the model input. Extensions can add receipt
+  fields using `Actions.record_receipt`. See [telemetry](docs/telemetry.md) (#102).
+
+### Changed
+
+- Pin Harnessed and its provider, MCP and OTel extras to 0.20.0. Model spans
+  use OpenInference for messages, tool definitions and inline images in Phoenix.
 
 ## 0.8.0 (2026-11-18)
 

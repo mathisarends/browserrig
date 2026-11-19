@@ -3,7 +3,8 @@ from unittest.mock import AsyncMock
 import pytest
 from harnessed import Agent as HarnessedAgent
 from harnessed import Plugin, PolicyDecision, SessionState
-from harnessed.events import TextDeltaEvent, ToolCallFinishedEvent, TurnResultEvent
+from harnessed.events import TextDeltaEvent, ToolCallFinishedEvent
+from harnessed.events.stream import TurnResultEvent
 from harnessed.integrations.json import JsonSessionStore
 from harnessed.kernel import PluginScope, needs
 from harnessed.models.pydantic_ai import PydanticAIModel

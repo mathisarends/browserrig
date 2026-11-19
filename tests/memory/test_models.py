@@ -1,4 +1,4 @@
-from harnessed.events import EventRegistry
+from harnessed.events.registry import EventRegistry
 from pydantic import TypeAdapter
 
 from browserrig import MemoryAction, TaskMemoryEvent

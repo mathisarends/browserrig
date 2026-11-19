@@ -1,10 +1,15 @@
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
-from harnessed.core.compaction import ModelSummarizer, SummaryError
-from harnessed.core.tokens import TokenCounter
 from harnessed.plugins import ContextState
-from harnessed.services import CompactionContext, CompactionRequest, Summarizer, Summary
+from harnessed.plugins.compaction import (
+    CompactionContext,
+    CompactionRequest,
+    Summarizer,
+    Summary,
+)
+from harnessed.runtime.compaction import ModelSummarizer, SummaryError
+from harnessed.runtime.tokens import TokenCounter
 from harnessed.tracing import span
 from pydantic import ConfigDict, TypeAdapter
 

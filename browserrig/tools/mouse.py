@@ -20,6 +20,7 @@ from browserrig.observation import BrowserPerception, CapturedImage, Snapshot
 
 from .effects import Effect
 from .execution import Actions
+from .execution.telemetry import record_point
 from .parameters import NewTab
 from .targeting import Targeting
 
@@ -70,6 +71,7 @@ class _PointerInput(Plugin):
         prepared_scroll: bool = False,
     ) -> Effect:
         mouse = self._input.mouse
+        record_point("viewport", point)
         if new_tab:
             # Arrive first, so the keys are held for the click alone.
             await mouse.move_to(point)
@@ -109,6 +111,7 @@ class PointerTools(_PointerInput):
         self, x: Annotated[float, _X_COORDINATE], y: Annotated[float, _Y_COORDINATE]
     ) -> Effect:
         point = _image_point(self._observe.coordinate_source(), Point(x=x, y=y))
+        record_point("viewport", point)
         await self._input.mouse.move_to(point)
         return Effect("Cursor moved without clicking.")
 
@@ -142,9 +145,13 @@ class PointerTools(_PointerInput):
         duration_seconds: Annotated[float, _DRAG_DURATION] = 0.5,
     ) -> Effect:
         source = self._observe.coordinate_source()
+        viewport_start = _image_point(source, start)
+        viewport_end = _image_point(source, end)
+        record_point("viewport", viewport_start, endpoint="start")
+        record_point("viewport", viewport_end, endpoint="end")
         await self._input.mouse.drag(
-            start=_image_point(source, start),
-            end=_image_point(source, end),
+            start=viewport_start,
+            end=viewport_end,
             duration_seconds=duration_seconds,
         )
         return Effect("Drag dispatched; inspect the destination.")
@@ -161,6 +168,7 @@ class ReferencePointerTools(_PointerInput):
     )
     async def hover(self, ref: Annotated[str, _REF]) -> Effect:
         point = await self._targets.locate(ref=ref)
+        record_point("viewport", point)
         await self._input.mouse.move_to(point)
         return Effect(
             "Cursor moved onto the ref without clicking.",
@@ -189,6 +197,7 @@ class ReferencePointerTools(_PointerInput):
                 "Inspect the next observation before choosing a target.",
                 prepared_scroll=point.scrolled,
                 break_chain=True,
+                blocked_reason=change,
             )
         # Hover may reveal an overlay or move the target; hit-test again.
         current = await self._targets.locate(ref=ref, scroll=False)
@@ -221,6 +230,8 @@ class ReferencePointerTools(_PointerInput):
             self._targets.locate(ref=source_ref, scroll=False),
             self._targets.locate(ref=target_ref, scroll=False),
         )
+        record_point("viewport", start, endpoint="start")
+        record_point("viewport", end, endpoint="end")
         await self._input.mouse.drag(
             start=start, end=end, duration_seconds=duration_seconds
         )

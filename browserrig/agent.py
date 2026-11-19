@@ -8,10 +8,11 @@ from harnessed import (
     PromptFormat,
     SystemPrompt,
 )
-from harnessed.core.budget import ContextBudget
 from harnessed.kernel import PluginLike
-from harnessed.models import Model, PydanticAIModel
+from harnessed.models import Model
+from harnessed.models.pydantic_ai import PydanticAIModel
 from harnessed.plugins import Service
+from harnessed.runtime.budget import ContextBudget
 from harnessed.sessions import SessionStore
 
 from .activity import Activity

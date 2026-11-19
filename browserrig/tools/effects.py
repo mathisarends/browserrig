@@ -8,3 +8,4 @@ class Effect:
     break_chain: bool = False
     # The input asked the browser to open a new tab, such as a Ctrl+click on a link.
     expects_new_tab: bool = False
+    blocked_reason: str = ""

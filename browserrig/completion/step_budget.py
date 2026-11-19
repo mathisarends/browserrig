@@ -4,7 +4,7 @@ from harnessed.hooks import Next, PrepareRequest
 from harnessed.kernel import needs, observes
 from harnessed.models import ModelRequest, UserMessage
 from harnessed.plugins import FinalStepPolicy
-from harnessed.services import SessionContext
+from harnessed.sessions import SessionContext
 
 from .plugin import Done
 

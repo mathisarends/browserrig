@@ -2,8 +2,8 @@ import pytest
 from harnessed import Agent as HarnessedAgent
 from harnessed import ToolCall
 from harnessed.errors import PluginConflict
-from harnessed.services import ToolRegistry
 from harnessed.testing import ScriptedModel
+from harnessed.tools import ToolRegistry
 
 from browserrig import (
     Actions,

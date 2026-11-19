@@ -1,8 +1,8 @@
 import pytest
-from harnessed.core.budget import ContextBudget
-from harnessed.core.compaction import CompactionPolicy
 from harnessed.models import ModelInfo
 from harnessed.plugins import Service
+from harnessed.runtime.budget import ContextBudget
+from harnessed.runtime.compaction import CompactionPolicy
 from harnessed.testing import ScriptedModel
 
 from browserrig import Agent, ContextCompaction, TaskMemory

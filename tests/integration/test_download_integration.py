@@ -9,8 +9,8 @@ import yaml
 from harnessed import PolicyDecision, ToolCall
 from harnessed.models import ImagePart, ModelChunk, ToolMessage
 from harnessed.plugins import Approvals
-from harnessed.services import ToolRegistry
 from harnessed.testing import CallbackModel, ScriptedModel
+from harnessed.tools import ToolRegistry
 
 from browserrig import (
     Agent,

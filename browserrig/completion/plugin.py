@@ -12,8 +12,8 @@ from harnessed import (
     hook,
     tool,
 )
-from harnessed.core.limits import FinalStepPolicy
 from harnessed.events import AssistantMessageEvent, ToolCallFinishedEvent
+from harnessed.events.turn import FinalStepPolicy
 from harnessed.hooks import (
     ExecuteTool,
     Next,
@@ -27,7 +27,7 @@ from harnessed.hooks import (
 )
 from harnessed.kernel import needs
 from harnessed.models import ModelRequest, StopReason, SystemMessage, UserMessage
-from harnessed.services import SessionContext
+from harnessed.sessions import SessionContext
 
 from .models import DENIALS, Phase, closing_step, permits
 from .state import CompletionState
