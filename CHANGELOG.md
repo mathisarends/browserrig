@@ -1,27 +1,47 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 (2026-11-19)
+
+Upgrade from 0.8.x using the [migration guide](docs/migration-0.9.md).
 
 ### Breaking changes
 
+- Upgrade Harnessed and its provider, MCP and OTel extras to 0.20.0. Update
+  extensions that import from `harnessed.services` or `harnessed.core`, and
+  update model trace consumers to read OpenInference attributes (#105).
 - Catch `browserrig.core.BrowserError` for CDP failures from `Tab` and `Frame`
   methods, `screenshot()` and observation capture strategies. The original cdpify
   exception is available as `__cause__`. Direct calls through `tab.cdp` or
   `frame.cdp` can still raise raw `CDPError` exceptions (#103).
+- Replace direct calls to the removed Python method `NavigationTools.wait(...)`
+  with calls through the session tool registry (#104).
 
 ### Added
 
 - Mount `WaitTools(max_seconds=10, description=None)` to offer `wait` independently
   of navigation. `NavigationTools` still includes `wait` by default, and an
-  explicitly mounted `WaitTools` supplies its configuration when both are used.
-- Trace screenshot delivery and retention and link managed browser actions to
-  the screenshot asset visible in the model input. Extensions can add receipt
-  fields using `Actions.record_receipt`. See [telemetry](docs/telemetry.md) (#102).
+  explicitly mounted `WaitTools` supplies its configuration when both are used
+  (#104).
+- Provide an `AppState` service for application-specific target and layout
+  generations and reasons input is blocked. `CheckAction` includes the current
+  observation and coordinate source. Readiness reports application blocks with
+  `BLOCKED` (#101).
+- Trace screenshot projection, delivery, reuse and retention. Managed action
+  spans link the visible screenshot asset, tool call, target, coordinates and
+  dispatch outcome. Extensions can add fields with `Actions.record_receipt`.
+  See [telemetry](docs/telemetry.md) (#105).
 
 ### Changed
 
-- Pin Harnessed and its provider, MCP and OTel extras to 0.20.0. Model spans
-  use OpenInference for messages, tool definitions and inline images in Phoenix.
+- Reject coordinate input when the observation or retained screenshot is stale
+  after a tab, document, viewport or tracked layout change, such as browserrig
+  scrolling. Capture retries once within its existing time budget when state
+  or layout changes during collection. Screenshot reuse checks the generation
+  along with the image and geometry (#101).
+- With content capture enabled, model traces include OpenInference messages,
+  tool definitions, invocation settings and inline images in Phoenix. The eval
+  analyzer reads these traces and continues to read the legacy JSON format
+  (#105).
 
 ## 0.8.0 (2026-11-18)
 

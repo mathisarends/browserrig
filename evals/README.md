@@ -207,10 +207,12 @@ Automatic run comparisons require
 the same dataset hash and budgets. Historical custom-benchmark artifacts remain
 readable but are not compared against this dataset.
 
-For Phoenix, start `docker compose up -d --wait` and pass `--trace`. Existing
-OTel export and `python -m evals.analyze` keep working; session IDs link task results
-to traces. HARs and traces contain benchmark account/session data; keep artifacts
-local or redact them before sharing.
+For Phoenix, start `docker compose up -d --wait` and pass `--trace`.
+`python -m evals.analyze` reads Harnessed 0.20 OpenInference messages and earlier
+JSON message attributes. Session IDs link task results to traces. See
+[telemetry](../docs/telemetry.md#screenshot-and-action-attributes) to link an
+action to the screenshot it used. HARs and traces contain benchmark
+account/session data. Keep artifacts local or redact them before sharing.
 
 ## HTML diagnosis report
 

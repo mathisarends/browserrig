@@ -25,6 +25,11 @@ async with ChromeBrowser(Launch(url="https://example.com")) as browser:
 The browser owns tabs and CDP transport; `Input` owns devices. Direct callers
 synchronize devices after technical tab changes. Agent sessions get that wiring
 from `Runtime()` and `InputRuntime()` and resolve devices with `session.scope[Input]`.
+
+Catch `browserrig.core.BrowserError` for CDP failures surfaced by `Tab`, `Frame`,
+the browser screenshot helper and observation capture. The original cdpify
+exception is available as `__cause__` on translated errors. Direct
+`tab.cdp` and `frame.cdp` calls can raise cdpify exceptions.
 When mixing direct inputs with agent work, acquire
 `session.scope[BrowserCoordination].exclusive()` around the complete operation.
 
@@ -105,6 +110,7 @@ See [backend contracts](browser-composition.md#references-from-other-capture-bac
 | `DomScrollTools` | `scroll_page(delta_y=..., delta_x=...)` moves the document; `scroll_element(ref=..., ...)` moves only that container |
 | `FormTools` | Native selects, exact multi-select sets and date fields |
 | `NavigationTools` / `TabTools` | Navigation, search, history and tab management |
+| `WaitTools` | `wait(seconds=...)` for an expected asynchronous update, also supplied by default with navigation |
 | `ScreenshotTools` | Request an image/crop at the next observation boundary |
 | `PageSearchTools` | Search loaded page text for matching records |
 
@@ -129,12 +135,17 @@ Observation values, radio IDs and `selection_group` are raw page metadata.
 
 Coordinates use viewport CSS pixels unless mapped from a screenshot included in
 the model request. Text-only steps retain the latest included image's geometry.
-A screenshot from a different document cannot supply current coordinates.
+Browserrig checks the source against the current tab, document, viewport and
+tracked layout. After browserrig scrolls or otherwise invalidates that layout,
+call `screenshot` if available and use the next delivered image. In a text-only
+session, use the next observation's viewport coordinates.
 
 Headed windows can be resized; headless launches pin viewport metrics. A resize
-invalidates cached coordinate geometry until the next observation. Ref actions
-locate targets again and remain available. Refresh the screenshot after layout
-changes. Model screenshots omit application overlays by default.
+invalidates previous coordinates. Ref actions resolve their targets in the live
+layout as long as the observed state still matches. A custom application can
+expose its own state and layout changes through
+[`AppState`](browser-composition.md#validate-an-action-before-dispatch).
+Model screenshots omit application overlays by default.
 
 ## Page content and search
 

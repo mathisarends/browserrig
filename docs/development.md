@@ -62,10 +62,11 @@ The [Smelt policy decisions](smelt-policy.md) explain the rules reviewed through
 
 ## Distribution and releases
 
-Before publishing, run the checks and Chrome suite, update `CHANGELOG.md`, and
-verify metadata/license in the built artifacts. The release workflow reruns CI,
-requires a tag on `main`, checks matching versions, builds the wheel from the
-sdist, and validates the exact artifacts uploaded to PyPI.
+Before publishing, run the checks and Chrome suite, update `CHANGELOG.md` and
+the migration guide, and verify metadata and license in the built artifacts.
+The release workflow reruns CI, requires a tag on `main`, checks matching
+versions, builds the wheel from the sdist, and validates the exact artifacts
+uploaded to PyPI.
 
 Configure the PyPI Trusted Publisher with:
 
@@ -83,7 +84,8 @@ package → Run workflow** run validates/uploads artifacts and skips publication
 To release:
 
 1. Merge matching versions in `pyproject.toml`, `browserrig/__init__.py`, `uv.lock`
-   and a dated changelog section.
+   and a dated changelog section. Run
+   `uv run --no-sync python tests/check_release.py --tag vX.Y.Z` with the planned tag.
 2. Publish a matching GitHub release/tag on the prepared `main` commit, or push
    that version tag (for example `v0.2.0`). A tag push starts publication even if
    its GitHub release is a draft.
@@ -95,9 +97,9 @@ rather than moving published tags; PyPI versions cannot be overwritten.
 ## Compatibility and coverage
 
 Harnessed and its provider, MCP and OTel extras are pinned to 0.20.0.
-State/checkpoint format 3 and audit envelope 6 reject older data. Keep older stores
-separate. Review the
-[changelog](../CHANGELOG.md) when upgrading.
+State/checkpoint format 3 and audit envelope 6 carry forward from Browserrig 0.8.
+Keep stores from earlier format versions separate. See the
+[0.9 migration guide](migration-0.9.md) when upgrading.
 
 Persistence adapters in handoff/todos and compaction integration in task memory
 include narrow internal Harnessed dependencies. Their restoration, request-context

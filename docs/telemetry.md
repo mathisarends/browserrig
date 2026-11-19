@@ -57,6 +57,8 @@ Harnessed 0.20 model spans expose `llm.input_messages`, `llm.output_messages`,
 new messages by default. `harnessed.input_messages.inherited` counts messages
 already shown on earlier spans. Use `full_input_messages=True` on the tracer to
 include the full message list on each model span.
+For the attribute mapping from Harnessed 0.19, see the
+[0.9 migration guide](migration-0.9.md#update-trace-consumers).
 
 For slow runs, compare model time, browser operation time and lock acquisition
 (`BrowserCoordination.acquire`). Hook spans identify handlers with

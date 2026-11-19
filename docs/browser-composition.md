@@ -124,6 +124,17 @@ service dependencies; instruction order follows the configured plugin list.
 Configure Harnessed `Approvals` to allow tool side effects
 or ask through your host UI.
 
+## Offer wait independently of navigation
+
+Import `WaitTools` from `browserrig` and mount it in a custom composition with
+`Actions()` to offer a wait for asynchronous page updates. For example, add
+`WaitTools(max_seconds=3)` to the screenshot-driven setup above.
+
+`NavigationTools()` supplies a default `wait` tool. If you also mount
+`WaitTools(max_seconds=..., description=...)`, its configuration takes
+precedence. Removing that plugin restores navigation's default while
+`NavigationTools` is mounted.
+
 ## Choose pointer tools
 
 `PointerTools()` provides `click_at`, `drag_at` and `move_mouse(x, y)`. It
