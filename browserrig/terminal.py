@@ -21,7 +21,6 @@ from harnessed.events import (
 from harnessed.hooks import SessionAppended
 
 from .events import BrowserEvent, EventKind, LiveEvent, TabEvent
-from .usage import aggregate_model_usage
 
 _METADATA = {
     "request_id",
@@ -80,7 +79,7 @@ class TerminalEvents(Plugin):
     def _appended(self, receipt: SessionAppended) -> None:
         record = _event_record(receipt.event)
         if isinstance(receipt.event, TurnEndedEvent):
-            usage = aggregate_model_usage(receipt.log.turns[-1].events)
+            usage = receipt.event.usage
             record["usage"] = {
                 **asdict(usage),
                 "total_tokens": usage.total_tokens,

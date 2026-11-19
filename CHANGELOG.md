@@ -49,6 +49,8 @@ Upgrade from 0.9.x using the [migration guide](docs/migration-0.10.md).
 ### Changed
 
 - Upgrade Harnessed and its provider, MCP and OTel extras to 0.21.0.
+  `TerminalEvents` reads the turn's model usage from Harnessed's
+  `TurnEndedEvent.usage`. Applications can subscribe to that event directly.
 
 ## 0.9.0 (2026-11-19)
 

@@ -26,7 +26,6 @@ class EventKind(StrEnum):
     """Stable wire tags, independent of Python class names."""
 
     TASK_MEMORY = "browserrig.memory"
-    TURN_USAGE = "browserrig.turn.usage"
     CONNECTED = "browser.connected"
     DISCONNECTED = "browser.disconnected"
     TAB_OPENED = "browser.tab.opened"
