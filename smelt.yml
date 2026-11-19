@@ -77,6 +77,7 @@ architecture:
     browserrig.kinds: core
     browserrig.events: core
     browserrig.terminal: terminal
+    browserrig.usage: usage
     browserrig.completion: completion
   layers:
     core: {path: core}
@@ -112,7 +113,8 @@ architecture:
       may_depend_on: [core, scripts, input, browser, observation, tools, files, secrets]
     # Drawing that staging in the page only consumes its events; staging never draws.
     overlay: {path: overlay, may_depend_on: [core, scripts, browser, choreography]}
-    terminal: {path: terminal, may_depend_on: [core]}
+    terminal: {path: terminal, may_depend_on: [core, usage]}
+    usage: {path: usage, may_depend_on: [core]}
     completion: {path: completion}
     todos: {path: todos, may_depend_on: [core]}
     memory: {path: memory, may_depend_on: [core, files]}

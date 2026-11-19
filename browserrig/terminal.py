@@ -16,10 +16,12 @@ from harnessed.events import (
     ToolCallFinishedEvent,
     ToolCallRequestedEvent,
     ToolExecutionFinishedEvent,
+    TurnEndedEvent,
 )
 from harnessed.hooks import SessionAppended
 
 from .events import BrowserEvent, EventKind, LiveEvent, TabEvent
+from .usage import aggregate_model_usage
 
 _METADATA = {
     "request_id",
@@ -67,16 +69,24 @@ class TerminalEvents(Plugin):
         super().__init__()
         self._output = output
 
-    def _write(self, event: _TerminalEvent) -> None:
+    def _write(self, record: dict[str, object]) -> None:
         print(
-            json.dumps(_event_record(event), ensure_ascii=True, allow_nan=False),
+            json.dumps(record, ensure_ascii=True, allow_nan=False),
             file=self._output if self._output is not None else sys.stderr,
             flush=True,
         )
 
     @hook(SessionAppended)
     def _appended(self, receipt: SessionAppended) -> None:
-        self._write(receipt.event)
+        record = _event_record(receipt.event)
+        if isinstance(receipt.event, TurnEndedEvent):
+            usage = aggregate_model_usage(receipt.log.turns[-1].events)
+            record["usage"] = {
+                **asdict(usage),
+                "total_tokens": usage.total_tokens,
+                "cache_hit_rate": usage.cache_hit_rate,
+            }
+        self._write(record)
 
     @hook(
         LiveEvent,
@@ -88,7 +98,7 @@ class TerminalEvents(Plugin):
         ModelAttemptFinishedEvent,
     )
     def _transient(self, event: _TerminalEvent) -> None:
-        self._write(event)
+        self._write(_event_record(event))
 
 
 def _event_record(event: _TerminalEvent) -> dict[str, object]:

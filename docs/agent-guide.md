@@ -74,6 +74,26 @@ falling back to 100,000 tokens when the window is unknown. The default
 `Screenshots` policy keeps the latest screenshot. Set image retention on
 `BrowserPerception`.
 
+## Token usage
+
+Harnessed exposes the reported usage for each turn as `result.usage`.
+`TerminalEvents()` includes it on the `turn.ended` JSON line as `usage`, with
+input, output, total, cache-read, cache-write and reasoning tokens, cache hit rate
+and cost. Optional values that Harnessed cannot aggregate appear as `null`.
+
+Mount `TokenUsageTracker()` to handle turn usage in your own application. It
+works with both Browserrig and plain Harnessed agents and publishes a
+`TurnUsageEvent` with the turn ID and the native Harnessed `ModelUsage`.
+
+```python
+from browserrig import Agent, TokenUsageTracker, TurnUsageEvent
+
+agent = Agent(model=model, plugins=[TokenUsageTracker()])
+async with agent.session() as session:
+    session.on(TurnUsageEvent, lambda event: print(event.turn_id, event.usage))
+    await session.run("Describe this site.")
+```
+
 ## Session controls
 
 ```python
