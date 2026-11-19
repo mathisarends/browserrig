@@ -76,7 +76,7 @@ Chrome opens with the session and closes with it. Use
 
 Already using Harnessed? List the Browserrig plugins you want in its `Agent`.
 See [explicit plugin composition](docs/browser-composition.md#explicit-plugin-composition)
-and the [0.8 migration guide](docs/migration-0.8.md) for upgrade notes.
+and the [0.9 migration guide](docs/migration-0.9.md) for upgrade notes.
 
 ## Co-locate a capability
 
@@ -91,6 +91,7 @@ follow the plugin's lifetime.
 | `ProjectObservation` / `ChangeTab` | Compose observation content or wrap a backend tab operation |
 | `SelectReadiness` / `CheckReadiness` | Select a page readiness policy or extend its checks |
 | `BrowserToolCall` / `Perform` / `TargetLocated` | Wrap browser execution, stage an intent or react to a resolved target |
+| `CheckAction` | Validate the addressed tab, observation and coordinate source before dispatch |
 | `ObservationsIncludedEvent` | Track the observations actually sent after request processing and compaction |
 
 Context flows through the session scope into tools and hooks. `Actions` binds the
@@ -106,6 +107,7 @@ custom tools and context propagation.
 
 | Guide | Start here for… |
 | --- | --- |
+| [Migrate to 0.9](docs/migration-0.9.md) | Harnessed 0.20, browser errors, screenshot freshness and wait tools |
 | [Migrate to 0.8](docs/migration-0.8.md) | Replace the browser defaults helpers and migrate pointer tools |
 | [Migrate to 0.7](docs/migration-0.7.md) | API changes from 0.6.x |
 | [Migrate to 0.6](docs/migration-0.6.md) | API changes from 0.5.x, observation modes and host event envelopes |
