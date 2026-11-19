@@ -28,6 +28,7 @@ from .search import PageSearchTools
 from .tabs import TabTools
 from .targeting import Targeting
 from .typing import DomTypingTools
+from .wait import WaitTools
 from .wheel import WheelTools
 from .workspace import WorkspaceTools
 
@@ -68,5 +69,6 @@ __all__ = [
     "JavaScriptTools",
     "KeyboardTools",
     "NavigationTools",
+    "WaitTools",
     "TabTools",
 ]

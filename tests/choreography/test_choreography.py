@@ -11,7 +11,8 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
-from harnessed import ToolError
+from harnessed import ToolCall, ToolError
+from harnessed.services import ToolRegistry
 
 from browserrig import (
     Actions,
@@ -23,6 +24,7 @@ from browserrig import (
     MountedWorkspace,
     NavigationTools,
     PageSearchTools,
+    WaitTools,
 )
 from browserrig.choreography import (  # smelt: ignore[SMT107] -- test seam
     # Test scene timelines without exposing staging internals as API.
@@ -496,8 +498,9 @@ async def test_a_cancelled_control_returns_the_pointer_at_once(timeline):
 
 
 async def test_wait_announces_its_duration_then_pauses(timeline):
-    async with _staged(timeline, _NavigationTools()) as (_, ctx):
-        await ctx[_NavigationTools].wait(2)
+    async with _staged(timeline, WaitTools()) as (_, ctx):
+        result = await ctx[ToolRegistry].execute(ToolCall("wait", {"seconds": 2}))
+        assert not result.is_error
     assert _shown(timeline) == ["waiting 2", "sleep 2.00"]
 
 
@@ -659,8 +662,9 @@ async def test_unstaged_history_controls_act_right_away(timeline):
 
 
 async def test_unstaged_wait_only_waits(timeline):
-    async with _staged(timeline, _NavigationTools(), staging=()) as (_, ctx):
-        await ctx[_NavigationTools].wait(2)
+    async with _staged(timeline, NavigationTools(), staging=()) as (_, ctx):
+        result = await ctx[ToolRegistry].execute(ToolCall("wait", {"seconds": 2}))
+        assert not result.is_error
     assert _shown(timeline) == ["sleep 2.00"]
 
 
