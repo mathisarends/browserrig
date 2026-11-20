@@ -1,128 +1,97 @@
-# Browserrig
+# BrowserRig
 
-A composable agent runtime for browser agents, built on
-[Harnessed](https://github.com/mathisarends/harnessed). Compose the model, browser,
-perception, tools and context policies for your agent. Use the default recipe to
-start, replace individual capabilities, or assemble your own runtime from plugins.
+BrowserRig is a composable Python SDK for building browser agents with
+[Harnessed](https://github.com/mathisarends/harnessed). It connects an agent
+to Chrome and gives it tools to navigate, read pages, click controls and type.
 
-## Compose the layers
+## How it works
 
-| Layer | Responsibility | Extension points |
-| --- | --- | --- |
-| Agent runtime | Model calls, sessions, approvals and persistence | Harnessed models, plugins and lifecycle hooks |
-| Browser | Tabs, frames and browser lifetime | `Browser`, `InputTargets`; local or remote `Chrome` |
-| Input | Mouse and keyboard, independent of the browser backend | `InputRuntime`, `Input`, `Targeting` |
-| Perception | Capture page state and deliver observations | `BrowserPerception`, `DomPage`, `Screenshots`, `SetOfMarks`, `CursorMarker`; custom `PageModel`, `FrameSource` and `ImageAnnotator` |
-| Actions | Coordinate input, readiness and action chains | Tool groups, `browser_tool`, `ReadinessPolicy` |
-| Context | Compact history and recover task memory | `TaskMemory` |
-| Presentation | Pace input, show activity and record sessions | `InputPacing`, `Choreography`, `ChoreographyOverlay`, `VideoRecording` |
+Harnessed runs the model loop, manages sessions and applies tool approvals.
+BrowserRig turns browser state into observations the model can use. Those
+observations can include page text, references to controls and screenshots.
+When the model requests a browser action, BrowserRig performs it in the live
+browser, resolving control references when needed. The next observation
+reflects the resulting page state.
 
-These layers have separate contracts: changing capture does not require changing
-the model loop; a workspace can run without a browser; input pacing and
-visualization can be configured independently. Chrome/CDP and `DomPage` are the
-built-in adapters. Custom page models can supply their own targets, references and
-live target resolution for the shared pointer tools.
+## Requirements
 
-## Quick start
+BrowserRig requires Python 3.12 or newer and access to Chrome or Chromium.
+The Python package is `browserrig`. The `openai` and `anthropic` extras add
+provider integrations.
 
-Requires Python 3.12+ and Chrome or Chromium:
+## Run a browser agent
 
-```sh
-python -m pip install "browserrig[openai]>=0.10.0"
-```
-
-Set `OPENAI_API_KEY`, then run:
+`browserrig.Agent` bundles the standard browser plugins. This example opens
+a page and asks the agent to summarize it. The model uses the `openai` extra
+and reads `OPENAI_API_KEY` from the environment.
 
 ```python
 import asyncio
 
-from harnessed.models.pydantic_ai import PydanticAIModel
-from pydantic_ai.models.openai import OpenAIResponsesModel
+from browserrig import Agent, Chrome
 
-from browserrig import (
-    Agent,
-    Chrome,
-    Choreography,
-    ChoreographyOverlay,
-    InputPacing,
-    Screenshots,
-    ScreenshotTrigger,
-)
+model = "openai-responses:gpt-6.1-terra"
+url = "https://example.com"
+agent = Agent(model=model, browser=Chrome.launch(url=url))
 
 
-async def main():
-    agent = Agent(
-        model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
-        browser=Chrome.launch(url="https://example.com", headless=False),
-        plugins=[Screenshots(trigger=ScreenshotTrigger.EACH_STEP)],
-        without=(InputPacing, Choreography, ChoreographyOverlay),
-    )
-    async with agent.session() as session:
-        result = await session.run("Describe this page and cite its URL.", max_steps=10)
-        print(result.text)
+async def main() -> None:
+    result = await agent.run("Summarize the page and include its URL.", max_steps=5)
+    print(result.text)
 
 
 asyncio.run(main())
 ```
 
-A plugin in `plugins` replaces the default in the same slot or adds a capability;
-`without` removes defaults. The example enables screenshots and removes input
-pacing and visualization. Tool calls run without confirmation by default. Pass
-`approvals=Approvals(default=Decision.ASK, approver=...)` with `Approvals` and
-`Decision` from `harnessed` to ask through your application.
-Chrome opens with the session and closes with it. Use
-`Chrome.connect(endpoint="http://localhost:9222")` for an existing CDP browser.
+`agent.run()` opens a session for one turn. Use `agent.session()` to keep the
+browser and conversation open across turns. Use `Chrome.connect(endpoint=...)`
+to attach to an existing Chrome instance over CDP. See the
+[agent guide](docs/agent-guide.md) for sessions and streaming.
 
-Already using Harnessed? List the Browserrig plugins you want in its `Agent`.
-See [explicit plugin composition](docs/browser-composition.md#explicit-plugin-composition)
-and the [0.10 migration guide](docs/migration-0.10.md) for upgrade notes.
+## Compose the runtime
 
-## Co-locate a capability
+For the same page summary, the agent only needs to observe the page. Replace
+the `agent = ...` line above with this explicit composition.
 
-A plugin keeps its tools, instructions, hooks and session state together. Declare
-shared services with `needs(T)` or optional services with `observes(T)`; use
-`PluginState` for state belonging to each activation. Resources and registrations
-follow the plugin's lifetime.
+```python
+from harnessed import Agent
 
-| Hook | Use |
-| --- | --- |
-| `PreStep` / `PrepareRequest` | Observe before a step; add current application facts to the model request |
-| `ProjectObservation` / `ChangeTab` | Compose observation content or wrap a backend tab operation |
-| `SelectReadiness` / `CheckReadiness` | Select a page readiness policy or extend its checks |
-| `BrowserToolCall` / `Perform` / `TargetLocated` | Wrap browser execution, stage an intent or react to a resolved target |
-| `CheckAction` | Validate the addressed tab, observation and coordinate source before dispatch |
-| `ObservationsIncludedEvent` | Track the observations actually sent after request processing and compaction |
+from browserrig import (
+    BrowserPerception,
+    Chrome,
+    DomPage,
+    InputRuntime,
+    PageReadiness,
+    Runtime,
+)
 
-Context flows through the session scope into tools and hooks. `Actions` binds the
-addressed tab; `Runtime` provides a shared `ActionContext` whose ID follows input
-and browser operations. Typed events carry that identity to viewers and traces.
-`instructions()` supplies fixed guidance,
-`PrepareRequest` adds request-only context, and
-`session.append_message(UserMessage(...))` adds durable conversation input.
-See [composition](docs/browser-composition.md) for a complete co-located plugin,
-custom tools and context propagation.
+agent = Agent(
+    model=model,
+    plugins=[
+        Runtime(),
+        Chrome.launch(url=url),
+        InputRuntime(),
+        PageReadiness(),
+        BrowserPerception(),
+        DomPage(),
+    ],
+)
+```
+
+`BrowserPerception` manages observations and `DomPage` supplies page text and
+control references. Each additional plugin adds a capability to the runtime.
+For example, `Screenshots` adds image capture, and tool plugins give the model
+actions it can call. See [composition](docs/browser-composition.md) for the
+available plugins and their dependencies.
 
 ## Documentation
 
-| Guide | Start here for… |
-| --- | --- |
-| [Migrate to 0.10](docs/migration-0.10.md) | Perception plugins, Harnessed 0.22, approval defaults and session stores |
-| [Migrate to 0.9](docs/migration-0.9.md) | Harnessed 0.20, browser errors, screenshot freshness and wait tools |
-| [Migrate to 0.8](docs/migration-0.8.md) | Replace the browser defaults helpers and migrate pointer tools |
-| [Migrate to 0.7](docs/migration-0.7.md) | API changes from 0.6.x |
-| [Migrate to 0.6](docs/migration-0.6.md) | API changes from 0.5.x, observation modes and host event envelopes |
-| [Composition](docs/browser-composition.md) | Layers, plugins, hooks and custom page models |
-| [Agent guide](docs/agent-guide.md) | Sessions, streaming, prompts, completion and persistence |
-| [Browser interaction](docs/browser-interaction.md) | Direct browser access, refs, coordinates and input |
-| [Files and events](docs/files-and-events.md) | Workspaces, remote file bridges, downloads and streams |
-| [Choreography and video](docs/browser-choreography.md) | Viewer configuration, captures and recording |
-| [Task memory](docs/task-memory.md) · [Todos](docs/todos.md) · [Human handoff](docs/human-handoff.md) | Optional task and human workflows |
-| [Telemetry](docs/telemetry.md) · [Development](docs/development.md) | Traces, local setup, checks and releases |
+- [Composition](docs/browser-composition.md) explains the standard runtime,
+  plugin selection and extension points.
+- [Agent guide](docs/agent-guide.md) covers sessions, streaming and persistence.
+- [Browser interaction](docs/browser-interaction.md) covers direct control,
+  references and coordinates.
+- The [documentation index](docs/index.md) lists the remaining guides.
 
-Install `browserrig[files]` for document readers, `browserrig[ocr]` for readers plus
-local OCR, or `browserrig[otel]` for tracing. Other extras include `openai`,
-`anthropic` and `mcp`. Runnable examples live in [`examples/`](examples).
-
-Early 0.x: APIs may change between minor versions. CI covers Python 3.12–3.14 on
-Windows and Linux; macOS is not covered. See the [changelog](CHANGELOG.md) for
-compatibility and upgrade notes. [MIT license](LICENSE).
+See the [changelog](CHANGELOG.md) for release history. BrowserRig is early 0.x
+software. CI covers Python 3.12–3.14 on Windows and Linux. [MIT license](LICENSE).
