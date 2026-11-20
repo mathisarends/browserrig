@@ -1,7 +1,6 @@
 import asyncio
 
 import pytest
-from harnessed import PolicyDecision
 from harnessed.errors import ConfigError
 from harnessed.events import (
     ControlState,
@@ -11,7 +10,6 @@ from harnessed.events import (
 )
 from harnessed.integrations.json import JsonSessionStore
 from harnessed.models import ImageReference, ModelChunk, TextPart, UserMessage
-from harnessed.plugins import Approvals
 from harnessed.testing import CallbackModel, ScriptedModel, call
 from pydantic import BaseModel
 
@@ -130,7 +128,7 @@ async def test_facade_reopens_history_context_and_image_assets_with_a_new_store(
         await session.flush()
     saved = await store.load_session("conversation")
     assert saved is not None and saved.revision > 0
-    assert saved.checkpoint.version == 3
+    assert saved.checkpoint.version == 4
 
     model = ScriptedModel(["Continued answer"])
     reopened = _agent(model, store=JsonSessionStore(root=root))
@@ -180,7 +178,7 @@ async def test_paused_done_restores_browser_events_and_structured_finalization(
     agent = _agent(
         CallbackModel(done_response),
         store=JsonSessionStore(root=root),
-        plugins=[Done(), Approvals(default=PolicyDecision.ALLOW)],
+        plugins=[Done()],
     )
     async with agent.session(id="paused") as session:
         session.on(SessionControlChangedEvent, control_changed)
@@ -199,7 +197,7 @@ async def test_paused_done_restores_browser_events_and_structured_finalization(
     reopened = _agent(
         model,
         store=JsonSessionStore(root=root),
-        plugins=[Done(), Approvals(default=PolicyDecision.ALLOW)],
+        plugins=[Done()],
     )
     async with reopened.session(id="paused", restore_outputs=[Answer]) as session:
         assert session.log.control.state is ControlState.PAUSED

@@ -3,9 +3,8 @@ import base64
 from collections.abc import AsyncIterator
 
 import pytest
-from harnessed import Agent, PolicyDecision
+from harnessed import Agent
 from harnessed.models import ToolMessage
-from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
 import browserrig
@@ -168,9 +167,7 @@ async def test_navigate_can_open_the_url_in_a_new_tab(icon_site):
     agent = browserrig.Agent(
         model=model,
         browser=Chrome.launch(url=icon_site + "/inline"),
-        plugins=[
-            Approvals(default=PolicyDecision.ALLOW),
-        ],
+        plugins=[],
     )
     result = await agent.run("Open the page in a new tab", max_steps=3)
     assert result.text == "Done"

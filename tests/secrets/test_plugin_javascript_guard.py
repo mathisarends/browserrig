@@ -1,4 +1,5 @@
-from harnessed import Plugin, ToolResult, tool
+from harnessed import Plugin, tool
+from harnessed.models import ToolResult
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import Secrets

@@ -1,6 +1,5 @@
 import pytest
-from harnessed import Agent, Plugin, PolicyDecision, tool
-from harnessed.plugins import Approvals
+from harnessed import Agent, Plugin, tool
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import AllowedDomains
@@ -38,7 +37,6 @@ async def test_javascript_tools_and_aliases_are_blocked_without_execution(
         plugins=[
             _ScriptTools(executed),
             AllowedDomains(domains),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     await agent.run("go", max_steps=3)
@@ -54,7 +52,9 @@ async def test_omitting_plugin_keeps_javascript_available():
     model = ScriptedModel([call("execute_javascript", code="1+1"), "done"])
     await Agent(
         model=model,
-        plugins=[_ScriptTools(executed), Approvals(default=PolicyDecision.ALLOW)],
+        plugins=[
+            _ScriptTools(executed),
+        ],
     ).run("go", max_steps=3)
     assert executed == ["1+1"]
     assert "Script executed" in repr(model.requests[-1].messages)

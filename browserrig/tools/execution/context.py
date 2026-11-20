@@ -3,7 +3,8 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
-from harnessed import ToolError, ToolResult
+from harnessed.models import ToolResult
+from harnessed.tools import ToolError
 
 from browserrig.browser import Tab
 from browserrig.core import ActionKind

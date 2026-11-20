@@ -96,10 +96,10 @@ rather than moving published tags; PyPI versions cannot be overwritten.
 
 ## Compatibility and coverage
 
-Harnessed and its provider, MCP and OTel extras are pinned to 0.21.0.
-State/checkpoint format 3 and audit envelope 6 carry forward from Browserrig 0.8.
-Keep stores from earlier format versions separate. See the
-[0.9 migration guide](migration-0.9.md) when upgrading.
+Harnessed and its provider, MCP and OTel extras are pinned to 0.22.0.
+Conversation snapshots use format 3, checkpoints use format 4 and standalone
+audit envelopes use version 7. See the [0.10 migration guide](migration-0.10.md)
+for the snapshot export and restore procedure.
 
 Persistence adapters in handoff/todos and compaction integration in task memory
 include narrow internal Harnessed dependencies. Their restoration, request-context

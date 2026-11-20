@@ -3,8 +3,9 @@ from collections.abc import Awaitable, Callable, Mapping
 from contextlib import AsyncExitStack
 from uuid import uuid4
 
-from harnessed import ToolError, ToolResult
 from harnessed.kernel import PluginScope
+from harnessed.models import ToolResult
+from harnessed.tools import ToolError
 from harnessed.tracing import record, traced
 
 from browserrig.browser import Browser, BrowserEvents, Tab

@@ -1,7 +1,7 @@
-from harnessed import Plugin, hook
+from harnessed import Plugin
 from harnessed.events import StepStartedEvent
 from harnessed.hooks import Next, PrepareRequest
-from harnessed.kernel import needs, observes
+from harnessed.kernel import hook, needs, observes
 from harnessed.models import ModelRequest, UserMessage
 from harnessed.plugins import FinalStepPolicy
 from harnessed.sessions import SessionContext

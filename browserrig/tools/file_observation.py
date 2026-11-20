@@ -2,10 +2,10 @@ import hashlib
 from dataclasses import dataclass
 
 import yaml
-from harnessed import Plugin, PluginState, hook
+from harnessed import Plugin
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.kernel import observes
+from harnessed.kernel import PluginState, hook, observes
 from harnessed.models import UserMessage
 
 from browserrig.browser import Browser, DownloadReceiving

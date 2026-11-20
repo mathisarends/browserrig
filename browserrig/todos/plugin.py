@@ -1,9 +1,9 @@
 from collections.abc import Sequence
 from typing import Annotated
 
-from harnessed import Instructions, Plugin, SystemPrompt, ToolError, hook, tool
+from harnessed import Plugin, SystemPrompt, tool
 from harnessed.hooks import Next, PrepareRequest
-from harnessed.kernel import needs
+from harnessed.kernel import hook, needs
 from harnessed.models import (
     AssistantMessage,
     Message,
@@ -11,7 +11,9 @@ from harnessed.models import (
     ToolMessage,
     UserMessage,
 )
+from harnessed.prompts import Instructions
 from harnessed.prompts.plugin_instructions import PluginInstructions
+from harnessed.tools import ToolError
 from pydantic import Field, ValidationError
 
 from .models import Todo, TodoList

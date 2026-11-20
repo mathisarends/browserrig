@@ -5,8 +5,9 @@ from inspect import iscoroutinefunction, signature
 from typing import Annotated, cast
 from weakref import WeakKeyDictionary
 
-from harnessed import ToolChain, tool
+from harnessed import tool
 from harnessed.kernel import PluginBase, Scope, Waterfall, registration
+from harnessed.tools import ToolChain
 from pydantic import Field
 
 from .kinds import ActionKind
@@ -61,6 +62,7 @@ def browser_tool[F: Callable[..., Awaitable[object]]](
     """
     metadata = BrowserToolMetadata(chainable=chainable, kind=kind)
     register = tool(
+        action=kind,
         description=description,
         enabled=enabled,
         readonly=readonly,

@@ -1,8 +1,6 @@
-from collections.abc import Callable
 from dataclasses import dataclass, replace
 
-from harnessed.plugins import ContextState
-from harnessed.plugins.compaction import (
+from harnessed.context import (
     CompactionContext,
     CompactionRequest,
     Summarizer,
@@ -10,40 +8,19 @@ from harnessed.plugins.compaction import (
 )
 from harnessed.runtime.compaction import ModelSummarizer, SummaryError
 from harnessed.runtime.tokens import TokenCounter
-from harnessed.tracing import span
-from pydantic import ConfigDict, TypeAdapter
-
-_BOOL = TypeAdapter(bool, config=ConfigDict(strict=True, hide_input_in_errors=True))
 
 
 @dataclass
 class MemoryRuntime:
     """Per-mount delivery state; durable handover metadata lives in the session."""
 
+    enabled: bool = False
     remaining_steps: int = 0
     final_step: bool = False
     defer_once: bool = False
     can_read: bool = False
     inline_restore: bool = False
     restore_notified: bool = False
-
-
-@dataclass
-class CheckpointTrigger:
-    trigger: Callable[[ContextState], bool]
-    runtime: MemoryRuntime
-
-    def __call__(self, state: ContextState) -> bool:
-        due = _BOOL.validate_python(self.trigger(state))
-        defer = self.runtime.defer_once
-        self.runtime.defer_once = False
-        # Native emergency compaction still takes precedence over this return value.
-        if due and defer and (state.ratio is None or state.ratio < 0.9):
-            with span(
-                "browserrig.memory.defer_compaction", input_tokens=state.input_tokens
-            ):
-                return False
-        return due
 
 
 class MemorySummarizer(Summarizer):

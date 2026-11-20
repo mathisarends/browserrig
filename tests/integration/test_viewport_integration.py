@@ -2,11 +2,10 @@ import json
 import re
 
 import pytest
-from harnessed import Plugin, PolicyDecision, ToolCall
+from harnessed import Plugin
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.kernel import needs
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import CallbackModel
 
 from browserrig import (
@@ -126,7 +125,7 @@ async def test_dom_preparation_frames_forms_avoids_jitter_and_keeps_pinned_contr
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
-        plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
+        plugins=[Prepare()],
     )
     async with agent.session() as session:
         result = await session.run(
@@ -216,7 +215,7 @@ async def test_clipped_control_inside_vertical_and_horizontal_scroll_container(
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
-        plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
+        plugins=[Prepare()],
     )
     async with agent.session() as session:
         result = await session.run("Click the clipped nested target", max_steps=2)
@@ -287,7 +286,7 @@ async def test_edge_frame_is_scrolled_into_view_before_interaction(
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site + "/frames", arguments=("--site-per-process",)),
-        plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
+        plugins=[Prepare()],
     )
     async with agent.session() as session:
         result = await session.run("Click the target in an edge frame", max_steps=2)
@@ -338,7 +337,7 @@ async def test_dom_preparation_reaches_target_despite_prevented_wheel(site):
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
-        plugins=[Approvals(default=PolicyDecision.ALLOW), Prepare()],
+        plugins=[Prepare()],
     )
     async with agent.session() as session:
         result = await session.run(

@@ -2,8 +2,8 @@ import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import ToolCall
 from harnessed.kernel import PluginActivated
+from harnessed.models import ToolCall
 from harnessed.tools import ToolRegistry
 
 from browserrig import ActionKind, Actions, NavigationTools, WaitTools

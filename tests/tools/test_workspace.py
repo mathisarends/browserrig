@@ -1,10 +1,9 @@
 from dataclasses import replace
 
 import pytest
-from harnessed import Agent, PolicyDecision
+from harnessed import Agent
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.models import ImagePart, ImageReference
-from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from harnessed.tools import ToolRegistry
 from PIL import Image
@@ -63,7 +62,6 @@ async def test_workspace_tools_run_without_browser_or_action_services(tmp_path):
         plugins=[
             Files(LocalWorkspace(tmp_path)),
             WorkspaceTools(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     async with agent.session() as session:

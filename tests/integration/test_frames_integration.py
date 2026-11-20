@@ -2,15 +2,10 @@ import json
 
 import pytest
 from cdpify import CDPCommandError
-from harnessed import (
-    Plugin,
-    PolicyDecision,
-    ToolCall,
-)
+from harnessed import Plugin
 from harnessed.events import ToolExecutionFinishedEvent
 from harnessed.kernel import PluginScope, needs
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import CallbackModel
 
 from browserrig import (
@@ -152,7 +147,6 @@ async def test_frame_refs_route_real_typing_and_trusted_clicks(
         ),
         plugins=[
             Prepare(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     async with agent.session() as session:

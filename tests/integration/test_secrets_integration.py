@@ -1,15 +1,10 @@
 import json
 
 import pytest
-from harnessed import (
-    Plugin,
-    PolicyDecision,
-    ToolCall,
-)
+from harnessed import Plugin
 from harnessed.events import ToolExecutionFinishedEvent
 from harnessed.kernel import PluginScope, needs
-from harnessed.models import ModelChunk, ToolMessage
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall, ToolMessage
 from harnessed.testing import CallbackModel
 
 from browserrig import (
@@ -86,7 +81,6 @@ def _agent(site, model, domains, holder, *, path="/", screenshots=False, live=No
         ),
         secrets,
         _Hold(holder),
-        Approvals(default=PolicyDecision.ALLOW),
     ]
     if live is not None:
         plugins.append(live)

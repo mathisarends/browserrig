@@ -1,10 +1,8 @@
 import json
 
 import pytest
-from harnessed import PolicyDecision, ToolCall
 from harnessed.events import ToolCallFinishedEvent
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import CallbackModel
 
 from browserrig import (
@@ -139,7 +137,7 @@ def _agent(site, respond):
     return Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
-        plugins=[Approvals(default=PolicyDecision.ALLOW)],
+        plugins=[],
         without=(InputPacing, Choreography, ChoreographyOverlay),
     )
 

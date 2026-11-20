@@ -1,5 +1,6 @@
-from harnessed import Plugin, ToolError
+from harnessed import Plugin
 from harnessed.kernel import needs
+from harnessed.tools import ToolError
 
 from browserrig.browser import Browser
 from browserrig.core import ActionKind

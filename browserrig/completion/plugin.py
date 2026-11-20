@@ -1,17 +1,6 @@
 import json
 
-from harnessed import (
-    Instructions,
-    Plugin,
-    PluginState,
-    PolicyDecision,
-    SystemPrompt,
-    ToolChain,
-    ToolResult,
-    ToolStatus,
-    hook,
-    tool,
-)
+from harnessed import Plugin, SystemPrompt, tool
 from harnessed.events import AssistantMessageEvent, ToolCallFinishedEvent
 from harnessed.events.turn import FinalStepPolicy
 from harnessed.hooks import (
@@ -25,9 +14,19 @@ from harnessed.hooks import (
     ToolPolicy,
     TurnStopping,
 )
-from harnessed.kernel import needs
-from harnessed.models import ModelRequest, StopReason, SystemMessage, UserMessage
+from harnessed.kernel import PluginState, hook, needs
+from harnessed.models import (
+    Decision,
+    ModelRequest,
+    StopReason,
+    SystemMessage,
+    ToolResult,
+    ToolStatus,
+    UserMessage,
+)
+from harnessed.prompts import Instructions
 from harnessed.sessions import SessionContext
+from harnessed.tools import ToolChain
 
 from .models import DENIALS, Phase, closing_step, permits
 from .state import CompletionState
@@ -159,15 +158,13 @@ class Done(Plugin, slot="completion", provides=True):
         return decision
 
     @hook(ToolPolicy, priority=-200)
-    async def _phase_policy(
-        self, event: ToolPolicy, next_: Next[PolicyDecision]
-    ) -> PolicyDecision:
+    async def _phase_policy(self, event: ToolPolicy, next_: Next[Decision]) -> Decision:
         # Refuse calls the phase forbids before ordinary approval hooks can ask
         # the host to authorize work that is no longer permitted.
         if event.session.log is self._session.log and not permits(
             self._phase(), event.call.name
         ):
-            return PolicyDecision.DENY
+            return Decision.DENY
         return await next_()
 
     @hook(ExecuteTool, priority=-100)

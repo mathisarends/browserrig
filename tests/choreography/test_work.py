@@ -1,4 +1,4 @@
-from harnessed import ToolCall, ToolResult, ToolStatus
+from harnessed.models import ToolCall, ToolResult, ToolStatus
 
 from browserrig import ActionKind
 from browserrig.choreography import WorkPhase

@@ -1,21 +1,13 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import (
-    Agent,
-    Plugin,
-    PolicyDecision,
-    ToolChain,
-    ToolError,
-    ToolResult,
-    ToolStatus,
-    hook,
-)
+from harnessed import Agent, Approvals, Plugin
 from harnessed.events import ToolCallFinishedEvent, ToolExecutionFinishedEvent
 from harnessed.hooks import ReviewToolResult
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.kernel import hook
+from harnessed.models import Decision, ModelChunk, ToolResult, ToolStatus
 from harnessed.testing import ScriptedModel, call
+from harnessed.tools import ToolChain, ToolError
 
 from browserrig import ActionKind
 from browserrig.dom import Element, Offscreen, decision_change
@@ -163,7 +155,6 @@ async def test_native_chain_skips_trailing_calls_after_boundary_or_failure(
         plugins=[
             *_browser(),
             _Tools(executed),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     result = await agent.run("Fill the form")
@@ -185,10 +176,10 @@ async def test_denied_boundary_does_not_discard_unrelated_followup():
     )
     agent = Agent(
         model=model,
+        approvals=Approvals(default=Decision.ALLOW, deny=[ActionKind.SWITCH_TAB]),
         plugins=[
             *_browser(),
             _Tools(executed),
-            Approvals(default=PolicyDecision.ALLOW, deny=["change"]),
         ],
     )
     result = await agent.run("Fill a field")
@@ -214,13 +205,13 @@ async def test_browser_metadata_is_captured_for_review_without_reaching_the_mode
             *_browser(),
             _Tools(executed),
             Inspect(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     ).run("Fill")
     info = registrations[0]
     assert info.metadata.get(BrowserToolMetadata) == BrowserToolMetadata(
         ActionKind.TYPE, True
     )
+    assert info.action is ActionKind.TYPE
     assert info.chain is ToolChain.CONTINUE and not info.parallel
     assert "BrowserToolMetadata" not in str(model.requests[0].tools)
 

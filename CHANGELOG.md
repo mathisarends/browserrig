@@ -6,6 +6,13 @@ Upgrade from 0.9.x using the [migration guide](docs/migration-0.10.md).
 
 ### Breaking changes
 
+- Pin Harnessed and its provider, MCP and OTel extras to 0.22.0. Pass
+  `approvals=`, `loop=`, `context=` and `instructions=` directly to `Agent`.
+  Configure compaction with `Context(compaction=Compaction(...))` and add
+  `TaskMemory()` for workspace guidance with a custom context. Migrate
+  existing stores through conversation snapshots. Checkpoints use format 4
+  and audit envelopes use version 7. Tool calls run without confirmation by
+  default. Set `approvals=` to require confirmation or restrict actions.
 - Compose perception from plugins. `BrowserPerception(text=...)` keeps the
   observation lifecycle and takes `"delta"`, `"full"` or `None`; `capture=`,
   `renderer=` and `screenshots=` are removed. `Screenshots(...)` is now a plugin;
@@ -39,6 +46,8 @@ Upgrade from 0.9.x using the [migration guide](docs/migration-0.10.md).
 
 ### Added
 
+- Use stable `ActionKind` members to select browser and workspace tools in
+  Harnessed approval rules.
 - Supply an application view from a plugin: register a `PageModel` and
   `FrameSource` with `BrowserPerception` during setup, for example to read a
   canvas application's nodes and frames. Registrations return their removal, and
@@ -48,9 +57,10 @@ Upgrade from 0.9.x using the [migration guide](docs/migration-0.10.md).
 
 ### Changed
 
-- Upgrade Harnessed and its provider, MCP and OTel extras to 0.21.0.
-  `TerminalEvents` reads the turn's model usage from Harnessed's
+- `TerminalEvents` reads the turn's model usage from Harnessed's
   `TurnEndedEvent.usage`. Applications can subscribe to that event directly.
+- Use Harnessed's session-owned OTLP tracing in the runnable examples.
+  Model spans retain correlation metadata when captured history is truncated.
 
 ## 0.9.0 (2026-11-19)
 

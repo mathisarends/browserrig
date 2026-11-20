@@ -2,7 +2,7 @@
 
 [Back to README](../README.md)
 
-Browserrig uses Harnessed's native `OpenTelemetryTracer`. Traces show turns, model
+Browserrig uses Harnessed's native OpenTelemetry plugins. Traces show turns, model
 requests, tools, browser operations, timings and usage. Content capture and hook
 instrumentation are opt-in.
 
@@ -56,7 +56,11 @@ Harnessed 0.20 model spans expose `llm.input_messages`, `llm.output_messages`,
 `llm.tools`, and `llm.invocation_parameters` using OpenInference. Input spans show
 new messages by default. `harnessed.input_messages.inherited` counts messages
 already shown on earlier spans. Use `full_input_messages=True` on the tracer to
-include the full message list on each model span.
+include history on each model span. When history exceeds the span attribute
+budget, Harnessed keeps the newest complete input messages that fit and preserves
+correlation IDs. Read `harnessed.input_messages.omitted` and
+`harnessed.input.truncated` to detect this. Set `max_span_attributes` on the
+tracer or use `OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT`.
 For the attribute mapping from Harnessed 0.19, see the
 [0.9 migration guide](migration-0.9.md#update-trace-consumers).
 
@@ -136,8 +140,12 @@ a managed action have no effect.
 
 ## Use in an application
 
-Install `browserrig[otel]` and supply the native plugin. The application owns the
-provider and shuts it down after its sessions close:
+Install `browserrig[otel]` and add `OTLPTracing()` from
+`harnessed.integrations.opentelemetry` to `plugins=` for a session-owned provider.
+Each session drains its pending spans on close. The examples use this setup.
+
+For an application-owned provider shared by multiple sessions, supply
+`OpenTelemetryTracer` and shut down the provider after those sessions close.
 
 ```python
 import asyncio

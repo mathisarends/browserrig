@@ -11,8 +11,8 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
-from harnessed import ToolCall, ToolError
-from harnessed.tools import ToolRegistry
+from harnessed.models import ToolCall
+from harnessed.tools import ToolError, ToolRegistry
 
 from browserrig import (
     Actions,

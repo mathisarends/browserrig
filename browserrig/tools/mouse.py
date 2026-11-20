@@ -3,13 +3,10 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from harnessed import (
-    Instructions,
-    Plugin,
-    SystemPrompt,
-    ToolError,
-)
+from harnessed import Plugin, SystemPrompt
 from harnessed.kernel import needs, observes
+from harnessed.prompts import Instructions
+from harnessed.tools import ToolError
 from pydantic import Field
 
 from browserrig.browser import Browser, TabPolicy

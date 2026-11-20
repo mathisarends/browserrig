@@ -4,8 +4,8 @@ import asyncio
 from contextlib import suppress
 from typing import NamedTuple
 
-from harnessed import Plugin, PluginState, hook
-from harnessed.kernel import PluginScope, needs
+from harnessed import Plugin
+from harnessed.kernel import PluginScope, PluginState, hook, needs
 
 from browserrig.browser import Browser, Tab, TabChanged
 from browserrig.core import BrowserError

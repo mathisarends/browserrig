@@ -1,7 +1,8 @@
 from dataclasses import replace
 
-from harnessed import ToolError, ToolResult
 from harnessed.hooks import Next
+from harnessed.models import ToolResult
+from harnessed.tools import ToolError
 
 from browserrig.browser import Tab
 from browserrig.core import (

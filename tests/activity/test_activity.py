@@ -1,7 +1,7 @@
 from dataclasses import replace
 
 import pytest
-from harnessed import Agent, Plugin, ToolResult, ToolStatus
+from harnessed import Agent, Plugin
 from harnessed.errors import SessionFormatError
 from harnessed.events import (
     AssistantMessageEvent,
@@ -23,7 +23,13 @@ from harnessed.events import (
 )
 from harnessed.events.registry import EventRegistry
 from harnessed.kernel import PluginScope, needs
-from harnessed.models import AssistantMessage, ModelInfo, ModelRequest
+from harnessed.models import (
+    AssistantMessage,
+    ModelInfo,
+    ModelRequest,
+    ToolResult,
+    ToolStatus,
+)
 from harnessed.testing import ScriptedModel
 
 from browserrig.activity import Activity, ActivityKind, ActivityOutcome

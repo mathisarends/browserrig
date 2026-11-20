@@ -1,19 +1,13 @@
 from collections.abc import Callable
 
-from harnessed import (
-    Inject,
-    Instructions,
-    Plugin,
-    PluginState,
-    SessionLog,
-    SystemPrompt,
-    ToolError,
-    hook,
-)
+from harnessed import Plugin, SystemPrompt
 from harnessed.events import ObservationsIncludedEvent, TurnEndedEvent
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
-from harnessed.kernel import PluginScope, needs, observes
+from harnessed.kernel import Inject, PluginScope, PluginState, hook, needs, observes
 from harnessed.models import ModelRequest, UserMessage
+from harnessed.prompts import Instructions
+from harnessed.sessions.log import SessionLog
+from harnessed.tools import ToolError
 from harnessed.tracing import record, traced
 
 from browserrig.browser import (

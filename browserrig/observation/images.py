@@ -4,7 +4,6 @@ import hashlib
 from dataclasses import replace
 from itertools import chain
 
-from harnessed import SessionLog
 from harnessed.events import ObservationsIncludedEvent
 from harnessed.models import (
     ImagePart,
@@ -13,6 +12,7 @@ from harnessed.models import (
     TextPart,
     UserMessage,
 )
+from harnessed.sessions.log import SessionLog
 
 from browserrig.core import Bounds
 

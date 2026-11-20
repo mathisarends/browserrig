@@ -5,9 +5,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from harnessed import Agent, Plugin, ToolError
+from harnessed import Agent, Plugin
 from harnessed.kernel import PluginScope, needs
 from harnessed.testing import ScriptedModel
+from harnessed.tools import ToolError
 
 from browserrig import (
     Actions,

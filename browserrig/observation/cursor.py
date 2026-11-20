@@ -1,7 +1,8 @@
 from typing import ClassVar, override
 
-from harnessed import Instructions, Plugin, SystemPrompt
+from harnessed import Plugin, SystemPrompt
 from harnessed.kernel import PluginScope, needs
+from harnessed.prompts import Instructions
 from PIL import ImageDraw
 
 from .drawing import ImageAnnotator, ImageView

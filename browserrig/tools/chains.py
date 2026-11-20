@@ -1,7 +1,8 @@
 from dataclasses import replace
 from typing import Protocol
 
-from harnessed import ToolInfo, ToolResult, ToolStatus
+from harnessed.models import ToolResult, ToolStatus
+from harnessed.tools import ToolInfo
 
 from browserrig.browser import Tab
 from browserrig.core import BrowserToolMetadata, ReadinessStatus

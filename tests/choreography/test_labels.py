@@ -1,11 +1,10 @@
 import asyncio
 
 import pytest
-from harnessed import Agent, Plugin, ToolCall, ToolChain, ToolError, ToolStatus, tool
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed import Agent, Approvals, Plugin, tool
+from harnessed.models import ModelChunk, ToolCall, ToolStatus
 from harnessed.testing import ScriptedModel
-from harnessed.tools import ToolRegistry
+from harnessed.tools import ToolChain, ToolError, ToolRegistry
 from pydantic import TypeAdapter
 
 from browserrig import ActionLabels, Secret, Secrets
@@ -43,11 +42,13 @@ async def test_stream_envelopes_are_redacted_before_emission_and_survive_session
     plugins = [secrets, ActionLabels()] if secrets_first else [ActionLabels(), secrets]
     agent = Agent(
         model=ScriptedModel([[ModelChunk(tool_call=request)], "Done"]),
+        approvals=Approvals(deny=(_Report.read_report,))
+        if outcome == "denied"
+        else None,
         plugins=[
             FakeChrome({}),
             _Report(),
             *plugins,
-            Approvals(deny=("read_report",)) if outcome == "denied" else None,
         ],
     )
     displayed = []
@@ -109,7 +110,7 @@ async def test_schema_and_presentation_opt_in_together(enabled):
         model=ScriptedModel(
             [[ModelChunk(tool_call=ToolCall("read_report", {}))], "Done"]
         ),
-        plugins=[_Report(), ActionLabels() if enabled else None],
+        plugins=[_Report(), *([ActionLabels()] if enabled else [])],
     )
     events = []
     async with agent.session() as session:

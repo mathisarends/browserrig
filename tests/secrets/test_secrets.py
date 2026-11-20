@@ -6,17 +6,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import (
-    Agent,
-    Inject,
-    Plugin,
-    PolicyDecision,
-    ToolResult,
-    tool,
-)
+from harnessed import Agent, Plugin, tool
 from harnessed.events import InboxAddedEvent, UserMessageEvent
-from harnessed.kernel import PluginScope, needs
-from harnessed.plugins import Approvals
+from harnessed.kernel import Inject, PluginScope, needs
+from harnessed.models import ToolResult
 from harnessed.testing import ScriptedModel, call
 from PIL import Image
 
@@ -343,10 +336,9 @@ def _agent(secrets, *, model, plugins=()):
     class Chrome(FakeChrome):
         events = (ActionFailedEvent,)
 
-    allow = Approvals(default=PolicyDecision.ALLOW)
     agent = Agent(
         model=model,
-        plugins=[Chrome(holder), secrets, Capture(), allow, *plugins],
+        plugins=[Chrome(holder), secrets, Capture(), *plugins],
     )
     return agent, holder
 

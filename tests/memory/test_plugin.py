@@ -1,7 +1,8 @@
 import hashlib
 
 import pytest
-from harnessed import Agent, PolicyDecision, SessionState
+from harnessed import Agent, Compaction, Context
+from harnessed.context import Summary
 from harnessed.events import CompactionAppliedEvent
 from harnessed.integrations.json import JsonSessionStore
 from harnessed.models import (
@@ -11,8 +12,7 @@ from harnessed.models import (
     ModelUsage,
     StopReason,
 )
-from harnessed.plugins import Approvals
-from harnessed.plugins.compaction import Summary
+from harnessed.sessions import SessionState
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import (
@@ -42,7 +42,6 @@ def _plugins(tmp_path, memory):
         Files(LocalWorkspace(tmp_path)),
         WorkspaceTools(),
         memory,
-        Approvals(default=PolicyDecision.ALLOW),
     ]
 
 
@@ -64,15 +63,17 @@ async def test_checkpoint_defers_once_then_first_compacted_request_prompts_a_rea
         ],
         info=ModelInfo("test"),
     )
-    memory = TaskMemory(
-        trigger=lambda state: state.input_tokens >= 5000,
-        fallback_tokens=5000,
-        summarizer=summary,
-        keep_last_steps=1,
-        max_summary_tokens=2048,
+    memory = TaskMemory(fallback_tokens=5000)
+    context = Context(
+        compaction=Compaction(
+            trigger=lambda state: state.input_tokens >= 5000,
+            summarizer=summary,
+            keep_last_steps=1,
+            max_summary_tokens=2048,
+        )
     )
     async with Agent(
-        model=model, plugins=_plugins(tmp_path, memory)
+        model=model, context=context, plugins=_plugins(tmp_path, memory)
     ).session() as session:
         result = await session.run("Compare products", max_steps=8)
         state = session.scope[TaskMemory].current
@@ -102,7 +103,11 @@ async def test_checkpoint_defers_once_then_first_compacted_request_prompts_a_rea
 
 async def test_no_file_tools_means_no_checkpoint_or_restore_injection():
     model = ScriptedModel(["A", "B", "C"])
-    agent = Agent(model=model, plugins=[TaskMemory(fallback_tokens=1)])
+    agent = Agent(
+        model=model,
+        context=Context(compaction=Compaction(fallback_tokens=100_000)),
+        plugins=[TaskMemory(fallback_tokens=1)],
+    )
     async with agent.session() as session:
         for prompt in ("First", "Second", "Third"):
             result = await session.run(prompt)
@@ -137,17 +142,19 @@ async def test_separate_llm_and_async_prompt_preserve_native_retry_and_usage(tmp
             "Finished",
         ]
     )
-    memory = TaskMemory(
-        trigger=lambda _state: next(fire),
-        fallback_tokens=1,
-        llm=summary,
-        prompt=prompt,
-        keep_last_steps=1,
-        target_tokens=8000,
-        max_summary_tokens=512,
+    memory = TaskMemory(fallback_tokens=1)
+    context = Context(
+        compaction=Compaction(
+            trigger=lambda _state: next(fire),
+            llm=summary,
+            prompt=prompt,
+            keep_last_steps=1,
+            target_tokens=8000,
+            max_summary_tokens=512,
+        )
     )
     async with Agent(
-        model=model, plugins=_plugins(tmp_path, memory)
+        model=model, context=context, plugins=_plugins(tmp_path, memory)
     ).session() as session:
         result = await session.run("Compare products", max_steps=8)
     assert result.text == "Finished"
@@ -174,7 +181,9 @@ async def test_separate_llm_and_async_prompt_preserve_native_retry_and_usage(tmp
 async def test_checkpoint_is_not_requested_on_the_last_available_steps(tmp_path):
     model = ScriptedModel(["Unfinished"])
     async with Agent(
-        model=model, plugins=_plugins(tmp_path, TaskMemory(fallback_tokens=1))
+        model=model,
+        context=Context(compaction=Compaction(fallback_tokens=100_000)),
+        plugins=_plugins(tmp_path, TaskMemory(fallback_tokens=1)),
     ).session() as session:
         result = await session.run("Large task", max_steps=2)
     assert not any(isinstance(e, TaskMemoryEvent) for e in result.events)
@@ -192,15 +201,17 @@ async def test_missing_checkpoint_is_visible_and_does_not_stop_compaction(tmp_pa
         ],
         info=ModelInfo("test"),
     )
-    memory = TaskMemory(
-        trigger=lambda _state: True,
-        fallback_tokens=1,
-        summarizer=_Summary(),
-        keep_last_steps=1,
-        max_summary_tokens=2048,
+    memory = TaskMemory(fallback_tokens=1)
+    context = Context(
+        compaction=Compaction(
+            trigger=lambda _state: True,
+            summarizer=_Summary(),
+            keep_last_steps=1,
+            max_summary_tokens=2048,
+        )
     )
     async with Agent(
-        model=model, plugins=_plugins(tmp_path, memory)
+        model=model, context=context, plugins=_plugins(tmp_path, memory)
     ).session() as session:
         result = await session.run("Compare products", max_steps=8)
         state = session.scope[TaskMemory].current
@@ -226,15 +237,17 @@ async def test_pending_read_survives_snapshot_and_store_reopen_without_copying_n
         ],
         info=ModelInfo("test"),
     )
-    memory = TaskMemory(
-        trigger=lambda _state: True,
-        fallback_tokens=1,
-        summarizer=_Summary(),
-        keep_last_steps=1,
-        max_summary_tokens=2048,
+    memory = TaskMemory(fallback_tokens=1)
+    context = Context(
+        compaction=Compaction(
+            trigger=lambda _state: True,
+            summarizer=_Summary(),
+            keep_last_steps=1,
+            max_summary_tokens=2048,
+        )
     )
     async with Agent(
-        model=model, plugins=_plugins(workspace, memory), store=store
+        model=model, context=context, plugins=_plugins(workspace, memory), store=store
     ).session(id="task") as session:
         await session.run("Compare products", max_steps=8)
         saved = session.snapshot().to_json()
@@ -242,7 +255,12 @@ async def test_pending_read_survives_snapshot_and_store_reopen_without_copying_n
     assert previous.restore_pending
 
     reader = ScriptedModel([call("read_file", path=_PATH), "Resumed"])
-    agent = Agent(model=reader, plugins=_plugins(workspace, TaskMemory()), store=store)
+    agent = Agent(
+        model=reader,
+        context=Context(compaction=Compaction(fallback_tokens=100_000)),
+        plugins=_plugins(workspace, TaskMemory()),
+        store=store,
+    )
     async with agent.session(id="task") as session:
         await session.run("Continue")
         state = session.scope[TaskMemory].current
@@ -251,7 +269,11 @@ async def test_pending_read_survives_snapshot_and_store_reopen_without_copying_n
     assert _NOTES not in reader.requests[0].messages[-1].text
 
     snapshot_reader = ScriptedModel([call("read_file", path=_PATH), "Restored"])
-    agent = Agent(model=snapshot_reader, plugins=_plugins(workspace, TaskMemory()))
+    agent = Agent(
+        model=snapshot_reader,
+        context=Context(compaction=Compaction(fallback_tokens=100_000)),
+        plugins=_plugins(workspace, TaskMemory()),
+    )
     async with agent.session(state=SessionState.from_json(saved)) as session:
         await session.run("Continue")
         assert not session.scope[TaskMemory].current.restore_pending
@@ -270,15 +292,17 @@ async def test_partial_read_does_not_acknowledge_restoration(tmp_path, read_args
         ],
         info=ModelInfo("test"),
     )
-    memory = TaskMemory(
-        trigger=lambda _state: True,
-        fallback_tokens=1,
-        summarizer=_Summary(),
-        keep_last_steps=1,
-        max_summary_tokens=2048,
+    memory = TaskMemory(fallback_tokens=1)
+    context = Context(
+        compaction=Compaction(
+            trigger=lambda _state: True,
+            summarizer=_Summary(),
+            keep_last_steps=1,
+            max_summary_tokens=2048,
+        )
     )
     async with Agent(
-        model=model, plugins=_plugins(tmp_path, memory)
+        model=model, context=context, plugins=_plugins(tmp_path, memory)
     ).session() as session:
         result = await session.run("Compare products", max_steps=8)
         assert session.scope[TaskMemory].current.restore_pending
@@ -291,7 +315,9 @@ async def test_partial_read_does_not_acknowledge_restoration(tmp_path, read_args
 async def test_normal_small_task_has_no_dynamic_memory_messages(tmp_path):
     model = ScriptedModel(["Finished"])
     async with Agent(
-        model=model, plugins=_plugins(tmp_path, TaskMemory())
+        model=model,
+        context=Context(compaction=Compaction(fallback_tokens=100_000)),
+        plugins=_plugins(tmp_path, TaskMemory()),
     ).session() as session:
         prompt = await session.prompt.render()
         result = await session.run("Simple task")
@@ -305,7 +331,9 @@ async def test_normal_small_task_has_no_dynamic_memory_messages(tmp_path):
 async def test_empty_or_oversized_notes_do_not_count_as_a_checkpoint(tmp_path, content):
     model = ScriptedModel([_save(content), "Finished"])
     async with Agent(
-        model=model, plugins=_plugins(tmp_path, TaskMemory())
+        model=model,
+        context=Context(compaction=Compaction(fallback_tokens=100_000)),
+        plugins=_plugins(tmp_path, TaskMemory()),
     ).session() as session:
         result = await session.run("Save notes")
         assert session.scope[TaskMemory].current.revision is None
@@ -328,7 +356,9 @@ async def test_editing_notes_records_the_new_revision(tmp_path):
         ]
     )
     async with Agent(
-        model=model, plugins=_plugins(tmp_path, TaskMemory())
+        model=model,
+        context=Context(compaction=Compaction(fallback_tokens=100_000)),
+        plugins=_plugins(tmp_path, TaskMemory()),
     ).session() as session:
         result = await session.run("Update notes")
         current = session.scope[TaskMemory].current
@@ -351,9 +381,11 @@ async def test_known_window_uses_ratio_instead_of_unknown_window_fallback(tmp_pa
         ["Finished"], info=ModelInfo("test", context_window=1_000_000)
     )
     memory = TaskMemory(fallback_tokens=1)
-    result = await Agent(model=model, plugins=_plugins(tmp_path, memory)).run(
-        "Simple task"
-    )
+    result = await Agent(
+        model=model,
+        context=Context(compaction=Compaction(fallback_tokens=100_000)),
+        plugins=_plugins(tmp_path, memory),
+    ).run("Simple task")
     assert not any(isinstance(e, TaskMemoryEvent) for e in result.events)
 
 

@@ -3,22 +3,14 @@ import math
 from typing import Annotated
 from uuid import uuid4
 
-from harnessed import (
-    Inject,
-    Instructions,
-    Plugin,
-    PluginState,
-    SystemPrompt,
-    ToolChain,
-    ToolContext,
-    hook,
-    tool,
-)
+from harnessed import Plugin, SystemPrompt, ToolContext, tool
 from harnessed.events import ControlState, SessionControlChangedEvent
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
-from harnessed.kernel import PluginScope, needs
+from harnessed.kernel import Inject, PluginScope, PluginState, hook, needs
 from harnessed.models import ModelRequest, UserMessage
+from harnessed.prompts import Instructions
 from harnessed.prompts.plugin_instructions import PluginInstructions
+from harnessed.tools import ToolChain
 from pydantic import Field, TypeAdapter, ValidationError
 
 from browserrig.browser import Browser, BrowserEvents

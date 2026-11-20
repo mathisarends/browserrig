@@ -1,12 +1,6 @@
 import pytest
-from harnessed import (
-    Instructions,
-    Plugin,
-    PluginPack,
-    PromptFormat,
-    SystemPrompt,
-)
-from harnessed.errors import PluginConflict
+from harnessed import Plugin, SystemPrompt
+from harnessed.prompts import Instructions, PromptFormat
 from harnessed.testing import ScriptedModel
 
 import browserrig
@@ -25,7 +19,7 @@ from browserrig import (
 from tests.fakes import FakeChrome
 
 
-def test_facade_reports_default_origins_replacements_and_exclusions_without_resources(
+def test_facade_describes_selected_plugins_without_resources(
     tmp_path,
 ):
     workspace = LocalWorkspace(tmp_path / "files")
@@ -40,27 +34,11 @@ def test_facade_reports_default_origins_replacements_and_exclusions_without_reso
     selected = next(
         item for item in description.plugins if item.name == "BrowserPerception"
     )
-    assert selected.pack_path == ()
-    assert len(selected.replaces) == 1
-    assert selected.replaces[0].pack_path == ("browserrig",)
-    assert {item.plugin.name for item in description.removed} == {
-        "FileTools",
-    }
+    assert selected.slot == "browserrig.observation"
+    assert "FileTools" not in {item.name for item in description.plugins}
+    assert description.model is not None
+    assert "AgentLoop" in description.loop
     assert not workspace.directory.exists()
-
-
-def test_extension_pack_requires_a_direct_slot_override_for_a_default():
-    custom = PluginPack("custom", [BrowserPerception()])
-    with pytest.raises(PluginConflict, match="browserrig.observation"):
-        browserrig.Agent(model=ScriptedModel([]), plugins=[custom])
-    selected = BrowserPerception()
-    agent = browserrig.Agent(
-        model=ScriptedModel([]),
-        plugins=[custom, selected],
-    )
-    assert [
-        plugin for plugin in agent.plugins if isinstance(plugin, BrowserPerception)
-    ] == [selected]
 
 
 @pytest.mark.parametrize("instructions", [None, "Custom role."])
@@ -152,7 +130,7 @@ async def test_facade_prompt_follows_removals_and_replacements():
 
 async def test_explicit_document_omits_plugin_blocks_and_reports_them():
     agent = browserrig.Agent(
-        model=ScriptedModel([]), prompt=SystemPrompt("Custom role.")
+        model=ScriptedModel([]), instructions=SystemPrompt("Custom role.")
     )
     rendered = await agent.prompt.render()
     assert "Custom role." in rendered
@@ -163,13 +141,12 @@ async def test_explicit_document_omits_plugin_blocks_and_reports_them():
 async def test_explicit_prompt_overrides_default_format_and_keeps_caller_text_first():
     agent = browserrig.Agent(
         model=ScriptedModel([]),
-        instructions="Caller role.",
-        prompt=SystemPrompt.from_plugins(
+        instructions=SystemPrompt.from_plugins(
+            "Caller role.",
             "Fixed guidance.",
-            None,
             format=PromptFormat.XML,
         ),
-        plugins=[None, FakeChrome({}), None],
+        plugins=[FakeChrome({})],
         without=(Chrome,),
     )
     async with agent.session() as session:
@@ -188,12 +165,10 @@ async def test_instruction_providers_only_run_for_selected_recipes_once_per_agen
             calls.append(self)
             return SystemPrompt("Custom observation guidance.")
 
-    removed = CustomPerception()
     selected = CustomPerception()
-    pack = PluginPack("application", [removed])
     agent = browserrig.Agent(
         model=ScriptedModel([]),
-        plugins=[pack, selected, FakeChrome({})],
+        plugins=[selected, FakeChrome({})],
         without=(Chrome,),
     )
     assert calls == [selected]

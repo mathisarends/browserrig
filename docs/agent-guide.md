@@ -25,21 +25,23 @@ result = await agent.run("Describe this site.", max_steps=20)
 print(result.text)
 ```
 
-`model` is supplied by your application. Configure `Approvals(approver=...)` from
-`harnessed.plugins` to ask through your UI, or explicitly allow actions with
-`Approvals(default=PolicyDecision.ALLOW)` from `harnessed`. Side effects are
-rejected without an approval handler or an allow policy.
+`model` is supplied by your application. Browserrig follows Harnessed's default
+and allows tool calls without confirmation. Supply
+`approvals=Approvals(default=Decision.ASK, approver=...)` to ask through your UI,
+or `approvals=Approvals(allow=[ActionKind.NAVIGATE, ActionKind.LIST_TABS])` to run
+only those actions. An explicit allowlist denies unmatched tools by default.
+`Approvals` and `Decision` come from `harnessed`.
 
 ## Composing plugins
 
 A supplied plugin replaces the default in the same slot; other plugins are added.
-`without=(PluginType, ...)` removes defaults, and `None` entries are skipped.
+`without=(PluginType, ...)` removes defaults. Omit disabled plugins when building the list.
 Conflicting explicit plugins raise `PluginConflict`. In a custom Harnessed agent,
 list the capabilities your application needs. The
 [composition guide](browser-composition.md) covers explicit plugin lists,
 dependency injection, co-located features and extension hooks.
 
-`agent.describe()` reports the resolved plugins and replacements. Startup validates
+`agent.describe()` reports the model, loop and selected plugins. Startup validates
 required services and raises `PluginDependencyError` for missing dependencies.
 Use `plugin_validation=PluginValidation.WARN` only when services will deliberately
 be mounted later; both types come from Harnessed (`PluginDependencyError` from
@@ -124,8 +126,9 @@ dialogs, waiting and screenshot requests end the chain. Later unstarted calls ar
 is where the agent verifies the intended result. Browser inputs are not replayed
 by observation recovery.
 
-Tools declare `ActionKind` through `BrowserToolMetadata`; custom policy and
-execution hooks can inspect `event.tool.metadata.get(BrowserToolMetadata)`.
+Browser tools publish their `ActionKind` as the Harnessed approval selector.
+Custom policy and execution hooks can read `event.tool.action` or inspect
+`event.tool.metadata.get(BrowserToolMetadata)` for browser coordination metadata.
 Import `ActionKind` from `browserrig` and `BrowserToolMetadata` from
 `browserrig.tools`. See
 [custom browser tools](browser-composition.md#add-a-browser-tool).
@@ -162,8 +165,9 @@ progress remains unconstrained. Native validation and retries apply. Read
 
 `max_steps=` bounds the whole turn, including completion and validation retries.
 For a reserved final text summary, configure
-`AgentLoop(max_steps=20, final_step=FinalStepPolicy.SUMMARIZE)` from
-`harnessed.plugins`. The summary consumes the last step and returns
+`loop=AgentLoop(max_steps=20, final_step=FinalStepPolicy.SUMMARIZE)`.
+Import `AgentLoop` from `harnessed` and `FinalStepPolicy` from
+`harnessed.events.turn`. The summary consumes the last step and returns
 `completed=False`; it does not extend the budget.
 
 ### Model-facing step hints
@@ -172,11 +176,12 @@ Add `StepBudgetHints` to make the effective step limit visible to the model.
 
 ```python
 from browserrig import Agent, Done, StepBudgetHints
-from harnessed.plugins import AgentLoop
+from harnessed import AgentLoop
 
 agent = Agent(
     model=model,
-    plugins=[AgentLoop(max_steps=25), StepBudgetHints(warn_at_remaining=3), Done()],
+    loop=AgentLoop(max_steps=25),
+    plugins=[StepBudgetHints(warn_at_remaining=3), Done()],
 )
 result = await agent.run("Verify the delivery options.")
 ```
@@ -207,19 +212,22 @@ prioritize unfinished checks. The loop still enforces the step limit.
 
 The standard agent collects each selected plugin's `instructions()` in configured
 list order. `instructions=` prepends caller guidance. Use
-`prompt=SystemPrompt.from_plugins(format=PromptFormat.XML)` to change formatting;
-a standalone `SystemPrompt(...)` document omits plugin blocks. These types come
-from `harnessed`. Inspect `agent.prompt` or `await session.prompt.render()`.
+`instructions=SystemPrompt.from_plugins(format=PromptFormat.XML)` to change
+formatting. A standalone `SystemPrompt(...)` document supplies the whole prompt.
+Import `SystemPrompt` and `PromptFormat` from `harnessed.prompts`. Inspect
+`agent.prompt` or `await session.prompt.render()`.
 
-A runtime mount uses `async with session.use(plugin,
-section_delivery=SectionDelivery.CONTEXT): ...` to deliver its guidance until it
-closes; `SectionDelivery.IGNORE` skips it. The fixed system prompt stays unchanged.
+Use `async with session.mount(plugin): ...` to deliver a plugin's runtime
+guidance until it closes. Specify `section_delivery=SectionDelivery.IGNORE`
+to skip its guidance or `SectionDelivery.ERROR` to require an explicit choice.
+Import `SectionDelivery` from `harnessed.prompts`.
 
 Install `browserrig[mcp]` and add
 `MCP.http("catalog", url=endpoint, include_tools=["search"])` from
 `harnessed.plugins.mcp` for external tools. `MCP.stdio(...)` starts a local server.
-Connections belong to each session, tools are namespaced, and approval policies
-apply. Failed operations are not automatically retried.
+Connections belong to each session and tools are namespaced. Pass an `actions=`
+mapping from remote tool names to members of your action enum to apply approval
+rules. Failed operations are not automatically retried.
 
 ## Navigation and secrets
 
@@ -266,6 +274,7 @@ paused; supply `restore_outputs=[YourOutputType]` before resuming structured wor
 
 For explicit continuation without a store, serialize `result.state.to_json()` and
 pass `state=SessionState.from_json(saved)` to `run()` or `session()`.
-Harnessed 0.17 uses state/checkpoint format 3 and audit envelope 6; older formats
-require separate stores. See the [upgrade notes](../CHANGELOG.md) and
-[session-store example](../examples/session_store.py).
+Harnessed 0.22 uses snapshot format 3, checkpoint format 4 and audit envelope 7.
+For existing stores, follow the [0.10 migration guide](migration-0.10.md#upgrade-harnessed).
+The [session-store example](../examples/session_store.py) shows how to persist and
+reopen sessions.

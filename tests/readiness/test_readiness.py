@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 from cdpify import CDPCommandError
-from harnessed import Agent, Plugin, hook
+from harnessed import Agent, Plugin
 from harnessed.hooks import Next
-from harnessed.kernel import PluginScope, needs
+from harnessed.kernel import PluginScope, hook, needs
 from harnessed.testing import ScriptedModel
 
 from browserrig import (

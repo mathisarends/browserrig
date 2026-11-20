@@ -2,9 +2,10 @@ import asyncio
 from dataclasses import dataclass, field
 
 import pytest
-from harnessed import Agent, Plugin, SessionLog
+from harnessed import Agent, Plugin
 from harnessed.errors import PluginDependencyError
 from harnessed.plugins import Service
+from harnessed.sessions.log import SessionLog
 from harnessed.testing import ScriptedModel
 
 from browserrig import (

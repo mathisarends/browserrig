@@ -4,11 +4,20 @@ from hashlib import sha256
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent, Plugin, PolicyDecision, ToolCall, ToolResult, ToolStatus
+from harnessed import Agent, Approvals, Plugin
 from harnessed.events import ToolCallFinishedEvent, ToolExecutionFinishedEvent
 from harnessed.kernel import needs
-from harnessed.models import ImagePart, ImageReference, ModelChunk, TextPart
-from harnessed.plugins import Approvals, CallEnvelope
+from harnessed.models import (
+    Decision,
+    ImagePart,
+    ImageReference,
+    ModelChunk,
+    TextPart,
+    ToolCall,
+    ToolResult,
+    ToolStatus,
+)
+from harnessed.plugins import CallEnvelope
 from harnessed.testing import ScriptedModel, call
 from harnessed.tools import ToolRegistry
 
@@ -98,7 +107,6 @@ async def test_action_lifecycle_uses_redacted_model_label(status):
             _ResultTools(ToolResult("Done", status=status)),
             CallEnvelope(ActionLabel),
             Secrets({"KEY": Secret(secret, domains=("example.org",))}),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     async with agent.session() as session:
@@ -208,10 +216,10 @@ class _Dialogs(DialogTools, provides=True):
 def _agent(value, request, *, allow=True):
     return Agent(
         model=ScriptedModel([request, "Done"]),
+        approvals=Approvals(default=Decision.ALLOW if allow else Decision.DENY),
         plugins=[
             FakeServices(),
             Actions(),
             _ResultTools(value),
-            Approvals(default=PolicyDecision.ALLOW if allow else PolicyDecision.DENY),
         ],
     )

@@ -2,9 +2,11 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from typing import cast
 
-from harnessed import Instructions, Plugin, PluginState, SystemPrompt, ToolResult, hook
+from harnessed import Plugin, SystemPrompt
 from harnessed.hooks import ExecuteTool, Next, ReviewToolResult
-from harnessed.kernel import PluginScope, needs, observes
+from harnessed.kernel import PluginScope, PluginState, hook, needs, observes
+from harnessed.models import ToolResult
+from harnessed.prompts import Instructions
 from harnessed.tracing import record, traced
 
 from browserrig.browser import (

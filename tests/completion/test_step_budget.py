@@ -1,7 +1,7 @@
 import pytest
-from harnessed import Agent, Plugin, StopReason, tool
-from harnessed.models import ModelRequest
-from harnessed.plugins import AgentLoop, FinalStepPolicy
+from harnessed import Agent, AgentLoop, Plugin, tool
+from harnessed.models import ModelRequest, StopReason
+from harnessed.plugins import FinalStepPolicy
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import Done, StepBudgetHints
@@ -28,8 +28,8 @@ async def test_warns_during_work_and_yields_to_done_at_closing(
     )
     agent = Agent(
         model=model,
+        loop=AgentLoop(max_steps=8, final_step=final_step),
         plugins=[
-            AgentLoop(max_steps=8, final_step=final_step),
             StepBudgetHints(),
             Done(),
             _Inspect(),
@@ -61,8 +61,8 @@ async def test_every_step_uses_current_turn_limit_and_keeps_only_the_current_hin
     )
     agent = Agent(
         model=model,
+        loop=AgentLoop(max_steps=12),
         plugins=[
-            AgentLoop(max_steps=12),
             StepBudgetHints(warn_at_remaining=1, show_every_step=True),
             _Inspect(),
         ],
@@ -100,8 +100,8 @@ async def test_native_final_summary_owns_the_final_step_without_done():
     model = ScriptedModel([call("inspect"), "Partial summary"])
     agent = Agent(
         model=model,
+        loop=AgentLoop(final_step=FinalStepPolicy.SUMMARIZE),
         plugins=[
-            AgentLoop(final_step=FinalStepPolicy.SUMMARIZE),
             StepBudgetHints(),
             _Inspect(),
         ],

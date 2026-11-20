@@ -2,10 +2,10 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from uuid import uuid4
 
-from harnessed import Plugin, PluginState, hook
+from harnessed import Plugin
 from harnessed.events import ControlState, SessionControlChangedEvent
 from harnessed.hooks import Next
-from harnessed.kernel import PluginScope, needs, observes
+from harnessed.kernel import PluginScope, PluginState, hook, needs, observes
 from harnessed.tracing import traced
 
 from browserrig.browser import AppState, BrowserEvents, Tab, blocked_reason

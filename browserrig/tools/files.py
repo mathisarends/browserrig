@@ -1,14 +1,10 @@
 from pathlib import PurePath
 from typing import Annotated
 
-from harnessed import (
-    Inject,
-    Instructions,
-    Plugin,
-    SystemPrompt,
-    ToolError,
-)
-from harnessed.kernel import PluginScope, needs, observes
+from harnessed import Plugin, SystemPrompt
+from harnessed.kernel import Inject, PluginScope, needs, observes
+from harnessed.prompts import Instructions
+from harnessed.tools import ToolError
 from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab

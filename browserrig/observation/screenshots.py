@@ -1,5 +1,6 @@
-from harnessed import Instructions, Plugin, SystemPrompt
+from harnessed import Plugin, SystemPrompt
 from harnessed.kernel import PluginScope, needs
+from harnessed.prompts import Instructions
 
 from .config import ScreenshotPolicy, ScreenshotTrigger
 from .plugin import BrowserPerception

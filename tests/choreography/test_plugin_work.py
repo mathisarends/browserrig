@@ -1,12 +1,12 @@
 import asyncio
 
 import pytest
-from harnessed import Agent, Plugin, ToolCall, ToolError, envelope_value, tool
+from harnessed import Agent, Approvals, Plugin, tool
 from harnessed.events import ToolCallFinishedEvent, ToolCallRequestedEvent
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals, CallEnvelope
+from harnessed.models import ModelChunk, ToolCall
+from harnessed.plugins import CallEnvelope
 from harnessed.testing import ScriptedModel
-from harnessed.tools import ToolRegistry
+from harnessed.tools import ToolError, ToolRegistry, envelope_value
 
 from browserrig import ActionLabel, Choreography, Secret, Secrets
 from browserrig.choreography import WorkPhase, WorkPresentedEvent
@@ -80,11 +80,11 @@ async def test_denied_call_is_visible_without_faking_an_execution_start():
         model=ScriptedModel(
             [[ModelChunk(tool_call=ToolCall("read_material", {}))], "Done"]
         ),
+        approvals=Approvals(deny=(_Reader.read_material,)),
         plugins=[
             FakeChrome({}),
             _Reader("unused"),
             Choreography(),
-            Approvals(deny=("read_material",)),
         ],
     )
     receipts = []
@@ -182,13 +182,13 @@ async def test_labels_are_redacted_for_executed_and_denied_calls(denied):
                 "Done",
             ]
         ),
+        approvals=Approvals(deny=(_Reader.read_material,)) if denied else None,
         plugins=[
             FakeChrome({}),
             _Reader("Report"),
             Choreography(),
             CallEnvelope(ActionLabel),
             Secrets({"KEY": Secret(secret, domains=("example.org",))}),
-            Approvals(deny=("read_material",)) if denied else None,
         ],
     )
     receipts = []
@@ -248,7 +248,7 @@ async def test_label_schema_is_opt_in_without_adding_foreign_tool_presentation(e
             FakeChrome({}),
             _Foreign(),
             Choreography(),
-            CallEnvelope(ActionLabel) if enabled else None,
+            *([CallEnvelope(ActionLabel)] if enabled else []),
         ],
     )
     receipts = []

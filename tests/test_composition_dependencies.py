@@ -5,20 +5,13 @@ from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
-from harnessed import (
-    Agent,
-    Plugin,
-    PluginValidation,
-    PromptFormat,
-    SectionDelivery,
-    SystemPrompt,
-    ToolCall,
-)
+from harnessed import Agent, Plugin, PluginValidation, SystemPrompt
 from harnessed.errors import ConfigError, PluginDependencyError, PluginDependencyWarning
 from harnessed.hooks import PrepareRequest
 from harnessed.kernel import Scope, needs
-from harnessed.models import ModelRequest
+from harnessed.models import ModelRequest, ToolCall
 from harnessed.plugins import Service
+from harnessed.prompts import PromptFormat, SectionDelivery
 from harnessed.testing import ScriptedModel
 from harnessed.tools import ToolRegistry
 
@@ -255,7 +248,11 @@ async def test_facade_rejects_missing_services_and_closes_acquired_browser(
     fake_chrome, use_run
 ):
     model = ScriptedModel(["unused"])
-    agent = browserrig.Agent(model=model, plugins=[Plugin(needs=(_DeferredService,))])
+
+    class Deferred(Plugin, needs=(_DeferredService,)):
+        pass
+
+    agent = browserrig.Agent(model=model, plugins=[Deferred()])
     with pytest.raises(PluginDependencyError) as caught:
         if use_run:
             await agent.run("Inspect the page")
@@ -305,8 +302,9 @@ async def test_facade_renders_configured_observation_prompt(
 ):
     agent = browserrig.Agent(
         model=ScriptedModel(["unused"]),
-        instructions="Custom role.",
-        prompt=SystemPrompt.from_plugins(format=PromptFormat.MARKDOWN),
+        instructions=SystemPrompt.from_plugins(
+            "Custom role.", format=PromptFormat.MARKDOWN
+        ),
         plugins=[DomPage(prose=prose), Screenshots(trigger=trigger)],
         without=() if marks else (SetOfMarks,),
     )
@@ -345,8 +343,8 @@ async def test_native_composition_can_replace_a_complete_browser_instruction_blo
             Files(),
             FileTools(),
         ],
-        instructions="Custom role.",
-        prompt=SystemPrompt.from_plugins(
+        instructions=SystemPrompt.from_plugins(
+            "Custom role.",
             format=PromptFormat.XML,
         ),
     )
@@ -537,7 +535,7 @@ async def test_workspace_changes_replace_transfer_without_reopening_chrome(
     assert fake_chrome[0].closed
 
 
-async def test_runtime_browser_sections_need_explicit_context_delivery(fake_chrome):
+async def test_runtime_browser_sections_deliver_context_by_default(fake_chrome):
     agent = Agent(
         model=ScriptedModel(["Mounted", "Unmounted"]),
         plugins=[Runtime(), Chrome(), InputRuntime(), PageReadiness()],
@@ -545,10 +543,10 @@ async def test_runtime_browser_sections_need_explicit_context_delivery(fake_chro
     async with agent.session() as session:
         fixed_prompt = await session.prompt.render()
         with pytest.raises(ConfigError):
-            await session.mount(BrowserPerception())
-        handle = await session.mount(
-            BrowserPerception(), section_delivery=SectionDelivery.CONTEXT
-        )
+            await session.mount(
+                BrowserPerception(), section_delivery=SectionDelivery.ERROR
+            )
+        handle = await session.mount(BrowserPerception())
         request = ModelRequest(())
         mounted = await session.scope.dispatch(
             PrepareRequest(session.plugin_context, request), default=lambda: request

@@ -2,17 +2,17 @@ from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Agent as HarnessedAgent
-from harnessed import Plugin, PolicyDecision, SessionState
+from harnessed import Approvals, Plugin
 from harnessed.events import TextDeltaEvent, ToolCallFinishedEvent
 from harnessed.events.stream import TurnResultEvent
 from harnessed.integrations.json import JsonSessionStore
 from harnessed.kernel import PluginScope, needs
 from harnessed.models.pydantic_ai import PydanticAIModel
-from harnessed.plugins import Approvals
+from harnessed.sessions import SessionState
 from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel
 
-from browserrig import Agent, Browser, Chrome, ChromeBrowser, Done, Runtime
+from browserrig import ActionKind, Agent, Browser, Chrome, ChromeBrowser, Done, Runtime
 from browserrig.events import ActionStartedEvent, ActivityStartedEvent
 from browserrig.kinds import ActivityKind
 
@@ -102,21 +102,30 @@ async def test_facade_restores_saved_state_and_owns_a_fresh_browser_per_session(
     assert not browsers[1].client.is_connected
 
 
-async def test_facade_honors_explicit_tool_policy(site):
-    model = ScriptedModel([call("navigate", url=site + "/other"), "Denied"])
+@pytest.mark.parametrize("explicit", [False, True])
+async def test_facade_allows_tool_calls_by_default_and_respects_allowlists(
+    site, explicit
+):
+    model = ScriptedModel(
+        [call("list_tabs"), call("navigate", url=site + "/other"), "Done"]
+    )
+    approvals = Approvals(allow=[ActionKind.LIST_TABS]) if explicit else None
     agent = Agent(
         model=model,
         browser=Chrome.launch(url=site),
-        plugins=[Approvals(default=PolicyDecision.ALLOW, deny=["navigate"])],
+        approvals=approvals,
     )
     result = await agent.run("Try navigation")
-    assert result.text == "Denied"
+    assert result.text == "Done"
     replies = [
         item for item in result.events if isinstance(item, ToolCallFinishedEvent)
     ]
-    assert len(replies) == 1
-    assert replies[0].result.is_error
-    assert not any(isinstance(item, ActionStartedEvent) for item in result.events)
+    assert [reply.call.name for reply in replies] == ["list_tabs", "navigate"]
+    assert not replies[0].result.is_error
+    assert replies[1].result.is_error is explicit
+    assert (
+        any(isinstance(item, ActionStartedEvent) for item in result.events) != explicit
+    )
 
 
 async def test_facade_manages_wrapped_native_model_context_on_reuse(site, monkeypatch):
@@ -152,7 +161,7 @@ async def test_facade_streams_commentary_and_returns_a_typed_answer_after_done(s
     agent = Agent(
         model=model,
         browser=Chrome.launch(url=site),
-        plugins=[Approvals(default=PolicyDecision.ALLOW), Done()],
+        plugins=[Done()],
     )
     async with (
         agent.session() as session,

@@ -4,8 +4,8 @@ import shutil
 from pathlib import Path
 from uuid import uuid4
 
-from harnessed import Plugin, hook
-from harnessed.kernel import PluginScope, needs
+from harnessed import Plugin
+from harnessed.kernel import PluginScope, hook, needs
 
 from browserrig.activity import Activity
 from browserrig.browser import Browser

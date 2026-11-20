@@ -2,9 +2,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 import pytest
-from harnessed import PolicyDecision
 from harnessed.models import ToolMessage
-from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import (
@@ -154,7 +152,6 @@ async def test_plugin_is_active_before_chrome_opens_initial_url(guarded_site):
         browser=Chrome.launch(url=denied),
         plugins=[
             AllowedDomains("127.0.0.1"),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     with pytest.RaisesGroup(DomainNotAllowed):
@@ -171,7 +168,6 @@ async def test_model_receives_blocked_navigation_error_and_can_continue(guarded_
         browser=Chrome.launch(url=allowed),
         plugins=[
             AllowedDomains("127.0.0.1"),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
         without=(InputPacing, Choreography, ChoreographyOverlay, TabStrip),
     )

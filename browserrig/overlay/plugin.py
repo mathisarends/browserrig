@@ -4,8 +4,8 @@ from collections import deque
 from contextlib import suppress
 from dataclasses import dataclass, field
 
-from harnessed import Plugin, PluginState, hook
-from harnessed.kernel import PluginScope, needs
+from harnessed import Plugin
+from harnessed.kernel import PluginScope, PluginState, hook, needs
 
 from browserrig.browser import Browser, TabChanged
 from browserrig.choreography import (

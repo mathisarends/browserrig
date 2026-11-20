@@ -2,23 +2,23 @@ from collections.abc import Iterable
 
 import harnessed
 from harnessed import (
+    AgentLoop,
+    Approvals,
+    Compaction,
+    Context,
     Plugin,
-    PluginPack,
     PluginValidation,
-    PromptFormat,
     SystemPrompt,
 )
-from harnessed.kernel import PluginLike
 from harnessed.models import Model
 from harnessed.models.pydantic_ai import PydanticAIModel
-from harnessed.plugins import Service
-from harnessed.runtime.budget import ContextBudget
+from harnessed.prompts import PromptFormat
 from harnessed.sessions import SessionStore
 
 from .activity import Activity
 from .browser import Chrome, DownloadReceiving, MultiTab
 from .choreography import Choreography, TabStrip
-from .composition import WindowRatio
+from .composition import select_plugins
 from .core import MODEL_PROFILES, ModelProfile, Runtime
 from .dom import DomPage
 from .files import Files, FileTransfers
@@ -62,15 +62,14 @@ class Agent(harnessed.Agent):
     to reopen them by ID, or continue with an explicit `SessionState`. Long runs
     summarize older steps once the request fills 80% of the model's context window,
     with a 256k application limit for GPT-6.1 Terra, or 100k tokens for other models
-    when no window is known. Pass `without=(ContextCompaction,)`
-    to keep everything, or a configured `ContextCompaction`. Input is paced like a
-    person and streamed and drawn for people watching; pass
+    when no window is known. Pass `context=Context(...)` to supply your own budgets
+    and compaction settings. Input is paced for live viewing. Pass
     `without=(InputPacing, Choreography, ChoreographyOverlay)` to work at full speed
     unseen.
 
-    The default `TaskMemory` compaction asks for a workspace checkpoint before
-    summarizing and an explicit read afterward. Configure `TaskMemory(...)` to
-    tune this protocol; plain `ContextCompaction(...)` disables its memory guidance.
+    The default `TaskMemory` plugin asks for a workspace checkpoint before
+    summarizing and an explicit read afterward. With an explicit context, add
+    `TaskMemory()` to enable its guidance alongside your compaction settings.
     """
 
     def __init__(
@@ -78,38 +77,26 @@ class Agent(harnessed.Agent):
         *,
         model: Model | str | None = None,
         browser: Chrome | None = None,
-        plugins: Iterable[PluginLike | PluginPack | None] = (),
+        plugins: Iterable[Plugin] = (),
         without: Iterable[type[Plugin]] = (),
-        instructions: str | None = DEFAULT_PROMPT,
-        prompt: SystemPrompt | None = None,
+        instructions: str | SystemPrompt | None = DEFAULT_PROMPT,
+        approvals: Approvals | None = None,
+        context: Context | None = None,
+        loop: AgentLoop | None = None,
         store: SessionStore | None = None,
         plugin_validation: PluginValidation = PluginValidation.ERROR,
     ) -> None:
         profile = MODEL_PROFILES.get(_model_name(model))
         if isinstance(model, str) and profile is not None:
             model = PydanticAIModel(model, context_window=profile.context_window)
-        defaults: list[PluginLike] = []
-        if profile is not None:
-            defaults.append(
-                Service(
-                    ContextBudget,
-                    ContextBudget(
-                        limit=profile.context_window,
-                        reserve_tokens=profile.reserve_tokens,
-                    ),
-                )
-            )
-        # Use Harnessed's resolver for default replacements and exclusions.
-        recipe = PluginPack(
-            "browserrig",
-            plugins=_browser_defaults(browser, profile),
-            prompt=SystemPrompt.from_plugins(format=PromptFormat.MARKDOWN),
-        ).without(*without)
+        selected = _select_browser_plugins(browser, plugins, without, context=context)
         super().__init__(
             model=model,
-            instructions=instructions,
-            prompt=prompt,
-            plugins=[recipe, *defaults, *plugins],
+            instructions=_instructions(instructions),
+            approvals=approvals,
+            context=_context_settings(context, profile, selected),
+            loop=loop,
+            plugins=selected,
             store=store,
             plugin_validation=plugin_validation,
         )
@@ -123,9 +110,50 @@ def _model_name(model: Model | str | None) -> str:
     return ""
 
 
-def _browser_defaults(
-    browser: Chrome | None, model_profile: ModelProfile | None
-) -> list[PluginLike]:
+def _select_browser_plugins(
+    browser: Chrome | None,
+    plugins: Iterable[Plugin],
+    without: Iterable[type[Plugin]],
+    *,
+    context: Context | None,
+) -> list[Plugin]:
+    task_memory = TaskMemory()
+    selected = select_plugins(
+        [*_browser_defaults(browser), task_memory], plugins, without
+    )
+    if context is not None:
+        selected = [plugin for plugin in selected if plugin is not task_memory]
+    return selected
+
+
+def _instructions(value: str | SystemPrompt | None) -> SystemPrompt:
+    if isinstance(value, SystemPrompt):
+        return value
+    return SystemPrompt.from_plugins(value, format=PromptFormat.MARKDOWN)
+
+
+def _context_settings(
+    context: Context | None, profile: ModelProfile | None, plugins: list[Plugin]
+) -> Context:
+    if context is not None:
+        return context
+    compaction = None
+    if any(isinstance(plugin, TaskMemory) for plugin in plugins):
+        compaction = Compaction(
+            at=0.8,
+            fallback_tokens=100_000,
+            keep_last_steps=profile.keep_last_steps if profile else 2,
+            target_ratio=profile.target_ratio if profile else None,
+            max_summary_tokens=profile.max_summary_tokens if profile else None,
+        )
+    return Context(
+        max_tokens=profile.context_window if profile else None,
+        reserve_tokens=profile.reserve_tokens if profile else 0,
+        compaction=compaction,
+    )
+
+
+def _browser_defaults(browser: Chrome | None) -> list[Plugin]:
     if browser is not None and not isinstance(browser, Chrome):
         raise TypeError(
             "browser must be a Chrome plugin; use Chrome.launch(...) or Chrome.connect(...)"
@@ -173,12 +201,4 @@ def _browser_defaults(
         FileTransfers(),
         DownloadReceiving(),
         FileTools(),
-        TaskMemory(
-            trigger=WindowRatio(),
-            keep_last_steps=model_profile.keep_last_steps if model_profile else 2,
-            target_ratio=model_profile.target_ratio if model_profile else None,
-            max_summary_tokens=(
-                model_profile.max_summary_tokens if model_profile else None
-            ),
-        ),
     ]

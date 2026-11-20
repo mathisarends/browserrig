@@ -2,8 +2,11 @@ import ipaddress
 from collections.abc import Iterable
 from urllib.parse import urlsplit
 
-from harnessed import Instructions, Plugin, SystemPrompt, ToolResult, hook
+from harnessed import Plugin, SystemPrompt
 from harnessed.hooks import ExecuteTool, Next, Priority
+from harnessed.kernel import hook
+from harnessed.models import ToolResult
+from harnessed.prompts import Instructions
 
 from browserrig.browser import DomainNotAllowed, NavigationPolicy
 from browserrig.core import ActionKind, BrowserToolMetadata

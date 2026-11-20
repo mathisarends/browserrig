@@ -10,11 +10,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from harnessed import Plugin, PolicyDecision, ToolCall, ToolStatus
+from harnessed import Plugin
 from harnessed.events import ToolCallFinishedEvent
-from harnessed.kernel import PluginLike
-from harnessed.models import Message
-from harnessed.plugins import Approvals
+from harnessed.models import Message, ToolCall, ToolStatus
 from pydantic import ConfigDict, TypeAdapter
 from pydantic_core import PydanticSerializationError
 
@@ -48,7 +46,7 @@ class RunOptions:
     model: str | NativeModel
     headed: bool = False
     humanlike: bool = False
-    plugins: tuple[PluginLike, ...] = ()
+    plugins: tuple[Plugin, ...] = ()
     max_steps: int = 50
     timeout_seconds: int = 300
     without: tuple[type[Plugin], ...] = ()
@@ -173,7 +171,6 @@ def _agent(options: RunOptions, workspace: Path, endpoint: str, target: str) -> 
         browser=Chrome.connect(endpoint=endpoint, target_id=target),
         plugins=[
             Files(LocalWorkspace(workspace)),
-            Approvals(default=PolicyDecision.ALLOW),
             *options.plugins,
         ],
         without=(*presentation, *options.without),

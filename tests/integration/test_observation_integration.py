@@ -6,11 +6,10 @@ from io import BytesIO
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Plugin, PolicyDecision, ToolCall
+from harnessed import Plugin
 from harnessed.events import ToolExecutionFinishedEvent
 from harnessed.kernel import needs
-from harnessed.models import ImagePart, ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ImagePart, ModelChunk, ToolCall
 from harnessed.testing import CallbackModel, ScriptedModel
 from PIL import Image
 
@@ -76,19 +75,17 @@ async def test_perception_delivers_exactly_the_selected_modalities(
             yield ModelChunk(text="Done")
 
     policy = NetworkQuiet(inner=BrowserReady())
+    plugins = [BrowserPerception(text="full" if text else None)]
+    if not (text or marked):
+        plugins.append(PageReadiness(initial=policy, ongoing=policy))
+    if pixels:
+        plugins.append(
+            Screenshots(trigger=ScreenshotTrigger.EACH_STEP, skip_unchanged=False)
+        )
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
-        plugins=[
-            PageReadiness(initial=policy, ongoing=policy)
-            if not (text or marked)
-            else None,
-            BrowserPerception(text="full" if text else None),
-            Screenshots(trigger=ScreenshotTrigger.EACH_STEP, skip_unchanged=False)
-            if pixels
-            else None,
-            Approvals(default=PolicyDecision.ALLOW),
-        ],
+        plugins=plugins,
         without=(
             ChoreographyOverlay,
             *(() if pixels else (Screenshots,)),
@@ -138,7 +135,7 @@ async def test_metadata_observation_uses_chrome_layout_without_dom_extraction(
         model=model,
         browser=Chrome.launch(url=site),
         plugins=[
-            SingleTab() if single_tab else None,
+            *([SingleTab()] if single_tab else []),
             PageReadiness(initial=policy, ongoing=policy),
             BrowserPerception(text="full"),
         ],
@@ -207,7 +204,6 @@ async def test_vision_on_request_starts_with_an_image_and_refreshes_after_wheel_
             BrowserPerception(text=None),
             Screenshots(skip_unchanged=False),
             WheelTools(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
         without=(ChoreographyOverlay, InputPacing, DomPage, SetOfMarks),
     )
@@ -260,7 +256,6 @@ async def test_pointer_rejects_old_screenshot_after_wheel_scroll(site):
         plugins=[
             Screenshots(trigger=ScreenshotTrigger.ON_REQUEST),
             WheelTools(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
         without=(ChoreographyOverlay, InputPacing),
     )
@@ -443,8 +438,10 @@ async def test_raw_capture_keeps_refs_and_hidpi_geometry_without_page_mutation(s
         )
         assert await evaluate(tab, "document.documentElement.outerHTML") == before
         assert state.image is not None
+        viewport = (await tab.page_layout()).viewport
         with Image.open(BytesIO(base64.b64decode(state.image))) as image:
-            assert image.size == (state.width, state.height)
+            assert image.size == (round(viewport.width), round(viewport.height))
+        assert state.device_scale == pytest.approx(2, rel=0.05)
         refs = [element.ref for element in state.targets]
         assert len(set(refs)) == len(refs)
         rendered = render(state)
@@ -509,8 +506,7 @@ async def test_model_cursor_marker_is_optional_after_movement_and_click(
         browser=Chrome.launch(url=site + "/canvas", viewport=Viewport(scale=2)),
         plugins=[
             Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
-            CursorMarker() if show_cursor else None,
-            Approvals(default=PolicyDecision.ALLOW),
+            *([CursorMarker()] if show_cursor else []),
         ],
     )
     result = await agent.run(
@@ -710,7 +706,6 @@ async def test_screenshot_only_agent_clicks_canvas_through_region_screenshot(sit
         without=(ReferencePointerTools,),
         plugins=[
             BrowserPerception(text=None),
-            Approvals(default=PolicyDecision.ALLOW),
             Access(),
         ],
     )

@@ -3,15 +3,14 @@ import io
 import json
 
 import pytest
-from harnessed import Plugin, PolicyDecision, ToolCall
+from harnessed import Plugin
 from harnessed.events import (
     ModelRequestedEvent,
     ToolExecutionFinishedEvent,
     TurnStartedEvent,
 )
 from harnessed.kernel import needs
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import CallbackModel, ScriptedModel
 
 from browserrig import (
@@ -47,7 +46,6 @@ async def test_typing_shortcuts_stream_and_storage(site, coordinates):
         model=_typing_model(holder, coordinates),
         browser=Chrome.launch(url=site),
         plugins=[
-            Approvals(default=PolicyDecision.ALLOW),
             TerminalEvents(output),
             Access(),
         ],
@@ -202,7 +200,7 @@ async def test_move_mouse_hovers_and_scrolls_only_the_target_panel(site, coordin
     agent = Agent(
         model=_ref_model(requests),
         browser=Chrome.launch(url=site),
-        plugins=[Approvals(default=PolicyDecision.ALLOW), Panels()],
+        plugins=[Panels()],
     )
     async with agent.session() as session:
         result = await session.run(
@@ -254,7 +252,7 @@ async def test_scroll_moves_a_carousel_horizontally(site):
             ]
         ),
         browser=Chrome.launch(url=site),
-        plugins=[Approvals(default=PolicyDecision.ALLOW), Carousel()],
+        plugins=[Carousel()],
     )
     async with agent.session() as session:
         result = await session.run("Scroll the carousel sideways", max_steps=5)
@@ -319,7 +317,7 @@ async def test_scroll_and_hover_by_ref_target_the_element_not_the_cursor(site):
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
-        plugins=[Approvals(default=PolicyDecision.ALLOW), Panels()],
+        plugins=[Panels()],
     )
     async with agent.session() as session:
         result = await session.run("Scroll one panel and hover the other", max_steps=5)

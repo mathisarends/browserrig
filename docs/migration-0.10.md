@@ -4,11 +4,51 @@
 
 ## Upgrade Harnessed
 
-Browserrig pins Harnessed and its provider, MCP and OTel extras to 0.21.0.
-Conversation state, checkpoints and JSON stores keep format 3. In a staged
-rollout, upgrade standalone audit readers before writers. The 0.20.0 reader
-rejects the new `usage` field in `turn.ended` records.
-See the [Harnessed 0.21.0 release notes](https://github.com/mathisarends/harnessed/releases/tag/v0.21.0).
+Browserrig pins Harnessed and its provider, MCP and OTel extras to 0.22.0.
+
+1. Back up the session store before upgrading. With Harnessed 0.21.0, open each
+   conversation by ID, finish any open turn, and export the idle conversation
+   using `session.snapshot().to_json()`.
+2. Upgrade and open each conversation by ID using a fresh `JsonSessionStore`
+   root and `state=SessionState.from_json(payload)`. Import `SessionState` from
+   `harnessed.sessions`. The next turn writes a format 4 checkpoint. Standalone
+   snapshots and the outer JSON store envelope still use format 3.
+3. Keep the backup and old SDK for completed or paused format 3 checkpoints
+   and archived version 6 audit records. Switch live audit readers and writers
+   together to version 7.
+
+See the [Harnessed 0.22.0 release notes](https://github.com/mathisarends/harnessed/releases/tag/v0.22.0).
+
+## Move runtime settings out of the plugin list
+
+| 0.9 | 0.10 |
+| --- | --- |
+| `plugins=[AgentLoop(...), Approvals(...), ...]` | `loop=AgentLoop(...), approvals=Approvals(...), plugins=[...]` |
+| `prompt=SystemPrompt(...)` | `instructions=SystemPrompt(...)` |
+| `ContextCompaction(trigger=WindowRatio(...))` | `context=Context(compaction=Compaction(at=..., fallback_tokens=...))` |
+| `TaskMemory(..., keep_last_steps=..., summarizer=...)` | Put summarizer and history limits in `Context(compaction=Compaction(...))` and add `TaskMemory(...)` for workspace guidance |
+| `without=(ContextCompaction,)` | `without=(TaskMemory,)` to remove the default compaction and workspace guidance |
+| `async with session.use(plugin)` | `async with session.mount(plugin)` |
+
+Use a flat list of configured plugin instances and omit disabled capabilities.
+Browserrig applies its defaults and slot overrides before passing that list to
+Harnessed. Native Harnessed agents use the list as supplied.
+
+Use `Decision` in place of `PolicyDecision`. Approval rules accept `ActionKind`
+members or decorated tool references. To ask through an application, set
+`approvals=Approvals(default=Decision.ASK, approver=...)` and return
+`request.allow()` or `request.deny()` from the callback. For stream responses use
+`session.approvals.allow(id, remember=...)` or `session.approvals.deny(id)`.
+Browserrig follows Harnessed's default and permits tool calls, including side
+effects, without confirmation. Set an explicit policy if your application needs
+confirmation or an allowlist.
+
+Import `Inject`, `PluginState` and `hook` from `harnessed.kernel`, tool metadata
+and errors from `harnessed.tools`, and prompt types from `harnessed.prompts`.
+If you use Harnessed's file and shell tools, supply the workspace provider
+separately as in `[LocalWorkspace(root=path), Filesystem(), Shell()]` from
+`harnessed.plugins`. Browserrig's `Files` and workspace tools keep their own
+configuration.
 
 ## Compose perception from plugins
 

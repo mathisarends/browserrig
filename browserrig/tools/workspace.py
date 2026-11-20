@@ -4,17 +4,13 @@ from contextlib import contextmanager
 from typing import Annotated
 from uuid import uuid4
 
-from harnessed import (
-    Inject,
-    Instructions,
-    SessionLog,
-    SystemPrompt,
-    ToolError,
-    ToolResult,
-)
-from harnessed.kernel import needs, observes
-from harnessed.models import ImagePart, TextPart
+from harnessed import SystemPrompt
+from harnessed.kernel import Inject, needs, observes
+from harnessed.models import ImagePart, TextPart, ToolResult
 from harnessed.plugins import filesystem
+from harnessed.prompts import Instructions
+from harnessed.sessions.log import SessionLog
+from harnessed.tools import ToolError
 from pydantic import Field
 
 from browserrig.browser import BrowserEvents

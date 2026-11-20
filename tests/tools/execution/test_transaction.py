@@ -4,7 +4,7 @@ from typing import NamedTuple
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import ToolError
+from harnessed.tools import ToolError
 
 from browserrig import (
     Actions,

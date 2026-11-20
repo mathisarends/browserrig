@@ -8,8 +8,8 @@ from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
-from harnessed import ToolCall, ToolResult, ToolStatus
 from harnessed.events import ToolCallFinishedEvent
+from harnessed.models import ToolCall, ToolResult, ToolStatus
 
 from evals import analyze, evaluate, report, run, runner
 from evals.environments import Environments
