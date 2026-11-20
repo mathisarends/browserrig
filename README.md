@@ -13,17 +13,76 @@ When the model requests a browser action, BrowserRig performs it in the live
 browser, resolving control references when needed. The next observation
 reflects the resulting page state.
 
-`browserrig.Agent` bundles the standard browser plugins. For a custom
-runtime, use `harnessed.Agent` and supply the plugins your application needs.
-The browser connection, observations, input tools and viewer are separate
-capabilities. You can launch Chrome or connect to an existing instance over
-CDP, choose what the model sees, and select the tools it can call.
-
 ## Requirements
 
 BrowserRig requires Python 3.12 or newer and access to Chrome or Chromium.
 The Python package is `browserrig`. The `openai` and `anthropic` extras add
 provider integrations.
+
+## Run a browser agent
+
+`browserrig.Agent` bundles the standard browser plugins. This example opens
+a page and asks the agent to summarize it. The model uses the `openai` extra
+and reads `OPENAI_API_KEY` from the environment.
+
+```python
+import asyncio
+
+from browserrig import Agent, Chrome
+
+model = "openai-responses:gpt-6.1-terra"
+url = "https://example.com"
+agent = Agent(model=model, browser=Chrome.launch(url=url))
+
+
+async def main() -> None:
+    result = await agent.run("Summarize the page and include its URL.", max_steps=5)
+    print(result.text)
+
+
+asyncio.run(main())
+```
+
+`agent.run()` opens a session for one turn. Use `agent.session()` to keep the
+browser and conversation open across turns. Use `Chrome.connect(endpoint=...)`
+to attach to an existing Chrome instance over CDP. See the
+[agent guide](docs/agent-guide.md) for sessions and streaming.
+
+## Compose the runtime
+
+For the same page summary, the agent only needs to observe the page. Replace
+the `agent = ...` line above with this explicit composition.
+
+```python
+from harnessed import Agent
+
+from browserrig import (
+    BrowserPerception,
+    Chrome,
+    DomPage,
+    InputRuntime,
+    PageReadiness,
+    Runtime,
+)
+
+agent = Agent(
+    model=model,
+    plugins=[
+        Runtime(),
+        Chrome.launch(url=url),
+        InputRuntime(),
+        PageReadiness(),
+        BrowserPerception(),
+        DomPage(),
+    ],
+)
+```
+
+`BrowserPerception` manages observations and `DomPage` supplies page text and
+control references. Each additional plugin adds a capability to the runtime.
+For example, `Screenshots` adds image capture, and tool plugins give the model
+actions it can call. See [composition](docs/browser-composition.md) for the
+available plugins and their dependencies.
 
 ## Documentation
 
