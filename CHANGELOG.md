@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Replace or omit a BrowserRig plugin's prompt block with Harnessed's
+  `with_instructions(...)` and `without_instructions()` methods. Pass the
+  configured plugin to `Agent(plugins=[...])` or mount it in a session.
+
+### Changed
+
+- Pin Harnessed and its provider, MCP and OTel extras to 0.23.0. Existing 0.22
+  stores open with the new version. Update audit and checkpoint readers before
+  writers because older readers reject the new `accepted_note_keys` field.
+- Task Memory uses Harnessed's native handover notes for automatic, manual and
+  context-limit recovery compaction. Harnessed budgets the read reminder with the
+  summary. If the reminder is omitted, Task Memory asks for the read on a later
+  eligible request.
+
 ## 0.10.0 (2026-11-20)
 
 Upgrade from 0.9.x using the [migration guide](docs/migration-0.10.md).

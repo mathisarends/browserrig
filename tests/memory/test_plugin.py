@@ -26,6 +26,7 @@ from browserrig import (
 
 _PATH = "notes/task_state.md"
 _NOTES = "Requirements: 5 reviews. Best candidate B, source /products/2. Not purchased."
+_HANDOVER_KEY = "browserrig.memory.handover"
 
 
 class _Summary:
@@ -79,6 +80,7 @@ async def test_checkpoint_defers_once_then_first_compacted_request_prompts_a_rea
         state = session.scope[TaskMemory].current
     applied = [e for e in result.events if isinstance(e, CompactionAppliedEvent)]
     assert len(applied) == len(summary.budgets) == 1
+    assert applied[0].accepted_note_keys == (_HANDOVER_KEY,)
     # Compaction is due at request 2, but the agent first gets a normal save step.
     assert "Context compaction is approaching" in model.requests[2].messages[-1].text
     assert not any(
@@ -116,6 +118,59 @@ async def test_no_file_tools_means_no_checkpoint_or_restore_injection():
         "Context compaction is approaching" not in r.messages[-1].text
         for r in model.requests
     )
+
+
+async def test_manual_compaction_without_automatic_policy_commits_handover(tmp_path):
+    model = ScriptedModel([_save(), "Earlier findings. " * 200, "Paused", "Summary."])
+    async with Agent(
+        model=model, plugins=_plugins(tmp_path, TaskMemory(fallback_tokens=1))
+    ).session() as session:
+        await session.run("Compare products")
+        await session.run("Pause work")
+        applied = await session.compact()
+        state = session.scope[TaskMemory].current
+
+    assert applied is not None and applied.accepted_note_keys == (_HANDOVER_KEY,)
+    assert f'read_file(path="{_PATH}")' in applied.summary
+    assert state.restore_pending and state.compaction_id == applied.id
+
+
+async def test_handover_that_does_not_fit_leaves_restore_pending(tmp_path):
+    summary = _Summary()
+    model = ScriptedModel(
+        [
+            _save(),
+            "Earlier findings. " * 200,
+            "Paused",
+            call("read_file", path=_PATH),
+            "Done",
+        ]
+    )
+    context = Context(
+        compaction=Compaction(
+            trigger=lambda _state: False,
+            summarizer=summary,
+            keep_last_steps=1,
+            max_summary_tokens=32,
+        )
+    )
+    async with Agent(
+        model=model, context=context, plugins=_plugins(tmp_path, TaskMemory())
+    ).session() as session:
+        await session.run("Compare products")
+        await session.run("Pause work")
+        applied = await session.compact()
+        assert applied is not None and applied.accepted_note_keys == ()
+        assert summary.budgets == [32]
+        assert session.scope[TaskMemory].current.restore_pending
+        result = await session.run("Continue")
+        assert not session.scope[TaskMemory].current.restore_pending
+
+    assert "Read the saved working state" in model.requests[3].messages[-1].text
+    actions = [
+        event.action for event in result.events if isinstance(event, TaskMemoryEvent)
+    ]
+    assert actions == [MemoryAction.RESTORE_REQUESTED, MemoryAction.RESTORED]
 
 
 async def test_separate_llm_and_async_prompt_preserve_native_retry_and_usage(tmp_path):

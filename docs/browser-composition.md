@@ -44,6 +44,21 @@ disabled plugins when building the list. Two explicit plugins in the same slot
 raise `PluginConflict`. Use `agent.describe()` to inspect the selected plugins
 before opening Chrome.
 
+Use `with_instructions(...)` to replace a plugin's prompt block, or
+`without_instructions()` to omit it. Both return a configured copy with the same
+plugin type and tools. For example, customize the default navigation plugin:
+
+```python
+from browserrig import Agent, NavigationTools
+
+navigation = NavigationTools().with_instructions(
+    "After navigating, check the resulting page before taking another action."
+)
+agent = Agent(model=model, plugins=[navigation])
+```
+
+The same methods apply to recipes passed to `session.mount(...)`.
+
 ### Compose a screenshot-driven single-tab agent
 
 With `harnessed.Agent`, `plugins=` is the complete list. This agent starts at the

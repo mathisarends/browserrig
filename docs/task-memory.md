@@ -15,8 +15,12 @@ separately.
    the agent to save its working state. It appears once per compaction cycle.
 2. Native compaction can be deferred by one request below 90% of a known window.
    Emergency compaction takes precedence; checkpoint work uses the existing budget.
-3. Compaction includes a short handover asking the agent to read its notes in the
-   first compacted request. The file contents are not loaded into the summary.
+3. Task Memory offers a short handover during automatic, manual and context-limit
+   recovery compaction when `read_file` is available. If it fits alongside the
+   generated summary, Harnessed prepends it to the summary so the first request
+   using the compacted history asks the agent to read its notes. Otherwise Task
+   Memory asks on a later request with sufficient steps and `read_file` available.
+   Only the read reminder is added to the summary.
 4. A complete read acknowledges recovery. Missing or partial notes leave recovery
    pending, and the agent can reconstruct them from the summary and observations.
 
@@ -66,5 +70,7 @@ notes into the session store. A fresh session starts with fresh metadata.
 `session.scope[TaskMemory].current` returns immutable `TaskMemoryState`.
 `TaskMemoryEvent` records checkpoint requests, saves, compactions, restore
 requests, complete/partial reads and unavailable notes, with path, revision and
-compaction ID. Traces use `browserrig.memory` spans. These receipts establish
+compaction ID. `CompactionAppliedEvent.accepted_note_keys` includes
+`browserrig.memory.handover` when the read reminder was saved in the summary.
+Traces use `browserrig.memory` spans. These receipts establish
 which operations occurred, not whether the agent understood or verified the notes.

@@ -96,10 +96,12 @@ rather than moving published tags; PyPI versions cannot be overwritten.
 
 ## Compatibility and coverage
 
-Harnessed and its provider, MCP and OTel extras are pinned to 0.22.0.
+Harnessed and its provider, MCP and OTel extras are pinned to 0.23.0.
 Conversation snapshots use format 3, checkpoints use format 4 and standalone
-audit envelopes use version 7. See the [0.10 migration guide](migration-0.10.md)
-for the snapshot export and restore procedure.
+audit envelopes use version 7. Harnessed 0.23 accepts existing 0.22 stores.
+In a staged rollout, upgrade audit and checkpoint readers first because 0.22
+rejects compaction events containing `accepted_note_keys`. See the
+[0.10 migration guide](migration-0.10.md) for export and restore from older formats.
 
 Persistence adapters in handoff/todos and compaction integration in task memory
 include narrow internal Harnessed dependencies. Their restoration, request-context
