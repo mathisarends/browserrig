@@ -10,21 +10,59 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from harnessed import Plugin
+from harnessed import Agent, Compaction, Context, Plugin, SystemPrompt
 from harnessed.events import ToolCallFinishedEvent
-from harnessed.models import Message, ToolCall, ToolStatus
+from harnessed.models import Message, Model, ToolCall, ToolStatus
+from harnessed.prompts import PromptFormat
 from pydantic import ConfigDict, TypeAdapter
 from pydantic_core import PydanticSerializationError
 
 from browserrig import (
-    Agent,
+    Actions,
+    Activity,
+    BrowserPerception,
     Choreography,
     ChoreographyOverlay,
     Chrome,
+    DialogTools,
+    DomActionChains,
+    DomPage,
+    DomScrollTools,
+    DomTypingTools,
+    DownloadReadiness,
+    DownloadReceiving,
     Files,
+    FileTools,
+    FileTransfers,
+    FormTools,
     InputPacing,
+    InputRuntime,
+    JavaScriptTools,
+    KeyboardTools,
     LocalWorkspace,
+    MultiTab,
+    NavigationTools,
+    NetworkQuiet,
+    Nudges,
+    PageReadiness,
+    PageSearchTools,
+    PointerTools,
+    ReferencePointerTools,
+    Runtime,
+    Screenshots,
+    ScreenshotTools,
+    ScreenshotTrigger,
+    SetOfMarks,
+    TabStrip,
+    TabTools,
+    Targeting,
+    TaskMemory,
+    WheelTools,
+    WorkspaceTools,
 )
+from browserrig.core import MODEL_PROFILES
+from browserrig.dom import PageProse
+from browserrig.readiness import BrowserReady
 
 from .environments import Environments
 from .evaluate import evaluate
@@ -42,6 +80,20 @@ _MESSAGES_ADAPTER = TypeAdapter(
 
 
 @dataclass(frozen=True)
+class ObservationOptions:
+    mode: str | None = None
+    trigger: ScreenshotTrigger | None = ScreenshotTrigger.ON_REQUEST
+    screenshot_tool: bool = True
+    prose: PageProse = "inline"
+    headings: bool = True
+    landmarks: bool = True
+
+    @property
+    def text(self) -> bool:
+        return self.mode is None or self.mode.startswith("text")
+
+
+@dataclass(frozen=True)
 class RunOptions:
     model: str | NativeModel
     headed: bool = False
@@ -49,7 +101,7 @@ class RunOptions:
     plugins: tuple[Plugin, ...] = ()
     max_steps: int = 50
     timeout_seconds: int = 300
-    without: tuple[type[Plugin], ...] = ()
+    observation: ObservationOptions = ObservationOptions()
 
     def __post_init__(self) -> None:
         if self.max_steps < 1 or self.timeout_seconds < 1:
@@ -92,7 +144,7 @@ async def run_task(
         async with recording_browser(
             task, environments, workspace, headless=not options.headed
         ) as (endpoint, target):
-            async with _agent(
+            async with build_agent(
                 options, workspace / "agent", endpoint, target
             ).session() as session:
                 record.session_id = session.id
@@ -158,23 +210,123 @@ def task_prompt(task: Task, environments: Environments) -> str:
     )
 
 
-def _agent(options: RunOptions, workspace: Path, endpoint: str, target: str) -> Agent:
+def build_agent(
+    options: RunOptions, workspace: Path, endpoint: str, target: str
+) -> Agent:
+    """Build the agent for an eval attempt using the selected benchmark settings."""
     # Provider dependencies are only needed for actual model execution.
     # pylint: disable=import-outside-toplevel
     from harnessed.models.pydantic_ai import PydanticAIModel
 
-    presentation = (
-        () if options.humanlike else (InputPacing, Choreography, ChoreographyOverlay)
-    )
+    model = PydanticAIModel(options.model)
     return Agent(
-        model=PydanticAIModel(options.model),
-        browser=Chrome.connect(endpoint=endpoint, target_id=target),
-        plugins=[
-            Files(LocalWorkspace(workspace)),
-            *options.plugins,
-        ],
-        without=(*presentation, *options.without),
+        model=model,
+        instructions=SystemPrompt.from_plugins(
+            "Complete the requested browser task using the observed page state.",
+            format=PromptFormat.MARKDOWN,
+        ),
+        context=_context(model),
+        plugins=_agent_plugins(
+            options, Chrome.connect(endpoint=endpoint, target_id=target), workspace
+        ),
     )
+
+
+def _context(model: Model) -> Context:
+    profile = MODEL_PROFILES.get(model.info.name)
+    return Context(
+        max_tokens=profile.context_window if profile else None,
+        reserve_tokens=profile.reserve_tokens if profile else 0,
+        compaction=Compaction(
+            at=0.8,
+            fallback_tokens=100_000,
+            keep_last_steps=profile.keep_last_steps if profile else 2,
+            target_ratio=profile.target_ratio if profile else None,
+            max_summary_tokens=profile.max_summary_tokens if profile else None,
+        ),
+    )
+
+
+def _agent_plugins(
+    options: RunOptions, browser: Chrome, workspace: Path
+) -> list[Plugin]:
+    observation = options.observation
+    presentation = (
+        [InputPacing(), Choreography(), ChoreographyOverlay()]
+        if options.humanlike
+        else []
+    )
+    return [
+        Runtime(),
+        Activity(),
+        browser,
+        InputRuntime(),
+        Targeting(),
+        *presentation,
+        TabStrip(),
+        _page_readiness(observation),
+        DownloadReadiness(),
+        *([Nudges()] if observation.text else []),
+        *_perception_plugins(observation),
+        *_browser_tools(observation),
+        Files(LocalWorkspace(workspace)),
+        FileTransfers(),
+        DownloadReceiving(),
+        FileTools() if observation.text else WorkspaceTools(),
+        TaskMemory(),
+        *options.plugins,
+        *([] if observation.text else [WheelTools()]),
+    ]
+
+
+def _page_readiness(observation: ObservationOptions) -> PageReadiness:
+    if observation.mode == "screenshot":
+        policy = NetworkQuiet(inner=BrowserReady())
+        return PageReadiness(initial=policy, ongoing=policy)
+    return PageReadiness()
+
+
+def _perception_plugins(observation: ObservationOptions) -> list[Plugin]:
+    text = None
+    if observation.text:
+        text = "delta" if observation.mode is None else "full"
+    # Preserve the effective DOM defaults and marks used in previous eval runs.
+    if observation.mode == "screenshot":
+        dom = DomPage()
+    else:
+        dom = DomPage(
+            prose=observation.prose,
+            headings=observation.headings,
+            landmarks=observation.landmarks,
+        )
+    return [
+        BrowserPerception(text=text),
+        Screenshots(
+            trigger=observation.trigger or ScreenshotTrigger.ON_REQUEST,
+            skip_unchanged=observation.mode in (None, "text"),
+        ),
+        dom,
+        SetOfMarks(),
+    ]
+
+
+def _browser_tools(observation: ObservationOptions) -> list[Plugin]:
+    text = observation.text
+    return [
+        PointerTools(),
+        ReferencePointerTools(),
+        Actions(chain_policy=DomActionChains()) if text else Actions(),
+        MultiTab(),
+        NavigationTools(),
+        *([JavaScriptTools()] if text else []),
+        KeyboardTools(),
+        *([DomTypingTools(), DomScrollTools()] if text else []),
+        *([ScreenshotTools()] if observation.screenshot_tool else []),
+        *([FormTools()] if text else []),
+        TabTools(),
+        DialogTools(),
+        *([PageSearchTools()] if text else []),
+    ]
 
 
 def _write_messages(messages: Iterable[Message], workspace: Path) -> None:
