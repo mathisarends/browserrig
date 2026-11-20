@@ -1,128 +1,134 @@
-# Browserrig
+# BrowserRig
 
-A composable agent runtime for browser agents, built on
-[Harnessed](https://github.com/mathisarends/harnessed). Compose the model, browser,
-perception, tools and context policies for your agent. Use the default recipe to
-start, replace individual capabilities, or assemble your own runtime from plugins.
+BrowserRig is a composable Python SDK for agents that operate a browser. A browser
+task works like a game. Give the agent a goal, a view of the current state and a
+set of moves. After a move, the agent sees what changed and can act again or
+answer.
 
-## Compose the layers
+[Harnessed](https://github.com/mathisarends/harnessed) runs that loop and owns the
+session. BrowserRig plugins supply the browser, observations and actions. The
+plugin list is where you choose what the agent sees and what it can do.
 
-| Layer | Responsibility | Extension points |
-| --- | --- | --- |
-| Agent runtime | Model calls, sessions, approvals and persistence | Harnessed models, plugins and lifecycle hooks |
-| Browser | Tabs, frames and browser lifetime | `Browser`, `InputTargets`; local or remote `Chrome` |
-| Input | Mouse and keyboard, independent of the browser backend | `InputRuntime`, `Input`, `Targeting` |
-| Perception | Capture page state and deliver observations | `BrowserPerception`, `DomPage`, `Screenshots`, `SetOfMarks`, `CursorMarker`; custom `PageModel`, `FrameSource` and `ImageAnnotator` |
-| Actions | Coordinate input, readiness and action chains | Tool groups, `browser_tool`, `ReadinessPolicy` |
-| Context | Compact history and recover task memory | `TaskMemory` |
-| Presentation | Pace input, show activity and record sessions | `InputPacing`, `Choreography`, `ChoreographyOverlay`, `VideoRecording` |
+## Compose a browser agent
 
-These layers have separate contracts: changing capture does not require changing
-the model loop; a workspace can run without a browser; input pacing and
-visualization can be configured independently. Chrome/CDP and `DomPage` are the
-built-in adapters. Custom page models can supply their own targets, references and
-live target resolution for the shared pointer tools.
-
-## Quick start
-
-Requires Python 3.12+ and Chrome or Chromium:
-
-```sh
-python -m pip install "browserrig[openai]>=0.7.0"
-```
-
-Set `OPENAI_API_KEY`, then run:
+This agent plays a small game. It clicks the beacon on a
+[local page](examples/signal_station.html) and reports the code that appears.
+Use this checkout with the `openai` extra enabled, Python 3.12 or newer,
+Chrome or Chromium, and `OPENAI_API_KEY`. The page path is relative to the
+repository root.
 
 ```python
 import asyncio
+from pathlib import Path
 
-from harnessed.models.pydantic_ai import PydanticAIModel
-from pydantic_ai.models.openai import OpenAIResponsesModel
+from harnessed import Agent, Approvals
 
 from browserrig import (
-    Agent,
+    Actions,
+    Browser,
+    BrowserPerception,
     Chrome,
-    Choreography,
-    ChoreographyOverlay,
-    InputPacing,
-    Screenshots,
-    ScreenshotTrigger,
+    DomPage,
+    InputRuntime,
+    PageReadiness,
+    ReferencePointerTools,
+    Runtime,
+    Targeting,
+)
+
+plugins = [
+    Runtime(),
+    Chrome.launch(),
+    InputRuntime(),
+    PageReadiness(),
+    BrowserPerception(),
+    DomPage(),
+    Actions(),
+    Targeting(),
+    ReferencePointerTools(),
+]
+agent = Agent(
+    model="openai-responses:gpt-6.1-terra",
+    plugins=plugins,
+    approvals=Approvals(allow=[ReferencePointerTools.click]),
 )
 
 
-async def main():
-    agent = Agent(
-        model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
-        browser=Chrome.launch(url="https://example.com", headless=False),
-        plugins=[Screenshots(trigger=ScreenshotTrigger.EACH_STEP)],
-        without=(InputPacing, Choreography, ChoreographyOverlay),
-    )
+async def main() -> None:
     async with agent.session() as session:
-        result = await session.run("Describe this page and cite its URL.", max_steps=10)
+        browser = session.scope[Browser]
+        await browser.tabs.open(Path("examples/signal_station.html"))
+        result = await session.run(
+            "Activate the beacon and report the signal code shown on the page.",
+            max_steps=4,
+        )
         print(result.text)
 
 
 asyncio.run(main())
 ```
 
-A plugin in `plugins` replaces the default in the same slot or adds a capability;
-`without` removes defaults. The example enables screenshots and removes input
-pacing and visualization. Tool calls run without confirmation by default. Pass
-`approvals=Approvals(default=Decision.ASK, approver=...)` with `Approvals` and
-`Decision` from `harnessed` to ask through your application.
-Chrome opens with the session and closes with it. Use
-`Chrome.connect(endpoint="http://localhost:9222")` for an existing CDP browser.
+`Runtime` provides shared coordination. `Chrome` and `InputRuntime` give the
+session a browser and input devices. `PageReadiness` checks whether the page is
+ready to observe. `DomPage` supplies page text and control references to
+`BrowserPerception`.
+When the model calls `click(ref=...)`, `Actions` coordinates the operation and
+`Targeting` resolves the reference in the live page. The next observation shows
+the code after the click. The approval policy permits only the click tool.
 
-Already using Harnessed? List the Browserrig plugins you want in its `Agent`.
-See [explicit plugin composition](docs/browser-composition.md#explicit-plugin-composition)
-and the [0.10 migration guide](docs/migration-0.10.md) for upgrade notes.
+The [executable example](examples/signal_station.py) also runs this composition
+with a scripted model that reads the real observations. It prints the observed
+button reference, the click and the resulting code without provider credentials.
 
-## Co-locate a capability
+## Add screenshots
 
-A plugin keeps its tools, instructions, hooks and session state together. Declare
-shared services with `needs(T)` or optional services with `observes(T)`; use
-`PluginState` for state belonging to each activation. Resources and registrations
-follow the plugin's lifetime.
+Add these plugins to the list before constructing `Agent`.
 
-| Hook | Use |
-| --- | --- |
-| `PreStep` / `PrepareRequest` | Observe before a step; add current application facts to the model request |
-| `ProjectObservation` / `ChangeTab` | Compose observation content or wrap a backend tab operation |
-| `SelectReadiness` / `CheckReadiness` | Select a page readiness policy or extend its checks |
-| `BrowserToolCall` / `Perform` / `TargetLocated` | Wrap browser execution, stage an intent or react to a resolved target |
-| `CheckAction` | Validate the addressed tab, observation and coordinate source before dispatch |
-| `ObservationsIncludedEvent` | Track the observations actually sent after request processing and compaction |
+```python
+from browserrig import Screenshots, ScreenshotTrigger, SetOfMarks
 
-Context flows through the session scope into tools and hooks. `Actions` binds the
-addressed tab; `Runtime` provides a shared `ActionContext` whose ID follows input
-and browser operations. Typed events carry that identity to viewers and traces.
-`instructions()` supplies fixed guidance,
-`PrepareRequest` adds request-only context, and
-`session.append_message(UserMessage(...))` adds durable conversation input.
-See [composition](docs/browser-composition.md) for a complete co-located plugin,
-custom tools and context propagation.
+plugins.extend(
+    [
+        Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
+        SetOfMarks(),
+    ]
+)
+```
+
+The model now receives screenshots alongside page text. `SetOfMarks` labels
+visible controls with the same references the model can pass to `click`. Change
+the capture policy to control when images enter the model context. See
+[observation settings](docs/browser-composition.md#browser-observations).
+
+## Add keyboard input
+
+Give the agent a second way to activate the beacon. Add `KeyboardTools` before
+constructing `Agent` and include `send_keys` in the allowlist.
+
+```python
+from browserrig import KeyboardTools
+
+plugins.append(KeyboardTools())
+approvals = Approvals(allow=[ReferencePointerTools.click, KeyboardTools.send_keys])
+```
+
+Pass `approvals=approvals` to `Agent` and change the task to “Activate the
+beacon using Tab and Enter, then report the signal code.” The agent can now
+send keys to move focus and activate the focused button. It reads the result
+through the same observation plugins.
+
+For a longer task with navigation and tab tools, see the
+[research example](docs/examples.md#research-a-live-site).
 
 ## Documentation
 
-| Guide | Start here for… |
-| --- | --- |
-| [Migrate to 0.10](docs/migration-0.10.md) | Composable perception plugins, page models and generic targets |
-| [Migrate to 0.9](docs/migration-0.9.md) | Harnessed 0.20, browser errors, screenshot freshness and wait tools |
-| [Migrate to 0.8](docs/migration-0.8.md) | Replace the browser defaults helpers and migrate pointer tools |
-| [Migrate to 0.7](docs/migration-0.7.md) | API changes from 0.6.x |
-| [Migrate to 0.6](docs/migration-0.6.md) | API changes from 0.5.x, observation modes and host event envelopes |
-| [Composition](docs/browser-composition.md) | Layers, plugins, hooks and custom page models |
-| [Agent guide](docs/agent-guide.md) | Sessions, streaming, prompts, completion and persistence |
-| [Browser interaction](docs/browser-interaction.md) | Direct browser access, refs, coordinates and input |
-| [Files and events](docs/files-and-events.md) | Workspaces, remote file bridges, downloads and streams |
-| [Choreography and video](docs/browser-choreography.md) | Viewer configuration, captures and recording |
-| [Task memory](docs/task-memory.md) · [Todos](docs/todos.md) · [Human handoff](docs/human-handoff.md) | Optional task and human workflows |
-| [Telemetry](docs/telemetry.md) · [Development](docs/development.md) | Traces, local setup, checks and releases |
+- [Composition](docs/browser-composition.md) covers plugin dependencies, custom
+  page models and tools. It also shows the standard `browserrig.Agent` recipe.
+- [Runnable examples](docs/examples.md) cover a local task, live research,
+  session persistence and tracing.
+- The [documentation index](docs/index.md) connects the SDK guides for sessions,
+  browser controls, files, events and viewer integration.
+- The [changelog](CHANGELOG.md) covers releases and compatibility.
 
-Install `browserrig[files]` for document readers, `browserrig[ocr]` for readers plus
-local OCR, or `browserrig[otel]` for tracing. Other extras include `openai`,
-`anthropic` and `mcp`. Runnable examples live in [`examples/`](examples).
-
-Early 0.x: APIs may change between minor versions. CI covers Python 3.12–3.14 on
-Windows and Linux; macOS is not covered. See the [changelog](CHANGELOG.md) for
-compatibility and upgrade notes. [MIT license](LICENSE).
+BrowserRig is early 0.x software. CI covers Python 3.12–3.14 on Windows and
+Linux. [MIT license](LICENSE).
