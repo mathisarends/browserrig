@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 (2026-11-20)
+
+Upgrade from 0.10.x using the [migration guide](docs/migration-0.11.md).
 
 ### Added
 
