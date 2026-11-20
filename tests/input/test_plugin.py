@@ -19,9 +19,9 @@ from browserrig import (
     Point,
     Runtime,
 )
-from browserrig.core import TabGesture, ViewportSize
+from browserrig.core import BrowserError, TabGesture, ViewportSize
 from browserrig.events import TabActivatedEvent, TabClosedEvent
-from browserrig.input import HumanMotor, Instant
+from browserrig.input import CursorPath, HumanMotor, Instant, KeyStroke
 
 
 async def test_devices_can_run_against_a_transport_without_a_browser():
@@ -106,6 +106,52 @@ async def test_pacing_mount_controls_wheel_input_and_unmount_restores_instant():
         target.wheels.clear()
         await devices.mouse.scroll(delta_y=120)
         assert target.wheels == [(0, 120)]
+
+
+@pytest.mark.parametrize("typing,route", [(True, False), (False, True), (True, True)])
+async def test_planners_override_independently_and_restore_the_session_motor(
+    typing, route
+):
+    calls = []
+
+    def keys(text, *, sensitive):
+        calls.append(("keys", text, sensitive))
+        return (KeyStroke("b"),)
+
+    def path(start, destination):
+        calls.append(("path", start, destination))
+        return (CursorPath.curved(start, destination, 0),)
+
+    target = _Transport("planned")
+    destination = Point(x=8, y=12)
+    async with _agent(_Targets(target)).session() as session:
+        devices = session.scope[Input]
+        original = devices.motor()
+        handle = await session.mount(
+            InputPacing(
+                _Corner(),
+                keystrokes=keys if typing else None,
+                pointer_route=path if route else None,
+            )
+        )
+        assert devices.motor().landing(80, 60) == Point(x=3, y=5)
+        start = devices.mouse.position
+        await devices.mouse.move_to(destination)
+        assert target.mouse[-1] == destination
+        result = await devices.keyboard.type_text("a")
+        assert result.entered == ("b" if typing else "a")
+        if typing:
+            with pytest.raises(
+                BrowserError, match="Sensitive text must be typed exactly"
+            ):
+                await devices.keyboard.type_text("a", sensitive=True)
+        expected = [("path", start, destination)] if route else []
+        if typing:
+            expected.extend([("keys", "a", False), ("keys", "a", True)])
+        assert calls == expected
+        await handle.aclose()
+        await session.scope.settle()
+        assert devices.motor() is original
 
 
 async def test_missing_transport_is_reported_before_model_use():

@@ -1,5 +1,19 @@
 """Optional staging of browser work for people watching it live."""
 
+from .contributions import (
+    Activity,
+    Contribution,
+    DomScroll,
+    Download,
+    FileTransfer,
+    Find,
+    Keyboard,
+    Navigation,
+    Pointer,
+    TabSwitch,
+    TargetHighlight,
+    Work,
+)
 from .events import (
     SCENE_EVENTS,
     ActionEnvelope,
@@ -34,6 +48,18 @@ from .stage import Stage
 from .tabstrip import TabStrip
 
 __all__ = [
+    "Pointer",
+    "Keyboard",
+    "TargetHighlight",
+    "DomScroll",
+    "Navigation",
+    "TabSwitch",
+    "Find",
+    "FileTransfer",
+    "Download",
+    "Work",
+    "Activity",
+    "Contribution",
     "ActionEnvelope",
     "ActionLabels",
     "ToolCallPhase",
