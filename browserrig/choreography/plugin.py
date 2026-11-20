@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field, replace
 from time import monotonic
 from typing import Any
@@ -7,7 +7,7 @@ from typing import Any
 from harnessed import Plugin
 from harnessed.events import ToolCallFinishedEvent, TurnEndedEvent, TurnStartedEvent
 from harnessed.hooks import ExecuteTool, Next
-from harnessed.kernel import PluginScope, PluginState, hook, needs
+from harnessed.kernel import PluginScope, PluginState, needs
 from harnessed.models import ToolResult, ToolStatus
 from harnessed.tools import envelope_value
 
@@ -21,8 +21,15 @@ from browserrig.core import (
 )
 from browserrig.events import (
     INPUT_EVENTS,
+    ActivityFinishedEvent,
+    ActivityStartedEvent,
     BrowserEvent,
+    DownloadCanceledEvent,
+    DownloadCompletedEvent,
+    DownloadFailedEvent,
     DownloadProgressedEvent,
+    DownloadStartedEvent,
+    FilesUploadedEvent,
     ObservationCapturedEvent,
 )
 from browserrig.input import Input
@@ -40,7 +47,8 @@ from browserrig.tools import (
     WaitIntent,
 )
 
-from . import scenes, work
+from . import contributions, scenes, work
+from .contributions import Contribution
 from .events import (
     SCENE_EVENTS,
     CaptureRegion,
@@ -55,14 +63,15 @@ from .stage import Stage
 from .status import ProjectStatus, StatusFact
 
 # How each intent is staged around its step.
-_SCENES: dict[type, Callable[[scenes.Scene, Any, scenes.Step], Awaitable[Any]]] = {
-    DomScrollIntent: scenes.dom_scroll,
-    SearchIntent: scenes.search,
-    NavigateIntent: scenes.navigate,
-    ControlIntent: scenes.press,
-    WaitIntent: scenes.wait,
-    OpenFileIntent: scenes.open_file,
-    UploadIntent: scenes.upload,
+type SceneHandler = Callable[[scenes.Scene, Any, scenes.Step], Awaitable[Any]]
+_SCENES: dict[type, tuple[type[Contribution], SceneHandler]] = {
+    DomScrollIntent: (contributions.DomScroll, scenes.dom_scroll),
+    SearchIntent: (contributions.Find, scenes.search),
+    NavigateIntent: (contributions.Navigation, scenes.navigate),
+    ControlIntent: (contributions.Navigation, scenes.press),
+    WaitIntent: (contributions.Activity, scenes.wait),
+    OpenFileIntent: (contributions.FileTransfer, scenes.open_file),
+    UploadIntent: (contributions.FileTransfer, scenes.upload),
 }
 
 
@@ -80,6 +89,9 @@ class _Staging:
 class Choreography(Plugin, slot="browserrig.choreography", provides=True):
     """Stage the browser for people watching: visible input and browser UI as events.
 
+    Select contributions with `only` (instances) or `without` (types). By default all
+    built-in contributions are active.
+
     Tools and input devices only describe what they do. This plugin streams input as
     live events, stages browser UI such as the address and find bars, highlights the
     elements tools act on and projects work, downloads, uploads and activities into
@@ -95,20 +107,58 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
     _events = needs(BrowserEvents)
     _coordination = needs(BrowserCoordination)
 
+    def __init__(
+        self,
+        *,
+        only: Sequence[Contribution] | None = None,
+        without: Sequence[type[Contribution]] | None = None,
+    ) -> None:
+        super().__init__()
+        self._selected = contributions.select(only, without)
+        self._scenes = {
+            intent: handler
+            for intent, (group, handler) in _SCENES.items()
+            if group in self._selected
+        }
+
     async def setup(self, scope: PluginScope) -> None:
         self._state.context = scope
-        scope.on(BrowserEvent, self._browser_event)
-        scope.on(DownloadProgressedEvent, self._status)
-        # Each call installs now and registers its undo for teardown.
-        scope.effect(self._input.present(Stage()))
+        scope.effect(
+            self._input.present(
+                Stage(
+                    pointer=contributions.Pointer in self._selected,
+                    keyboard=contributions.Keyboard in self._selected,
+                    tabs=contributions.TabSwitch in self._selected,
+                )
+            )
+        )
+        if contributions.Pointer in self._selected:
+            scope.on(TurnStartedEvent, self._publish_cursor)
+            scope.on(TabChanged, self._republish_cursor)
+        if self._scenes:
+            scope.on(Perform, self._stage)
+        if contributions.TargetHighlight in self._selected:
+            scope.on(TargetLocated, self._highlight)
+        if contributions.Work in self._selected:
+            scope.on(BrowserEvent, self._browser_event)
+            scope.on(ExecuteTool, self._work)
+            scope.on(ToolCallFinishedEvent, self._unexecuted)
+            scope.on(TurnEndedEvent, self._turn_ended)
+        if contributions.Download in self._selected:
+            scope.on(DownloadStartedEvent, self._status)
+            scope.on(DownloadProgressedEvent, self._status)
+            scope.on(DownloadCompletedEvent, self._status)
+            scope.on(DownloadFailedEvent, self._status)
+            scope.on(DownloadCanceledEvent, self._status)
+        if contributions.Activity in self._selected:
+            scope.on(ActivityStartedEvent, self._status)
+            scope.on(ActivityFinishedEvent, self._status)
+        if contributions.FileTransfer in self._selected:
+            scope.on(FilesUploadedEvent, self._status)
 
-        async def publish_cursor(_event: TurnStartedEvent) -> None:
-            # Live subscribers often attach late, so seed their cursor at turn start.
-            await self._input.mouse.publish_cursor()
+    async def _publish_cursor(self, _event: TurnStartedEvent) -> None:
+        await self._input.mouse.publish_cursor()
 
-        scope.on(TurnStartedEvent, publish_cursor)
-
-    @hook(TabChanged)
     async def _republish_cursor(self, event: TabChanged) -> None:
         # A new document or tab shows nothing yet; viewers learn where the pointer rests.
         if not event.settled or event.tab.closed:
@@ -123,7 +173,6 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
             await self._emit(presented)
 
     async def _browser_event(self, event: BrowserEvent) -> None:
-        await self._status(event)
         if receipt := project(event):
             # Facts enrich the same tool receipt rather than creating a second card.
             if active := self._owner(receipt):
@@ -158,7 +207,6 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
             None,
         )
 
-    @hook(ExecuteTool)
     async def _work(self, event: ExecuteTool, next_: Next[ToolResult]) -> ToolResult:
         metadata = event.tool.metadata.get(BrowserToolMetadata) if event.tool else None
         if metadata is None:
@@ -236,7 +284,6 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
             else value
         )
 
-    @hook(ToolCallFinishedEvent)
     async def _unexecuted(self, event: ToolCallFinishedEvent) -> None:
         if event.call_id in self._state.handled:
             self._state.handled.discard(event.call_id)
@@ -305,7 +352,6 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
             )
         )
 
-    @hook(TurnEndedEvent)
     async def _turn_ended(self, _event: TurnEndedEvent) -> None:
         self._state.handled.clear()
         if receipt := self._state.screenshot:
@@ -318,16 +364,14 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
                 )
             )
 
-    @hook(Perform)
     async def _stage(self, event: Perform, next_: Next[Any]) -> Any:
-        staged = _SCENES.get(type(event.intent))
+        staged = self._scenes.get(type(event.intent))
         if staged is None:
             return await next_()
         pointer = self._input.mouse.position_in(event.tab.id)
         scene = scenes.Scene(event.tab, event.action_id, pointer)
         return await staged(scene, event.intent, next_)
 
-    @hook(TargetLocated)
     async def _highlight(self, event: TargetLocated) -> None:
         bounds = event.bounds
         await event.tab.emit(

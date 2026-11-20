@@ -14,6 +14,44 @@ outside the capture. Both are browser defaults.
 the local walkthrough with real browser input and a scripted thinking receipt;
 it makes no model calls.
 
+## Select what viewers see
+
+`Choreography()` enables all eleven contributions. Replace it in the standard
+agent's plugin list to choose which presentation events a session produces.
+
+```python
+from browserrig import Agent, Choreography
+from browserrig.choreography import FileTransfer, Find, Keyboard, Pointer, TargetHighlight
+
+input_viewer = Agent(plugins=[Choreography(only=(Pointer(), Keyboard(), TargetHighlight()))])
+compact_viewer = Agent(plugins=[Choreography(without=(Find, FileTransfer))])
+```
+
+Use `only` with instances for a fixed selection, or `without` with types to
+follow the defaults and omit specific contributions. Passing both raises
+`ValueError`. An empty `only=()` disables all contributions. Excluding a scene
+skips its preview queries and animation delays while the underlying tool runs.
+
+| Contribution | Viewer feedback |
+| --- | --- |
+| `Pointer` | Cursor position and style, movement, button presses and wheel gestures |
+| `Keyboard` | Keys sent to the page and keyboard visibility |
+| `TargetHighlight` | Bounds of the element a tool targets |
+| `DomScroll` | Measured page and element scroll deltas |
+| `Navigation` | Address bar typing, back, forward and reload gestures |
+| `TabSwitch` | Tab-strip presses and cursor re-entry |
+| `Find` | Find bar, simulated keys, live marks and match counts |
+| `FileTransfer` | File-open and upload animations, upload confirmation |
+| `Download` | Download progress and outcome |
+| `Work` | Tool and action receipts, errors, dialog and handoff cards, screenshot previews |
+| `Activity` | Wait scenes and ongoing activity intervals |
+
+Each scene owns its simulated input. For example, `Find()` alone can show
+Ctrl+F, and `Keyboard()` alone shows real page input. A host can select
+`Work()` alone to receive the search receipt. `InputPacing` controls actual
+input timing separately. `TabStrip` supplies tab metadata and `ActionLabels`
+supplies model-written labels through their own plugins.
+
 ## Configure or reproduce
 
 ```python
@@ -187,8 +225,8 @@ with `TypeAdapter(WorkPresentedEvent).json_schema()`.
 ### DOM scroll receipts
 
 The supplied DOM scroll tools publish separate transient events after measured
-movement. With `Choreography` mounted (a default), start a consumer before
-execution:
+movement. With the `DomScroll` contribution enabled (the default), start a
+consumer before execution:
 
 ```python
 from browserrig.choreography import ElementScrolledEvent, PageScrolledEvent
@@ -225,9 +263,8 @@ movement that occurred. Element scrolling emits only `ElementScrolledEvent`;
 it does not also emit a page event. No wheel input or pointer trajectory is invented.
 
 Both events derive from `TabEvent`, stay transient and are excluded from saved
-results and model context. They are emitted only with `Choreography`
-mounted. Direct low-level scroll helpers retain their existing API and do not
-stage choreography. Generate frontend schemas with
+results and model context. The `DomScroll` contribution emits them. Direct
+low-level scroll helpers retain their existing API and do not stage choreography. Generate frontend schemas with
 `TypeAdapter(PageScrolledEvent).json_schema()` and
 `TypeAdapter(ElementScrolledEvent).json_schema()`.
 

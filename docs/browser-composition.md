@@ -581,6 +581,30 @@ pause. `HumanMotor` supplies a smooth wheel plan; use
 `wheel_steps(delta_x=..., delta_y=...)`, returning `WheelStep` values with native
 CSS-pixel deltas and `delay_before_seconds`. Their deltas must total the requested
 distance; the mouse executes their timing without selecting its own scroll curve.
+
+Override either planner or both with callables. The base motor supplies the
+other behaviors, including aiming, wheel steps, press duration and landing.
+The default base is `HumanMotor()`.
+
+```python
+from browserrig import InputPacing, Point
+from browserrig.input import CursorPath, Instant, KeyStroke
+
+
+def keystrokes(text: str, *, sensitive: bool) -> tuple[KeyStroke, ...]:
+    return tuple(KeyStroke(key, delay_after=0.02) for key in text)
+
+
+def pointer_route(start: Point, destination: Point) -> tuple[CursorPath, ...]:
+    return (CursorPath.curved(start, destination, duration_seconds=0.12),)
+
+
+pacing = InputPacing(Instant(), keystrokes=keystrokes, pointer_route=pointer_route)
+```
+
+Sensitive text must be typed exactly as supplied. Consecutive pointer strokes
+must join and reach the destination. The input devices validate the plans.
+
 `Choreography` installs a `Presenter` controlling viewer feedback and streams it
 as events; `ChoreographyOverlay` draws them in the page. All are optional;
 tools consume the session's `Input` service in any configuration.

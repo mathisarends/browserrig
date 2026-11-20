@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Override typing and pointer routes independently with
+  `InputPacing(keystrokes=..., pointer_route=...)`. A supplied motor handles
+  the remaining input behavior. See [input pacing](docs/browser-composition.md#browser-owned-presentation).
+- Choose viewer feedback with `Choreography(only=(Pointer(), Keyboard()))` or
+  `Choreography(without=(Find, FileTransfer))`. The existing default enables
+  all eleven [contributions](docs/browser-choreography.md#select-what-viewers-see).
+
 ## 0.10.0 (2026-11-20)
 
 Upgrade from 0.9.x using the [migration guide](docs/migration-0.10.md).

@@ -1,7 +1,7 @@
 import asyncio
 
 from browserrig.core import Point, Position, TabGesture
-from browserrig.events import InputEvent
+from browserrig.events import InputEvent, KeyboardVisibilityEvent, KeyPressedEvent
 from browserrig.input import InputTarget
 
 from .events import CursorEnteredEvent, TabPressedEvent
@@ -18,8 +18,15 @@ class Stage:
     reports. How fast input runs is up to the motor.
     """
 
+    def __init__(
+        self, *, pointer: bool = True, keyboard: bool = True, tabs: bool = True
+    ) -> None:
+        self._pointer = pointer
+        self._keyboard = keyboard
+        self._tabs = tabs
+
     def shows_cursor_style(self) -> bool:
-        return True
+        return self._pointer
 
     async def leave(
         self,
@@ -30,6 +37,8 @@ class Stage:
         *,
         action_id: str,
     ) -> None:
+        if not self._tabs:
+            return
         await source.emit(
             TabPressedEvent(
                 gesture=gesture,
@@ -44,6 +53,8 @@ class Stage:
     async def enter(
         self, target: InputTarget, position: Point, *, action_id: str
     ) -> None:
+        if not self._tabs:
+            return
         await target.emit(
             CursorEnteredEvent(
                 to_position=Position(position.x, position.y),
@@ -54,4 +65,10 @@ class Stage:
         await asyncio.sleep(ENTER_SECONDS)
 
     async def show(self, target: InputTarget, event: InputEvent) -> None:
-        await target.emit(event)
+        enabled = (
+            self._keyboard
+            if isinstance(event, (KeyboardVisibilityEvent, KeyPressedEvent))
+            else self._pointer
+        )
+        if enabled:
+            await target.emit(event)
