@@ -12,6 +12,7 @@ from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel
 
 from browserrig import Files, FileSystem, LocalWorkspace, TaskMemory, WorkspaceTools
+from evals.telemetry import tracing_plugins as eval_tracing_plugins
 from examples.telemetry import tracing_plugins
 
 
@@ -73,8 +74,10 @@ async def test_memory_handover_exports_correlated_metadata_without_note_contents
 def test_disabled_tracing_keeps_optional_dependencies_unloaded():
     script = """
 import sys
+from evals.telemetry import tracing_plugins as eval_tracing_plugins
 from examples.telemetry import tracing_plugins
 
+assert eval_tracing_plugins(False, 'eval-test') == ()
 assert tracing_plugins() == []
 assert not any(name.startswith('opentelemetry') for name in sys.modules)
 """
@@ -86,6 +89,28 @@ assert not any(name.startswith('opentelemetry') for name in sys.modules)
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+async def test_eval_tracing_exports_each_attempt_on_session_close(
+    collector, monkeypatch
+):
+    monkeypatch.setenv("OTEL_BSP_SCHEDULE_DELAY", "60000")
+    monkeypatch.setenv("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", "32")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TIMEOUT", "60")
+    plugins = eval_tracing_plugins(True, "eval-test")
+
+    for task in ("First eval task", "Second eval task"):
+        collector.clear()
+        result = await Agent(model=ScriptedModel(["Done"]), plugins=plugins).run(task)
+        assert result.completed
+        resources = [
+            resource for _, request in collector for resource in request.resource_spans
+        ]
+        assert {
+            _attributes(resource.resource.attributes)["openinference.project.name"]
+            for resource in resources
+        } == {"eval-test"}
+        assert task in str(collector)
 
 
 @pytest.fixture(name="collector")

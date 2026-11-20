@@ -169,24 +169,23 @@ async def main() -> None:
             )
             output = report.RESULTS / f"{run_name}.json"
             write_run(output, benchmark)
-            async with tracing_plugins(args.trace, project) as plugins:
-                options = RunOptions(
-                    model=model,
-                    headed=args.headed,
-                    humanlike=args.humanlike,
-                    plugins=plugins,
-                    max_steps=args.max_steps,
-                    timeout_seconds=args.timeout_seconds,
-                    observation=observation,
-                )
-                await run_tasks(
-                    tasks,
-                    options,
-                    benchmark,
-                    output,
-                    args.parallel,
-                    environments=environments,
-                )
+            options = RunOptions(
+                model=model,
+                headed=args.headed,
+                humanlike=args.humanlike,
+                plugins=tracing_plugins(args.trace, project),
+                max_steps=args.max_steps,
+                timeout_seconds=args.timeout_seconds,
+                observation=observation,
+            )
+            await run_tasks(
+                tasks,
+                options,
+                benchmark,
+                output,
+                args.parallel,
+                environments=environments,
+            )
     except Timeout as error:
         parser.error(f"Another WebArena process holds {lock}: {error}")
     print("\n" + report.summary(benchmark))
