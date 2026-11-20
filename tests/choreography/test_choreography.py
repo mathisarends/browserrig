@@ -33,10 +33,13 @@ from browserrig.choreography import (  # smelt: ignore[SMT107] -- test seam
     BarTypedEvent,
     CursorEnteredEvent,
     FileTransferEvent,
+    Find,
     FindBarEvent,
     FindResultsEvent,
     ForwardPressedEvent,
     HighlightElementEvent,
+    Keyboard,
+    Pointer,
     ReloadPressedEvent,
     TabPressedEvent,
     WaitingEvent,
@@ -317,11 +320,12 @@ class _FileTools(FileTools, provides=True):
     pass
 
 
+@pytest.mark.parametrize("choreography", [Choreography(), Choreography(only=(Find(),))])
 async def test_search_page_types_into_the_find_bar_and_shows_records_without_scrolling(
-    timeline, monkeypatch
+    timeline, monkeypatch, choreography
 ):
     _page(monkeypatch, timeline)
-    async with _staged(timeline, _SearchTools()) as (_, ctx):
+    async with _staged(timeline, choreography, _SearchTools(), staging=()) as (_, ctx):
         result = await ctx[_SearchTools].search_page("ab", ("c",))
     assert result.text.startswith('1 record matches "ab" | "c"')
     assert _shown(timeline) == [
@@ -679,3 +683,51 @@ async def test_unstaged_input_types_and_moves_without_pauses(timeline):
         "key keyUp a",
         "mouse mouseMoved 300,0",
     ]
+
+
+@pytest.mark.parametrize(
+    "choreography", [Choreography(without=(Find,)), Choreography(only=())]
+)
+async def test_disabled_find_skips_previews_and_pauses(
+    timeline, monkeypatch, choreography
+):
+    _page(monkeypatch, timeline)
+    async with _staged(timeline, choreography, _SearchTools(), staging=()) as (_, ctx):
+        result = await ctx[_SearchTools].search_page("ab", ("c",))
+    assert result.text.startswith('1 record matches "ab"')
+    assert _shown(timeline) == ["page read"]
+
+
+@pytest.mark.parametrize(
+    "choreography,visible",
+    [
+        (Choreography(only=(Pointer(),)), [CursorMovedEvent, CursorStateEvent]),
+        (
+            Choreography(only=(Keyboard(),)),
+            [KeyboardVisibilityEvent, KeyPressedEvent, KeyboardVisibilityEvent],
+        ),
+        (Choreography(only=()), []),
+    ],
+)
+async def test_selected_device_feedback_preserves_real_input(
+    timeline, choreography, visible
+):
+    async with _staged(timeline, choreography, staging=()) as (services, _):
+        await services.input.keyboard.type_text("a")
+        await services.input.mouse.move_to(Point(x=300, y=0))
+    assert [type(item) for item in timeline if isinstance(item, InputEvent)] == visible
+    assert [item for item in timeline if isinstance(item, str)] == [
+        "key rawKeyDown a",
+        "key char a",
+        "key keyUp a",
+        "mouse mouseMoved 300,0",
+    ]
+
+
+def test_conflicting_or_mistyped_selectors_fail_at_configuration():
+    with pytest.raises(ValueError, match="either only or without"):
+        Choreography(only=(), without=())
+    with pytest.raises(TypeError, match="instances"):
+        Choreography(only=(Pointer,))
+    with pytest.raises(TypeError, match="types"):
+        Choreography(without=(Find(),))

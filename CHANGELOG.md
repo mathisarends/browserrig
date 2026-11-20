@@ -4,6 +4,12 @@
 
 ### Added
 
+- Override typing and pointer routes independently with
+  `InputPacing(keystrokes=..., pointer_route=...)`. A supplied motor handles
+  the remaining input behavior. See [input pacing](docs/browser-composition.md#browser-owned-presentation).
+- Choose viewer feedback with `Choreography(only=(Pointer(), Keyboard()))` or
+  `Choreography(without=(Find, FileTransfer))`. The existing default enables
+  all eleven [contributions](docs/browser-choreography.md#select-what-viewers-see).
 - Replace or omit a BrowserRig plugin's prompt block with Harnessed's
   `with_instructions(...)` and `without_instructions()` methods. Pass the
   configured plugin to `Agent(plugins=[...])` or mount it in a session.
