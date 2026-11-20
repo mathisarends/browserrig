@@ -41,15 +41,14 @@ async def test_pause_steer_resume_observes_external_page_change(site, handoff_en
             return "Step finished"
 
     model = ScriptedModel([call(Gate.hold), "Resumed"])
+    plugins = []
+    if handoff_enabled:
+        plugins.append(HumanHandoff(ask=AsyncMock(return_value=HumanResponse())))
+    plugins.append(Gate())
     agent = Agent(
         model=model,
         browser=Chrome.launch(url=site),
-        plugins=[
-            HumanHandoff(ask=AsyncMock(return_value=HumanResponse()))
-            if handoff_enabled
-            else None,
-            Gate(),
-        ],
+        plugins=plugins,
     )
     async with agent.session() as session:
         handle = await session.submit("Inspect the page")
