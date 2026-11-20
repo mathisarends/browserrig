@@ -62,3 +62,25 @@ async def test_explicit_budget_and_compaction_override_terra_defaults():
         assert session.scope[CompactionPolicy].settings.target_tokens == 16_000
         assert session.scope[CompactionPolicy].settings.target_ratio is None
         assert (await session.run("Inspect")).text == "Done"
+
+
+@pytest.mark.parametrize("instructions", ["Keep concise notes.", None])
+async def test_default_plugin_can_override_or_omit_its_prompt(instructions):
+    original = TaskMemory(path="notes/custom.md")
+    configured = (
+        original.without_instructions()
+        if instructions is None
+        else original.with_instructions(instructions)
+    )
+    async with Agent(
+        model=ScriptedModel([]), without=_without_browser(), plugins=[configured]
+    ).session() as session:
+        prompt = await session.prompt.render()
+        assert session.scope[TaskMemory].current.path == "notes/custom.md"
+    async with Agent(
+        model=ScriptedModel([]), without=_without_browser(), plugins=[original]
+    ).session() as session:
+        assert "Task working memory" in await session.prompt.render()
+
+    assert "Task working memory" not in prompt
+    assert ("Keep concise notes." in prompt) is (instructions is not None)

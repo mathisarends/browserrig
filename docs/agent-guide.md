@@ -274,7 +274,10 @@ paused; supply `restore_outputs=[YourOutputType]` before resuming structured wor
 
 For explicit continuation without a store, serialize `result.state.to_json()` and
 pass `state=SessionState.from_json(saved)` to `run()` or `session()`.
-Harnessed 0.22 uses snapshot format 3, checkpoint format 4 and audit envelope 7.
-For existing stores, follow the [0.10 migration guide](migration-0.10.md#upgrade-harnessed).
+Harnessed 0.23 uses snapshot format 3, checkpoint format 4 and audit envelope 7.
+Existing 0.22 stores can be reopened directly. Upgrade consumers of audit and
+checkpoint data first in a staged rollout because 0.22 rejects compaction events
+containing `accepted_note_keys`. For older stores, follow the
+[0.10 migration guide](migration-0.10.md#upgrade-harnessed).
 The [session-store example](../examples/session_store.py) shows how to persist and
 reopen sessions.
