@@ -1,21 +1,15 @@
-"""Application-owned tracing setup; optional OTel imports stay lazy."""
+"""Session-owned tracing for eval attempts."""
 
 import os
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 
 from harnessed import Plugin
 
 DEFAULT_PROJECT = "browserrig-evals"
 
 
-@asynccontextmanager
-async def tracing_plugins(
-    enabled: bool, project: str
-) -> AsyncGenerator[tuple[Plugin, ...]]:
+def tracing_plugins(enabled: bool, project: str) -> tuple[Plugin, ...]:
     if not enabled:
-        yield ()
-        return
+        return ()
 
     # Large browser observations produce sizeable spans. Keep batches small and
     # allow a busy local collector enough time; explicit user settings still win.
@@ -25,20 +19,17 @@ async def tracing_plugins(
 
     # OTel is an optional extra.
     # pylint: disable=import-outside-toplevel
-    from harnessed.integrations.opentelemetry import OpenTelemetryTracer, otlp_provider
+    from harnessed.integrations.opentelemetry import OTLPTracing
 
     configured = os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") or os.getenv(
         "OTEL_EXPORTER_OTLP_ENDPOINT"
     )
-    async with otlp_provider(
-        service_name=os.getenv("OTEL_SERVICE_NAME", "browserrig"),
-        endpoint=None if configured else "http://127.0.0.1:6006/v1/traces",
-        resource_attributes={"openinference.project.name": project},
-    ) as provider:
-        yield (
-            OpenTelemetryTracer(
-                tracer_provider=provider,
-                capture_content=True,
-                max_content_length=400_000,
-            ),
-        )
+    return (
+        OTLPTracing(
+            service_name=os.getenv("OTEL_SERVICE_NAME", "browserrig"),
+            endpoint=None if configured else "http://127.0.0.1:6006/v1/traces",
+            resource_attributes={"openinference.project.name": project},
+            capture_content=True,
+            max_content_length=400_000,
+        ),
+    )

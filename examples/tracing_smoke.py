@@ -8,10 +8,23 @@ import argparse
 import asyncio
 
 from dotenv import load_dotenv
+from harnessed import Agent
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.testing import ScriptedModel, call
 
-from browserrig import Agent, Chrome
+from browserrig import (
+    Actions,
+    BrowserPerception,
+    Chrome,
+    InputRuntime,
+    NavigationTools,
+    PageReadiness,
+    PointerTools,
+    Runtime,
+    Screenshots,
+    ScreenshotTools,
+    SingleTab,
+)
 from examples.telemetry import add_tracing_arguments, tracing_plugins
 
 
@@ -56,13 +69,25 @@ async def main() -> None:
                     "Browserrig tracing smoke test completed.",
                 ]
             ),
-            browser=Chrome.launch(url="about:blank"),
-            plugins=tracing_plugins(
-                enabled=args.trace,
-                capture_content=args.trace_content,
-                trace_hooks=args.trace_hooks,
-                max_content_length=args.trace_max_content_length,
-            ),
+            plugins=[
+                Runtime(),
+                Chrome.launch(),
+                SingleTab(),
+                InputRuntime(),
+                PageReadiness(),
+                BrowserPerception(text=None),
+                Screenshots(),
+                Actions(),
+                NavigationTools(),
+                ScreenshotTools(),
+                PointerTools(),
+                *tracing_plugins(
+                    enabled=args.trace,
+                    capture_content=args.trace_content,
+                    trace_hooks=args.trace_hooks,
+                    max_content_length=args.trace_max_content_length,
+                ),
+            ],
         )
         async with agent.session() as session:
             result = await session.run(

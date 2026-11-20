@@ -3,42 +3,20 @@
 import argparse
 import asyncio
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
-from harnessed import Plugin
 
-from browserrig import (
-    Actions,
-    DomScrollTools,
-    DomTypingTools,
-    FormTools,
-    JavaScriptTools,
-    NetworkQuiet,
-    Nudges,
-    PageReadiness,
-    PageSearchTools,
-    ScreenshotTools,
-    WheelTools,
-    WorkspaceTools,
-)
 from browserrig.core import MODEL_PROFILES
-from browserrig.dom import DomPage
-from browserrig.observation import (
-    BrowserPerception,
-    Screenshots,
-    ScreenshotTrigger,
-    SetOfMarks,
-)
-from browserrig.readiness import BrowserReady
+from browserrig.observation import ScreenshotTrigger
 
 from . import report
 from .environments import DEFAULT_CONFIG, DEFAULT_DATA, Environments
 from .freeze import SUBSETS
 from .results import BenchmarkResult, write_run
-from .runner import RunOptions, run_task
+from .runner import ObservationOptions, RunOptions, run_task
 from .task import Task, load_tasks, select
 from .telemetry import DEFAULT_PROJECT, tracing_plugins
 
@@ -191,34 +169,23 @@ async def main() -> None:
             )
             output = report.RESULTS / f"{run_name}.json"
             write_run(output, benchmark)
-            async with tracing_plugins(args.trace, project) as plugins:
-                inputs = (
-                    ()
-                    if observation.text
-                    else (Actions(), WheelTools(), WorkspaceTools())
-                )
-                options = RunOptions(
-                    model,
-                    args.headed,
-                    args.humanlike,
-                    (
-                        *plugins,
-                        *observation.plugins,
-                        *inputs,
-                        *_pixel_readiness(args.observation),
-                    ),
-                    args.max_steps,
-                    args.timeout_seconds,
-                    without=_excluded_tools(observation),
-                )
-                await run_tasks(
-                    tasks,
-                    options,
-                    benchmark,
-                    output,
-                    args.parallel,
-                    environments=environments,
-                )
+            options = RunOptions(
+                model=model,
+                headed=args.headed,
+                humanlike=args.humanlike,
+                plugins=tracing_plugins(args.trace, project),
+                max_steps=args.max_steps,
+                timeout_seconds=args.timeout_seconds,
+                observation=observation,
+            )
+            await run_tasks(
+                tasks,
+                options,
+                benchmark,
+                output,
+                args.parallel,
+                environments=environments,
+            )
     except Timeout as error:
         parser.error(f"Another WebArena process holds {lock}: {error}")
     print("\n" + report.summary(benchmark))
@@ -278,36 +245,28 @@ async def run_tasks(
             )
 
 
-@dataclass(frozen=True, slots=True)
-class _Observation:
-    plugins: tuple[Plugin, ...]
-    text: bool
-    trigger: ScreenshotTrigger | None
-    screenshot_tool: bool
-
-
-def _observation(args, parser) -> _Observation:
+def _observation(args, parser) -> ObservationOptions:
     mode = args.observation
-    text = mode is None or mode.startswith("text")
-    perception = BrowserPerception(
-        text=("delta" if mode is None else "full") if text else None
+    trigger, enabled = _screenshot_options(args, parser)
+    return ObservationOptions(
+        mode=mode,
+        trigger=trigger,
+        screenshot_tool=enabled,
+        prose=args.page_prose,
+        headings=args.headings,
+        landmarks=args.landmarks,
     )
-    marks = mode is None or mode.endswith("-marks")
-    dom = (
-        (
-            DomPage(
-                prose=args.page_prose, headings=args.headings, landmarks=args.landmarks
-            ),
-        )
-        if text or marks
-        else ()
-    )
-    if mode == "text":
+
+
+def _screenshot_options(args, parser) -> tuple[ScreenshotTrigger | None, bool]:
+    if args.observation == "text":
         if args.screenshot_trigger is not None or args.screenshot_tool:
             parser.error("Screenshot options require an image observation variant")
-        return _Observation((perception, *dom), text, None, False)
+        return None, False
     default = (
-        ScreenshotTrigger.ON_REQUEST if mode is None else ScreenshotTrigger.EACH_STEP
+        ScreenshotTrigger.ON_REQUEST
+        if args.observation is None
+        else ScreenshotTrigger.EACH_STEP
     )
     trigger = args.screenshot_trigger or default
     enabled = args.screenshot_tool
@@ -315,31 +274,7 @@ def _observation(args, parser) -> _Observation:
         enabled = trigger == ScreenshotTrigger.ON_REQUEST
     if trigger == ScreenshotTrigger.ON_REQUEST and not enabled:
         parser.error("on_request requires the screenshot tool")
-    screenshots = Screenshots(trigger=trigger, skip_unchanged=mode is None)
-    plugins = (perception, screenshots, *dom, *((SetOfMarks(),) if marks else ()))
-    return _Observation(plugins, text, trigger, enabled)
-
-
-def _pixel_readiness(observation: str | None) -> tuple[PageReadiness, ...]:
-    if observation != "screenshot":
-        return ()
-    policy = NetworkQuiet(inner=BrowserReady())
-    return (PageReadiness(initial=policy, ongoing=policy),)
-
-
-def _excluded_tools(observation: _Observation) -> tuple[type[Plugin], ...]:
-    screenshot = () if observation.screenshot_tool else (ScreenshotTools,)
-    if observation.text:
-        return screenshot
-    return (
-        *screenshot,
-        DomTypingTools,
-        DomScrollTools,
-        FormTools,
-        JavaScriptTools,
-        Nudges,
-        PageSearchTools,
-    )
+    return trigger, enabled
 
 
 def _positive_int(value: str) -> int:

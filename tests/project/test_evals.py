@@ -5,12 +5,17 @@ import json
 import sys
 from collections import Counter
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
+from harnessed import Agent
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.models import ToolCall, ToolResult, ToolStatus
 
+from browserrig.browser import (  # smelt: ignore[SMT107] -- offline Chrome connection seam
+    plugin as chrome_module,
+)
 from evals import analyze, evaluate, report, run, runner
 from evals.environments import Environments
 from evals.evaluate import Grade
@@ -32,6 +37,30 @@ from evals.results import (
     write_run,
 )
 from evals.task import load_tasks, select
+from tests.fakes import FakeBrowser
+
+_TEXT_TOOLS = """
+wait navigate search go_back go_forward reload execute_javascript send_keys
+scroll_page scroll_element list_tabs open_tab switch_tab close_tab handle_dialog
+search_page move_mouse click_at drag_at hover click drag type_text select_option
+select_options set_date list_downloads glob grep list_files read_file write_file edit_file
+"""
+_IMAGE_TOOLS = """
+wait navigate search go_back go_forward reload send_keys list_tabs open_tab switch_tab
+close_tab handle_dialog glob grep list_files read_file write_file edit_file scroll
+move_mouse click_at drag_at hover click drag
+"""
+_SHARED_PROMPT_SECTIONS = (
+    "Browser content and action results",
+    "Browser screenshots",
+    "Page elements",
+    "Element references",
+    "Screenshot marks",
+    "Screenshot coordinates",
+    "Browser action chains",
+    "Multiple browser tabs",
+    "Browser navigation and web search",
+)
 
 
 @pytest.fixture(name="agent_result")
@@ -81,7 +110,7 @@ def prepared_agent_result(monkeypatch):
         yield SimpleNamespace(id="session", run=execute)
 
     monkeypatch.setattr(
-        runner, "_agent", lambda *_args: SimpleNamespace(session=session)
+        runner, "build_agent", lambda *_args: SimpleNamespace(session=session)
     )
     monkeypatch.setattr(runner, "recording_browser", recording)
     monkeypatch.setattr(runner, "evaluate", grading)
@@ -281,7 +310,7 @@ async def test_run_cancellation_propagates_and_flushes_har(tmp_path, monkeypatch
     def cancel(*_args):
         raise asyncio.CancelledError
 
-    monkeypatch.setattr(runner, "_agent", cancel)
+    monkeypatch.setattr(runner, "build_agent", cancel)
     with pytest.raises(asyncio.CancelledError):
         await runner.run_task(_task(), runner.RunOptions("test"), tmp_path / "29")
     assert (tmp_path / "29/network.har").exists()
@@ -297,7 +326,7 @@ async def test_timeout_is_an_agent_failure(tmp_path, monkeypatch):
         yield SimpleNamespace(id="session", run=timeout)
 
     monkeypatch.setattr(
-        runner, "_agent", lambda *_args: SimpleNamespace(session=session)
+        runner, "build_agent", lambda *_args: SimpleNamespace(session=session)
     )
     result = await runner.run_task(_task(), runner.RunOptions("test"), tmp_path / "29")
     assert result.status == "fail", result.error
@@ -622,6 +651,69 @@ async def test_cli_page_prose_preserves_the_report_key(
 
     saved = json.loads(benchmark_cli["output"].read_text(encoding="utf-8"))
     assert saved["page_text"] == "off"
+
+
+@pytest.mark.parametrize(
+    ("flags", "text", "screenshot"),
+    [
+        ([], True, True),
+        (["--observation", "text"], True, False),
+        (["--observation", "screenshot"], False, False),
+        (["--observation", "screenshot-marks"], False, False),
+        (["--observation", "text-screenshot"], True, False),
+        (["--observation", "text-screenshot-marks"], True, False),
+        (
+            ["--observation", "screenshot", "--screenshot-trigger", "on_request"],
+            False,
+            True,
+        ),
+        (["--observation", "text-screenshot", "--screenshot-tool"], True, True),
+    ],
+)
+async def test_cli_agent_preserves_tool_and_prompt_order(
+    benchmark_cli, monkeypatch, tmp_path, *, flags, text, screenshot
+):
+    model_module = pytest.importorskip("pydantic_ai.models.test")
+
+    @asynccontextmanager
+    async def open_browser(_options, *, emit, **_):
+        yield FakeBrowser(SimpleNamespace(emit=emit))
+
+    monkeypatch.setattr(chrome_module, "ChromeBrowser", open_browser)
+    monkeypatch.setattr(sys, "argv", ["evals.run", "--tasks", "29", *flags])
+    await run.main()
+
+    options = replace(
+        benchmark_cli["options"],
+        model=model_module.TestModel(model_name="gpt-6.1-terra"),
+    )
+    agent = runner.build_agent(
+        options, tmp_path / "workspace", "http://127.0.0.1:9222", "tab"
+    )
+    assert agent.__class__ is Agent
+    assert agent.context.max_tokens == 256_000
+    assert agent.context.reserve_tokens == 8192
+
+    async with agent.session() as session:
+        names = list(session.tools)
+        prompt = await session.prompt.render()
+
+    expected_tools = (_TEXT_TOOLS if text else _IMAGE_TOOLS).split()
+    if screenshot:
+        expected_tools.insert(expected_tools.index("list_tabs"), "screenshot")
+    assert names == expected_tools
+
+    expected_sections = [
+        *(["Browser observations"] if text else []),
+        *_SHARED_PROMPT_SECTIONS,
+        "Workspace and downloads" if text else "Workspace files",
+        "Task working memory",
+    ]
+    assert [
+        line.removeprefix("## ")
+        for line in prompt.splitlines()
+        if line.startswith("## ")
+    ] == expected_sections
 
 
 @pytest.mark.parametrize(

@@ -208,6 +208,8 @@ the same dataset hash and budgets. Historical custom-benchmark artifacts remain
 readable but are not compared against this dataset.
 
 For Phoenix, start `docker compose up -d --wait` and pass `--trace`.
+Harnessed exports pending traces when each attempt's session closes. The
+reported wall time includes that export.
 `python -m evals.analyze` reads Harnessed 0.20 OpenInference messages and earlier
 JSON message attributes. Session IDs link task results to traces. See
 [telemetry](../docs/telemetry.md#screenshot-and-action-attributes) to link an

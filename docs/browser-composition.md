@@ -9,12 +9,9 @@ application needs at the composition root.
 
 ## Explicit plugin composition
 
-Choose perception, context delivery and tools independently. The default recipe
-assembles them for you; manual compositions expose every choice.
+### Start with Browserrig's standard setup
 
-### Choose a recipe
-
-Use the recipe and replace only what your agent needs:
+Use `browserrig.Agent` to start with the standard browser plugins:
 
 ```python
 from browserrig import (
@@ -40,16 +37,18 @@ agent = Agent(
 )
 ```
 
-`model` and `endpoint` are application inputs. Matching plugin slots replace
-recipe defaults in place; other plugins are added. `without` removes defaults by
-type, and `None` entries are skipped. Two explicit plugins in the same slot raise
-`PluginConflict`. `agent.describe()` shows the resolved composition without opening
-Chrome.
+`model` and `endpoint` are application inputs. A supplied plugin replaces the
+default in the same slot. Other supplied plugins are appended. Use `without`
+to remove defaults by type. Pass only plugin instances in `plugins=` and omit
+disabled plugins when building the list. Two explicit plugins in the same slot
+raise `PluginConflict`. Use `agent.describe()` to inspect the selected plugins
+before opening Chrome.
 
 ### Compose a screenshot-driven single-tab agent
 
-This prototype starts at the configured URL. It receives screenshots and uses
-the pointer and keyboard to interact with the page.
+With `harnessed.Agent`, `plugins=` is the complete list. This agent starts at the
+configured URL, receives screenshots and uses the pointer and keyboard to
+interact with the page.
 
 ```python
 from harnessed import Agent
