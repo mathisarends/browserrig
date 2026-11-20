@@ -3,11 +3,9 @@
 [Back to README](../README.md)
 
 Harnessed owns the agent loop. Browserrig adds independently configurable browser,
-perception, action, context and presentation capabilities. The
-[README tutorial](../README.md#compose-a-browser-agent) builds a small
-`harnessed.Agent` from an explicit list of plugins and then extends it with
-screenshots and keyboard input. The recipes below show other configurations,
-including the defaults bundled in `browserrig.Agent`.
+perception, action, context and presentation capabilities. Use `browserrig.Agent`
+for the standard recipe. In a custom `harnessed.Agent`, list the plugins your
+application needs at the composition root.
 
 ## Explicit plugin composition
 

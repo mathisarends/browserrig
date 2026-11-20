@@ -1,9 +1,8 @@
 # BrowserRig documentation
 
-Start with the [README tutorial](../README.md#compose-a-browser-agent) to see how
-a page observation becomes a browser action and how the result reaches the
-model. Continue with the [runnable examples](examples.md) or choose a guide by
-task.
+The [README](../README.md) describes how BrowserRig integrates with Harnessed.
+Use the guides below to configure the SDK or find a
+[runnable example](examples.md) in the repository.
 
 | I want to… | Read |
 | --- | --- |
