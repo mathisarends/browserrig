@@ -28,7 +28,7 @@ live target resolution for the shared pointer tools.
 Requires Python 3.12+ and Chrome or Chromium:
 
 ```sh
-python -m pip install "browserrig[openai]>=0.7.0"
+python -m pip install "browserrig[openai]>=0.10.0"
 ```
 
 Set `OPENAI_API_KEY`, then run:
@@ -106,7 +106,7 @@ custom tools and context propagation.
 
 | Guide | Start here for… |
 | --- | --- |
-| [Migrate to 0.10](docs/migration-0.10.md) | Composable perception plugins, page models and generic targets |
+| [Migrate to 0.10](docs/migration-0.10.md) | Perception plugins, Harnessed 0.22, approval defaults and session stores |
 | [Migrate to 0.9](docs/migration-0.9.md) | Harnessed 0.20, browser errors, screenshot freshness and wait tools |
 | [Migrate to 0.8](docs/migration-0.8.md) | Replace the browser defaults helpers and migrate pointer tools |
 | [Migrate to 0.7](docs/migration-0.7.md) | API changes from 0.6.x |

@@ -50,10 +50,13 @@ async def _click(site, name, *, path="/links", tab_mode=None, **arguments):
         seen["nudges"] = [m.text for m in request.messages if "nudges" in m.text]
         yield ModelChunk(text="Done")
 
+    plugins = [Choreography()]
+    if tab_mode is not None:
+        plugins.append(tab_mode)
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site + path),
-        plugins=[Choreography(), tab_mode],
+        plugins=plugins,
     )
     streamed = []
     ready = asyncio.Event()
