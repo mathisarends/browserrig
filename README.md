@@ -13,9 +13,9 @@ plugin list is where you choose what the agent sees and what it can do.
 
 This agent plays a small game. It clicks the beacon on a
 [local page](examples/signal_station.html) and reports the code that appears.
-Use this checkout with the `openai` extra enabled, Python 3.12 or newer,
-Chrome or Chromium, and `OPENAI_API_KEY`. The page path is relative to the
-repository root.
+The example requires BrowserRig 0.10 or newer with the `openai` extra,
+Python 3.12 or newer, Chrome or Chromium, and `OPENAI_API_KEY`. The page path
+is relative to the repository root.
 
 ```python
 import asyncio

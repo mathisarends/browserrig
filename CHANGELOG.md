@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 (2026-11-20)
 
 Upgrade from 0.9.x using the [migration guide](docs/migration-0.10.md).
 
@@ -8,11 +8,12 @@ Upgrade from 0.9.x using the [migration guide](docs/migration-0.10.md).
 
 - Pin Harnessed and its provider, MCP and OTel extras to 0.22.0. Pass
   `approvals=`, `loop=`, `context=` and `instructions=` directly to `Agent`.
-  Configure compaction with `Context(compaction=Compaction(...))` and add
+  Supply only plugin instances in a flat `plugins=` list and omit disabled
+  plugins. Configure compaction with `Context(compaction=Compaction(...))` and add
   `TaskMemory()` for workspace guidance with a custom context. Migrate
   existing stores through conversation snapshots. Checkpoints use format 4
   and audit envelopes use version 7. Tool calls run without confirmation by
-  default. Set `approvals=` to require confirmation or restrict actions.
+  default. Set `approvals=` to require confirmation or restrict actions (#111).
 - Compose perception from plugins. `BrowserPerception(text=...)` keeps the
   observation lifecycle and takes `"delta"`, `"full"` or `None`; `capture=`,
   `renderer=` and `screenshots=` are removed. `Screenshots(...)` is now a plugin;
@@ -42,7 +43,7 @@ Upgrade from 0.9.x using the [migration guide](docs/migration-0.10.md).
   its existing DOM exports.
 - Serialize snapshots with `model_dump` only; `Snapshot.model_validate_json` no
   longer restores DOM targets and parts. Page fingerprints now also cover the raw
-  page text, so unchanged checks may differ from 0.9 for the same page.
+  page text, so unchanged checks may differ from 0.9 for the same page (#109).
 
 ### Added
 
@@ -58,9 +59,12 @@ Upgrade from 0.9.x using the [migration guide](docs/migration-0.10.md).
 ### Changed
 
 - `TerminalEvents` reads the turn's model usage from Harnessed's
-  `TurnEndedEvent.usage`. Applications can subscribe to that event directly.
-- Use Harnessed's session-owned OTLP tracing in the runnable examples.
-  Model spans retain correlation metadata when captured history is truncated.
+  `TurnEndedEvent.usage`. Applications can subscribe to that event directly (#110).
+- Use Harnessed's session-owned OTLP tracing in the runnable examples and
+  WebArena evals. Model spans retain correlation metadata when captured history
+  is truncated. Eval attempt durations include the final trace export (#111, #112).
+- Compose the WebArena agent and tracing smoke example from explicit plugin
+  lists (#112).
 
 ## 0.9.0 (2026-11-19)
 

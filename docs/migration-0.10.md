@@ -1,23 +1,25 @@
 # Migrate from 0.9.x to 0.10.0
 
-[Back to README](../README.md) · [Release notes](../CHANGELOG.md#unreleased)
+[Back to README](../README.md) · [Release notes](../CHANGELOG.md#0100-2026-11-20)
 
 ## Upgrade Harnessed
 
-Browserrig pins Harnessed and its provider, MCP and OTel extras to 0.22.0.
+Browserrig 0.9 pins Harnessed 0.20.0. Browserrig 0.10 pins Harnessed and its
+provider, MCP and OTel extras to 0.22.0.
 
-1. Back up the session store before upgrading. With Harnessed 0.21.0, open each
-   conversation by ID, finish any open turn, and export the idle conversation
-   using `session.snapshot().to_json()`.
+1. Back up the session store before upgrading. In the existing 0.9 environment,
+   open each conversation by ID, finish any open turn, and export the idle
+   conversation using `session.snapshot().to_json()`.
 2. Upgrade and open each conversation by ID using a fresh `JsonSessionStore`
    root and `state=SessionState.from_json(payload)`. Import `SessionState` from
    `harnessed.sessions`. The next turn writes a format 4 checkpoint. Standalone
    snapshots and the outer JSON store envelope still use format 3.
 3. Keep the backup and old SDK for completed or paused format 3 checkpoints
-   and archived version 6 audit records. Switch live audit readers and writers
-   together to version 7.
+   and archived version 6 audit records. Use a reader from the SDK that wrote the
+   audit records. Switch live audit readers and writers together to version 7.
 
-See the [Harnessed 0.22.0 release notes](https://github.com/mathisarends/harnessed/releases/tag/v0.22.0).
+See the [Harnessed 0.21.0](https://github.com/mathisarends/harnessed/releases/tag/v0.21.0)
+and [0.22.0 release notes](https://github.com/mathisarends/harnessed/releases/tag/v0.22.0).
 
 ## Move runtime settings out of the plugin list
 
@@ -25,12 +27,14 @@ See the [Harnessed 0.22.0 release notes](https://github.com/mathisarends/harness
 | --- | --- |
 | `plugins=[AgentLoop(...), Approvals(...), ...]` | `loop=AgentLoop(...), approvals=Approvals(...), plugins=[...]` |
 | `prompt=SystemPrompt(...)` | `instructions=SystemPrompt(...)` |
+| `AgentLoop(context_window=..., max_tool_output=...)` | `Context(max_tokens=..., max_tool_output_chars=...)` |
 | `ContextCompaction(trigger=WindowRatio(...))` | `context=Context(compaction=Compaction(at=..., fallback_tokens=...))` |
 | `TaskMemory(..., keep_last_steps=..., summarizer=...)` | Put summarizer and history limits in `Context(compaction=Compaction(...))` and add `TaskMemory(...)` for workspace guidance |
 | `without=(ContextCompaction,)` | `without=(TaskMemory,)` to remove the default compaction and workspace guidance |
 | `async with session.use(plugin)` | `async with session.mount(plugin)` |
 
 Use a flat list of configured plugin instances and omit disabled capabilities.
+Build conditional plugin lists by appending enabled plugins to the list.
 Browserrig applies its defaults and slot overrides before passing that list to
 Harnessed. Native Harnessed agents use the list as supplied.
 
@@ -49,6 +53,14 @@ If you use Harnessed's file and shell tools, supply the workspace provider
 separately as in `[LocalWorkspace(root=path), Filesystem(), Shell()]` from
 `harnessed.plugins`. Browserrig's `Files` and workspace tools keep their own
 configuration.
+
+## Update usage and tracing consumers
+
+Read turn-level usage from `RunResult.usage` or `TurnEndedEvent.usage`.
+`TerminalEvents()` emits it in the `turn.ended` JSON record. For tracing,
+`OTLPTracing()` owns the exporter for each session and flushes on close. Keep
+`OpenTelemetryTracer` for an application-owned provider. See
+[telemetry](telemetry.md#use-in-an-application).
 
 ## Compose perception from plugins
 
