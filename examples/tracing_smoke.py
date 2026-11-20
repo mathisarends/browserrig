@@ -8,9 +8,7 @@ import argparse
 import asyncio
 
 from dotenv import load_dotenv
-from harnessed import PolicyDecision
 from harnessed.events import ToolCallFinishedEvent
-from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import Agent, Chrome
@@ -48,15 +46,7 @@ async def main() -> None:
     args = parser.parse_args()
     server = await asyncio.start_server(_serve_page, "127.0.0.1", 0)
     page = f"http://127.0.0.1:{server.sockets[0].getsockname()[1]}/"
-    async with (
-        server,
-        tracing_plugins(
-            enabled=args.trace,
-            capture_content=args.trace_content,
-            trace_hooks=args.trace_hooks,
-            max_content_length=args.trace_max_content_length,
-        ) as telemetry,
-    ):
+    async with server:
         agent = Agent(
             model=ScriptedModel(
                 [
@@ -67,7 +57,12 @@ async def main() -> None:
                 ]
             ),
             browser=Chrome.launch(url="about:blank"),
-            plugins=[Approvals(default=PolicyDecision.ALLOW), *telemetry],
+            plugins=tracing_plugins(
+                enabled=args.trace,
+                capture_content=args.trace_content,
+                trace_hooks=args.trace_hooks,
+                max_content_length=args.trace_max_content_length,
+            ),
         )
         async with agent.session() as session:
             result = await session.run(

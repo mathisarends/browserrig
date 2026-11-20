@@ -2,10 +2,9 @@ import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Plugin, PolicyDecision, tool
+from harnessed import Plugin, tool
 from harnessed.kernel import PluginScope, needs
 from harnessed.models import UserMessage
-from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import (
@@ -46,7 +45,6 @@ async def test_pause_steer_resume_observes_external_page_change(site, handoff_en
         model=model,
         browser=Chrome.launch(url=site),
         plugins=[
-            Approvals(default=PolicyDecision.ALLOW),
             HumanHandoff(ask=AsyncMock(return_value=HumanResponse()))
             if handoff_enabled
             else None,

@@ -1,8 +1,9 @@
 from functools import partial
 from typing import Annotated
 
-from harnessed import Plugin, ToolError
+from harnessed import Plugin
 from harnessed.kernel import PluginScope, needs, observes
+from harnessed.tools import ToolError
 from pydantic import Field
 
 from browserrig.browser import Tab

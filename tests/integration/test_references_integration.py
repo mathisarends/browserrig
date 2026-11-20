@@ -1,15 +1,9 @@
 from dataclasses import dataclass
 
 import pytest
-from harnessed import (
-    Agent,
-    Plugin,
-    PolicyDecision,
-    ToolCall,
-)
+from harnessed import Agent, Plugin
 from harnessed.kernel import PluginScope, needs
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import CallbackModel
 
 from browserrig import (
@@ -96,7 +90,6 @@ async def test_non_dom_refs_deliver_trusted_pointer_and_keyboard_events(site):
             ReferencePointerTools(),
             KeyboardTools(),
             Prepare(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     async with agent.session() as session:

@@ -6,16 +6,8 @@ from typing import Literal
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import (
-    Agent,
-    Inject,
-    Plugin,
-    PolicyDecision,
-    SessionLog,
-    SessionState,
-    hook,
-    tool,
-)
+from harnessed import Agent, Context, Plugin, tool
+from harnessed.context import Compaction, Summary
 from harnessed.events import (
     DurableEvent,
     ModelRequestedEvent,
@@ -24,9 +16,16 @@ from harnessed.events import (
     TransientEvent,
 )
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
-from harnessed.models import ImagePart, ImageReference, ModelRequest, ToolMessage
-from harnessed.plugins import Approvals, LatestObservationOnly
-from harnessed.plugins.compaction import Compaction, Summary
+from harnessed.kernel import Inject, hook
+from harnessed.models import (
+    ImagePart,
+    ImageReference,
+    ModelRequest,
+    ToolMessage,
+)
+from harnessed.plugins import LatestObservationOnly
+from harnessed.sessions import SessionState
+from harnessed.sessions.log import SessionLog
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import (
@@ -125,6 +124,7 @@ def _agent(
     trigger=ScreenshotTrigger.ON_REQUEST,
     retention=None,
     extra=(),
+    context=None,
     frames=None,
     skip_unchanged=True,
     after=(),
@@ -135,6 +135,7 @@ def _agent(
     model = ScriptedModel(responses)
     agent = Agent(
         model=model,
+        context=context,
         plugins=[
             *extra,
             FakeChrome(holder),
@@ -147,7 +148,6 @@ def _agent(
             ),
             UseModel(capture, frames=capture),
             ScreenshotTools(),
-            Approvals(default=PolicyDecision.ALLOW),
             _Step(),
             *after,
         ],
@@ -404,7 +404,7 @@ async def test_until_compaction_keeps_images_until_their_steps_are_summarized():
         [*_steps(5), "Done"],
         trigger=ScreenshotTrigger.EACH_STEP,
         retention=UntilCompaction(),
-        extra=(compaction,),
+        context=Context(compaction=compaction),
     )
     async with agent.session() as session:
         _browser_ready(holder)
@@ -519,7 +519,7 @@ async def test_compaction_removes_last_screenshot_on_a_text_only_step():
     agent, model, _capture, holder = _agent(
         [call("screenshot"), *_steps(2), "Done"],
         retention=UntilCompaction(),
-        extra=(compaction,),
+        context=Context(compaction=compaction),
     )
     async with agent.session() as session:
         _browser_ready(holder)
@@ -590,7 +590,9 @@ async def test_file_state_is_resent_when_compaction_removed_the_last_copy():
         keep_last_steps=1,
     )
     agent, model, _capture, holder = _agent(
-        [*_steps(4), "Done"], extra=(compaction,), after=(Actions(), BrowserFileTools())
+        [*_steps(4), "Done"],
+        context=Context(compaction=compaction),
+        after=(Actions(), BrowserFileTools()),
     )
     async with agent.session() as session:
         _browser_ready(holder)
@@ -934,7 +936,7 @@ async def test_page_is_resent_with_a_screenshot_and_after_compaction():
     )
     agent, model, _capture, holder = _agent(
         [call("screenshot"), *_steps(3), "Done"],
-        extra=(compaction,),
+        context=Context(compaction=compaction),
         renderer=PageRenderer(),
     )
     async with agent.session() as session:

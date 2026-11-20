@@ -1,7 +1,8 @@
 from typing import Annotated
 
-from harnessed import Plugin, ToolResult
+from harnessed import Plugin
 from harnessed.kernel import Inject, needs
+from harnessed.models import ToolResult
 from pydantic import Field
 
 from browserrig.core import ActionKind, Region

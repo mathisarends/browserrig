@@ -1,9 +1,8 @@
 import pytest
-from harnessed import Plugin, PolicyDecision, ToolCall, hook
+from harnessed import Plugin
 from harnessed.events import ToolCallFinishedEvent
-from harnessed.kernel import PluginScope
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.kernel import PluginScope, hook
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import CallbackModel
 
 from browserrig import (
@@ -63,7 +62,6 @@ async def test_board_revision_check_rejects_stale_screenshot_then_allows_click(s
             BrowserPerception(text=None),
             Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             _BoardChecks(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
         without=(
             InputPacing,
@@ -127,10 +125,8 @@ async def test_app_generation_checks_managed_actions(site, change, tool, error):
             state=(tab.document_id, ("board", 0)),
             layout=((tab.viewport_revision, tab.layout_revision), 0),
         )
-        assert (
-            Snapshot.model_validate_json(observed.model_dump_json()).generation
-            == observed.generation
-        )
+        metadata = observed.model_dump_json(exclude={"targets", "parts"})
+        assert Snapshot.model_validate_json(metadata).generation == observed.generation
         setattr(app, change, 1)
         options = {
             "click_at": {"x": 50, "y": 50},
@@ -215,7 +211,6 @@ def _app_agent(site, respond):
         plugins=[
             Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             _App(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
         without=(InputPacing, Choreography, ChoreographyOverlay),
     )

@@ -1,7 +1,7 @@
 from typing import assert_never
 from uuid import uuid4
 
-from harnessed import Plugin, PluginState, SessionLog, ToolStatus, hook
+from harnessed import Plugin
 from harnessed.events import (
     AssistantMessageEvent,
     CompactionFinishedEvent,
@@ -17,7 +17,9 @@ from harnessed.events import (
     ToolExecutionStartedEvent,
     TurnEndedEvent,
 )
-from harnessed.kernel import PluginScope, needs
+from harnessed.kernel import PluginScope, PluginState, hook, needs
+from harnessed.models import ToolStatus
+from harnessed.sessions.log import SessionLog
 
 from browserrig.core import ActivityKind, ActivityOutcome, HandoffStatus
 from browserrig.events import (

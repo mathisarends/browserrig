@@ -1,19 +1,14 @@
 from dataclasses import replace
 
 import pytest
-from harnessed import (
-    Agent,
-    Inject,
-    Plugin,
-    hook,
-)
+from harnessed import Agent, Plugin
 from harnessed.events import (
     IncludedObservation,
     ModelRequestedEvent,
     ObservationsIncludedEvent,
 )
 from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
-from harnessed.kernel import PluginScope, needs
+from harnessed.kernel import Inject, PluginScope, hook, needs
 from harnessed.models import ModelInfo, ModelRequest, UserMessage
 from harnessed.testing import ScriptedModel
 

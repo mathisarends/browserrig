@@ -1,8 +1,4 @@
-"""Application-owned OTel setup shared by the runnable examples.
-
-Agent accepts Harnessed's tracer directly through plugins; no Browserrig
-tracer or global provider is needed. Imports stay lazy for runs without --trace.
-"""
+"""Session-owned OTel setup shared by the runnable examples."""
 
 from __future__ import annotations
 
@@ -10,11 +6,9 @@ from __future__ import annotations
 # pylint: disable=import-outside-toplevel
 import argparse
 import os
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
-from harnessed.kernel import PluginLike
+from harnessed import Plugin
 
 if TYPE_CHECKING:
     from harnessed.integrations.opentelemetry import ContentCapture, TraceContentFilter
@@ -52,25 +46,19 @@ def add_tracing_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-@asynccontextmanager
-async def tracing_plugins(
+def tracing_plugins(
     *,
     enabled: bool = False,
     capture_content: bool | ContentCapture = False,
     trace_hooks: bool = False,
     max_content_length: int = 16_384,
     content_filter: TraceContentFilter | None = None,
-) -> AsyncIterator[list[PluginLike]]:
+) -> list[Plugin]:
     if not enabled and not capture_content and not trace_hooks:
-        yield []
-        return
+        return []
 
-    # Optional dependencies belong to application startup, never Browserrig imports.
     try:
-        from harnessed.integrations.opentelemetry import (
-            OpenTelemetryTracer,
-            otlp_provider,
-        )
+        from harnessed.integrations.opentelemetry import OTLPTracing
     except ImportError as error:
         raise RuntimeError(
             "Tracing requires the otel extra: uv sync --extra otel"
@@ -80,22 +68,18 @@ async def tracing_plugins(
     configured = os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") or os.getenv(
         "OTEL_EXPORTER_OTLP_ENDPOINT"
     )
-    # The provider flushes its batch on exit, after sessions closed, including on errors.
-    async with otlp_provider(
-        service_name=os.getenv("OTEL_SERVICE_NAME", "browserrig"),
-        endpoint=None if configured else "http://127.0.0.1:6006/v1/traces",
-        resource_attributes={
-            "openinference.project.name": os.getenv(
-                "PHOENIX_PROJECT_NAME", "browserrig"
-            )
-        },
-    ) as provider:
-        yield [
-            OpenTelemetryTracer(
-                tracer_provider=provider,
-                capture_content=capture_content,
-                max_content_length=max_content_length,
-                content_filter=content_filter,
-                trace_hooks=trace_hooks,
-            )
-        ]
+    return [
+        OTLPTracing(
+            service_name=os.getenv("OTEL_SERVICE_NAME", "browserrig"),
+            endpoint=None if configured else "http://127.0.0.1:6006/v1/traces",
+            resource_attributes={
+                "openinference.project.name": os.getenv(
+                    "PHOENIX_PROJECT_NAME", "browserrig"
+                )
+            },
+            capture_content=capture_content,
+            max_content_length=max_content_length,
+            content_filter=content_filter,
+            trace_hooks=trace_hooks,
+        )
+    ]

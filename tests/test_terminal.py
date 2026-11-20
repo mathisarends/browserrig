@@ -3,16 +3,7 @@ import json
 from dataclasses import dataclass
 from typing import Literal
 
-from harnessed import (
-    Agent,
-    Inject,
-    Plugin,
-    SessionLog,
-    ToolCall,
-    ToolResult,
-    ToolStatus,
-    hook,
-)
+from harnessed import Agent, Plugin
 from harnessed.events import (
     CompactionFinishedEvent,
     CompactionStartedEvent,
@@ -22,7 +13,9 @@ from harnessed.events import (
     ModelRetryScheduledEvent,
     ToolCallFinishedEvent,
 )
-from harnessed.models import ModelChunk, ModelUsage
+from harnessed.kernel import Inject, hook
+from harnessed.models import ModelChunk, ModelUsage, ToolCall, ToolResult, ToolStatus
+from harnessed.sessions.log import SessionLog
 from harnessed.testing import ScriptedModel
 
 from browserrig import TerminalEvents

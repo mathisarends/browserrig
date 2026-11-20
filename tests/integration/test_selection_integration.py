@@ -1,10 +1,8 @@
 import json
 
 import pytest
-from harnessed import PolicyDecision, ToolCall
 from harnessed.events import ToolCallFinishedEvent
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import CallbackModel
 
 from browserrig import (
@@ -75,7 +73,7 @@ async def test_select_options_replaces_exact_set_or_reports_atomic_failure(
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
-        plugins=[Approvals(default=PolicyDecision.ALLOW)],
+        plugins=[],
         without=(InputPacing, Choreography, ChoreographyOverlay),
     )
     async with agent.session() as session:

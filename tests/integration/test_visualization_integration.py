@@ -2,10 +2,9 @@ import asyncio
 import base64
 
 import pytest
-from harnessed import Agent, Plugin, PolicyDecision, ToolCall
+from harnessed import Agent, Plugin
 from harnessed.events import ToolCallFinishedEvent
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import ScriptedModel
 
 from browserrig import (
@@ -260,7 +259,6 @@ async def test_work_stream_is_complete_with_and_without_local_rendering(
         browser=Chrome.launch(url=site),
         plugins=[
             Files(LocalWorkspace(tmp_path)),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
         without=(InputPacing,)
         if local_renderer
@@ -495,7 +493,6 @@ async def test_model_labels_stay_in_the_event_stream_without_changing_overlay(
         plugins=[
             Files(LocalWorkspace(tmp_path)),
             ActionLabels(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
         without=(InputPacing,),
     )

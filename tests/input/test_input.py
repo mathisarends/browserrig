@@ -8,10 +8,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import ToolError
 from harnessed.events.registry import EventRegistry
 from harnessed.plugins import Service
 from harnessed.testing import mount_plugin
+from harnessed.tools import ToolError
 
 from browserrig.browser import Tab
 from browserrig.choreography import (  # smelt: ignore[SMT107] -- test seam

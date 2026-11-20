@@ -146,8 +146,8 @@ This composition has no workspace, presentation or task memory. Add capabilities
 explicitly. `Actions()` observes after each input; the task recipe selects
 `Actions(chain_policy=DomActionChains())` for verified DOM chains. Setup follows
 service dependencies; instruction order follows the configured plugin list.
-Configure Harnessed `Approvals` to allow tool side effects
-or ask through your host UI.
+Harnessed permits tool calls by default. Set
+`approvals=Approvals(default=Decision.ASK, approver=...)` to ask through your host UI.
 
 ## Offer wait independently of navigation
 
@@ -221,10 +221,11 @@ them available to subsequent model requests:
 ```python
 from dataclasses import dataclass, field
 
-from harnessed import Instructions, Plugin, PluginState, SystemPrompt, hook, tool
+from harnessed import Plugin, tool
 from harnessed.hooks import Next, PrepareRequest
-from harnessed.kernel import needs
+from harnessed.kernel import PluginState, hook, needs
 from harnessed.models import ModelRequest, UserMessage
+from harnessed.prompts import Instructions, SystemPrompt
 
 from browserrig import Browser
 
@@ -273,7 +274,7 @@ session restoration. `PluginState` provides activation-local state, not storage.
 
 Constructors hold reusable configuration. Acquire resources in
 `async setup(self, scope: PluginScope)` with `scope.enter(...)`, and register cleanup
-with `scope.effect(...)`. Compose plugins in the application or a `PluginPack`.
+with `scope.effect(...)`. Share plugin lists through ordinary Python functions.
 
 ## How context propagates
 
@@ -319,8 +320,9 @@ in-process hook requests are separate extension points.
 For example, an application can add its own readiness signal:
 
 ```python
-from harnessed import Plugin, hook
+from harnessed import Plugin
 from harnessed.hooks import Next
+from harnessed.kernel import hook
 from browserrig import CheckReadiness, ReadinessCheck
 
 
@@ -367,7 +369,8 @@ Browserrig runs it once after generation validation and any per-call
 all registered checks in order. Keep checks read-only and use the addressed tab.
 
 ```python
-from harnessed import Plugin, hook
+from harnessed import Plugin
+from harnessed.kernel import hook
 from browserrig.core import BrowserError
 from browserrig.tools import CheckAction
 
@@ -446,8 +449,9 @@ read before setup, so a model plugin also contributes its own `instructions()`.
 | `ImageRetention` | `overflow(count) -> int`, the number of oldest images to drop |
 
 ```python
-from harnessed import Instructions, Plugin, SystemPrompt
+from harnessed import Plugin
 from harnessed.kernel import PluginScope, needs
+from harnessed.prompts import Instructions, SystemPrompt
 
 from browserrig import BrowserPerception
 

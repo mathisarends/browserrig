@@ -4,9 +4,9 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from functools import partial
 from math import inf
 
-from harnessed import Plugin, ToolChain
+from harnessed import Plugin
 from harnessed.kernel import Disposer, Key, PluginScope, Scope
-from harnessed.tools import ToolRegistry
+from harnessed.tools import ToolChain, ToolRegistry
 from pydantic import Field
 
 from browserrig.browser import Browser
@@ -101,6 +101,7 @@ def _register_wait(
 
     return scope[ToolRegistry].register(
         wait,
+        action=ActionKind.WAIT,
         description=_DEFAULT_DESCRIPTION if description is None else description,
         readonly=True,
         owner=scope,

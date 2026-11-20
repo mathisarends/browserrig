@@ -2,10 +2,8 @@ import asyncio
 import json
 
 import pytest
-from harnessed import PolicyDecision, ToolCall
 from harnessed.events import ToolExecutionFinishedEvent
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import CallbackModel, ScriptedModel
 
 from browserrig import (
@@ -150,7 +148,6 @@ async def test_element_actions_reveal_scroll_containers_and_project_the_cursor(
         browser=Chrome.launch(url=site),
         plugins=[
             Files(LocalWorkspace(workspace)),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     async with agent.session() as session:

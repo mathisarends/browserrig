@@ -2,15 +2,10 @@ import pytest
 from harnessed import (
     Agent as HarnessedAgent,
 )
-from harnessed import (
-    Plugin,
-    PolicyDecision,
-    ToolCall,
-)
+from harnessed import Plugin
 from harnessed.events import ModelRequestedEvent, ObservationsIncludedEvent
 from harnessed.kernel import PluginScope, needs
-from harnessed.models import ImagePart, ModelChunk, ToolMessage
-from harnessed.plugins import Approvals
+from harnessed.models import ImagePart, ModelChunk, ToolCall, ToolMessage
 from harnessed.testing import CallbackModel, ScriptedModel, call
 
 from browserrig import (
@@ -72,7 +67,6 @@ async def test_screenshots_are_requested_as_tools_and_markdown_is_text_only(
         browser=Chrome.launch(url=site),
         plugins=[
             CountScreenshots(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     result = await agent.run("Inspect the page on demand", max_steps=5)
@@ -149,7 +143,7 @@ async def test_model_tools_yaml_and_activity(site):
     model = CallbackModel(respond)
     agent = Agent(
         model=model,
-        plugins=[Approvals(default=PolicyDecision.ALLOW)],
+        plugins=[],
     )
     result = await agent.run("Fill the form and submit", max_steps=5)
     assert result.text == "Completed"
@@ -215,7 +209,6 @@ async def test_dom_screenshots_are_native_images(site):
             BrowserPerception(),
             Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             DomPage(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     result = await agent.run("Inspect the canvas")
@@ -253,7 +246,6 @@ async def test_no_progress_hint_is_derived_from_events(site):
         model=CallbackModel(respond),
         plugins=[
             PageReadiness(options=ReadinessOptions(quiet_ms=50, navigation_min_ms=100)),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     result = await agent.run("Click Nothing")

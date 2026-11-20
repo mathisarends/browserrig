@@ -1,18 +1,12 @@
 import json
 
 import pytest
-from harnessed import (
-    Plugin,
-    PolicyDecision,
-    ToolCall,
-    ToolStatus,
-    hook,
-)
+from harnessed import AgentLoop, Plugin
 from harnessed.events import ToolCallFinishedEvent, ToolExecutionFinishedEvent
 from harnessed.hooks import Next, PreStep, StepDecision
-from harnessed.kernel import PluginScope, needs
-from harnessed.models import ModelChunk
-from harnessed.plugins import AgentLoop, Approvals, FinalStepPolicy
+from harnessed.kernel import PluginScope, hook, needs
+from harnessed.models import ModelChunk, ToolCall, ToolStatus
+from harnessed.plugins import FinalStepPolicy
 from harnessed.testing import CallbackModel, ScriptedModel
 
 from browserrig import (
@@ -80,10 +74,8 @@ async def test_typing_reveals_existing_suggestions_and_skips_submit(site):
     assert values["email"] == "person" and values["clicked"] is None
     assert replies[0].break_chain and replies[1].status is ToolStatus.SKIPPED
     assert "Text entered" in replies[0].text
-    assert not any(e.name == "Suggested address" for e in holder["delivered"].elements)
-    assert any(
-        e.new and e.name == "Suggested address" for e in holder["after"].elements
-    )
+    assert not any(e.name == "Suggested address" for e in holder["delivered"].targets)
+    assert any(e.new and e.name == "Suggested address" for e in holder["after"].targets)
 
 
 @pytest.mark.parametrize(
@@ -265,7 +257,9 @@ async def test_tab_actions_keep_their_distinct_kinds_in_durable_receipts(site):
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
-        plugins=[Access(), Approvals(default=PolicyDecision.ALLOW)],
+        plugins=[
+            Access(),
+        ],
     )
     result = await agent.run("Manage tabs")
     assert result.text == "Done"
@@ -293,8 +287,8 @@ async def test_reserved_final_summary_uses_effective_limit_and_remains_incomplet
     agent = Agent(
         model=model,
         browser=Chrome.launch(url=site),
+        loop=AgentLoop(max_steps=10, final_step=FinalStepPolicy.SUMMARIZE),
         plugins=[
-            AgentLoop(max_steps=10, final_step=FinalStepPolicy.SUMMARIZE),
             Progress(),
         ],
     )
@@ -344,7 +338,6 @@ async def _run(site, markup, plan):
         browser=Chrome.launch(url=site),
         plugins=[
             PageReadiness(options=ReadinessOptions(quiet_ms=30, navigation_min_ms=50)),
-            Approvals(default=PolicyDecision.ALLOW),
             Page(),
         ],
     )

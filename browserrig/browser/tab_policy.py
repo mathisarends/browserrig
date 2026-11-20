@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 
-from harnessed import Instructions, Plugin, SystemPrompt
+from harnessed import Plugin, SystemPrompt
 from harnessed.kernel import PluginScope
+from harnessed.prompts import Instructions
 
 from browserrig.core import BrowserError
 

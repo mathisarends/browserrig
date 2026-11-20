@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any, NamedTuple
 
-from harnessed import ToolCall, ToolResult, ToolStatus
+from harnessed.models import ToolCall, ToolResult, ToolStatus
 from pydantic import TypeAdapter, ValidationError
 
 from browserrig.browser import TabInfo

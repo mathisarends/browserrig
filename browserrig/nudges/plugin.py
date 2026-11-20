@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import yaml
-from harnessed import Plugin, PluginState, SessionLog, hook
+from harnessed import Plugin
 from harnessed.events import ObservationsIncludedEvent
-from harnessed.kernel import needs
+from harnessed.kernel import PluginState, hook, needs
 from harnessed.models import UserMessage
+from harnessed.sessions.log import SessionLog
 
 from browserrig.browser import BrowserEvents
 from browserrig.core import ActionKind, ReadinessStatus

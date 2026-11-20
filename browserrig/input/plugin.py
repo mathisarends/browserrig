@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-from harnessed import Plugin, PluginState, hook
+from harnessed import Plugin
 from harnessed.hooks import Next
-from harnessed.kernel import PluginScope, needs
+from harnessed.kernel import PluginScope, PluginState, hook, needs
 
 from browserrig.core import ActionContext, ChangeTab
 from browserrig.events import TabActivatedEvent, TabClosedEvent

@@ -2,23 +2,16 @@ import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import (
-    Agent,
-    Plugin,
-    PolicyDecision,
-    SessionState,
-    ToolStatus,
-    tool,
-)
+from harnessed import Agent, AgentLoop, Compaction, Context, Plugin, tool
+from harnessed.context import Summary
 from harnessed.events import (
     CompactionAppliedEvent,
     ToolCallFinishedEvent,
 )
 from harnessed.events.registry import EventRegistry
 from harnessed.integrations.json import JsonSessionStore
-from harnessed.models import ModelChunk, ToolMessage
-from harnessed.plugins import AgentLoop, Approvals, Compaction
-from harnessed.plugins.compaction import Summary
+from harnessed.models import ModelChunk, ToolMessage, ToolStatus
+from harnessed.sessions import SessionState
 from harnessed.testing import ScriptedModel, call
 from pydantic import ValidationError
 
@@ -89,12 +82,14 @@ class _Step(Plugin):
         return "Advanced"
 
 
-def _agent(responses, ask, *, extra=(), store=None, **options):
+def _agent(responses, ask, *, extra=(), store=None, context=None, loop=None, **options):
     holder = {}
     model = ScriptedModel(responses)
     agent = Agent(
         model=model,
         store=store,
+        context=context,
+        loop=loop,
         plugins=[
             Activity(),
             FakeChrome(holder),
@@ -105,7 +100,6 @@ def _agent(responses, ask, *, extra=(), store=None, **options):
             Nudges(),
             HumanHandoff(ask=ask, **options),
             _Step(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     return agent, model, holder
@@ -285,7 +279,7 @@ async def test_handoff_has_its_own_timeout_and_stops_trailing_tool_calls():
         [batch, "Done"],
         ask,
         timeout_seconds=1,
-        extra=(AgentLoop(tool_timeout=0.01),),
+        loop=AgentLoop(tool_timeout=0.01),
     )
     async with agent.session() as session:
         _prepare(holder)
@@ -380,7 +374,7 @@ async def test_handoff_context_survives_compaction_and_session_restore():
     agent, model, holder = _agent(
         [_request(), call("step"), call("step"), call("step"), "Done", "Restored"],
         callback,
-        extra=(compaction,),
+        context=Context(compaction=compaction),
     )
     async with agent.session() as session:
         _prepare(holder)

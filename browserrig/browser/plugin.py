@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
-from harnessed import Plugin, SessionLog
+from harnessed import Plugin
 from harnessed.kernel import Event, PluginScope, needs, observes
+from harnessed.sessions.log import SessionLog
 from pydantic import SecretStr
 
 from browserrig.core import ActionContext, BrowserCoordination, ChangeTab, TargetId

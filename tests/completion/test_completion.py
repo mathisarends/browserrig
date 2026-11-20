@@ -3,15 +3,7 @@ import json
 from dataclasses import replace
 
 import pytest
-from harnessed import (
-    Agent,
-    Plugin,
-    PolicyDecision,
-    SectionDelivery,
-    StopReason,
-    ToolStatus,
-    tool,
-)
+from harnessed import Agent, AgentLoop, Approvals, Plugin, tool
 from harnessed.errors import OutputUnavailable, OutputValidationError
 from harnessed.events import (
     ApprovalRequestedEvent,
@@ -22,8 +14,16 @@ from harnessed.events import (
 from harnessed.events.stream import TurnResultEvent
 from harnessed.hooks import OutputDecision, PrepareOutput, TurnStopping
 from harnessed.kernel import needs
-from harnessed.models import ModelChunk, ModelInfo, ModelUsage
-from harnessed.plugins import AgentLoop, Approvals, FinalStepPolicy
+from harnessed.models import (
+    Decision,
+    ModelChunk,
+    ModelInfo,
+    ModelUsage,
+    StopReason,
+    ToolStatus,
+)
+from harnessed.plugins import FinalStepPolicy
+from harnessed.prompts import SectionDelivery
 from harnessed.sessions import SessionContext
 from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel, Field
@@ -185,7 +185,10 @@ async def test_invalid_final_output_still_obeys_the_native_retry_limit():
     )
     agent = Agent(
         model=model,
-        plugins=[Done(), AgentLoop(output_retries=0)],
+        loop=AgentLoop(output_retries=0),
+        plugins=[
+            Done(),
+        ],
     )
     with pytest.raises(OutputValidationError):
         await agent.run("Task", output=_Answer)
@@ -242,7 +245,10 @@ async def test_denied_done_does_not_enter_finalization():
     model = ScriptedModel([call("done", success=True), "Still working."])
     agent = Agent(
         model=model,
-        plugins=[Done(), Approvals(deny=["done"], default=PolicyDecision.ALLOW)],
+        approvals=Approvals(deny=[Done.done], default=Decision.ALLOW),
+        plugins=[
+            Done(),
+        ],
     )
     result = await agent.run("Task", max_steps=2)
     assert not result.completed and result.stop_reason is StopReason.MAX_STEPS
@@ -352,7 +358,11 @@ async def test_a_reserved_summary_moves_the_closing_step_one_earlier():
     model = ScriptedModel([call("inspect"), call("done", success=True), "Final"])
     result = await Agent(
         model=model,
-        plugins=[Done(), _Work([]), AgentLoop(final_step=FinalStepPolicy.SUMMARIZE)],
+        loop=AgentLoop(final_step=FinalStepPolicy.SUMMARIZE),
+        plugins=[
+            Done(),
+            _Work([]),
+        ],
     ).run("Task", max_steps=4)
     assert result.completed and result.text == "Final"
     assert "Step 2 of 4" in _texts(model.requests[1])
@@ -377,7 +387,10 @@ async def test_optional_limit_summary_remains_incomplete_and_unstructured(with_d
     )
     result = await Agent(
         model=model,
-        plugins=[Done(), AgentLoop(final_step=FinalStepPolicy.SUMMARIZE)],
+        loop=AgentLoop(final_step=FinalStepPolicy.SUMMARIZE),
+        plugins=[
+            Done(),
+        ],
     ).run("Task", output=_Answer, max_steps=2)
     assert result.text == "Partial summary"
     assert not result.completed and result.stop_reason is StopReason.MAX_STEPS
@@ -454,7 +467,7 @@ async def test_overlapping_done_sessions_isolate_native_output_and_cleanup(nativ
         Agent(model=plain_model).session() as plain,
     ):
         first_mount = await first.mount(Done(), section_delivery=SectionDelivery.IGNORE)
-        async with second.use(Done(), section_delivery=SectionDelivery.IGNORE):
+        async with second.mount(Done(), section_delivery=SectionDelivery.IGNORE):
             first_result, plain_result = await asyncio.gather(
                 first.run("First task", output=_Answer),
                 plain.run("Plain task", output=_Answer),

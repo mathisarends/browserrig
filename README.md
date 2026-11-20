@@ -36,9 +36,7 @@ Set `OPENAI_API_KEY`, then run:
 ```python
 import asyncio
 
-from harnessed import PolicyDecision
 from harnessed.models.pydantic_ai import PydanticAIModel
-from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
@@ -56,10 +54,7 @@ async def main():
     agent = Agent(
         model=PydanticAIModel(OpenAIResponsesModel("gpt-6.1-terra")),
         browser=Chrome.launch(url="https://example.com", headless=False),
-        plugins=[
-            Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
-            Approvals(default=PolicyDecision.ALLOW),
-        ],
+        plugins=[Screenshots(trigger=ScreenshotTrigger.EACH_STEP)],
         without=(InputPacing, Choreography, ChoreographyOverlay),
     )
     async with agent.session() as session:
@@ -71,9 +66,10 @@ asyncio.run(main())
 ```
 
 A plugin in `plugins` replaces the default in the same slot or adds a capability;
-`without` removes defaults. The example enables screenshots and automatic tool
-approval, and removes input pacing and visualization. By default, side effects
-require approval: use `Approvals(approver=...)` to ask through your application.
+`without` removes defaults. The example enables screenshots and removes input
+pacing and visualization. Tool calls run without confirmation by default. Pass
+`approvals=Approvals(default=Decision.ASK, approver=...)` with `Approvals` and
+`Decision` from `harnessed` to ask through your application.
 Chrome opens with the session and closes with it. Use
 `Chrome.connect(endpoint="http://localhost:9222")` for an existing CDP browser.
 

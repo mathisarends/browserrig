@@ -6,9 +6,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from harnessed import PolicyDecision
 from harnessed.models.pydantic_ai import PydanticAIModel
-from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import (
@@ -68,38 +66,40 @@ async def main() -> None:
     if not os.environ.get("OPENAI_API_KEY"):
         parser.error("Set OPENAI_API_KEY in the environment or in .env")
 
-    async with tracing_plugins(
-        enabled=args.trace,
-        capture_content=args.trace_content,
-        trace_hooks=args.trace_hooks,
-        max_content_length=args.trace_max_content_length,
-    ) as telemetry:
-        agent = Agent(
-            model=PydanticAIModel(
-                OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra"))
-            ),
-            browser=Chrome.launch(
-                url=args.url,
-                headless=not args.headed,
-            ),
-            plugins=[
-                Files(LocalWorkspace(args.workspace)),
-                Screenshots(retention=UntilCompaction()),
-                VideoRecording(args.video) if args.video is not None else None,
-                Approvals(default=PolicyDecision.ALLOW),
-                *telemetry,
-                Done() if args.done else None,
-                None if args.quiet else TerminalEvents(),
-            ],
+    plugins = [
+        Files(LocalWorkspace(args.workspace)),
+        Screenshots(retention=UntilCompaction()),
+    ]
+    if args.video is not None:
+        plugins.append(VideoRecording(args.video))
+    plugins.extend(
+        tracing_plugins(
+            enabled=args.trace,
+            capture_content=args.trace_content,
+            trace_hooks=args.trace_hooks,
+            max_content_length=args.trace_max_content_length,
         )
-        async with agent.session() as session:
-            recording = (
-                session.scope[VideoRecording] if args.video is not None else None
-            )
-            result = await session.run(args.task, max_steps=20)
-            print(result.text)
-        if recording is not None and recording.result is not None:
-            print(f"Video: {recording.result.path}")
+    )
+    if args.done:
+        plugins.append(Done())
+    if not args.quiet:
+        plugins.append(TerminalEvents())
+    agent = Agent(
+        model=PydanticAIModel(
+            OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra"))
+        ),
+        browser=Chrome.launch(
+            url=args.url,
+            headless=not args.headed,
+        ),
+        plugins=plugins,
+    )
+    async with agent.session() as session:
+        recording = session.scope[VideoRecording] if args.video is not None else None
+        result = await session.run(args.task, max_steps=20)
+        print(result.text)
+    if recording is not None and recording.result is not None:
+        print(f"Video: {recording.result.path}")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
-from harnessed import Instructions, Plugin, SystemPrompt
+from harnessed import Plugin, SystemPrompt
 from harnessed.kernel import PluginScope, needs
+from harnessed.prompts import Instructions
 
 from browserrig.browser import Tab
 from browserrig.core import BrowserError

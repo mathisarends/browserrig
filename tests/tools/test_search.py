@@ -1,8 +1,8 @@
 from unittest.mock import AsyncMock
 
-from harnessed import Agent, ToolCall
+from harnessed import Agent
 from harnessed.events import ToolCallFinishedEvent
-from harnessed.models import ModelChunk
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import ScriptedModel
 
 from browserrig import Browser, PageReadiness, PageSearchTools, Secret, Secrets

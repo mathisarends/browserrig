@@ -1,6 +1,6 @@
-from harnessed import Plugin, hook
+from harnessed import Plugin
 from harnessed.hooks import Next
-from harnessed.kernel import needs
+from harnessed.kernel import hook, needs
 
 from browserrig.browser import Browser
 from browserrig.files import DownloadState

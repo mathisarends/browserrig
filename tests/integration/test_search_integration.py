@@ -1,9 +1,8 @@
 import json
 
 import pytest
-from harnessed import ToolCall
 from harnessed.events import ToolCallFinishedEvent
-from harnessed.models import ModelChunk
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import ScriptedModel
 
 from browserrig import Agent, Browser, Chrome, wait_for_page

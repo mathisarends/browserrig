@@ -5,10 +5,9 @@ from unittest.mock import AsyncMock
 from unittest.mock import call as mock_call
 
 import pytest
-from harnessed import Agent, PolicyDecision, ToolCall, ToolStatus
+from harnessed import Agent
 from harnessed.events import ToolCallFinishedEvent, ToolExecutionFinishedEvent
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall, ToolStatus
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import (
@@ -230,7 +229,6 @@ async def _pointer_session(responses):
             _ReferencePointerTools(),
             DomScrollTools(),
             TabTools(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     async with agent.session() as session:

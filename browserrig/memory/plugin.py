@@ -1,19 +1,23 @@
 import hashlib
-from collections.abc import Callable
 from dataclasses import replace
 
-from harnessed import Instructions, PluginState, SystemPrompt, hook
+from harnessed import Plugin, SystemPrompt
 from harnessed.events import CompactionAppliedEvent
-from harnessed.hooks import Next, PrepareRequest, PreStep, SessionAppended, StepDecision
-from harnessed.kernel import PluginScope, needs, observes
+from harnessed.hooks import (
+    DeferCompaction,
+    Next,
+    PrepareRequest,
+    PreStep,
+    SessionAppended,
+    StepDecision,
+)
+from harnessed.kernel import PluginScope, PluginState, hook, needs, observes
 from harnessed.models import Model, ModelRequest, UserMessage
-from harnessed.plugins import Compaction, ContextState
-from harnessed.plugins.compaction import Summarizer
+from harnessed.prompts import Instructions
 from harnessed.prompts.plugin_instructions import PluginInstructions
 from harnessed.runtime.budget import ContextBudget
 from harnessed.runtime.compaction import (
     CompactionPolicy,
-    CompactionPrompt,
     ModelSummarizer,
 )
 from harnessed.runtime.tokens import TokenCounter, count_request
@@ -23,23 +27,23 @@ from harnessed.tracing import span
 from browserrig.events import FileReadFinishedEvent, FileWrittenEvent
 from browserrig.files import FileSystem, workspace_path
 
-from .compaction import CheckpointTrigger, MemoryRuntime, MemorySummarizer
+from .compaction import MemoryRuntime, MemorySummarizer
 from .models import MemoryAction, TaskMemoryEvent, TaskMemoryState
 
 _STATE_KEY = "browserrig.memory"
 
 
-class TaskMemory(Compaction, provides=True):
+class TaskMemory(Plugin, slot="browserrig.task-memory", provides=True):
     """Compaction with a bounded workspace checkpoint and an explicit recovery read.
 
-    This fills the normal compaction slot. Checkpoints and reads use existing file
-    tools in the same agent loop; no extra agent, judge or independent store is used.
+    Pair this plugin with `Context(compaction=Compaction(...))`. Checkpoints and
+    reads use existing file tools in the agent loop.
     """
 
     events = (TaskMemoryEvent,)
     _runtime = PluginState(MemoryRuntime)
     _files = observes(FileSystem)
-    _budget = observes(ContextBudget)
+    _budget = needs(ContextBudget)
     _context = needs(PluginInstructions)
     _session = needs(SessionContext)
     _counter = needs(TokenCounter)
@@ -51,25 +55,8 @@ class TaskMemory(Compaction, provides=True):
         path: str = "notes/task_state.md",
         warn_at: float = 0.7,
         fallback_tokens: int = 70_000,
-        trigger: Callable[[ContextState], bool] | None = None,
-        llm: Model | str | None = None,
-        prompt: CompactionPrompt | None = None,
-        summarizer: Summarizer | None = None,
-        keep_last_steps: int = 2,
-        target_ratio: float | None = None,
-        target_tokens: int | None = None,
-        max_summary_tokens: int | None = None,
     ) -> None:
-        super().__init__(
-            trigger=_default_trigger if trigger is None else trigger,
-            llm=llm,
-            prompt=prompt,
-            summarizer=summarizer,
-            keep_last_steps=keep_last_steps,
-            target_ratio=target_ratio,
-            target_tokens=target_tokens,
-            max_summary_tokens=max_summary_tokens,
-        )
+        super().__init__()
         normalized = _memory_path(path)
         _validate_budget(warn_at, fallback_tokens)
         self.path = normalized
@@ -87,12 +74,11 @@ class TaskMemory(Compaction, provides=True):
         return TaskMemoryState(path=self.path)
 
     async def setup(self, scope: PluginScope) -> None:
-        await super().setup(scope)
-        if self._files is None:
+        policy = scope.get(CompactionPolicy)
+        if self._files is None or policy is None:
             return
-        # Compatibility boundary for pinned Harnessed 0.17: wrap its existing
-        # policy, retaining native budgets, usage accounting and emergency recovery.
-        policy = scope[CompactionPolicy]
+        # Keep the read reminder inside the first compacted model request.
+        self._runtime.enabled = True
         summarizer = policy.summarizer or ModelSummarizer(
             policy.llm or self._model, prompt=policy.prompt, counter=self._counter
         )
@@ -100,7 +86,6 @@ class TaskMemory(Compaction, provides=True):
             CompactionPolicy,
             replace(
                 policy,
-                trigger=CheckpointTrigger(policy.trigger, self._runtime),
                 summarizer=MemorySummarizer(
                     summarizer, self._counter, self.path, self._runtime
                 ),
@@ -139,7 +124,7 @@ class TaskMemory(Compaction, provides=True):
         self, event: PrepareRequest, next_: Next[ModelRequest]
     ) -> ModelRequest:
         request = await next_()
-        if event.session.log is not self._session.log or self._files is None:
+        if event.session.log is not self._session.log or not self._runtime.enabled:
             return request
         runtime = self._runtime
         tools = {tool.name for tool in request.tools}
@@ -160,7 +145,7 @@ class TaskMemory(Compaction, provides=True):
             )
         if state.checkpoint_requested or not {"read_file", "write_file"} <= tools:
             return request
-        budget = self._budget or ContextBudget()
+        budget = self._budget
         tokens = await count_request(self._counter, request) + budget.output_reserve(
             request
         )
@@ -187,6 +172,16 @@ class TaskMemory(Compaction, provides=True):
                 "This checkpoint uses the current step budget.",
             )
         )
+
+    @hook(DeferCompaction)
+    def _defer(self, event: DeferCompaction) -> bool | None:
+        state = event.state
+        if self._runtime.defer_once and (state.ratio is None or state.ratio < 0.9):
+            with span(
+                "browserrig.memory.defer_compaction", input_tokens=state.input_tokens
+            ):
+                return True
+        return None
 
     @hook(SessionAppended)
     async def _appended(self, event: SessionAppended) -> None:
@@ -307,9 +302,3 @@ def _validate_budget(warn_at: float, fallback_tokens: int) -> None:
         or fallback_tokens < 1
     ):
         raise ValueError("fallback_tokens must be a positive integer")
-
-
-def _default_trigger(state: ContextState) -> bool:
-    if state.ratio is None:
-        return state.input_tokens + state.reserve_tokens >= 100_000
-    return state.ratio >= 0.8

@@ -1,8 +1,8 @@
 import logging
 from typing import Annotated
 
-from harnessed import ToolError, ToolParameter
 from harnessed.kernel import Inject, PluginScope
+from harnessed.tools import ToolError, ToolParameter
 from pydantic import Field
 
 from browserrig.browser import TabPolicy

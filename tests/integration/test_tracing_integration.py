@@ -2,10 +2,9 @@ import base64
 import hashlib
 
 import pytest
-from harnessed import Plugin, PolicyDecision, ToolCall, hook
-from harnessed.kernel import needs
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed import Plugin
+from harnessed.kernel import hook, needs
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import CallbackModel, ScriptedModel, call
 
 from browserrig import (
@@ -65,7 +64,6 @@ async def test_browser_methods_nest_below_harnessed_spans(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
         plugins=[
-            Approvals(default=PolicyDecision.ALLOW),
             OpenTelemetryTracer(tracer_provider=provider, trace_hooks=trace_hooks),
         ],
     )
@@ -144,7 +142,6 @@ async def test_screenshot_assets_link_to_actions_and_model_spans(site, trace_pro
         plugins=[
             Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             CursorMarker(),
-            Approvals(default=PolicyDecision.ALLOW),
             _HotspotReceipt(),
             OpenTelemetryTracer(
                 tracer_provider=provider, capture_content=True, trace_hooks=True

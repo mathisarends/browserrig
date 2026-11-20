@@ -1,9 +1,10 @@
 import pytest
-from harnessed import Agent, SessionState, ToolStatus
+from harnessed import Agent, Compaction, Context
+from harnessed.context import Summary
 from harnessed.events import CompactionAppliedEvent, ToolCallFinishedEvent
 from harnessed.integrations.json import JsonSessionStore
-from harnessed.plugins import Compaction
-from harnessed.plugins.compaction import Summary
+from harnessed.models import ToolStatus
+from harnessed.sessions import SessionState
 from harnessed.testing import ScriptedModel, call
 
 import browserrig
@@ -155,13 +156,15 @@ async def test_list_is_reminded_after_compaction_restore_and_store_reopen(tmp_pa
     )
     agent = Agent(
         model=model,
-        plugins=[
-            Todos(),
-            Compaction(
+        context=Context(
+            compaction=Compaction(
                 trigger=lambda _state: next(fire),
                 summarizer=_Summary(),
                 keep_last_steps=1,
-            ),
+            )
+        ),
+        plugins=[
+            Todos(),
         ],
         store=JsonSessionStore(root=tmp_path),
     )

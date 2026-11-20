@@ -4,7 +4,7 @@ import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from harnessed.kernel import PluginLike
+from harnessed import Plugin
 
 DEFAULT_PROJECT = "browserrig-evals"
 
@@ -12,7 +12,7 @@ DEFAULT_PROJECT = "browserrig-evals"
 @asynccontextmanager
 async def tracing_plugins(
     enabled: bool, project: str
-) -> AsyncGenerator[tuple[PluginLike, ...]]:
+) -> AsyncGenerator[tuple[Plugin, ...]]:
     if not enabled:
         yield ()
         return

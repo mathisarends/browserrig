@@ -1,9 +1,7 @@
 import json
 
 import pytest
-from harnessed import PolicyDecision, ToolCall
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import CallbackModel
 
 from browserrig import (
@@ -196,7 +194,7 @@ async def test_element_action_reveals_a_preview_before_clicking(site):
     agent = Agent(
         model=CallbackModel(respond),
         browser=Chrome.launch(url=site),
-        plugins=[Approvals(default=PolicyDecision.ALLOW)],
+        plugins=[],
     )
     async with agent.session() as session:
         browser, observe = session.scope[Browser], session.scope[BrowserPerception]

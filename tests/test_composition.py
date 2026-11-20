@@ -2,11 +2,13 @@ import subprocess
 import sys
 
 import pytest
-from harnessed import Agent, Instructions, Plugin, PolicyDecision, SystemPrompt
+from harnessed import Agent, Approvals, Plugin, SystemPrompt
+from harnessed.context import ContextState
 from harnessed.errors import PluginConflict
-from harnessed.plugins import Approvals, Compaction, ContextState
-from harnessed.plugins.filesystem import FilesystemTools
-from harnessed.plugins.shell import ShellTools
+from harnessed.models import Decision
+from harnessed.plugins.filesystem import Filesystem
+from harnessed.plugins.shell import Shell
+from harnessed.prompts import Instructions
 from harnessed.testing import ScriptedModel
 
 import browserrig
@@ -32,7 +34,6 @@ from browserrig import (
     Secrets,
     TabStrip,
     TaskMemory,
-    WindowRatio,
     WorkspaceTools,
 )
 from browserrig.input import Instant
@@ -64,7 +65,7 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     browser = Chrome.launch(url="https://example.com", headless=False)
     files = Files(workspace)
     readiness = ReadinessOptions(quiet_ms=123)
-    approvals = Approvals(default=PolicyDecision.DENY)
+    approvals = Approvals(default=Decision.DENY)
     extension = Extension()
     agent = browserrig.Agent(
         model=ScriptedModel(["ok"]),
@@ -73,11 +74,11 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
         plugins=[
             Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
             PageReadiness(options=readiness),
-            approvals,
             files,
             extension,
         ],
-        without=(Compaction,),
+        approvals=approvals,
+        without=(TaskMemory,),
     )
     assert isinstance(agent, Agent)
     assert next(item for item in agent.plugins if isinstance(item, Chrome)) is browser
@@ -87,10 +88,8 @@ def test_facade_configures_resources_without_opening_them_and_accepts_extra_plug
     )
     assert extension in agent.plugins
     assert [item for item in agent.plugins if isinstance(item, Files)] == [files]
-    assert [item for item in agent.plugins if isinstance(item, Approvals)] == [
-        approvals
-    ]
-    assert not any(isinstance(item, Compaction) for item in agent.plugins)
+    assert agent.approvals is approvals
+    assert agent.context.compaction is None
     assert not workspace.directory.exists()
 
 
@@ -105,18 +104,15 @@ def test_facade_mounts_every_tool_group_once():
 
 def test_facade_compacts_by_window_ratio_and_keeps_approval_defaults():
     agent = browserrig.Agent(model=ScriptedModel(["ok"]))
-    assert not any(
-        isinstance(item, (ShellTools, FilesystemTools)) for item in agent.plugins
-    )
-    (compaction,) = [item for item in agent.plugins if isinstance(item, Compaction)]
-    assert compaction.config.trigger == WindowRatio(0.8, fallback_tokens=100_000)
-    assert next(
-        item for item in agent.plugins if isinstance(item, Approvals)
-    ).default is (PolicyDecision.ASK)
+    assert not any(isinstance(item, (Shell, Filesystem)) for item in agent.plugins)
+    assert agent.context.compaction is not None
+    assert agent.approvals.default is Decision.ALLOW
 
 
-def test_window_ratio_uses_the_token_fallback_only_without_a_known_window():
-    trigger = WindowRatio(0.8, fallback_tokens=1000)
+def test_default_compaction_uses_fallback_only_without_a_known_window():
+    context = browserrig.Agent(model=ScriptedModel([])).context
+    assert context.compaction is not None
+    trigger = context.compaction.config.trigger
 
     def state(tokens, window):
         return ContextState(
@@ -126,7 +122,10 @@ def test_window_ratio_uses_the_token_fallback_only_without_a_known_window():
             turns_since_compaction=0,
         )
 
-    assert [trigger(state(900, None)), trigger(state(1000, None))] == [False, True]
+    assert [trigger(state(99_999, None)), trigger(state(100_000, None))] == [
+        False,
+        True,
+    ]
     assert [trigger(state(1500, 2000)), trigger(state(1600, 2000))] == [False, True]
 
 
@@ -154,25 +153,27 @@ def test_facade_import_and_scripted_model_do_not_require_provider_sdks():
 
 def test_plugins_replace_matching_defaults_in_place():
     observe = Screenshots(trigger=ScreenshotTrigger.EACH_STEP, skip_unchanged=False)
-    compaction = Compaction(trigger=WindowRatio(0.5))
+    memory = TaskMemory(warn_at=0.6)
     defaults = browserrig.Agent(model=ScriptedModel([])).plugins
     composed = browserrig.Agent(
-        model=ScriptedModel([]), plugins=[compaction, observe]
+        model=ScriptedModel([]), plugins=[memory, observe]
     ).plugins
     assert len(composed) == len(defaults)
-    assert composed[_index(defaults, TaskMemory)] is compaction
-    assert observe in composed and compaction in composed
+    assert composed[_index(defaults, TaskMemory)] is memory
+    assert observe in composed and memory in composed
     assert composed.index(observe) == _index(defaults, Screenshots)
 
 
-def test_plugins_without_a_matching_default_are_added_and_none_is_skipped():
+def test_plugins_without_a_matching_default_are_added():
     secrets = Secrets({"pw": Secret("value", domains="example.org")})
-    composed = browserrig.Agent(
-        model=ScriptedModel([]), plugins=[None, secrets, None]
-    ).plugins
+    composed = browserrig.Agent(model=ScriptedModel([]), plugins=[secrets]).plugins
     assert composed[-1] is secrets
-    assert None not in composed
     assert len(composed) == len(browserrig.Agent(model=ScriptedModel([])).plugins) + 1
+
+
+def test_plugin_list_rejects_none():
+    with pytest.raises(TypeError, match="Expected a Plugin instance"):
+        browserrig.Agent(model=ScriptedModel([]), plugins=[None])
 
 
 def test_two_plugins_for_the_same_default_conflict():
@@ -194,7 +195,7 @@ def test_one_file_tool_group_replaces_the_combined_default_in_place(group):
 
 def test_without_matches_each_file_tool_group_exactly():
     assert not isinstance(FileTools(), (WorkspaceTools, BrowserFileTools))
-    with pytest.raises(ValueError, match="no recipes matching: BrowserFileTools"):
+    with pytest.raises(ValueError, match="no defaults matching: BrowserFileTools"):
         browserrig.Agent(model=ScriptedModel([]), without=(BrowserFileTools,))
 
 
@@ -219,13 +220,13 @@ def test_configured_pacing_and_choreography_replace_their_defaults_in_place():
 def test_without_drops_defaults_and_rejects_types_that_are_not_defaults():
     composed = browserrig.Agent(
         model=ScriptedModel([]),
-        without=(Choreography, ChoreographyOverlay, TabStrip, Compaction),
+        without=(Choreography, ChoreographyOverlay, TabStrip, TaskMemory),
     ).plugins
     assert not any(
-        isinstance(plugin, (Choreography, ChoreographyOverlay, TabStrip, Compaction))
+        isinstance(plugin, (Choreography, ChoreographyOverlay, TabStrip, TaskMemory))
         for plugin in composed
     )
-    with pytest.raises(ValueError, match="contains no recipes matching: Secrets"):
+    with pytest.raises(ValueError, match="has no defaults matching: Secrets"):
         browserrig.Agent(model=ScriptedModel([]), without=(Secrets,))
 
 

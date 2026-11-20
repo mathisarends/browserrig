@@ -6,16 +6,7 @@ from dataclasses import field as dataclass_field
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
-from harnessed import (
-    Instructions,
-    Plugin,
-    PluginState,
-    SessionLog,
-    SystemPrompt,
-    ToolInfo,
-    ToolResult,
-    hook,
-)
+from harnessed import Plugin, SystemPrompt
 from harnessed.hooks import (
     ExecuteTool,
     Next,
@@ -23,8 +14,11 @@ from harnessed.hooks import (
     Priority,
     ReviewToolResult,
 )
-from harnessed.kernel import PluginScope, needs
-from harnessed.models import TextPart, UserMessage
+from harnessed.kernel import PluginScope, PluginState, hook, needs
+from harnessed.models import TextPart, ToolResult, UserMessage
+from harnessed.prompts import Instructions
+from harnessed.sessions.log import SessionLog
+from harnessed.tools import ToolInfo
 
 from browserrig.browser import Browser, BrowserEvents
 from browserrig.core import ActionKind, BrowserToolMetadata, SecretError

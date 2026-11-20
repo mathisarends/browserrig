@@ -1,5 +1,5 @@
 import pytest
-from harnessed import ToolCall
+from harnessed.models import ToolCall
 
 from tests.integration.test_secrets_integration import (
     PASSWORD,

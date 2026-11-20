@@ -5,10 +5,9 @@ import sys
 from dataclasses import replace
 
 import pytest
-from harnessed import Agent, Plugin, PolicyDecision, tool
+from harnessed import Agent, Compaction, Context, Plugin, tool
 from harnessed.kernel import needs
 from harnessed.models import ModelInfo
-from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel
 
@@ -31,22 +30,23 @@ async def test_memory_handover_exports_correlated_metadata_without_note_contents
         ],
         info=ModelInfo("test"),
     )
-    async with tracing_plugins(enabled=True, capture_content=False) as tracing:
-        await Agent(
-            model=model,
-            plugins=[
-                *tracing,
-                Files(LocalWorkspace(tmp_path)),
-                WorkspaceTools(),
-                TaskMemory(
-                    trigger=lambda state: state.input_tokens >= 5000,
-                    fallback_tokens=5000,
-                    llm=summary,
-                    keep_last_steps=1,
-                ),
-                Approvals(default=PolicyDecision.ALLOW),
-            ],
-        ).run("Compare products", max_steps=8)
+    tracing = tracing_plugins(enabled=True, capture_content=False)
+    await Agent(
+        model=model,
+        context=Context(
+            compaction=Compaction(
+                trigger=lambda state: state.input_tokens >= 5000,
+                llm=summary,
+                keep_last_steps=1,
+            )
+        ),
+        plugins=[
+            *tracing,
+            Files(LocalWorkspace(tmp_path)),
+            WorkspaceTools(),
+            TaskMemory(fallback_tokens=5000),
+        ],
+    ).run("Compare products", max_steps=8)
     spans = [
         span
         for _, request in collector
@@ -72,16 +72,11 @@ async def test_memory_handover_exports_correlated_metadata_without_note_contents
 
 def test_disabled_tracing_keeps_optional_dependencies_unloaded():
     script = """
-import asyncio
 import sys
 from examples.telemetry import tracing_plugins
 
-async def main():
-    async with tracing_plugins() as plugins:
-        assert plugins == []
-    assert not any(name.startswith('opentelemetry') for name in sys.modules)
-
-asyncio.run(main())
+assert tracing_plugins() == []
+assert not any(name.startswith('opentelemetry') for name in sys.modules)
 """
     result = subprocess.run(
         [sys.executable, "-c", script],
@@ -169,17 +164,18 @@ def _attributes(attributes):
 async def test_otlp_export_contains_correlated_model_and_tool_spans(
     collector, capture_content
 ):
-    async with tracing_plugins(
-        enabled=True, capture_content=capture_content
-    ) as plugins:
-        agent = Agent(
-            model=ScriptedModel([call("echo", value="TOOL INPUT"), "MODEL OUTPUT"]),
-            plugins=[*plugins, Echo(), Approvals(default=PolicyDecision.ALLOW)],
-        )
-        async with agent.session() as session:
-            result = await session.run("MODEL INPUT")
-            assert result.text == "MODEL OUTPUT"
-            session_id = session.id
+    plugins = tracing_plugins(enabled=True, capture_content=capture_content)
+    agent = Agent(
+        model=ScriptedModel([call("echo", value="TOOL INPUT"), "MODEL OUTPUT"]),
+        plugins=[
+            *plugins,
+            Echo(),
+        ],
+    )
+    async with agent.session() as session:
+        result = await session.run("MODEL INPUT")
+        assert result.text == "MODEL OUTPUT"
+        session_id = session.id
 
     assert collector and all(
         path == "POST /v1/traces HTTP/1.1" for path, _ in collector
@@ -227,14 +223,12 @@ async def test_content_is_bounded_and_batches_flush_when_host_fails(
     collector, direction
 ):
     with pytest.raises(RuntimeError, match="host failed"):
-        async with tracing_plugins(
-            capture_content=True, max_content_length=20
-        ) as plugins:
-            result = await Agent(model=ScriptedModel(["x" * 100]), plugins=plugins).run(
-                "y" * 100
-            )
-            assert result.text == "x" * 100
-            raise RuntimeError("host failed")
+        plugins = tracing_plugins(capture_content=True, max_content_length=20)
+        result = await Agent(model=ScriptedModel(["x" * 100]), plugins=plugins).run(
+            "y" * 100
+        )
+        assert result.text == "x" * 100
+        raise RuntimeError("host failed")
     spans = [
         span
         for _, request in collector
@@ -275,14 +269,17 @@ async def test_redaction_and_application_filter_leave_live_history_intact(collec
         return content
 
     model = ScriptedModel([call("echo", value=secret), f"Answer: {secret}"])
-    async with tracing_plugins(
+    plugins = tracing_plugins(
         capture_content=ContentCapture.redacted(SecretStr(secret)),
         content_filter=filter_content,
-    ) as plugins:
-        result = await Agent(
-            model=model,
-            plugins=[*plugins, Echo(), Approvals(default=PolicyDecision.ALLOW)],
-        ).run(f"Input: {secret}")
+    )
+    result = await Agent(
+        model=model,
+        plugins=[
+            *plugins,
+            Echo(),
+        ],
+    ).run(f"Input: {secret}")
     assert result.text == f"Answer: {secret}"
     assert any(secret in str(message) for message in model.requests[-1].messages)
     spans = [
@@ -313,18 +310,15 @@ async def test_library_and_worker_spans_share_the_tool_context(
     collector, tmp_path, trace_hooks
 ):
     (tmp_path / "note.txt").write_text("PRIVATE FILE CONTENT", encoding="utf-8")
-    async with tracing_plugins(
-        enabled=not trace_hooks, trace_hooks=trace_hooks
-    ) as plugins:
-        result = await Agent(
-            model=ScriptedModel([call("file_echo"), "Read"]),
-            plugins=[
-                *plugins,
-                Files(LocalWorkspace(tmp_path)),
-                FileEcho(),
-                Approvals(default=PolicyDecision.ALLOW),
-            ],
-        ).run("Read the note")
+    plugins = tracing_plugins(enabled=not trace_hooks, trace_hooks=trace_hooks)
+    result = await Agent(
+        model=ScriptedModel([call("file_echo"), "Read"]),
+        plugins=[
+            *plugins,
+            Files(LocalWorkspace(tmp_path)),
+            FileEcho(),
+        ],
+    ).run("Read the note")
     assert result.text == "Read"
     spans = [
         span
@@ -369,16 +363,16 @@ async def test_structured_turn_output_and_schema_use_the_content_policy(collecto
         seen.append(content.kind)
         return content
 
-    async with tracing_plugins(
+    plugins = tracing_plugins(
         capture_content=ContentCapture.redacted(secret), content_filter=filter_content
-    ) as plugins:
-        result = await Agent(
-            model=ScriptedModel(
-                [json.dumps({"value": secret})],
-                info=ModelInfo("test", supports_structured_output=True),
-            ),
-            plugins=plugins,
-        ).run("Return the value", output=TraceAnswer)
+    )
+    result = await Agent(
+        model=ScriptedModel(
+            [json.dumps({"value": secret})],
+            info=ModelInfo("test", supports_structured_output=True),
+        ),
+        plugins=plugins,
+    ).run("Return the value", output=TraceAnswer)
     assert result.output == TraceAnswer(value=secret)
     spans = [
         span

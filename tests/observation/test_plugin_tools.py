@@ -1,5 +1,6 @@
 import pytest
-from harnessed import Agent, ToolCall
+from harnessed import Agent
+from harnessed.models import ToolCall
 from harnessed.testing import ScriptedModel
 from harnessed.tools import ToolRegistry
 

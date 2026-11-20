@@ -4,10 +4,8 @@ import argparse
 import asyncio
 import os
 
-from harnessed import PolicyDecision
 from harnessed.models import UserMessage
 from harnessed.models.pydantic_ai import PydanticAIModel
-from harnessed.plugins import Approvals
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 from browserrig import Agent, Chrome
@@ -27,7 +25,7 @@ async def main() -> None:
             OpenAIResponsesModel(os.getenv("OPENAI_MODEL", "gpt-6.1-terra"))
         ),
         browser=Chrome.launch(url=args.url),
-        plugins=[Approvals(default=PolicyDecision.ALLOW)],
+        plugins=[],
     )
     async with agent.session() as session:
         handle = await session.submit(args.task)

@@ -1,9 +1,8 @@
 import json
 
 import pytest
-from harnessed import Agent, PolicyDecision
+from harnessed import Agent
 from harnessed.models import ToolMessage
-from harnessed.plugins import Approvals
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import (
@@ -60,7 +59,6 @@ async def test_agent_javascript_shell_retains_main_world_state_awaits_and_report
             DomPage(),
             Actions(),
             JavaScriptTools(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     async with agent.session() as session:

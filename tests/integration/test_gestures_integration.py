@@ -1,15 +1,10 @@
 import asyncio
 
 import pytest
-from harnessed import (
-    Plugin,
-    PolicyDecision,
-    ToolCall,
-)
+from harnessed import Plugin
 from harnessed.events import ToolExecutionFinishedEvent
 from harnessed.kernel import PluginScope, needs
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import CallbackModel
 
 from browserrig import (
@@ -188,7 +183,6 @@ async def _perform(site, name, arguments):
         browser=Chrome.launch(url=site + "/gestures"),
         plugins=[
             Access(),
-            Approvals(default=PolicyDecision.ALLOW),
         ],
     )
     async with agent.session() as session:

@@ -74,7 +74,7 @@ def test_optional_plugin_composes_without_changing_defaults():
     guard = AllowedDomains(["example.com", "*.example.com"])
     defaults = Agent(model=ScriptedModel([])).plugins
     assert not any(isinstance(plugin, AllowedDomains) for plugin in defaults)
-    composed = Agent(model=ScriptedModel([]), plugins=[None, guard]).plugins
+    composed = Agent(model=ScriptedModel([]), plugins=[guard]).plugins
     assert composed[-1] is guard
     assert [type(plugin) for plugin in composed[:-1]] == [
         type(plugin) for plugin in defaults

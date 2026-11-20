@@ -18,10 +18,6 @@ from .browser import (
 )
 from .choreography import ActionLabels, Choreography, TabStrip
 from .completion import Done, StepBudgetHints
-from .composition import (  # smelt: ignore[SMT106] -- public facade
-    ContextCompaction,
-    WindowRatio,
-)
 from .core import (
     ActionContext,
     ActionKind,
@@ -172,7 +168,6 @@ __all__ = [
     "AllowedDomains",
     "DomainNotAllowed",
     "Agent",
-    "ContextCompaction",
     "CheckReadiness",
     "DownloadReadiness",
     "DownloadReceiving",
@@ -267,7 +262,6 @@ __all__ = [
     "Totp",
     "env",
     "Viewport",
-    "WindowRatio",
     "TerminalEvents",
     "Todo",
     "TodoList",

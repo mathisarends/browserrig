@@ -28,34 +28,34 @@ checkpoint/recovery requests are suppressed to leave room for the final answer.
 ## Configuration and persistence
 
 ```python
-from browserrig import Agent, Files, LocalWorkspace, TaskMemory, WindowRatio
+from harnessed import Compaction, Context
+
+from browserrig import Agent, Files, LocalWorkspace, TaskMemory
 
 agent = Agent(
     model=model,
+    context=Context(
+        compaction=Compaction(at=0.8, fallback_tokens=100_000, keep_last_steps=4),
+    ),
     plugins=[
         Files(LocalWorkspace(".browserrig/research")),
-        TaskMemory(
-            path="notes/task_state.md",
-            warn_at=0.65,
-            trigger=WindowRatio(0.8),
-            keep_last_steps=4,
-        ),
+        TaskMemory(path="notes/task_state.md", warn_at=0.65),
     ],
 )
 ```
 
-`TaskMemory` fills the `ContextCompaction` slot and accepts native summarizer,
-trigger and budget options. Default compaction starts at 80% of the model window,
-or 100,000 tokens when unknown, retaining two steps. A custom earlier trigger
-should use an earlier warning threshold too.
+Set summarizer, trigger and summary limits on native `Compaction`. The default
+starts at 80% of the model window, or 100,000 tokens when unknown, retaining
+two steps. Set an earlier warning threshold when you configure an earlier trigger.
 
-Pass `ContextCompaction(...)` for plain native summarization;
-`without=(ContextCompaction,)` removes the default task memory. Without workspace
-file tools, compaction continues without checkpoint/recovery requests.
+Pass `context=Context(compaction=Compaction(...))` for native summarization
+and add `TaskMemory()` for workspace guidance. `without=(TaskMemory,)` disables
+the default plugin and automatic compaction. Without workspace file tools,
+compaction continues without checkpoint or recovery requests.
 
 GPT-6.1 Terra uses a shared application profile: 256,000 context tokens, an 8,192
 token output reserve, two retained steps, a 40% post-compaction target and an 8,192
-token summary ceiling. Explicit budgets and compaction plugins override defaults.
+token summary ceiling. Explicit `context=` settings override the profile.
 
 For recovery after a restart, reuse the workspace and restore the session.
 Persisted metadata records revisions and recovery status; it does not copy the

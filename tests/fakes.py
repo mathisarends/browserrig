@@ -2,12 +2,9 @@ import asyncio
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
-from harnessed import (
-    Agent,
-    Plugin,
-    SessionLog,
-)
+from harnessed import Agent, Plugin
 from harnessed.kernel import PluginScope, needs
+from harnessed.sessions.log import SessionLog
 from harnessed.testing import ScriptedModel
 
 from browserrig import Browser, BrowserCoordination, FileSystem

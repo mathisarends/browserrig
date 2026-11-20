@@ -1,11 +1,11 @@
 import pytest
+from harnessed import Compaction, Context
 from harnessed.models import ModelInfo
-from harnessed.plugins import Service
 from harnessed.runtime.budget import ContextBudget
 from harnessed.runtime.compaction import CompactionPolicy
 from harnessed.testing import ScriptedModel
 
-from browserrig import Agent, ContextCompaction, TaskMemory
+from browserrig import Agent, TaskMemory
 
 
 def _without_browser():
@@ -48,16 +48,17 @@ async def test_other_models_keep_their_existing_context_and_compaction_defaults(
 
 async def test_explicit_budget_and_compaction_override_terra_defaults():
     model = ScriptedModel(["Done"], info=ModelInfo("gpt-6.1-terra"))
-    budget = ContextBudget(limit=64_000, reserve_tokens=4096)
     async with Agent(
         model=model,
         without=_without_browser(),
-        plugins=[
-            Service(ContextBudget, budget),
-            ContextCompaction(target_tokens=16_000),
-        ],
+        context=Context(
+            max_tokens=64_000,
+            reserve_tokens=4096,
+            compaction=Compaction(target_tokens=16_000, fallback_tokens=100_000),
+        ),
     ).session() as session:
-        assert session.scope[ContextBudget] is budget
+        assert session.scope[ContextBudget].window_limit(None) == 64_000
+        assert session.scope[ContextBudget].reserve_tokens == 4096
         assert session.scope[CompactionPolicy].settings.target_tokens == 16_000
         assert session.scope[CompactionPolicy].settings.target_ratio is None
         assert (await session.run("Inspect")).text == "Done"

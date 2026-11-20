@@ -2,9 +2,7 @@ import asyncio
 import json
 
 import pytest
-from harnessed import PolicyDecision, ToolCall
-from harnessed.models import ModelChunk, ToolMessage
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall, ToolMessage
 from harnessed.testing import ScriptedModel, call
 
 from browserrig import Agent, Browser, Chrome, ChromeBrowser
@@ -118,9 +116,7 @@ async def test_search_page_shows_the_find_bar_marks_and_ticks_without_scrolling(
     agent = Agent(
         model=model,
         browser=Chrome.launch(url=site),
-        plugins=[
-            Approvals(default=PolicyDecision.ALLOW),
-        ],
+        plugins=[],
     )
     streamed = []
     ready = asyncio.Event()

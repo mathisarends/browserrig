@@ -2,8 +2,9 @@ from functools import partial
 from typing import Annotated
 from urllib.parse import quote_plus, urljoin, urlsplit
 
-from harnessed import Instructions, Plugin, SystemPrompt
+from harnessed import Plugin, SystemPrompt
 from harnessed.kernel import PluginScope, needs, observes
+from harnessed.prompts import Instructions
 from pydantic import Field
 
 from browserrig.browser import Browser, BrowserEvents, Tab, TabPolicy, validated_url

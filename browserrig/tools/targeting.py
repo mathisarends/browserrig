@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
-from harnessed import Plugin, PluginState
-from harnessed.kernel import PluginScope, needs
+from harnessed import Plugin
+from harnessed.kernel import PluginScope, PluginState, needs
 from harnessed.tracing import traced
 
 from browserrig.browser import Tab

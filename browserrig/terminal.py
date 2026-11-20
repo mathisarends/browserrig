@@ -4,7 +4,7 @@ from dataclasses import asdict, fields, is_dataclass
 from enum import Enum
 from typing import TextIO
 
-from harnessed import Plugin, ToolResult, hook
+from harnessed import Plugin
 from harnessed.events import (
     ApprovalRequestedEvent,
     CompactionFinishedEvent,
@@ -19,6 +19,8 @@ from harnessed.events import (
     TurnEndedEvent,
 )
 from harnessed.hooks import SessionAppended
+from harnessed.kernel import hook
+from harnessed.models import ToolResult
 
 from .events import BrowserEvent, EventKind, LiveEvent, TabEvent
 

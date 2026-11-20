@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from unittest.mock import AsyncMock
 
 import pytest
-from harnessed import Agent, Plugin, ToolCall
+from harnessed import Agent, Plugin
 from harnessed.kernel import PluginScope, needs
-from harnessed.models import ImagePart, ModelChunk, ToolMessage
+from harnessed.models import ImagePart, ModelChunk, ToolCall, ToolMessage
 from harnessed.testing import ScriptedModel
 
 from browserrig import (

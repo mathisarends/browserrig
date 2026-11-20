@@ -1,41 +1,19 @@
 import pytest
+from harnessed.context import (
+    CompactionContext,
+    CompactionRequest,
+    ContextState,
+    Summary,
+)
 from harnessed.models import ModelUsage
-from harnessed.plugins import ContextState
-from harnessed.plugins.compaction import CompactionContext, CompactionRequest, Summary
 from harnessed.runtime.compaction import SummaryError
 from harnessed.runtime.tokens import ApproximateTokenCounter
 
 from browserrig.memory.compaction import (  # smelt: ignore[SMT107] -- test seam
-    # Test compaction deferral and summaries without activating a session.
-    CheckpointTrigger,
+    # Test summaries without activating a session.
     MemoryRuntime,
     MemorySummarizer,
 )
-
-
-@pytest.mark.parametrize(
-    "tokens, window, first",
-    [
-        (800, 1000, False),
-        (900, 1000, True),
-        (1100, 1000, True),
-        (800, None, False),
-    ],
-)
-def test_deferral_is_single_use_and_does_not_override_emergency_threshold(
-    tokens, window, first
-):
-    calls = []
-
-    def due(state):
-        calls.append(state)
-        return True
-
-    trigger = CheckpointTrigger(due, MemoryRuntime(defer_once=True))
-    state = ContextState(tokens, 0, window, 0)
-    assert trigger(state) is first
-    assert trigger(state) is True
-    assert calls == [state, state]
 
 
 async def test_summary_reserves_prefix_space_and_preserves_usage():

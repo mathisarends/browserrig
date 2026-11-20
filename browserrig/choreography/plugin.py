@@ -4,10 +4,12 @@ from dataclasses import dataclass, field, replace
 from time import monotonic
 from typing import Any
 
-from harnessed import Plugin, PluginState, ToolResult, ToolStatus, envelope_value, hook
+from harnessed import Plugin
 from harnessed.events import ToolCallFinishedEvent, TurnEndedEvent, TurnStartedEvent
 from harnessed.hooks import ExecuteTool, Next
-from harnessed.kernel import PluginScope, needs
+from harnessed.kernel import PluginScope, PluginState, hook, needs
+from harnessed.models import ToolResult, ToolStatus
+from harnessed.tools import envelope_value
 
 from browserrig.browser import Browser, BrowserEvents, TabChanged
 from browserrig.core import (

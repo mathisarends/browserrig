@@ -3,10 +3,8 @@ import json
 from contextlib import asynccontextmanager
 
 import pytest
-from harnessed import PolicyDecision, ToolCall
 from harnessed.events import ToolExecutionFinishedEvent
-from harnessed.models import ModelChunk
-from harnessed.plugins import Approvals
+from harnessed.models import ModelChunk, ToolCall
 from harnessed.testing import CallbackModel, ScriptedModel, call
 
 from browserrig import (
@@ -461,7 +459,6 @@ async def _editor_session(site, model, *, visualization=False):
         model=model,
         browser=Chrome.launch(url=site),
         plugins=[
-            Approvals(default=PolicyDecision.ALLOW),
             *([Choreography()] if visualization else []),
         ],
         without=(InputPacing, Choreography, ChoreographyOverlay),

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Literal
 
-from harnessed import ToolStatus
+from harnessed.models import ToolStatus
 
 from browserrig.core import (
     ActionKind,
