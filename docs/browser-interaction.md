@@ -108,7 +108,7 @@ See [custom page models](browser-composition.md#custom-page-models).
 | `PointerDragTools` | `drag_at(start, end)` by viewport or image coordinates |
 | `ReferenceDragTools` | `drag(source_ref, target_ref)` by observed element refs |
 | `KeyboardTools` | `send_keys(text="Hello")` types text; `send_keys(key="Enter")` presses a key; modifier flags apply to keys |
-| `DomTypingTools` | `type_text(ref, text, clear=True)` focuses and replaces a DOM field; `clear=False` inserts at its selection |
+| `DomTypingTools` | `type_text(ref, text, clear=True, press_enter_after=False)` focuses and replaces a DOM field. `clear=False` inserts at its selection. |
 | `DomScrollTools` | `scroll_page(delta_y=..., delta_x=...)` moves the document; `scroll_element(ref=..., ...)` moves only that container |
 | `FormTools` | Native selects, exact multi-select sets and date fields |
 | `NavigationTools` / `TabTools` | Navigation, search, history and tab management |
@@ -126,6 +126,11 @@ link with the platform modifier; newly opened tabs become active. Drag endpoints
 must fit together before the gesture begins. Held keys/buttons are released on
 failure or cancellation. Text-field focus is checked while typing; a lost focus
 can leave a prefix entered, so inspect before retrying.
+
+Use `type_text(ref=..., text=..., press_enter_after=True)` to type and press Enter
+in the same tool call. Enter requires successful typing and the same focused
+field. New choices such as autocomplete suggestions skip Enter and prompt for a
+fresh observation. Requesting Enter ends the batch.
 
 `select_options(ref="123", values=["General", "Wholesale"])` replaces a native
 multi-select's complete set; `values=[]` clears it. Values or displayed labels
