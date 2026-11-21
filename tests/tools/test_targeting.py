@@ -40,7 +40,7 @@ async def test_hover_stops_when_its_document_or_focus_changes(change):
                 services.browser.active_tab = other
 
         move = services.input.mouse.move_to = AsyncMock(side_effect=change_target)
-        with pytest.raises(StaleElement, match="changed during hover"):
+        with pytest.raises(StaleElement, match="changed during targeting"):
             await scope[Targeting].hover(ref="field", tab=tab)
     move.assert_awaited_once()
 

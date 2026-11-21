@@ -1,7 +1,7 @@
 from harnessed import Plugin
 from harnessed.kernel import PluginScope, needs
 
-from browserrig.input import HumanMotor, Input, Motor
+from browserrig.input import HumanMotor, InputSettings, Motor
 
 from .planners import CursorRoutePlanner, KeystrokePlanner, compose
 
@@ -15,7 +15,7 @@ class InputPacing(Plugin, slot="browserrig.pacing"):
     runs at full speed.
     """
 
-    _input = needs(Input)
+    _input = needs(InputSettings)
 
     def __init__(
         self,

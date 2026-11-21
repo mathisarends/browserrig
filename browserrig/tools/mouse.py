@@ -10,7 +10,7 @@ from pydantic import Field
 from browserrig.browser import Browser, TabPolicy
 from browserrig.core import ActionKind, Point
 from browserrig.core import browser_tool as tool
-from browserrig.input import ClickButton, ClickCount, Input
+from browserrig.input import ClickButton, ClickCount, Keyboard, Mouse
 from browserrig.observation import BrowserPerception, viewport_point
 
 from .effects import Effect
@@ -33,7 +33,8 @@ class _PointerInput(Plugin):
 
     _actions = needs(Actions)
     _browser = needs(Browser)
-    _input = needs(Input)
+    _mouse = needs(Mouse)
+    _keyboard = observes(Keyboard)
     _tabs = observes(TabPolicy)
 
     def _check_click(
@@ -41,6 +42,8 @@ class _PointerInput(Plugin):
     ) -> None:
         if new_tab and (count != 1 or button != "left"):
             raise ToolError("new_tab needs a single left click")
+        if new_tab and self._keyboard is None:
+            raise ToolError("Opening a link with a modifier requires keyboard input")
         if new_tab and self._tabs is not None:
             self._tabs.check_new_tab()
 
@@ -53,7 +56,7 @@ class _PointerInput(Plugin):
         new_tab: bool,
         prepared_scroll: bool = False,
     ) -> Effect:
-        mouse = self._input.mouse
+        mouse = self._mouse
         record_point("viewport", point)
         if new_tab:
             # Arrive first, so the keys are held for the click alone.
@@ -73,8 +76,9 @@ class _PointerInput(Plugin):
         if not new_tab:
             yield 0
             return
+        assert self._keyboard is not None
         key = await self._browser.tabs.link_modifier()
-        async with self._input.keyboard.hold(key, "Shift") as modifiers:
+        async with self._keyboard.hold(key, "Shift") as modifiers:
             yield modifiers
 
 
@@ -92,7 +96,7 @@ class PointerTools(_PointerInput):
     ) -> Effect:
         point = viewport_point(self._observe.coordinate_source(), Point(x=x, y=y))
         record_point("viewport", point)
-        await self._input.mouse.move_to(point)
+        await self._mouse.move_to(point)
         return Effect("Cursor moved without clicking.")
 
     @tool(
@@ -127,7 +131,7 @@ class ReferencePointerTools(_PointerInput):
     async def hover(self, ref: Annotated[str, _REF]) -> Effect:
         point = await self._targets.locate(ref=ref)
         record_point("viewport", point)
-        await self._input.mouse.move_to(point)
+        await self._mouse.move_to(point)
         return Effect(
             "Cursor moved onto the ref without clicking.",
             prepared_scroll=point.scrolled,
@@ -148,7 +152,7 @@ class ReferencePointerTools(_PointerInput):
     ) -> Effect:
         self._check_click(count=count, button=button, new_tab=new_tab)
         point = await self._targets.locate(ref=ref)
-        await self._input.mouse.move_to(point)
+        await self._mouse.move_to(point)
         if change := await self._actions.page_change(after_input=False):
             return Effect(
                 f"Hover changed the page: {change} The click was not dispatched. "

@@ -31,7 +31,6 @@ from browserrig import (
     FileSystem,
     FileTools,
     FileTransfer,
-    Input,
     InputRuntime,
     LocalWorkspace,
     MountedWorkspace,
@@ -47,6 +46,7 @@ from browserrig.browser import (  # smelt: ignore[ARC007] -- test seam
     # Replace ChromeBrowser at the plugin connection boundary.
     plugin as plugin_module,
 )
+from browserrig.input import Keyboard
 from browserrig.tools import BrowserToolMetadata, DialogTools, KeyboardTools
 from tests.fakes import FakeBrowser
 
@@ -158,7 +158,7 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
         await agent.run("Inspect the page")
     missing = {issue.plugin.name: issue.missing for issue in caught.value.issues}
     assert missing == {
-        "KeyboardTools": (Actions, Browser, Input),
+        "KeyboardTools": (Actions, Browser, Keyboard),
         "Actions": (
             Browser,
             ActionContext,
@@ -169,7 +169,6 @@ async def test_incomplete_browser_composition_reports_transitive_dependencies_be
         ),
         "BrowserPerception": (
             Browser,
-            Input,
             BrowserCoordination,
             BrowserEvents,
             PageReadiness,
@@ -224,7 +223,6 @@ async def test_browser_dependency_loss_and_replacement_restart_observation_state
             "PageReadiness": (BrowserEvents,),
             "BrowserPerception": (
                 Browser,
-                Input,
                 BrowserCoordination,
                 BrowserEvents,
                 PageReadiness,
@@ -595,7 +593,6 @@ async def test_facade_owns_a_fresh_mcp_stdio_server_per_session(fake_chrome, tmp
 def _provide(ctx, browser):
     removals = (
         ctx.provide(Browser, browser),
-        ctx.provide(Input, Input(browser.input_targets.focused)),
         ctx.provide(BrowserEvents, browser.events),
         ctx.provide(BrowserCoordination, BrowserCoordination()),
     )

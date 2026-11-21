@@ -53,7 +53,17 @@ from .files import (
 )
 from .guardrails import AllowedDomains
 from .handoff import HandoffCallback, HandoffReceipt, HumanHandoff, HumanResponse
-from .input import Input, InputRuntime, InputTarget, InputTargets
+from .input import (
+    DeviceRuntime,
+    Input,
+    InputRuntime,
+    InputTarget,
+    InputTargets,
+    KeyboardInput,
+    MouseInput,
+    Touch,
+    TouchInput,
+)
 from .kinds import MouseEventKind
 from .memory import MemoryAction, TaskMemory, TaskMemoryEvent, TaskMemoryState
 from .nudges import Nudges
@@ -124,9 +134,11 @@ from .tools import (
     PointerTools,
     ReferenceDragTools,
     ReferencePointerTools,
+    ReferenceTouchTools,
     ScreenshotTools,
     TabTools,
     Targeting,
+    TouchTools,
     WaitTools,
     WheelTools,
     WorkspaceTools,
@@ -135,6 +147,13 @@ from .tools import (
 __version__ = "0.12.0"
 
 __all__ = [
+    "DeviceRuntime",
+    "KeyboardInput",
+    "MouseInput",
+    "TouchInput",
+    "Touch",
+    "ReferenceTouchTools",
+    "TouchTools",
     "ViewportFrames",
     "Target",
     "PagePart",

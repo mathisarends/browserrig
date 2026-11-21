@@ -5,7 +5,13 @@ from dataclasses import dataclass, replace
 from browserrig.core import ActionKind, ReadinessPhase
 
 COORDINATE_KINDS = frozenset(
-    {ActionKind.CLICK_AT, ActionKind.DRAG_AT, ActionKind.MOVE_MOUSE}
+    {
+        ActionKind.TAP_AT,
+        ActionKind.SWIPE_AT,
+        ActionKind.CLICK_AT,
+        ActionKind.DRAG_AT,
+        ActionKind.MOVE_MOUSE,
+    }
 )
 
 
@@ -36,6 +42,9 @@ _KEY = replace(_OBSERVED_INPUT, check_chain=True)
 _FORM = replace(_KEY, preflight=True)
 
 _PROFILES = {
+    ActionKind.TAP: _POINTER_MUTATION,
+    ActionKind.TAP_AT: _POINTER_MUTATION,
+    ActionKind.SWIPE_AT: _POINTER_MUTATION,
     ActionKind.CLICK: _CLICK,
     ActionKind.CLICK_AT: _POINTER_MUTATION,
     ActionKind.MOVE_MOUSE: _OBSERVED_INPUT,

@@ -298,7 +298,7 @@ async def test_send_keys_rejects_ambiguous_arguments_before_dispatch(arguments):
 async def test_send_keys_distinguishes_literal_text_from_named_keys(monkeypatch):
     monkeypatch.setattr(keyboard_module.asyncio, "sleep", AsyncMock())
     devices, _tab, events, commands = _rig()
-    tools = SimpleNamespace(_input=devices, _secrets=None)
+    tools = SimpleNamespace(_keyboard=devices.keyboard, _secrets=None)
     await KeyboardTools.send_keys(tools, text="Escape")
     assert [
         command["text"] for command in commands if command["type"] == "char"
@@ -951,7 +951,7 @@ async def test_send_keys_reports_a_slip_that_stayed():
     devices, _tab, _events, _commands = _rig()
     devices.pace(_Slipping("h", "e", "l", "o"))
 
-    tools = SimpleNamespace(_input=devices, _secrets=None)
+    tools = SimpleNamespace(_keyboard=devices.keyboard, _secrets=None)
     reply = await KeyboardTools.send_keys(tools, text="hello")
     assert "typed 'helo' instead of 'hello'" in reply.text
 

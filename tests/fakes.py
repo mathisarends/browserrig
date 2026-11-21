@@ -18,7 +18,7 @@ from browserrig.core import (
 )
 from browserrig.dom import DomReferences, ResolveDomElement, render
 from browserrig.files import FileBridge, FileTransfers
-from browserrig.input import Input, InputTargets
+from browserrig.input import Input, InputSettings, InputTargets, Keyboard, Mouse
 from browserrig.observation import BrowserPerception, Snapshot
 from browserrig.readiness import PageReadiness, ReadinessReport
 from browserrig.scripts import DOMProbe
@@ -131,6 +131,9 @@ class FakeChrome(Plugin, needs=(SessionLog,)):
         )
         ctx.provide(ActionContext, actions)
         ctx.provide(Input, devices)
+        ctx.provide(InputSettings, devices)
+        ctx.provide(Mouse, devices.mouse)
+        ctx.provide(Keyboard, devices.keyboard)
         ctx.provide(InputTargets, browser.input_targets)
         self.holder["input"] = devices
         self.holder["actions"] = actions
@@ -221,6 +224,9 @@ class FakeServices(Plugin, provides=True):
     async def setup(self, ctx: PluginScope):
         ctx.provide(ActionContext, self.correlation)
         ctx.provide(Input, self.input)
+        ctx.provide(InputSettings, self.input)
+        ctx.provide(Mouse, self.input.mouse)
+        ctx.provide(Keyboard, self.input.keyboard)
         ctx.provide(InputTargets, self.browser.input_targets)
         ctx.provide(Browser, self.browser)
         ctx.provide(BrowserEvents, self.browser.events)

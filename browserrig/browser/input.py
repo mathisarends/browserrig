@@ -5,10 +5,23 @@ from collections.abc import Coroutine
 from typing import TYPE_CHECKING, Any, Literal
 
 from cdpify.domains.input import MouseButton as CdpMouseButton
+from cdpify.domains.input import TouchPoint
 
-from browserrig.core import CursorStyle, MouseEventKind, Point, ViewportSize
+from browserrig.core import (
+    BrowserError,
+    CursorStyle,
+    MouseEventKind,
+    Point,
+    ViewportSize,
+)
 from browserrig.events import InputEvent
-from browserrig.input import InputTarget, InputTargets, KeyEventType, MouseButton
+from browserrig.input import (
+    InputTarget,
+    InputTargets,
+    KeyEventType,
+    MouseButton,
+    TouchEventType,
+)
 from browserrig.scripts import CURSOR, CursorArgs
 
 if TYPE_CHECKING:
@@ -44,6 +57,10 @@ class CdpInput:
     @property
     def id(self) -> str:
         return self._tab.id
+
+    @property
+    def document_id(self) -> str:
+        return self._tab.document_id
 
     def dialog_opened(self) -> None:
         """Release input that waits for its reply because a dialog now holds it."""
@@ -113,6 +130,32 @@ class CdpInput:
             )
         )
         self._tab.invalidate_image_coordinates()
+
+    async def check_touch_points(self, *points: Point) -> None:
+        metrics = await self._tab.cdp.page.get_layout_metrics()
+        visual = metrics.css_visual_viewport
+        layout = metrics.css_layout_viewport
+        # Snapshot geometry currently describes the layout viewport. Reject a
+        # panned or clipped visual viewport before sending a contact at a wrong point.
+        if (
+            visual.offset_x
+            or visual.offset_y
+            or abs(layout.client_width - visual.client_width) > 1
+            or abs(layout.client_height - visual.client_height) > 1
+        ):
+            raise BrowserError("Touch requires the full layout viewport to be visible")
+        if any(
+            point.x >= visual.client_width or point.y >= visual.client_height
+            for point in points
+        ):
+            raise BrowserError("Touch point is outside the visible viewport")
+
+    async def dispatch_touch(self, kind: TouchEventType, point: Point | None) -> None:
+        points = [] if point is None else [TouchPoint(x=point.x, y=point.y, id=0)]
+        self._tab.layout_changed()
+        await self._input(
+            self._tab.cdp.input.dispatch_touch_event(type=kind, touch_points=points)
+        )
 
     async def dispatch_key(
         self,

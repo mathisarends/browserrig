@@ -16,7 +16,7 @@ _WHEEL_SETTLE_SECONDS = 0.05
 async def prepare_element(
     tab: Tab,
     handle: TargetHandle,
-    mouse: Mouse,
+    mouse: Mouse | None,
     *,
     document_id: str,
     report: Callable[[str], None] | None = None,
@@ -26,6 +26,8 @@ async def prepare_element(
         return await handle.reveal(report=report)
     if not isinstance(handle, ScrollableElement):
         return False
+    if mouse is None:
+        raise BrowserError("This target requires wheel input to reveal")
     scrolled = False
     previous = None
     stalled = 0
