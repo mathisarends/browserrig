@@ -13,3 +13,4 @@ guides in version order if you are upgrading across several releases.
 | [0.9](migration-0.9.md) | Harnessed 0.20, browser errors, screenshot freshness and wait tools |
 | [0.10](migration-0.10.md) | Composable perception, Harnessed 0.22, approval defaults and session stores |
 | [0.11](migration-0.11.md) | Harnessed 0.23, independent input planners and selectable choreography |
+| [0.12](migration-0.12.md) | Harnessed 0.25, drag tools and cursor routes |

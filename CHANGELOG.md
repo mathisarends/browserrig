@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.12.0 (2026-11-21)
+
+Upgrade from 0.11.x using the [migration guide](docs/migration-0.12.md).
+
 ### Breaking changes
 
 - Pin Harnessed and its provider, MCP and OpenTelemetry extras to 0.25.0.
@@ -17,6 +21,16 @@
   keyword to `cursor_route`. Rename `PointerRoutePlanner` to
   `CursorRoutePlanner`. The same planner now controls free cursor movement and
   movement with the primary mouse button held.
+
+### Added
+
+- Stream live images of the active Chrome tab to an application with the
+  opt-in [`Screencast` plugin](docs/browser-choreography.md#stream-the-active-tab)
+  (#121).
+- Show the remaining wait time next to the browser cursor during `wait`
+  when wait choreography is enabled (#120).
+- Pass `press_enter_after=True` to `type_text` to type and press Enter in the
+  same tool call when the field keeps focus and no new choices appear (#125).
 
 ### Changed
 
