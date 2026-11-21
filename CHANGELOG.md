@@ -4,10 +4,11 @@
 
 ### Breaking changes
 
-- Pin Harnessed and its provider, MCP and OpenTelemetry extras to 0.24.0.
-  Existing session stores require a snapshot export and import into a fresh
-  store. Conversation snapshots use format 4 and standalone audit envelopes use
-  version 8. See the [session migration guide](docs/agent-guide.md#migrating-from-harnessed-023).
+- Pin Harnessed and its provider, MCP and OpenTelemetry extras to 0.25.0.
+  Rename Harnessed timeout options to their explicit second-based names in custom
+  compositions. Harnessed 0.24 stores can be reopened directly. Stores from 0.23
+  require a snapshot export and import into a fresh store. See the
+  [upgrade guide](docs/agent-guide.md#upgrading-from-harnessed-024).
 - In explicit compositions, add `PointerDragTools()` for `drag_at` and
   `ReferenceDragTools()` for `drag`. The standard agent includes both. The drag
   tools take only the endpoints. The input motor plans the timing, and direct

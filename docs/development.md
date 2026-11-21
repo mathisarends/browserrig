@@ -96,7 +96,7 @@ rather than moving published tags; PyPI versions cannot be overwritten.
 
 ## Compatibility and coverage
 
-Harnessed and its provider, MCP and OTel extras are pinned to 0.24.0.
+Harnessed and its provider, MCP and OTel extras are pinned to 0.25.0.
 Conversation snapshots and checkpoints use format 4. Standalone audit envelopes
 use version 8. See the [session migration guide](agent-guide.md#migrating-from-harnessed-023)
 for exporting and restoring conversations from existing stores.
