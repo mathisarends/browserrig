@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.1 (2026-11-21)
+
+### Fixed
+
+- Resume Chrome workers paused by the `AllowedDomains` navigation guard,
+  including workers started in cross-origin iframes (#118, #119).
+
 ## 0.11.0 (2026-11-20)
 
 Upgrade from 0.10.x using the [migration guide](docs/migration-0.11.md).
