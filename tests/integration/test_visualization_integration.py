@@ -241,6 +241,49 @@ async def test_long_cursor_badge_stays_inside_a_compact_viewport(site):
             assert 0 <= bounds["top"] < bounds["bottom"] <= 640
 
 
+async def test_wait_counts_down_at_the_cursor_and_restores_the_pointer(site):
+    wait = ModelChunk(tool_call=ToolCall("wait", {"seconds": 3}))
+    agent = BrowserAgent(
+        model=ScriptedModel([[wait], "Done"]),
+        browser=Chrome.launch(url=site, viewport=Viewport(width=360, height=640)),
+        without=(InputPacing,),
+    )
+    cursor = """(() => {
+        const icon = document.querySelector('#cursor-icon');
+        const badge = document.querySelector('#cursor-name');
+        const bounds = badge.getBoundingClientRect();
+        return {
+          label: badge.textContent,
+          pointer: icon.innerHTML,
+          pulsing: getComputedStyle(icon).animationName === 'breathe',
+          reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+          captionVisible: document.querySelector('#caption').dataset.visible === 'true',
+          badgeInViewport: bounds.left >= 0 && bounds.top >= 0 &&
+            bounds.right <= innerWidth && bounds.bottom <= innerHeight,
+        };
+    })()"""
+    async with agent.session() as session:
+        tab = session.scope[Browser].active_tab
+        await session.scope[Input].mouse.move_to(Point(x=357, y=637))
+        resting = await _surface(tab, cursor)
+        async with asyncio.TaskGroup() as tasks:
+            tasks.create_task(session.run("Wait three seconds"))
+            for seconds in (3, 2, 1):
+                label = f"Waiting {seconds} s"
+                state = await _settled(
+                    tab,
+                    cursor,
+                    lambda state, expected=label: state["label"] == expected,
+                )
+                assert state["pointer"] == resting["pointer"]
+                assert state["pulsing"] == (not state["reducedMotion"])
+                assert state["badgeInViewport"] and not state["captionVisible"]
+        pointer = await _settled(
+            tab, cursor, lambda state: state["label"] == "Browserrig"
+        )
+        assert pointer["pointer"] == resting["pointer"] and not pointer["pulsing"]
+
+
 @pytest.mark.parametrize("local_renderer", [False, True])
 async def test_work_stream_is_complete_with_and_without_local_rendering(
     site, tmp_path, local_renderer

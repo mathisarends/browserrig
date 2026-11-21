@@ -4,7 +4,7 @@ function browserrigChoreography(_args) {
   const cursor = createChoreographyCursor(ui);
   const keyboard = createChoreographyKeyboard(ui);
   const caption = createChoreographyCaption(ui);
-  const panels = createChoreographyPanels(ui, caption);
+  const panels = createChoreographyPanels(ui);
   const transfers = createChoreographyTransfers(ui, cursor);
   const work = createChoreographyWork(ui, cursor, caption, panels);
   const show = (data) => {

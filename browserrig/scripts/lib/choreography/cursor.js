@@ -8,12 +8,14 @@ function createChoreographyCursor(ui) {
   const scripts = new Map();
   const readings = new Map();
   let point = [0, 0];
+  let placed = false;
   let style = 'default';
   let nativeStyle = 'default';
   let browserControl = false;
   let route = 0;
   let scroll = 0;
   let scrolling = false;
+  let waitSeconds = 0;
   const paths = {
     default: 'M0 0 L1 22 L6.5 16.5 L11 26 L14.5 24 L10 14.5 L18 13 Z',
     // Hotspot at the index fingertip; rounded caps mark the folded fingers.
@@ -43,13 +45,14 @@ function createChoreographyCursor(ui) {
     );
   };
   const shape = () => {
+    const code = !waitSeconds && !scrolling && scripts.size > 0 && !readings.size;
     cursor.dataset.style = style;
-    cursor.dataset.code = String(scripts.size > 0 && !readings.size && !scrolling);
-    if (scrolling) {
+    cursor.dataset.code = String(code);
+    if (scrolling && !waitSeconds) {
       icon.innerHTML = wheel();
       return;
     }
-    if (scripts.size && !readings.size) {
+    if (code) {
       icon.innerHTML = braces();
       return;
     }
@@ -62,7 +65,9 @@ function createChoreographyCursor(ui) {
     const values = [...activities.values()];
     const activity = ui.options().activities || {};
     let value = ui.options().name;
-    if (readings.size) {
+    if (waitSeconds) {
+      value = `Waiting ${waitSeconds} s`;
+    } else if (readings.size) {
       value = `Reading ${[...readings.values()].at(-1).name}`.trim();
     } else if (scripts.size) {
       value = 'Executing JavaScript';
@@ -77,7 +82,7 @@ function createChoreographyCursor(ui) {
     }
     badge.textContent = value;
     cursor.dataset.thinking = String(
-      !readings.size && !scripts.size && values.includes(activity.LLM),
+      !waitSeconds && !readings.size && !scripts.size && values.includes(activity.LLM),
     );
     const width = badge.getBoundingClientRect().width;
     const left = point[0] + width + 25 > innerWidth;
@@ -86,11 +91,50 @@ function createChoreographyCursor(ui) {
     cursor.dataset.left = String(left);
     cursor.dataset.above = String(point[1] + 54 > innerHeight);
   };
+  const updateVisibility = () => {
+    cursor.style.display =
+      waitSeconds || (placed && style !== 'none') ? 'block' : 'none';
+  };
   const place = (next) => {
     point = next;
-    cursor.style.display = style === 'none' ? 'none' : 'block';
+    placed = true;
+    updateVisibility();
     cursor.style.transform = `translate(${next[0]}px, ${next[1]}px)`;
     label();
+  };
+  const showWait = (seconds) => {
+    const waiting = seconds > 0;
+    const wasWaiting = waitSeconds > 0;
+    waitSeconds = seconds;
+    if (waiting !== wasWaiting) {
+      cursor.dataset.waiting = String(waiting);
+      updateVisibility();
+      shape();
+    }
+    label();
+  };
+  const stopWait = () => {
+    ui.cancel('wait');
+    showWait(0);
+  };
+  const startWait = (durationSeconds) => {
+    const duration = durationSeconds * 1000;
+    if (duration <= 0) {
+      stopWait();
+      return;
+    }
+    const deadline = performance.now() + duration;
+    const tick = () => {
+      const remaining = deadline - performance.now();
+      if (remaining <= 0) {
+        stopWait();
+        return;
+      }
+      const seconds = Math.ceil(remaining / 1000);
+      showWait(seconds);
+      ui.later('wait', tick, remaining - (seconds - 1) * 1000);
+    };
+    tick();
   };
   const mix = (from, to, t) =>
     from.map((value, axis) => value + (to[axis] - value) * t);
@@ -261,6 +305,9 @@ function createChoreographyCursor(ui) {
       case kinds.SCROLLED:
         ui.later('scroll-end', endScroll, 180);
         break;
+      case kinds.WAITING:
+        startWait(event.duration_seconds);
+        break;
       case kinds.TAB_PRESSED: {
         browserControl = true;
         style = 'pointer';
@@ -351,7 +398,7 @@ function createChoreographyCursor(ui) {
     }
     readings.clear();
     shape();
-    label();
+    stopWait();
   };
   const visible = () => cursor.style.display === 'block';
   const shake = () => {

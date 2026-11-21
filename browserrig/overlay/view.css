@@ -119,7 +119,8 @@ body {
 #cursor[data-above='true'] #cursor-name {
   top: -33px;
 }
-#cursor[data-thinking='true'] #cursor-icon {
+#cursor[data-thinking='true'] #cursor-icon,
+#cursor[data-waiting='true'] #cursor-icon {
   animation: breathe 1100ms ease-in-out infinite;
 }
 /* The braces bob vertically against each other. */
@@ -133,6 +134,9 @@ body {
 #cursor[data-thinking='true'] #cursor-name::after {
   content: ' ···';
   letter-spacing: 1px;
+}
+#cursor[data-waiting='true'] #cursor-name {
+  font-variant-numeric: tabular-nums;
 }
 #scroll-feedback {
   position: absolute;
@@ -152,7 +156,7 @@ body {
   transition: opacity 140ms;
   font-size: 11px;
 }
-#cursor[data-scrolling='true'] #scroll-feedback {
+#cursor[data-scrolling='true']:not([data-waiting='true']) #scroll-feedback {
   opacity: 1;
 }
 #scroll-chevron {
