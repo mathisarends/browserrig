@@ -79,11 +79,12 @@ class TerminalEvents(Plugin):
         )
 
     @hook(DurableEvent)
-    def _committed(self, event: DurableEvent, log: Inject[SessionLog]) -> None:
+    def _committed(self, event: DurableEvent, log: Inject[SessionLog | None]) -> None:
         record = _event_record(event)
         if isinstance(event, TurnEndedEvent):
             usage = event.usage
-            record["session_model_request_count"] = log.model_request_count
+            if log is not None:
+                record["session_model_request_count"] = log.model_request_count
             record["usage"] = {
                 **asdict(usage),
                 "total_tokens": usage.total_tokens,
