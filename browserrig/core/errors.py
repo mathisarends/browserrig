@@ -1,3 +1,6 @@
+"""Exceptions for failed browser operations and unavailable resources."""
+
+
 class BrowserError(Exception):
     """An actionable browser failure, without endpoint credentials."""
 

@@ -1,3 +1,5 @@
+"""Immutable generation tokens for invalidating cached browser state."""
+
 from collections.abc import Hashable
 from dataclasses import dataclass
 from typing import Annotated

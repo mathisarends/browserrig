@@ -3,10 +3,10 @@ import pytest
 from browserrig import ChromeBrowser, DomModel, Viewport, wait_for_page
 from browserrig.browser import Launch
 from browserrig.dom import ContentGroup, DomView, TextBlock, render
-from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+from browserrig.observation import (  # smelt: ignore[ARC007] -- facade callable
     capture,
 )
-from browserrig.secrets.redaction import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.secrets.redaction import (  # smelt: ignore[ARC007] -- test seam
     # Test redaction of text and pixels independently of plugin activation.
     Redactor,
 )

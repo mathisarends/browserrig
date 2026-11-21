@@ -7,7 +7,7 @@ from pypdf import PdfWriter
 
 from browserrig import FileOptions, FileSystem, LocalWorkspace
 from browserrig.files import FileContent
-from browserrig.files.indexing import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.files.indexing import (  # smelt: ignore[ARC007] -- test seam
     # Test index lifecycle without making its worker a public service.
     Indexing,
 )

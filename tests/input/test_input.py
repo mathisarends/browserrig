@@ -14,7 +14,7 @@ from harnessed.testing import mount_plugin
 from harnessed.tools import ToolError
 
 from browserrig.browser import Tab
-from browserrig.choreography import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.choreography import (  # smelt: ignore[ARC007] -- test seam
     # Test scene timelines without exposing staging internals as API.
     SCENE_EVENTS,
     AddressBarFocusedEvent,
@@ -24,7 +24,7 @@ from browserrig.choreography import (  # smelt: ignore[SMT107] -- test seam
     TabPressedEvent,
     scenes,
 )
-from browserrig.choreography.scenes import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.choreography.scenes import (  # smelt: ignore[ARC007] -- test seam
     # Test scene timelines without exposing staging internals as API.
     Scene,
 )
@@ -52,11 +52,11 @@ from browserrig.input import (
     WheelStep,
     movement,
 )
-from browserrig.input import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.input import (  # smelt: ignore[ARC007] -- test seam
     # Replace input timing where the keyboard reads it.
     keyboard as keyboard_module,
 )
-from browserrig.input import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.input import (  # smelt: ignore[ARC007] -- test seam
     # Replace input timing where the mouse reads it.
     mouse as mouse_module,
 )

@@ -57,8 +57,8 @@ and source policies; accepted findings live in `.smelt/debt.json`.
 entries without accepting new debt. When upgrading Smelt, refresh its checked-in
 schema with `uv run --locked smelt config schema` and refresh the skill under
 `.agents/skills/smelt` with `uv run --locked smelt skill install --force`.
-The [Smelt policy decisions](smelt-policy.md) explain the rules reviewed through
-0.13.0, the advisory findings and the narrowly scoped test-import exceptions.
+The [Smelt policy decisions](smelt-policy.md) record the 0.14.0 rule audit,
+including advisory checks and scoped policies.
 
 ## Distribution and releases
 

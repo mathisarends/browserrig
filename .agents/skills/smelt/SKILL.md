@@ -1,6 +1,6 @@
 ---
 name: smelt
-description: Configure and use Smelt to check Python architecture, package APIs, source conventions and test quality. Use for smelt.yml policies, SMT findings, changed or staged checks, debt baselines and Smelt hook/CI integration.
+description: Configure and use Smelt to check Python architecture, package APIs, source conventions and test quality. Use for smelt.yml policies, Smelt findings, changed or staged checks, debt baselines and Smelt hook/CI integration.
 ---
 
 # Use Smelt
@@ -18,6 +18,10 @@ installed skill records the CLI version that installed it.
    `VERSION`. After upgrading Smelt, refresh with `smelt skill install --force`
    using the same `--destination` if installed outside the default directory.
 2. Before creating or moving code, run `smelt context <feature-or-module-or-path>`.
+   For architecture placement, inspect `layer_assignment` in `--format json`.
+   A matching parent already covers the planned file. For a deliberate layer
+   change in central code, add the narrowest qualified prefix to the intended
+   layer's `modules` list.
    For inherited policy, inspect `smelt config show --sources --format json`.
    A planned path is valid for `context`; explicit `check` paths must already exist.
 3. After editing, run `smelt check --changed --fail-on warning --format concise`
@@ -32,31 +36,33 @@ installed skill records the CLI version that installed it.
 
 ## Policy and repair rules
 
-- Enable rules individually by name or stable SMT code. A named `on` uses the
+- Enable rules individually by name or stable code. A named `on` uses the
   catalog severity. Families and `ALL` in YAML can only disable or cap
   active rules. Use local `extends` files to share explicit policy.
-  Architecture, package and test options activate their associated rules.
+  Policies never enable rules: name each rule that checks a declared policy.
+  An unnamed policy is a configuration warning; enabling a rule without its
+  required policy is a configuration error.
   Use `smelt rules --unconfigured` to find named checks to review after upgrades.
 - `--select` replaces normal selection and accepts names, families,
-  SMT prefixes and `ALL`. Explicit `off` entries still apply. Strict coverage
-  takes precedence over selection and severity settings.
+  code prefixes and `ALL`. Explicit `off` entries still apply. Once enabled,
+  `architecture/uncovered-source` takes precedence over selection and severity settings.
 - Normal checks are read-only. `--fix` writes permitted source-ordering repairs;
-  behavior-changing SMT321 repairs also need `--unsafe-fixes` and review of falsy
+  behavior-changing TYP003 repairs also need `--unsafe-fixes` and review of falsy
   values. `--unsafe-fixes` alone writes nothing. `--staged` rejects `--fix`.
-- Review new style policies before adopting them. SMT341 `modeling/str-enum-value-convention`
+- Review new style policies before adopting them. MOD004 `modeling/str-enum-value-convention`
   follows `style.str_enum_values` (`explicit` or `auto`); choose the project's
-  convention once and preserve serialized values. SMT343/SMT344 review forwarding
-  methods and name aliases. SMT346 prefers deferred annotations; verify runtime
+  convention once and preserve serialized values. VIS006/IDM004 review forwarding
+  methods and name aliases. TYP006 prefers deferred annotations; verify runtime
   annotation consumers before removing quotes or adding a future import.
-  SMT347 reviews anonymous tuple types; repeated shapes can represent distinct
+  TYP007 reviews anonymous tuple types; repeated shapes can represent distinct
   concepts, so name records where field meaning benefits callers rather than
-  merging unrelated types. `max_positional_parameters`, set under `style` or
-  in a style override, activates SMT345 for that scope; after adding
+  merging unrelated types. The `max` of the CPX003 rule entry, in `rules` or
+  in a style override's `rules`, sets the limit for that scope; after adding
   keyword-only parameters, update all callers, including tests and callbacks.
   These rules have no automatic rewrite.
 - Keep shared conventions in `style` and package-specific choices in
-  `style.overrides`. An option tied to a rule enables it wherever the option
-  applies. `smelt context TARGET --format json` shows effective `style` and
+  `style.overrides`. Enable an option's rule in an override's `rules` to check
+  only those packages. `smelt context TARGET --format json` shows effective `style` and
   `rule_details`, with sources and exception reasons.
 - In a uv workspace, keep `project.workspace: uv` in the root `smelt.yml`.
   Check the owning file before adding a local policy.
@@ -69,9 +75,9 @@ installed skill records the CLI version that installed it.
 
   Keep package APIs and `style.overrides` with their owning project or member.
   A member without local layers still inherits shared style. Boundaries between
-  members live in root `architecture.members` (SMT111).
+  members live in root `architecture.members` (ARC009).
   Declare imported member distributions in `project.dependencies` or
-  `project.optional-dependencies` and configure their uv sources (SMT112);
+  `project.optional-dependencies` and configure their uv sources (ARC010);
   a source entry alone is not a dependency declaration. Both checks use direct
   production imports. `smelt check --statistics --by member` counts findings,
   including hints, by member; JSON findings carry the member path.
@@ -98,8 +104,9 @@ installed skill records the CLI version that installed it.
   When intentionally adopting a baseline, `smelt debt` records current findings
   and changes configuration. `smelt debt --prune` removes resolved debt without
   accepting new findings; `smelt debt --show` inspects stored debt read-only.
-- For an intentional local exception, use a specific code and reason, for example
-  `# smelt: ignore[SMT101] -- migration tracked in #123`. Statement comments do not
+- For an intentional local exception, name the specific rule and a reason, for example
+  `# smelt: ignore[architecture/layer-boundary] -- migration tracked in #123`.
+  Rule codes also work. Statement comments do not
   suppress a whole function body. Keep exceptions narrow and address unused ones.
 - Exit codes are `0` for passing, `1` for findings at the failure threshold, `2`
   for usage/configuration/analysis errors. Hints do not fail a check. JSON check
@@ -124,7 +131,7 @@ Installed consumer copies refresh through `smelt skill install --force`.
 | Install Smelt or start a policy | [Quick start](references/README.md) |
 | Find commands, flags, outputs and scope semantics | [CLI and reports](references/docs/cli.md); also `smelt <command> --help` |
 | Select rules and understand precedence | [Activation](references/docs/rule-selection.md) |
-| Look up every rule, its rationale, examples, repair and config | [Complete catalog](references/docs/rules/README.md); follow its SMT page links |
+| Look up every rule, its rationale, examples, repair and config | [Complete catalog](references/docs/rules/README.md); follow its rule page links |
 | Configure roots, inheritance, overrides or editor completion | [Configuration](references/docs/configuration.md); `smelt config schema` prints the complete editor schema |
 | Design features, layers, dependencies and coverage | [Architecture](references/docs/architecture.md) |
 | Configure package APIs, visibility and source style | [Structure](references/docs/structure.md) |

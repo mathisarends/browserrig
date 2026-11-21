@@ -43,7 +43,7 @@ from browserrig import (
     Targeting,
 )
 from browserrig.browser import BrowserEvents
-from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.browser import (  # smelt: ignore[ARC007] -- test seam
     # Replace ChromeBrowser at the plugin connection boundary.
     plugin as plugin_module,
 )

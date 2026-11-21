@@ -15,14 +15,14 @@ from browserrig.dom import (
     Extraction,
     decision_change,
 )
-from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+from browserrig.observation import (  # smelt: ignore[ARC007] -- facade callable
     CaptureRequest,
     PagePart,
     ScreenshotStatus,
-    # Public facade callable; SMT107 confuses it with the same-named module.
+    # Public facade callable; ARC007 confuses it with the same-named module.
     capture,
 )
-from browserrig.observation.models import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.observation.models import (  # smelt: ignore[ARC007] -- test seam
     # Test internal change fingerprints without exposing them as API.
     PageFingerprint,
     TargetFingerprint,

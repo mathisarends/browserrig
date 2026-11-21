@@ -2,11 +2,11 @@ import base64
 
 import pytest
 
-from browserrig.dom.extraction.accessibility import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.dom.extraction.accessibility import (  # smelt: ignore[ARC007] -- test seam
     # Verify accessible-name precedence directly.
     preferred,
 )
-from browserrig.dom.redirects import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.dom.redirects import (  # smelt: ignore[ARC007] -- test seam
     # Verify redirect decoding independently of page capture.
     unwrap_redirect,
 )

@@ -549,7 +549,7 @@ class Tabs:
                     tab.layout_changed()
 
 
-def file_url(path: PurePath) -> str:  # smelt: ignore[SMT429] -- pure, table-tested
+def file_url(path: PurePath) -> str:  # smelt: ignore[VIS009] -- pure, table-tested
     """A file:// URL for a path on the browser host, whose OS may differ from ours."""
     if not path.is_absolute():
         raise ValueError("A browser host path must be absolute")

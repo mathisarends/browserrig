@@ -1,5 +1,5 @@
 from .activity import Activity
-from .agent import Agent  # smelt: ignore[SMT106] -- public facade
+from .agent import Agent  # smelt: ignore[ARC006] -- public facade
 from .browser import (
     AppState,
     Browser,

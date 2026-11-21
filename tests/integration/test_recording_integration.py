@@ -24,7 +24,7 @@ from browserrig import (
     VideoRecording,
     wait_for_page,
 )
-from browserrig.recording import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.recording import (  # smelt: ignore[ARC007] -- test seam
     # Test and replace video capture without requiring ffmpeg.
     capture as capture_module,
 )

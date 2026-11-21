@@ -17,8 +17,8 @@ from browserrig import (
 from browserrig.browser import Launch
 from browserrig.core import ReadinessPhase
 from browserrig.dom import DomView, render
-from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
-    # Public facade callable; SMT107 confuses it with the same-named module.
+from browserrig.observation import (  # smelt: ignore[ARC007] -- facade callable
+    # Public facade callable; ARC007 confuses it with the same-named module.
     capture,
 )
 from tests.javascript import evaluate

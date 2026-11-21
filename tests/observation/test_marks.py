@@ -7,7 +7,7 @@ from PIL import Image
 from browserrig.core import Bounds, Point
 from browserrig.dom import Element
 from browserrig.observation import CursorAnnotator, MarksAnnotator
-from browserrig.observation.drawing import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.observation.drawing import (  # smelt: ignore[ARC007] -- test seam
     # Verify screenshot annotation independently of capture.
     annotate,
 )

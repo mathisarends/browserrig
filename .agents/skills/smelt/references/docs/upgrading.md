@@ -1,6 +1,258 @@
 # Upgrading Smelt
 
+## 0.13 to 0.14
+
+Upgrade the config and existing suppressions together:
+
+1. Run `smelt config migrate` with Smelt 0.14. If a rule lacks its required
+   policy, configure it where the rule should run or remove the entry if it was
+   intentionally inactive. Review the diff and apply it with
+   `smelt config migrate --write`. The command upgrades to `version: 2` and
+   converts the workspace root, its `extends` bases and every member together.
+2. Replace old `SMT?` identifiers in inline `# smelt: ignore[?]` comments by
+   hand. For example, replace `SMT420` with `tests/private-access` or `TST002`,
+   and keep the comment's reason. Use the [code table below](#use-the-family-rule-codes).
+3. Update the [hook and CI pins](integrations.md) and run the full check with
+   `smelt check --fail-on warning`.
+
+### Use the family rule codes
+
+Rule codes now start with their family, so a code tells you what kind of
+finding it is: `ARC` architecture, `IMP` imports, `LAY` layout, `VIS`
+visibility, `MOD` modeling, `TYP` typing, `CPX` complexity, `IDM` idioms, `FWK`
+frameworks, `TST` tests and `MET` meta. Findings, JSON, SARIF and the rule pages
+use the new codes, so update scripts or dashboards that match on `SMTnnn`.
+
+Old codes are no longer accepted. Smelt rejects them in `rules`, `ignore`,
+`--select`, `--ignore` and `smelt explain`, and each error names the new code.
+`smelt config migrate` replaces old codes in `rules` with rule names and in
+`ignore` with the new codes; rewrite old prefixes such as `SMT3` by hand, for
+example with a family name. Inline suppressions with old codes no longer
+suppress anything; `meta/unused-suppression`, on by default, reports each one
+with its new code. Prefer rule names in suppressions; they do not change. Existing debt baselines keep matching without regeneration.
+
+<details>
+<summary>Old and new codes</summary>
+
+| New | Old |
+| --- | --- |
+| ARC001 | SMT101 |
+| ARC002 | SMT102 |
+| ARC003 | SMT103 |
+| ARC004 | SMT104 |
+| ARC005 | SMT105 |
+| ARC006 | SMT106 |
+| ARC007 | SMT107 |
+| ARC008 | SMT109 |
+| ARC009 | SMT111 |
+| ARC010 | SMT112 |
+| ARC011 | SMT301 |
+| ARC012 | SMT305 |
+| ARC013 | SMT306 |
+| ARC014 | SMT307 |
+| CPX001 | SMT322 |
+| CPX002 | SMT340 |
+| CPX003 | SMT345 |
+| CPX004 | SMT352 |
+| CPX005 | SMT359 |
+| CPX006 | SMT363 |
+| CPX007 | SMT364 |
+| FWK001 | SMT327 |
+| FWK002 | SMT328 |
+| IDM001 | SMT314 |
+| IDM002 | SMT315 |
+| IDM003 | SMT333 |
+| IDM004 | SMT344 |
+| IDM005 | SMT348 |
+| IDM006 | SMT350 |
+| IDM007 | SMT356 |
+| IDM008 | SMT362 |
+| IMP001 | SMT108 |
+| IMP002 | SMT110 |
+| IMP003 | SMT308 |
+| IMP004 | SMT319 |
+| LAY001 | SMT302 |
+| LAY002 | SMT309 |
+| LAY003 | SMT312 |
+| LAY004 | SMT313 |
+| LAY005 | SMT317 |
+| LAY006 | SMT329 |
+| LAY007 | SMT331 |
+| LAY008 | SMT334 |
+| LAY009 | SMT336 |
+| LAY010 | SMT368 |
+| LAY011 | SMT370 |
+| MET001 | SMT901 |
+| MET002 | SMT902 |
+| MET003 | SMT903 |
+| MET004 | SMT904 |
+| MOD001 | SMT318 |
+| MOD002 | SMT323 |
+| MOD003 | SMT324 |
+| MOD004 | SMT341 |
+| MOD005 | SMT349 |
+| MOD006 | SMT351 |
+| MOD007 | SMT353 |
+| MOD008 | SMT354 |
+| MOD009 | SMT355 |
+| MOD010 | SMT357 |
+| MOD011 | SMT360 |
+| MOD012 | SMT361 |
+| TST001 | SMT401 |
+| TST002 | SMT420 |
+| TST003 | SMT421 |
+| TST004 | SMT422 |
+| TST005 | SMT423 |
+| TST006 | SMT424 |
+| TST007 | SMT425 |
+| TST008 | SMT426 |
+| TST009 | SMT427 |
+| TST010 | SMT428 |
+| TST011 | SMT431 |
+| TYP001 | SMT310 |
+| TYP002 | SMT311 |
+| TYP003 | SMT321 |
+| TYP004 | SMT337 |
+| TYP005 | SMT338 |
+| TYP006 | SMT346 |
+| TYP007 | SMT347 |
+| TYP008 | SMT371 |
+| VIS001 | SMT316 |
+| VIS002 | SMT320 |
+| VIS003 | SMT330 |
+| VIS004 | SMT335 |
+| VIS005 | SMT339 |
+| VIS006 | SMT343 |
+| VIS007 | SMT367 |
+| VIS008 | SMT369 |
+| VIS009 | SMT429 |
+| VIS010 | SMT430 |
+
+</details>
+
+### Enable the rules your policies used to enable
+
+A declared policy no longer enables its rule. Name every rule you want checked
+under `rules`:
+
+```yaml
+# before: layers and the mirror layout enabled their rules implicitly
+architecture:
+  layers:
+    domain: {modules: [app.domain]}
+tests:
+  layout: mirror
+
+# after
+architecture:
+  layers:
+    domain: {modules: [app.domain]}
+tests:
+  layout: mirror
+rules:
+  architecture/layer-boundary: error
+  tests/misplaced-test: error
+```
+
+The migration adds an entry at the catalog severity for each declared policy.
+An option set only in a style override, such as `dataclass_options`,
+is enabled in that override's `rules`, so its built-in default does not start
+checking other packages. Until you migrate, each unnamed policy is a
+configuration warning that fails `--fail-on warning`. Set the rule to `off` to
+keep a policy unchecked. Enabling a rule whose required policy is missing is now
+a configuration error instead of a silent no-op.
+
+### Move limits into their rule entries
+
+Rules that count something take their limit as `max` in their `rules` entry.
+The `style` and `tests` limit options were removed:
+
+| Removed option | Rule entry |
+| --- | --- |
+| `style.max_module_imports` | `imports/excess-module-imports: {severity: hint, max: N}` |
+| `style.max_positional_parameters` | `complexity/excess-positional-parameters: {severity: warning, max: N}` |
+| `style.max_comprehension_loops` | `complexity/excess-comprehension-loops: {severity: hint, max: N}` |
+| `style.max_constructor_decisions` | `complexity/excess-constructor-decisions: {severity: hint, max: N}` |
+| `style.max_private_definitions` | `visibility/excess-private-definitions: {severity: hint, max: N}` |
+| `tests.max_patches_per_test` | `tests/excess-patches: {severity: error, max: N}` |
+
+```yaml
+# before
+version: 1
+style:
+  max_positional_parameters: 3
+  overrides:
+    api:
+      match: app.api
+      max_positional_parameters: 2
+
+# after
+version: 2
+rules:
+  complexity/excess-positional-parameters: {severity: warning, max: 3}
+style:
+  overrides:
+    api:
+      match: app.api
+      rules:
+        complexity/excess-positional-parameters: {max: 2}
+```
+
+The migration keeps an existing severity and moves an option's reason into
+the entry. An override or member entry that sets only `max` inherits the
+enclosing severity. The patch limit stays project-wide: it is only valid in
+the root `rules`.
+
+### Replace project.coverage with the guard rule
+
+`project.coverage` was removed. Enable the guard in the root config instead:
+
+```yaml
+# before
+project:
+  coverage: strict
+
+# after
+rules:
+  architecture/uncovered-source: error
+```
+
+`--strict-coverage` still enables it for one run. The guard always reports
+errors and cannot be enabled in a workspace member.
+
+### Move layer assignments into layers
+
+Smelt 0.14 removes `architecture.modules`. Run `smelt config migrate` to
+preview the assignments grouped by layer, then apply the migration with
+`--write`.
+
+```yaml
+# before
+architecture:
+  modules: {app.api: adapters, app.core: domain}
+
+# after
+architecture:
+  layers:
+    adapters:
+      modules: [app.api]
+    domain:
+      modules: [app.core]
+```
+
+The migration retains existing layer settings, including `path` for packages
+inside features. It preserves assignments from the selected `extends` chain
+and migrates workspace member architectures in their own files. Resolve
+conflicting layer assignments before writing the migration. If several projects
+share a base, review each project's effective layer lists after migrating it.
+
 ## 0.12 to 0.13
+
+Preview the mechanical changes with `smelt config migrate`. Review the diff,
+then use `smelt config migrate --write` to apply it. Use `--config PATH` to
+choose the declaring YAML file. Comments and rule severities carry forward.
+Conflicts require manual review before writing. Review workspace ownership and
+migrate inherited files separately.
 
 0.13.0 changes configuration keys, rule names and uv workspace policy ownership.
 YAML version 1, check report schema 2 and CLI exit codes carry forward. Existing
@@ -117,9 +369,19 @@ conventions.
 
 ### Explicit rule activation
 
-Replace the former `information-hiding` selector with SMT316, SMT320, SMT335,
-SMT429 and SMT430 at the former severity. These five codes also form the
-equivalent comma-separated CLI selection. The `visibility` family covers
+Replace the former `information-hiding` selector with its five rules at the
+former severity:
+
+```yaml
+rules:
+  visibility/internal-public-member: warning          # SMT316
+  visibility/internal-public-module-symbol: warning   # SMT320
+  visibility/internal-public-attribute: warning       # SMT335
+  visibility/test-only-public-function: warning       # SMT429
+  visibility/test-only-public-attribute: warning      # SMT430
+```
+
+These five codes also form the equivalent comma-separated CLI selection. The `visibility` family covers
 additional rules. Use named entries from `smelt init --maintainability` or a
 local `extends` file to replace the unreleased `smelt:recommended` preset.
 Families and `ALL` in YAML can disable or cap active rules. Named `on` uses
@@ -192,7 +454,7 @@ new reviews require explicit selection. See the
    | Rule | Activation | Review |
    | --- | --- | --- |
    | [SMT366](https://github.com/mathisarends/smelt/blob/v0.12.0/docs/rules/SMT366.md) | `rules: {comprehension-in-call-argument: hint}` | List, set and dict comprehensions passed directly to calls |
-   | [SMT367](rules/SMT367.md) | `rules: {excess-private-definitions: hint}` | Modules above `structure.max_private_definitions` (default 12) |
+   | [SMT367](rules/VIS007.md) | `rules: {excess-private-definitions: hint}` | Modules above `structure.max_private_definitions` (default 12) |
 
    Repairs remain manual. SMT366 skips generator expressions and conditional
    or repeated expression contexts; preserve callable lookup and argument
@@ -265,9 +527,9 @@ new rules require explicit selection or package policy. See the
 
    | Rule | Activation | Review |
    | --- | --- | --- |
-   | [SMT110](rules/SMT110.md) | `structure.max_module_imports: 10` | Distinct direct imports across project packages; choose a threshold for your project |
-   | [SMT363](rules/SMT363.md) | `rules: {complex-comprehension: hint}` | Excessive iteration clauses, conditional elements and compound filters |
-   | [SMT364](rules/SMT364.md) | `rules: {constructor-logic: hint}` | Constructor decisions above `structure.max_constructor_decisions` (default 2) |
+   | [SMT110](rules/IMP002.md) | `structure.max_module_imports: 10` | Distinct direct imports across project packages; choose a threshold for your project |
+   | [SMT363](rules/CPX006.md) | `rules: {complex-comprehension: hint}` | Excessive iteration clauses, conditional elements and compound filters |
+   | [SMT364](rules/CPX007.md) | `rules: {constructor-logic: hint}` | Constructor decisions above `structure.max_constructor_decisions` (default 2) |
    | [SMT365](https://github.com/mathisarends/smelt/blob/v0.11.0/docs/rules/SMT365.md) | `rules: {cross-module-private-attribute: warning}` | Private member accesses through known project receivers owned by another module |
 
    Repairs remain manual. SMT110 exempts package initializers and declared
@@ -309,8 +571,8 @@ new rules require explicit selection. See the
 
    | Rule | Activation | Review |
    | --- | --- | --- |
-   | [SMT361](rules/SMT361.md) | `rules: {parallel-record-fields: hint}` | Declared sequence fields of one instance paired with `zip` |
-   | [SMT362](rules/SMT362.md) | `rules: {loop-invariant-collection: hint}` | Repeated membership-set comprehensions over proven immutable inputs in passive `for` loops |
+   | [SMT361](rules/MOD012.md) | `rules: {parallel-record-fields: hint}` | Declared sequence fields of one instance paired with `zip` |
+   | [SMT362](rules/IDM008.md) | `rules: {loop-invariant-collection: hint}` | Repeated membership-set comprehensions over proven immutable inputs in passive `for` loops |
 
    Repairs remain manual. Review whether parallel fields represent records or
    deliberate column storage before restructuring them. Preserve guards, empty
@@ -350,19 +612,19 @@ new rules require explicit selection or package policy. See the
 
    | Rule | Activation | Review |
    | --- | --- | --- |
-   | [SMT348](rules/SMT348.md) | `rules: {missing-interface-docstring: hint}` | Abstract and Protocol method contracts without docstrings |
-   | [SMT349](rules/SMT349.md) | `rules: {stateful-dataclass: hint}` | Dataclasses that mutate their fields after construction |
-   | [SMT350](rules/SMT350.md) | `rules: {missing-broad-except-reason: hint}` | Broad exception handlers without an explanatory comment |
-   | [SMT351](rules/SMT351.md) | `structure.contracts.<name>: {match: app, dataclass_options: [slots]}` | Dataclasses missing required `frozen`, `slots` or `kw_only` options |
-   | [SMT352](rules/SMT352.md) | `rules: {duplicate-function: warning}` | Matching module-level function implementations within a root package |
-   | [SMT353](rules/SMT353.md) | `structure.contracts.<name>: {match: app, bases: {pydantic.BaseModel: app.core.Options}}` | Direct inheritance from an outside base with a project replacement |
-   | [SMT354](rules/SMT354.md) | `structure.contracts.<name>: {match: app, errors: {base: app.errors.AppError}}` | Builtin exceptions raised instead of the project hierarchy |
-   | [SMT355](rules/SMT355.md) | `rules: {duplicate-class-name: warning}` | Public top-level class names repeated within a package |
-   | [SMT356](rules/SMT356.md) | `rules: {duplicate-narrowing-assert: warning}` | Attribute narrowing assertions repeated across methods |
-   | [SMT357](rules/SMT357.md) | `rules: {missing-duration-unit: warning}` | Numeric duration names without a unit suffix |
+   | [SMT348](rules/IDM005.md) | `rules: {missing-interface-docstring: hint}` | Abstract and Protocol method contracts without docstrings |
+   | [SMT349](rules/MOD005.md) | `rules: {stateful-dataclass: hint}` | Dataclasses that mutate their fields after construction |
+   | [SMT350](rules/IDM006.md) | `rules: {missing-broad-except-reason: hint}` | Broad exception handlers without an explanatory comment |
+   | [SMT351](rules/MOD006.md) | `structure.contracts.<name>: {match: app, dataclass_options: [slots]}` | Dataclasses missing required `frozen`, `slots` or `kw_only` options |
+   | [SMT352](rules/CPX004.md) | `rules: {duplicate-function: warning}` | Matching module-level function implementations within a root package |
+   | [SMT353](rules/MOD007.md) | `structure.contracts.<name>: {match: app, bases: {pydantic.BaseModel: app.core.Options}}` | Direct inheritance from an outside base with a project replacement |
+   | [SMT354](rules/MOD008.md) | `structure.contracts.<name>: {match: app, errors: {base: app.errors.AppError}}` | Builtin exceptions raised instead of the project hierarchy |
+   | [SMT355](rules/MOD009.md) | `rules: {duplicate-class-name: warning}` | Public top-level class names repeated within a package |
+   | [SMT356](rules/IDM007.md) | `rules: {duplicate-narrowing-assert: warning}` | Attribute narrowing assertions repeated across methods |
+   | [SMT357](rules/MOD010.md) | `rules: {missing-duration-unit: warning}` | Numeric duration names without a unit suffix |
    | [SMT358](https://github.com/mathisarends/smelt/blob/v0.9.0/docs/rules/SMT358.md) | `rules: {prefer-named-duration: warning}` | Literal durations in supported sleep, timeout and clock expressions |
-   | [SMT359](rules/SMT359.md) | `rules: {nested-conditional-expression: hint}` | Conditional expressions nested in result branches |
-   | [SMT360](rules/SMT360.md) | `rules: {mutable-field-in-frozen-dataclass: warning}` | Mutable container fields on frozen dataclasses |
+   | [SMT359](rules/CPX005.md) | `rules: {nested-conditional-expression: hint}` | Conditional expressions nested in result branches |
+   | [SMT360](rules/MOD011.md) | `rules: {mutable-field-in-frozen-dataclass: warning}` | Mutable container fields on frozen dataclasses |
 
    Repairs remain manual. Preserve exception behavior and duration units when
    changing interfaces. Review ownership and caller aliases before replacing
@@ -402,11 +664,11 @@ new rules require explicit selection or package policy. See the
 
    | Rule | Activation | Review |
    | --- | --- | --- |
-   | [SMT343](rules/SMT343.md) | `rules: {redundant-private-delegate: hint}` | Methods that only forward unchanged arguments to an exclusive private helper |
-   | [SMT344](rules/SMT344.md) | `rules: {redundant-name-alias: hint}` | Module aliases that only repeat a class or function name |
-   | [SMT345](rules/SMT345.md) | `structure.contracts.<name>: {match: app, max_positional_parameters: 2}` | Parameters beyond the package limit must be keyword-only |
-   | [SMT346](rules/SMT346.md) | `rules: {prefer-deferred-annotations: hint}` | Quoted annotations that can use deferred evaluation |
-   | [SMT347](rules/SMT347.md) | `rules: {anonymous-tuple-type: hint}` | Fixed tuple types with repeated element types or at least three fields |
+   | [SMT343](rules/VIS006.md) | `rules: {redundant-private-delegate: hint}` | Methods that only forward unchanged arguments to an exclusive private helper |
+   | [SMT344](rules/IDM004.md) | `rules: {redundant-name-alias: hint}` | Module aliases that only repeat a class or function name |
+   | [SMT345](rules/CPX003.md) | `structure.contracts.<name>: {match: app, max_positional_parameters: 2}` | Parameters beyond the package limit must be keyword-only |
+   | [SMT346](rules/TYP006.md) | `rules: {prefer-deferred-annotations: hint}` | Quoted annotations that can use deferred evaluation |
+   | [SMT347](rules/TYP007.md) | `rules: {anonymous-tuple-type: hint}` | Fixed tuple types with repeated element types or at least three fields |
 
    Repairs remain manual. Update callers when making parameters keyword-only;
    preserve callbacks with externally defined positional signatures. Before
@@ -442,11 +704,11 @@ new rules are opt-in. See the [changelog](../CHANGELOG.md#070---2026-11-14).
 
    | Rule | Activation | Review |
    | --- | --- | --- |
-   | [SMT337](rules/SMT337.md) | `rules: {deprecated-async-contextmanager-return: warning}` | `AsyncIterator` returns on `@asynccontextmanager` |
-   | [SMT338](rules/SMT338.md) | `rules: {duplicate-literal-type: hint}` | Repeated multi-value `Literal` types |
-   | [SMT339](rules/SMT339.md) | `rules: {private-symbol-import: warning}` | Production access to private project symbols |
-   | [SMT340](rules/SMT340.md) | `rules: {await-in-call-argument: hint}` | Awaited results passed directly as arguments |
-   | [SMT341](rules/SMT341.md) | `rules: {str-enum-auto-values: hint}` | `StrEnum` values via `auto()` |
+   | [SMT337](rules/TYP004.md) | `rules: {deprecated-async-contextmanager-return: warning}` | `AsyncIterator` returns on `@asynccontextmanager` |
+   | [SMT338](rules/TYP005.md) | `rules: {duplicate-literal-type: hint}` | Repeated multi-value `Literal` types |
+   | [SMT339](rules/VIS005.md) | `rules: {private-symbol-import: warning}` | Production access to private project symbols |
+   | [SMT340](rules/CPX002.md) | `rules: {await-in-call-argument: hint}` | Awaited results passed directly as arguments |
+   | [SMT341](rules/MOD004.md) | `rules: {str-enum-auto-values: hint}` | `StrEnum` values via `auto()` |
    | [SMT342](https://github.com/mathisarends/smelt/blob/v0.7.0/docs/rules/SMT342.md) | `rules: {str-enum-explicit-values: hint}` | `StrEnum` values as explicit strings |
 
    SMT341 and SMT342 enforce opposite conventions; enable at most one. All
@@ -493,12 +755,12 @@ new rules are opt-in. See the [changelog](../CHANGELOG.md#060---2026-11-08).
 
    | Rule | Activation | Review |
    | --- | --- | --- |
-   | [SMT331](rules/SMT331.md) | `structure.file_naming.yaml_extension: yaml` (or `yml`) | Canonical YAML extensions |
+   | [SMT331](rules/LAY007.md) | `structure.file_naming.yaml_extension: yaml` (or `yml`) | Canonical YAML extensions |
    | [SMT332](https://github.com/mathisarends/smelt/blob/v0.6.0/docs/rules/SMT332.md) | `structure.file_naming.compose_basename: compose` (or `docker-compose`) | Canonical Compose basenames |
-   | [SMT333](rules/SMT333.md) | `rules: {prefer-callable-instance: hint}` | Single public instance method |
-   | [SMT334](rules/SMT334.md) | `rules: {private-class-constant: warning}` | Private literal class constants |
-   | [SMT335](rules/SMT335.md) | `rules: {internal-public-attribute: warning}` | Public data without external use |
-   | [SMT336](rules/SMT336.md) | `rules: {redundant-module-name: hint}` | Module filenames repeating package context |
+   | [SMT333](rules/IDM003.md) | `rules: {prefer-callable-instance: hint}` | Single public instance method |
+   | [SMT334](rules/LAY008.md) | `rules: {private-class-constant: warning}` | Private literal class constants |
+   | [SMT335](rules/VIS004.md) | `rules: {internal-public-attribute: warning}` | Public data without external use |
+   | [SMT336](rules/LAY009.md) | `rules: {redundant-module-name: hint}` | Module filenames repeating package context |
 
    Filename, symbol and placement repairs remain manual. Review imports,
    inheritance, framework contracts and consumers outside the analysis scope
@@ -545,9 +807,9 @@ SMT321 debt identities need review. See the
    `smelt debt --show` before pruning or re-recording it. Review unscoped SMT321
    debt explicitly; pruning does not accept current findings.
 
-3. Adopt new rules deliberately through `rules` or `--select`: [SMT324](rules/SMT324.md),
-   [SMT326](https://github.com/mathisarends/smelt/blob/v0.5.0/docs/rules/SMT326.md), [SMT327](rules/SMT327.md), [SMT328](rules/SMT328.md),
-   [SMT329](rules/SMT329.md), [SMT330](rules/SMT330.md) and [SMT431](rules/SMT431.md).
+3. Adopt new rules deliberately through `rules` or `--select`: [SMT324](rules/MOD003.md),
+   [SMT326](https://github.com/mathisarends/smelt/blob/v0.5.0/docs/rules/SMT326.md), [SMT327](rules/FWK001.md), [SMT328](rules/FWK002.md),
+   [SMT329](rules/LAY006.md), [SMT330](rules/VIS003.md) and [SMT431](rules/TST011.md).
    Activate [SMT325](https://github.com/mathisarends/smelt/blob/v0.5.0/docs/rules/SMT325.md) with a package contract's
    `module_docstrings: require`. These new checks do not rewrite code.
 
@@ -567,7 +829,7 @@ function from hiding a newly introduced violation in another. Use `smelt debt
 
 ### Changes in findings
 
-With `bundle_imports_at: 2`, [SMT108](rules/SMT108.md) now reviews mixed package
+With `bundle_imports_at: 2`, [SMT108](rules/IMP001.md) now reviews mixed package
 facade and implementation imports and includes missing export proposals. Bundling
 advice is withheld when the proposed caller/facade edges close a known runtime
 import cycle. Existing enabled policies can therefore produce different findings.
@@ -606,8 +868,8 @@ the import migration below. See the
    SMT codes or prefixes in inline suppressions.
 
 4. Adopt new capabilities deliberately: [shared configuration](configuration.md#shared-local-policy)
-   uses `extends`; [SMT321](rules/SMT321.md), [SMT322](rules/SMT322.md) and
-   [SMT323](rules/SMT323.md) require rule selection. SMT321 rewrites require both
+   uses `extends`; [SMT321](rules/TYP003.md), [SMT322](rules/CPX001.md) and
+   [SMT323](rules/MOD002.md) require rule selection. SMT321 rewrites require both
    `--fix` and `--unsafe-fixes`; review intentional falsy defaults first. SMT322
    and SMT323 never rename symbols or rewrite navigation.
 
@@ -757,12 +1019,12 @@ structure:
       count_tests: false                 # true also counts discovered tests
 ```
 
-[SMT109](rules/SMT109.md) reviews widely imported implementation names missing
+[SMT109](rules/ARC008.md) reviews widely imported implementation names missing
 from a package facade. Its default severity is `hint`, so use `--show-hints` to
 see it. Review ownership and initialization before adding exports; a missing
 cycle witness does not establish import safety.
 
-[SMT320](rules/SMT320.md) reviews public uppercase module assignments and PEP 695
+[SMT320](rules/VIS002.md) reviews public uppercase module assignments and PEP 695
 type aliases without observed external use or public-signature evidence. Exports,
 analyzed callers and public annotations preserve names. Excluded and external
 consumers remain unassessed. Review the API before renaming. See the full

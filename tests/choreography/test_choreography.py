@@ -26,7 +26,7 @@ from browserrig import (
     PageSearchTools,
     WaitTools,
 )
-from browserrig.choreography import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.choreography import (  # smelt: ignore[ARC007] -- test seam
     # Test scene timelines without exposing staging internals as API.
     AddressBarFocusedEvent,
     BackPressedEvent,
@@ -67,16 +67,16 @@ from browserrig.events import (
     KeyPressedEvent,
     NavigationStartedEvent,
 )
-from browserrig.input import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.input import (  # smelt: ignore[ARC007] -- test seam
     # Replace input timing where the mouse reads it.
     mouse as mouse_module,
 )
 from browserrig.scripts import FindResult
-from browserrig.tools import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.tools import (  # smelt: ignore[ARC007] -- test seam
     # Replace document extraction where the search tool looks it up.
     search as search_module,
 )
-from browserrig.tools import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.tools import (  # smelt: ignore[ARC007] -- test seam
     # Replace element preparation where targeting looks it up.
     targeting as targeting_module,
 )

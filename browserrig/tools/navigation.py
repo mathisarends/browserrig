@@ -160,7 +160,7 @@ class NavigationTools(Plugin):
         await tab.navigate(url)
 
 
-def site_url(  # smelt: ignore[SMT429] -- pure, table-tested
+def site_url(  # smelt: ignore[VIS009] -- pure, table-tested
     url: str, current: str
 ) -> str:
     """Resolve a site path such as ``/wiki/Page`` against the current HTTP(S) page."""
@@ -170,7 +170,7 @@ def site_url(  # smelt: ignore[SMT429] -- pure, table-tested
     return url
 
 
-def typed_address(url: str) -> str:  # smelt: ignore[SMT429] -- pure, table-tested
+def typed_address(url: str) -> str:  # smelt: ignore[VIS009] -- pure, table-tested
     """What a person types into the address bar for `url`: no scheme, no lone trailing slash."""
     parts = urlsplit(url)
     if parts.scheme not in {"http", "https"}:

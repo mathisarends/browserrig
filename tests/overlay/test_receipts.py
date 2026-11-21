@@ -8,11 +8,11 @@ from browserrig.choreography import (
     WorkPresentedEvent,
 )
 from browserrig.core import ActionKind, ActivityKind
-from browserrig.overlay import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.overlay import (  # smelt: ignore[ARC007] -- test seam
     # Control the receipt clock to reproduce floating-point boundary cases.
     receipts as receipts_module,
 )
-from browserrig.overlay.receipts import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.overlay.receipts import (  # smelt: ignore[ARC007] -- test seam
     # Verify receipt rendering independently of browser staging.
     Receipts,
 )

@@ -22,8 +22,8 @@ uv tool install smelt-cli
 smelt init --maintainability
 ```
 
-Upgrading to 0.13.0? Follow the [upgrade checklist](docs/upgrading.md#012-to-013)
-for configuration keys, rule names and hook pins.
+Upgrading to 0.14.0? Follow the [upgrade guide](docs/upgrading.md#013-to-014)
+for configuration changes, inline suppressions and hook pins.
 
 Review the generated `smelt.yml`: it proposes a starting policy from your layout
 and selects source and test checks. You decide which conventions to adopt.
@@ -37,7 +37,7 @@ defaults should distinguish `None` from valid falsy values.
 
 ```yaml
 # smelt.yml
-version: 1
+version: 2
 
 project:
   root_packages: [app]
@@ -64,7 +64,7 @@ Smelt catches an import that crosses the declared boundary:
 
 ```python
 # src/app/application/orders.py
-from app.infrastructure.database import SqlOrderRepository  # SMT101
+from app.infrastructure.database import SqlOrderRepository  # ARC001
 ```
 
 Application code should depend on an interface in an allowed layer; wire the
@@ -72,7 +72,7 @@ concrete repository in your composition root. Smelt also flags this fallback:
 
 ```python
 def page_size(limit: int | None = None) -> int:
-    return limit or 100  # SMT321: also replaces an explicit 0
+    return limit or 100  # TYP003: also replaces an explicit 0
 ```
 
 If only `None` means "not supplied", use
@@ -81,18 +81,18 @@ keep it with a reasoned exception.
 
 ```bash
 smelt check --show-hints --fail-on warning
-smelt explain SMT101  # why it fired and how to fix it
+smelt explain ARC001  # why it fired and how to fix it
 ```
 
 The same configuration can describe [feature boundaries and third-party dependencies](docs/architecture.md),
 [package APIs and source conventions](docs/structure.md), and
-[test conventions](docs/testing.md). Most checks require explicit selection or
-an applicable policy; see [rule activation](docs/rule-selection.md).
+[test conventions](docs/testing.md). A policy describes what a rule checks;
+the rule runs once `rules` names it. See [rule activation](docs/rule-selection.md).
 
 Use the visibility rules to review unnecessarily public definitions and APIs
 whose only observed users are tests.
 
-Enable individual rules in YAML by their `family/finding` names or SMT codes.
+Enable individual rules in YAML by their `family/finding` names or codes.
 `on` uses the named rule's catalog severity. Families and `ALL` can
 disable or cap already-active rules in YAML. Use `smelt check --select modeling`
 to explore a family and `smelt rules --unconfigured` to discover rules to review.
@@ -105,7 +105,7 @@ convention exceptions for its files; see
 ## Catch it at commit time
 
 Smelt uses the pre-commit hook format. With [prek](https://prek.j178.dev/installation/),
-add this to `.pre-commit-config.yml`:
+add this to `.pre-commit-config.yaml`:
 
 ```yaml
 repos:
@@ -115,7 +115,7 @@ repos:
         name: smelt
         entry: smelt check --staged --fail-on warning
         language: python
-        additional_dependencies: [smelt-cli==0.13.0]
+        additional_dependencies: [smelt-cli==0.14.0]
         pass_filenames: false
         always_run: true
         require_serial: true

@@ -1,3 +1,5 @@
+"""Shared enums for browser actions, activity and presentation."""
+
 from enum import StrEnum
 from typing import Self
 

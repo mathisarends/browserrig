@@ -7,10 +7,10 @@ When `project.test_roots` overlap, the most specific declared root owns each tes
 independent of list order. Mirror paths are relative to that root.
 
 Tests also obey [package API policies](structure.md#suggestions-to-bundle-implementation-imports):
-SMT107 enforces declared public entry points, SMT108 reviews configured import
-bundling thresholds, and opt-in SMT319 suggests existing package re-exports.
+ARC007 enforces declared public entry points, IMP001 reviews configured import
+bundling thresholds, and opt-in IMP004 suggests existing package re-exports.
 This includes `conftest.py` and configured test roots inside a source package.
-`tests.quality_exclude` does not exempt these imports. SMT109's `count_tests`
+`tests.quality_exclude` does not exempt these imports. ARC008's `count_tests`
 option remains separate: it controls whether test demand suggests adding exports.
 
 Enable the policies that match your unit-test conventions in the existing YAML
@@ -21,13 +21,13 @@ tests:
   layout: mirror
   forbidden_mock_paths:
   - '**/tests/**/domain/**'
-  max_patches_per_test: 2
   assertion_helpers:
   - tests.assertions.assert_user
   timeout_helpers:
   - tests.timing.deadline
   quality_exclude: []
 rules:
+  tests/excess-patches: {severity: error, max: 2}
   tests/private-access: error
   tests/string-patch-target: error
   tests/missing-outcome-check: warning
@@ -40,17 +40,17 @@ rules:
 
 | Code | Checks |
 | --- | --- |
-| SMT420 | Private production imports, module access and direct known/typed instance reads |
-| SMT421 | Recognized mocking operations in the configured test paths, including conftest fixtures |
-| SMT422 | Literal string targets of patch, patch.dict, patch.multiple and MonkeyPatch setattr/delattr |
-| SMT423 | Recognized patch calls exceeding the per-test limit, including decorators, patch.object and MonkeyPatch attribute replacement |
-| SMT424 | No recognized explicit outcome assertion (warning by default) |
-| SMT425 | Every recognized outcome can disappear or pass trivially on empty input (warning) |
-| SMT426 | Known waits without local deadlines or replacement of the asyncio scheduler clock (warning) |
-| SMT427 | Small literal loops containing candidate independent cases (hint) |
-| SMT428 | Call-only assertions on known async mocks without corresponding await evidence (warning) |
-| SMT429 | Public module functions accessed from tests but not from other analyzed production modules (warning) |
-| SMT430 | Public instance/class data attributes read from tests but not accessed by production code outside their class (warning) |
+| TST002 | Private production imports, module access and direct known/typed instance reads |
+| TST003 | Recognized mocking operations in the configured test paths, including conftest fixtures |
+| TST004 | Literal string targets of patch, patch.dict, patch.multiple and MonkeyPatch setattr/delattr |
+| TST005 | Recognized patch calls exceeding the per-test limit, including decorators, patch.object and MonkeyPatch attribute replacement |
+| TST006 | No recognized explicit outcome assertion (warning by default) |
+| TST007 | Every recognized outcome can disappear or pass trivially on empty input (warning) |
+| TST008 | Known waits without local deadlines or replacement of the asyncio scheduler clock (warning) |
+| TST009 | Small literal loops containing candidate independent cases (hint) |
+| TST010 | Call-only assertions on known async mocks without corresponding await evidence (warning) |
+| VIS009 | Public module functions accessed from tests but not from other analyzed production modules (warning) |
+| VIS010 | Public data attributes read from tests with no observed production access outside their visibility boundary (warning) |
 
 Every policy is opt-in; `0` is a valid patch limit. Globs are relative to the
 configuration root, not each test root. `quality_exclude` does not disable mirror
@@ -67,7 +67,7 @@ mapping and directory setup remain separate. Local shadowing and common
 control-flow bindings are respected. Locally declared fixture overrides take
 precedence over standard fixture names; external plugin overrides remain unknown.
 
-SMT424 accepts assert other than literal `assert True`, recognized pytest
+TST006 accepts assert other than literal `assert True`, recognized pytest
 exception/warning checks, unittest.TestCase assertions, known mock interaction
 assertions and imported qualified assertion helpers. A mere unused
 `pytest.raises(...)` context object supplies no check. Known Mock/AsyncMock
@@ -88,7 +88,7 @@ still counts: this rule detects missing explicit checks, not assertion quality,
 reachability or correct behavior. Neither a literal threshold nor syntax proves
 that a test protects a requirement.
 
-SMT425 complements outcome recognition: if every recognized check is inside a
+TST007 complements outcome recognition: if every recognized check is inside a
 possibly empty result loop, or is a positive `assert all(...)` over possibly empty
 input, it asks for review. Nonempty literal collections, immutable tuple/string
 aliases and literal builtin `range` calls are recognized. Mutable collection
@@ -101,7 +101,7 @@ retains the same review. An assertion on an unfiltered collection does not prove
 that a filtered subset contains any items; prefer expected artifacts or an
 explicit check of the collection actually iterated.
 
-SMT426 checks known subprocess calls for their own timeout, and known asyncio
+TST008 checks known subprocess calls for their own timeout, and known asyncio
 Event/Task/Future and subprocess Process waits for local guards such as `wait_for`, `asyncio.timeout`,
 AnyIO/Trio timeout contexts or configured qualified `timeout_helpers`. Async
 cancellation cannot bound a blocking synchronous subprocess. A known loop's
@@ -117,11 +117,11 @@ still need their own timeout. Arguments, arbitrary callbacks and transitive
 helper execution are not inferred.
 External runner deadlines and general task/fixture flow are not resolved.
 Bounded real-boundary polling and `asyncio.sleep(0)` are valid; positive sleeps
-are not prohibited. SMT427 only suggests parametrization for narrow literal-loop
+are not prohibited. TST009 only suggests parametrization for narrow literal-loop
 candidates and avoids common stateful replay, handoff and transaction lifecycles.
 Review both heuristics in context before treating their findings as defects.
 
-SMT428 reviews known async interactions checked only through call assertions or
+TST010 reviews known async interactions checked only through call assertions or
 asserted call history. `assert_called_once_with` can pass even when an async
 operation was never awaited; use `assert_awaited_once_with` when execution matters.
 Direct AsyncMock callables and explicitly async methods on known class specs are
@@ -134,26 +134,29 @@ arbitrarily decorated methods, transitive helpers and general data flow remain
 outside scope. A finding concerns an individual test, not the suite's ability to
 catch the regression. There is no automatic assertion rewrite.
 
-SMT429 reviews functions such as `drag_gesture` that are used inside their own
+VIS009 reviews functions such as `drag_gesture` that are used inside their own
 module but exposed publicly only to tests. Its finding points at the definition,
 suggests `_drag_gesture` and lists the test locations in JSON. Review the rename
 and update internal references; prefer testing the public `drag` operation that
 calls the helper. Deliberate direct helper tests can retain a reasoned exception
-to SMT420 when that policy is also enabled. Functions in `__all__`, production
+to TST002 when that policy is also enabled. Functions in `__all__`, production
 re-exports, decorated functions and methods are excluded. Aliased and relative
 imports count as production consumers; star imports and escaped module values
 conservatively preserve public visibility. External users, packaging entry points
 and arbitrary dynamic access remain review limits. Checks do not rename code.
 
-Enable SMT430 with `rules: {visibility/test-only-public-attribute: warning}` or
-`--select SMT430`. It reviews public attributes such as `worker.pending` when only
+Enable VIS010 with `rules: {visibility/test-only-public-attribute: warning}` or
+`--select VIS010`. It reviews public attributes such as `worker.pending` when only
 tests read them outside the owning class. It shares the member-use analysis with
-SMT316, SMT317 and SMT429 and suggests an available private name. Known
-constructors, annotations, fixtures and class re-exports establish test receivers.
+VIS001, LAY005, VIS004 and VIS009 and suggests an available private name.
+With `style.public_attribute_boundary: module`, production accesses in the
+defining module count as internal for VIS004 and VIS010. Enable VIS010 separately
+to review fields read by tests. Known constructors, annotations, fixtures and
+class re-exports establish test receivers.
 Possible production accesses preserve visibility, including unresolved same-named
 receivers. Decorated/inherited classes, properties, descriptors, slots and custom
 attribute hooks are excluded. Prefer observing public behavior; keep deliberate
-public state with a reasoned suppression. See [the rule](rules/SMT430.md) for
+public state with a reasoned suppression. See [the rule](rules/VIS010.md) for
 scope and limits.
 
 The scope is the discovered `test_*.py`, `*_test.py` and conftest files. Test
@@ -164,12 +167,12 @@ this inventory and transitive fixture/helper effects are not traversed. A fixtur
 in a permitted shared conftest can therefore introduce mocking into a domain test
 without this path policy detecting that dependency. Direct production constructors,
 explicit instance annotations and annotated local/conftest fixture returns support
-SMT420. Consistent known constructor/alias fixture returns and yields are also
+TST002. Consistent known constructor/alias fixture returns and yields are also
 recognized, including fixed tuple components when unpacked. Inferred fixture
 types carry separate provenance; fixture bodies are never executed. Class fixture
 types stay in their own class. Private instance writes are excluded for
 immutability probes. Unknown factories, conflicting fixture outputs, arbitrary
-attribute types and reflection are not inferred. String target variables and f-strings are outside SMT422's
+attribute types and reflection are not inferred. String target variables and f-strings are outside TST004's
 literal check. A passing static report is not evidence that tests ran or protect
 their intended behavior.
 
@@ -200,7 +203,7 @@ uv run python scripts/evaluate.py --config ../application/smelt.yml \
 Both import roots must contain `smelt/__init__.py`; checkouts and extracted wheels
 are supported. Use `--candidate`, `--python`, `--test-python`, `--pythonpath` and
 repeatable `--pytest-arg` options when the project uses a separate test environment.
-`--select` defaults to SMT42; use `--select ''` for the adopted policy. Enable new
+`--select` defaults to the test-quality rules TST002-TST010; use `--select ''` for the adopted policy. Enable new
 candidate-only policies in a separate review run; old versions reject unknown
 configuration fields. Keep reports outside inspected source roots.
 

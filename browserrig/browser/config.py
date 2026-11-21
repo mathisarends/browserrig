@@ -25,7 +25,7 @@ class CdpEndpoint:
     """Where to reach a browser over CDP, and the headers that request needs."""
 
     url: str
-    headers: dict[str, str]  # smelt: ignore[SMT360] -- mutable transport headers
+    headers: dict[str, str]  # smelt: ignore[MOD011] -- mutable transport headers
 
 
 class Launch(Options):

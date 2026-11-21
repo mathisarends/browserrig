@@ -1,5 +1,5 @@
 from browserrig.choreography import WorkPhase
-from browserrig.choreography.projection import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.choreography.projection import (  # smelt: ignore[ARC007] -- test seam
     # Test event projection independently of plugin activation.
     project,
 )
