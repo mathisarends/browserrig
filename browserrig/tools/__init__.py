@@ -28,12 +28,15 @@ from .screenshots import ScreenshotTools
 from .search import PageSearchTools
 from .tabs import TabTools
 from .targeting import Targeting
+from .touch import ReferenceTouchTools, TouchTools
 from .typing import DomTypingTools
 from .wait import WaitTools
 from .wheel import WheelTools
 from .workspace import WorkspaceTools
 
 __all__ = [
+    "ReferenceTouchTools",
+    "TouchTools",
     "DomScrollIntent",
     "Targeting",
     "DomUploadTools",

@@ -7,7 +7,7 @@ from typing import Any
 from harnessed import Plugin
 from harnessed.events import ToolCallFinishedEvent, TurnEndedEvent, TurnStartedEvent
 from harnessed.hooks import ExecuteTool, Next
-from harnessed.kernel import PluginScope, PluginState, needs
+from harnessed.kernel import PluginScope, PluginState, needs, observes
 from harnessed.models import ToolResult, ToolStatus
 from harnessed.tools import envelope_value
 
@@ -32,7 +32,7 @@ from browserrig.events import (
     FilesUploadedEvent,
     ObservationCapturedEvent,
 )
-from browserrig.input import Input
+from browserrig.input import InputSettings, Mouse
 from browserrig.observation import BrowserPerception
 from browserrig.secrets import Secrets
 from browserrig.tools import (
@@ -103,7 +103,8 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
     events = INPUT_EVENTS + SCENE_EVENTS
     _state = PluginState(_Staging)
     _browser = needs(Browser)
-    _input = needs(Input)
+    _input = needs(InputSettings)
+    _mouse = observes(Mouse)
     _events = needs(BrowserEvents)
     _coordination = needs(BrowserCoordination)
 
@@ -132,7 +133,7 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
                 )
             )
         )
-        if contributions.Pointer in self._selected:
+        if self._mouse is not None and contributions.Pointer in self._selected:
             scope.on(TurnStartedEvent, self._publish_cursor)
             scope.on(TabChanged, self._republish_cursor)
         if self._scenes:
@@ -157,7 +158,8 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
             scope.on(FilesUploadedEvent, self._status)
 
     async def _publish_cursor(self, _event: TurnStartedEvent) -> None:
-        await self._input.mouse.publish_cursor()
+        if self._mouse is not None:
+            await self._mouse.publish_cursor()
 
     async def _republish_cursor(self, event: TabChanged) -> None:
         # A new document or tab shows nothing yet; viewers learn where the pointer rests.
@@ -165,8 +167,11 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
             return
         if event.tab.id != self._browser.active_tab.id:
             return
-        if self._input.mouse.position_in(event.tab.id) is not None:
-            await self._input.mouse.publish_cursor()
+        if (
+            self._mouse is not None
+            and self._mouse.position_in(event.tab.id) is not None
+        ):
+            await self._mouse.publish_cursor()
 
     async def _status(self, event: StatusFact) -> None:
         if presented := self._state.status(event):
@@ -368,7 +373,7 @@ class Choreography(Plugin, slot="browserrig.choreography", provides=True):
         staged = self._scenes.get(type(event.intent))
         if staged is None:
             return await next_()
-        pointer = self._input.mouse.position_in(event.tab.id)
+        pointer = self._mouse.position_in(event.tab.id) if self._mouse else None
         scene = scenes.Scene(event.tab, event.action_id, pointer)
         return await staged(scene, event.intent, next_)
 

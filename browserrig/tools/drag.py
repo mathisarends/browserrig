@@ -7,7 +7,7 @@ from pydantic import Field
 
 from browserrig.core import ActionKind, Point
 from browserrig.core import browser_tool as tool
-from browserrig.input import Input
+from browserrig.input import Mouse
 from browserrig.observation import BrowserPerception, viewport_point
 
 from .effects import Effect
@@ -22,7 +22,7 @@ class PointerDragTools(Plugin):
     """Mouse drag by screenshot or viewport coordinates."""
 
     _actions = needs(Actions)
-    _input = needs(Input)
+    _mouse = needs(Mouse)
     _observe = needs(BrowserPerception)
 
     @tool(
@@ -33,14 +33,14 @@ class PointerDragTools(Plugin):
         source = self._observe.coordinate_source()
         viewport_start = viewport_point(source, start)
         viewport_end = viewport_point(source, end)
-        return await _drag(self._input, viewport_start, viewport_end)
+        return await _drag(self._mouse, viewport_start, viewport_end)
 
 
 class ReferenceDragTools(Plugin):
     """Mouse drag between resolvable element references."""
 
     _actions = needs(Actions)
-    _input = needs(Input)
+    _mouse = needs(Mouse)
     _targets = needs(Targeting)
 
     @tool(
@@ -61,16 +61,16 @@ class ReferenceDragTools(Plugin):
             self._targets.locate(ref=target_ref, scroll=False),
         )
         return await _drag(
-            self._input, start, end, prepared_scroll=source.scrolled or target.scrolled
+            self._mouse, start, end, prepared_scroll=source.scrolled or target.scrolled
         )
 
 
 async def _drag(
-    devices: Input, start: Point, end: Point, *, prepared_scroll: bool = False
+    mouse: Mouse, start: Point, end: Point, *, prepared_scroll: bool = False
 ) -> Effect:
     record_point("viewport", start, endpoint="start")
     record_point("viewport", end, endpoint="end")
-    await devices.mouse.drag(start=start, end=end)
+    await mouse.drag(start=start, end=end)
     return Effect(
         "Drag dispatched; inspect the destination.", prepared_scroll=prepared_scroll
     )

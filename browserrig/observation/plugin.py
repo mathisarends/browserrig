@@ -31,7 +31,7 @@ from browserrig.core import (
 from browserrig.events import (
     ObservationCapturedEvent,
 )
-from browserrig.input import Input
+from browserrig.input import Mouse
 from browserrig.nudges import Nudges
 from browserrig.readiness import PageReadiness
 from browserrig.secrets import Secrets
@@ -95,7 +95,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
     events = (ObservationCapturedEvent,)
     _state = PluginState(BrowserPerceptionState)
     _browser = needs(Browser)
-    _input = needs(Input)
+    _mouse = observes(Mouse)
     _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
     _readiness = needs(PageReadiness)
@@ -348,7 +348,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
                 previous=self.snapshot,
                 region=region,
                 zoom=zoom,
-                cursor=self._input.mouse.position_in(selected.id),
+                cursor=self._mouse.position_in(selected.id) if self._mouse else None,
                 screenshots=take_image and not withheld,
                 redaction=secrets,
                 prefer_tab_title=extensions.model is None,

@@ -138,6 +138,53 @@ must identify options unambiguously. Invalid or disabled changes reject the
 whole request before mutation; the tool verifies the selected set afterward.
 Observation values, radio IDs and `selection_group` are raw page metadata.
 
+## Touch and keyboard on a mobile page
+
+Use an explicit Harnessed composition to give the session a keyboard and a
+single-finger touchscreen. The desktop recipe uses `InputRuntime()` for its
+mouse, keyboard and direct `Input` facade. `DeviceRuntime()` supplies shared
+pacing and presentation settings for individually mounted devices.
+
+```python
+from harnessed import Agent
+from browserrig import (
+    Actions, BrowserPerception, Chrome, DeviceRuntime, DomPage, KeyboardInput,
+    KeyboardTools, PageReadiness, ReferenceTouchTools, Runtime, Screenshots,
+    ScreenshotTrigger, Targeting, TouchInput, TouchTools,
+)
+
+
+class Phone:
+    async def apply(self, cdp, *, frame):
+        if not frame:
+            await cdp.emulation.set_device_metrics_override(
+                width=390, height=844, device_scale_factor=3, mobile=True,
+            )
+            await cdp.emulation.set_touch_emulation_enabled(enabled=True)
+
+
+agent = Agent(model=model, plugins=[
+    Runtime(), Chrome.launch(session_setup=(Phone(),)), DeviceRuntime(),
+    KeyboardInput(), TouchInput(), PageReadiness(), BrowserPerception(),
+    DomPage(), Screenshots(trigger=ScreenshotTrigger.EACH_STEP), Actions(),
+    Targeting(), ReferenceTouchTools(), TouchTools(), KeyboardTools(),
+])
+```
+
+`tap(ref)` hit-tests a currently visible reference. Use `swipe_at(start, end)`
+to move a finger through a list, then use the next observation to choose the
+target. `tap_at(x, y)` uses the delivered screenshot's crop and scale.
+A tap on an editable field can be followed by `send_keys(text=...)`.
+Touch coordinates currently require the visible and layout viewports to
+align. Browserrig rejects the gesture before contact when a zoomed or occluded
+viewport makes that mapping ambiguous.
+
+For direct Python input, use `session.scope[Touch].tap(point)` or
+`swipe(start, end, duration_seconds=...)`. Custom input targets implement
+`browserrig.input.TouchTransport` to opt in. Add `MouseInput()` to an
+explicit composition to enable desktop cursor behavior. The tool plugins
+are selected independently of their devices.
+
 ## Coordinates and resizing
 
 Coordinates use viewport CSS pixels unless mapped from a screenshot included in

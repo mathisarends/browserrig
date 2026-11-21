@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Compose mouse, keyboard and single-finger touch input independently. Opt in to
+  `TouchTools` for coordinate taps and swipes and `ReferenceTouchTools` for
+  visible target taps. See [mobile input](docs/browser-interaction.md#touch-and-keyboard-on-a-mobile-page).
+
 ## 0.12.1 (2026-11-21)
 
 ### Fixed

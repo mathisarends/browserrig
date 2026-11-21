@@ -10,28 +10,32 @@ from .presenter import Presenter, Unseen
 from .target import Focus, InputTarget
 
 
-class Input:
-    """Session-owned mouse and keyboard, bound to a backend's focused target.
+class InputSettings:
+    """Session-owned pacing and presentation shared by the installed devices.
 
     The installed `Motor` decides how input is performed and the installed `Presenter`
     what viewers see of it. The runtime supplies action correlation through a reader;
     devices never own or change the action context.
     """
 
-    def __init__(self, focus: Focus, *, action_id: Callable[[], str] = str) -> None:
+    def __init__(self, *, action_id: Callable[[], str] = str) -> None:
         self._action_id = action_id
         self._default_motor: Motor = Instant()
         self._default_presenter: Presenter = Unseen()
         self._motors: dict[object, Motor] = {}
         self._presenters: dict[object, Presenter] = {}
-        self.mouse = Mouse(
+
+    def create_mouse(self, focus: Focus) -> Mouse:
+        return Mouse(
             focus,
             emit=self._emit,
             motor=self.motor,
             presenter=self.presenter,
-            action_id=action_id,
+            action_id=self._action_id,
         )
-        self.keyboard = Keyboard(focus, emit=self._emit, motor=self.motor)
+
+    def create_keyboard(self, focus: Focus) -> Keyboard:
+        return Keyboard(focus, emit=self._emit, motor=self.motor)
 
     def motor(self) -> Motor:
         return next(reversed(self._motors.values()), self._default_motor)
@@ -61,3 +65,12 @@ class Input:
 
     async def _emit(self, target: InputTarget, event: InputEvent) -> None:
         await self.presenter().show(target, replace(event, action_id=self._action_id()))
+
+
+class Input(InputSettings):
+    """Direct desktop input and the compatibility service of InputRuntime."""
+
+    def __init__(self, focus: Focus, *, action_id: Callable[[], str] = str) -> None:
+        super().__init__(action_id=action_id)
+        self.mouse = self.create_mouse(focus)
+        self.keyboard = self.create_keyboard(focus)

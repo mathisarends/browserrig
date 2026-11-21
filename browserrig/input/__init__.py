@@ -1,4 +1,4 @@
-from .controller import Input
+from .controller import Input, InputSettings
 from .keyboard import Keyboard, TypedText
 from .motor import (
     CENTER,
@@ -9,13 +9,22 @@ from .motor import (
     Motor,
 )
 from .mouse import ClickButton, ClickCount, Mouse
-from .plugin import InputRuntime
+from .plugin import DeviceRuntime, InputRuntime, KeyboardInput, MouseInput, TouchInput
 from .pointer import Bend, CursorPath, movement
 from .presenter import Presenter, Unseen
 from .target import Focus, InputTarget, InputTargets, KeyEventType, MouseButton
+from .touch import Touch, TouchEventType, TouchTransport
 from .wheel import WheelStep
 
 __all__ = [
+    "DeviceRuntime",
+    "InputSettings",
+    "KeyboardInput",
+    "MouseInput",
+    "TouchInput",
+    "Touch",
+    "TouchEventType",
+    "TouchTransport",
     "InputRuntime",
     "InputTargets",
     "MouseButton",

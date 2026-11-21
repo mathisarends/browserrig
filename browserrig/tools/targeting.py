@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from harnessed import Plugin
-from harnessed.kernel import PluginScope, PluginState, needs
+from harnessed.kernel import PluginScope, PluginState, needs, observes
 from harnessed.tracing import traced
 
 from browserrig.browser import Tab
@@ -13,7 +13,7 @@ from browserrig.core import (
     ElementPoint,
     StaleElement,
 )
-from browserrig.input import Input, InputTargets
+from browserrig.input import InputSettings, InputTargets, Mouse
 from browserrig.observation import BrowserPerception
 
 from .execution import Actions
@@ -33,7 +33,8 @@ class Targeting(Plugin, slot="browserrig.targeting", provides=True):
 
     _actions = needs(Actions)
     _correlation = needs(ActionContext)
-    _input = needs(Input)
+    _input = needs(InputSettings)
+    _mouse = observes(Mouse)
     _targets = needs(InputTargets)
     _observe = needs(BrowserPerception)
     _state = PluginState(_Aim)
@@ -55,7 +56,7 @@ class Targeting(Plugin, slot="browserrig.targeting", provides=True):
             scrolled = await prepare_element(
                 tab,
                 handle,
-                self._input.mouse,
+                self._mouse,
                 document_id=tab.document_id,
                 report=self._actions.record_preparation,
             )
@@ -71,16 +72,26 @@ class Targeting(Plugin, slot="browserrig.targeting", provides=True):
             x=point.x, y=point.y, bounds=point.bounds, scrolled=scrolled
         )
 
+    async def locate_visible(self, *, ref: str) -> ElementPoint:
+        """Hit-test a visible reference and verify its document before dispatch."""
+        tab = self._actions.tab
+        document_id = tab.document_id
+        point = await self.locate(ref=ref, tab=tab, scroll=False)
+        await self._require_target(tab, document_id)
+        return point
+
     @traced
     async def hover(self, *, ref: str, tab: Tab | None = None) -> ElementPoint:
         """Reveal, hover and recheck a target; follow one move, then fail if unstable."""
         tab = tab if tab is not None else self._actions.tab
+        if self._mouse is None:
+            raise BrowserError("Hover requires a mouse")
         document_id = tab.document_id
         point = await self.locate(ref=ref, tab=tab)
         scrolled = point.scrolled
         for _ in range(2):
             await self._require_target(tab, document_id)
-            await self._input.mouse.move_to(point)
+            await self._mouse.move_to(point)
             await self._require_target(tab, document_id)
             current = await self.locate(ref=ref, tab=tab, scroll=False)
             if (current.x, current.y) == (point.x, point.y):
@@ -94,13 +105,17 @@ class Targeting(Plugin, slot="browserrig.targeting", provides=True):
 
     async def _require_target(self, tab: Tab, document_id: str) -> None:
         if tab.closed:
-            raise StaleElement("The focused tab changed during hover; observe again")
+            raise StaleElement(
+                "The focused tab changed during targeting; observe again"
+            )
         await tab.sync_document()
         target = self._targets.focused()
         if tab.closed or target is None or target.id != tab.id:
-            raise StaleElement("The focused tab changed during hover; observe again")
+            raise StaleElement(
+                "The focused tab changed during targeting; observe again"
+            )
         if tab.document_id != document_id:
-            raise StaleElement("The document changed during hover; observe again")
+            raise StaleElement("The document changed during targeting; observe again")
 
     def _aim(self, ref: str, bounds: Bounds | None) -> Aim:
         action_id = self._correlation.action_id

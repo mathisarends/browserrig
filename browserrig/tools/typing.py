@@ -9,7 +9,7 @@ from browserrig.browser import Browser, Tab
 from browserrig.core import ActionKind, BrowserError
 from browserrig.core import browser_tool as tool
 from browserrig.dom import DomElementHandle, ResolveDomElement
-from browserrig.input import Input
+from browserrig.input import Keyboard
 from browserrig.secrets import Secrets
 
 from .effects import Effect
@@ -25,7 +25,7 @@ class DomTypingTools(Plugin):
     _actions = needs(Actions)
     _targets = needs(Targeting)
     _browser = needs(Browser)
-    _input = needs(Input)
+    _keyboard = needs(Keyboard)
     _elements = observes(ResolveDomElement)
     _secrets = observes(Secrets)
 
@@ -75,15 +75,15 @@ class DomTypingTools(Plugin):
         before = await field.text_state()
         # Backspace on an empty token input can select/remove its preceding chip.
         if clear and (before is None or before.value):
-            await self._input.keyboard.press_key("Backspace")
+            await self._keyboard.press_key("Backspace")
         await guard()
 
         typed = None
         if entry is not None and secrets is not None:
-            exact = await secrets.enter(entry, self._input.keyboard)
+            exact = await secrets.enter(entry, self._keyboard)
             effect = secret_entered(exact)
         else:
-            typed = await self._input.keyboard.type_text(text, guard=guard)
+            typed = await self._keyboard.type_text(text, guard=guard)
             effect = entered(typed)
 
         if (
@@ -131,7 +131,7 @@ class DomTypingTools(Plugin):
                 "Observe before continuing.",
                 break_chain=True,
             )
-        await self._input.keyboard.press_key("Enter")
+        await self._keyboard.press_key("Enter")
         return Effect(f"{effect.text} Enter pressed.", break_chain=True)
 
 

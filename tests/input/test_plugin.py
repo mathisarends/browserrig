@@ -12,16 +12,21 @@ from browserrig import (
     ActionContext,
     Browser,
     ChangeTab,
+    DeviceRuntime,
     Input,
     InputPacing,
     InputRuntime,
     InputTargets,
+    KeyboardInput,
+    MouseInput,
     Point,
     Runtime,
+    Touch,
+    TouchInput,
 )
 from browserrig.core import BrowserError, TabGesture, ViewportSize
 from browserrig.events import TabActivatedEvent, TabClosedEvent
-from browserrig.input import CursorPath, HumanMotor, Instant, KeyStroke
+from browserrig.input import CursorPath, HumanMotor, Instant, Keyboard, KeyStroke, Mouse
 
 
 async def test_devices_can_run_against_a_transport_without_a_browser():
@@ -43,6 +48,32 @@ async def test_devices_can_run_against_a_transport_without_a_browser():
         await devices.keyboard.press_key("Enter")
         assert target.mouse[-1] == Point(x=7, y=9)
         assert target.keys == ["Enter", "Enter"]
+
+
+@pytest.mark.parametrize("mouse", [False, True])
+async def test_explicit_device_services_work_independently(mouse):
+    target = _Transport("current")
+    devices = [MouseInput()] if mouse else [KeyboardInput(), TouchInput()]
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            Runtime(),
+            _Backend(_Targets(target)),
+            DeviceRuntime(),
+            *devices,
+        ],
+    )
+    async with agent.session() as session:
+        assert (Mouse in session.scope) == mouse
+        assert (Keyboard in session.scope) != mouse
+        assert (Touch in session.scope) != mouse
+        assert bool(target.mouse) == mouse
+        if not mouse:
+            await session.scope[Keyboard].press_key("Enter")
+            assert target.keys == ["Enter", "Enter"]
+            with pytest.raises(BrowserError, match="does not support touch"):
+                await session.scope[Touch].tap(Point(x=10, y=10))
+            assert not target.mouse
 
 
 async def test_initial_focus_is_synchronized_and_closed_targets_are_forgotten():

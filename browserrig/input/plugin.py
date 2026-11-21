@@ -7,43 +7,43 @@ from harnessed.kernel import PluginScope, PluginState, hook, needs
 from browserrig.core import ActionContext, ChangeTab
 from browserrig.events import TabActivatedEvent, TabClosedEvent
 
-from .controller import Input
+from .controller import Input, InputSettings
+from .keyboard import Keyboard
+from .mouse import Mouse
 from .target import InputTargets
+from .touch import Touch
 
 
 @dataclass
-class _Devices:
-    input: Input | None = None
+class _MouseState:
+    mouse: Mouse | None = None
     switching: int = 0
 
 
-class InputRuntime(Plugin, slot="browserrig.input"):
-    """Own a session's devices and bind them to the backend's input targets."""
+class _MouseLifecycle(Plugin):
+    """Provide a mouse and synchronize its cursor when tabs change."""
 
     _targets = needs(InputTargets)
-    _actions = needs(ActionContext)
-    _state = PluginState(_Devices)
+    _state = PluginState(_MouseState)
 
-    async def setup(self, scope: PluginScope) -> None:
-        devices = self._state.input = Input(
-            self._targets.focused, action_id=lambda: self._actions.action_id
-        )
-        scope.provide(Input, devices)
+    async def _install(self, scope: PluginScope, mouse: Mouse) -> None:
+        self._state.mouse = mouse
+        scope.provide(Mouse, mouse)
         scope.on(TabActivatedEvent, self._activated)
         scope.on(TabClosedEvent, self._closed)
         # Chrome may already have focused its initial tab before this plugin mounts.
         if self._targets.focused() is not None:
-            await devices.mouse.resume()
+            await mouse.resume()
 
     @hook(ChangeTab)
     async def _change(self, event: ChangeTab, next_: Next[None]) -> None:
-        if self._state.input is None:
+        if self._state.mouse is None:
             # The backend can open its initial tab before devices are mounted.
             await next_()
             return
         self._state.switching += 1
         try:
-            await self._devices.mouse.switch_tab(event.gesture, event.target_id, next_)
+            await self._mouse.switch_tab(event.gesture, event.target_id, next_)
         finally:
             self._state.switching -= 1
 
@@ -53,7 +53,7 @@ class InputRuntime(Plugin, slot="browserrig.input"):
         target = self._targets.focused()
         if target is None:
             return
-        mouse = self._devices.mouse
+        mouse = self._mouse
         if mouse.position_in(target.id) is None:
             await mouse.resume()
         else:
@@ -61,10 +61,64 @@ class InputRuntime(Plugin, slot="browserrig.input"):
             await mouse.publish_cursor()
 
     async def _closed(self, event: TabClosedEvent) -> None:
-        self._devices.mouse.forget(event.target_id)
+        self._mouse.forget(event.target_id)
 
     @property
-    def _devices(self) -> Input:
-        devices = self._state.input
-        assert devices is not None
-        return devices
+    def _mouse(self) -> Mouse:
+        mouse = self._state.mouse
+        assert mouse is not None
+        return mouse
+
+
+class DeviceRuntime(Plugin, slot="browserrig.input"):
+    """Provide shared pacing and presentation for an explicit device composition."""
+
+    _actions = needs(ActionContext)
+
+    async def setup(self, scope: PluginScope) -> None:
+        scope.provide(
+            InputSettings, InputSettings(action_id=lambda: self._actions.action_id)
+        )
+
+
+class KeyboardInput(Plugin):
+    """Provide keyboard input to the focused tab."""
+
+    _targets = needs(InputTargets)
+    _settings = needs(InputSettings)
+
+    async def setup(self, scope: PluginScope) -> None:
+        scope.provide(Keyboard, self._settings.create_keyboard(self._targets.focused))
+
+
+class MouseInput(_MouseLifecycle):
+    """Provide mouse input and synchronize the cursor on tab activation."""
+
+    _settings = needs(InputSettings)
+
+    async def setup(self, scope: PluginScope) -> None:
+        await self._install(scope, self._settings.create_mouse(self._targets.focused))
+
+
+class TouchInput(Plugin):
+    """Provide single-finger touch gestures to the focused tab."""
+
+    _targets = needs(InputTargets)
+
+    async def setup(self, scope: PluginScope) -> None:
+        scope.provide(Touch, Touch(self._targets.focused))
+
+
+class InputRuntime(_MouseLifecycle, slot="browserrig.input"):
+    """Provide the standard desktop mouse, keyboard and direct Input facade."""
+
+    _actions = needs(ActionContext)
+
+    async def setup(self, scope: PluginScope) -> None:
+        devices = Input(
+            self._targets.focused, action_id=lambda: self._actions.action_id
+        )
+        scope.provide(Input, devices)
+        scope.provide(InputSettings, devices)
+        scope.provide(Keyboard, devices.keyboard)
+        await self._install(scope, devices.mouse)
