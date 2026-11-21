@@ -1,5 +1,4 @@
 from harnessed import Plugin
-from harnessed.events import StepStartedEvent
 from harnessed.hooks import Next, PrepareRequest
 from harnessed.kernel import hook, needs, observes
 from harnessed.models import ModelRequest, UserMessage
@@ -39,13 +38,9 @@ class StepBudgetHints(Plugin):
         request = await next_()
         if event.session.log is not self._session.log:
             return request
-        turn = event.session.log.current_turn()
-        started = event.session.last(StepStartedEvent)
-        limit = turn.start.limits.max_steps
-        if started is None or started.turn_id != turn.id or limit is None:
-            return request
-        summarize = turn.start.final_step is FinalStepPolicy.SUMMARIZE
-        hint = self._hint(started.step, limit, summarize=summarize)
+        progress = event.progress
+        summarize = progress.final_step is FinalStepPolicy.SUMMARIZE
+        hint = self._hint(progress.step, progress.max_steps, summarize=summarize)
         if hint is None:
             return request
         return request.append_message(UserMessage(hint))

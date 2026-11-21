@@ -14,6 +14,7 @@ from harnessed.testing import CallbackModel, ScriptedModel, call
 from pydantic import BaseModel
 
 from browserrig import Activity, Agent, Done
+from browserrig.core import ActivityKind, ActivityOutcome
 from browserrig.events import ActivityFinishedEvent
 
 
@@ -181,7 +182,7 @@ async def test_paused_done_restores_browser_events_and_structured_finalization(
         plugins=[Done()],
     )
     async with agent.session(id="paused") as session:
-        session.on(SessionControlChangedEvent, control_changed)
+        session.scope.on(SessionControlChangedEvent, control_changed)
         await session.submit("Return the title", output=Answer, max_steps=3)
         await asyncio.wait_for(entered.wait(), 5)
         pause = asyncio.create_task(session.pause())
@@ -203,8 +204,18 @@ async def test_paused_done_restores_browser_events_and_structured_finalization(
         assert session.log.control.state is ControlState.PAUSED
         assert session.last(ToolCallFinishedEvent).call.name == "done"
         assert session.last(ActivityFinishedEvent) is not None
+        activity = session.scope[Activity]
+        (paused,) = activity.intervals()
+        assert (paused.kind, paused.outcome) == (
+            ActivityKind.PAUSED,
+            ActivityOutcome.RUNNING,
+        )
         await session.resume()
         await asyncio.wait_for(session.wait_until_idle(), 5)
+        ended = next(
+            i for i in activity.intervals() if i.interval_id == paused.interval_id
+        )
+        assert ended.outcome is ActivityOutcome.COMPLETED
         assert session.last(OutputValidatedEvent).data == {"title": "Restored title"}
     assert len(model.requests) == 1
     # Working tools stay declared after done; only the output tool joins them.

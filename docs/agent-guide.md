@@ -31,6 +31,8 @@ and allows tool calls without confirmation. Supply
 or `approvals=Approvals(allow=[ActionKind.NAVIGATE, ActionKind.LIST_TABS])` to run
 only those actions. An explicit allowlist denies unmatched tools by default.
 `Approvals` and `Decision` come from `harnessed`.
+In an open session, `session.tools.resolve(ActionKind.OPEN_TAB)` returns the
+visible registration and its model-facing name, or `None` in single-tab mode.
 
 ## Composing plugins
 
@@ -82,19 +84,24 @@ Harnessed exposes the reported usage for each turn as `result.usage`.
 `TerminalEvents()` includes it on the `turn.ended` JSON line as `usage`, with
 input, output, total, cache-read, cache-write and reasoning tokens, cache hit rate
 and cost. Optional values that Harnessed cannot aggregate appear as `null`.
+The same line includes `session_model_request_count`, the number of local model
+requests recorded by Harnessed, including failures and cancellations. Provider
+transport retries count toward their original request.
 
-Subscribe to Harnessed's `TurnEndedEvent` to receive the turn ID and aggregated
-`ModelUsage` as the turn ends.
+Read Harnessed's `TurnResultEvent` from the run stream to receive the turn ID and
+aggregated `ModelUsage` as the turn ends.
 
 ```python
-from harnessed.events import TurnEndedEvent
+from harnessed.events.stream import TurnResultEvent
 
 from browserrig import Agent
 
 agent = Agent(model=model)
 async with agent.session() as session:
-    session.on(TurnEndedEvent, lambda event: print(event.turn_id, event.usage))
-    await session.run("Describe this site.")
+    async with session.stream("Describe this site.") as run:
+        async for event in run:
+            if isinstance(event, TurnResultEvent):
+                print(event.result.turn_id, event.result.usage)
 ```
 
 ## Session controls
@@ -274,10 +281,27 @@ paused; supply `restore_outputs=[YourOutputType]` before resuming structured wor
 
 For explicit continuation without a store, serialize `result.state.to_json()` and
 pass `state=SessionState.from_json(saved)` to `run()` or `session()`.
-Harnessed 0.23 uses snapshot format 3, checkpoint format 4 and audit envelope 7.
-Existing 0.22 stores can be reopened directly. Upgrade consumers of audit and
-checkpoint data first in a staged rollout because 0.22 rejects compaction events
-containing `accepted_note_keys`. For older stores, follow the
-[0.10 migration guide](migration-0.10.md#upgrade-harnessed).
 The [session-store example](../examples/session_store.py) shows how to persist and
 reopen sessions.
+
+### Migrating from Harnessed 0.23
+
+Harnessed 0.24 uses conversation snapshot format 4 and standalone audit envelope
+version 8. Existing 0.23 stores require migration even though the checkpoint and
+outer JSON store formats are still 4 and 3, respectively.
+
+1. Back up the store. With Harnessed 0.23, finish open turns and export each
+   conversation with `session.snapshot().to_json()`.
+2. Set `version` to `4` in each snapshot, remove `plugin_instructions`, and add
+   `"plugin_values": {}`. To carry over BrowserRig plugin state, copy the entries
+   `browser.handoffs`, `browserrig.todos`, and `browserrig.memory` if present.
+   Decode each old JSON string to a JSON value and put it under the same key in
+   `plugin_values`.
+3. With Harnessed 0.24, load the converted snapshot through
+   `SessionState.from_json(payload)` from `harnessed.sessions`, then pass it as
+   `state=` when opening a session with a fresh store. Switch live audit readers
+   and writers together and keep the old reader for archived audit envelopes.
+
+For older stores, see the [0.10 migration guide](migration-0.10.md#upgrade-harnessed).
+For extensions that use Harnessed hooks and tool selectors, see the
+[Harnessed 0.24 upgrade checklist](https://github.com/mathisarends/harnessed/blob/v0.24.0/Changelog.md#upgrade-from-0230).

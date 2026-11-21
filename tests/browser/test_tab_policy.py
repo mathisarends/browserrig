@@ -6,6 +6,7 @@ from harnessed.testing import ScriptedModel
 from harnessed.tools import ToolRegistry
 
 from browserrig import (
+    ActionKind,
     Actions,
     Agent,
     MultiTab,
@@ -35,6 +36,10 @@ async def test_tab_mode_controls_tools_and_prompt(mode, multiple):
         assert (
             {"list_tabs", "open_tab", "close_tab", "switch_tab"} <= names
         ) is multiple
+        open_tab = session.tools.resolve(ActionKind.OPEN_TAB)
+        assert (open_tab is not None) is multiple
+        if open_tab is not None:
+            assert open_tab.definition == session.tools["open_tab"]
         prompt = await session.prompt.render()
         assert ("new_tab" in prompt) is multiple
         assert ("This session uses one browser tab" in prompt) is not multiple

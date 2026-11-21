@@ -9,6 +9,7 @@ from harnessed.events import (
     ApprovalRequestedEvent,
     CompactionFinishedEvent,
     CompactionStartedEvent,
+    DurableEvent,
     ModelAttemptFinishedEvent,
     ModelAttemptStartedEvent,
     ModelRetryScheduledEvent,
@@ -18,9 +19,9 @@ from harnessed.events import (
     ToolExecutionFinishedEvent,
     TurnEndedEvent,
 )
-from harnessed.hooks import SessionAppended
-from harnessed.kernel import hook
+from harnessed.kernel import Inject, hook
 from harnessed.models import ToolResult
+from harnessed.sessions.log import SessionLog
 
 from .events import BrowserEvent, EventKind, LiveEvent, TabEvent
 
@@ -77,11 +78,12 @@ class TerminalEvents(Plugin):
             flush=True,
         )
 
-    @hook(SessionAppended)
-    def _appended(self, receipt: SessionAppended) -> None:
-        record = _event_record(receipt.event)
-        if isinstance(receipt.event, TurnEndedEvent):
-            usage = receipt.event.usage
+    @hook(DurableEvent)
+    def _committed(self, event: DurableEvent, log: Inject[SessionLog]) -> None:
+        record = _event_record(event)
+        if isinstance(event, TurnEndedEvent):
+            usage = event.usage
+            record["session_model_request_count"] = log.model_request_count
             record["usage"] = {
                 **asdict(usage),
                 "total_tokens": usage.total_tokens,

@@ -1,3 +1,4 @@
+from time import monotonic
 from typing import assert_never
 from uuid import uuid4
 
@@ -17,6 +18,7 @@ from harnessed.events import (
     ToolExecutionStartedEvent,
     TurnEndedEvent,
 )
+from harnessed.hooks import SessionOpened
 from harnessed.kernel import PluginScope, PluginState, hook, needs
 from harnessed.models import ToolStatus
 from harnessed.sessions.log import SessionLog
@@ -55,7 +57,9 @@ class Activity(Plugin, slot="browserrig.activity", provides=True):
     ) -> tuple[ActivityFinishedEvent, ...]:
         return project_intervals(self._state.records, now=now)
 
-    async def _start(self, key: ActivityKey, *, cause_id: str) -> None:
+    async def _start(
+        self, key: ActivityKey, *, cause_id: str, at: float | None = None
+    ) -> None:
         """A new interval in the same slot supersedes only that slot's previous interval."""
         await self._finish(key, ActivityOutcome.SUPERSEDED)
         event = ActivityStartedEvent(
@@ -63,6 +67,7 @@ class Activity(Plugin, slot="browserrig.activity", provides=True):
             kind=key.kind,
             cause_id=cause_id,
             epoch_id=self._state.epoch,
+            at=monotonic() if at is None else at,
         )
         self._state.open[key] = event
         self._state.records.append(event)
@@ -233,6 +238,11 @@ class Activity(Plugin, slot="browserrig.activity", provides=True):
             outcome,
             reason=event.reason,
         )
+
+    @hook(SessionOpened)
+    async def _on_opened(self, event: SessionOpened) -> None:
+        if event.session.log.control.state is ControlState.PAUSED:
+            await self._start(_PAUSE, cause_id=self._state.epoch, at=event.at)
 
     @hook(SessionControlChangedEvent)
     async def _on_control(self, event: SessionControlChangedEvent) -> None:

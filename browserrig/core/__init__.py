@@ -44,7 +44,13 @@ from .model_profiles import MODEL_PROFILES, ModelProfile
 from .options import Options
 from .runtime import Runtime
 from .tabs import ChangeTab, TabDispatch
-from .tools import ActionLabel, BrowserToolCall, BrowserToolMetadata, browser_tool
+from .tools import (
+    ActionLabel,
+    BrowserToolCall,
+    BrowserToolMetadata,
+    browser_tool,
+    is_javascript_tool,
+)
 
 __all__ = [
     "ActionLabel",
@@ -93,4 +99,5 @@ __all__ = [
     "TargetId",
     "ViewportSize",
     "browser_tool",
+    "is_javascript_tool",
 ]

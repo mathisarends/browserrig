@@ -1,3 +1,4 @@
+import pytest
 from harnessed import Plugin, tool
 from harnessed.models import ToolResult
 from harnessed.testing import ScriptedModel, call
@@ -15,9 +16,14 @@ class _AliasedJavaScript(Plugin):
     async def evaluate_page(self) -> ToolResult:
         return ToolResult("listener installed")
 
+    @tool(action=ActionKind.JAVASCRIPT, description="Evaluate page JavaScript.")
+    async def evaluate_registered_action(self) -> ToolResult:
+        return ToolResult("listener installed")
 
-async def test_aliased_javascript_is_blocked_before_secret_entry():
-    model = ScriptedModel([call("evaluate_page"), "done"])
+
+@pytest.mark.parametrize("name", ["evaluate_page", "evaluate_registered_action"])
+async def test_aliased_javascript_is_blocked_before_secret_entry(name):
+    model = ScriptedModel([call(name), "done"])
     agent, _ = _agent(_secrets(), model=model, plugins=[_AliasedJavaScript()])
     await agent.run("go", max_steps=3)
     replies = repr(model.requests[-1].messages)

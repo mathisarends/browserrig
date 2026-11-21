@@ -2,7 +2,6 @@ import json
 
 from harnessed import Plugin, SystemPrompt, tool
 from harnessed.events import AssistantMessageEvent, ToolCallFinishedEvent
-from harnessed.events.turn import FinalStepPolicy
 from harnessed.hooks import (
     ExecuteTool,
     Next,
@@ -26,7 +25,7 @@ from harnessed.models import (
 )
 from harnessed.prompts import Instructions
 from harnessed.sessions import SessionContext
-from harnessed.tools import ToolChain
+from harnessed.tools import ToolChain, tool_name
 
 from .models import DENIALS, Phase, closing_step, permits
 from .state import CompletionState
@@ -40,19 +39,16 @@ _FINAL_INSTRUCTION = (
 
 _CLOSING_HINT = (
     "Step {step} of {max_steps}: this is the last step that still leaves room for a "
-    "final answer. Call done alone now, with success=false if the task is unfinished. "
+    "final answer. Call {tool} alone now, with success=false if the task is unfinished. "
     "Other tools are blocked from here on."
 )
 
-_INSTRUCTIONS = Instructions(
-    title="Explicit task completion",
-    text=(
-        "Brief progress messages between tool calls do not end the task. When browser "
-        "work is finished, inspect the last action's result, then call done alone. Write "
-        "the final answer in the next response, following the requested format and any "
-        "declared output schema. Use success=false if the task could not be completed. "
-        "Do not call done before required work is finished."
-    ),
+_INSTRUCTIONS = (
+    "Brief progress messages between tool calls do not end the task. When browser "
+    "work is finished, inspect the last action's result, then call {tool} alone. Write "
+    "the final answer in the next response, following the requested format and any "
+    "declared output schema. Use success=false if the task could not be completed. "
+    "Do not call {tool} before required work is finished."
 )
 
 
@@ -70,7 +66,12 @@ class Done(Plugin, slot="completion", provides=True):
     _state = PluginState(CompletionState)
 
     def instructions(self) -> SystemPrompt:
-        return SystemPrompt(_INSTRUCTIONS)
+        return SystemPrompt(
+            Instructions(
+                title="Explicit task completion",
+                text=_INSTRUCTIONS.format(tool=tool_name(self.done)),
+            )
+        )
 
     @property
     def remaining_work_steps(self) -> int:
@@ -90,10 +91,11 @@ class Done(Plugin, slot="completion", provides=True):
         schema = event.session.log.current_turn().start.output_schema
         if schema is None:
             return request
+        name = tool_name(self.done)
         return request.append_message(
             SystemMessage(
-                "After done, the final answer must match this JSON Schema. "
-                "Progress messages before done may use ordinary text.\n"
+                f"After {name}, the final answer must match this JSON Schema. "
+                f"Progress messages before {name} may use ordinary text.\n"
                 + json.dumps(schema.json_schema, default=dict, ensure_ascii=False)
             )
         )
@@ -138,19 +140,18 @@ class Done(Plugin, slot="completion", provides=True):
         decision = await next_()
         if event.session.log is not self._session.log or not decision.accepted:
             return decision
+        progress = event.progress
         state = self._state
-        state.step = event.step
-        state.closing_step = closing_step(
-            event.max_steps,
-            summarize=self._session.log.current_turn().start.final_step
-            is FinalStepPolicy.SUMMARIZE,
-        )
-        if event.step == state.closing_step and not self._finished():
+        state.step = progress.step
+        state.closing_step = closing_step(progress.last_tool_step)
+        if progress.step == state.closing_step and not self._finished():
             # Observed after the page observation so the hint is the latest context.
             event.session.observe(
                 UserMessage(
                     content=_CLOSING_HINT.format(
-                        step=event.step, max_steps=event.max_steps
+                        step=progress.step,
+                        max_steps=progress.max_steps,
+                        tool=tool_name(self.done),
                     )
                 ),
                 source="completion",
@@ -162,7 +163,7 @@ class Done(Plugin, slot="completion", provides=True):
         # Refuse calls the phase forbids before ordinary approval hooks can ask
         # the host to authorize work that is no longer permitted.
         if event.session.log is self._session.log and not permits(
-            self._phase(), event.call.name
+            self._phase(), is_done=event.matches(self.done)
         ):
             return Decision.DENY
         return await next_()
@@ -172,13 +173,16 @@ class Done(Plugin, slot="completion", provides=True):
         if event.session.log is not self._session.log:
             return await next_()
         phase = self._phase()
-        if not permits(phase, event.call.name):
-            return ToolResult(DENIALS[phase], ToolStatus.ERROR, break_chain=True)
+        name = tool_name(self.done)
+        if not permits(phase, is_done=event.matches(self.done)):
+            return ToolResult(
+                DENIALS[phase].format(tool=name), ToolStatus.ERROR, break_chain=True
+            )
         answer = event.session.log.last(AssistantMessageEvent)
         calls = answer.message.tool_calls if answer is not None else ()
-        if len(calls) > 1 and any(call.name == "done" for call in calls):
+        if len(calls) > 1 and any(call.name == name for call in calls):
             return ToolResult(
-                "Call done alone, after inspecting the last action's result.",
+                f"Call {name} alone, after inspecting the last action's result.",
                 ToolStatus.ERROR,
                 break_chain=True,
             )
@@ -194,9 +198,10 @@ class Done(Plugin, slot="completion", provides=True):
 
     def _finished(self) -> bool:
         turn = self._session.log.open_turn
+        name = tool_name(self.done)
         return turn is not None and any(
             isinstance(event, ToolCallFinishedEvent)
-            and event.call.name == "done"
+            and event.call.name == name
             and event.result.status is ToolStatus.OK
             for event in turn.events
         )

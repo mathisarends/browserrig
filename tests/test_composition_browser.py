@@ -7,7 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Agent, Context, Plugin, tool
-from harnessed.context import Compaction, Summary
+from harnessed.context import Compaction
+from harnessed.context.compaction import Summary
 from harnessed.events import (
     DurableEvent,
     ModelRequestedEvent,

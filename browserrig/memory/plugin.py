@@ -2,24 +2,19 @@ import hashlib
 from dataclasses import dataclass
 
 from harnessed import Plugin, SystemPrompt
+from harnessed.context import ContextMeter
+from harnessed.context.compaction import CompactionPolicy
 from harnessed.events import CompactionAppliedEvent
 from harnessed.hooks import (
     DeferCompaction,
     Next,
     PrepareCompaction,
     PrepareRequest,
-    PreStep,
-    SessionAppended,
-    StepDecision,
 )
 from harnessed.kernel import PluginState, hook, needs, observes
-from harnessed.models import Model, ModelRequest, UserMessage
+from harnessed.models import ModelRequest, UserMessage
 from harnessed.prompts import Instructions
-from harnessed.prompts.plugin_instructions import PluginInstructions
-from harnessed.runtime.budget import ContextBudget
-from harnessed.runtime.compaction import CompactionPolicy
-from harnessed.runtime.tokens import TokenCounter, count_request
-from harnessed.sessions import SessionContext
+from harnessed.sessions import SessionContext, SessionValue
 from harnessed.tracing import span
 
 from browserrig.events import FileReadFinishedEvent, FileWrittenEvent
@@ -33,8 +28,6 @@ _HANDOVER_KEY = "browserrig.memory.handover"
 
 @dataclass
 class _MemoryRuntime:
-    remaining_steps: int = 0
-    final_step: bool = False
     defer_once: bool = False
     compaction_can_read: bool = False
     restore_notified: bool = False
@@ -49,13 +42,11 @@ class TaskMemory(Plugin, slot="browserrig.task-memory", provides=True):
 
     events = (TaskMemoryEvent,)
     _runtime = PluginState(_MemoryRuntime)
+    _saved = SessionValue(TaskMemoryState, key=_STATE_KEY)
     _files = observes(FileSystem)
     _compaction = observes(CompactionPolicy)
-    _budget = needs(ContextBudget)
-    _context = needs(PluginInstructions)
+    _meter = needs(ContextMeter)
     _session = needs(SessionContext)
-    _counter = needs(TokenCounter)
-    _model = needs(Model)
 
     def __init__(
         self,
@@ -74,11 +65,9 @@ class TaskMemory(Plugin, slot="browserrig.task-memory", provides=True):
     @property
     def current(self) -> TaskMemoryState:
         """The latest handover metadata; note contents are read through file tools."""
-        saved = self._context.values.get(_STATE_KEY)
-        if saved is not None:
-            state = TaskMemoryState.model_validate_json(saved)
-            if state.path == self.path:
-                return state
+        saved = self._saved.get()
+        if saved is not None and saved.path == self.path:
+            return saved
         return TaskMemoryState(path=self.path)
 
     def instructions(self) -> SystemPrompt:
@@ -100,14 +89,6 @@ class TaskMemory(Plugin, slot="browserrig.task-memory", provides=True):
             )
         )
 
-    @hook(PreStep)
-    async def _step(self, event: PreStep, next_: Next[StepDecision]) -> StepDecision:
-        decision = await next_()
-        if event.session.log is self._session.log:
-            self._runtime.remaining_steps = event.remaining_steps
-            self._runtime.final_step = event.is_final_step
-        return decision
-
     @hook(PrepareRequest, priority=-50)
     async def _prepare(
         self, event: PrepareRequest, next_: Next[ModelRequest]
@@ -119,7 +100,7 @@ class TaskMemory(Plugin, slot="browserrig.task-memory", provides=True):
         tools = {tool.name for tool in request.tools}
         runtime.defer_once = False
         state = self.current
-        if runtime.final_step or runtime.remaining_steps < 3:
+        if event.progress.is_final_step or event.progress.remaining_steps < 3:
             return request
         if (
             state.restore_pending
@@ -141,19 +122,16 @@ class TaskMemory(Plugin, slot="browserrig.task-memory", provides=True):
             or not {"read_file", "write_file"} <= tools
         ):
             return request
-        budget = self._budget
-        tokens = await count_request(self._counter, request) + budget.output_reserve(
-            request
-        )
-        window = budget.window_limit(self._model.info.context_window)
+        context = await self._meter.measure(request)
+        ratio = context.ratio
         near = (
-            tokens >= self.fallback_tokens
-            if window is None
-            else tokens / window >= self.warn_at
+            context.input_tokens + context.reserve_tokens >= self.fallback_tokens
+            if ratio is None
+            else ratio >= self.warn_at
         )
         if not near:
             return request
-        runtime.defer_once = window is None or tokens / window < 0.9
+        runtime.defer_once = ratio is None or ratio < 0.9
         state = state.model_copy(
             update={"checkpoint_requested": True, "checkpoint_saved": False}
         )
@@ -197,18 +175,7 @@ class TaskMemory(Plugin, slot="browserrig.task-memory", provides=True):
                 min_summary_tokens=64,
             )
 
-    @hook(SessionAppended)
-    async def _appended(self, event: SessionAppended) -> None:
-        if event.log is not self._session.log:
-            return
-        match event.event:
-            case FileWrittenEvent() as written:
-                await self._written(written)
-            case FileReadFinishedEvent() as read:
-                await self._read(read)
-            case CompactionAppliedEvent() as compacted:
-                await self._compacted(compacted)
-
+    @hook(FileWrittenEvent)
     async def _written(self, event: FileWrittenEvent) -> None:
         if self._matches(event.path):
             revision = await self._revision()
@@ -222,6 +189,7 @@ class TaskMemory(Plugin, slot="browserrig.task-memory", provides=True):
                 MemoryAction.SAVED if revision else MemoryAction.UNAVAILABLE, state
             )
 
+    @hook(FileReadFinishedEvent)
     async def _read(self, event: FileReadFinishedEvent) -> None:
         if not self._matches(event.path) or not self.current.restore_pending:
             return
@@ -243,6 +211,7 @@ class TaskMemory(Plugin, slot="browserrig.task-memory", provides=True):
             MemoryAction.RESTORED if revision else MemoryAction.PARTIAL_READ, state
         )
 
+    @hook(CompactionAppliedEvent)
     async def _compacted(self, event: CompactionAppliedEvent) -> None:
         if not self._runtime.compaction_can_read:
             return
@@ -255,7 +224,7 @@ class TaskMemory(Plugin, slot="browserrig.task-memory", provides=True):
         )
         await self._record(MemoryAction.COMPACTED, state)
         state = state.model_copy(update={"checkpoint_saved": False})
-        await self._context.set(_STATE_KEY, state.model_dump_json())
+        await self._saved.set(state)
         self._runtime.restore_notified = _HANDOVER_KEY in event.accepted_note_keys
         if self._runtime.restore_notified:
             await self._record(MemoryAction.RESTORE_REQUESTED, state)
@@ -278,7 +247,7 @@ class TaskMemory(Plugin, slot="browserrig.task-memory", provides=True):
             return None
 
     async def _record(self, action: MemoryAction, state: TaskMemoryState) -> None:
-        await self._context.set(_STATE_KEY, state.model_dump_json())
+        await self._saved.set(state)
         with span(
             "browserrig.memory",
             action=action.value,

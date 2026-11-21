@@ -278,9 +278,8 @@ async def test_reserved_final_summary_uses_effective_limit_and_remains_incomplet
         async def before(
             self, event: PreStep, next_: Next[StepDecision]
         ) -> StepDecision:
-            progress.append(
-                (event.max_steps, event.remaining_steps, event.is_final_step)
-            )
+            step = event.progress
+            progress.append((step.max_steps, step.remaining_steps, step.is_final_step))
             return await next_()
 
     model = ScriptedModel(["Partial browser findings"])

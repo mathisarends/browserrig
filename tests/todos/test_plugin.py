@@ -1,6 +1,6 @@
 import pytest
 from harnessed import Agent, Compaction, Context
-from harnessed.context import Summary
+from harnessed.context.compaction import Summary
 from harnessed.events import CompactionAppliedEvent, ToolCallFinishedEvent
 from harnessed.integrations.json import JsonSessionStore
 from harnessed.models import ToolStatus

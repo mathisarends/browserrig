@@ -79,14 +79,19 @@ async def test_terminal_includes_turn_usage_in_its_json_output():
                 ModelChunk(usage=ModelUsage(8, 2, 4, 1, 1)),
             ],
             [ModelChunk(text="Answer", usage=ModelUsage(12, 3, 6, 2, 1))],
+            "Follow-up answer",
         ]
     )
     agent = Agent(model=model, plugins=[TerminalEvents(output)])
-    result = await agent.run("Task")
+    async with agent.session() as session:
+        result = await session.run("Task")
+        await session.run("Follow up")
 
     records = [json.loads(line) for line in output.getvalue().splitlines()]
-    record = next(item for item in records if item["type"] == "turn.ended")
+    record, follow_up = (item for item in records if item["type"] == "turn.ended")
     assert record["turn_id"] == result.turn_id
+    assert record["session_model_request_count"] == 2
+    assert follow_up["session_model_request_count"] == 3
     assert record["usage"] == {
         "input_tokens": 20,
         "output_tokens": 5,
