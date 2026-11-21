@@ -1,4 +1,4 @@
-function createChoreographyPanels(ui, caption) {
+function createChoreographyPanels(ui) {
   const highlight = (event) => {
     const padding = 4;
     const x = Math.max(1, event.x - padding);
@@ -134,18 +134,6 @@ function createChoreographyPanels(ui, caption) {
         break;
       case kinds.TAB_PRESSED:
         tab(event);
-        break;
-      case kinds.WAITING:
-        caption.put(
-          {
-            id: 'waiting',
-            kind: ui.options().actions.WAIT,
-            phase: ui.options().phases.RUNNING,
-            title: 'Waiting',
-            detail: `${event.duration_seconds.toFixed(1)} s`,
-          },
-          event.duration_seconds * 1000,
-        );
         break;
       default:
         break;

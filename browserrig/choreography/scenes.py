@@ -160,7 +160,11 @@ async def press(scene: Scene, intent: ControlIntent, step: Step) -> Any:
 
 async def wait(scene: Scene, intent: WaitIntent, step: Step) -> Any:
     await scene.show(WaitingEvent(duration_seconds=intent.seconds))
-    return await step()
+    try:
+        return await step()
+    except (Exception, asyncio.CancelledError):
+        await scene.show(WaitingEvent(duration_seconds=0))
+        raise
 
 
 async def open_file(scene: Scene, intent: OpenFileIntent, step: Step) -> Any:

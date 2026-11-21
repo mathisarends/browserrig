@@ -66,6 +66,8 @@ class HighlightElementEvent(PositionedEvent):
 
 @dataclass(frozen=True, slots=True)
 class WaitingEvent(InputEvent):
+    """Requested wait in seconds, or zero when an active wait is interrupted."""
+
     duration_seconds: float
     type: Literal[EventKind.WAITING] = field(default=EventKind.WAITING, kw_only=True)
 
