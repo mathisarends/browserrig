@@ -103,6 +103,7 @@ architecture:
       third_party: {deny: [cdpify]}
     activity: {path: activity, may_depend_on: [core]}
     recording: {path: recording, may_depend_on: [core, browser, activity]}
+    screencast: {path: screencast, may_depend_on: [core, browser]}
     handoff:
       path: handoff
       may_depend_on: [core, browser, nudges, observation, dom, secrets]
