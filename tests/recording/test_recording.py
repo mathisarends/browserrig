@@ -19,7 +19,6 @@ from browserrig.core import ActivityKind, ActivityOutcome, BrowserError
 from browserrig.events import (
     BROWSER_EVENTS,
     ActivityFinishedEvent,
-    ActivityStartedEvent,
     PageCaptureFinishedEvent,
     PageCaptureStartedEvent,
     TabActivatedEvent,
@@ -356,12 +355,9 @@ class _BrowserService(Plugin):
 def _recording_clock(monkeypatch):
     clock = SimpleNamespace(now=100.0)
 
-    def started(**fields):
-        return ActivityStartedEvent(**fields, at=clock.now)
-
     # Keep native captures and Activity receipts on the same explicit timeline.
     monkeypatch.setattr(capture_module, "monotonic", lambda: clock.now)
-    monkeypatch.setattr(activity_module, "ActivityStartedEvent", started)
+    monkeypatch.setattr(activity_module, "monotonic", lambda: clock.now)
     return clock
 
 

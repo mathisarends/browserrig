@@ -26,6 +26,7 @@ from harnessed.plugins import FinalStepPolicy
 from harnessed.prompts import SectionDelivery
 from harnessed.sessions import SessionContext
 from harnessed.testing import ScriptedModel, call
+from harnessed.tools import ToolChain
 from pydantic import BaseModel, Field
 
 import browserrig
@@ -325,19 +326,26 @@ def _texts(request):
     return "\n".join(message.text for message in request.messages)
 
 
-async def test_the_last_step_with_room_for_an_answer_asks_for_done():
+@pytest.mark.parametrize("name", ["done", "finish_task"])
+async def test_the_last_step_with_room_for_an_answer_asks_for_done(name):
+    class RenamedDone(Done):
+        @tool(name="finish_task", readonly=True, chain=ToolChain.STOP_AFTER)
+        async def done(self, success: bool) -> str:
+            return await super().done(success)
+
     performed = []
     model = ScriptedModel(
-        [call("inspect"), call("inspect"), call("done", success=True), "Final"]
+        [call("inspect"), call("inspect"), call(name, success=True), "Final"]
     )
     result = await Agent(
         model=model,
-        plugins=[Done(), _Work(performed)],
+        plugins=[Done() if name == "done" else RenamedDone(), _Work(performed)],
     ).run("Task", max_steps=4)
     assert result.completed and result.text == "Final"
     assert performed == ["inspect", "inspect"]
     assert not any("Step" in _texts(request) for request in model.requests[:2])
     assert "Step 3 of 4" in _texts(model.requests[2])
+    assert f"Call {name} alone now" in _texts(model.requests[2])
     assert all(request.tools == model.requests[0].tools for request in model.requests)
 
 

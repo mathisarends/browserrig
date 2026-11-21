@@ -96,15 +96,15 @@ rather than moving published tags; PyPI versions cannot be overwritten.
 
 ## Compatibility and coverage
 
-Harnessed and its provider, MCP and OTel extras are pinned to 0.23.0.
-Conversation snapshots use format 3, checkpoints use format 4 and standalone
-audit envelopes use version 7. Harnessed 0.23 accepts existing 0.22 stores.
-See the [0.11 migration guide](migration-0.11.md) for a staged rollout and the
-[0.10 migration guide](migration-0.10.md) for export and restore from older formats.
+Harnessed and its provider, MCP and OTel extras are pinned to 0.24.0.
+Conversation snapshots and checkpoints use format 4. Standalone audit envelopes
+use version 8. See the [session migration guide](agent-guide.md#migrating-from-harnessed-023)
+for exporting and restoring conversations from existing stores.
 
-Persistence adapters in handoff/todos and compaction integration in task memory
-include narrow internal Harnessed dependencies. Their restoration, request-context
-and recovery tests matter when upgrading upstream.
+Handoff, Todos and Task Memory persist their state through Harnessed's
+`SessionValue`. Task Memory uses the internal `CompactionPolicy` to detect
+whether compaction is configured. Run the restoration, request-context and
+recovery tests when upgrading Harnessed.
 
 CI covers Python 3.12–3.14 on Windows/Linux, with real Chrome tests on Linux.
 macOS, perspective-transformed frames and browser-crash recovery remain coverage

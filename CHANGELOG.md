@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+- Pin Harnessed and its provider, MCP and OpenTelemetry extras to 0.24.0.
+  Existing session stores require a snapshot export and import into a fresh
+  store. Conversation snapshots use format 4 and standalone audit envelopes use
+  version 8. See the [session migration guide](docs/agent-guide.md#migrating-from-harnessed-023).
+
+### Changed
+
+- Match JavaScript guardrails and the completion tool against their registered
+  actions or methods so aliases keep the same behavior.
+- Track activity from the moment a paused session reopens and include the
+  session's native model request count in terminal turn summaries.
+
 ## 0.11.1 (2026-11-21)
 
 ### Fixed

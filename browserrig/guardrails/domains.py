@@ -9,7 +9,7 @@ from harnessed.models import ToolResult
 from harnessed.prompts import Instructions
 
 from browserrig.browser import DomainNotAllowed, NavigationPolicy
-from browserrig.core import ActionKind, BrowserToolMetadata
+from browserrig.core import is_javascript_tool
 
 
 class AllowedDomains(
@@ -66,14 +66,7 @@ class AllowedDomains(
     async def _guard_tool(
         self, event: ExecuteTool, next_: Next[ToolResult]
     ) -> ToolResult:
-        metadata = (
-            event.tool.metadata.get(BrowserToolMetadata)
-            if event.tool is not None
-            else None
-        )
-        if event.call.name == "execute_javascript" or (
-            metadata is not None and metadata.kind == ActionKind.JAVASCRIPT
-        ):
+        if is_javascript_tool(event.call.name, event.tool):
             return ToolResult.error(
                 "JavaScript execution is unavailable while allowed domains are configured."
             )

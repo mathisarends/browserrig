@@ -3,7 +3,7 @@ from typing import Annotated
 
 from harnessed import Plugin, SystemPrompt, tool
 from harnessed.hooks import Next, PrepareRequest
-from harnessed.kernel import hook, needs
+from harnessed.kernel import hook
 from harnessed.models import (
     AssistantMessage,
     Message,
@@ -12,7 +12,7 @@ from harnessed.models import (
     UserMessage,
 )
 from harnessed.prompts import Instructions
-from harnessed.prompts.plugin_instructions import PluginInstructions
+from harnessed.sessions import SessionValue
 from harnessed.tools import ToolError
 from pydantic import Field, ValidationError
 
@@ -42,7 +42,7 @@ class Todos(Plugin, provides=True):
     steps old. A restored session retains the list.
     """
 
-    _context = needs(PluginInstructions)
+    _saved = SessionValue(TodoList, key=_STATE_KEY)
 
     def __init__(self, *, remind_after: int = 10) -> None:
         super().__init__()
@@ -57,8 +57,7 @@ class Todos(Plugin, provides=True):
     @property
     def current(self) -> TodoList | None:
         """The current immutable list, or None before the first update."""
-        saved = self._context.values.get(_STATE_KEY)
-        return TodoList.model_validate_json(saved) if saved is not None else None
+        return self._saved.get()
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
@@ -118,7 +117,7 @@ class Todos(Plugin, provides=True):
             raise ToolError(
                 "; ".join(issue["msg"] for issue in error.errors(include_url=False))
             ) from error
-        await self._context.set(_STATE_KEY, updated.model_dump_json())
+        await self._saved.set(updated)
         return f"Saved todo list:\n{updated.render()}"
 
 

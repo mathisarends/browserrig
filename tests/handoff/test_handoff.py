@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from harnessed import Agent, AgentLoop, Compaction, Context, Plugin, tool
-from harnessed.context import Summary
+from harnessed.context.compaction import Summary
 from harnessed.events import (
     CompactionAppliedEvent,
     ToolCallFinishedEvent,
@@ -204,7 +204,7 @@ async def test_done_without_a_note_or_page_change_does_not_claim_login_success()
     )
 
 
-@pytest.mark.parametrize("stored", ['[{"status":"invalid"}]', "not JSON"])
+@pytest.mark.parametrize("stored", [[{"status": "invalid"}], "not a receipt list"])
 async def test_failed_comparison_still_returns_a_typed_receipt_and_refreshes_the_page(
     stored,
 ):
@@ -216,7 +216,7 @@ async def test_failed_comparison_still_returns_a_typed_receipt_and_refreshes_the
         return HumanResponse()
 
     agent, model, holder = _agent([_request(), "Done"], ask)
-    state = SessionState(plugin_instructions={"browser.handoffs": stored})
+    state = SessionState(plugin_values={"browser.handoffs": stored})
     async with agent.session(state=state) as session:
         _prepare(holder)
         assert session.scope[HumanHandoff].history == ()

@@ -7,7 +7,7 @@ from weakref import WeakKeyDictionary
 
 from harnessed import tool
 from harnessed.kernel import PluginBase, Scope, Waterfall, registration
-from harnessed.tools import ToolChain
+from harnessed.tools import ToolChain, ToolInfo
 from pydantic import Field
 
 from .kinds import ActionKind
@@ -46,6 +46,18 @@ class BrowserToolCall(Waterfall[object]):
     metadata: BrowserToolMetadata
     arguments: Mapping[str, object]
     name: str = ""
+
+
+def is_javascript_tool(name: str, info: ToolInfo | None) -> bool:
+    """Recognize the JavaScript action and older registrations used by guards."""
+    if name == "execute_javascript":
+        return True
+    if info is None:
+        return False
+    metadata = info.metadata.get(BrowserToolMetadata)
+    return info.matches(ActionKind.JAVASCRIPT) or (
+        metadata is not None and metadata.kind == ActionKind.JAVASCRIPT
+    )
 
 
 def browser_tool[F: Callable[..., Awaitable[object]]](

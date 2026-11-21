@@ -7,7 +7,7 @@ from dataclasses import replace
 import pytest
 from harnessed import Agent, Compaction, Context, Plugin, tool
 from harnessed.kernel import needs
-from harnessed.models import ModelInfo
+from harnessed.models import ImagePart, ModelInfo, TextPart, UserMessage
 from harnessed.testing import ScriptedModel, call
 from pydantic import BaseModel
 
@@ -283,6 +283,7 @@ async def test_redaction_and_application_filter_leave_live_history_intact(collec
     from pydantic import SecretStr  # pylint: disable=import-outside-toplevel
 
     secret = "credential-12345"
+    image_url = f"https://example.test/image?token={secret}"
     seen = []
 
     def filter_content(content):
@@ -304,9 +305,9 @@ async def test_redaction_and_application_filter_leave_live_history_intact(collec
             *plugins,
             Echo(),
         ],
-    ).run(f"Input: {secret}")
+    ).run(UserMessage((TextPart(f"Input: {secret}"), ImagePart(image_url))))
     assert result.text == f"Answer: {secret}"
-    assert any(secret in str(message) for message in model.requests[-1].messages)
+    assert any(image_url in str(message) for message in model.requests[0].messages)
     spans = [
         span
         for _, request in collector
@@ -315,6 +316,13 @@ async def test_redaction_and_application_filter_leave_live_history_intact(collec
         for span in scope.spans
     ]
     assert spans and secret not in str(spans)
+    model_attributes = [
+        _attributes(span.attributes) for span in spans if span.name == "harnessed.model"
+    ]
+    assert any(
+        item.get("harnessed.input_messages.image_urls_redacted") == 1
+        for item in model_attributes
+    )
     tool_attributes = _attributes(
         next(span for span in spans if span.name == "harnessed.tool").attributes
     )

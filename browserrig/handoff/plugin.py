@@ -9,9 +9,9 @@ from harnessed.hooks import Next, PrepareRequest, PreStep, StepDecision
 from harnessed.kernel import Inject, PluginScope, PluginState, hook, needs
 from harnessed.models import ModelRequest, UserMessage
 from harnessed.prompts import Instructions
-from harnessed.prompts.plugin_instructions import PluginInstructions
+from harnessed.sessions import SessionValue
 from harnessed.tools import ToolChain
-from pydantic import Field, TypeAdapter, ValidationError
+from pydantic import Field, TypeAdapter
 
 from browserrig.browser import Browser, BrowserEvents
 from browserrig.core import BrowserCoordination, HandoffStatus
@@ -56,11 +56,11 @@ class HumanHandoff(Plugin, provides=True):
 
     events = HANDOFF_EVENTS
     _state = PluginState(HandoffState)
+    _history = SessionValue(tuple[HandoffReceipt, ...], key=_HISTORY_KEY, default=())
     _browser = needs(Browser)
     _coordination = needs(BrowserCoordination)
     _events = needs(BrowserEvents)
     _observe = needs(BrowserPerception)
-    _context = needs(PluginInstructions)
 
     def __init__(
         self,
@@ -89,13 +89,15 @@ class HumanHandoff(Plugin, provides=True):
         Resolve the mounted plugin with ``session.scope[HumanHandoff]``. History
         is restored when the session opens and bounded by ``history_limit``.
         """
-        return self._state.history
+        try:
+            return self._history.get()[-self.history_limit :]
+        except ValueError:
+            return ()
 
     def instructions(self) -> SystemPrompt:
         return SystemPrompt(_INSTRUCTIONS)
 
     async def setup(self, scope: PluginScope) -> None:
-        self._state.history = self._read_history()
         scope.effect(self._release)
 
     def _release(self) -> None:
@@ -248,34 +250,21 @@ class HumanHandoff(Plugin, provides=True):
         return receipt.model_dump_json()
 
     async def _record(self, receipt: HandoffReceipt) -> None:
-        # Harnessed stores feature instruction state as text. Keep that wire format at
-        # this boundary; callers and handoff logic work with typed receipts.
         history = (*self.history, receipt)[-self.history_limit :]
-        try:
-            await self._context.set(_HISTORY_KEY, _HISTORY.dump_json(history).decode())
-        finally:
-            # A cancelled write may already have committed. Reflect the actual
-            # context state rather than publishing an uncommitted local value.
-            self._state.history = self._read_history()
-
-    def _read_history(self) -> tuple[HandoffReceipt, ...]:
-        previous = self._context.values.get(_HISTORY_KEY, "[]")
-        try:
-            return _HISTORY.validate_json(previous)[-self.history_limit :]
-        except ValidationError:
-            return ()
+        await self._history.set(history)
 
     @hook(PrepareRequest)
     async def _prepare(
         self, _event: PrepareRequest, next_: Next[ModelRequest]
     ) -> ModelRequest:
         request = await next_()
-        if not self.history:
+        history = self.history
+        if not history:
             return request
         return request.append_message(
             UserMessage(
                 "Recent human handoffs (historical reports; current page observations take "
-                "precedence):\n" + _HISTORY.dump_json(self.history).decode()
+                "precedence):\n" + _HISTORY.dump_json(history).decode()
             )
         )
 

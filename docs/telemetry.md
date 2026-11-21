@@ -191,6 +191,9 @@ async def run_traced(model, token):
 ```
 
 `ContentCapture.redacted(*secrets)` masks registered literals before truncation.
+External image URLs containing a registered secret are replaced with a text
+placeholder in the trace. `harnessed.input_messages.image_urls_redacted` counts
+the replacements, and the model receives the original URL.
 It does not scan the environment or Browserrig's `Secrets` plugin; recreate the
 policy when credentials rotate. Exception text is disabled unless explicitly
 enabled. A synchronous `content_filter` can replace or omit detached `TraceContent`

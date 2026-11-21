@@ -18,10 +18,9 @@ from harnessed.kernel import PluginScope, PluginState, hook, needs
 from harnessed.models import TextPart, ToolResult, UserMessage
 from harnessed.prompts import Instructions
 from harnessed.sessions.log import SessionLog
-from harnessed.tools import ToolInfo
 
 from browserrig.browser import Browser, BrowserEvents
-from browserrig.core import ActionKind, BrowserToolMetadata, SecretError
+from browserrig.core import SecretError, is_javascript_tool
 from browserrig.events import (
     SECRET_EVENTS,
     BrowserEvent,
@@ -248,7 +247,7 @@ class Secrets(Plugin, provides=True, needs=(SessionLog,)):
             return ToolResult.error(
                 "Secret placeholders work only in the text of type_text or send_keys."
             )
-        if self._secrets and _runs_javascript(call.name, event.tool):
+        if self._secrets and is_javascript_tool(call.name, event.tool):
             return ToolResult.error(
                 "JavaScript execution is unavailable while secrets are configured."
             )
@@ -372,13 +371,6 @@ def _has_placeholder(value: object) -> bool:
     if isinstance(value, (list, tuple)):
         return any(_has_placeholder(item) for item in value)
     return False
-
-
-def _runs_javascript(name: str, tool: ToolInfo | None) -> bool:
-    metadata = tool.metadata.get(BrowserToolMetadata) if tool is not None else None
-    return name == "execute_javascript" or (
-        metadata is not None and metadata.kind == ActionKind.JAVASCRIPT
-    )
 
 
 def _redact_message(redactor: Redactor, message: Any) -> Any:

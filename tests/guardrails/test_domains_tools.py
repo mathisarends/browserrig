@@ -24,8 +24,15 @@ class _ScriptTools(Plugin):
         self.executed.append(code)
         return "Script executed"
 
+    @tool(action=ActionKind.JAVASCRIPT, description="Evaluate page JavaScript.")
+    async def evaluate_registered_action(self, code: str) -> str:
+        self.executed.append(code)
+        return "Script executed"
 
-@pytest.mark.parametrize("name", ["execute_javascript", "evaluate_page"])
+
+@pytest.mark.parametrize(
+    "name", ["execute_javascript", "evaluate_page", "evaluate_registered_action"]
+)
 @pytest.mark.parametrize("domains", [(), ("example.com",)])
 async def test_javascript_tools_and_aliases_are_blocked_without_execution(
     name, domains
