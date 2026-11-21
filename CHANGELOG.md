@@ -12,6 +12,10 @@
   `ReferenceDragTools()` for `drag`. The standard agent includes both. The drag
   tools take only the endpoints. The input motor plans the timing, and direct
   Python calls to `Input.mouse.drag()` can still specify `duration_seconds`.
+- Rename `Motor.pointer_route()` and the `InputPacing(pointer_route=...)`
+  keyword to `cursor_route`. Rename `PointerRoutePlanner` to
+  `CursorRoutePlanner`. The same planner now controls free cursor movement and
+  movement with the primary mouse button held.
 
 ### Changed
 

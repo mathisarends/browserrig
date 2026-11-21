@@ -594,8 +594,8 @@ provide separate DOM capabilities. Tools that take DOM refs require
 
 ## Browser-owned presentation
 
-`InputPacing` installs a `Motor` controlling keystrokes, pointer and drag routes,
-and wheel steps. Without it, `Instant` dispatches a wheel gesture in one event without a
+`InputPacing` installs a `Motor` controlling keystrokes, cursor routes and wheel
+steps. Without it, `Instant` dispatches a wheel gesture in one event without a
 pause. `HumanMotor` supplies a smooth wheel plan; use
 `InputPacing(HumanMotor(scroll_speed=0.5))` for half the default scroll speed
 (`HumanMotor` is imported from `browserrig.input`). Custom motors implement
@@ -603,15 +603,14 @@ pause. `HumanMotor` supplies a smooth wheel plan; use
 CSS-pixel deltas and `delay_before_seconds`. Their deltas must total the requested
 distance; the mouse executes their timing without selecting its own scroll curve.
 
-Custom motors can supply `drag_route(start, destination)` with consecutive
-`CursorPath` strokes for the movement with the primary button pressed. A motor
-without a drag planner gets a straight half-second route. `Instant` runs the
-drag steps without pauses. Direct Python callers can use
+The motor's `cursor_route(start, destination)` supplies consecutive
+`CursorPath` strokes for free movement and for drags. `Instant` runs the
+strokes without pauses. Direct Python callers can use
 `Input.mouse.drag(start=..., end=..., duration_seconds=...)` for a linear drag
 of an explicit duration.
 
 Override either planner or both with callables. The base motor supplies the
-other behaviors, including drag routes, aiming, wheel steps, press duration and landing.
+other behaviors, including aiming, wheel steps, press duration and landing.
 The default base is `HumanMotor()`.
 
 ```python
@@ -623,11 +622,11 @@ def keystrokes(text: str, *, sensitive: bool) -> tuple[KeyStroke, ...]:
     return tuple(KeyStroke(key, delay_after=0.02) for key in text)
 
 
-def pointer_route(start: Point, destination: Point) -> tuple[CursorPath, ...]:
+def cursor_route(start: Point, destination: Point) -> tuple[CursorPath, ...]:
     return (CursorPath.curved(start, destination, duration_seconds=0.12),)
 
 
-pacing = InputPacing(Instant(), keystrokes=keystrokes, pointer_route=pointer_route)
+pacing = InputPacing(Instant(), keystrokes=keystrokes, cursor_route=cursor_route)
 ```
 
 Sensitive text must be typed exactly as supplied. Consecutive pointer strokes

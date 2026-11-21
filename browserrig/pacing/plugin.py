@@ -3,14 +3,14 @@ from harnessed.kernel import PluginScope, needs
 
 from browserrig.input import HumanMotor, Input, Motor
 
-from .planners import KeystrokePlanner, PointerRoutePlanner, compose
+from .planners import CursorRoutePlanner, KeystrokePlanner, compose
 
 
 class InputPacing(Plugin, slot="browserrig.pacing"):
     """Operate the browser's mouse and keyboard through a `Motor`.
 
     The default motor types, moves the pointer, drags and scrolls at a person's pace.
-    Override individual plans with `keystrokes` and `pointer_route`.
+    Override individual plans with `keystrokes` and `cursor_route`.
     Pass another motor to change how input is performed; without this plugin it
     runs at full speed.
     """
@@ -22,11 +22,11 @@ class InputPacing(Plugin, slot="browserrig.pacing"):
         motor: Motor | None = None,
         *,
         keystrokes: KeystrokePlanner | None = None,
-        pointer_route: PointerRoutePlanner | None = None,
+        cursor_route: CursorRoutePlanner | None = None,
     ) -> None:
         super().__init__()
         base = motor if motor is not None else HumanMotor()
-        self._motor = compose(base, keystrokes, pointer_route)
+        self._motor = compose(base, keystrokes, cursor_route)
 
     async def setup(self, scope: PluginScope) -> None:
         scope.effect(self._input.pace(self._motor))

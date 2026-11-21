@@ -26,7 +26,7 @@ from browserrig.events import (
     ScrollStartedEvent,
 )
 
-from .motor import Motor, plan_drag
+from .motor import Motor
 from .pointer import CursorPath
 from .presenter import Presenter
 from .target import Focus, InputTarget, MouseButton, focused
@@ -190,7 +190,7 @@ class Mouse:
         if distance < 1:
             raise BrowserError("Drag source and destination must be different")
         if duration_seconds is None:
-            route = _joined(plan_drag(self._motor(), start, end), start, end)
+            route = _cursor_route(self._motor(), start, end)
             moves = _drag_steps(route)
         else:
             if not math.isfinite(duration_seconds) or duration_seconds < 0:
@@ -280,9 +280,7 @@ class Mouse:
 
     async def _move(self, target: InputTarget, point: Point) -> None:
         start = self._rest(target).position
-        motor = self._motor()
-        planned = motor.pointer_route(start, point)
-        route = _joined(planned, start, point)
+        route = _cursor_route(self._motor(), start, point)
         try:
             for path in route:
                 await self._stroke(target, path)
@@ -417,11 +415,9 @@ def _wheel_plan(
     return steps
 
 
-def _joined(
-    route: Sequence[CursorPath], start: Point, end: Point
-) -> tuple[CursorPath, ...]:
-    """Check that a route runs unbroken from `start` to `end`, before the pointer moves."""
-    strokes = tuple(route)
+def _cursor_route(motor: Motor, start: Point, end: Point) -> tuple[CursorPath, ...]:
+    """Plan and validate the route before moving the cursor."""
+    strokes = tuple(motor.cursor_route(start, end))
     if not strokes or strokes[0].start != start or strokes[-1].end != end:
         raise BrowserError(
             "A pointer route must run from the pointer to its destination"

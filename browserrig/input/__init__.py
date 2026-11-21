@@ -7,7 +7,6 @@ from .motor import (
     Instant,
     KeyStroke,
     Motor,
-    plan_drag,
 )
 from .mouse import ClickButton, ClickCount, Mouse
 from .plugin import InputRuntime
@@ -41,5 +40,4 @@ __all__ = [
     "Unseen",
     "WheelStep",
     "movement",
-    "plan_drag",
 ]

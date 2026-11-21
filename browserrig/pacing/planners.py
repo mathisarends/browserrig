@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from typing import Protocol
 
 from browserrig.core import Aim, Point
-from browserrig.input import CursorPath, KeyStroke, Motor, WheelStep, plan_drag
+from browserrig.input import CursorPath, KeyStroke, Motor, WheelStep
 
 
 class KeystrokePlanner(Protocol):
@@ -13,20 +13,20 @@ class KeystrokePlanner(Protocol):
         ...
 
 
-type PointerRoutePlanner = Callable[[Point, Point], Sequence[CursorPath]]
+type CursorRoutePlanner = Callable[[Point, Point], Sequence[CursorPath]]
 
 
 def compose(
     base: Motor,
     keystrokes: KeystrokePlanner | None,
-    pointer_route: PointerRoutePlanner | None,
+    cursor_route: CursorRoutePlanner | None,
 ) -> Motor:
-    if keystrokes is None and pointer_route is None:
+    if keystrokes is None and cursor_route is None:
         return base
     return _PlannedMotor(
         base,
         base.keystrokes if keystrokes is None else keystrokes,
-        base.pointer_route if pointer_route is None else pointer_route,
+        base.cursor_route if cursor_route is None else cursor_route,
     )
 
 
@@ -35,20 +35,17 @@ class _PlannedMotor:
         self,
         base: Motor,
         keystrokes: KeystrokePlanner,
-        pointer_route: PointerRoutePlanner,
+        cursor_route: CursorRoutePlanner,
     ) -> None:
         self._base = base
         self._keystrokes = keystrokes
-        self._pointer_route = pointer_route
+        self._cursor_route = cursor_route
 
     def keystrokes(self, text: str, *, sensitive: bool) -> Sequence[KeyStroke]:
         return self._keystrokes(text, sensitive=sensitive)
 
-    def pointer_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
-        return self._pointer_route(start, destination)
-
-    def drag_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
-        return plan_drag(self._base, start, destination)
+    def cursor_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
+        return self._cursor_route(start, destination)
 
     def aim_fractions(self, target_width: float, target_height: float) -> Aim:
         return self._base.aim_fractions(target_width, target_height)
