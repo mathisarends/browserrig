@@ -130,6 +130,38 @@ action events fall back to the tool name.
 
 Labels arrive once per complete call event, not token by token.
 
+## Stream the active tab
+
+Add `Screencast()` to the agent's plugins and open it from the application
+while the agent runs. For example, the application can pass each image to a
+viewer using `frame.mime_type` and the base64 string in `frame.data`.
+
+```python
+from browserrig import Agent, Screencast
+
+agent = Agent(model=model, plugins=[Screencast(max_width=960, max_height=600)])
+
+
+async def show_screencast(session, display):
+    async with session.scope[Screencast].open() as frames:
+        async for frame in frames:
+            await display(frame)
+```
+
+The stream follows the active tab, including changes triggered by the agent.
+Each frame has a `target_id` and Chrome's optional Unix `timestamp_seconds`.
+One viewer can read each session at a time. The viewer receives the latest
+unread frame if it falls behind. Close the context to stop capture and open
+it again to reconnect. Closing the session also stops capture and ends iteration.
+To add it to an existing session, use `async with session.mount(Screencast()):`.
+
+Chrome delivers JPEG frames by default. Pass `quality=80` to set JPEG quality
+or `image_format="png"` for PNG. The stream uses experimental
+[`Page.startScreencast`](https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-startScreencast)
+and includes the rendered viewport and any visible choreography overlays.
+Frames go to the viewer's iterator. They are excluded from model context and
+session logs.
+
 ## Session videos
 
 Add `VideoRecording()` to the agent's plugins:

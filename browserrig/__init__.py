@@ -100,7 +100,7 @@ from .readiness import (
     SelectReadiness,
     wait_for_page,
 )
-from .recording import RecordingResult, VideoRecording
+from .recording import RecordingResult, Screencast, ScreencastFrame, VideoRecording
 from .secrets import Secret, Secrets, SecretValue, Totp, env
 from .terminal import TerminalEvents
 from .todos import Todo, TodoList, Todos
@@ -232,6 +232,8 @@ __all__ = [
     "DomActionChains",
     "Activity",
     "RecordingResult",
+    "Screencast",
+    "ScreencastFrame",
     "VideoRecording",
     "Actions",
     "Point",
