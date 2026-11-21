@@ -9,12 +9,12 @@ from PIL import Image
 from browserrig import PageCapture, ScreenshotStatus
 from browserrig.core import Bounds, ReadinessPhase
 from browserrig.dom import CookieBanner, Element, Extraction
-from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
+from browserrig.observation import (  # smelt: ignore[ARC007] -- facade callable
     Frame,
-    # Public facade callable; SMT107 confuses it with the same-named module.
+    # Public facade callable; ARC007 confuses it with the same-named module.
     capture,
 )
-from browserrig.secrets.redaction import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.secrets.redaction import (  # smelt: ignore[ARC007] -- test seam
     # Test redaction of text and pixels independently of plugin activation.
     Redactor,
 )

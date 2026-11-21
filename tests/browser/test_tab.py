@@ -7,7 +7,7 @@ from cdpify import CDPCommandError
 from cdpify.domains.runtime import EvaluateResult, ExceptionDetails, RemoteObject
 
 from browserrig.browser import OpenDialog, Tab
-from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.browser import (  # smelt: ignore[ARC007] -- test seam
     # Shorten the viewport probe deadline at its owning module.
     tab as tab_module,
 )

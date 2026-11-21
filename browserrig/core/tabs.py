@@ -1,3 +1,5 @@
+"""Hook for routing tab changes through the browser runtime."""
+
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 

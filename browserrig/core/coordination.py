@@ -1,3 +1,5 @@
+"""Shared tab and browser events exposed to plugin scopes."""
+
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager

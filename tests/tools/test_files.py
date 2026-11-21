@@ -31,15 +31,15 @@ from browserrig import (
     Workspace,
 )
 from browserrig.browser import Connect, Launch, Tab
-from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.browser import (  # smelt: ignore[ARC007] -- test seam
     # Control download expiry and browser event bookkeeping directly.
     downloads as downloads_module,
 )
-from browserrig.browser.downloads import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.browser.downloads import (  # smelt: ignore[ARC007] -- test seam
     # Control download expiry and browser event bookkeeping directly.
     Downloads,
 )
-from browserrig.browser.tabs import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.browser.tabs import (  # smelt: ignore[ARC007] -- test seam
     # Verify local-file URL recognition at the download boundary.
     file_url,
 )
@@ -56,7 +56,7 @@ from browserrig.events import (
     FileWrittenEvent,
 )
 from browserrig.files import DownloadState, FileStat, FileTransfer, workspace_path
-from browserrig.files.reading import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.files.reading import (  # smelt: ignore[ARC007] -- test seam
     # Test file-read outcomes without exposing the reader as library API.
     FileReader,
 )

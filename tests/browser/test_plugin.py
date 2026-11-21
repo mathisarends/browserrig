@@ -13,7 +13,7 @@ from browserrig import (
     Viewport,
 )
 from browserrig.browser import Connect, Launch
-from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.browser import (  # smelt: ignore[ARC007] -- test seam
     # Replace ChromeBrowser at the plugin connection boundary.
     plugin as chrome_plugin,
 )

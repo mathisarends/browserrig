@@ -1,6 +1,6 @@
 from browserrig import ElementInfo, ElementRef
 from browserrig.dom import ContentGroup, TextBlock, render
-from browserrig.observation.delta import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.observation.delta import (  # smelt: ignore[ARC007] -- test seam
     # Verify model-facing deltas and ref markers independently of capture.
     unmarked,
 )

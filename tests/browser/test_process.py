@@ -7,11 +7,11 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from browserrig.browser import Launch
-from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.browser import (  # smelt: ignore[ARC007] -- test seam
     # Test process ownership and cleanup without starting Chrome.
     process as process_module,
 )
-from browserrig.browser.process import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.browser.process import (  # smelt: ignore[ARC007] -- test seam
     # Test process ownership and cleanup without starting Chrome.
     ChromeProcess,
 )
@@ -82,7 +82,7 @@ async def test_profile_cleanup_gives_up_on_persistent_lock_without_failing(
     process = _process()
     clock = iter(range(0, 1000, 5))
     monkeypatch.setattr(asyncio, "sleep", _no_sleep)
-    monkeypatch.setattr(  # smelt: ignore[SMT426] -- sleep is patched; no wait uses this clock
+    monkeypatch.setattr(  # smelt: ignore[TST008] -- sleep is patched; no wait uses this clock
         asyncio.get_running_loop(), "time", lambda: next(clock)
     )
     # The startup error is reported, not the leftover profile.

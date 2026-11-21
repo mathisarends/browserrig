@@ -35,7 +35,7 @@ from browserrig.choreography import (
     WorkPresentedEvent,
 )
 from browserrig.core import FileTransferDirection
-from browserrig.dom.content import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.dom.content import (  # smelt: ignore[ARC007] -- test seam
     # Test document extraction independently of capture strategy.
     extract_content,
 )

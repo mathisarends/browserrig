@@ -60,7 +60,7 @@ from browserrig.core import (
 from browserrig.dom import Extraction
 from browserrig.events import ObservationCapturedEvent, ReadinessStartedEvent
 from browserrig.files import Download
-from browserrig.observation.delta import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.observation.delta import (  # smelt: ignore[ARC007] -- test seam
     # Verify model-facing deltas and ref markers independently of capture.
     INTRO,
 )

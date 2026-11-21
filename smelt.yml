@@ -1,13 +1,12 @@
 # yaml-language-server: $schema=.smelt.schema.json
 # Static guardrails for browserrig. Rule details: `smelt explain <code>`.
 # Existing findings live in .smelt/debt.json; `smelt debt --prune` after fixing them.
-version: 1
+version: 2
 
 project:
   source_roots: [.]
   root_packages: [browserrig]
   test_roots: [tests]
-  coverage: strict
   exclude:
     - {path: ".browserrig/**", reason: "Generated browser state and temporary worktrees are not project sources."}
     - {path: ".uv-cache/**", reason: "Local uv cache contains third-party packages and downloaded checkouts."}
@@ -22,9 +21,9 @@ ignore:
     reason: "pnpm requires this exact lockfile name."
 
 style:
+  forbidden_names: [common, helpers, util, utils]
+  reexports: all
   file_naming: {yaml_extension: yml, compose_basename: compose}
-  # A ninth project dependency merits review; facades and composition roots are exempt.
-  max_module_imports: 8
   str_enum_values: explicit
   overrides:
     conventions:
@@ -34,14 +33,14 @@ style:
       future_annotations: when-needed
       private_modules: forbid
       type_dispatch: {style: match, min_branches: 3}
-      # Later parameters are keyword-only so call sites name their values.
-      max_positional_parameters: 4
       bases: {pydantic.BaseModel: browserrig.core.Options}
       ordering:
         constants_exempt: true
         fix: safe-only
-    # These reviewed areas need no postponed annotations, including decorated code
-    # for which when-needed deliberately emits no SMT311 finding.
+      rules:
+        # Later parameters are keyword-only so call sites name their values.
+        complexity/excess-positional-parameters: {max: 4}
+    # These areas also forbid unnecessary future imports in decorated code.
     input-annotations:
       match: browserrig.input
       future_annotations: forbid
@@ -51,9 +50,20 @@ style:
     recording-values:
       match: browserrig.recording
       dataclass_options: [frozen, slots]
+    core-docstrings:
+      match: browserrig.core
+      module_docstrings: require
+    browser-errors:
+      match: browserrig.browser
+      errors: {base: browserrig.core.BrowserError, allow: [ValueError]}
+    guardrail-errors:
+      match: browserrig.guardrails
+      errors: {base: browserrig.core.BrowserError, allow: [TypeError, ValueError]}
+    readiness-errors:
+      match: browserrig.readiness
+      errors: {base: browserrig.core.BrowserError}
 
-# Every package depends only on the packages listed under it (SMT101), so a new
-# dependency between packages is a decision made here, not an accident.
+# Each layer lists the other layers it may depend on.
 architecture:
   composition_root: [browserrig.composition, browserrig.agent]
   # Annotations may name types from anywhere; only runtime imports couple packages.
@@ -62,63 +72,62 @@ architecture:
     dom-rendering:
       match: browserrig.dom.rendering
       public: ['.']
+      min_importers_to_export: 3
     spreadsheet-readers:
       match: browserrig.files.spreadsheets
       public: ['.']
+      min_importers_to_export: 3
     # Packages depend on each other only through their __init__ facade
-    # (SMT107 error); focused test seams need reasoned import-level exceptions.
-    # SMT108 hints when one file reaches into several modules of a package.
+    # (ARC007); focused test seams need reasoned import-level exceptions.
+    # IMP001 flags several internal imports from a single caller. ARC008 looks
+    # for symbols used by at least three outside production modules.
     package-facades:
       match: browserrig.*
       public: ['.']
       min_imports_to_bundle: 2
+      min_importers_to_export: 3
 
-  modules:
-    browserrig.kinds: core
-    browserrig.events: core
-    browserrig.terminal: terminal
-    browserrig.completion: completion
   layers:
-    core: {path: core}
-    scripts: {path: scripts, may_depend_on: [core]}
-    files: {path: files, may_depend_on: [core]}
+    core: {modules: [browserrig.core, browserrig.kinds, browserrig.events]}
+    scripts: {modules: [browserrig.scripts], may_depend_on: [core]}
+    files: {modules: [browserrig.files], may_depend_on: [core]}
     input:
-      path: input
+      modules: [browserrig.input]
       may_depend_on: [core]
       third_party: {deny: [cdpify]}
-    browser: {path: browser, may_depend_on: [core, scripts, files, input]}
-    guardrails: {path: guardrails, may_depend_on: [core, browser]}
-    readiness: {path: readiness, may_depend_on: [core, scripts, files, browser]}
+    browser: {modules: [browserrig.browser], may_depend_on: [core, scripts, files, input]}
+    guardrails: {modules: [browserrig.guardrails], may_depend_on: [core, browser]}
+    readiness: {modules: [browserrig.readiness], may_depend_on: [core, scripts, files, browser]}
     observation:
-      path: observation
+      modules: [browserrig.observation]
       may_depend_on: [core, scripts, files, input, browser, readiness, nudges, secrets]
     # Reading pages from the DOM is one page model; observation knows none of it.
-    dom: {path: dom, may_depend_on: [core, scripts, browser, observation]}
-    nudges: {path: nudges, may_depend_on: [core, browser]}
-    # Observation redacts with secrets; the way back is recorded debt.
-    secrets: {path: secrets, may_depend_on: [core, scripts, input, browser]}
+    dom: {modules: [browserrig.dom], may_depend_on: [core, scripts, browser, observation]}
+    nudges: {modules: [browserrig.nudges], may_depend_on: [core, browser]}
+    # Observation uses secrets for redaction.
+    secrets: {modules: [browserrig.secrets], may_depend_on: [core, scripts, input, browser]}
     tools:
-      path: tools
+      modules: [browserrig.tools]
       may_depend_on: [core, scripts, files, input, browser, readiness, observation, dom, secrets]
       third_party: {deny: [cdpify]}
-    activity: {path: activity, may_depend_on: [core]}
-    recording: {path: recording, may_depend_on: [core, browser, activity]}
-    screencast: {path: screencast, may_depend_on: [core, browser]}
+    activity: {modules: [browserrig.activity], may_depend_on: [core]}
+    recording: {modules: [browserrig.recording], may_depend_on: [core, browser, activity]}
+    screencast: {modules: [browserrig.screencast], may_depend_on: [core, browser]}
     handoff:
-      path: handoff
+      modules: [browserrig.handoff]
       may_depend_on: [core, browser, nudges, observation, dom, secrets]
     # Input behavior depends on the devices, independently of the browser backend.
-    pacing: {path: pacing, may_depend_on: [core, input]}
+    pacing: {modules: [browserrig.pacing], may_depend_on: [core, input]}
     # Staging for viewers is optional: it builds on the rest, nothing builds on it.
     choreography:
-      path: choreography
+      modules: [browserrig.choreography]
       may_depend_on: [core, scripts, input, browser, observation, dom, tools, files, secrets]
     # Drawing that staging in the page only consumes its events; staging never draws.
-    overlay: {path: overlay, may_depend_on: [core, scripts, browser, choreography]}
-    terminal: {path: terminal, may_depend_on: [core]}
-    completion: {path: completion}
-    todos: {path: todos, may_depend_on: [core]}
-    memory: {path: memory, may_depend_on: [core, files]}
+    overlay: {modules: [browserrig.overlay], may_depend_on: [core, scripts, browser, choreography]}
+    terminal: {modules: [browserrig.terminal], may_depend_on: [core]}
+    completion: {modules: [browserrig.completion]}
+    todos: {modules: [browserrig.todos], may_depend_on: [core]}
+    memory: {modules: [browserrig.memory], may_depend_on: [core, files]}
 
 tests:
   # tests/<package>/test_<module>.py mirrors browserrig/<package>/<module>.py; a topic
@@ -128,22 +137,41 @@ tests:
   mirror_exclude:
     - "tests/integration/**"  # real Chrome, spans several modules (pytest -m integration)
     - "tests/project/**"      # repository-wide checks: architecture, release, telemetry
-  max_patches_per_test: 3
+  # These tests exercise domain behavior with real values or injected fakes.
+  forbidden_mock_paths: ["tests/dom/**", "tests/memory/**", "tests/todos/**"]
 
-# Enforce adopted conventions; narrow exceptions require concrete ownership evidence.
 rules:
+  # Architecture and package contracts
+  architecture/uncovered-source: error
+  architecture/layer-boundary: error
+  architecture/forbidden-third-party-import: error
+  architecture/shared-imports-feature: error
+  architecture/composition-root-leak: error
+  architecture/import-cycle: error
+  architecture/non-public-module-import: error
+  architecture/missing-required-module: error
+  architecture/missing-facade-export: error
+  imports/forbidden-import-style: error
+  imports/prefer-package-import: error
+  layout/forbidden-module-name: error
+  layout/forbidden-private-module: error
+  layout/file-name-convention: error
+  layout/module-docstring-convention: error
+
+  # Source conventions
+  visibility/reexport-convention: error
   visibility/internal-public-member: error
   visibility/internal-public-module-symbol: error
   visibility/internal-public-attribute: error
   modeling/missing-dataclass-option: error
   modeling/prefer-project-base-class: error
+  modeling/prefer-domain-exception: error
   meta/unused-suppression: error
   meta/resolved-debt: error
   idioms/prefer-callable-instance: error
   layout/misplaced-private-constant: error
   layout/redundant-module-name: error
-  # Source conventions
-  architecture/import-cycle: error
+  layout/misplaced-module-logger: error
   layout/definition-order: error
   idioms/bundled-instance-assignment: error
   modeling/redundant-str-enum-value: error
@@ -153,8 +181,8 @@ rules:
   frameworks/prefer-secret-type: error
   visibility/misplaced-dunder-all: error
   layout/callee-before-caller: error
-  imports/prefer-package-import: error
   layout/misplaced-static-helper: error
+  typing/forbidden-future-annotations: error
   typing/redundant-future-annotations: error
   idioms/prefer-match-type-dispatch: error
   visibility/foreign-private-access: error
@@ -182,12 +210,20 @@ rules:
   visibility/excess-private-definitions: error
   modeling/dataclass-field-mutation: error
   idioms/duplicate-narrowing-assert: error
-  architecture/missing-facade-export: error
+
   # Review candidates and their ownership rationale are recorded in docs/smelt-policy.md.
   imports/excess-package-imports: hint
-  imports/excess-module-imports: hint
+  # A ninth dependency merits review. Facades and composition roots are exempt.
+  imports/excess-module-imports: {severity: hint, max: 8}
   complexity/excess-attribute-depth: hint
-  # Test smells
+  layout/reexport-only-module: hint
+  meta/uncovered-package-facade: hint
+  typing/prefer-inline-type-parameters: hint
+
+  # Test layout and quality
+  tests/misplaced-test: error
+  tests/forbidden-mock: error
+  tests/excess-patches: {severity: error, max: 3}
   tests/private-access: error
   tests/string-patch-target: error
   visibility/test-only-public-function: error

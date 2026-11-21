@@ -25,12 +25,12 @@ from browserrig import (
 from browserrig.core import BrowserError, ReadinessError, ReadinessPhase
 from browserrig.events import ReadinessDegradedEvent, ReadinessStartedEvent, ReadyEvent
 from browserrig.files import Download
-from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
-    # Public facade callable; SMT107 confuses it with the same-named module.
+from browserrig.observation import (  # smelt: ignore[ARC007] -- facade callable
+    # Public facade callable; ARC007 confuses it with the same-named module.
     capture,
 )
 from browserrig.readiness import probe_dom
-from browserrig.readiness import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.readiness import (  # smelt: ignore[ARC007] -- test seam
     # Control readiness checks and clocks at their owning module.
     wait as wait_module,
 )

@@ -12,7 +12,7 @@ from browserrig.choreography import (
     WorkPhase,
     WorkPresentedEvent,
 )
-from browserrig.choreography.status import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.choreography.status import (  # smelt: ignore[ARC007] -- test seam
     # Test status projection independently of plugin activation.
     ProjectStatus,
 )

@@ -15,6 +15,8 @@
   actions or methods so aliases keep the same behavior.
 - Track activity from the moment a paused session reopens and include the
   session's native model request count in terminal turn summaries.
+- Pin the development checks to Smelt 0.14.0 and migrate the rule policy,
+  inline suppressions, editor schema and bundled skill.
 
 ## 0.11.1 (2026-11-21)
 

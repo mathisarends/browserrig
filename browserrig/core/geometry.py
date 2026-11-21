@@ -1,3 +1,5 @@
+"""Coordinate types and transforms between frames and captured images."""
+
 from __future__ import annotations
 
 from collections.abc import Callable

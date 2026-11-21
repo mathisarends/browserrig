@@ -33,7 +33,7 @@ from harnessed.models import (
 from harnessed.testing import ScriptedModel
 
 from browserrig.activity import Activity, ActivityKind, ActivityOutcome
-from browserrig.activity.models import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.activity.models import (  # smelt: ignore[ARC007] -- test seam
     # Test interval matching without making projection helpers public API.
     ActivityKey,
     project_intervals,

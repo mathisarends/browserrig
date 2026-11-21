@@ -1,3 +1,5 @@
+"""Model capability profiles and defaults used by agent configuration."""
+
 from dataclasses import dataclass
 
 

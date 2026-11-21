@@ -44,7 +44,7 @@ can affect unchanged modules. Keep `always_run: true` in local hook definitions
 when using [shared configuration](configuration.md#shared-local-policy).
 
 Install [prek](https://prek.j178.dev/installation/) and add the hook to
-`.pre-commit-config.yml`:
+`.pre-commit-config.yaml`:
 
 ```yaml
 repos:
@@ -54,7 +54,7 @@ repos:
         name: smelt (new staged findings)
         entry: smelt check --staged --fail-on warning
         language: python
-        additional_dependencies: [smelt-cli==0.13.0]
+        additional_dependencies: [smelt-cli==0.14.0]
         pass_filenames: false
         always_run: true
         require_serial: true
@@ -70,19 +70,30 @@ new warnings and errors. It also runs with `--all-files`, but still checks the
 index; run `smelt check` separately for a full working-tree check. Other hooks
 can modify files; inspect their changes, rerun and stage the result.
 
+For most projects, run the staged hook on each commit and the full check in CI.
+A staged policy or API edit can introduce a finding in an unchanged caller, so
+the hook compares findings across the project. If every existing warning must
+block each commit, use the published `id: smelt` with `args: [--fail-on, warning]`
+or change the local hook entry above to `smelt check --fail-on warning`. Keep
+`pass_filenames: false` and `always_run: true` for both policies. To estimate
+latency for your project, measure a full check after an API edit as well as an
+identical retry. The [full-policy edit benchmark](https://github.com/mathisarends/smelt/blob/ceadc918696dbe4b11c9e9f0d1d6240977161c6a/docs/benchmarks/full-policy-edit-2026-11-19.json)
+records these workloads on the Smelt corpus.
+
 Projects already depending on Smelt can instead use a local `language: system`
 hook with `entry: uv run --locked smelt check --staged --fail-on warning`.
 To install from source, use `repo: https://github.com/mathisarends/smelt`,
-`rev: v0.13.0` and `id: smelt-staged` (or `id: smelt` for full checks). This source
+`rev: v0.14.0` and `id: smelt-staged` (or `id: smelt` for full checks). This source
 installation requires Rust 1.88+ and a platform linker. Use the release's
 matching `v`-prefixed Git tag. See the [agent workflow](https://github.com/mathisarends/smelt/blob/main/docs/agent-workflow.md) for
 cache behavior and limitations. Smelt's disposable `.smelt_cache/` creates its
 own `.gitignore`; cache files should not enter commits.
 
 prek uses the [pre-commit hook format](https://pre-commit.com/#creating-new-hooks).
-The published `.pre-commit-hooks.yaml` manifest keeps the required filename;
-project configuration uses `.pre-commit-config.yml`. Existing upstream pre-commit
-integrations can continue using the same published hooks.
+The published `.pre-commit-hooks.yaml` manifest keeps the required filename.
+prek and pre-commit both read `.pre-commit-config.yaml`; prek also accepts
+`.yml`. Existing upstream pre-commit integrations can continue using the same
+published hooks.
 
 
 ## GitHub Actions
@@ -94,9 +105,9 @@ Install prek in the CI environment before running it (or use `uvx prek run`).
 ```yaml
 - uses: astral-sh/setup-uv@v7
 - run: prek run --all-files --show-diff-on-failure
-- run: uvx --from smelt-cli==0.13.0 smelt check --format github
+- run: uvx --from smelt-cli==0.14.0 smelt check --format github
 # optional: code scanning
-- run: uvx --from smelt-cli==0.13.0 smelt check --format sarif > smelt.sarif || true
+- run: uvx --from smelt-cli==0.14.0 smelt check --format sarif > smelt.sarif || true
 - uses: github/codeql-action/upload-sarif@v3
   with:
     sarif_file: smelt.sarif

@@ -13,7 +13,7 @@ from harnessed import Agent
 from harnessed.events import ToolCallFinishedEvent
 from harnessed.models import ToolCall, ToolResult, ToolStatus
 
-from browserrig.browser import (  # smelt: ignore[SMT107] -- offline Chrome connection seam
+from browserrig.browser import (  # smelt: ignore[ARC007] -- offline Chrome connection seam
     plugin as chrome_module,
 )
 from evals import analyze, evaluate, report, run, runner

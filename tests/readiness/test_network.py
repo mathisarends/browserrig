@@ -10,11 +10,11 @@ from cdpify.domains.network import (
 )
 
 from browserrig import NetworkQuiet, ReadinessContext, ReadinessOptions, wait_for_page
-from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.browser import (  # smelt: ignore[ARC007] -- test seam
     # Control the network clock and test request bookkeeping directly.
     network as network_module,
 )
-from browserrig.browser.network import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.browser.network import (  # smelt: ignore[ARC007] -- test seam
     # Control the network clock and test request bookkeeping directly.
     NetworkActivity,
 )

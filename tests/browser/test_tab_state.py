@@ -20,14 +20,14 @@ from harnessed.testing import ScriptedModel
 
 from browserrig import TabStrip as TabStripPlugin
 from browserrig.browser import Tab, TabChanged
-from browserrig.browser.favicon import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.browser.favicon import (  # smelt: ignore[ARC007] -- test seam
     # Test favicon loading failures independently of a browser session.
     load_favicon,
 )
 from browserrig.core import MouseEventKind, Point
 from browserrig.events import TabUpdatedEvent
 from browserrig.scripts import TabStrip
-from browserrig.tools.navigation import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.tools.navigation import (  # smelt: ignore[ARC007] -- test seam
     # Test address normalization without executing navigation.
     site_url,
     typed_address,
