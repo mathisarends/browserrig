@@ -73,7 +73,7 @@ async def test_explicit_device_services_work_independently(mouse):
             assert target.keys == ["Enter", "Enter"]
             with pytest.raises(BrowserError, match="does not support touch"):
                 await session.scope[Touch].tap(Point(x=10, y=10))
-            assert target.mouse == []
+            assert not target.mouse
 
 
 async def test_initial_focus_is_synchronized_and_closed_targets_are_forgotten():
