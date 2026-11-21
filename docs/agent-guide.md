@@ -284,6 +284,16 @@ pass `state=SessionState.from_json(saved)` to `run()` or `session()`.
 The [session-store example](../examples/session_store.py) shows how to persist and
 reopen sessions.
 
+### Upgrading from Harnessed 0.24
+
+Harnessed 0.25 gives timeout options explicit units. In custom agent
+compositions, use `AgentLoop(tool_timeout_seconds=...)`,
+`Approvals(timeout_seconds=...)` and
+`MCP(startup_timeout_seconds=..., call_timeout_seconds=...)` with the same values.
+Existing 0.24 session stores can be reopened directly. For custom sandbox
+transports and approval event consumers, see the
+[Harnessed 0.25 upgrade checklist](https://github.com/mathisarends/harnessed/blob/v0.25.0/Changelog.md#upgrade-from-0240).
+
 ### Migrating from Harnessed 0.23
 
 Harnessed 0.24 uses conversation snapshot format 4 and standalone audit envelope
@@ -297,7 +307,7 @@ outer JSON store formats are still 4 and 3, respectively.
    `browser.handoffs`, `browserrig.todos`, and `browserrig.memory` if present.
    Decode each old JSON string to a JSON value and put it under the same key in
    `plugin_values`.
-3. With Harnessed 0.24, load the converted snapshot through
+3. With Harnessed 0.24 or 0.25, load the converted snapshot through
    `SessionState.from_json(payload)` from `harnessed.sessions`, then pass it as
    `state=` when opening a session with a fresh store. Switch live audit readers
    and writers together and keep the old reader for archived audit envelopes.

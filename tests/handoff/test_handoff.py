@@ -279,7 +279,7 @@ async def test_handoff_has_its_own_timeout_and_stops_trailing_tool_calls():
         [batch, "Done"],
         ask,
         timeout_seconds=1,
-        loop=AgentLoop(tool_timeout=0.01),
+        loop=AgentLoop(tool_timeout_seconds=0.01),
     )
     async with agent.session() as session:
         _prepare(holder)
