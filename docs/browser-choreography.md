@@ -137,7 +137,8 @@ while the agent runs. For example, the application can pass each image to a
 viewer using `frame.mime_type` and the base64 string in `frame.data`.
 
 ```python
-from browserrig import Agent, Screencast
+from browserrig import Agent
+from browserrig.screencast import Screencast
 
 agent = Agent(model=model, plugins=[Screencast(max_width=960, max_height=600)])
 

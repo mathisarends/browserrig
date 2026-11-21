@@ -1,7 +1,6 @@
 import asyncio
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager, suppress
-from dataclasses import dataclass, field
 from typing import Literal
 
 from cdpify import CDPError
@@ -14,17 +13,9 @@ from browserrig.browser import Browser, Tab
 from browserrig.core import BrowserError, Options
 from browserrig.events import TabActivatedEvent, TabClosedEvent
 
+from .models import ScreencastFrame
+
 type _ImageFormat = Literal["jpeg", "png"]
-
-
-@dataclass(frozen=True, slots=True)
-class ScreencastFrame:
-    """A base64-encoded viewport image with its tab and Chrome's Unix timestamp."""
-
-    target_id: str
-    data: str = field(repr=False)
-    mime_type: str
-    timestamp_seconds: float | None
 
 
 class _Settings(Options):
