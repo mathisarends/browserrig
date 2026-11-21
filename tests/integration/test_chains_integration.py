@@ -16,6 +16,7 @@ from browserrig import (
     Chrome,
     PageReadiness,
     ReadinessOptions,
+    wait_for_page,
 )
 from browserrig.events import ActionFinishedEvent, ObservationCapturedEvent
 from browserrig.kinds import ActionKind
@@ -117,6 +118,62 @@ async def test_typing_without_clear_verifies_insertion_at_the_current_selection(
     assert all(
         reply.status is ToolStatus.OK and not reply.break_chain for reply in replies
     )
+
+
+@pytest.mark.parametrize(
+    ("handler", "expected_value", "submit", "message"),
+    [
+        pytest.param("", "person", True, "Enter pressed", id="submit"),
+        pytest.param(
+            "this.value=this.value.toUpperCase()",
+            "PERSON",
+            False,
+            "field value differs",
+            id="field-value-changed",
+        ),
+        pytest.param(
+            "document.querySelector('#suggestions').hidden=false",
+            "person",
+            False,
+            "New interactive elements",
+            id="suggestions-appear",
+        ),
+        pytest.param(
+            "if(this.value==='person') document.querySelector('#password').focus()",
+            "person",
+            False,
+            "lost focus",
+            id="focus-lost-after-last-character",
+        ),
+    ],
+)
+async def test_type_text_with_enter_submits_only_when_ready(
+    site, handler, expected_value, submit, message
+):
+    markup = f'<form onsubmit="event.preventDefault()">{_FORM}</form>'.replace(
+        "<input id=email>", f'<input id=email oninput="{handler}">'
+    )
+    markup += "<div id=suggestions hidden><button>Suggested address</button></div>"
+    values, replies, _, _ = await _run(
+        site,
+        markup,
+        lambda refs: [
+            (
+                "type_text",
+                {"ref": refs["Email"], "text": "person", "press_enter_after": True},
+            ),
+            ("type_text", {"ref": refs["Password"], "text": "skipped"}),
+        ],
+    )
+    assert values == {
+        "email": expected_value,
+        "password": "",
+        "clicked": "yes" if submit else None,
+    }
+    assert replies[0].status is ToolStatus.OK and replies[0].break_chain
+    assert message in replies[0].text
+    assert ("Enter was not pressed" in replies[0].text) is not submit
+    assert replies[1].status is ToolStatus.SKIPPED
 
 
 async def test_hover_reveals_menu_without_dispatching_click(site):
@@ -310,9 +367,9 @@ async def _run(site, markup, plan):
             browser = self._setup_browser
             observe = self._setup_observe
             holder.update(browser=browser, observe=observe)
-            await evaluate(
-                browser.active_tab, f"document.body.innerHTML={json.dumps(markup)}"
-            )
+            tab = browser.active_tab
+            await wait_for_page(tab)
+            await evaluate(tab, f"document.body.innerHTML={json.dumps(markup)}")
 
         @hook(ObservationCapturedEvent)
         async def observed(self, event: ObservationCapturedEvent):
