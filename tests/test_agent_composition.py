@@ -90,11 +90,11 @@ async def test_facade_renders_complete_blocks_in_plugin_list_order(completion_la
     assert headings == [
         "## Browser observations",
         "## Browser content and action results",
+        "## Screenshot coordinates",
         "## Browser screenshots",
         "## Page elements",
         "## Element references",
         "## Screenshot marks",
-        "## Screenshot coordinates",
         "## Browser action chains",
         "## Multiple browser tabs",
         "## Browser navigation and web search",
@@ -122,8 +122,8 @@ async def test_facade_prompt_follows_removals_and_replacements():
     assert "The file system observation identifies" not in rendered
     assert "Form filling" not in rendered
     assert (
-        rendered.index("Browser screenshots")
-        < rendered.index("Screenshot coordinates")
+        rendered.index("Screenshot coordinates")
+        < rendered.index("Browser screenshots")
         < rendered.index("Browser action chains")
     )
 

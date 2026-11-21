@@ -41,7 +41,9 @@ from .tools import (
     KeyboardTools,
     NavigationTools,
     PageSearchTools,
+    PointerDragTools,
     PointerTools,
+    ReferenceDragTools,
     ReferencePointerTools,
     ScreenshotTools,
     TabTools,
@@ -180,10 +182,10 @@ def _browser_defaults(browser: Chrome | None) -> list[Plugin]:
         # Reads pages into controls with refs and prose; screenshots label those refs.
         DomPage(),
         SetOfMarks(),
-        # Explain screenshot coordinates before the chains that refer to them.
-        # Harnessed resolves setup dependencies independently of prompt order.
         PointerTools(),
+        PointerDragTools(),
         ReferencePointerTools(),
+        ReferenceDragTools(),
         Actions(chain_policy=DomActionChains()),
         MultiTab(),
         NavigationTools(),

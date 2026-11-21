@@ -413,6 +413,36 @@ async def test_failed_native_drag_cancellation_still_releases_mouse_button():
     assert commands[-1]["buttons"] == 0
 
 
+async def test_drag_dispatches_the_motor_route_with_the_button_held(monkeypatch):
+    sleep = AsyncMock()
+    monkeypatch.setattr(mouse_module.asyncio, "sleep", sleep)
+    devices, _tab, _events, commands = _rig()
+    devices.pace(_DragDetour())
+
+    await devices.mouse.drag(start=Point(x=10, y=10), end=Point(x=100, y=70))
+
+    pressed = next(c for c in commands if c["type"] == "mousePressed")
+    assert (pressed["x"], pressed["y"], pressed["buttons"]) == (10, 10, 1)
+    held = [
+        (c["x"], c["y"]) for c in commands if c["type"] == "mouseMoved" and c["buttons"]
+    ]
+    assert len(held) == 7
+    assert held[2] == (100, 10) and held[-2:] == [(100, 70), (100, 70)]
+    assert [call.args[0] for call in sleep.await_args_list] == pytest.approx([0.03] * 3)
+    released = commands[-1]
+    assert released["type"] == "mouseReleased" and released["buttons"] == 0
+    assert (released["x"], released["y"]) == (100, 70)
+
+
+class _DragDetour(Instant):
+    def drag_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
+        corner = Point(x=destination.x, y=start.y)
+        return (
+            CursorPath.curved(start, corner, 0.09),
+            CursorPath.curved(corner, destination, 0),
+        )
+
+
 def _rest(devices, tab, point):
     rest = devices.mouse._rest(tab)
     rest.position, rest.placed = point, True

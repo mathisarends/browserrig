@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from typing import Protocol
 
 from browserrig.core import Aim, Point
-from browserrig.input import CursorPath, KeyStroke, Motor, WheelStep
+from browserrig.input import CursorPath, KeyStroke, Motor, WheelStep, plan_drag
 
 
 class KeystrokePlanner(Protocol):
@@ -46,6 +46,9 @@ class _PlannedMotor:
 
     def pointer_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
         return self._pointer_route(start, destination)
+
+    def drag_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
+        return plan_drag(self._base, start, destination)
 
     def aim_fractions(self, target_width: float, target_height: float) -> Aim:
         return self._base.aim_fractions(target_width, target_height)

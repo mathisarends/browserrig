@@ -1,7 +1,17 @@
 from browserrig.browser import Tab
-from browserrig.core import Generation, StaleElement
+from browserrig.core import BrowserError, Generation, Point, StaleElement
 
 from .models import CapturedImage, Snapshot
+
+
+def viewport_point(source: Snapshot | CapturedImage, point: Point) -> Point:
+    """Map a point in the observed image or viewport to viewport CSS pixels."""
+    if source.geometry is not None:
+        x, y = source.geometry.point(point.x, point.y)
+        return Point(x=x, y=y)
+    if point.x >= source.width or point.y >= source.height:
+        raise BrowserError("Point is outside the observed viewport")
+    return point
 
 
 def check_observation(

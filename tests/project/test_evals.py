@@ -52,11 +52,11 @@ move_mouse click_at drag_at hover click drag
 """
 _SHARED_PROMPT_SECTIONS = (
     "Browser content and action results",
+    "Screenshot coordinates",
     "Browser screenshots",
     "Page elements",
     "Element references",
     "Screenshot marks",
-    "Screenshot coordinates",
     "Browser action chains",
     "Multiple browser tabs",
     "Browser navigation and web search",

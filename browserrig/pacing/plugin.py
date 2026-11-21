@@ -9,7 +9,7 @@ from .planners import KeystrokePlanner, PointerRoutePlanner, compose
 class InputPacing(Plugin, slot="browserrig.pacing"):
     """Operate the browser's mouse and keyboard through a `Motor`.
 
-    The default motor types, moves the pointer and scrolls at a person's pace.
+    The default motor types, moves the pointer, drags and scrolls at a person's pace.
     Override individual plans with `keystrokes` and `pointer_route`.
     Pass another motor to change how input is performed; without this plugin it
     runs at full speed.

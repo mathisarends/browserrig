@@ -69,14 +69,12 @@ async def test_drag_pointer_and_html5_transfer(site, native, coordinates):
             return {
                 "start": {"x": 70, "y": y},
                 "end": {"x": 350, "y": y},
-                "duration_seconds": 0.1,
             }
         prefix = "Native" if native else "Pointer"
         refs = {e["name"]: e["ref"] for e in state["elements"]}
         return {
             "source_ref": refs[f"{prefix} source"],
             "target_ref": refs[f"{prefix} target"],
-            "duration_seconds": 0.1,
         }
 
     state = await _perform(site, "drag_at" if coordinates else "drag", arguments)
@@ -105,9 +103,7 @@ async def test_drag_uses_browser_behavior_for_draggable_ancestor(site, prevented
         assert (
             await evaluate(tab, "document.elementFromPoint(70, 140).draggable") is False
         )
-        await devices.mouse.drag(
-            start=Point(x=70, y=140), end=Point(x=350, y=140), duration_seconds=0.1
-        )
+        await devices.mouse.drag(start=Point(x=70, y=140), end=Point(x=350, y=140))
         assert await evaluate(tab, "window.dragStarts") == 1
         assert await evaluate(tab, "window.nativeDrop") == (
             "" if prevented else "payload"

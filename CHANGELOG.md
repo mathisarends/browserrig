@@ -8,6 +8,10 @@
   Existing session stores require a snapshot export and import into a fresh
   store. Conversation snapshots use format 4 and standalone audit envelopes use
   version 8. See the [session migration guide](docs/agent-guide.md#migrating-from-harnessed-023).
+- In explicit compositions, add `PointerDragTools()` for `drag_at` and
+  `ReferenceDragTools()` for `drag`. The standard agent includes both. The drag
+  tools take only the endpoints. The input motor plans the timing, and direct
+  Python calls to `Input.mouse.drag()` can still specify `duration_seconds`.
 
 ### Changed
 

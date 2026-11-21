@@ -16,7 +16,9 @@ from browserrig import (
     KeyboardTools,
     PageReadiness,
     PageSearchTools,
+    PointerDragTools,
     PointerTools,
+    ReferenceDragTools,
     ReferencePointerTools,
     Screenshots,
     ScreenshotTools,
@@ -54,7 +56,7 @@ async def test_observation_guidance_works_without_browser_tools():
     "extension,expected",
     [
         (None, set()),
-        (ReferencePointerTools(), {"click", "hover", "drag"}),
+        (ReferencePointerTools(), {"click", "hover"}),
         (DomTypingTools(), {"type_text"}),
         (DomScrollTools(), {"scroll_page", "scroll_element"}),
         (FormTools(), {"select_option", "select_options", "set_date"}),
@@ -87,7 +89,7 @@ async def test_tools_are_exposed_only_by_the_selected_capability_plugin(
             info = session.scope[ToolRegistry].plan(ToolCall("screenshot", {})).tool
             assert set(info.definition.parameters["properties"]) == {"region"}
             assert not info.definition.parameters.get("required")
-        assert names == {"send_keys", "click_at", "move_mouse", "drag_at"} | expected
+        assert names == {"send_keys", "click_at", "move_mouse"} | expected
     assert not model.requests
 
 
@@ -104,13 +106,42 @@ async def test_screenshot_only_pointer_tools_have_required_coordinates():
         ],
     )
     async with agent.session() as session:
-        assert set(session.tools) == {"click_at", "drag_at", "move_mouse"}
+        assert set(session.tools) == {"click_at", "move_mouse"}
         parameters = session.tools["move_mouse"].parameters
         assert set(parameters["properties"]) == {"x", "y"}
         assert set(parameters["required"]) == {"x", "y"}
         assert all(
             field["type"] == "number" for field in parameters["properties"].values()
         )
+
+
+@pytest.mark.parametrize(
+    ("plugin", "name", "endpoints"),
+    [
+        (PointerDragTools(), "drag_at", {"start", "end"}),
+        (ReferenceDragTools(), "drag", {"source_ref", "target_ref"}),
+    ],
+)
+async def test_drag_plugins_register_without_other_pointer_tools(
+    plugin, name, endpoints
+):
+    agent = Agent(
+        model=ScriptedModel([]),
+        plugins=[
+            FakeChrome({}),
+            PageReadiness(),
+            BrowserPerception(text=None),
+            Actions(),
+            *([Targeting()] if isinstance(plugin, ReferenceDragTools) else []),
+            plugin,
+        ],
+    )
+    async with agent.session() as session:
+        assert set(session.tools) == {name}
+        parameters = session.tools[name].parameters
+        assert set(parameters["properties"]) == set(parameters["required"]) == endpoints
+        prompt = await session.prompt.render()
+        assert prompt.count("Without an image, use viewport CSS pixels.") == 1
 
 
 @pytest.mark.parametrize("pixels", [False, True])

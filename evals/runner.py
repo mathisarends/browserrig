@@ -46,7 +46,9 @@ from browserrig import (
     Nudges,
     PageReadiness,
     PageSearchTools,
+    PointerDragTools,
     PointerTools,
+    ReferenceDragTools,
     ReferencePointerTools,
     Runtime,
     Screenshots,
@@ -314,7 +316,9 @@ def _browser_tools(observation: ObservationOptions) -> list[Plugin]:
     text = observation.text
     return [
         PointerTools(),
+        PointerDragTools(),
         ReferencePointerTools(),
+        ReferenceDragTools(),
         Actions(chain_policy=DomActionChains()) if text else Actions(),
         MultiTab(),
         NavigationTools(),

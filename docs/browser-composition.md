@@ -74,6 +74,7 @@ from browserrig import (
     InputRuntime,
     KeyboardTools,
     PageReadiness,
+    PointerDragTools,
     PointerTools,
     Runtime,
     Screenshots,
@@ -93,6 +94,7 @@ agent = Agent(
         Screenshots(trigger=ScreenshotTrigger.EACH_STEP),
         Actions(),
         PointerTools(),
+        PointerDragTools(),
         KeyboardTools(),
     ],
 )
@@ -101,8 +103,8 @@ agent = Agent(
 `Runtime`, `Chrome`, `InputRuntime` and `PageReadiness` provide the browser,
 devices and readiness checks. Without a page model, perception reads only page
 metadata and skips DOM extraction. `Actions` coordinates tool execution.
-`PointerTools` uses screenshot coordinates and `KeyboardTools` sends keys to
-the focused control.
+`PointerTools` and `PointerDragTools` use screenshot or viewport coordinates.
+`KeyboardTools` sends keys to the focused control.
 `SingleTab` keeps the session in one tab. Add input pacing and viewer plugins
 where the application needs them. Configure [Harnessed approvals](agent-guide.md#configure-an-agent)
 for tools with side effects.
@@ -124,7 +126,9 @@ from browserrig import (
     MultiTab,
     NavigationTools,
     PageReadiness,
+    PointerDragTools,
     PointerTools,
+    ReferenceDragTools,
     ReferencePointerTools,
     Runtime,
     Screenshots,
@@ -148,7 +152,9 @@ agent = Agent(
         Actions(),
         Targeting(),
         PointerTools(),
+        PointerDragTools(),
         ReferencePointerTools(),
+        ReferenceDragTools(),
         KeyboardTools(),
         NavigationTools(),
         TabTools(),
@@ -176,18 +182,18 @@ precedence. Removing that plugin restores navigation's default while
 
 ## Choose pointer tools
 
-`PointerTools()` provides `click_at`, `drag_at` and `move_mouse(x, y)`. It
-uses screenshot or viewport geometry and works without a page model or
-`Targeting()`.
+`PointerTools()` provides `click_at` and `move_mouse(x, y)`. Add
+`PointerDragTools()` for `drag_at(start, end)`. Both plugins use screenshot or
+viewport geometry and work without a page model or `Targeting()`.
 
-Add `Targeting()` and `ReferencePointerTools()` for `click(ref)`,
-`drag(source_ref, target_ref)` and `hover(ref)`. These tools work with
-`DomPage()` and [custom page models](#custom-page-models)
-that resolve their own refs.
+Use `ReferencePointerTools()` for `click(ref)` and `hover(ref)`, and
+`ReferenceDragTools()` for `drag(source_ref, target_ref)`. Both use
+`Targeting()` and work with `DomPage()` and
+[custom page models](#custom-page-models) that resolve their own refs.
 
-`browserrig.Agent` includes both pointer plugins. For a screenshot-only
-configuration of the standard agent, pass `without=(ReferencePointerTools,)`
-with your screenshot perception.
+`browserrig.Agent` includes all four plugins. For a screenshot-only
+configuration of the standard agent, pass
+`without=(ReferencePointerTools, ReferenceDragTools)` with your screenshot perception.
 
 ## Choose tab behavior
 
@@ -588,8 +594,8 @@ provide separate DOM capabilities. Tools that take DOM refs require
 
 ## Browser-owned presentation
 
-`InputPacing` installs a `Motor` controlling keystrokes, pointer routes and wheel
-steps. Without it, `Instant` dispatches a wheel gesture in one event without a
+`InputPacing` installs a `Motor` controlling keystrokes, pointer and drag routes,
+and wheel steps. Without it, `Instant` dispatches a wheel gesture in one event without a
 pause. `HumanMotor` supplies a smooth wheel plan; use
 `InputPacing(HumanMotor(scroll_speed=0.5))` for half the default scroll speed
 (`HumanMotor` is imported from `browserrig.input`). Custom motors implement
@@ -597,8 +603,15 @@ pause. `HumanMotor` supplies a smooth wheel plan; use
 CSS-pixel deltas and `delay_before_seconds`. Their deltas must total the requested
 distance; the mouse executes their timing without selecting its own scroll curve.
 
+Custom motors can supply `drag_route(start, destination)` with consecutive
+`CursorPath` strokes for the movement with the primary button pressed. A motor
+without a drag planner gets a straight half-second route. `Instant` runs the
+drag steps without pauses. Direct Python callers can use
+`Input.mouse.drag(start=..., end=..., duration_seconds=...)` for a linear drag
+of an explicit duration.
+
 Override either planner or both with callables. The base motor supplies the
-other behaviors, including aiming, wheel steps, press duration and landing.
+other behaviors, including drag routes, aiming, wheel steps, press duration and landing.
 The default base is `HumanMotor()`.
 
 ```python

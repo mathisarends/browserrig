@@ -34,7 +34,7 @@ from .references import (
 from .request import CaptureRequest
 from .retention import ImageRetention, TrimInBatches, UntilCompaction
 from .screenshots import Screenshots
-from .validity import check_coordinates, check_observation
+from .validity import check_coordinates, check_observation, viewport_point
 
 __all__ = [
     "BrowserPerception",
@@ -78,4 +78,5 @@ __all__ = [
     "check_coordinates",
     "check_observation",
     "header",
+    "viewport_point",
 ]

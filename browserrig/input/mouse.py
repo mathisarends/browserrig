@@ -1,9 +1,9 @@
 import asyncio
 import math
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Iterator, Sequence
 from dataclasses import dataclass, field
 from time import monotonic
-from typing import Literal
+from typing import Literal, NamedTuple
 
 from harnessed.tracing import traced
 
@@ -26,7 +26,7 @@ from browserrig.events import (
     ScrollStartedEvent,
 )
 
-from .motor import Motor
+from .motor import Motor, plan_drag
 from .pointer import CursorPath
 from .presenter import Presenter
 from .target import Focus, InputTarget, MouseButton, focused
@@ -45,6 +45,11 @@ class _Rest:
     # Last CSS cursor reported to viewers; None until the page has been asked.
     style: CursorStyle | None = None
     placed: bool = False
+
+
+class _DragStep(NamedTuple):
+    point: Point
+    delay_after_seconds: float
 
 
 class Mouse:
@@ -178,12 +183,19 @@ class Mouse:
         *,
         start: Point,
         end: Point,
-        duration_seconds: float,
+        duration_seconds: float | None = None,
     ) -> None:
-        """Let the browser handle the drag gesture; always release the left button."""
+        """Drag with the motor's route or a linear path for an explicit duration."""
         distance = math.hypot(end.x - start.x, end.y - start.y)
         if distance < 1:
             raise BrowserError("Drag source and destination must be different")
+        if duration_seconds is None:
+            route = _joined(plan_drag(self._motor(), start, end), start, end)
+            moves = _drag_steps(route)
+        else:
+            if not math.isfinite(duration_seconds) or duration_seconds < 0:
+                raise BrowserError("Drag duration must be finite and non-negative")
+            moves = _linear_drag_steps(start, end, duration_seconds)
         target = focused(self._focus)
         await self._move(target, start)
         current = start
@@ -192,15 +204,11 @@ class Mouse:
                 target, MouseEventKind.PRESSED, start, buttons=1, click_count=1
             )
             # CDP's mouse input handles native drag-and-drop as well as pointer gestures.
-            steps = max(3, math.ceil(duration_seconds * 30))
-            for index in range(1, steps + 1):
-                fraction = index / steps
-                current = Point(
-                    x=start.x + (end.x - start.x) * fraction,
-                    y=start.y + (end.y - start.y) * fraction,
-                )
+            for move in moves:
+                current = move.point
                 await self._dispatch(target, MouseEventKind.MOVED, current, buttons=1)
-                await asyncio.sleep(duration_seconds / steps)
+                if move.delay_after_seconds:
+                    await asyncio.sleep(move.delay_after_seconds)
             # Entering the drop target may only fire dragenter. Move again there so
             # its dragover handler can accept the drop before the button is released.
             await self._dispatch(target, MouseEventKind.MOVED, end, buttons=1)
@@ -375,6 +383,26 @@ class Mouse:
         return self._rests.setdefault(target.id, _Rest())
 
 
+def _drag_steps(route: Sequence[CursorPath]) -> Iterator[_DragStep]:
+    for path in route:
+        steps = max(3, math.ceil(path.duration_seconds * 30))
+        for index in range(1, steps + 1):
+            yield _DragStep(path.point(index / steps), path.duration_seconds / steps)
+
+
+def _linear_drag_steps(
+    start: Point, end: Point, duration_seconds: float
+) -> Iterator[_DragStep]:
+    steps = max(3, math.ceil(duration_seconds * 30))
+    for index in range(1, steps + 1):
+        fraction = index / steps
+        point = Point(
+            x=start.x + (end.x - start.x) * fraction,
+            y=start.y + (end.y - start.y) * fraction,
+        )
+        yield _DragStep(point, duration_seconds / steps)
+
+
 def _wheel_plan(
     plan: Sequence[WheelStep], *, delta_x: float, delta_y: float
 ) -> tuple[WheelStep, ...]:
@@ -403,6 +431,9 @@ def _joined(
             raise BrowserError(
                 "Each stroke of a pointer route starts where the last ended"
             )
-    if any(path.duration_seconds < 0 for path in strokes):
-        raise BrowserError("Pointer strokes must not have a negative duration")
+    if any(
+        not math.isfinite(path.duration_seconds) or path.duration_seconds < 0
+        for path in strokes
+    ):
+        raise BrowserError("Pointer strokes must have a finite, non-negative duration")
     return strokes
