@@ -23,6 +23,9 @@ if TYPE_CHECKING:
     from .base import EventSink
 
 _TARGET_SETUP_SECONDS = 10
+_DOCUMENT_TYPES = ("page", "iframe")
+_WORKER_TYPES = ("worker", "shared_worker", "service_worker")
+_TARGET_FILTER = [FilterEntry(type=kind) for kind in (*_DOCUMENT_TYPES, *_WORKER_TYPES)]
 
 
 class NavigationGuard:
@@ -73,7 +76,7 @@ class NavigationGuard:
             auto_attach=True,
             wait_for_debugger_on_start=True,
             flatten=True,
-            filter=[FilterEntry(type="page"), FilterEntry(type="iframe")],
+            filter=_TARGET_FILTER,
         )
 
     async def check(self, url: str, target_id: str = "") -> None:
@@ -126,12 +129,18 @@ class NavigationGuard:
                 ready.set()
 
     async def _attached(self, event: AttachedToTargetEvent, parent: str | None) -> None:
-        if (
-            parent is not None and parent not in self._sessions
-        ) or event.target_info.type not in {"page", "iframe"}:
+        if parent is not None and parent not in self._sessions:
             return
-        cdp = self._client.session(event.session_id)
         info = event.target_info
+        cdp = self._client.session(event.session_id)
+        if info.type in _WORKER_TYPES:
+            # Chrome can pause workers of guarded frames until we explicitly resume them.
+            await cdp.runtime.run_if_waiting_for_debugger()
+            owner = self._client if parent is None else self._client.session(parent)
+            await owner.target.detach_from_target(session_id=event.session_id)
+            return
+        if info.type not in _DOCUMENT_TYPES:
+            return
         target_id = info.target_id
         controlled = parent in self._sessions or (
             info.browser_context_id == self._context
@@ -157,7 +166,7 @@ class NavigationGuard:
             auto_attach=True,
             wait_for_debugger_on_start=True,
             flatten=True,
-            filter=[FilterEntry(type="page"), FilterEntry(type="iframe")],
+            filter=_TARGET_FILTER,
         )
         await cdp.runtime.run_if_waiting_for_debugger()
         self._ready.setdefault(target_id, asyncio.Event()).set()

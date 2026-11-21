@@ -188,9 +188,9 @@ async def test_without_policy_browsing_is_unrestricted(guarded_site):
     assert any("Host: localhost:" in request for request in requests)
 
 
-async def test_cross_process_frame_cannot_navigate_to_a_denied_domain(guarded_site):
-    allowed, child, requests, blocked, receipts, emit = guarded_site
-    denied = allowed.replace("127.0.0.1", "127.0.0.2")
+@pytest.fixture(name="guarded_frame")
+async def _guarded_frame(guarded_site):
+    allowed, child, _, _, _, emit = guarded_site
     async with ChromeBrowser(
         Launch(url=allowed, arguments=("--site-per-process",)),
         navigation_policy=AllowedDomains(("127.0.0.1", "localhost")),
@@ -207,10 +207,32 @@ async def test_cross_process_frame_cannot_navigate_to_a_denied_domain(guarded_si
         frames = await tab.frames()
         assert len(frames) == 2
         assert frames[0].cdp.session_id != frames[1].cdp.session_id
-        await evaluate(frames[1], f"location.href = '{denied}'")
-        await asyncio.wait_for(blocked.wait(), timeout=5)
-        assert receipts[-1].url.startswith(denied)
-        assert all("Host: 127.0.0.2:" not in request for request in requests)
+        yield frames[1]
+
+
+async def test_cross_process_frame_cannot_navigate_to_a_denied_domain(
+    guarded_site, guarded_frame
+):
+    allowed, _, requests, blocked, receipts, _ = guarded_site
+    denied = allowed.replace("127.0.0.1", "127.0.0.2")
+    await evaluate(guarded_frame, f"location.href = '{denied}'")
+    await asyncio.wait_for(blocked.wait(), timeout=5)
+    assert receipts[-1].url.startswith(denied)
+    assert all("Host: 127.0.0.2:" not in request for request in requests)
+
+
+async def test_worker_in_guarded_frame_starts(guarded_frame):
+    async with asyncio.timeout(5):
+        reply = await evaluate(
+            guarded_frame,
+            """new Promise((resolve, reject) => {
+                const script = new Blob(["postMessage('ready')"], {type: 'text/javascript'});
+                const worker = new Worker(URL.createObjectURL(script));
+                worker.onmessage = event => resolve(event.data);
+                worker.onerror = event => reject(new Error(event.message));
+            })""",
+        )
+    assert reply == "ready"
 
 
 @pytest.mark.parametrize("attach", [False, True])
