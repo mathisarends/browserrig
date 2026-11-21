@@ -3,6 +3,7 @@ from browserrig.core import BrowserToolCall, BrowserToolMetadata, browser_tool
 from .chains import ActionChainPolicy, DomActionChains, ObserveAfterInput
 from .dialogs import DialogTools
 from .dom_scroll import DomScrollTools
+from .drag import PointerDragTools, ReferenceDragTools
 from .effects import Effect
 from .execution import Actions, CheckAction
 from .files import BrowserFileTools, DomUploadTools, FileTools
@@ -43,6 +44,8 @@ __all__ = [
     "ScreenshotTools",
     "PointerTools",
     "ReferencePointerTools",
+    "PointerDragTools",
+    "ReferenceDragTools",
     "ActionChainPolicy",
     "DomActionChains",
     "ObserveAfterInput",

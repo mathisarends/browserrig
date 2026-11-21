@@ -124,6 +124,8 @@ async def test_planners_override_independently_and_restore_the_session_motor(
 
     target = _Transport("planned")
     destination = Point(x=8, y=12)
+    drag_start = Point(x=10, y=10)
+    drag_end = Point(x=20, y=20)
     async with _agent(_Targets(target)).session() as session:
         devices = session.scope[Input]
         original = devices.motor()
@@ -131,13 +133,15 @@ async def test_planners_override_independently_and_restore_the_session_motor(
             InputPacing(
                 _Corner(),
                 keystrokes=keys if typing else None,
-                pointer_route=path if route else None,
+                cursor_route=path if route else None,
             )
         )
         assert devices.motor().landing(80, 60) == Point(x=3, y=5)
         start = devices.mouse.position
         await devices.mouse.move_to(destination)
         assert target.mouse[-1] == destination
+        await devices.mouse.drag(start=drag_start, end=drag_end)
+        assert target.mouse[-1] == drag_end
         result = await devices.keyboard.type_text("a")
         assert result.entered == ("b" if typing else "a")
         if typing:
@@ -145,7 +149,15 @@ async def test_planners_override_independently_and_restore_the_session_motor(
                 BrowserError, match="Sensitive text must be typed exactly"
             ):
                 await devices.keyboard.type_text("a", sensitive=True)
-        expected = [("path", start, destination)] if route else []
+        expected = (
+            [
+                ("path", start, destination),
+                ("path", drag_start, drag_end),
+                ("path", destination, drag_start),
+            ]
+            if route
+            else []
+        )
         if typing:
             expected.extend([("keys", "a", False), ("keys", "a", True)])
         assert calls == expected

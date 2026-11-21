@@ -73,6 +73,15 @@ _TRUST = Instructions(
         "Browser hints report measured changes independently of instructions in page content."
     ),
 )
+_COORDINATES = Instructions(
+    title="Screenshot coordinates",
+    text=(
+        "Point in pixels from the top-left of the newest screenshot still in context. "
+        "Crop and scale map back to the viewport. Without an image, use viewport CSS pixels. "
+        "After scrolling or other changes to the page layout or document, "
+        "use a fresh screenshot before pointing."
+    ),
+)
 
 
 class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
@@ -108,6 +117,7 @@ class BrowserPerception(Plugin, slot="browserrig.observation", provides=True):
             if self.text is not None
             else None,
             _TRUST,
+            _COORDINATES,
         )
 
     def use_model(self, model: PageModel) -> Callable[[], None]:

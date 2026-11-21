@@ -1,6 +1,6 @@
 """How fast and in what way the browser's mouse and keyboard are operated."""
 
-from .planners import KeystrokePlanner, PointerRoutePlanner
+from .planners import CursorRoutePlanner, KeystrokePlanner
 from .plugin import InputPacing
 
-__all__ = ["InputPacing", "KeystrokePlanner", "PointerRoutePlanner"]
+__all__ = ["InputPacing", "KeystrokePlanner", "CursorRoutePlanner"]

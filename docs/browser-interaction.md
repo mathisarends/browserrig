@@ -95,15 +95,18 @@ extraction limits are reported.
 Perspective-transformed frames remain unsupported.
 
 Custom page models supply opaque refs through `References`. `ReferencePointerTools`
-resolves their live positions. DOM-specific typing and forms require `ResolveDomElement`.
+and `ReferenceDragTools` resolve their live positions. DOM-specific typing and forms
+require `ResolveDomElement`.
 See [custom page models](browser-composition.md#custom-page-models).
 
 ## Input tools
 
 | Capability | Tools and behavior |
 | --- | --- |
-| `PointerTools` | `click_at(x, y)`, `move_mouse(x, y)`, `drag_at(start, end)` by viewport or image coordinates |
-| `ReferencePointerTools` | `click(ref, count=2)`, `hover(ref)`, `drag(source_ref, target_ref)` by observed element refs |
+| `PointerTools` | `click_at(x, y)` and `move_mouse(x, y)` by viewport or image coordinates |
+| `ReferencePointerTools` | `click(ref, count=2)` and `hover(ref)` by observed element refs |
+| `PointerDragTools` | `drag_at(start, end)` by viewport or image coordinates |
+| `ReferenceDragTools` | `drag(source_ref, target_ref)` by observed element refs |
 | `KeyboardTools` | `send_keys(text="Hello")` types text; `send_keys(key="Enter")` presses a key; modifier flags apply to keys |
 | `DomTypingTools` | `type_text(ref, text, clear=True)` focuses and replaces a DOM field; `clear=False` inserts at its selection |
 | `DomScrollTools` | `scroll_page(delta_y=..., delta_x=...)` moves the document; `scroll_element(ref=..., ...)` moves only that container |

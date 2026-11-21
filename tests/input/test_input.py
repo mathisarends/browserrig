@@ -413,6 +413,24 @@ async def test_failed_native_drag_cancellation_still_releases_mouse_button():
     assert commands[-1]["buttons"] == 0
 
 
+async def test_drag_dispatches_the_cursor_route_with_the_button_held():
+    devices, _tab, _events, commands = _rig()
+    devices.pace(_Detour())
+
+    await devices.mouse.drag(start=Point(x=10, y=10), end=Point(x=100, y=70))
+
+    pressed = next(c for c in commands if c["type"] == "mousePressed")
+    assert (pressed["x"], pressed["y"], pressed["buttons"]) == (10, 10, 1)
+    held = [
+        (c["x"], c["y"]) for c in commands if c["type"] == "mouseMoved" and c["buttons"]
+    ]
+    assert len(held) == 7
+    assert held[2] == (100, 10) and held[-2:] == [(100, 70), (100, 70)]
+    released = commands[-1]
+    assert released["type"] == "mouseReleased" and released["buttons"] == 0
+    assert (released["x"], released["y"]) == (100, 70)
+
+
 def _rest(devices, tab, point):
     rest = devices.mouse._rest(tab)
     rest.position, rest.placed = point, True
@@ -729,7 +747,7 @@ class _SlowMotor:
     ) -> tuple[KeyStroke, ...]:
         return tuple(KeyStroke(key, 0.2) for key in text)
 
-    def pointer_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
+    def cursor_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
         return (CursorPath.curved(start, destination, 1 / 30),)
 
     def wheel_steps(self, *, delta_x: float, delta_y: float) -> tuple[WheelStep, ...]:
@@ -783,7 +801,7 @@ def _clocked(monkeypatch) -> tuple[_Clock, AsyncMock]:
 class _Steady(Instant):
     """One straight stroke of 0.3 seconds, 18 frames at 60 Hz."""
 
-    def pointer_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
+    def cursor_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
         return (CursorPath.curved(start, destination, 0.3, bend=Bend(0, 0)),)
 
 
@@ -846,7 +864,7 @@ class _Detour(Instant):
     def __init__(self, *, hold: float = 0) -> None:
         self._hold = hold
 
-    def pointer_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
+    def cursor_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
         corner = Point(x=destination.x, y=start.y)
         return (
             CursorPath.curved(start, corner, 0),
@@ -860,7 +878,7 @@ class _Detour(Instant):
 class _Gapped(Instant):
     """Lifts the pointer halfway, which no hand can do."""
 
-    def pointer_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
+    def cursor_route(self, start: Point, destination: Point) -> tuple[CursorPath, ...]:
         return (
             CursorPath.curved(start, Point(x=50, y=0), 0),
             CursorPath.curved(Point(x=60, y=0), destination, 0),

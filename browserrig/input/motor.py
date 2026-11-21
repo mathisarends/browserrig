@@ -5,13 +5,14 @@ from typing import Protocol
 
 from browserrig.core import Aim, Point
 
-from .pointer import CursorPath, movement
+from .pointer import Bend, CursorPath, movement
 from .wheel import WheelStep, scrolling
 
 # Seconds between keys a person types, in the page and in the browser's own bars.
 TYPING_INTERVAL_SECONDS = 0.05
 # The middle of a target, as fractions of its visible box.
 CENTER = Aim(0.5, 0.5)
+_STRAIGHT = Bend(0, 0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +25,7 @@ class KeyStroke:
 
 
 class Motor(Protocol):
-    """How the hand moves: typing rhythm, pointer routes, wheel steps, aim and clicks.
+    """How the hand moves: typing rhythm, cursor routes, wheel steps, aim and clicks.
 
     The devices ask it how to perform input; what viewers see is the `Presenter`'s
     concern. Without one, input runs as fast as the page accepts it.
@@ -38,10 +39,11 @@ class Motor(Protocol):
         """
         ...
 
-    def pointer_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
+    def cursor_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
         """Plan consecutive cursor strokes from `start` to `destination`.
 
-        Stroke endpoints must meet; their durations pace native mouse movement.
+        Stroke endpoints must meet. Stroke durations pace both free mouse
+        movement and movement with the primary button held.
         """
         ...
 
@@ -73,8 +75,8 @@ class Instant:
     ) -> Sequence[KeyStroke]:
         return tuple(KeyStroke(key) for key in text)
 
-    def pointer_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
-        return (CursorPath.curved(start, destination, 0),)
+    def cursor_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
+        return (CursorPath.curved(start, destination, 0, bend=_STRAIGHT),)
 
     def wheel_steps(self, *, delta_x: float, delta_y: float) -> Sequence[WheelStep]:
         return (WheelStep(delta_x=delta_x, delta_y=delta_y),)
@@ -92,8 +94,8 @@ class Instant:
 
 
 class HumanMotor:
-    """Input at a person's pace: steady typing, eased pointer paths, smooth wheel
-    gestures and clicks in the middle of a target.
+    """Input at a person's pace: steady typing, eased cursor routes,
+    smooth wheel gestures and clicks in the middle of a target.
 
     `scroll_speed` multiplies wheel speed: 2 halves its duration, 0.5 doubles it.
     """
@@ -113,7 +115,7 @@ class HumanMotor:
     ) -> Sequence[KeyStroke]:
         return tuple(KeyStroke(key, self._typing_interval_seconds) for key in text)
 
-    def pointer_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
+    def cursor_route(self, start: Point, destination: Point) -> Sequence[CursorPath]:
         return (movement(start, destination),)
 
     def wheel_steps(self, *, delta_x: float, delta_y: float) -> Sequence[WheelStep]:
