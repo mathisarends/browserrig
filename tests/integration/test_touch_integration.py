@@ -132,8 +132,8 @@ async def test_touch_session_scrolls_and_fills_form_without_mouse(site, monkeypa
         assert await evaluate(tab, "document.querySelector('#city').value") == "Berlin"
 
 
-async def test_cancelled_swipe_releases_original_touch_contact(site):
-    async with ChromeBrowser(Launch(url=site, session_setup=(Phone(),))) as browser:
+async def test_cancelled_swipe_releases_original_touch_contact():
+    async with ChromeBrowser(Launch(session_setup=(Phone(),))) as browser:
         tab = browser.active_tab
         await evaluate(
             tab,
