@@ -1,6 +1,6 @@
 import pytest
 
-from browserrig.secrets.redaction import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.secrets.redaction import (  # smelt: ignore[ARC007] -- test seam
     # Test redaction of text and pixels independently of plugin activation.
     Redactor,
 )

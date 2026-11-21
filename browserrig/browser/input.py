@@ -105,7 +105,7 @@ class CdpInput:
     ) -> None:
         await self._input(
             self._tab.cdp.input.dispatch_mouse_event(
-                type=MouseEventKind.WHEEL.value,  # smelt: ignore[SMT318] -- cdpify wants a Literal
+                type=MouseEventKind.WHEEL.value,  # smelt: ignore[MOD001] -- cdpify wants a Literal
                 x=point.x,
                 y=point.y,
                 delta_x=delta_x,

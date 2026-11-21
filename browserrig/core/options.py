@@ -1,3 +1,5 @@
+"""Base validation and immutability settings for BrowserRig options."""
+
 from pydantic import BaseModel, ConfigDict
 
 

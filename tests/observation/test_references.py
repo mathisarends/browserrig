@@ -35,7 +35,7 @@ from browserrig.dom import DomContent, Element, Offscreen, render
 from browserrig.events import ActionFailedEvent
 from browserrig.input import Instant
 from browserrig.observation import EmptyReferences, PagePart
-from browserrig.tools.scrolling import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.tools.scrolling import (  # smelt: ignore[ARC007] -- test seam
     # Test reveal preparation independently of tool execution.
     prepare_element,
 )

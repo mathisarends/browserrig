@@ -2,7 +2,7 @@ import pytest
 
 from browserrig import ElementInfo, ElementRef
 from browserrig.dom import ContentGroup, Extraction, Heading, render
-from browserrig.dom.outline import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.dom.outline import (  # smelt: ignore[ARC007] -- test seam
     # Verify outline selection independently of plugin activation.
     outline,
 )

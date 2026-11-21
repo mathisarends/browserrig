@@ -15,7 +15,7 @@ from browserrig.dom import (
     render,
 )
 from browserrig.observation import Snapshot
-from browserrig.observation.models import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.observation.models import (  # smelt: ignore[ARC007] -- test seam
     # Test internal change fingerprints without exposing them as API.
     PageFingerprint,
     TargetFingerprint,

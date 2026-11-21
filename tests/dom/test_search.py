@@ -1,7 +1,7 @@
 import pytest
 
 from browserrig.dom import ExtractedContent, search_content
-from browserrig.dom.search import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.dom.search import (  # smelt: ignore[ARC007] -- test seam
     # Verify search record boundaries independently of page capture.
     records,
 )

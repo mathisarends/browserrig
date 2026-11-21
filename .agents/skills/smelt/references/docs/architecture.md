@@ -4,7 +4,7 @@
 
 
 ```yaml
-version: 1
+version: 2
 project:
   root_packages: [backend, agent]
   source_roots: [backend/src, libs/agent/src]
@@ -15,13 +15,13 @@ architecture:
   shared: [backend.shared, backend.env]  # importable everywhere, imports no feature
   composition_root: [backend.main, backend.app]
   wiring: [backend.features.*.infrastructure.di]
-  modules:                               # packages outside the features
-    backend.platform: infrastructure
-    agent: infrastructure
   layers:
     domain: {path: domain}
     application: {path: application, may_depend_on: [domain]}
-    infrastructure: {path: infrastructure, may_depend_on: [domain, application]}
+    infrastructure:
+      path: infrastructure
+      modules: [backend.platform, agent]  # packages outside the features
+      may_depend_on: [domain, application]
     presentation: {path: presentation, may_depend_on: [application, domain]}
   cross_feature:
     default: deny
@@ -37,15 +37,15 @@ tests:
 - **Layers** hold inside every feature: `domain` must not import `infrastructure`.
 - **Features** may only import each other through `cross_feature.allow`. The string form
   allows a layer pair for all features, the object form one direction between two.
-- **Central packages** such as a platform or a workspace library get a layer under
-  `modules`. The layer rules then apply between them and the features (a feature's domain
+- **Central packages** such as a platform or a workspace library belong in their
+  layer's `modules` list. The layer rules then apply between them and the features (a feature's domain
   must not import `backend.platform`), and they must not import features.
 - **Wiring** modules (whole-segment `*` allowed) keep their feature and layer and may cross
   layer boundaries. Feature wiring may also cross feature boundaries. Composition roots,
   other wiring modules and their package facades may import declared wiring. Central or
   shared wiring keeps the prohibition on importing features.
 - Every module should belong somewhere: an unclassified module is exempt from all
-  layer and feature boundary checks, so SMT305 warns about it. Composition-root/wiring
+  layer and feature boundary checks, so ARC012 warns about it. Composition-root/wiring
   import restrictions and configured cycle checks still apply.
 
 `smelt init` infers most of this: features, layers, shared and settings modules, the
@@ -88,7 +88,7 @@ Direct violations are not repeated as indirect ones for the same target.
 This is a module-graph check: importing one name from a facade also makes the
 facade's other imports reachable. A layer's `may_depend_on` and cross-feature
 allowances must permit all reachable targets when transitive checking is enabled.
-The package's public-entry-point contract ([SMT107](rules/SMT107.md)) still
+The package's public-entry-point contract ([ARC007](rules/ARC007.md)) still
 allows intentional symbol re-exports. External packages are leaves; smelt does
 not inspect their implementation or infer dynamic imports. No `import-linter`
 dependency or separate contracts are needed for these indirect checks.
@@ -108,11 +108,43 @@ is still available and its violation counts are marked unavailable (`violations:
 and `analysis_error` in JSON). Central and wiring modules have explicit JSON flags.
 
 
+## Libraries and mixed package layouts
+
+When a layer spans several packages, declare their fully qualified module names
+in `architecture.layers.<layer>.modules`. A package prefix covers all descendants.
+Use a more specific prefix for a subtree or file that belongs to a different layer.
+
+```yaml
+architecture:
+  layers:
+    values:
+      modules: [sdk.diagnostics, sdk.errors, sdk.error.types]
+    adapters:
+      modules: [sdk.error, sdk.openapi]
+      may_depend_on: [values]
+```
+
+Here `sdk.error.registry` inherits `adapters` from `sdk.error`, and
+`sdk.error.types` belongs to `values`. `path` is optional for layers assigned this
+way. You can set both keys when a layer also has a repeated path inside features.
+Explicit module bindings cover central code outside the feature grid and take
+precedence over relative `path` matching. The most specific prefix wins, and
+conflicting layers for the same prefix are rejected. A child assignment that
+repeats its nearest parent's layer produces an advisory configuration warning.
+
+Before adding a file, run `smelt context sdk/error/registry.py --format json`.
+`layer_assignment` identifies the matching prefix, declaring file, config key
+and whether the assignment was inherited. An inherited match needs no extra YAML.
+When the new code belongs to another layer, add the narrowest intended prefix to
+that layer's `modules` list. Run `smelt check --strict-coverage --fail-on warning`
+to verify placement and import boundaries.
+
 ## Strict policy coverage
 
 
-Enable `project.coverage: strict`, or use `smelt check --strict-coverage`, to fail
-when production source escapes package selection or has no architecture role.
+Enable `architecture/uncovered-source` in the root `rules`, or use
+`smelt check --strict-coverage`, to fail when production source escapes package
+selection or has no architecture role.
 Folder names, layer names and frameworks come from your policy. Flat libraries,
 feature-only architectures and custom layers work without adopting a DDD layout.
 Outside uv workspaces, declare the relevant import roots in `source_roots`.
@@ -126,10 +158,11 @@ in `tool.uv.workspace.exclude` do not hide source from this inventory.
 project:
   root_packages: [backend, client]
   source_roots: [backend/src, libs/client/src]
-  coverage: strict
   exclude:
     - path: "libs/client/src/client/generated/**"
       reason: "Generated SDK; regeneration and drift are checked separately."
+rules:
+  architecture/uncovered-source: error
 ```
 
 Each discovered source has one status:
@@ -162,9 +195,9 @@ and exclusion reason. Text output groups related missing files into one decision
 while JSON retains every path. The text summary also reports incomplete policy
 assignment in `configured` mode, which preserves the existing exit behavior.
 
-Strict coverage findings (`SMT306`) remain errors even in `--changed`, path-scoped
+Strict coverage findings (`ARC013`) remain errors even in `--changed`, path-scoped
 and `--select` runs. Inline/config ignores and debt cannot hide them; disabling or
-demoting SMT306 in strict mode is rejected. Recording or pruning debt requires
+demoting ARC013 in strict mode is rejected. Recording or pruning debt requires
 complete coverage first. Resolve the placement or document a deliberate exclusion.
 
 `smelt context <path> --format json` includes the file's coverage status and policy.

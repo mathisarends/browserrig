@@ -8,14 +8,14 @@ Settle each edge once: fix the code, or record an intended dependency as policy,
 JSON also lists `groups`, sorted by size: a `facade` group collects the indirect
 findings one module relays (its count is what narrowing that facade's exports would
 address), an `edge` group counts `direct` and `transitive` findings of one dependency, a
-`cycle` group carries the witness import path, and a `test_move` group the SMT401 files
+`cycle` group carries the witness import path, and a `test_move` group the TST001 files
 moving between the same directories. Groups cite findings by their `id`; every finding
 stays in `violations`, so a group is one decision, not one more defect.
 
 Accept what remains with a baseline:
 
 `smelt debt` records today's violations in `.smelt/debt.json` and sets `debt:` in
-`smelt.yml`. `smelt check` then fails only on new violations, and SMT903 reports entries
+`smelt.yml`. `smelt check` then fails only on new violations, and MET003 reports entries
 that were fixed and can leave the file (`smelt debt --prune`).
 Existing debt files remain readable. Run `smelt debt --prune` once before editing imports
 covered by an older baseline to upgrade their fingerprints; pruning accepts no new debt.
@@ -47,8 +47,8 @@ documents under `files`, keyed by workspace-relative baseline filename.
 
 New writes use debt JSON version 2. Rule, path, message and an optional definition
 scope appear once per group; `fingerprints` contains every accepted matching token.
-One aggregate finding can have several tokens: SMT109 tracks individual importers,
-SMT313 individual ordering inversions, and SMT104 individual cyclic edges. Repeated
+One aggregate finding can have several tokens: ARC008 tracks individual importers,
+LAY004 individual ordering inversions, and ARC004 individual cyclic edges. Repeated
 fingerprints retain their multiplicity. A group is not a blanket allowance for
 future imports or inversions, and replacing an accepted edge with a new one still
 reports the new edge. Report JSON remains schema 2; configuration remains version 1.
@@ -58,7 +58,7 @@ reports the new edge. Report JSON remains schema 2; configuration remains versio
   "version": 2,
   "violations": [
     {
-      "code": "SMT109",
+      "code": "ARC008",
       "path": "app/browser/base.py",
       "message": "BrowserEvents is missing from the package API",
       "scope": "app.browser.base.BrowserEvents",
@@ -89,10 +89,10 @@ messages and unassessed rules; use `smelt check app/browser --format concise` fo
 current findings. `--show` and `--prune` are mutually exclusive. Paths and `--format`
 are inspection options only, so recording/pruning always assesses the full project.
 
-SMT321 now includes the enclosing function's qualified name in its identity,
+TYP003 now includes the enclosing function's qualified name in its identity,
 distinguishing methods in different classes and nested functions while surviving
 line shifts. A fixed occurrence cannot pay for an identical new occurrence in
-another function. Old unscoped SMT321 fingerprints cannot establish which function
+another function. Old unscoped TYP003 fingerprints cannot establish which function
 was accepted, so those findings require review and explicit re-recording with
 `smelt debt`. `--prune` removes the old tokens without accepting the current findings.
 
@@ -110,8 +110,11 @@ Override severities by rule name or code, e.g. `rules: {architecture/unclassifie
 Silence a single finding inline, always with a reason:
 
 ```python
-from gateway.infra.sql import Repo  # smelt: ignore[SMT101] -- migration tracked in #123
+from gateway.infra.sql import Repo  # smelt: ignore[architecture/layer-boundary] -- migration tracked in #123
 ```
+
+Rule names keep the exception readable in review; stable codes such as `ARC001`
+and code prefixes work too.
 
 Comments within a logical statement cover that statement,
 including its continuation lines, so formatting a long call or signature does

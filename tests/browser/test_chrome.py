@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 from browserrig import ActionContext, ChromeBrowser, SessionSetup, Viewport
 from browserrig.browser import Connect, DownloadState, Launch, Tab
-from browserrig.browser import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.browser import (  # smelt: ignore[ARC007] -- test seam
     # Patch frame discovery where the tab manager looks it up.
     tabs as tabs_module,
 )

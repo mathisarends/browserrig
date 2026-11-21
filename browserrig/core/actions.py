@@ -1,3 +1,5 @@
+"""Context for associating browser events with the current action."""
+
 from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar

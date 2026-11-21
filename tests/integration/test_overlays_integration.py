@@ -28,13 +28,13 @@ from browserrig.browser import Launch, screenshot
 from browserrig.choreography import FindBarEvent, FindResultsEvent
 from browserrig.core import ReadinessStatus
 from browserrig.dom import find_text
-from browserrig.dom.content import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.dom.content import (  # smelt: ignore[ARC007] -- test seam
     # Test document extraction independently of capture strategy.
     extract_content,
 )
 from browserrig.events import KeyPressedEvent
-from browserrig.observation import (  # smelt: ignore[SMT107] -- facade callable
-    # Public facade callable; SMT107 confuses it with the same-named module.
+from browserrig.observation import (  # smelt: ignore[ARC007] -- facade callable
+    # Public facade callable; ARC007 confuses it with the same-named module.
     capture,
 )
 from browserrig.scripts import Script, ScriptArgs

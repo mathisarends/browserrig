@@ -37,7 +37,7 @@ from browserrig import (
     WorkspaceTools,
 )
 from browserrig.input import Instant
-from browserrig.observation import (  # smelt: ignore[SMT319] -- facade identity
+from browserrig.observation import (  # smelt: ignore[IMP004] -- facade identity
     # Compare the two facade exports, not a name with itself.
     BrowserPerception as PerceptionExport,
 )

@@ -1,3 +1,5 @@
+"""Harnessed runtime integration for BrowserRig plugins."""
+
 from harnessed import Plugin
 from harnessed.kernel import PluginScope
 

@@ -1,3 +1,5 @@
+"""Metadata, hooks and registration for browser tools."""
+
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
@@ -121,7 +123,7 @@ def browser_tool[F: Callable[..., Awaitable[object]]](
 class _ToolBinding:
     """Associate mounted methods with their owner scope, including direct calls."""
 
-    needs = ()  # smelt: ignore[SMT335] -- Harnessed's Registration protocol reads this attribute.
+    needs = ()  # smelt: ignore[VIS004] -- Harnessed's Registration protocol reads this attribute.
 
     def __init__(self) -> None:
         self.scopes: WeakKeyDictionary[PluginBase, Scope] = WeakKeyDictionary()

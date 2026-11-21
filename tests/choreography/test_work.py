@@ -2,7 +2,7 @@ from harnessed.models import ToolCall, ToolResult, ToolStatus
 
 from browserrig import ActionKind
 from browserrig.choreography import WorkPhase
-from browserrig.choreography.work import (  # smelt: ignore[SMT107] -- test seam
+from browserrig.choreography.work import (  # smelt: ignore[ARC007] -- test seam
     # Test work-event pairing independently of plugin activation.
     finished,
     started,
